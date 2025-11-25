@@ -1,3 +1,5 @@
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import { connection } from "../../../redis";
 import type {
   EventSourcedQueueDefinition,
@@ -28,11 +30,17 @@ export interface QueueProcessorFactory {
  * - Memory (development/testing): If Redis is unavailable, provides in-memory queues for local development
  */
 export class DefaultQueueProcessorFactory implements QueueProcessorFactory {
+  constructor(private readonly redisConnection?: IORedis | Cluster) {}
+
   create<Payload>(
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
-    if (connection) {
-      return new EventSourcedQueueProcessorBullMq<Payload>(definition);
+    const effectiveConnection = this.redisConnection ?? connection;
+    if (effectiveConnection) {
+      return new EventSourcedQueueProcessorBullMq<Payload>(
+        definition,
+        effectiveConnection,
+      );
     }
     return new EventSourcedQueueProcessorMemory<Payload>(definition);
   }
@@ -43,10 +51,15 @@ export class DefaultQueueProcessorFactory implements QueueProcessorFactory {
  * Throws an error if Redis is not available.
  */
 export class BullmqQueueProcessorFactory implements QueueProcessorFactory {
+  constructor(private readonly redisConnection?: IORedis | Cluster) {}
+
   create<Payload>(
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
-    return new EventSourcedQueueProcessorBullMq<Payload>(definition);
+    return new EventSourcedQueueProcessorBullMq<Payload>(
+      definition,
+      this.redisConnection,
+    );
   }
 }
 

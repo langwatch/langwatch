@@ -22,6 +22,7 @@ import { defaultQueueProcessorFactory } from "../queue";
 import type { RegisteredPipeline, PipelineWithCommandHandlers } from "./types";
 import type { QueueProcessorFactory } from "../queue";
 import { ConfigurationError } from "../../library/services/errorHandling";
+import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 
 /**
  * Options for configuring a command handler.
@@ -96,10 +97,11 @@ export class PipelineBuilder<
 > {
   constructor(
     private readonly eventStore: EventStore<any>,
-    private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly queueProcessorFactory?: QueueProcessorFactory,
     private readonly distributedLock?: DistributedLock,
     private readonly handlerLockTtlMs?: number,
     private readonly updateLockTtlMs?: number,
+    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
   ) {}
 
   withName(name: string): PipelineBuilderWithName<EventType, ProjectionType> {
@@ -110,6 +112,7 @@ export class PipelineBuilder<
       this.distributedLock,
       this.handlerLockTtlMs,
       this.updateLockTtlMs,
+      this.processorCheckpointStore,
     );
   }
 
@@ -128,10 +131,11 @@ export class PipelineBuilderWithName<
   constructor(
     private readonly eventStore: EventStore<any>,
     private readonly name: string,
-    private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly queueProcessorFactory?: QueueProcessorFactory,
     private readonly distributedLock?: DistributedLock,
     private readonly handlerLockTtlMs?: number,
     private readonly updateLockTtlMs?: number,
+    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
   ) {}
 
   withAggregateType(
@@ -145,6 +149,7 @@ export class PipelineBuilderWithName<
       this.distributedLock,
       this.handlerLockTtlMs,
       this.updateLockTtlMs,
+      this.processorCheckpointStore,
     );
   }
 
@@ -199,10 +204,11 @@ export class PipelineBuilderWithNameAndType<
     private readonly eventStore: EventStore<any>,
     private readonly name: string,
     private readonly aggregateType: AggregateType,
-    private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly queueProcessorFactory?: QueueProcessorFactory,
     private readonly distributedLock?: DistributedLock,
     private readonly handlerLockTtlMs?: number,
     private readonly updateLockTtlMs?: number,
+    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
   ) {}
 
   /**
@@ -440,6 +446,7 @@ export class PipelineBuilderWithNameAndType<
       distributedLock: this.distributedLock,
       handlerLockTtlMs: this.handlerLockTtlMs,
       updateLockTtlMs: this.updateLockTtlMs,
+      processorCheckpointStore: this.processorCheckpointStore,
     });
 
     // Create dispatchers now that we have the service

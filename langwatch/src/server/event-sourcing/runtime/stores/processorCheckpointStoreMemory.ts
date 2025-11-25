@@ -264,7 +264,10 @@ export class ProcessorCheckpointStoreMemory
     return records.map((record) => this.recordToCheckpoint(record));
   }
 
-  async clearCheckpoint(tenantId: TenantId, checkpointKey: string): Promise<void> {
+  async clearCheckpoint(
+    tenantId: TenantId,
+    checkpointKey: string,
+  ): Promise<void> {
     // Validate tenantId
     EventUtils.validateTenantId(
       { tenantId },

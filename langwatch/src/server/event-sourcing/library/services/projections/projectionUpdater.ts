@@ -16,9 +16,8 @@ import { type EventProcessorValidator } from "../validation/eventProcessorValida
 import { type CheckpointManager } from "../checkpoints/checkpointManager";
 import { type QueueProcessorManager } from "../queues/queueProcessorManager";
 import {
-  ErrorCategory,
   handleError,
-  isSequentialOrderingError,
+  categorizeError,
   ConfigurationError,
   LockError,
   ValidationError,
@@ -169,9 +168,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
                 });
               } catch (error) {
                 // Determine error category and handle accordingly
-                const category = isSequentialOrderingError(error)
-                  ? ErrorCategory.CRITICAL
-                  : ErrorCategory.NON_CRITICAL;
+                const category = categorizeError(error);
 
                 span.addEvent("projection.update.aggregate.error", {
                   "projection.name": projectionName,
@@ -459,7 +456,10 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
   ): Promise<any> {
-    EventUtils.validateTenantId(options?.projectionStoreContext ?? context, "updateProjectionByName");
+    EventUtils.validateTenantId(
+      options?.projectionStoreContext ?? context,
+      "updateProjectionByName",
+    );
 
     if (!this.projections) {
       throw new ConfigurationError(

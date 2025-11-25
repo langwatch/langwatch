@@ -196,7 +196,6 @@ export class RedisDistributedLock implements DistributedLock {
         const ttlSeconds = Math.ceil(ttlMs / 1000);
 
         // SET NX EX: atomic operation that only succeeds if key doesn't exist, with expiration
-        // IORedis uses positional arguments: set(key, value, 'EX', seconds, 'NX')
         const result = await this.redis.set(key, value, "EX", ttlSeconds, "NX");
 
         const acquired = result === "OK";

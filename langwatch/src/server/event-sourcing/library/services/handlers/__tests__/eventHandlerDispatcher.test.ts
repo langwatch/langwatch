@@ -19,6 +19,7 @@ import { EventProcessorValidator } from "../../validation/eventProcessorValidato
 import { CheckpointManager } from "../../checkpoints/checkpointManager";
 import { QueueProcessorManager } from "../../queues/queueProcessorManager";
 import { EVENT_TYPES } from "../../../domain/eventType";
+import { SequentialOrderingError } from "../../errorHandling";
 
 describe("EventHandlerDispatcher", () => {
   const aggregateType = createTestAggregateType();
@@ -416,6 +417,95 @@ describe("EventHandlerDispatcher", () => {
       // Optimistic locking still saves a pending checkpoint during validation
       // even when processing is skipped due to previous failures
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws SequentialOrderingError when previous event has pending checkpoint", async () => {
+      const handler = createMockEventReactionHandler<Event>();
+      const handlerDef = createMockEventHandlerDefinition("handler1", handler);
+
+      const eventStore = createMockEventStore<Event>();
+      // Mock countEventsBefore to return 1 for event2 (sequence number 2)
+      eventStore.countEventsBefore = vi
+        .fn()
+        .mockImplementation((eventId, aggregateId, context, aggregateType) => {
+          // event1 has sequence 1, event2 has sequence 2
+          if (eventId === "event2") {
+            return Promise.resolve(1);
+          }
+          return Promise.resolve(0);
+        });
+      eventStore.getEvents = vi.fn().mockResolvedValue([]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+      // Mock getCheckpointBySequenceNumber to return a pending checkpoint for sequence 1
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockImplementation(
+          (
+            pipelineName,
+            processorName,
+            processorType,
+            tenantId,
+            aggregateType,
+            aggregateId,
+            sequenceNumber,
+          ) => {
+            // For sequence 1, return a pending checkpoint
+            if (sequenceNumber === 1) {
+              return Promise.resolve({
+                processorName: "handler1",
+                processorType: "handler",
+                tenantId,
+                aggregateType,
+                aggregateId,
+                sequenceNumber: 1,
+                status: "pending",
+                eventId: "event1",
+                timestamp: TEST_CONSTANTS.BASE_TIMESTAMP,
+              });
+            }
+            return Promise.resolve(null);
+          },
+        );
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const checkpointManager = new CheckpointManager(
+        TEST_CONSTANTS.PIPELINE_NAME,
+        checkpointStore,
+      );
+
+      const dispatcher = createDispatcher({
+        processorCheckpointStore: checkpointStore,
+        validator,
+        checkpointManager,
+      });
+
+      // Create event2 (sequence 2) - should fail because event1 (sequence 1) is still pending
+      const event2 = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+        EVENT_TYPES[0],
+        2000000,
+        {},
+        "event2",
+      );
+
+      await expect(
+        dispatcher.handleEvent("handler1", handlerDef, event2, context),
+      ).rejects.toThrow(SequentialOrderingError);
+
+      expect(handler.handle).not.toHaveBeenCalled();
+      // Should not save any checkpoints since ordering check fails early
+      expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
     });
   });
 });

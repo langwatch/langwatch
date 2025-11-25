@@ -6,6 +6,7 @@ import type { ProjectionDefinitions } from "../../library/projection.types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
 import type { EventPublisher } from "../../library/publishing/eventPublisher.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
+import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type {
   EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
@@ -47,6 +48,11 @@ export interface EventSourcingPipelineDefinition<
       definition: EventSourcedQueueDefinition<Payload>,
     ): EventSourcedQueueProcessor<Payload>;
   };
+  /**
+   * Optional preconfigured checkpoint store. When provided we skip automatic
+   * selection (memory vs ClickHouse) and use the supplied implementation as-is.
+   */
+  processorCheckpointStore?: ProcessorCheckpointStore;
   /**
    * Optional distributed lock for preventing concurrent updates.
    * Used for both projections and event handlers to serialize processing per aggregate.

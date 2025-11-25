@@ -401,13 +401,9 @@ export class SpanProcessingMapperService {
 
     // Convert to hrtime format [seconds, nanoseconds]
     const startTimeHr =
-      startTime !== void 0
-        ? msToUnixNano(startTime as Milliseconds)
-        : void 0;
+      startTime !== void 0 ? msToUnixNano(startTime as Milliseconds) : void 0;
     const endTimeHr =
-      endTime !== void 0
-        ? msToUnixNano(endTime as Milliseconds)
-        : void 0;
+      endTime !== void 0 ? msToUnixNano(endTime as Milliseconds) : void 0;
 
     // Map GenAI attributes
     const genAiAttributes = this.mapGenAiAttributes(langWatchSpan);

@@ -6,6 +6,8 @@ import {
   type WorkerOptions,
 } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
+import type IORedis from "ioredis";
+import type { Cluster } from "ioredis";
 import { connection } from "../../../redis";
 import { createLogger } from "../../../../utils/logger";
 import { trace } from "@opentelemetry/api";
@@ -32,17 +34,26 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   private readonly queue: Queue<Payload, unknown, string>;
   private readonly worker: Worker<Payload>;
   private readonly delay?: number;
+  private readonly redisConnection: IORedis | Cluster;
 
-  constructor(definition: EventSourcedQueueDefinition<Payload>) {
+  constructor(
+    definition: EventSourcedQueueDefinition<Payload>,
+    redisConnection?: IORedis | Cluster,
+  ) {
     const { name, makeJobId, process, options, delay, spanAttributes } =
       definition;
 
-    if (!connection) {
+    // Use provided connection if available, otherwise fall back to global connection
+    const effectiveConnection = redisConnection ?? connection;
+
+    if (!effectiveConnection) {
       throw new ConfigurationError(
         "BullMQQueueProcessor",
         "BullMQ queue processor requires Redis connection. Use memory implementation instead.",
       );
     }
+
+    this.redisConnection = effectiveConnection;
 
     this.spanAttributes = spanAttributes;
     this.delay = delay;
@@ -53,7 +64,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     this.process = process;
 
     const queueOptions: QueueOptions = {
-      connection,
+      connection: this.redisConnection,
       telemetry: new BullMQOtel(this.queueName),
       defaultJobOptions: {
         attempts: 15,
@@ -81,7 +92,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     );
 
     const workerOptions: WorkerOptions = {
-      connection,
+      connection: this.redisConnection,
       concurrency: options?.concurrency ?? 5,
       telemetry: new BullMQOtel(this.queueName),
     };
@@ -152,10 +163,17 @@ export class EventSourcedQueueProcessorBullMq<Payload>
             // hitting retry limits when processing 30+ events sequentially
             const baseDelayMs = 2000;
             const progressiveDelayMs = Math.min(
-              baseDelayMs + job.attemptsMade * 1000,
+              baseDelayMs + ((job.attemptsMade ?? 0) + 1) * 1000,
               20000, // Cap at 30 seconds
             );
             const delayedTimestamp = Date.now() + progressiveDelayMs;
+
+            console.log("timing info", {
+              delayedTimestamp,
+              progressiveDelayMs,
+              baseDelayMs,
+              attemptsMade: job.attemptsMade,
+            });
 
             try {
               await job.moveToDelayed(delayedTimestamp);
@@ -177,15 +195,37 @@ export class EventSourcedQueueProcessorBullMq<Payload>
               // the previous event is processed.
               return;
             } catch (moveError) {
-              // If moveToDelayed fails (e.g., job already processed), log and throw original error
+              // If moveToDelayed fails, handle gracefully
+              const moveErrorMessage =
+                moveError instanceof Error
+                  ? moveError.message
+                  : String(moveError);
+
+              // If lock is missing, the job is already being retried by BullMQ's retry mechanism.
+              // In this case, we should just return and let BullMQ handle the retry naturally.
+              // If we throw the error here, BullMQ will retry it again immediately (after backoff),
+              // which will hit the same ordering error again, creating an infinite loop.
+              if (moveErrorMessage.includes("Missing lock")) {
+                this.logger.debug(
+                  {
+                    queueName: this.queueName,
+                    jobId: job.id,
+                    moveError: moveErrorMessage,
+                    previousSequenceNumber: previousSequence,
+                  },
+                  "Job lock missing when trying to delay - job already retrying, letting BullMQ handle retry naturally",
+                );
+                // Rethrow the original ordering error so BullMQ's retry logic
+                // persists the job instead of treating it as handled.
+                throw error;
+              }
+
+              // For other moveToDelayed errors, log and throw original error
               this.logger.warn(
                 {
                   queueName: this.queueName,
                   jobId: job.id,
-                  moveError:
-                    moveError instanceof Error
-                      ? moveError.message
-                      : String(moveError),
+                  moveError: moveErrorMessage,
                 },
                 "Failed to move ordering error job to delayed state, will retry normally",
               );

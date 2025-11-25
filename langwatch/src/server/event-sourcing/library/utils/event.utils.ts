@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import { context, trace } from "@opentelemetry/api";
 import { EventStream } from "../streams/eventStream";
 import {
@@ -75,22 +74,6 @@ function createEvent<TEvent extends Event>(
   timestamp?: number,
   options?: CreateEventOptions,
 ): TEvent;
-
-// Generic overload for backward compatibility
-function createEvent<
-  Payload = unknown,
-  Metadata extends EventMetadataBase = EventMetadataBase,
-  TEventType extends EventType = EventType,
->(
-  aggregateType: AggregateType,
-  aggregateId: string,
-  tenantId: TenantId,
-  type: TEventType,
-  data: Payload,
-  metadata?: Metadata,
-  timestamp?: number,
-  options?: CreateEventOptions,
-): Event<Payload, Metadata>;
 
 // Implementation
 function createEvent<

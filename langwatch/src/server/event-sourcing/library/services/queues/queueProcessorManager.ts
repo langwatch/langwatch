@@ -1,4 +1,5 @@
 import type { Event } from "../../domain/types";
+import { EventSchema } from "../../domain/types";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
 import type { ProjectionDefinition } from "../../projection.types";
@@ -7,7 +8,7 @@ import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
 import type { CommandHandler, Command } from "../../commands/command";
 import type { CommandType, CommandSchemaType } from "../../index";
-import { createCommand, createTenantId } from "../../index";
+import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
 import { createLogger } from "~/utils/logger";
 import { ValidationError, ConfigurationError } from "../errorHandling";
@@ -82,14 +83,14 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   ) => Promise<void>,
   factory: QueueProcessorFactory,
 ): EventSourcedQueueProcessor<Payload> {
-  return factory.create<Payload>({
+  const processor = factory.create<Payload>({
     name: queueName,
     makeJobId: config.makeJobId,
     delay: config.delay,
     spanAttributes: config.spanAttributes,
     options: config.concurrency ? { concurrency: config.concurrency } : void 0,
     async process(payload: Payload) {
-      // Validate payload
+      // Validate payload (also validated in send, but keep here for safety)
       if (!commandSchema.validate(payload)) {
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
@@ -112,12 +113,82 @@ function createCommandDispatcher<Payload, EventType extends Event>(
       // Handler returns events
       const events = await handler.handle(command);
 
+      // Validate that handler returned events, not the payload
+      if (!events) {
+        throw new ValidationError(
+          `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
+          "events",
+          void 0,
+          { commandType, payload },
+        );
+      }
+
+      if (!Array.isArray(events)) {
+        throw new ValidationError(
+          `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
+          "events",
+          events,
+          { commandType, payload },
+        );
+      }
+
+      // Validate each event structure before storing
+      for (let i = 0; i < events.length; i++) {
+        const event = events[i];
+        if (!event) {
+          throw new ValidationError(
+            `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+            "events",
+            events,
+            { commandType, payload, index: i },
+          );
+        }
+
+        if (!EventUtils.isValidEvent(event)) {
+          // Try to get more detailed validation error
+          const parseResult = EventSchema.safeParse(event);
+          const validationError =
+            parseResult.success === false
+              ? `Validation errors: ${parseResult.error.issues
+                  .map((issue: any) => `${issue.path.join(".")}: ${issue.message}`)
+                  .join(", ")}`
+              : "Unknown validation error";
+
+          throw new ValidationError(
+            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
+            "events",
+            event,
+            { commandType, payload, index: i, validationErrors: parseResult.success === false ? parseResult.error.issues : void 0 },
+          );
+        }
+      }
+
       // Store events automatically
-      if (events && events.length > 0) {
+      if (events.length > 0) {
         await storeEventsFn(events, { tenantId });
       }
     },
   });
+
+  // Wrap the processor to validate payload synchronously before queuing
+  return {
+    async send(payload: Payload): Promise<void> {
+      // Validate payload synchronously before queuing
+      if (!commandSchema.validate(payload)) {
+        throw new ValidationError(
+          `Invalid payload for command type "${commandType}". Validation failed.`,
+          "payload",
+          payload,
+          { commandType },
+        );
+      }
+      // If validation passes, queue the job
+      return processor.send(payload);
+    },
+    async close(): Promise<void> {
+      return processor.close();
+    },
+  };
 }
 
 /**
@@ -346,7 +417,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       const handlerInstance = new HandlerClass();
       const config = extractHandlerConfig(HandlerClass, registration.options);
 
-      const commandName = registration.name;
+      // Use static dispatcherName if available, otherwise use the registration name
+      const commandName = HandlerClass.dispatcherName ?? registration.name;
 
       // Validate uniqueness
       if (this.commandQueueProcessors.has(commandName)) {

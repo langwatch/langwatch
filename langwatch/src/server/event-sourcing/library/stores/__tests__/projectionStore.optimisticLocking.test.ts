@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ProjectionStore } from "../projectionStore.types";
 import {
   createMockProjectionStore,
   createTestProjection,
@@ -18,16 +17,12 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
       const projection1 = createTestProjection(
         "aggregate-1",
         tenantId,
-        {},
         1000,
-        "proj-1",
       );
       const projection2 = createTestProjection(
         "aggregate-1",
         tenantId,
-        {},
         2000, // Different version
-        "proj-1",
       );
 
       // Store first projection
@@ -52,16 +47,12 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
       const projection1 = createTestProjection(
         "aggregate-1",
         tenantId,
-        {},
         1000,
-        "proj-1",
       );
       const projection2 = createTestProjection(
         "aggregate-1",
         tenantId,
-        {},
         2000,
-        "proj-1",
       );
 
       // Simulate concurrent writes

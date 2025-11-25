@@ -461,7 +461,10 @@ export class ProcessorCheckpointStoreClickHouse
     );
   }
 
-  async clearCheckpoint(tenantId: TenantId, checkpointKey: string): Promise<void> {
+  async clearCheckpoint(
+    tenantId: TenantId,
+    checkpointKey: string,
+  ): Promise<void> {
     // Validate tenantId
     EventUtils.validateTenantId(
       { tenantId },

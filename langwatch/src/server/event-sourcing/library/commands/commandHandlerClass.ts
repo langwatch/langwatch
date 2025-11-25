@@ -42,6 +42,12 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
    * Optional: Concurrency limit for processing commands.
    */
   concurrency?: number;
+
+  /**
+   * Optional: Static dispatcher name to use instead of the registration name.
+   * If provided, this will be used as the command dispatcher name in the pipeline.
+   */
+  readonly dispatcherName?: string;
 }
 
 /**

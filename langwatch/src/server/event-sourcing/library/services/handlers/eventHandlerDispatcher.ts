@@ -440,6 +440,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         previousSequenceNumber,
       );
 
+    const isProcessed = previousCheckpoint?.status === "processed";
+
     this.logger.debug(
       {
         handlerName,
@@ -448,11 +450,12 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         found: previousCheckpoint !== null,
         checkpointSequence: previousCheckpoint?.sequenceNumber ?? null,
         checkpointStatus: previousCheckpoint?.status ?? null,
+        isProcessed,
       },
       "Previous checkpoint lookup result",
     );
 
-    return previousCheckpoint !== null;
+    return isProcessed;
   }
 
   /**
