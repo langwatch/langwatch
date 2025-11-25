@@ -765,12 +765,18 @@ model LlmPromptConfig {
     organizationId String
     scope          PromptScope @default(PROJECT)
 
+    // Copy tracking
+    copiedFromPromptId String?
+    copiedFrom         LlmPromptConfig? @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
+
     // Relation to all versions - latest is determined by query
     versions LlmPromptConfigVersion[] @relation("Versions")
 
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
     @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+    @@index([copiedFromPromptId])
 }
 
 model LlmPromptConfigVersion {

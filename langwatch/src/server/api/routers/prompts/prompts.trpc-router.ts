@@ -341,6 +341,296 @@ export const promptsRouter = createTRPCRouter({
         responseFormat: sourcePrompt.responseFormat ?? undefined,
       });
 
-      return copiedPrompt;
+      // Set the copiedFromPromptId to track the source
+      await ctx.prisma.llmPromptConfig.update({
+        where: { id: copiedPrompt.id },
+        data: { copiedFromPromptId: sourcePrompt.id },
+      });
+
+      return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
+    }),
+
+  /**
+   * Sync a copied prompt from its source
+   */
+  syncFromSource: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      // Get the prompt (copy)
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      // Get the raw config to check copiedFromPromptId
+      const promptConfig = await ctx.prisma.llmPromptConfig.findUnique({
+        where: { id: prompt.id },
+        select: { copiedFromPromptId: true },
+      });
+
+      if (!promptConfig?.copiedFromPromptId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This prompt is not a copy and has no source to sync from",
+        });
+      }
+
+      // Get the source prompt
+      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
+        where: { id: promptConfig.copiedFromPromptId },
+        include: {
+          versions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      if (!sourcePromptRaw || sourcePromptRaw.deletedAt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source prompt has been deleted",
+        });
+      }
+
+      if (!sourcePromptRaw.versions[0]) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source prompt or its latest version not found",
+        });
+      }
+
+      // Check permissions on source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        sourcePromptRaw.projectId,
+        "prompts:view",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to view prompts in the source project",
+        });
+      }
+
+      // Get source prompt using service to get properly formatted data
+      const sourcePrompt = await service.getPromptByIdOrHandle({
+        idOrHandle: sourcePromptRaw.id,
+        projectId: sourcePromptRaw.projectId,
+      });
+
+      if (!sourcePrompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source prompt not found",
+        });
+      }
+
+      // Normalize prompt/messages to avoid system prompt conflict
+      // Extract system message from messages array into prompt field
+      const systemMessage = sourcePrompt.messages?.find(
+        (msg) => msg.role === "system",
+      );
+      const nonSystemMessages = sourcePrompt.messages?.filter(
+        (msg) => msg.role !== "system",
+      );
+
+      // Use system message as prompt if it exists, otherwise use the prompt field
+      const normalizedPrompt = systemMessage
+        ? systemMessage.content
+        : sourcePrompt.prompt ?? undefined;
+
+      // Only include messages if there are non-system messages
+      const normalizedMessages =
+        nonSystemMessages && nonSystemMessages.length > 0
+          ? nonSystemMessages
+          : undefined;
+
+      // Update the copy with source's data
+      return await service.updatePrompt({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+        data: {
+          commitMessage: `Updated from source prompt "${
+            sourcePrompt.handle ?? sourcePrompt.id
+          }"`,
+          prompt: normalizedPrompt,
+          messages: normalizedMessages,
+          inputs: sourcePrompt.inputs,
+          outputs: sourcePrompt.outputs,
+          model: sourcePrompt.model,
+          temperature: sourcePrompt.temperature,
+          ...(sourcePrompt.maxTokens !== undefined && {
+            maxTokens: sourcePrompt.maxTokens,
+          }),
+          ...(sourcePrompt.promptingTechnique !== undefined && {
+            promptingTechnique: sourcePrompt.promptingTechnique,
+          }),
+          demonstrations: sourcePrompt.demonstrations,
+          ...(sourcePrompt.responseFormat !== undefined && {
+            responseFormat: sourcePrompt.responseFormat,
+          }),
+          authorId,
+        } as any, // Type assertion needed until Prisma types are regenerated
+      });
+    }),
+
+  /**
+   * Push a source prompt to all its copies
+   */
+  pushToCopies: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      // Get the source prompt
+      const sourcePrompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!sourcePrompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      // Get copies using raw Prisma query
+      const sourcePromptRaw = await ctx.prisma.llmPromptConfig.findUnique({
+        where: { id: sourcePrompt.id },
+        select: {
+          id: true,
+          handle: true,
+          copiedPrompts: {
+            where: { deletedAt: null },
+            select: { id: true, projectId: true, handle: true },
+          },
+        },
+      });
+
+      if (!sourcePromptRaw) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      if (sourcePromptRaw.copiedPrompts.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This prompt has no copies to push to",
+        });
+      }
+
+      const results = [];
+
+      // Push to each copy
+      for (const copy of sourcePromptRaw.copiedPrompts) {
+        // Check permissions on copy's project
+        const hasCopyPermission = await hasProjectPermission(
+          ctx,
+          copy.projectId,
+          "prompts:update",
+        );
+
+        if (!hasCopyPermission) {
+          // Skip copies where user doesn't have permission
+          continue;
+        }
+
+        // Normalize prompt/messages to avoid system prompt conflict
+        // Extract system message from messages array into prompt field
+        const systemMessage = sourcePrompt.messages?.find(
+          (msg) => msg.role === "system",
+        );
+        const nonSystemMessages = sourcePrompt.messages?.filter(
+          (msg) => msg.role !== "system",
+        );
+
+        // Use system message as prompt if it exists, otherwise use the prompt field
+        const normalizedPrompt = systemMessage
+          ? systemMessage.content
+          : sourcePrompt.prompt ?? undefined;
+
+        // Only include messages if there are non-system messages
+        const normalizedMessages =
+          nonSystemMessages && nonSystemMessages.length > 0
+            ? nonSystemMessages
+            : undefined;
+
+        // Update the copy with source's data
+        const updated = await service.updatePrompt({
+          idOrHandle: copy.id,
+          projectId: copy.projectId,
+          data: {
+            commitMessage: `Pushed from source prompt "${
+              sourcePrompt.handle ?? sourcePrompt.id
+            }"`,
+            prompt: normalizedPrompt,
+            messages: normalizedMessages,
+            inputs: sourcePrompt.inputs,
+            outputs: sourcePrompt.outputs,
+            model: sourcePrompt.model,
+            temperature: sourcePrompt.temperature,
+            ...(sourcePrompt.maxTokens !== undefined && {
+              maxTokens: sourcePrompt.maxTokens,
+            }),
+            ...(sourcePrompt.promptingTechnique !== undefined && {
+              promptingTechnique: sourcePrompt.promptingTechnique,
+            }),
+            demonstrations: sourcePrompt.demonstrations,
+            ...(sourcePrompt.responseFormat !== undefined && {
+              responseFormat: sourcePrompt.responseFormat,
+            }),
+            authorId,
+          } as any, // Type assertion needed until Prisma types are regenerated
+        });
+
+        results.push({
+          copyId: copy.id,
+          copyName: copy.handle ?? copy.id,
+          prompt: updated,
+        });
+      }
+
+      if (results.length === 0) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to update any of the copied prompts",
+        });
+      }
+
+      return {
+        pushedTo: results.length,
+        totalCopies: sourcePromptRaw.copiedPrompts.length,
+        results,
+      };
     }),
 });
