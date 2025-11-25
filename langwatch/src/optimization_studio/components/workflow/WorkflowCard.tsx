@@ -21,6 +21,7 @@ import type { AppRouter } from "../../../server/api/root";
 import { toaster } from "../../../components/ui/toaster";
 import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
 import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
+import { PushToCopiesDialog } from "./PushToCopiesDialog";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -68,12 +69,12 @@ export function WorkflowCard({
   const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
   const syncFromSource = api.workflow.syncFromSource.useMutation();
-  const pushToCopies = api.workflow.pushToCopies.useMutation();
   const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
   const hasWorkflowsCreatePermission = hasPermission("workflows:create");
   const hasWorkflowsUpdatePermission = hasPermission("workflows:update");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
 
   // Get the workflow data to check if it's a copy or has copies
   const workflow = workflowId
@@ -114,35 +115,8 @@ export function WorkflowCard({
   }, [syncFromSource, workflowId, project, query, name]);
 
   const onPushToCopies = useCallback(() => {
-    if (!workflowId || !project) return;
-
-    pushToCopies.mutate(
-      { workflowId, projectId: project.id },
-      {
-        onSuccess: (result) => {
-          void query?.refetch();
-          toaster.create({
-            title: "Workflow pushed",
-            description: `Latest version of "${name}" has been pushed to ${result.pushedTo} of ${result.totalCopies} copied workflow(s).`,
-            type: "success",
-            meta: {
-              closable: true,
-            },
-          });
-        },
-        onError: (error) => {
-          toaster.create({
-            title: "Error pushing workflow",
-            description: error.message || "Please try again later.",
-            type: "error",
-            meta: {
-              closable: true,
-            },
-          });
-        },
-      },
-    );
-  }, [pushToCopies, workflowId, project, query, name]);
+    setIsPushToCopiesDialogOpen(true);
+  }, []);
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -343,6 +317,14 @@ export function WorkflowCard({
         <CopyWorkflowDialog
           open={isCopyDialogOpen}
           onClose={() => setIsCopyDialogOpen(false)}
+          workflowId={workflowId}
+          workflowName={name}
+        />
+      )}
+      {workflowId && (
+        <PushToCopiesDialog
+          open={isPushToCopiesDialogOpen}
+          onClose={() => setIsPushToCopiesDialogOpen(false)}
           workflowId={workflowId}
           workflowName={name}
         />

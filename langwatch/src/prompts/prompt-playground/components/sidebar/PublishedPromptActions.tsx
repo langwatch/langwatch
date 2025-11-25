@@ -11,6 +11,7 @@ import { toaster } from "~/components/ui/toaster";
 import { getDisplayHandle } from "./PublishedPromptsList";
 import { api } from "~/utils/api";
 import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
+import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
 interface PublishedPromptActionsProps {
@@ -30,13 +31,14 @@ export function PublishedPromptActions({
 }: PublishedPromptActionsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
+    useState(false);
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
   const hasPromptsCreatePermission = hasPermission("prompts:create");
   const hasPromptsUpdatePermission = hasPermission("prompts:update");
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
-  const pushToCopies = api.prompts.pushToCopies.useMutation();
   const utils = api.useContext();
 
   const isCopiedPrompt = !!prompt?.copiedFromPromptId;
@@ -73,40 +75,6 @@ export function PublishedPromptActions({
       });
     }
   }, [syncFromSource, project, utils, promptId, promptHandle]);
-
-  const onPushToCopies = useCallback(async () => {
-    if (!project) return;
-
-    try {
-      const result = await pushToCopies.mutateAsync({
-        idOrHandle: promptId,
-        projectId: project.id,
-      });
-      await utils.prompts.getAllPromptsForProject.invalidate();
-      toaster.create({
-        title: "Prompt pushed",
-        description: `Latest version of "${getDisplayHandle(
-          promptHandle,
-        )}" has been pushed to ${result.pushedTo} of ${
-          result.totalCopies
-        } copied prompt(s).`,
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-    } catch (error) {
-      toaster.create({
-        title: "Error pushing prompt",
-        description:
-          error instanceof Error ? error.message : "Please try again later.",
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-    }
-  }, [pushToCopies, project, utils, promptId, promptHandle]);
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
@@ -203,7 +171,7 @@ export function PublishedPromptActions({
                   value="push"
                   onClick={
                     hasPromptsUpdatePermission
-                      ? () => void onPushToCopies()
+                      ? () => setIsPushToCopiesDialogOpen(true)
                       : undefined
                   }
                   disabled={!hasPromptsUpdatePermission}
@@ -268,6 +236,13 @@ export function PublishedPromptActions({
       <CopyPromptDialog
         open={isCopyDialogOpen}
         onClose={() => setIsCopyDialogOpen(false)}
+        promptId={promptId}
+        promptName={getDisplayHandle(promptHandle)}
+      />
+
+      <PushToCopiesDialog
+        open={isPushToCopiesDialogOpen}
+        onClose={() => setIsPushToCopiesDialogOpen(false)}
         promptId={promptId}
         promptName={getDisplayHandle(promptHandle)}
       />

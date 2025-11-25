@@ -32,6 +32,86 @@ export const promptsRouter = createTRPCRouter({
     }),
 
   /**
+   * Get copies of a prompt for push selection
+   */
+  getCopies: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        idOrHandle: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const prompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.projectId,
+      });
+
+      if (!prompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      const copies = await ctx.prisma.llmPromptConfig.findMany({
+        where: {
+          copiedFromPromptId: prompt.id,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          handle: true,
+          projectId: true,
+          project: {
+            select: {
+              id: true,
+              name: true,
+              team: {
+                select: {
+                  id: true,
+                  name: true,
+                  organization: {
+                    select: {
+                      id: true,
+                      name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Filter copies based on user's prompts:update permission
+      const copiesWithPermissions = await Promise.all(
+        copies.map(async (copy) => {
+          const hasPermission = await hasProjectPermission(
+            ctx,
+            copy.projectId,
+            "prompts:update",
+          );
+          return {
+            id: copy.id,
+            handle: copy.handle ?? copy.id,
+            projectId: copy.projectId,
+            projectName: copy.project.name,
+            teamName: copy.project.team.name,
+            organizationName: copy.project.team.organization.name,
+            fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
+            hasPermission,
+          };
+        }),
+      );
+
+      // Only return copies where user has permission
+      return copiesWithPermissions.filter((copy) => copy.hasPermission);
+    }),
+
+  /**
    * Restore a prompt version
    */
   restoreVersion: protectedProcedure
@@ -501,6 +581,7 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         idOrHandle: z.string(),
+        copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
       }),
     )
     .use(checkProjectPermission("prompts:update"))
@@ -548,10 +629,24 @@ export const promptsRouter = createTRPCRouter({
         });
       }
 
+      // Filter copies if copyIds is provided
+      const copiesToPush = input.copyIds
+        ? sourcePromptRaw.copiedPrompts.filter((copy) =>
+            input.copyIds!.includes(copy.id),
+          )
+        : sourcePromptRaw.copiedPrompts;
+
+      if (copiesToPush.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No valid copies selected to push to",
+        });
+      }
+
       const results = [];
 
       // Push to each copy
-      for (const copy of sourcePromptRaw.copiedPrompts) {
+      for (const copy of copiesToPush) {
         // Check permissions on copy's project
         const hasCopyPermission = await hasProjectPermission(
           ctx,
@@ -630,6 +725,7 @@ export const promptsRouter = createTRPCRouter({
       return {
         pushedTo: results.length,
         totalCopies: sourcePromptRaw.copiedPrompts.length,
+        selectedCopies: copiesToPush.length,
         results,
       };
     }),

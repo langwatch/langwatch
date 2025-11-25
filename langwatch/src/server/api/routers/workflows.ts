@@ -218,11 +218,138 @@ export const workflowRouter = createTRPCRouter({
           copiedFromWorkflowId: true,
           _count: {
             select: {
-              copiedWorkflows: true,
+              copiedWorkflows: {
+                where: {
+                  archivedAt: null,
+                },
+              },
             },
           },
         },
       });
+    }),
+
+  getCopies: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:view"))
+    .query(async ({ ctx, input }) => {
+      // Find the workflow by ID and projectId (Prisma requires projectId in where clause)
+      const workflow = await ctx.prisma.workflow.findFirst({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      // Verify the user has view permission on the workflow's project
+      const hasPermission = await hasProjectPermission(
+        ctx,
+        workflow.projectId,
+        "workflows:view",
+      );
+
+      if (!hasPermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to view this workflow",
+        });
+      }
+
+      // Query copies through the relation to avoid projectId requirement in findMany
+      const workflowWithCopies = await ctx.prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+        },
+        select: {
+          id: true,
+          copiedWorkflows: {
+            where: {
+              archivedAt: null,
+            },
+            select: {
+              id: true,
+              name: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  name: true,
+                  team: {
+                    select: {
+                      id: true,
+                      name: true,
+                      organization: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!workflowWithCopies) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      const copies = workflowWithCopies.copiedWorkflows;
+
+      // Filter copies based on user's workflows:update permission
+      const copiesWithPermissions = await Promise.all(
+        copies.map(async (copy) => {
+          const hasPermission = await hasProjectPermission(
+            ctx,
+            copy.projectId,
+            "workflows:update",
+          );
+          return {
+            id: copy.id,
+            name: copy.name,
+            projectId: copy.projectId,
+            projectName: copy.project.name,
+            teamName: copy.project.team.name,
+            organizationName: copy.project.team.organization.name,
+            fullPath: `${copy.project.team.organization.name} / ${copy.project.team.name} / ${copy.project.name}`,
+            hasPermission,
+          };
+        }),
+      );
+
+      // Only return copies where user has permission
+      const filteredCopies = copiesWithPermissions.filter(
+        (copy) => copy.hasPermission,
+      );
+
+      // If no copies found but copies exist, it means user doesn't have permission on any of them
+      if (filteredCopies.length === 0 && copies.length > 0) {
+        // Return empty array - the UI will show "No copies found"
+        // This is expected if user doesn't have workflows:update permission on copy projects
+        return [];
+      }
+
+      return filteredCopies;
     }),
 
   getById: protectedProcedure
@@ -559,7 +686,8 @@ export const workflowRouter = createTRPCRouter({
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "You do not have permission to view workflows in the source project",
+          message:
+            "You do not have permission to view workflows in the source project",
         });
       }
 
@@ -599,6 +727,7 @@ export const workflowRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         workflowId: z.string(),
+        copyIds: z.array(z.string()).optional(), // Optional: if provided, only push to selected copies
       }),
     )
     .use(checkProjectPermission("workflows:update"))
@@ -644,6 +773,20 @@ export const workflowRouter = createTRPCRouter({
         });
       }
 
+      // Filter copies if copyIds is provided
+      const copiesToPush = input.copyIds
+        ? workflow.copiedWorkflows.filter((copy) =>
+            input.copyIds!.includes(copy.id),
+          )
+        : workflow.copiedWorkflows;
+
+      if (copiesToPush.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No valid copies selected to push to",
+        });
+      }
+
       // Deep clone DSL to ensure mutability
       const dsl = JSON.parse(
         JSON.stringify(workflow.latestVersion.dsl),
@@ -652,7 +795,7 @@ export const workflowRouter = createTRPCRouter({
       const results = [];
 
       // Push to each copy
-      for (const copy of workflow.copiedWorkflows) {
+      for (const copy of copiesToPush) {
         // Check that the user has workflows:update permission on the copy's project
         const hasCopyPermission = await hasProjectPermission(
           ctx,
@@ -711,11 +854,17 @@ export const workflowRouter = createTRPCRouter({
       if (results.length === 0) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "You do not have permission to update any of the copied workflows",
+          message:
+            "You do not have permission to update any of the copied workflows",
         });
       }
 
-      return { pushedTo: results.length, totalCopies: workflow.copiedWorkflows.length, results };
+      return {
+        pushedTo: results.length,
+        totalCopies: workflow.copiedWorkflows.length,
+        selectedCopies: copiesToPush.length,
+        results,
+      };
     }),
 
   archive: protectedProcedure

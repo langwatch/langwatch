@@ -20,6 +20,7 @@ import { useState, useCallback } from "react";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 import { CopyPromptDialog } from "./components/CopyPromptDialog";
+import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -79,13 +80,17 @@ export function PromptsList({
   const hasPromptsCreatePermission = hasPermission("prompts:create");
 
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [pushToCopiesDialogOpen, setPushToCopiesDialogOpen] = useState(false);
   const [copyPrompt, setCopyPrompt] = useState<{
+    promptId: string;
+    promptName: string;
+  } | null>(null);
+  const [pushPrompt, setPushPrompt] = useState<{
     promptId: string;
     promptName: string;
   } | null>(null);
 
   const syncFromSource = api.prompts.syncFromSource.useMutation();
-  const pushToCopies = api.prompts.pushToCopies.useMutation();
   const utils = api.useContext();
 
   const onSyncFromSource = useCallback(
@@ -123,42 +128,13 @@ export function PromptsList({
     [syncFromSource, project, utils],
   );
 
-  const onPushToCopies = useCallback(
-    async (config: PromptListItem) => {
-      if (!project) return;
-
-      try {
-        const result = await pushToCopies.mutateAsync({
-          idOrHandle: config.id,
-          projectId: project.id,
-        });
-        await utils.prompts.getAllPromptsForProject.invalidate();
-        toaster.create({
-          title: "Prompt pushed",
-          description: `Latest version of "${
-            config.handle ?? config.name ?? config.id
-          }" has been pushed to ${result.pushedTo} of ${
-            result.totalCopies
-          } copied prompt(s).`,
-          type: "success",
-          meta: {
-            closable: true,
-          },
-        });
-      } catch (error) {
-        toaster.create({
-          title: "Error pushing prompt",
-          description:
-            error instanceof Error ? error.message : "Please try again later.",
-          type: "error",
-          meta: {
-            closable: true,
-          },
-        });
-      }
-    },
-    [pushToCopies, project, utils],
-  );
+  const onPushToCopies = useCallback((config: PromptListItem) => {
+    setPushPrompt({
+      promptId: config.id,
+      promptName: config.handle ?? config.name ?? config.id,
+    });
+    setPushToCopiesDialogOpen(true);
+  }, []);
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
@@ -477,6 +453,17 @@ export function PromptsList({
           }}
           promptId={copyPrompt.promptId}
           promptName={copyPrompt.promptName}
+        />
+      )}
+      {pushPrompt && (
+        <PushToCopiesDialog
+          open={pushToCopiesDialogOpen}
+          onClose={() => {
+            setPushToCopiesDialogOpen(false);
+            setPushPrompt(null);
+          }}
+          promptId={pushPrompt.promptId}
+          promptName={pushPrompt.promptName}
         />
       )}
     </VStack>
