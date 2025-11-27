@@ -55,7 +55,7 @@ export class EventSourcedQueueProcessorMemory<Payload>
     this.makeJobId = makeJobId;
     this.delay = delay;
     this.concurrency = options?.concurrency ?? 5;
-    this.queueName = `{${name}}`;
+    this.queueName = name;
     this.process = process;
 
     this.logger.info(
