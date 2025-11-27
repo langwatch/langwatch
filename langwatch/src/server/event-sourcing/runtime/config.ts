@@ -27,9 +27,9 @@ function isBuildPhase(): boolean {
 }
 
 export function createEventSourcingConfig(): EventSourcingConfig {
-  const isBuildTime = isBuildPhase();
   const isTestEnvironment =
-    process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+  process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+  const isBuildTime = isTestEnvironment ? false : isBuildPhase();
 
   // Disable event sourcing during build to avoid requiring external services
   const enabled =

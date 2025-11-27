@@ -190,42 +190,42 @@ describe("Projections - Integration Tests", () => {
     expect(checkpoint).toBe(true);
   });
 
-  // it("rebuilds projection correctly after events are stored", async () => {
-  //   const aggregateId = "projection-test-8";
+  it("rebuilds projection correctly after events are stored", async () => {
+    const aggregateId = "projection-test-8";
 
-  //   // Store events directly (bypassing command)
-  //   const event1 = EventUtils.createEvent(
-  //     "test_aggregate" as AggregateType,
-  //     aggregateId,
-  //     tenantId,
-  //     "test.integration.event" as const,
-  //     { value: 5 },
-  //   );
-  //   const event2 = EventUtils.createEvent(
-  //     "test_aggregate" as AggregateType,
-  //     aggregateId,
-  //     tenantId,
-  //     "test.integration.event" as const,
-  //     { value: 10 },
-  //   );
-  //   const events = [event1, event2] as TestEvent[];
+    // Store events directly (bypassing command)
+    const event1 = EventUtils.createEvent(
+      "test_aggregate" as AggregateType,
+      aggregateId,
+      tenantId,
+      "test.integration.event" as const,
+      { value: 5 },
+    );
+    const event2 = EventUtils.createEvent(
+      "test_aggregate" as AggregateType,
+      aggregateId,
+      tenantId,
+      "test.integration.event" as const,
+      { value: 10 },
+    );
+    const events = [event1, event2] as TestEvent[];
 
-  //   await pipeline.service.storeEvents(events, {
-  //     tenantId,
-  //   });
+    await pipeline.service.storeEvents(events, {
+      tenantId,
+    });
 
-  //   // Wait for projection processing
-  //   await waitForQueueProcessing(30000);
+    // Wait for projection processing
+    await waitForQueueProcessing(30000);
 
-  //   // Verify projection
-  //   const projection = (await pipeline.service.getProjectionByName(
-  //     "testProjection",
-  //     aggregateId,
-  //     { tenantId },
-  //   )) as TestProjection | null;
+    // Verify projection
+    const projection = (await pipeline.service.getProjectionByName(
+      "testProjection",
+      aggregateId,
+      { tenantId },
+    )) as TestProjection | null;
 
-  //   expect(projection).toBeDefined();
-  //   expect(projection?.data.totalValue).toBe(15);
-  //   expect(projection?.data.eventCount).toBe(2);
-  // });
+    expect(projection).toBeDefined();
+    expect(projection?.data.totalValue).toBe(15);
+    expect(projection?.data.eventCount).toBe(2);
+  });
 }, 60000);
