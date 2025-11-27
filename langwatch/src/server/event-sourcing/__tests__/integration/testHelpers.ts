@@ -78,6 +78,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
       clickHouseEnabled: true,
       forceClickHouseInTests: true,
       isTestEnvironment: true,
+      isBuildTime: false,
       clickHouseClient,
       redisConnection,
     },
