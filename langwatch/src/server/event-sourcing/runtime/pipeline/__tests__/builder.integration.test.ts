@@ -695,6 +695,17 @@ describe("PipelineBuilder Integration Tests", () => {
   });
 
   describe("Full Pipeline Scenarios with Sequential Ordering", () => {
+    // Override fake timers for these tests - they use actual delays
+    beforeEach(() => {
+      vi.useRealTimers();
+    });
+
+    afterEach(() => {
+      // Restore fake timers for consistency with other test suites
+      vi.useFakeTimers();
+      vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+    });
+
     it("full pipeline: command → event → handler → projection with sequential ordering", async () => {
       const eventStore = new EventStoreMemory<TestEvent>(
         new EventRepositoryMemory(),
@@ -738,6 +749,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
         queueProcessorFactory: factory,
+        processorCheckpointStore: checkpointStore,
       })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
@@ -751,9 +763,6 @@ describe("PipelineBuilder Integration Tests", () => {
         )
         .withProjection("summary", ProjectionHandlerClass)
         .build();
-
-      // Inject checkpoint store (normally done by runtime)
-      (pipeline.service as any).processorCheckpointStore = checkpointStore;
 
       const payload: TestCommandPayload = {
         tenantId: TEST_CONSTANTS.TENANT_ID_VALUE,
@@ -917,14 +926,12 @@ describe("PipelineBuilder Integration Tests", () => {
       const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
         queueProcessorFactory: factory,
+        processorCheckpointStore: checkpointStore,
       })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventHandler("handler", HandlerClass)
         .build();
-
-      // Inject checkpoint store
-      (pipeline.service as any).processorCheckpointStore = checkpointStore;
 
       // Create events with different timestamps
       const event1 = createTestEventForBuilder(aggregateId, tenantId);
@@ -942,12 +949,10 @@ describe("PipelineBuilder Integration Tests", () => {
       );
 
       // Process events - should enforce sequential ordering
+      // Note: No delays needed because the mock queue processor processes synchronously
+      // and checkpoints are saved before storeEvents returns
       await pipeline.service.storeEvents([event1], { tenantId });
-      // Wait a bit to ensure event1's checkpoint is saved before processing event2
-      await new Promise((resolve) => setTimeout(resolve, 10));
       await pipeline.service.storeEvents([event2], { tenantId });
-      // Wait a bit to ensure event2's checkpoint is saved before processing event3
-      await new Promise((resolve) => setTimeout(resolve, 10));
       await pipeline.service.storeEvents([event3], { tenantId });
 
       // Verify handlers were called in order
@@ -956,35 +961,19 @@ describe("PipelineBuilder Integration Tests", () => {
       expect(handleSpy).toHaveBeenNthCalledWith(2, event2);
       expect(handleSpy).toHaveBeenNthCalledWith(3, event3);
 
-      // Verify checkpoints were saved with correct sequence numbers
-      const checkpointKey1 = buildCheckpointKey(
+      // Verify final checkpoint reflects the last processed event
+      // Note: Checkpoint is per-aggregate, not per-event, so there's only one checkpoint
+      const checkpointKey = buildCheckpointKey(
         tenantId,
         "test-pipeline",
         "handler",
         "span_ingestion",
         aggregateId,
       );
-      const checkpointKey2 = buildCheckpointKey(
-        tenantId,
-        "test-pipeline",
-        "handler",
-        "span_ingestion",
-        aggregateId,
-      );
-      const checkpointKey3 = buildCheckpointKey(
-        tenantId,
-        "test-pipeline",
-        "handler",
-        "span_ingestion",
-        aggregateId,
-      );
-      const checkpoint1 = await checkpointStore.loadCheckpoint(checkpointKey1);
-      const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey2);
-      const checkpoint3 = await checkpointStore.loadCheckpoint(checkpointKey3);
+      const finalCheckpoint = await checkpointStore.loadCheckpoint(checkpointKey);
 
-      expect(checkpoint1?.sequenceNumber).toBe(1);
-      expect(checkpoint2?.sequenceNumber).toBe(2);
-      expect(checkpoint3?.sequenceNumber).toBe(3);
+      expect(finalCheckpoint?.sequenceNumber).toBe(3);
+      expect(finalCheckpoint?.status).toBe("processed");
     });
 
     it("sequential ordering maintained across queue retries", async () => {
@@ -1006,16 +995,14 @@ describe("PipelineBuilder Integration Tests", () => {
       const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
         queueProcessorFactory: factory,
+        processorCheckpointStore: checkpointStore,
       })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventHandler("handler", HandlerClass)
         .build();
 
-      // Inject checkpoint store
-      (pipeline.service as any).processorCheckpointStore = checkpointStore;
-
-      // Create events
+      // Create events with different timestamps
       const event1 = createTestEventForBuilder(aggregateId, tenantId);
       event1.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
       const event2 = createTestEventForBuilder(aggregateId, tenantId);

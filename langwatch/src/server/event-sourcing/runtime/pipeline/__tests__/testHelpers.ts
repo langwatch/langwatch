@@ -327,7 +327,8 @@ export const TEST_CONSTANTS = {
 } as const;
 
 /**
- * Creates a test event.
+ * Creates a test event with a unique ID.
+ * IDs are auto-generated to be unique even for events with the same timestamp.
  */
 export function createTestEventForBuilder(
   aggregateId: string,

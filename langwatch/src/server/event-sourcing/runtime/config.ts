@@ -27,19 +27,19 @@ function isBuildPhase(): boolean {
 }
 
 export function createEventSourcingConfig(): EventSourcingConfig {
+  const isBuildTime = isBuildPhase();
   const isTestEnvironment =
     process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
-  const isBuildTime = isTestEnvironment ? false : isBuildPhase();
 
-  // Disable event sourcing during build to avoid requiring external services
-  const enabled = process.env.ENABLE_EVENT_SOURCING !== "false" && !isBuildTime;
+  // Only check explicit disable flag - lazy init handles build-time safety
+  const enabled = process.env.ENABLE_EVENT_SOURCING !== "false";
   const clickHouseEnabled = process.env.ENABLE_CLICKHOUSE !== "false";
   const forceClickHouseInTests =
     process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true";
 
   // Only attempt to get ClickHouse client if enabled and not in build phase
   const resolvedClickHouseClient =
-    enabled && clickHouseEnabled ? getClickHouseClient() : null;
+    enabled && clickHouseEnabled && !isBuildTime ? getClickHouseClient() : null;
 
   return {
     enabled,

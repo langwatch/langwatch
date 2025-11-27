@@ -80,7 +80,7 @@ describe("QueueProcessorManager", () => {
       const jobId = manager.createDefaultJobId(event);
 
       expect(jobId).toBe(
-        `${TEST_CONSTANTS.BASE_TIMESTAMP}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}`,
+        `${TEST_CONSTANTS.BASE_TIMESTAMP}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:0`,
       );
     });
   });

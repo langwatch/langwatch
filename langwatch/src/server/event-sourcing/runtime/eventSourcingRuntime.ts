@@ -139,7 +139,7 @@ export class EventSourcingRuntime {
     } = this.config;
 
     const isProduction =
-      process.env.NODE_ENV === "production" && !isTestEnvironment;
+      process.env.NODE_ENV === "production";
 
     // Create event store
     if (clickHouseEnabled && clickHouseClient) {
@@ -199,7 +199,7 @@ export class EventSourcingRuntime {
     forceClickHouseInTests: boolean,
   ): ProcessorCheckpointStore | undefined {
     const isProduction =
-      process.env.NODE_ENV === "production" && !isTestEnvironment;
+      process.env.NODE_ENV === "production";
 
     // In test environment, use memory unless forced to use ClickHouse
     if (isTestEnvironment && !forceClickHouseInTests) {

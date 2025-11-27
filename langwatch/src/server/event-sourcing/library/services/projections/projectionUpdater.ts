@@ -479,10 +479,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
   ): Promise<any> {
-    EventUtils.validateTenantId(
-      options?.projectionStoreContext ?? context,
-      "updateProjectionByName",
-    );
+    // Always validate the event-store read context
+    EventUtils.validateTenantId(context, "updateProjectionByName");
+    // Also validate the projection-store write context if it differs
+    if (options?.projectionStoreContext) {
+      EventUtils.validateTenantId(
+        options.projectionStoreContext,
+        "updateProjectionByName",
+      );
+    }
 
     if (!this.projections) {
       throw new ConfigurationError(
@@ -600,11 +605,16 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             "projection.version": projection.version,
           });
 
+          // Always validate the event-store read context
+          EventUtils.validateTenantId(context, "updateProjectionByName");
+          // Also validate the projection-store write context if it differs
           const projectionContext = options?.projectionStoreContext ?? context;
-          EventUtils.validateTenantId(
-            projectionContext,
-            "updateProjectionByName",
-          );
+          if (options?.projectionStoreContext) {
+            EventUtils.validateTenantId(
+              options.projectionStoreContext,
+              "updateProjectionByName",
+            );
+          }
 
           span.addEvent("projection_store.store.start");
           await projectionDef.store.storeProjection(

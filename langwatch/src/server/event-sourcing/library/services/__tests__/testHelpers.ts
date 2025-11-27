@@ -165,8 +165,12 @@ export function createMockLogger(): Logger {
   } as unknown as Logger;
 }
 
+// Counter for generating unique event IDs in tests
+let testEventIdCounter = 0;
+
 /**
  * Creates a test event with predictable values.
+ * IDs are auto-generated to be unique even for events with the same timestamp.
  */
 export function createTestEvent(
   aggregateId: string,
@@ -177,8 +181,10 @@ export function createTestEvent(
   data: unknown = {},
   id?: string,
 ): Event {
+  const uniqueId =
+    id ?? `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
   return {
-    id: id ?? `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}`,
+    id: uniqueId,
     aggregateId,
     aggregateType,
     tenantId,

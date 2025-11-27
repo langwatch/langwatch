@@ -1,4 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Use vi.hoisted to define the mock function so it's available when vi.mock runs
+const { mockGetClickHouseClient } = vi.hoisted(() => ({
+  mockGetClickHouseClient: vi.fn(),
+}));
+
+vi.mock("~/utils/clickhouse", () => ({
+  getClickHouseClient: mockGetClickHouseClient,
+}));
+
 import { EventSourcing } from "../eventSourcing";
 import {
   EventSourcingRuntime,
@@ -10,23 +20,25 @@ import { PipelineBuilder } from "../pipeline";
 import { DisabledPipelineBuilder } from "../disabledPipeline";
 import type { Event } from "../../library";
 import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
-import * as clickhouseUtils from "../../../../utils/clickhouse";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { TenantId } from "../../library/domain/tenantId";
 
 describe("EventSourcing", () => {
-  let getClickHouseClientSpy: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
     // Reset singleton instances between tests
     EventSourcing.resetInstance();
     resetEventSourcingRuntime();
 
-    getClickHouseClientSpy = vi.spyOn(clickhouseUtils, "getClickHouseClient");
+    // Disable BUILD_TIME to enable event sourcing in tests
+    vi.stubEnv("BUILD_TIME", "");
+
+    // Reset the mock
+    mockGetClickHouseClient.mockReset();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     // Reset singleton instances after each test
     EventSourcing.resetInstance();
     resetEventSourcingRuntime();
@@ -34,7 +46,7 @@ describe("EventSourcing", () => {
 
   describe("getInstance", () => {
     it("returns the same singleton instance on multiple calls", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
+      mockGetClickHouseClient.mockReturnValue(null);
 
       const instance1 = EventSourcing.getInstance();
       const instance2 = EventSourcing.getInstance();
@@ -45,7 +57,7 @@ describe("EventSourcing", () => {
     });
 
     it("creates Memory store when ClickHouse client is not available", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
+      mockGetClickHouseClient.mockReturnValue(null);
 
       const instance = EventSourcing.getInstance();
       const eventStore = instance.getEventStore();
@@ -55,7 +67,7 @@ describe("EventSourcing", () => {
 
     it("creates ClickHouse store when client is available", () => {
       const mockClient = {} as ClickHouseClient;
-      getClickHouseClientSpy.mockReturnValue(mockClient);
+      mockGetClickHouseClient.mockReturnValue(mockClient);
 
       const instance = EventSourcing.getInstance();
       const eventStore = instance.getEventStore();
@@ -64,7 +76,7 @@ describe("EventSourcing", () => {
     });
 
     it("returns the same event store instance across multiple getInstance calls", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
+      mockGetClickHouseClient.mockReturnValue(null);
 
       const instance1 = EventSourcing.getInstance();
       const eventStore1 = instance1.getEventStore();
@@ -225,7 +237,7 @@ describe("EventSourcing", () => {
 
   describe("edge cases and security", () => {
     it("handles null ClickHouse client gracefully", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
+      mockGetClickHouseClient.mockReturnValue(null);
 
       const instance = new EventSourcing();
       const eventStore = instance.getEventStore();
@@ -250,7 +262,7 @@ describe("EventSourcing", () => {
     });
 
     it("handles multiple concurrent getInstance calls deterministically", async () => {
-      getClickHouseClientSpy.mockReturnValue(null);
+      mockGetClickHouseClient.mockReturnValue(null);
 
       const promises = Array.from({ length: 10 }, () =>
         Promise.resolve(EventSourcing.getInstance()),
