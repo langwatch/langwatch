@@ -25,6 +25,53 @@ import {
 } from "../../library/services/errorHandling";
 
 /**
+ * Configuration for job retry behavior.
+ */
+const JOB_RETRY_CONFIG = {
+  /** Maximum number of retry attempts before failing permanently */
+  maxAttempts: 15,
+  /** Fixed backoff delay between retries in milliseconds */
+  backoffDelayMs: 2000,
+  /** How long to keep completed jobs (in seconds) */
+  removeOnCompleteAgeSec: 3600, // 1 hour
+  /** Maximum number of completed jobs to keep */
+  removeOnCompleteCount: 1000,
+  /** How long to keep failed jobs (in seconds) */
+  removeOnFailAgeSec: 60 * 60 * 24 * 7, // 7 days
+} as const;
+
+/**
+ * Configuration for progressive delay calculation when handling ordering errors.
+ * Higher sequence numbers wait longer, giving earlier events priority.
+ */
+const PROGRESSIVE_DELAY_CONFIG = {
+  /** Base delay before any sequence-based adjustment */
+  baseDelayMs: 1000,
+  /** Additional delay per sequence number position */
+  perSequenceDelayMs: 200,
+  /** Additional delay per retry attempt */
+  perAttemptDelayMs: 200,
+  /** Maximum delay cap to prevent excessive waits */
+  maxDelayMs: 20000,
+} as const;
+
+/**
+ * Default worker configuration.
+ */
+const WORKER_CONFIG = {
+  /** Default concurrency for job processing */
+  defaultConcurrency: 5,
+} as const;
+
+/**
+ * Configuration for graceful shutdown.
+ */
+const SHUTDOWN_CONFIG = {
+  /** Maximum time to wait for graceful shutdown in milliseconds */
+  timeoutMs: 30000,
+} as const;
+
+/**
  * Context for handling ordering errors, containing all necessary information
  * for progressive delay calculation and job re-queuing.
  */
@@ -81,22 +128,22 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       connection: this.redisConnection,
       telemetry: new BullMQOtel(this.queueName),
       defaultJobOptions: {
-        attempts: 15,
+        attempts: JOB_RETRY_CONFIG.maxAttempts,
         backoff: {
           // Due to the sequential nature of event processing, we don't really want to use exponential backoff, as that
           // could cause a chain reaction of events that are laggier and laggier in processing, causing the system to
           // grind to a halt. Quick retires, coupled with our custom delay logic for event ordering errors, will
           // produce a much more resilient system.
           type: "fixed",
-          delay: 2000,
+          delay: JOB_RETRY_CONFIG.backoffDelayMs,
         },
         delay: this.delay ?? 0,
         removeOnComplete: {
-          age: 3600, // 1 hour
-          count: 1000,
+          age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
+          count: JOB_RETRY_CONFIG.removeOnCompleteCount,
         },
         removeOnFail: {
-          age: 60 * 60 * 24 * 7, // 7 days
+          age: JOB_RETRY_CONFIG.removeOnFailAgeSec,
         },
       },
     };
@@ -107,7 +154,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     const workerOptions: WorkerOptions = {
       connection: this.redisConnection,
-      concurrency: options?.concurrency ?? 5,
+      concurrency: options?.concurrency ?? WORKER_CONFIG.defaultConcurrency,
       telemetry: new BullMQOtel(this.queueName),
     };
     this.worker = new Worker<Payload>(
@@ -229,17 +276,16 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     attemptsMade: number | undefined,
   ): number {
     const currentSequence = (previousSequence ?? 0) + 1;
-    const baseDelayMs = 1000;
-    const perSequenceDelayMs = 200;
-    const perAttemptDelayMs = 200;
 
     const sequenceBasedDelay =
-      baseDelayMs + currentSequence * perSequenceDelayMs;
-    const attemptBasedDelay = (attemptsMade ?? 0) * perAttemptDelayMs;
+      PROGRESSIVE_DELAY_CONFIG.baseDelayMs +
+      currentSequence * PROGRESSIVE_DELAY_CONFIG.perSequenceDelayMs;
+    const attemptBasedDelay =
+      (attemptsMade ?? 0) * PROGRESSIVE_DELAY_CONFIG.perAttemptDelayMs;
 
     return Math.min(
       sequenceBasedDelay + attemptBasedDelay,
-      20000, // Cap at 20 seconds
+      PROGRESSIVE_DELAY_CONFIG.maxDelayMs,
     );
   }
 
@@ -362,10 +408,16 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     // Use job.opts with fallback defaults in case options are not set
     const defaultJobOptions = {
-      attempts: 15,
-      backoff: { type: "fixed" as const, delay: 2000 },
-      removeOnComplete: { age: 3600, count: 1000 },
-      removeOnFail: { age: 60 * 60 * 24 * 7 },
+      attempts: JOB_RETRY_CONFIG.maxAttempts,
+      backoff: {
+        type: "fixed" as const,
+        delay: JOB_RETRY_CONFIG.backoffDelayMs,
+      },
+      removeOnComplete: {
+        age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
+        count: JOB_RETRY_CONFIG.removeOnCompleteCount,
+      },
+      removeOnFail: { age: JOB_RETRY_CONFIG.removeOnFailAgeSec },
     };
 
     await this.queue.add(
@@ -418,13 +470,14 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
+   * Times out after SHUTDOWN_CONFIG.timeoutMs to prevent indefinite hangs.
    * Should be called during application shutdown.
    */
   async close(): Promise<void> {
     this.shutdownRequested = true;
     this.logger.info({ queueName: this.queueName }, "Closing queue processor");
 
-    try {
+    const closeWithTimeout = async (): Promise<void> => {
       // Close worker first to stop accepting new jobs
       if (this.worker) {
         await this.worker.close();
@@ -436,6 +489,25 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         await this.queue.close();
         this.logger.debug({ queueName: this.queueName }, "Queue closed");
       }
+    };
+
+    try {
+      await Promise.race([
+        closeWithTimeout(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new QueueError(
+                  this.queueName,
+                  "close",
+                  `Shutdown timed out after ${SHUTDOWN_CONFIG.timeoutMs}ms`,
+                ),
+              ),
+            SHUTDOWN_CONFIG.timeoutMs,
+          ),
+        ),
+      ]);
 
       this.logger.info(
         { queueName: this.queueName },

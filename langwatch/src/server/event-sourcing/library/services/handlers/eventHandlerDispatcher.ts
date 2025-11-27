@@ -817,17 +817,6 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             );
           }
 
-          this.logger.error(
-            {
-              handlerName,
-              eventId: event.id,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: errorMessage,
-            },
-            "Failed to handle event",
-          );
-
           // Throw to stop queue processing
           throw error;
         } finally {

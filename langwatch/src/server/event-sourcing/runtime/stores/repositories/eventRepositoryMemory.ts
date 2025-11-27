@@ -1,4 +1,7 @@
 import type { EventRepository, EventRecord } from "./eventRepository.types";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:event-sourcing:event-repository-memory");
 
 /**
  * In-memory implementation of EventRepository.
@@ -61,10 +64,15 @@ export class EventRepositoryMemory implements EventRepository {
         (e) => e.EventId === record.EventId,
       );
       if (alreadyExists) {
-        // Log duplicate attempt for observability (memory store is test-only, so console is acceptable)
+        // Log duplicate attempt for observability
         if (process.env.NODE_ENV !== "test") {
-          console.warn(
-            `[EventRepositoryMemory] Duplicate event detected and skipped: EventId=${record.EventId}, AggregateId=${record.AggregateId}, TenantId=${record.TenantId}`,
+          logger.warn(
+            {
+              eventId: record.EventId,
+              aggregateId: record.AggregateId,
+              tenantId: record.TenantId,
+            },
+            "Duplicate event detected and skipped",
           );
         }
         continue;

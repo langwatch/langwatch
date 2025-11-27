@@ -136,6 +136,10 @@ export class OrderingValidator<EventType extends Event = Event> {
    * Returns true if the previous event is processed, false otherwise.
    * This is a non-throwing version of validateOrdering for use in polling scenarios.
    *
+   * Note: This method is part of the public API for external consumers who need to
+   * check ordering status without triggering exceptions. It's useful for implementing
+   * custom retry logic or polling-based ordering checks outside the standard queue flow.
+   *
    * @param processorName - Name of the processor (handler or projection)
    * @param processorType - Type of processor ("handler" or "projection")
    * @param event - The event being checked
