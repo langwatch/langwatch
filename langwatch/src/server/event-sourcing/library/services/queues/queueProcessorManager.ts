@@ -150,7 +150,9 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           const validationError =
             parseResult.success === false
               ? `Validation errors: ${parseResult.error.issues
-                  .map((issue: any) => `${issue.path.join(".")}: ${issue.message}`)
+                  .map(
+                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
+                  )
                   .join(", ")}`
               : "Unknown validation error";
 
@@ -158,7 +160,15 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
             "events",
             event,
-            { commandType, payload, index: i, validationErrors: parseResult.success === false ? parseResult.error.issues : void 0 },
+            {
+              commandType,
+              payload,
+              index: i,
+              validationErrors:
+                parseResult.success === false
+                  ? parseResult.error.issues
+                  : void 0,
+            },
           );
         }
       }
@@ -230,10 +240,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
   /**
    * Creates a default job ID for event handler processing.
-   * Format: `${tenantId}:${aggregateId}:${timestamp}:${eventType}:${aggregateType}`
+   * Format: ${event.id}`
    */
   createDefaultJobId(event: EventType): string {
-    return `${event.tenantId}:${String(event.aggregateId)}:${event.timestamp}:${event.type}:${this.aggregateType}`;
+    return event.id;
   }
 
   /**

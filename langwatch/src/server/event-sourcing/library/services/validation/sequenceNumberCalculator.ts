@@ -47,6 +47,8 @@ export class SequenceNumberCalculator<EventType extends Event = Event> {
         eventId: event.id,
         timestamp: event.timestamp,
         aggregateId: event.aggregateId,
+        aggregateType: this.aggregateType,
+        tenantId: context.tenantId,
         count,
         sequenceNumber,
       },

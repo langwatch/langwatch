@@ -42,6 +42,16 @@ export class OrderingValidator<EventType extends Event = Event> {
 
     // If sequenceNumber is 1, there's no predecessor to check
     if (sequenceNumber <= 1) {
+      this.logger.debug(
+        {
+          eventId: event.id,
+          sequenceNumber,
+          processorName,
+          processorType,
+          reason: "sequenceNumber <= 1, no predecessor to check",
+        },
+        "Skipping ordering validation - first event",
+      );
       return;
     }
 
@@ -54,6 +64,9 @@ export class OrderingValidator<EventType extends Event = Event> {
         previousSequenceNumber,
         processorName,
         processorType,
+        aggregateId: String(event.aggregateId),
+        tenantId: event.tenantId,
+        pipelineName: this.pipelineName,
       },
       "Checking if previous event processed",
     );
@@ -78,12 +91,18 @@ export class OrderingValidator<EventType extends Event = Event> {
         found: previousCheckpoint !== null,
         checkpointSequence: previousCheckpoint?.sequenceNumber ?? null,
         checkpointStatus: previousCheckpoint?.status ?? null,
+        checkpointEventId: previousCheckpoint?.eventId ?? null,
+        checkpointKey: previousCheckpoint
+          ? `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`
+          : null,
       },
       "Previous checkpoint lookup result",
     );
 
     // If no processed checkpoint exists with sequence >= previousSequenceNumber, we must wait
     if (!previousCheckpoint) {
+      // DEBUG: Try to find what checkpoints DO exist for this aggregate
+      const checkpointKey = `${event.tenantId}:${this.pipelineName}:${processorName}:${event.aggregateType}:${String(event.aggregateId)}`;
       this.logger.warn(
         {
           processorName,
@@ -93,6 +112,8 @@ export class OrderingValidator<EventType extends Event = Event> {
           sequenceNumber,
           previousSequenceNumber,
           tenantId: event.tenantId,
+          checkpointKey,
+          reason: "No checkpoint found for previous sequence number",
         },
         "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
       );
