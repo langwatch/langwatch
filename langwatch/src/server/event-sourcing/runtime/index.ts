@@ -4,11 +4,9 @@ import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
 } from "./pipeline";
-import { ProcessorCheckpointStoreMemory } from "./stores/processorCheckpointStoreMemory";
-import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
-import { CheckpointRepositoryClickHouse } from "./stores/repositories/checkpointRepositoryClickHouse";
-import { CheckpointRepositoryMemory } from "./stores/repositories/checkpointRepositoryMemory";
-import { getClickHouseClient } from "../../../utils/clickhouse";
+import { createLogger } from "~/utils/logger";
+
+const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 
 export class EventSourcingPipeline<
   EventType extends Event = Event,
@@ -35,27 +33,21 @@ export class EventSourcingPipeline<
       enumerable: true,
       configurable: false,
     });
-    // Create checkpoint store for event handlers and projections
-    // Always use Memory store in test environment, otherwise use ClickHouse if available
-    const checkpointStore =
-      (definition.eventHandlers ?? definition.projections)
-        ? (() => {
-            // Always use Memory store in test environment
-            if (process.env.NODE_ENV === "test" || process.env.VITEST) {
-              return new ProcessorCheckpointStoreMemory(
-                new CheckpointRepositoryMemory(),
-              );
-            }
-            const clickHouseClient = getClickHouseClient();
-            return clickHouseClient
-              ? new ProcessorCheckpointStoreClickHouse(
-                  new CheckpointRepositoryClickHouse(clickHouseClient),
-                )
-              : new ProcessorCheckpointStoreMemory(
-                  new CheckpointRepositoryMemory(),
-                );
-          })()
-        : void 0;
+
+    // Checkpoint store is now provided by the builder (from EventSourcingRuntime)
+    // or explicitly injected for testing
+    const checkpointStore = definition.processorCheckpointStore;
+
+    pipelineLogger.debug(
+      {
+        pipelineName: definition.name,
+        checkpointStoreType: checkpointStore
+          ? checkpointStore.constructor.name
+          : "none",
+        checkpointStoreSource: checkpointStore ? "provided" : "none",
+      },
+      "Initialized event-sourcing pipeline",
+    );
 
     Object.defineProperty(this, "service", {
       value: new EventSourcingService<EventType, ProjectionType>({
@@ -93,7 +85,19 @@ export type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
   PipelineWithCommandHandlers,
+  PipelineBuilderOptions,
 } from "./pipeline";
 
 export { eventSourcing } from "./eventSourcing";
 export type { EventSourcing } from "./eventSourcing";
+
+export {
+  EventSourcingRuntime,
+  getEventSourcingRuntime,
+  resetEventSourcingRuntime,
+} from "./eventSourcingRuntime";
+
+export type { EventSourcingConfig } from "./config";
+export { createEventSourcingConfig } from "./config";
+
+export { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";

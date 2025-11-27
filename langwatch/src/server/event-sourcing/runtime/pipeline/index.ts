@@ -1,4 +1,5 @@
 export { PipelineBuilder } from "./builder";
+export type { PipelineBuilderOptions } from "./builder";
 export type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,

@@ -24,6 +24,15 @@ import type { QueueProcessorFactory } from "../queue";
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 
+export interface PipelineBuilderOptions {
+  eventStore: EventStore<any>;
+  queueProcessorFactory?: QueueProcessorFactory;
+  distributedLock?: DistributedLock;
+  handlerLockTtlMs?: number;
+  updateLockTtlMs?: number;
+  processorCheckpointStore?: ProcessorCheckpointStore;
+}
+
 /**
  * Options for configuring a command handler.
  * All options are optional and will fall back to static methods on the handler class if not provided.
@@ -95,25 +104,10 @@ export class PipelineBuilder<
   EventType extends Event,
   ProjectionType extends Projection,
 > {
-  constructor(
-    private readonly eventStore: EventStore<any>,
-    private readonly queueProcessorFactory?: QueueProcessorFactory,
-    private readonly distributedLock?: DistributedLock,
-    private readonly handlerLockTtlMs?: number,
-    private readonly updateLockTtlMs?: number,
-    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
-  ) {}
+  constructor(private readonly options: PipelineBuilderOptions) {}
 
   withName(name: string): PipelineBuilderWithName<EventType, ProjectionType> {
-    return new PipelineBuilderWithName(
-      this.eventStore,
-      name,
-      this.queueProcessorFactory,
-      this.distributedLock,
-      this.handlerLockTtlMs,
-      this.updateLockTtlMs,
-      this.processorCheckpointStore,
-    );
+    return new PipelineBuilderWithName(this.options, name);
   }
 
   build(): never {
@@ -129,27 +123,17 @@ export class PipelineBuilderWithName<
   ProjectionType extends Projection,
 > {
   constructor(
-    private readonly eventStore: EventStore<any>,
+    private readonly options: PipelineBuilderOptions,
     private readonly name: string,
-    private readonly queueProcessorFactory?: QueueProcessorFactory,
-    private readonly distributedLock?: DistributedLock,
-    private readonly handlerLockTtlMs?: number,
-    private readonly updateLockTtlMs?: number,
-    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
   ) {}
 
   withAggregateType(
     aggregateType: AggregateType,
   ): PipelineBuilderWithNameAndType<EventType, ProjectionType, never, never> {
     return new PipelineBuilderWithNameAndType(
-      this.eventStore,
+      this.options,
       this.name,
       aggregateType,
-      this.queueProcessorFactory,
-      this.distributedLock,
-      this.handlerLockTtlMs,
-      this.updateLockTtlMs,
-      this.processorCheckpointStore,
     );
   }
 
@@ -201,14 +185,9 @@ export class PipelineBuilderWithNameAndType<
   private commandHandlers: Array<CommandHandlerRegistration<EventType>> = [];
 
   constructor(
-    private readonly eventStore: EventStore<any>,
+    private readonly options: PipelineBuilderOptions,
     private readonly name: string,
     private readonly aggregateType: AggregateType,
-    private readonly queueProcessorFactory?: QueueProcessorFactory,
-    private readonly distributedLock?: DistributedLock,
-    private readonly handlerLockTtlMs?: number,
-    private readonly updateLockTtlMs?: number,
-    private readonly processorCheckpointStore?: ProcessorCheckpointStore,
   ) {}
 
   /**
@@ -438,15 +417,15 @@ export class PipelineBuilderWithNameAndType<
     const pipeline = new EventSourcingPipeline<EventType, ProjectionType>({
       name: this.name,
       aggregateType: this.aggregateType,
-      eventStore: this.eventStore as EventStore<EventType>,
+      eventStore: this.options.eventStore as EventStore<EventType>,
       projections: projectionsObject,
       eventPublisher: this.eventPublisher,
       eventHandlers: eventHandlersObject,
-      queueProcessorFactory: this.queueProcessorFactory,
-      distributedLock: this.distributedLock,
-      handlerLockTtlMs: this.handlerLockTtlMs,
-      updateLockTtlMs: this.updateLockTtlMs,
-      processorCheckpointStore: this.processorCheckpointStore,
+      queueProcessorFactory: this.options.queueProcessorFactory,
+      distributedLock: this.options.distributedLock,
+      handlerLockTtlMs: this.options.handlerLockTtlMs,
+      updateLockTtlMs: this.options.updateLockTtlMs,
+      processorCheckpointStore: this.options.processorCheckpointStore,
     });
 
     // Create dispatchers now that we have the service

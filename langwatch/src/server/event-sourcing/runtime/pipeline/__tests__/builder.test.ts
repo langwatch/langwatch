@@ -50,7 +50,9 @@ describe("PipelineBuilder", () => {
   describe("PipelineBuilder State Enforcement", () => {
     it('throws Error with message "Pipeline name is required" when build() called before withName()', () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore);
+      const builder = new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+      });
 
       expect(() => {
         builder.build();
@@ -59,7 +61,9 @@ describe("PipelineBuilder", () => {
 
     it("returns PipelineBuilderWithName instance when withName() called with string", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore);
+      const builder = new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+      });
 
       const result = builder.withName("test-pipeline");
 
@@ -74,10 +78,10 @@ describe("PipelineBuilder", () => {
     it("preserves eventStore and queueProcessorFactory when transitioning to PipelineBuilderWithName", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
-      const builder = new PipelineBuilder<TestEvent, Projection>(
+      const builder = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      );
+        queueProcessorFactory: factory,
+      });
 
       const withName = builder.withName("test-pipeline");
       const withType = withName.withAggregateType("span_ingestion");
@@ -96,7 +100,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -109,9 +116,9 @@ describe("PipelineBuilder", () => {
   describe("PipelineBuilderWithName State Enforcement", () => {
     it('throws Error with message "Aggregate type is required" when build() called before withAggregateType()', () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(
+      const builder = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-      ).withName("test-pipeline");
+      }).withName("test-pipeline");
 
       expect(() => {
         builder.build();
@@ -120,9 +127,9 @@ describe("PipelineBuilder", () => {
 
     it("returns PipelineBuilderWithNameAndType instance when withAggregateType() called with valid AggregateType", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(
+      const builder = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-      ).withName("test-pipeline");
+      }).withName("test-pipeline");
 
       const result = builder.withAggregateType("span_ingestion");
 
@@ -139,7 +146,7 @@ describe("PipelineBuilder", () => {
 
     it("preserves name, eventStore, and queueProcessorFactory when transitioning to PipelineBuilderWithNameAndType", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -153,7 +160,7 @@ describe("PipelineBuilder", () => {
   describe("PipelineBuilderWithNameAndType Build Contract", () => {
     it("creates RegisteredPipeline with name property matching builder name", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("my-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -164,7 +171,7 @@ describe("PipelineBuilder", () => {
 
     it("creates RegisteredPipeline with aggregateType property matching builder aggregateType", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("trace_aggregation");
 
@@ -175,7 +182,7 @@ describe("PipelineBuilder", () => {
 
     it("creates RegisteredPipeline with service property that is EventSourcingService instance", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -190,7 +197,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const storeEventsSpy = vi.spyOn(eventStore, "storeEvents");
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -206,7 +213,7 @@ describe("PipelineBuilder", () => {
 
     it("passes undefined projections when no projections registered", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -217,7 +224,7 @@ describe("PipelineBuilder", () => {
 
     it("passes undefined eventPublisher when no publisher registered", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -228,7 +235,7 @@ describe("PipelineBuilder", () => {
 
     it("passes undefined eventHandlers when no handlers registered", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -243,7 +250,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection(
@@ -281,7 +288,7 @@ describe("PipelineBuilder", () => {
         createTestProjection("proj-id", "aggregate-1", tenantId),
       );
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection("test-projection", ProjectionHandlerClass);
@@ -298,7 +305,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -314,7 +321,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection(
@@ -337,7 +344,7 @@ describe("PipelineBuilder", () => {
       const store1 = createMockProjectionStore<Projection>();
       const store2 = createMockProjectionStore<Projection>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection(
@@ -408,7 +415,7 @@ describe("PipelineBuilder", () => {
         data: {},
       } as Projection);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection("projection-1", ProjectionHandlerClass1)
@@ -432,7 +439,7 @@ describe("PipelineBuilder", () => {
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventPublisher(publisher);
@@ -454,7 +461,7 @@ describe("PipelineBuilder", () => {
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventPublisher(publisher1)
@@ -473,7 +480,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const publisher = createMockEventPublisher<TestEvent>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -489,7 +496,7 @@ describe("PipelineBuilder", () => {
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventPublisher(publisher);
@@ -506,7 +513,7 @@ describe("PipelineBuilder", () => {
     it("passes undefined to EventSourcingPipeline when no publisher registered", () => {
       const eventStore = createMockEventStore<TestEvent>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
@@ -522,7 +529,9 @@ describe("PipelineBuilder", () => {
       it("stores event handler definition in internal Map with exact name key when called with unique name", () => {
         const eventStore = createMockEventStore<TestEvent>();
 
-        const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+        const builder = new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler(
@@ -548,10 +557,10 @@ describe("PipelineBuilder", () => {
 
           const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
-          const builder = new PipelineBuilder<TestEvent, Projection>(
+          const builder = new PipelineBuilder<TestEvent, Projection>({
             eventStore,
-            factory,
-          )
+            queueProcessorFactory: factory,
+          })
             .withName("test-pipeline")
             .withAggregateType("span_ingestion")
             .withEventHandler("test-handler", HandlerClass);
@@ -576,7 +585,9 @@ describe("PipelineBuilder", () => {
 
       it("stores handler definition with options object matching provided options", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+        const builder = new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler(
@@ -594,7 +605,9 @@ describe("PipelineBuilder", () => {
 
       it("stores handler definition with empty options object when options not provided", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+        const builder = new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler(
@@ -611,7 +624,9 @@ describe("PipelineBuilder", () => {
         const eventStore = createMockEventStore<TestEvent>();
         const HandlerClass = createTestEventHandlerClass<TestEvent>();
 
-        const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+        const builder = new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler("duplicate-name", HandlerClass);
@@ -628,7 +643,9 @@ describe("PipelineBuilder", () => {
         const HandlerClass1 = createTestEventHandlerClass<TestEvent>();
         const HandlerClass2 = createTestEventHandlerClass<TestEvent>();
 
-        const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+        const builder = new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler("handler-1", HandlerClass1)
@@ -654,10 +671,10 @@ describe("PipelineBuilder", () => {
 
         const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
-        const builder = new PipelineBuilder<TestEvent, Projection>(
+        const builder = new PipelineBuilder<TestEvent, Projection>({
           eventStore,
-          factory,
-        )
+          queueProcessorFactory: factory,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withEventHandler("handler-1", HandlerClass1)
@@ -686,7 +703,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -704,10 +724,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -725,10 +745,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -746,10 +766,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("customName", HandlerClass)
@@ -772,10 +792,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("handler1", HandlerClass1)
@@ -803,7 +823,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("handler1", HandlerClass1)
@@ -823,7 +846,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("my-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -855,10 +881,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -877,10 +903,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -901,10 +927,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("customName", HandlerClass)
@@ -932,10 +958,10 @@ describe("PipelineBuilder", () => {
         }
       }
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("recordSpan", RecordSpanCommandHandler)
@@ -959,7 +985,10 @@ describe("PipelineBuilder", () => {
       >();
 
       expect(() => {
-        new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+        new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+          queueProcessorFactory: factory,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withCommand("duplicateName", HandlerClass1)
@@ -987,10 +1016,10 @@ describe("PipelineBuilder", () => {
         schema,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1014,10 +1043,10 @@ describe("PipelineBuilder", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1048,10 +1077,10 @@ describe("PipelineBuilder", () => {
         handleImpl: handleSpy,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1088,10 +1117,10 @@ describe("PipelineBuilder", () => {
         handleImpl: handleSpy,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1127,10 +1156,10 @@ describe("PipelineBuilder", () => {
         handleImpl: handleSpy,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1168,10 +1197,10 @@ describe("PipelineBuilder", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1205,10 +1234,10 @@ describe("PipelineBuilder", () => {
         handleImpl: async () => [],
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1242,10 +1271,10 @@ describe("PipelineBuilder", () => {
         },
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -1268,7 +1297,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withProjection(
@@ -1288,7 +1317,9 @@ describe("PipelineBuilder", () => {
 
     it("accepts empty string pipeline name (no validation enforced)", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore);
+      const builder = new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+      });
 
       const withName = builder.withName("");
       const pipeline = withName.withAggregateType("span_ingestion").build();
@@ -1300,7 +1331,7 @@ describe("PipelineBuilder", () => {
     it("handles very long pipeline names without issues", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const longName = "a".repeat(1000);
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName(longName)
         .withAggregateType("span_ingestion");
 
@@ -1315,7 +1346,7 @@ describe("PipelineBuilder", () => {
     it("handles special characters in pipeline name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const specialName = "test-pipeline_with.special@chars#123";
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName(specialName)
         .withAggregateType("span_ingestion");
 
@@ -1331,7 +1362,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const HandlerClass = createTestEventHandlerClass<TestEvent>();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withEventHandler("duplicate", HandlerClass);
@@ -1358,7 +1389,10 @@ describe("PipelineBuilder", () => {
       >();
 
       expect(() => {
-        new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+        new PipelineBuilder<TestEvent, Projection>({
+          eventStore,
+          queueProcessorFactory: factory,
+        })
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
           .withCommand("duplicate", HandlerClass1)
@@ -1374,7 +1408,7 @@ describe("PipelineBuilder", () => {
       const storeEventsError = new Error("Event store failure");
       vi.spyOn(eventStore, "storeEvents").mockRejectedValue(storeEventsError);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
+      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 

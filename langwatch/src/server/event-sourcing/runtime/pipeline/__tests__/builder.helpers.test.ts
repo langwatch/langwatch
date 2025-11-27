@@ -31,10 +31,10 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("customDispatcher", HandlerClass)
@@ -63,10 +63,10 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+      const pipeline = new PipelineBuilder<TestEvent, Projection>({
         eventStore,
-        factory,
-      )
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", TestHandler)
@@ -103,7 +103,10 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", TestHandler)
@@ -137,7 +140,10 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -161,7 +167,10 @@ describe("Pipeline Builder Helper Functions", () => {
         delay: 5000,
       });
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -183,7 +192,10 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -218,7 +230,10 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", TestHandler)
@@ -255,7 +270,10 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -279,7 +297,10 @@ describe("Pipeline Builder Helper Functions", () => {
         concurrency: 10,
       });
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)
@@ -301,7 +322,10 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+      new PipelineBuilder<TestEvent, Projection>({
+        eventStore,
+        queueProcessorFactory: factory,
+      })
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("testDispatcher", HandlerClass)

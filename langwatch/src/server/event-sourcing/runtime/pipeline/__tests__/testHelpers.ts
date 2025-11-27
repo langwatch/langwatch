@@ -130,6 +130,7 @@ export function createTestCommandHandlerClass<
   ) => Record<string, string | number | boolean>;
   handleImpl?: (command: Command<Payload>) => Promise<EventType[]>;
   schema?: CommandSchema<Payload, CommandType>;
+  dispatcherName?: string;
 }): CommandHandlerClass<Payload, CommandType, EventType> {
   const getAggregateId =
     config?.getAggregateId ?? ((payload: Payload) => payload.id);
@@ -146,6 +147,10 @@ export function createTestCommandHandlerClass<
         COMMAND_TYPES[0],
         testCommandPayloadSchema,
       ) as CommandSchema<Payload, CommandType>);
+
+    static readonly dispatcherName = config?.dispatcherName as
+      | string
+      | undefined;
 
     static getAggregateId(payload: Payload): string {
       return getAggregateId(payload);
@@ -193,10 +198,10 @@ export function createTestPipelineBuilder<
   const mockFactory =
     queueProcessorFactory ?? createMockQueueProcessorFactory();
 
-  return new PipelineBuilder<EventType, ProjectionType>(
-    mockEventStore,
-    mockFactory,
-  );
+  return new PipelineBuilder<EventType, ProjectionType>({
+    eventStore: mockEventStore,
+    queueProcessorFactory: mockFactory,
+  });
 }
 
 /**
@@ -327,12 +332,9 @@ export const TEST_CONSTANTS = {
 export function createTestEventForBuilder(
   aggregateId: string,
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+  aggregateType: AggregateType = "span_ingestion",
 ): TestEvent {
-  return createTestEvent(
-    aggregateId,
-    TEST_CONSTANTS.AGGREGATE_TYPE,
-    tenantId,
-  ) as TestEvent;
+  return createTestEvent(aggregateId, aggregateType, tenantId) as TestEvent;
 }
 
 /**
@@ -378,7 +380,10 @@ export function createMinimalPipelineBuilder() {
       TestEvent
     >,
   ) => {
-    return new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
+    return new PipelineBuilder<TestEvent, Projection>({
+      eventStore,
+      queueProcessorFactory: factory,
+    })
       .withName("test-pipeline")
       .withAggregateType("span_ingestion")
       .withCommand("testCommand", HandlerClass)
