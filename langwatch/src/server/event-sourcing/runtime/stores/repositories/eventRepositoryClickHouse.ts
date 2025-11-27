@@ -2,6 +2,38 @@ import { type ClickHouseClient } from "@clickhouse/client";
 import type { EventRepository, EventRecord } from "./eventRepository.types";
 import { createLogger } from "../../../../../utils/logger";
 
+const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
+
+function normalizePayloadValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return normalizePayloadValue(parsed);
+    } catch {
+      if (value.trim().length > 0 && NUMERIC_STRING_REGEX.test(value)) {
+        const numberValue = Number(value);
+        if (Number.isFinite(numberValue)) {
+          return numberValue;
+        }
+      }
+      return value;
+    }
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizePayloadValue(entry));
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).map(
+      ([key, entry]) => [key, normalizePayloadValue(entry)],
+    );
+    return Object.fromEntries(entries);
+  }
+
+  return value;
+}
+
 /**
  * ClickHouse implementation of EventRepository.
  * Handles raw data access to ClickHouse without business logic.
@@ -45,11 +77,12 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventId: string;
         EventTimestamp: number;
         EventType: string;
-        EventPayload: unknown;
+        EventPayload: unknown; // Can be object (when ClickHouse parses JSON) or string (when serialized)
         ProcessingTraceparent: string;
       }>();
 
-      // Transform to EventRecord format
+      // Normalize payload so numeric fields stay numeric regardless of how
+      // ClickHouse serializes the JSON column.
       return rows.map((row) => ({
         TenantId: tenantId,
         AggregateType: aggregateType,
@@ -57,7 +90,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         EventId: row.EventId,
         EventTimestamp: row.EventTimestamp,
         EventType: row.EventType,
-        EventPayload: row.EventPayload,
+        EventPayload: normalizePayloadValue(row.EventPayload),
         ProcessingTraceparent: row.ProcessingTraceparent || "",
       }));
     } catch (error) {
@@ -107,8 +140,8 @@ export class EventRepositoryClickHouse implements EventRepository {
         format: "JSONEachRow",
       });
 
-      const rows = await result.json<{ count: number }>();
-      const count = rows[0]?.count ?? 0;
+      const rows = await result.json<{ count: string }>();
+      const count = Number(rows[0]?.count ?? 0);
 
       // Log for debugging sequence number issues
       this.logger.debug(
