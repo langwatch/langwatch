@@ -125,10 +125,18 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     sequenceNumber: number,
   ): Promise<CheckpointRecord | null> {
     try {
-      // Query for checkpoints with sequence >= requested
-      // Accept "processed" status (normal case) or "pending" status for exact sequence match
-      // With distributed locking, if we have the lock and previous event is "pending",
-      // it means the previous event finished but checkpoint save hasn't completed yet
+      // Query for checkpoints that prove the requested sequence was processed.
+      //
+      // With ReplacingMergeTree, there's only ONE row per checkpoint key (the latest).
+      // When event N+1 starts processing, it saves a "pending" checkpoint that REPLACES
+      // the "processed" checkpoint from event N. This means we can't just look for
+      // a "processed" checkpoint with the exact sequence number.
+      //
+      // Logic:
+      // 1. If we find a "processed" checkpoint with seq >= requested, the requested seq is done
+      // 2. If we find a "pending" checkpoint with seq > requested, the requested seq must be done
+      //    (otherwise the higher sequence couldn't have started processing)
+      // 3. If we find a "pending" checkpoint with seq = requested, it's currently processing
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
@@ -151,7 +159,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AND Status != 'failed'
             AND (
               Status = 'processed'
-              OR (Status = 'pending' AND SequenceNumber = {sequenceNumber:UInt64})
+              OR (Status = 'pending' AND SequenceNumber >= {sequenceNumber:UInt64})
             )
           ORDER BY SequenceNumber ASC
           LIMIT 1
@@ -168,6 +176,17 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
 
       if (!row) {
         return null;
+      }
+
+      // If we found a pending checkpoint for a HIGHER sequence, convert the result
+      // to indicate the requested sequence is processed (since it must be for the
+      // higher sequence to have started)
+      if (row.Status === "pending" && row.SequenceNumber > sequenceNumber) {
+        return {
+          ...row,
+          Status: "processed",
+          SequenceNumber: sequenceNumber,
+        };
       }
 
       return row;
@@ -201,8 +220,8 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
         format: "JSONEachRow",
       });
 
-      const rows = await result.json<{ count: number }>();
-      const count = rows[0]?.count ?? 0;
+      const rows = await result.json<{ count: string }>();
+      const count = Number(rows[0]?.count ?? 0);
 
       return count > 0;
     } catch (error) {
