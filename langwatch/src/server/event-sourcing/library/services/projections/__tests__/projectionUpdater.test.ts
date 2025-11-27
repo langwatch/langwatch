@@ -327,9 +327,9 @@ describe("ProjectionUpdater", () => {
         .mock.calls.map((call) => call[4]);
 
       expect(savedStatuses).not.toContain("failed");
-      expect(savedStatuses.filter((status) => status === "pending").length).toBe(
-        2,
-      );
+      expect(
+        savedStatuses.filter((status) => status === "pending").length,
+      ).toBe(2);
       expect(updateSpy).toHaveBeenCalled();
     });
 

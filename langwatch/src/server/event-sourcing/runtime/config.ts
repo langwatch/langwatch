@@ -28,12 +28,11 @@ function isBuildPhase(): boolean {
 
 export function createEventSourcingConfig(): EventSourcingConfig {
   const isTestEnvironment =
-  process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
+    process.env.NODE_ENV === "test" || Boolean(process.env.VITEST);
   const isBuildTime = isTestEnvironment ? false : isBuildPhase();
 
   // Disable event sourcing during build to avoid requiring external services
-  const enabled =
-    process.env.ENABLE_EVENT_SOURCING !== "false" && !isBuildTime;
+  const enabled = process.env.ENABLE_EVENT_SOURCING !== "false" && !isBuildTime;
   const clickHouseEnabled = process.env.ENABLE_CLICKHOUSE !== "false";
   const forceClickHouseInTests =
     process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true";

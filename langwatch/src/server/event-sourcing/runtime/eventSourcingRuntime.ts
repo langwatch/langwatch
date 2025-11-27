@@ -119,7 +119,9 @@ export class EventSourcingRuntime {
       if (this.config.isBuildTime) {
         logger.warn("Event sourcing disabled during build phase");
       } else {
-        logger.info("Event sourcing is disabled via ENABLE_EVENT_SOURCING=false");
+        logger.info(
+          "Event sourcing is disabled via ENABLE_EVENT_SOURCING=false",
+        );
       }
       return;
     }
@@ -136,7 +138,8 @@ export class EventSourcingRuntime {
       forceClickHouseInTests,
     } = this.config;
 
-    const isProduction = process.env.NODE_ENV === "production" && !isTestEnvironment;
+    const isProduction =
+      process.env.NODE_ENV === "production" && !isTestEnvironment;
 
     // Create event store
     if (clickHouseEnabled && clickHouseClient) {
@@ -195,7 +198,8 @@ export class EventSourcingRuntime {
     isTestEnvironment: boolean,
     forceClickHouseInTests: boolean,
   ): ProcessorCheckpointStore | undefined {
-    const isProduction = process.env.NODE_ENV === "production" && !isTestEnvironment;
+    const isProduction =
+      process.env.NODE_ENV === "production" && !isTestEnvironment;
 
     // In test environment, use memory unless forced to use ClickHouse
     if (isTestEnvironment && !forceClickHouseInTests) {
