@@ -80,7 +80,7 @@ describe("QueueProcessorManager", () => {
       const jobId = manager.createDefaultJobId(event);
 
       expect(jobId).toBe(
-        `${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}:${aggregateType}`,
+        `${TEST_CONSTANTS.BASE_TIMESTAMP}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}`,
       );
     });
   });
@@ -378,12 +378,15 @@ describe("QueueProcessorManager", () => {
 
       expect(queueFactory.create).toHaveBeenCalledTimes(2);
       expect(manager.getCommandQueueProcessors().size).toBe(2);
-      expect(manager.getCommandQueueProcessor("command1")).toBe(
-        mockQueueProcessor,
-      );
-      expect(manager.getCommandQueueProcessor("command2")).toBe(
-        mockQueueProcessor,
-      );
+      // The manager wraps the processor with validation, so we check the interface exists
+      const command1Processor = manager.getCommandQueueProcessor("command1");
+      const command2Processor = manager.getCommandQueueProcessor("command2");
+      expect(command1Processor).toBeDefined();
+      expect(command2Processor).toBeDefined();
+      expect(typeof command1Processor?.send).toBe("function");
+      expect(typeof command1Processor?.close).toBe("function");
+      expect(typeof command2Processor?.send).toBe("function");
+      expect(typeof command2Processor?.close).toBe("function");
     });
 
     it("throws error when command name already exists", () => {

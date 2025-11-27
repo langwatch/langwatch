@@ -322,14 +322,14 @@ describe("ProjectionUpdater", () => {
         ),
       ).rejects.toBe(lockError);
 
-      const savedStatuses = checkpointStore.saveCheckpoint.mock.calls.map(
-        (call) => call[4],
-      );
+      const savedStatuses = vi
+        .mocked(checkpointStore.saveCheckpoint)
+        .mock.calls.map((call) => call[4]);
 
       expect(savedStatuses).not.toContain("failed");
-      expect(
-        savedStatuses.filter((status) => status === "pending").length,
-      ).toBe(2);
+      expect(savedStatuses.filter((status) => status === "pending").length).toBe(
+        2,
+      );
       expect(updateSpy).toHaveBeenCalled();
     });
 
@@ -399,9 +399,9 @@ describe("ProjectionUpdater", () => {
         ),
       ).rejects.toBe(orderingError);
 
-      const savedStatuses = checkpointStore.saveCheckpoint.mock.calls.map(
-        (call) => call[4],
-      );
+      const savedStatuses = vi
+        .mocked(checkpointStore.saveCheckpoint)
+        .mock.calls.map((call) => call[4]);
 
       expect(savedStatuses).not.toContain("failed");
       expect(validatorSpy).toHaveBeenCalled();
