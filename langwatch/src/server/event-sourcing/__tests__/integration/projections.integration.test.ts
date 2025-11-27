@@ -7,7 +7,10 @@ import {
   cleanupTestDataForTenant,
   verifyCheckpoint,
 } from "./testHelpers";
-import type { TestProjection } from "./testPipelines";
+import type { TestEvent,
+TestProjection } from "./testPipelines";
+import { type AggregateType,
+EventUtils } from "../../library";
 
 describe("Projections - Integration Tests", () => {
   let pipeline: ReturnType<typeof createTestPipeline>;
