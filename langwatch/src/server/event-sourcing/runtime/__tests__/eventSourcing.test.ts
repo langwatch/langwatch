@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventSourcing } from "../eventSourcing";
+import {
+  EventSourcingRuntime,
+  resetEventSourcingRuntime,
+} from "../eventSourcingRuntime";
 import { EventStoreClickHouse } from "../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../stores/eventStoreMemory";
 import { PipelineBuilder } from "../pipeline";
+import { DisabledPipelineBuilder } from "../disabledPipeline";
 import type { Event } from "../../library";
-import type { QueueProcessorFactory } from "../queue";
 import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
 import * as clickhouseUtils from "../../../../utils/clickhouse";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -14,18 +18,18 @@ describe("EventSourcing", () => {
   let getClickHouseClientSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    // Reset singleton instance between tests
-    (EventSourcing as unknown as { instance: EventSourcing | null }).instance =
-      null;
+    // Reset singleton instances between tests
+    EventSourcing.resetInstance();
+    resetEventSourcingRuntime();
 
     getClickHouseClientSpy = vi.spyOn(clickhouseUtils, "getClickHouseClient");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    // Reset singleton instance after each test
-    (EventSourcing as unknown as { instance: EventSourcing | null }).instance =
-      null;
+    // Reset singleton instances after each test
+    EventSourcing.resetInstance();
+    resetEventSourcingRuntime();
   });
 
   describe("getInstance", () => {
@@ -47,7 +51,6 @@ describe("EventSourcing", () => {
       const eventStore = instance.getEventStore();
 
       expect(eventStore).toBeInstanceOf(EventStoreMemory);
-      expect(getClickHouseClientSpy).toHaveBeenCalledTimes(1);
     });
 
     it("creates ClickHouse store when client is available", () => {
@@ -58,7 +61,6 @@ describe("EventSourcing", () => {
       const eventStore = instance.getEventStore();
 
       expect(eventStore).toBeInstanceOf(EventStoreClickHouse);
-      expect(getClickHouseClientSpy).toHaveBeenCalledTimes(1);
     });
 
     it("returns the same event store instance across multiple getInstance calls", () => {
@@ -75,64 +77,51 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("constructor", () => {
-    it("uses default event store when no parameters provided", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
-
-      const instance = new EventSourcing();
-      const eventStore = instance.getEventStore();
-
-      expect(eventStore).toBeInstanceOf(EventStoreMemory);
-    });
-
-    it("uses injected event store when provided", () => {
+  describe("constructor with runtime injection", () => {
+    it("uses injected event store from runtime", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const eventStore = instance.getEventStore();
 
       expect(eventStore).toBe(mockEventStore);
     });
 
-    it("uses injected queue processor factory when provided", () => {
+    it("returns PipelineBuilder when event sourcing is enabled", () => {
       const mockEventStore = createMockEventStore<Event>();
-      const mockFactory: QueueProcessorFactory = {
-        create: vi.fn(),
-      };
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore, mockFactory);
+      const instance = new EventSourcing(runtime);
       const builder = instance.registerPipeline<Event>();
 
       expect(builder).toBeInstanceOf(PipelineBuilder);
     });
 
-    it("creates ClickHouse store when client is available and no store provided", () => {
-      const mockClient = {} as ClickHouseClient;
-      getClickHouseClientSpy.mockReturnValue(mockClient);
+    it("returns disabled status from runtime", () => {
+      const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing();
-      const eventStore = instance.getEventStore();
+      const instance = new EventSourcing(runtime);
 
-      expect(eventStore).toBeInstanceOf(EventStoreClickHouse);
-      expect(getClickHouseClientSpy).toHaveBeenCalledTimes(1);
-    });
-
-    it("creates Memory store when client is not available and no store provided", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
-
-      const instance = new EventSourcing();
-      const eventStore = instance.getEventStore();
-
-      expect(eventStore).toBeInstanceOf(EventStoreMemory);
-      expect(getClickHouseClientSpy).toHaveBeenCalledTimes(1);
+      expect(instance.isEnabled).toBe(true);
     });
   });
 
   describe("getEventStore", () => {
-    it("returns the event store instance", () => {
+    it("returns the event store instance from runtime", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const eventStore = instance.getEventStore();
 
       expect(eventStore).toBe(mockEventStore);
@@ -140,8 +129,11 @@ describe("EventSourcing", () => {
 
     it("returns the same event store instance on multiple calls", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const eventStore1 = instance.getEventStore();
       const eventStore2 = instance.getEventStore();
       const eventStore3 = instance.getEventStore();
@@ -157,8 +149,11 @@ describe("EventSourcing", () => {
       }
 
       const mockEventStore = createMockEventStore<TestEvent>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const eventStore = instance.getEventStore<TestEvent>();
 
       expect(eventStore).toBe(mockEventStore);
@@ -168,8 +163,11 @@ describe("EventSourcing", () => {
   describe("registerPipeline", () => {
     it("returns a new PipelineBuilder instance", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const builder = instance.registerPipeline<Event>();
 
       expect(builder).toBeInstanceOf(PipelineBuilder);
@@ -188,8 +186,11 @@ describe("EventSourcing", () => {
       }
 
       const mockEventStore = createMockEventStore<TestEvent>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const builder = instance.registerPipeline<TestEvent, TestProjection>();
 
       expect(builder).toBeInstanceOf(PipelineBuilder);
@@ -197,14 +198,28 @@ describe("EventSourcing", () => {
 
     it("creates new builder instance on each call", () => {
       const mockEventStore = createMockEventStore<Event>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const builder1 = instance.registerPipeline<Event>();
       const builder2 = instance.registerPipeline<Event>();
 
       expect(builder1).toBeInstanceOf(PipelineBuilder);
       expect(builder2).toBeInstanceOf(PipelineBuilder);
       expect(builder1).not.toBe(builder2);
+    });
+
+    it("returns DisabledPipelineBuilder when runtime has no event store", () => {
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: void 0,
+      });
+
+      const instance = new EventSourcing(runtime);
+      const builder = instance.registerPipeline<Event>();
+
+      expect(builder).toBeInstanceOf(DisabledPipelineBuilder);
     });
   });
 
@@ -218,32 +233,17 @@ describe("EventSourcing", () => {
       expect(eventStore).toBeInstanceOf(EventStoreMemory);
     });
 
-    it("handles undefined event store parameter by using default", () => {
-      getClickHouseClientSpy.mockReturnValue(null);
-
-      const instance = new EventSourcing(undefined);
-      const eventStore = instance.getEventStore();
-
-      expect(eventStore).toBeInstanceOf(EventStoreMemory);
-    });
-
-    it("handles undefined queue processor factory parameter by using default", () => {
-      const mockEventStore = createMockEventStore<Event>();
-
-      const instance = new EventSourcing(mockEventStore, undefined);
-      const builder = instance.registerPipeline<Event>();
-
-      expect(builder).toBeInstanceOf(PipelineBuilder);
-    });
-
     it("maintains type safety with generic EventType", () => {
       interface SpecificEvent extends Event {
         data: { specific: boolean };
       }
 
       const mockEventStore = createMockEventStore<SpecificEvent>();
+      const runtime = EventSourcingRuntime.createForTesting({
+        eventStore: mockEventStore,
+      });
 
-      const instance = new EventSourcing(mockEventStore);
+      const instance = new EventSourcing(runtime);
       const eventStore = instance.getEventStore<SpecificEvent>();
 
       expect(eventStore).toBe(mockEventStore);

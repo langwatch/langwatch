@@ -586,9 +586,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         aggregateType,
         aggregateId,
       );
-      await expect(store.clearCheckpoint(tenantId, checkpointKey)).rejects.toThrow(
-        "ClickHouse connection failed",
-      );
+      await expect(
+        store.clearCheckpoint(tenantId, checkpointKey),
+      ).rejects.toThrow("ClickHouse connection failed");
     });
   });
 });

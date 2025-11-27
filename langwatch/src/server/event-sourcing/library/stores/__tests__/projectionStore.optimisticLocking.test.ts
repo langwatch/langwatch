@@ -14,11 +14,7 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
     it("projection stores use 'last write wins' behavior", async () => {
       const store = createMockProjectionStore();
 
-      const projection1 = createTestProjection(
-        "aggregate-1",
-        tenantId,
-        1000,
-      );
+      const projection1 = createTestProjection("aggregate-1", tenantId, 1000);
       const projection2 = createTestProjection(
         "aggregate-1",
         tenantId,
@@ -44,16 +40,8 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
     it("concurrent writes result in last write winning", async () => {
       const store = createMockProjectionStore();
 
-      const projection1 = createTestProjection(
-        "aggregate-1",
-        tenantId,
-        1000,
-      );
-      const projection2 = createTestProjection(
-        "aggregate-1",
-        tenantId,
-        2000,
-      );
+      const projection1 = createTestProjection("aggregate-1", tenantId, 1000);
+      const projection2 = createTestProjection("aggregate-1", tenantId, 2000);
 
       // Simulate concurrent writes
       await Promise.all([
