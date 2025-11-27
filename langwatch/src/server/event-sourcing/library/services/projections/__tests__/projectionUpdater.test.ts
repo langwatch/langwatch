@@ -23,6 +23,7 @@ import { CheckpointManager } from "../../checkpoints/checkpointManager";
 import { QueueProcessorManager } from "../../queues/queueProcessorManager";
 import { EventUtils } from "../../../utils/event.utils";
 import { EVENT_TYPES } from "../../../domain/eventType";
+import { LockError, SequentialOrderingError } from "../../errorHandling";
 
 // Mock EventUtils
 vi.mock("../../../utils/event.utils", () => ({
@@ -255,6 +256,155 @@ describe("ProjectionUpdater", () => {
         1,
         "Projection error",
       );
+    });
+
+    it("retries lock errors without marking checkpoint as failed", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore();
+      const projectionDef = createMockProjectionDefinition(
+        "projection1",
+        projectionHandler,
+        projectionStore,
+      );
+      const projections = new Map([["projection1", projectionDef]]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+      eventStore.getEvents = vi
+        .fn()
+        .mockResolvedValue([
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
+        ]);
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        validator,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      const lockError = new LockError(
+        "lock:test",
+        "updateProjection",
+        "Cannot acquire lock",
+        {
+          projectionName: "projection1",
+        },
+      );
+
+      const updateSpy = vi
+        .spyOn(updater as any, "updateProjectionByName")
+        .mockRejectedValue(lockError);
+
+      await expect(
+        updater.processProjectionEvent(
+          "projection1",
+          projectionDef,
+          event,
+          context,
+        ),
+      ).rejects.toBe(lockError);
+
+      const savedStatuses = checkpointStore.saveCheckpoint.mock.calls.map(
+        (call) => call[4],
+      );
+
+      expect(savedStatuses).not.toContain("failed");
+      expect(
+        savedStatuses.filter((status) => status === "pending").length,
+      ).toBe(2);
+      expect(updateSpy).toHaveBeenCalled();
+    });
+
+    it("retries ordering errors without marking checkpoint as failed", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore();
+      const projectionDef = createMockProjectionDefinition(
+        "projection1",
+        projectionHandler,
+        projectionStore,
+      );
+      const projections = new Map([["projection1", projectionDef]]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+      eventStore.getEvents = vi
+        .fn()
+        .mockResolvedValue([
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
+        ]);
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        validator,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      const orderingError = new SequentialOrderingError(
+        1,
+        2,
+        event.id,
+        event.aggregateId,
+        event.tenantId,
+        {
+          projectionName: "projection1",
+        },
+      );
+
+      const validatorSpy = vi
+        .spyOn((updater as any).validator, "validateEventProcessing")
+        .mockRejectedValue(orderingError);
+
+      await expect(
+        updater.processProjectionEvent(
+          "projection1",
+          projectionDef,
+          event,
+          context,
+        ),
+      ).rejects.toBe(orderingError);
+
+      const savedStatuses = checkpointStore.saveCheckpoint.mock.calls.map(
+        (call) => call[4],
+      );
+
+      expect(savedStatuses).not.toContain("failed");
+      expect(validatorSpy).toHaveBeenCalled();
     });
   });
 

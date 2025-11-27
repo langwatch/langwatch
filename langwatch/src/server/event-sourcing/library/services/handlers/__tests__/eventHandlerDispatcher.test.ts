@@ -423,19 +423,6 @@ describe("EventHandlerDispatcher", () => {
       const handler = createMockEventReactionHandler<Event>();
       const handlerDef = createMockEventHandlerDefinition("handler1", handler);
 
-      const eventStore = createMockEventStore<Event>();
-      // Mock countEventsBefore to return 1 for event2 (sequence number 2)
-      eventStore.countEventsBefore = vi
-        .fn()
-        .mockImplementation((eventId, aggregateId, context, aggregateType) => {
-          // event1 has sequence 1, event2 has sequence 2
-          if (eventId === "event2") {
-            return Promise.resolve(1);
-          }
-          return Promise.resolve(0);
-        });
-      eventStore.getEvents = vi.fn().mockResolvedValue([]);
-
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
@@ -470,22 +457,8 @@ describe("EventHandlerDispatcher", () => {
           },
         );
 
-      const validator = new EventProcessorValidator({
-        eventStore,
-        aggregateType,
-        processorCheckpointStore: checkpointStore,
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-      });
-
-      const checkpointManager = new CheckpointManager(
-        TEST_CONSTANTS.PIPELINE_NAME,
-        checkpointStore,
-      );
-
       const dispatcher = createDispatcher({
         processorCheckpointStore: checkpointStore,
-        validator,
-        checkpointManager,
       });
 
       // Create event2 (sequence 2) - should fail because event1 (sequence 1) is still pending
@@ -499,6 +472,9 @@ describe("EventHandlerDispatcher", () => {
         "event2",
       );
 
+      const validator = (dispatcher as any).validator;
+      validator.computeEventSequenceNumber = vi.fn().mockResolvedValue(2);
+
       await expect(
         dispatcher.handleEvent("handler1", handlerDef, event2, context),
       ).rejects.toThrow(SequentialOrderingError);
@@ -506,6 +482,59 @@ describe("EventHandlerDispatcher", () => {
       expect(handler.handle).not.toHaveBeenCalled();
       // Should not save any checkpoints since ordering check fails early
       expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
+    });
+
+    it("does not mark checkpoint as failed for ordering errors", async () => {
+      const handler = createMockEventReactionHandler<Event>();
+      const handlerDef = createMockEventHandlerDefinition("handler1", handler);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue({ status: "processed", sequenceNumber: 1 });
+
+      const checkpointManager = new CheckpointManager(
+        TEST_CONSTANTS.PIPELINE_NAME,
+        checkpointStore,
+      );
+      const checkpointSpy = vi.spyOn(checkpointManager, "saveCheckpointSafely");
+
+      const dispatcher = createDispatcher({
+        processorCheckpointStore: checkpointStore,
+        checkpointManager,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      const orderingError = new SequentialOrderingError(
+        1,
+        2,
+        event.id,
+        event.aggregateId,
+        event.tenantId,
+        { handlerName: "handler1" },
+      );
+
+      const validator = (dispatcher as any).validator;
+      validator.computeEventSequenceNumber = vi.fn().mockResolvedValue(2);
+      validator.validateEventProcessing = vi
+        .fn()
+        .mockRejectedValue(orderingError);
+
+      await expect(
+        dispatcher.handleEvent("handler1", handlerDef, event, context),
+      ).rejects.toBe(orderingError);
+
+      const failedCalls = checkpointSpy.mock.calls.filter(
+        (call) => call[3] === "failed",
+      );
+      expect(failedCalls).toHaveLength(0);
     });
   });
 });

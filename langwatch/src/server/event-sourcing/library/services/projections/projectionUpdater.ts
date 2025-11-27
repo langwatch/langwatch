@@ -21,6 +21,7 @@ import {
   ConfigurationError,
   LockError,
   ValidationError,
+  isSequentialOrderingError,
 } from "../errorHandling";
 
 /**
@@ -389,30 +390,52 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             "Saved processed checkpoint for projection",
           );
         } catch (error) {
-          // Save checkpoint as "failed" on failure
           const errorMessage =
             error instanceof Error ? error.message : String(error);
-          await this.checkpointManager.saveCheckpointSafely(
-            projectionName,
-            "projection",
-            event,
-            "failed",
-            sequenceNumber,
-            errorMessage,
-          );
+          const isLockError =
+            error instanceof LockError ||
+            (typeof error === "object" &&
+              error !== null &&
+              (error as { name?: string }).name === "LockError");
+          const isOrderingError = isSequentialOrderingError(error);
 
-          this.logger.error(
-            {
+          if (isLockError || isOrderingError) {
+            this.logger.warn(
+              {
+                projectionName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                error: errorMessage,
+                errorType: isLockError ? "lock" : "ordering",
+              },
+              isLockError
+                ? "Projection processing blocked by distributed lock; retrying without marking failure"
+                : "Projection processing blocked by sequential ordering; retrying without marking failure",
+            );
+          } else {
+            await this.checkpointManager.saveCheckpointSafely(
               projectionName,
-              eventId: event.id,
-              aggregateId: String(event.aggregateId),
-              tenantId: event.tenantId,
-              error: errorMessage,
-            },
-            "Failed to process event for projection",
-          );
+              "projection",
+              event,
+              "failed",
+              sequenceNumber,
+              errorMessage,
+            );
 
-          // Throw to stop queue processing
+            this.logger.error(
+              {
+                projectionName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                error: errorMessage,
+              },
+              "Failed to process event for projection",
+            );
+          }
+
+          // Throw to stop queue processing (BullMQ retry logic handles lock conflicts)
           throw error;
         }
       },

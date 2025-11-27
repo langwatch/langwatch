@@ -767,8 +767,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           // Save checkpoint as "failed" on failure (only if we have a sequence number)
           const errorMessage =
             error instanceof Error ? error.message : String(error);
+          const isOrderingError = isSequentialOrderingError(error);
 
-          if (sequenceNumber !== null) {
+          if (sequenceNumber !== null && !isOrderingError) {
             this.logger.error(
               {
                 handlerName,
@@ -790,7 +791,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               sequenceNumber,
               errorMessage,
             );
-          } else {
+          } else if (!isOrderingError) {
             this.logger.error(
               {
                 handlerName,
@@ -801,6 +802,18 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 errorStack: error instanceof Error ? error.stack : void 0,
               },
               "Event handler validation or execution failed before sequence number was determined",
+            );
+          } else {
+            this.logger.warn(
+              {
+                handlerName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                sequenceNumber,
+                error: errorMessage,
+              },
+              "Event handler blocked by sequential ordering; retrying without marking failure",
             );
           }
 

@@ -404,7 +404,12 @@ export class PublishingError extends NonCriticalError {
  * These are critical errors that must cause the operation to fail.
  */
 export function isSequentialOrderingError(error: unknown): boolean {
-  return error instanceof SequentialOrderingError;
+  return (
+    error instanceof SequentialOrderingError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { name?: string }).name === "SequentialOrderingError")
+  );
 }
 
 /**
