@@ -190,11 +190,11 @@ export const env = createEnv({
     OKTA_ISSUER: process.env.OKTA_ISSUER,
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
     ENABLE_EVENT_SOURCING:
-      process.env.ENABLE_EVENT_SOURCING !== "false" &&
-      process.env.ENABLE_EVENT_SOURCING?.toLowerCase() !== "false",
+      process.env.ENABLE_EVENT_SOURCING === "true" ||
+      process.env.ENABLE_EVENT_SOURCING?.toLowerCase() === "true",
     ENABLE_CLICKHOUSE:
-      process.env.ENABLE_CLICKHOUSE !== "false" &&
-      process.env.ENABLE_CLICKHOUSE?.toLowerCase() !== "false",
+      process.env.ENABLE_CLICKHOUSE === "true" ||
+      process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

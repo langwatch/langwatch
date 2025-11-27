@@ -1,8 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
-import type IORedis from "ioredis";
-import type { Cluster } from "ioredis";
 import { createLogger } from "~/utils/logger";
-import type { EventStore, Event } from "../library";
+import type { EventStore } from "../library";
 import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../library/utils/distributedLock";
 import { RedisDistributedLock } from "../library/utils/distributedLock";
@@ -118,7 +116,11 @@ export class EventSourcingRuntime {
     this._initialized = true;
 
     if (!this.config.enabled) {
-      logger.info("Event sourcing is disabled");
+      if (this.config.isBuildTime) {
+        logger.warn("Event sourcing disabled during build phase");
+      } else {
+        logger.info("Event sourcing is disabled via ENABLE_EVENT_SOURCING=false");
+      }
       return;
     }
 
@@ -134,15 +136,25 @@ export class EventSourcingRuntime {
       forceClickHouseInTests,
     } = this.config;
 
+    const isProduction = process.env.NODE_ENV === "production";
+
     // Create event store
     if (clickHouseEnabled && clickHouseClient) {
       this._eventStore = new EventStoreClickHouse(
         new EventRepositoryClickHouse(clickHouseClient),
       );
       logger.debug("Using ClickHouse event store");
-    } else {
+    } else if (!isProduction) {
+      // Only use memory stores in non-production environments
       this._eventStore = new EventStoreMemory(new EventRepositoryMemory());
-      logger.debug("Using in-memory event store");
+      logger.debug("Using in-memory event store (non-production)");
+    } else {
+      // In production without ClickHouse, leave stores undefined
+      logger.warn(
+        "ClickHouse not available in production - event sourcing will be disabled. " +
+          "Set CLICKHOUSE_URL to enable event sourcing.",
+      );
+      return;
     }
 
     // Create checkpoint store with test environment handling
@@ -168,7 +180,7 @@ export class EventSourcingRuntime {
 
     logger.info(
       {
-        eventStore: this._eventStore.constructor.name,
+        eventStore: this._eventStore?.constructor.name ?? "none",
         checkpointStore: this._checkpointStore?.constructor.name ?? "none",
         distributedLock: this._distributedLock ? "Redis" : "none",
         queueProcessor: redisConnection ? "BullMQ" : "Memory",
@@ -182,7 +194,9 @@ export class EventSourcingRuntime {
     clickHouseClient: ClickHouseClient | undefined,
     isTestEnvironment: boolean,
     forceClickHouseInTests: boolean,
-  ): ProcessorCheckpointStore {
+  ): ProcessorCheckpointStore | undefined {
+    const isProduction = process.env.NODE_ENV === "production";
+
     // In test environment, use memory unless forced to use ClickHouse
     if (isTestEnvironment && !forceClickHouseInTests) {
       logger.debug("Using in-memory checkpoint store (test environment)");
@@ -199,8 +213,14 @@ export class EventSourcingRuntime {
       );
     }
 
-    // Fallback to memory
-    logger.debug("Using in-memory checkpoint store (ClickHouse unavailable)");
+    // In production without ClickHouse, return undefined
+    if (isProduction) {
+      logger.warn("No checkpoint store in production without ClickHouse");
+      return void 0;
+    }
+
+    // Fallback to memory in non-production
+    logger.debug("Using in-memory checkpoint store (non-production)");
     return new ProcessorCheckpointStoreMemory(new CheckpointRepositoryMemory());
   }
 
@@ -216,6 +236,7 @@ export class EventSourcingRuntime {
       clickHouseEnabled: false,
       forceClickHouseInTests: false,
       isTestEnvironment: true,
+      isBuildTime: false,
       clickHouseClient: void 0,
       redisConnection: void 0,
     });
