@@ -98,7 +98,7 @@ jobs:
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
-      CLICKHOUSE_URL: "http://localhost:8123"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       BUILD_TIME: "true"
       CI: "true"
 
@@ -123,7 +123,7 @@ jobs:
         env:
           CLICKHOUSE_DB: default
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_PASSWORD: ci_password
         options: >-
           --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 10s
