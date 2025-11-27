@@ -3,11 +3,15 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    setupFiles: ["./test-setup.ts"],
+    setupFiles: [
+      "./test-setup.ts",
+      "./src/server/event-sourcing/__tests__/integration/setup.ts",
+    ],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
     exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*", "saas-src/**/*"],
-    testTimeout: 10_000,
-    hookTimeout: 10_000,
+    testTimeout: 60_000, // 60 seconds for testcontainers startup and processing
+    hookTimeout: 60_000, // 60 seconds for beforeAll/afterAll hooks
+    teardownTimeout: 30_000, // 30 seconds for cleanup
   },
   resolve: {
     alias: {
