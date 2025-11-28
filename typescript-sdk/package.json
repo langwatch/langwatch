@@ -51,6 +51,7 @@
         "cli": "node dist/cli/index.js",
         "lint": "eslint .",
         "test": "vitest",
+        "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
         "prebuild": "pnpm run prepare",
         "build": "tsc --noEmit && tsup",
