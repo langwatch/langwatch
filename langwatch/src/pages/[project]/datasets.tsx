@@ -17,6 +17,7 @@ import {
   Table as TableIcon,
   Edit,
   Trash2,
+  Copy,
 } from "react-feather";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
@@ -34,6 +35,7 @@ import { toaster } from "../../components/ui/toaster";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
 
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
@@ -59,6 +61,10 @@ function DatasetsPage() {
       }
     | undefined
   >();
+  const [copyDataset, setCopyDataset] = useState<{
+    datasetId: string;
+    datasetName: string;
+  } | null>(null);
 
   const deleteDataset = ({ id, name }: { id: string; name: string }) => {
     datasetDelete.mutate(
@@ -262,6 +268,32 @@ function DatasetsPage() {
                             <Menu.Content>
                               <Tooltip
                                 content={
+                                  !hasDatasetsCreatePermission
+                                    ? "You need datasets:create permission to copy datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsCreatePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
+                              >
+                                <Menu.Item
+                                  value="copy"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsCreatePermission) {
+                                      setCopyDataset({
+                                        datasetId: dataset.id,
+                                        datasetName: dataset.name,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsCreatePermission}
+                                >
+                                  <Copy size={16} /> Copy to another project
+                                </Menu.Item>
+                              </Tooltip>
+                              <Tooltip
+                                content={
                                   !hasDatasetsUpdatePermission
                                     ? "You need datasets:update permission to edit datasets"
                                     : undefined
@@ -354,6 +386,14 @@ function DatasetsPage() {
         }}
       />
       <DeleteDialog />
+      {copyDataset && (
+        <CopyDatasetDialog
+          open={!!copyDataset}
+          onClose={() => setCopyDataset(null)}
+          datasetId={copyDataset.datasetId}
+          datasetName={copyDataset.datasetName}
+        />
+      )}
     </DashboardLayout>
   );
 }
