@@ -1,8 +1,8 @@
 ---
 name: 🔧 Chore
 about: Maintenance tasks, refactoring, or technical debt
-title: "[CHORE] "
-labels: ["chore"]
+title: ""
+type: Task
 projects: ["5"]
 assignees: ""
 ---

@@ -1,8 +1,8 @@
 ---
 name: 🐛 Bug Report
 about: Report a bug or unexpected behavior
-title: "[BUG] "
-labels: ["bug"]
+title: ""
+type: Bug
 projects: ["5"]
 assignees: ""
 ---

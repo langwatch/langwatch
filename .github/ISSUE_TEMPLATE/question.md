@@ -1,8 +1,7 @@
 ---
 name: ❓ Question
 about: Ask a question about LangWatch
-title: "[QUESTION] "
-labels: ["question"]
+title: ""
 projects: ["5"]
 assignees: ""
 ---
