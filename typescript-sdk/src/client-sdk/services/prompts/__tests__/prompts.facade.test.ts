@@ -68,6 +68,7 @@ describe("PromptsFacade.get", () => {
 
       // Act & Assert
       await expect(facade.get(nonExistentHandle)).rejects.toThrow(mockError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(localPromptsService.get).toHaveBeenCalledWith(nonExistentHandle);
       expect(promptsApiService.get).toHaveBeenCalledWith(nonExistentHandle, undefined);
     });
