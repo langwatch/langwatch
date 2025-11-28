@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.0...python-sdk@v0.7.1) (2025-11-28)
+
+
+### Bug Fixes
+
+* **prompts:** make prompts.get throw error instead of returning null/undefined ([#867](https://github.com/langwatch/langwatch/issues/867)) ([9705201](https://github.com/langwatch/langwatch/commit/97052015061f40fc63069c78bb1e702cbf12fa29))
+
 ## [0.7.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.1...python-sdk@v0.7.0) (2025-11-05)
 
 
