@@ -14,7 +14,7 @@ const getDaysDifference = (startDate: Date, endDate: Date) =>
 
 export const currentVsPreviousDates = (
   input: z.infer<typeof sharedFiltersInputSchema>,
-  period?: number | string
+  period?: number | string,
 ) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
@@ -27,7 +27,7 @@ export const currentVsPreviousDates = (
 
   const daysDifference = Math.max(
     periodInDays,
-    getDaysDifference(startDate, endDate)
+    getDaysDifference(startDate, endDate),
   );
   const previousPeriodStartDate = addDays(startDate, -daysDifference);
 
@@ -40,6 +40,7 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
   query,
+  negateFilters,
 }: z.infer<typeof sharedFiltersInputSchema> & {
   filterForAnnotatedTraces?: boolean;
 }): {
@@ -69,8 +70,13 @@ export const generateTracesPivotQueryConditions = ({
               },
             },
           },
-          ...filterConditions,
+          ...(negateFilters ? [] : [...filterConditions]),
         ],
+        ...(negateFilters
+          ? {
+              must_not: [...filterConditions],
+            }
+          : {}),
       } as QueryDslBoolQuery,
     },
     isAnyFilterPresent: filterConditions.length > 0,
@@ -79,7 +85,7 @@ export const generateTracesPivotQueryConditions = ({
 };
 
 export const generateFilterConditions = (
-  filters: Partial<Record<FilterField, FilterParam>>
+  filters: Partial<Record<FilterField, FilterParam>>,
 ) => {
   let filterConditions: QueryDslQueryContainer[] = [];
   for (const [field, params] of Object.entries(filters)) {
@@ -100,7 +106,7 @@ const collectConditions = (
     | string[]
     | Record<string, string[]>
     | Record<string, Record<string, string[]>>,
-  keys: string[] = []
+  keys: string[] = [],
 ): QueryDslQueryContainer[] => {
   const key = keys[0];
   const subkey = keys[1];
@@ -115,8 +121,8 @@ const collectConditions = (
         availableFilters[filter.requiresKey.filter].query(
           [key],
           undefined,
-          undefined
-        )
+          undefined,
+        ),
       );
     }
 
@@ -125,8 +131,8 @@ const collectConditions = (
         availableFilters[filter.requiresSubkey.filter].query(
           [subkey],
           key,
-          undefined
-        )
+          undefined,
+        ),
       );
     }
 

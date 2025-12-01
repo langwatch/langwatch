@@ -18,6 +18,7 @@ export interface Dependencies {
         form: UseFormReturn<any>;
       }>
     | undefined;
+  hasNegateFilters?: ({ projectId }: { projectId: string }) => boolean;
 }
 
 const dependencies: Dependencies = {};
