@@ -17,6 +17,49 @@ import {
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**
+ * Normalizes prompt data by extracting system messages from the messages array
+ * into the prompt field to avoid conflicts.
+ *
+ * @param promptData - Object containing prompt and messages fields
+ * @returns Normalized prompt and messages, where system messages are moved to prompt field
+ */
+function normalizePromptData({
+  prompt,
+  messages,
+}: {
+  prompt?: string | null;
+  messages?: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+  }> | null;
+}): {
+  normalizedPrompt: string | undefined;
+  normalizedMessages:
+    | Array<{ role: "user" | "assistant" | "system"; content: string }>
+    | undefined;
+} {
+  // Extract system message from messages array
+  const systemMessage = messages?.find((msg) => msg.role === "system");
+  const nonSystemMessages = messages?.filter(
+    (msg): msg is { role: "user" | "assistant"; content: string } =>
+      msg.role !== "system",
+  );
+
+  // Use system message as prompt if it exists, otherwise use the prompt field
+  const normalizedPrompt = systemMessage
+    ? systemMessage.content
+    : prompt ?? undefined;
+
+  // Only include messages if there are non-system messages
+  const normalizedMessages =
+    nonSystemMessages && nonSystemMessages.length > 0
+      ? nonSystemMessages
+      : undefined;
+
+  return { normalizedPrompt, normalizedMessages };
+}
+
+/**
  * Router for handling prompts - the business-facing interface
  */
 export const promptsRouter = createTRPCRouter({
@@ -381,24 +424,10 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Normalize prompt/messages to avoid system prompt conflict
-      // Extract system message from messages array into prompt field
-      const systemMessage = sourcePrompt.messages?.find(
-        (msg) => msg.role === "system",
-      );
-      const nonSystemMessages = sourcePrompt.messages?.filter(
-        (msg) => msg.role !== "system",
-      );
-
-      // Use system message as prompt if it exists, otherwise use the prompt field
-      const normalizedPrompt = systemMessage
-        ? systemMessage.content
-        : sourcePrompt.prompt ?? undefined;
-
-      // Only include messages if there are non-system messages
-      const normalizedMessages =
-        nonSystemMessages && nonSystemMessages.length > 0
-          ? nonSystemMessages
-          : undefined;
+      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
+        prompt: sourcePrompt.prompt,
+        messages: sourcePrompt.messages,
+      });
 
       // Create the prompt in the target project
       const copiedPrompt = await service.createPrompt({
@@ -525,24 +554,11 @@ export const promptsRouter = createTRPCRouter({
       }
 
       // Normalize prompt/messages to avoid system prompt conflict
-      // Extract system message from messages array into prompt field
-      const systemMessage = sourcePrompt.messages?.find(
-        (msg) => msg.role === "system",
-      );
-      const nonSystemMessages = sourcePrompt.messages?.filter(
-        (msg) => msg.role !== "system",
-      );
-
-      // Use system message as prompt if it exists, otherwise use the prompt field
-      const normalizedPrompt = systemMessage
-        ? systemMessage.content
-        : sourcePrompt.prompt ?? undefined;
-
-      // Only include messages if there are non-system messages
-      const normalizedMessages =
-        nonSystemMessages && nonSystemMessages.length > 0
-          ? nonSystemMessages
-          : undefined;
+      // Normalize prompt/messages to avoid system prompt conflict
+      const { normalizedPrompt, normalizedMessages } = normalizePromptData({
+        prompt: sourcePrompt.prompt,
+        messages: sourcePrompt.messages,
+      });
 
       // Update the copy with source's data
       return await service.updatePrompt({
@@ -569,7 +585,7 @@ export const promptsRouter = createTRPCRouter({
             responseFormat: sourcePrompt.responseFormat,
           }),
           authorId,
-        } as any, // Type assertion needed until Prisma types are regenerated
+        },
       });
     }),
 
@@ -660,24 +676,11 @@ export const promptsRouter = createTRPCRouter({
         }
 
         // Normalize prompt/messages to avoid system prompt conflict
-        // Extract system message from messages array into prompt field
-        const systemMessage = sourcePrompt.messages?.find(
-          (msg) => msg.role === "system",
-        );
-        const nonSystemMessages = sourcePrompt.messages?.filter(
-          (msg) => msg.role !== "system",
-        );
-
-        // Use system message as prompt if it exists, otherwise use the prompt field
-        const normalizedPrompt = systemMessage
-          ? systemMessage.content
-          : sourcePrompt.prompt ?? undefined;
-
-        // Only include messages if there are non-system messages
-        const normalizedMessages =
-          nonSystemMessages && nonSystemMessages.length > 0
-            ? nonSystemMessages
-            : undefined;
+        // Normalize prompt/messages to avoid system prompt conflict
+        const { normalizedPrompt, normalizedMessages } = normalizePromptData({
+          prompt: sourcePrompt.prompt,
+          messages: sourcePrompt.messages,
+        });
 
         // Update the copy with source's data
         const updated = await service.updatePrompt({
@@ -704,7 +707,7 @@ export const promptsRouter = createTRPCRouter({
               responseFormat: sourcePrompt.responseFormat,
             }),
             authorId,
-          } as any, // Type assertion needed until Prisma types are regenerated
+          },
         });
 
         results.push({
