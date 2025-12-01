@@ -5,9 +5,11 @@ import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import { Tooltip } from "../ui/tooltip";
 import type { FilterField } from "../../server/filters/types";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
+import { dependencies } from "../../injection/dependencies.client";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export const useFilterToggle = (
-  { defaultShowFilters } = { defaultShowFilters: false }
+  { defaultShowFilters } = { defaultShowFilters: false },
 ) => {
   const router = useRouter();
 
@@ -29,11 +31,11 @@ export const useFilterToggle = (
               : defaultShowFilters
               ? "false"
               : undefined,
-          }).filter(([, value]) => value !== undefined)
+          }).filter(([, value]) => value !== undefined),
         ),
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
   };
 
@@ -48,7 +50,7 @@ export function FilterToggle({
   const { showFilters, setShowFilters } = useFilterToggle({
     defaultShowFilters,
   });
-  const { filterParams, clearFilters } = useFilterParams();
+  const { filterParams, clearFilters, setNegateFilters } = useFilterParams();
 
   return (
     <FilterToggleButton
@@ -56,6 +58,8 @@ export function FilterToggle({
       onClick={() => setShowFilters(!showFilters)}
       filters={filterParams.filters}
       onClear={clearFilters}
+      negateFiltersToggled={filterParams.negateFilters}
+      setNegateFilters={setNegateFilters}
     >
       Filters
     </FilterToggleButton>
@@ -68,64 +72,89 @@ export function FilterToggleButton({
   filters,
   onClear,
   children,
+  negateFiltersToggled,
+  setNegateFilters,
 }: {
   toggled: boolean;
   onClick?: () => void;
   filters: Partial<Record<FilterField, FilterParam>>;
   onClear?: () => void;
   children: React.ReactNode;
+  negateFiltersToggled?: boolean;
+  setNegateFilters?: (negateFilters: boolean) => void;
 }) {
   const nonEmptyFilters = filterOutEmptyFilters(filters);
   const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
+  const { project } = useOrganizationTeamProject();
+
+  const hasNegateFilters = dependencies.hasNegateFilters?.({ projectId: project?.id ?? "" });
 
   return (
-    <Button
-      variant="ghost"
-      backgroundColor={toggled ? "gray.200" : undefined}
-      onClick={onClick}
-      minWidth="fit-content"
-      paddingRight={hasAnyFilters ? 1 : undefined}
-    >
-      <HStack gap={0}>
-        {hasAnyFilters && (
-          <Box
-            width="12px"
-            height="12px"
-            borderRadius="12px"
-            background="red.500"
-            position="absolute"
-            marginTop="10px"
-            marginLeft="8px"
-            fontSize="8px"
-            color="white"
-            lineHeight="12px"
-            textAlign="center"
-          >
-            {Object.keys(nonEmptyFilters).length}
-          </Box>
-        )}
-        <Filter size={16} />
-        <Text paddingLeft={2}>{children}</Text>
-        {hasAnyFilters && onClear && (
-          <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
-            <Button
-              as={Box}
-              role="button"
-              variant="plain"
-              width="fit-content"
-              minWidth={0}
-              display="flex"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClear?.();
-              }}
-              paddingX={2}
+    <HStack gap={2}>
+      <Button
+        variant="ghost"
+        backgroundColor={toggled ? "gray.200" : undefined}
+        onClick={onClick}
+        minWidth="fit-content"
+        paddingRight={hasAnyFilters ? 1 : undefined}
+      >
+        <HStack gap={0}>
+          {hasAnyFilters && (
+            <Box
+              width="12px"
+              height="12px"
+              borderRadius="12px"
+              background="red.500"
+              position="absolute"
+              marginTop="10px"
+              marginLeft="8px"
+              fontSize="8px"
+              color="white"
+              lineHeight="12px"
+              textAlign="center"
             >
-              <X width={12} style={{ minWidth: "12px" }} />
-            </Button>
-          </Tooltip>
-        )}
-      </HStack>
-    </Button>
+              {Object.keys(nonEmptyFilters).length}
+            </Box>
+          )}
+          <Filter size={16} />
+          <Text paddingLeft={2}>{children}</Text>
+          {hasAnyFilters && onClear && (
+            <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
+              <Button
+                as={Box}
+                role="button"
+                variant="plain"
+                width="fit-content"
+                minWidth={0}
+                display="flex"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClear?.();
+                }}
+                paddingX={2}
+              >
+                <X width={12} style={{ minWidth: "12px" }} />
+              </Button>
+            </Tooltip>
+          )}
+        </HStack>
+      </Button>
+      {hasNegateFilters && (
+        <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
+          <Button
+            variant="plain"
+            width="fit-content"
+            minWidth={0}
+            backgroundColor={negateFiltersToggled ? "gray.200" : undefined}
+            onClick={(e) => {
+              e.stopPropagation();
+              setNegateFilters?.(!negateFiltersToggled);
+            }}
+          >
+            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span> Negate Filters
+          </Button>
+        </Tooltip>
+      )}
+    </HStack>
   );
 }
