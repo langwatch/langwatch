@@ -41,6 +41,7 @@ import {
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import Long from "long";
+import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.traces");
@@ -124,28 +125,28 @@ const decodeOpenTelemetryIds = (
       for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
         for (const span of scopeSpan?.spans ?? []) {
           if (span?.traceId) {
-            const values =
-              typeof span.traceId === "object" && !Array.isArray(span.traceId)
-                ? Object.values(span.traceId)
-                : span.traceId;
-            span.traceId = Buffer.from(values as any, "base64").toString("hex");
+            const decoded = typeof span.traceId === "string"
+              ? decodeBase64OpenTelemetryId(span.traceId)
+              : decodeOpenTelemetryId(span.traceId);
+            if (decoded) {
+              span.traceId = decoded;
+            }
           }
           if (span?.spanId) {
-            const values =
-              typeof span.spanId === "object" && !Array.isArray(span.spanId)
-                ? Object.values(span.spanId)
-                : span.spanId;
-            span.spanId = Buffer.from(values as any, "base64").toString("hex");
+            const decoded = typeof span.spanId === "string"
+              ? decodeBase64OpenTelemetryId(span.spanId)
+              : decodeOpenTelemetryId(span.spanId);
+            if (decoded) {
+              span.spanId = decoded;
+            }
           }
           if (span?.parentSpanId) {
-            const values =
-              typeof span.parentSpanId === "object" &&
-              !Array.isArray(span.parentSpanId)
-                ? Object.values(span.parentSpanId)
-                : span.parentSpanId;
-            span.parentSpanId = Buffer.from(values as any, "base64").toString(
-              "hex",
-            );
+            const decoded = typeof span.parentSpanId === "string"
+              ? decodeBase64OpenTelemetryId(span.parentSpanId)
+              : decodeOpenTelemetryId(span.parentSpanId);
+            if (decoded) {
+              span.parentSpanId = decoded;
+            }
           }
         }
       }
@@ -329,7 +330,10 @@ const addOpenTelemetrySpanAsSpan = (
         if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
           first_token_at =
             started_at +
-            parseInt((attributesMap as any).gen_ai.server.time_to_first_token, 10);
+            parseInt(
+              (attributesMap as any).gen_ai.server.time_to_first_token,
+              10,
+            );
         }
 
         if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
@@ -414,7 +418,10 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Strands chat LLM calls
-        if (type == "span" && attributesMap.gen_ai?.operation?.name === "chat") {
+        if (
+          type == "span" &&
+          attributesMap.gen_ai?.operation?.name === "chat"
+        ) {
           type = "llm";
         }
 
@@ -520,6 +527,26 @@ const addOpenTelemetrySpanAsSpan = (
             };
           }
           delete attributesMap.gen_ai.prompt;
+        }
+        if (
+          !input &&
+          attributesMap.gen_ai?.prompt?.messages &&
+          Array.isArray(attributesMap.gen_ai.prompt.messages)
+        ) {
+          const input_ = typedValueChatMessagesSchema.safeParse({
+            type: "chat_messages",
+            value: attributesMap.gen_ai.prompt.messages,
+          });
+
+          if (input_.success) {
+            input = input_.data as TypedValueChatMessages;
+            delete attributesMap.gen_ai.prompt;
+          } else {
+            input = {
+              type: "json",
+              value: attributesMap.gen_ai.prompt.messages,
+            };
+          }
         }
 
         // vercel
@@ -667,6 +694,18 @@ const addOpenTelemetrySpanAsSpan = (
               value: attributesMap.gen_ai.completion,
             };
           }
+          delete attributesMap.gen_ai.completion;
+        }
+
+        if (
+          !output &&
+          attributesMap.gen_ai?.completion &&
+          !Array.isArray(attributesMap.gen_ai.completion)
+        ) {
+          output = {
+            type: "json",
+            value: attributesMap.gen_ai.completion,
+          };
           delete attributesMap.gen_ai.completion;
         }
 

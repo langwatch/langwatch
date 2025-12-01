@@ -76,9 +76,17 @@ jobs:
         working-directory: langwatch
         run: npm run start:prepare:files
 
-      - name: Run unit tests
+      - name: Run unit tests with coverage
         working-directory: langwatch
-        run: npm run test:unit -- --run --bail=1
+        run: npm run test:unit -- --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
+
+      - name: Upload unit test coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: langwatch/coverage/lcov.info
+          flags: unit
+          name: unit-tests
+          fail_ci_if_error: false
 
   test-integration:
     env:
@@ -90,7 +98,9 @@ jobs:
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123"
       BUILD_TIME: "true"
+      CI: "true"
 
     runs-on: ubuntu-latest
 
@@ -101,6 +111,21 @@ jobs:
           - 6379:6379
         options: >-
           --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8123:8123
+          - 9000:9000
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -160,9 +185,17 @@ jobs:
         working-directory: langwatch
         run: npm run elastic:migrate
 
-      - name: Run integration tests
+      - name: Run integration tests with coverage
         working-directory: langwatch
-        run: npm run test:integration
+        run: npm run test:integration -- --coverage --coverage.reporter=lcov --coverage.reporter=text
+
+      - name: Upload integration test coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: langwatch/coverage/lcov.info
+          flags: integration
+          name: integration-tests
+          fail_ci_if_error: false
 
   build:
     runs-on: ubuntu-latest

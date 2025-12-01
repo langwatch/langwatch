@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
+import { getModelLimits } from "../../../utils/modelLimits";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -76,6 +77,17 @@ export const llmModelCostsRouter = createTRPCRouter({
         where: { id: input.id, projectId: input.projectId },
       });
     }),
+
+  /**
+   * Get model limits for a given model
+   * TODO: This doesn't need to be protected, but TRPC throws without it
+   * @param input - Input containing the project ID and model name
+   * @returns Model limits or null if not found
+   */
+  getModelLimits: protectedProcedure
+    .input(z.object({ projectId: z.string(), model: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input }) => getModelLimits(input.model)),
 });
 
 const isValidRegex = (pattern: string): boolean => {

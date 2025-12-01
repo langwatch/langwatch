@@ -3,7 +3,7 @@ import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
 import { otelAttributesToNestedAttributes, type TraceForCollection } from "./otel.traces";
-import { decodeOpenTelemetryId, convertFromUnixNano } from "./utils";
+import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId, convertFromUnixNano } from "./utils";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
@@ -54,10 +54,14 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
               }
 
               const traceId = logRecord.traceId
-                ? decodeOpenTelemetryId(logRecord.traceId)
+                ? (typeof logRecord.traceId === "string"
+                    ? decodeBase64OpenTelemetryId(logRecord.traceId)
+                    : decodeOpenTelemetryId(logRecord.traceId))
                 : generatedTraceId;
               const spanId = logRecord.spanId
-                ? decodeOpenTelemetryId(logRecord.spanId)
+                ? (typeof logRecord.spanId === "string"
+                    ? decodeBase64OpenTelemetryId(logRecord.spanId)
+                    : decodeOpenTelemetryId(logRecord.spanId))
                 : generateOtelSpanId();
               if (!traceId || !spanId) {
                 logger.info("received log with no span or trace id, rejecting");

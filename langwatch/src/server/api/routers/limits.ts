@@ -191,28 +191,16 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   );
 };
 
-export const maxMonthlyUsageLimit = async (organizationId: string) => {
-  const activePlan =
-    await dependencies.subscriptionHandler.getActivePlan(organizationId);
-  if (activePlan.name === "Open Source") {
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
-
-    return organization?.usageSpendingMaxLimit ?? Infinity;
-  }
-  if (activePlan.evaluationsCredit < 10) {
-    return activePlan.evaluationsCredit;
-  }
-
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-  });
-
-  // TODO: improve this logic to be based on subscription history
-  const maxLimitAccordingToSubscription = activePlan.prices.USD;
-  const maxLimitAccordingToUser =
-    organization?.usageSpendingMaxLimit ?? maxLimitAccordingToSubscription;
-
-  return Math.min(maxLimitAccordingToSubscription, maxLimitAccordingToUser);
+/**
+ * Get the maximum monthly usage limit for the organization.
+ * FIXME: This was recently changed to return Infinity,
+ * but still takes the organizationId as a parameter.
+ *
+ * Either we remove the organizationId parameter from all the calls to this function,
+ * or we use to get the plan and return it correctly.
+ *
+ * @returns The maximum monthly usage limit for the organization.
+ */
+export const maxMonthlyUsageLimit = async (_organizationId: string) => {
+  return Infinity;
 };

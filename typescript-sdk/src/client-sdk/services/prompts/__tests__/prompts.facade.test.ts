@@ -57,4 +57,20 @@ describe("PromptsFacade.get", () => {
       expect(result).toEqual(new Prompt(mockServerPrompt));
     });
   });
+
+  describe("when prompt doesn't exist locally or on server", () => {
+    it("should throw PromptsError", async () => {
+      // Arrange
+      const nonExistentHandle = "non-existent-prompt";
+      const mockError = new Error("404: Prompt not found");
+      localPromptsService.get.mockResolvedValue(null);
+      promptsApiService.get.mockRejectedValue(mockError);
+
+      // Act & Assert
+      await expect(facade.get(nonExistentHandle)).rejects.toThrow(mockError);
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      expect(localPromptsService.get).toHaveBeenCalledWith(nonExistentHandle);
+      expect(promptsApiService.get).toHaveBeenCalledWith(nonExistentHandle, undefined);
+    });
+  });
 });

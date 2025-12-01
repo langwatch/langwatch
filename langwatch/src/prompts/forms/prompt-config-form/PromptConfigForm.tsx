@@ -61,7 +61,17 @@ function InnerPromptConfigForm() {
     methods.watch("version.configData.inputs") ?? []
   ).map((input) => input.identifier);
 
-  const handleSaveClick = useCallback(() => {
+  const handleSaveClick = useCallback(async () => {
+    const isValid = await methods.trigger("version.configData.llm");
+    if (!isValid) {
+      toaster.create({
+        title: "Validation error",
+        description: "Please fix the LLM configuration errors before saving",
+        type: "error",
+      });
+      return;
+    }
+
     setIsSaving(true);
 
     const values = methods.getValues();

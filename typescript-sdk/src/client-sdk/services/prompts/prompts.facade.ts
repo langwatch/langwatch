@@ -37,13 +37,13 @@ export class PromptsFacade {
    * Retrieves a prompt by handle or ID.
    * @param handleOrId The prompt's handle or unique identifier.
    * @param options Optional parameters for the request.
-   * @returns The Prompt instance or null if not found.
-   * @throws {PromptsError} If the API call fails.
+   * @returns The Prompt instance.
+   * @throws {PromptsError} If the prompt is not found or the API call fails.
    */
   async get(
     handleOrId: string,
     options?: { version?: string },
-  ): Promise<Prompt | null> {
+  ): Promise<Prompt> {
     const localPrompt = await this.localPromptsService.get(handleOrId);
     if (localPrompt) {
       return new Prompt(localPrompt);

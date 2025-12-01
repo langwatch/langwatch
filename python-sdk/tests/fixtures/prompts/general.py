@@ -8,6 +8,7 @@ including LangWatch client setup and cleanup.
 import pytest
 from pathlib import Path
 import tempfile
+import os
 
 import langwatch
 
@@ -44,7 +45,7 @@ def clean_langwatch():
         del langwatch.__dict__["prompts"]
 
     # Setup langwatch client with test configuration
-    langwatch.setup(api_key="test-api-key", endpoint_url="http://localhost:3000")
+    langwatch.setup(api_key="test-api-key", endpoint_url=os.getenv("LANGWATCH_ENDPOINT", "https://app.langwatch.ai"))
 
     yield
 

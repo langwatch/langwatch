@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
+import { type ZodError, z } from "zod";
 import { toaster } from "../components/ui/toaster";
 import {
   getProviderModelOptions,
@@ -7,6 +7,7 @@ import {
   type MaybeStoredModelProvider,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
+import { fromZodError } from "zod-validation-error";
 
 type SelectOption = { value: string; label: string };
 
@@ -52,6 +53,7 @@ export type UseModelProviderFormActions = {
   setCustomEmbeddingsModels: (options: SelectOption[]) => void;
   addCustomEmbeddingsFromText: (text: string) => void;
   setDefaultModel: (model: string | null) => void;
+  setManaged: (managed: boolean) => void;
   submit: () => Promise<void>;
 };
 
@@ -113,6 +115,9 @@ export function useModelProviderForm(
     storedKeys: Record<string, unknown>,
     previousKeys?: Record<string, string>,
   ) => {
+    if (previousKeys?.MANAGED) {
+      return previousKeys;
+    }
     const result: Record<string, string> = {};
     Object.keys(displayKeyMap ?? {}).forEach((key) => {
       if (
@@ -215,6 +220,14 @@ export function useModelProviderForm(
   const [isSaving, setIsSaving] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
+
+  const setManaged = useCallback((managed: boolean) => {
+    if (managed) {
+      setCustomKeys({ MANAGED: "true" });
+    } else {
+      setCustomKeys({});
+    }
+  }, []);
 
   useEffect(() => {
     const storedKeys = (provider.customKeys as Record<string, unknown>) ?? {};
@@ -436,7 +449,7 @@ export function useModelProviderForm(
         ? (keysSchema as any).safeParse(keysToValidate)
         : { success: true };
       if (!parsed.success) {
-        setErrors({ customKeysRoot: parsed.error?.message });
+        setErrors({ customKeysRoot: fromZodError(parsed.error as ZodError).message });
         setIsSaving(false);
         return;
       }
@@ -540,6 +553,7 @@ export function useModelProviderForm(
       setCustomEmbeddingsModels,
       addCustomEmbeddingsFromText,
       setDefaultModel,
+      setManaged,
       submit,
     },
   ];
