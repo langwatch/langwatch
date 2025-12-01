@@ -36,6 +36,7 @@ export default function SettingsLayout({
             Members
           </MenuLink>
           <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+          <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
 
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores

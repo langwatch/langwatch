@@ -46,7 +46,7 @@ export const useMessagesNavigationFooter = () => {
     traceGroups: UseTRPCQueryResult<
       inferRouterOutputs<AppRouter>["traces"]["getAllForProject"],
       TRPCClientErrorLike<AppRouter>
-    >
+    >,
   ) => {
     useEffect(() => {
       if (traceGroups.isFetched) {
@@ -115,7 +115,7 @@ export function MessagesNavigationFooter({
         </HStack>
       </Field.Root>
 
-      <HStack gap={3}>
+      <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
           {" "}
           {`${pageOffset + 1}`} -{" "}
