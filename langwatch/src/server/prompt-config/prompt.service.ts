@@ -802,7 +802,7 @@ export class PromptService {
       promptingTechnique: config.latestVersion.configData.prompting_technique,
       commitMessage: config.latestVersion.commitMessage,
       copiedFromPromptId: config.copiedFromPromptId ?? null,
-      _count: config._count,
+      _count: config._count ?? undefined,
     };
   }
 
