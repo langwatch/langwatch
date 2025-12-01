@@ -33,6 +33,7 @@ export const CopyWorkflowDialog = ({
 }) => {
   const { organizations, project } = useOrganizationTeamProject();
   const session = useRequiredSession();
+  const utils = api.useContext();
   const copyWorkflow = api.workflow.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
@@ -88,6 +89,9 @@ export const CopyWorkflowDialog = ({
     const projectId = selectedProjectId[0];
     if (!projectId || !project) return;
 
+    const selectedProject = projects.find((p) => p.value === projectId);
+    const targetProjectPath = selectedProject?.label ?? "selected project";
+
     try {
       await copyWorkflow.mutateAsync({
         workflowId,
@@ -96,9 +100,12 @@ export const CopyWorkflowDialog = ({
         copyDatasets,
       });
 
+      // Invalidate queries to refresh the workflow list
+      await utils.workflow.getAll.invalidate();
+
       toaster.create({
         title: "Workflow copied",
-        description: `Workflow "${workflowName}" copied successfully.`,
+        description: `Workflow "${workflowName}" copied successfully to ${targetProjectPath}.`,
         type: "success",
       });
 

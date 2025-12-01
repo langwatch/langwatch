@@ -216,6 +216,31 @@ export const workflowRouter = createTRPCRouter({
           isEvaluator: true,
           isComponent: true,
           copiedFromWorkflowId: true,
+          copiedFrom: {
+            select: {
+              id: true,
+              name: true,
+              projectId: true,
+              project: {
+                select: {
+                  id: true,
+                  name: true,
+                  team: {
+                    select: {
+                      id: true,
+                      name: true,
+                      organization: {
+                        select: {
+                          id: true,
+                          name: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
           _count: {
             select: {
               copiedWorkflows: {

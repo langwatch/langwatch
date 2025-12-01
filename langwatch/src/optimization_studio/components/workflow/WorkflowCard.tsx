@@ -74,7 +74,8 @@ export function WorkflowCard({
   const hasWorkflowsUpdatePermission = hasPermission("workflows:update");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
-  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] = useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
+    useState(false);
 
   // Get the workflow data to check if it's a copy or has copies
   const workflow = workflowId
@@ -82,6 +83,11 @@ export function WorkflowCard({
     : undefined;
   const isCopiedWorkflow = !!workflow?.copiedFromWorkflowId;
   const hasCopies = (workflow?._count?.copiedWorkflows ?? 0) > 0;
+
+  // Get source project path for tooltip
+  const sourceProjectPath = workflow?.copiedFrom
+    ? `${workflow.copiedFrom.project.team.organization.name} / ${workflow.copiedFrom.project.team.name} / ${workflow.copiedFrom.project.name}`
+    : undefined;
 
   const onSyncFromSource = useCallback(() => {
     if (!workflowId || !project) return;
@@ -204,9 +210,13 @@ export function WorkflowCard({
                     content={
                       !hasWorkflowsUpdatePermission
                         ? "You need workflows:update permission to sync from source"
+                        : sourceProjectPath
+                        ? `Copied from: ${sourceProjectPath}`
                         : undefined
                     }
-                    disabled={hasWorkflowsUpdatePermission}
+                    disabled={
+                      !hasWorkflowsUpdatePermission && !sourceProjectPath
+                    }
                     positioning={{ placement: "right" }}
                     showArrow
                   >
