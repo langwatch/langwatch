@@ -146,7 +146,7 @@ export default function Accept() {
             </Button>
           ) : (
             <Button
-              colorPalette="blue"
+              colorPalette="orange"
               onClick={() => {
                 void router.push("/");
               }}
