@@ -278,6 +278,7 @@ export class PromptService {
         organizationId,
         scope: params.scope ?? "PROJECT",
         authorId: params.authorId,
+        copiedFromPromptId: null,
       },
       versionData: shouldCreateVersion
         ? {
