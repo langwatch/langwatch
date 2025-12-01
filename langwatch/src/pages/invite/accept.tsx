@@ -18,26 +18,17 @@ export default function Accept() {
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;
 
-  // Track the last attempted email to prevent duplicate attempts with same email
-  // This ensures we don't retry if the invite was already accepted by this user
   const lastAttemptedEmailRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!triggerInvite || !session?.user?.email) return;
 
     const currentEmail = session.user.email;
-
-    // Prevent multiple calls with the same email - only mutate if:
-    // 1. Not already loading
-    // 2. Not already successful
-    // 3. Previous attempt was a wrong email error (allow retry after logout/login with correct email)
-    // 4. Haven't already attempted with this email
     const isWrongEmailError =
       acceptInviteMutation.isError &&
-      acceptInviteMutation.error.message.includes("but you are signed in as");
+      acceptInviteMutation.error.data?.code === "FORBIDDEN";
 
-    // If we've already attempted with this email and it wasn't a wrong email error, don't retry
-    // This prevents accepting with wrong email (backend also prevents this, but this is an extra safeguard)
+    // Prevent duplicate attempts with the same email
     if (
       lastAttemptedEmailRef.current === currentEmail &&
       !isWrongEmailError &&
@@ -54,9 +45,6 @@ export default function Accept() {
       return;
     }
 
-    // Track that we're attempting with this email
-    // Note: Backend enforces email match (see organization.ts:829) - invite can ONLY be accepted
-    // if session.user.email === invite.email. This frontend check is just an extra safeguard.
     lastAttemptedEmailRef.current = currentEmail;
 
     acceptInviteMutation.mutate(
@@ -96,10 +84,9 @@ export default function Accept() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerInvite, session?.user?.email]);
 
-  // Check if error is "already accepted" - if so, show redirect button instead of error
   const isAlreadyAccepted =
     acceptInviteMutation.isError &&
-    acceptInviteMutation.error.message.includes("already accepted");
+    acceptInviteMutation.error.data?.code === "BAD_REQUEST";
 
   if (
     !triggerInvite ||
@@ -137,10 +124,7 @@ export default function Accept() {
   }
 
   if (acceptInviteMutation.isError) {
-    // Check if it's a wrong email error
-    const isWrongEmail = acceptInviteMutation.error.message.includes(
-      "but you are signed in as",
-    );
+    const isWrongEmail = acceptInviteMutation.error.data?.code === "FORBIDDEN";
 
     return (
       <SetupLayout>
