@@ -412,7 +412,20 @@ export const promptsRouter = createTRPCRouter({
       // If handle is not available, append a suffix
       if (!handleAvailable) {
         let index = 1;
+        const maxAttempts = 100;
+        let attempts = 0;
         while (!handleAvailable) {
+          attempts++;
+          if (attempts > maxAttempts) {
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Failed to generate unique handle after ${maxAttempts} attempts. Source prompt: ${
+                sourcePrompt.id
+              } (handle: ${sourcePrompt.handle ?? "none"}), target project: ${
+                input.projectId
+              }`,
+            });
+          }
           newHandle = `${sourcePrompt.handle ?? sourcePrompt.id}_copy${index}`;
           handleAvailable = await service.checkHandleUniqueness({
             handle: newHandle,

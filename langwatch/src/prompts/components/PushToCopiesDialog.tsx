@@ -1,9 +1,4 @@
-import {
-  Button,
-  Field,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Text, VStack } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { Dialog } from "../../components/ui/dialog";
 import { Checkbox } from "../../components/ui/checkbox";
@@ -25,9 +20,15 @@ export const PushToCopiesDialog = ({
   const { project } = useOrganizationTeamProject();
   const pushToCopies = api.prompts.pushToCopies.useMutation();
   const utils = api.useContext();
-  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(new Set());
+  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const { data: copies, isLoading } = api.prompts.getCopies.useQuery(
+  const {
+    data: copies,
+    isLoading,
+    error,
+  } = api.prompts.getCopies.useQuery(
     {
       projectId: project?.id ?? "",
       idOrHandle: promptId,
@@ -90,8 +91,7 @@ export const PushToCopiesDialog = ({
     } catch (error) {
       toaster.create({
         title: "Error pushing prompt",
-        description:
-          error instanceof Error ? error.message : "Unknown error",
+        description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
     }
@@ -111,6 +111,8 @@ export const PushToCopiesDialog = ({
             </Text>
             {isLoading ? (
               <Text>Loading copies...</Text>
+            ) : error ? (
+              <Text color="red.500">Error loading copies: {error.message}</Text>
             ) : availableCopies.length === 0 ? (
               <Text color="gray.500">No copies found.</Text>
             ) : (
@@ -122,9 +124,7 @@ export const PushToCopiesDialog = ({
                     onChange={() => handleToggleCopy(copy.id)}
                   >
                     <VStack align={"start"} gap={0}>
-                      <Text fontWeight="medium">
-                        {copy.handle}
-                      </Text>
+                      <Text fontWeight="medium">{copy.handle}</Text>
                       <Text fontSize="sm" color="gray.500">
                         {copy.fullPath}
                       </Text>
@@ -147,11 +147,11 @@ export const PushToCopiesDialog = ({
             loading={pushToCopies.isLoading}
             disabled={selectedCopyIds.size === 0 || isLoading}
           >
-            Push to {selectedCopyIds.size} copy{selectedCopyIds.size !== 1 ? "ies" : ""}
+            Push to {selectedCopyIds.size} copy
+            {selectedCopyIds.size !== 1 ? "ies" : ""}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );
 };
-

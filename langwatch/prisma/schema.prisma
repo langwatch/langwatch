@@ -767,7 +767,7 @@ model LlmPromptConfig {
 
     // Copy tracking
     copiedFromPromptId String?
-    copiedFrom         LlmPromptConfig? @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
     copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
 
     // Relation to all versions - latest is determined by query

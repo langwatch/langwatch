@@ -82,7 +82,7 @@ export const workflowRouter = createTRPCRouter({
         throw new TRPCError({
           code: "UNAUTHORIZED",
           message:
-            "You do not have permission to view workflows in the source project",
+            "You do not have permission to create workflows in the source project",
         });
       }
 
@@ -111,6 +111,18 @@ export const workflowRouter = createTRPCRouter({
 
       if (input.copyDatasets) {
         const datasetService = DatasetService.create(ctx.prisma);
+
+        // Type guard for dataset reference
+        const isDatasetRef = (
+          value: unknown,
+        ): value is { id?: string; name?: string } => {
+          if (!value || typeof value !== "object") return false;
+          const obj = value as Record<string, unknown>;
+          return (
+            (obj.id === undefined || typeof obj.id === "string") &&
+            (obj.name === undefined || typeof obj.name === "string")
+          );
+        };
 
         // Helper to process dataset reference
         const processDatasetRef = async (datasetRef: {
@@ -152,13 +164,8 @@ export const workflowRouter = createTRPCRouter({
           // Check parameters for Demonstrations
           if (node.data && "parameters" in node.data && node.data.parameters) {
             for (const param of node.data.parameters) {
-              if (
-                param.type === "dataset" &&
-                param.value &&
-                typeof param.value === "object" &&
-                "id" in param.value
-              ) {
-                await processDatasetRef(param.value as any);
+              if (param.type === "dataset" && isDatasetRef(param.value)) {
+                await processDatasetRef(param.value);
               }
             }
           }

@@ -45,6 +45,9 @@ export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
     author?: { name: string } | null;
   };
+  _count?: {
+    copiedPrompts?: number;
+  } | null;
 }
 
 /**
