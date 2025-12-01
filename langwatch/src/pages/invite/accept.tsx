@@ -113,7 +113,7 @@ export default function Accept() {
           <Button
             colorPalette="blue"
             onClick={() => {
-              void router.push("https://app.langwatch.ai");
+              void router.push("/");
             }}
           >
             Go to App
@@ -148,7 +148,7 @@ export default function Accept() {
             <Button
               colorPalette="blue"
               onClick={() => {
-                void router.push("https://app.langwatch.ai");
+                void router.push("/");
               }}
             >
               Go to App
