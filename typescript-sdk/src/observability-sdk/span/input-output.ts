@@ -20,16 +20,17 @@ const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
  * Utility function to create a safe fallback value
  */
 function createSafeFallbackValue(value: unknown): string {
+  return `[${typeof value}]`;
+  // if (typeof value === 'object' && value !== null) {
+  //   try {
+  //     return JSON.stringify(value);
+  //   } catch {
+  //     // Fallback on JSON.stringify failure as final step
+  //     return JSON.stringify({ type: "raw", value: "[Non-Serializable]" });
+  //   }
+  // }
 
-  if (typeof value === 'object' && value !== null) {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      // Fallback on JSON.stringify failure as final step
-      return JSON.stringify({ type: "raw", value: "[Non-Serializable]" });
-    }
-  }
-  return String(value);
+  // return String(value);
 }
 
 /**
