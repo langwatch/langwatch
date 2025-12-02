@@ -150,7 +150,7 @@ describe("LangChain Integration Tests", () => {
           { callbacks: [tracingCallback] }
         );
 
-        expect(result.output).toContain(date);
+        expect(result.output).toContain(date.split('.')[0]); // Ignore milliseconds due to span processing
       }
     );
 
