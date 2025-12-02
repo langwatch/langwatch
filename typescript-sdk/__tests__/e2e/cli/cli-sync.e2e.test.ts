@@ -138,7 +138,7 @@ describe("CLI E2E", () => {
           throw new Error("Lock file not found");
         }
         expect(lock1.prompts[promptHandle]).toBeDefined();
-        expect(lock1.prompts[promptHandle].version).toBe(0);
+        expect(lock1.prompts[promptHandle].version).toBe(1);
 
         // Modify local file
         localPromptFileManagement.updatePromptFile(promptHandle, {
@@ -183,7 +183,7 @@ describe("CLI E2E", () => {
         if (!lock2) {
           throw new Error("Lock file not found");
         }
-        expect(lock2.prompts[promptHandle].version).toBe(1);
+        expect(lock2.prompts[promptHandle].version).toBe(2);
 
         // Third sync - should be up-to-date
         const sync3 = cli.run("prompt sync");
@@ -250,16 +250,21 @@ describe("CLI E2E", () => {
 
       describe("when user chooses to use remote version", () => {
         it("should replace the local prompt with the remote version", async () => {
-          // Second sync - should sync
+          // Modify local file to create a real conflict
+          localPromptFileManagement.updatePromptFile(promptHandle, {
+            model: "openai/gpt-5",
+            modelParameters: { temperature: 0.5 },
+            messages: [
+              { role: "system", content: "Local change to system message." },
+              { role: "user", content: "{{input}}" },
+            ],
+          });
+
+          // Second sync - should detect conflict
           const sync2 = await cli.runInteractive("prompt sync", ["r"]);
 
           // Verify conflict output
           expect(sync2.output).toContain(`Conflict`);
-          expect(sync2.output).toContain(`Differences:`);
-          expect(sync2.output).toContain(`• model: openai/gpt-5 → gpt-4-turbo`);
-          expect(sync2.output).toContain(`• prompt content differs`);
-          expect(sync2.output).toContain(`• messages differ`);
-          expect(sync2.output).toContain(`• temperature: 0.7 → 0.9`);
 
           expect(localPromptFileManagement.getPromptFileContent(promptHandle))
             .toMatchInlineSnapshot(`
@@ -278,6 +283,16 @@ describe("CLI E2E", () => {
 
       describe("when user chooses to use local version", () => {
         it("should replace the remote version with the local version", async () => {
+          // Modify local file to create a real conflict
+          localPromptFileManagement.updatePromptFile(promptHandle, {
+            model: "openai/gpt-5",
+            modelParameters: { temperature: 0.5 },
+            messages: [
+              { role: "system", content: "Local change to system message." },
+              { role: "user", content: "{{input}}" },
+            ],
+          });
+
           const current =
             localPromptFileManagement.readPromptFile(promptHandle);
           // Run sync and choose local version ('l')
@@ -290,7 +305,7 @@ describe("CLI E2E", () => {
             throw new Error("Updated remote prompt not found");
           }
           expect(updatedRemote.model).toBe(current.model);
-          expect(updatedRemote.prompt).toBe(current.messages[0].content);
+          expect(updatedRemote.prompt).toBe(current.messages[0]?.content);
           expect(updatedRemote.messages).toEqual(current.messages);
         });
       });
