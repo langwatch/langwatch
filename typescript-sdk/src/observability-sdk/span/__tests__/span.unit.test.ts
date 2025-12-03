@@ -592,7 +592,7 @@ describe("span.ts", () => {
         intSemconv.ATTR_LANGWATCH_INPUT,
         JSON.stringify({
           type: "text",
-          value: "[object]" // Objects are converted to '[object]' string representation
+          value: JSON.stringify(obj) // Objects are JSON stringified
         })
       );
 
