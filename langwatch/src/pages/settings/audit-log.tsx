@@ -1,7 +1,6 @@
 import {
   Button,
   Card,
-  Field,
   HStack,
   Heading,
   Input,
@@ -12,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Search, Download } from "react-feather";
+import { Search, Download } from "lucide-react";
 import { useState } from "react";
 import { useRouter } from "next/router";
 import Parse from "papaparse";
@@ -38,19 +37,25 @@ function AuditLogPage() {
     period: { startDate, endDate },
   } = usePeriodSelector(30);
 
+  // Helper to parse URL query param to number with default
+  const parseQueryNumber = (
+    param: string | undefined,
+    defaultValue: number,
+  ): number => {
+    if (!param) return defaultValue;
+    const parsed = Number(param);
+    return isNaN(parsed) ? defaultValue : parsed;
+  };
+
   // Get pagination from URL parameters with defaults
-  const pageOffsetParam = router.query.pageOffset as string | undefined;
-  const pageSizeParam = router.query.pageSize as string | undefined;
-  const pageOffset = pageOffsetParam
-    ? isNaN(Number(pageOffsetParam))
-      ? 0
-      : Number(pageOffsetParam)
-    : 0;
-  const pageSize = pageSizeParam
-    ? isNaN(Number(pageSizeParam))
-      ? 25
-      : Number(pageSizeParam)
-    : 25;
+  const pageOffset = parseQueryNumber(
+    router.query.pageOffset as string | undefined,
+    0,
+  );
+  const pageSize = parseQueryNumber(
+    router.query.pageSize as string | undefined,
+    25,
+  );
 
   // Search state
   const [userSearch, setUserSearch] = useState(
