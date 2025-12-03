@@ -8,6 +8,7 @@ import {
   type User,
   type CustomRole,
   TeamUserRole,
+  type Prisma,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -1316,7 +1317,9 @@ export const organizationRouter = createTRPCRouter({
       const orgUserIdsList = orgUserIds.map((ou) => ou.userId);
 
       // Build base conditions for organizationId
-      const orgIdConditions: any[] = [{ organizationId: input.organizationId }];
+      const orgIdConditions: Prisma.AuditLogWhereInput[] = [
+        { organizationId: input.organizationId },
+      ];
 
       // Only include null organizationId logs if:
       // 1. The user list is not empty
@@ -1324,7 +1327,7 @@ export const organizationRouter = createTRPCRouter({
       // We exclude logs where both organizationId and projectId are null
       if (orgUserIdsList.length > 0) {
         orgIdConditions.push({
-          organizationId: null as any,
+          organizationId: null,
           userId: {
             in: orgUserIdsList,
           },
@@ -1335,10 +1338,10 @@ export const organizationRouter = createTRPCRouter({
       }
 
       // Build the where clause
-      const where: any = {};
+      const where: Prisma.AuditLogWhereInput = {};
 
       // Build AND conditions
-      const andConditions: any[] = [
+      const andConditions: Prisma.AuditLogWhereInput[] = [
         {
           OR: orgIdConditions,
         },
@@ -1363,7 +1366,7 @@ export const organizationRouter = createTRPCRouter({
       if (input.projectId) {
         // When project is selected, show logs for that project OR organization-level (null projectId)
         andConditions.push({
-          OR: [{ projectId: input.projectId }, { projectId: null as any }],
+          OR: [{ projectId: input.projectId }, { projectId: null }],
         });
       }
 

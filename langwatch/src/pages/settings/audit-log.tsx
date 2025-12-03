@@ -52,21 +52,14 @@ function AuditLogPage() {
     project?.id ?? null,
   );
 
-  if (!organization) {
-    return (
-      <SettingsLayout>
-        <VStack align="center" justify="center" width="full" height="200px">
-          <Spinner />
-        </VStack>
-      </SettingsLayout>
-    );
-  }
+  // Extract organizationId with fallback for TypeScript
+  const organizationId = organization?.id ?? "";
 
   // Get users for search - we'll search by user ID or name/email
   const { data: organizationMembers } =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       {
-        organizationId: organization.id,
+        organizationId,
       },
       {
         enabled: !!organization,
@@ -89,7 +82,7 @@ function AuditLogPage() {
   const { data: auditLogsData, isLoading } =
     api.organization.getAuditLogs.useQuery(
       {
-        organizationId: organization.id,
+        organizationId,
         projectId: selectedProjectId ?? undefined,
         userId: searchUserId,
         pageOffset,
@@ -100,6 +93,16 @@ function AuditLogPage() {
         enabled: !!organization,
       },
     );
+
+  if (!organization) {
+    return (
+      <SettingsLayout>
+        <VStack align="center" justify="center" width="full" height="200px">
+          <Spinner />
+        </VStack>
+      </SettingsLayout>
+    );
+  }
 
   const updateQueryParams = (updates: Record<string, string | number>) => {
     void router.push({
@@ -300,9 +303,16 @@ function AuditLogPage() {
                         </Table.Cell>
                         <Table.Cell>
                           {log.projectId ? (
-                            <Text fontSize="sm">
-                              {(log as any).project?.name ?? log.projectId}
-                            </Text>
+                            (() => {
+                              const project = organization.teams
+                                .flatMap((team) => team.projects)
+                                .find((p) => p.id === log.projectId);
+                              return (
+                                <Text fontSize="sm">
+                                  {project?.name ?? log.projectId}
+                                </Text>
+                              );
+                            })()
                           ) : (
                             <Text fontSize="sm" color="gray.400">
                               —
