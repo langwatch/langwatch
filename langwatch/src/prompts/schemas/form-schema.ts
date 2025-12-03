@@ -12,13 +12,14 @@ import {
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
-const llmSchemaWithPreprocessing = z.object({
+const llmSchema = z.object({
   model:
     latestConfigVersionSchema.shape.configData.shape.model.default(
       DEFAULT_MODEL,
     ),
-  temperature: z.number(),
-  maxTokens: z.number(),
+  // Derive from DB schema to stay in sync
+  temperature: latestConfigVersionSchema.shape.configData.shape.temperature,
+  maxTokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
   litellmParams: z.record(z.string()).optional(),
 });
 
@@ -39,7 +40,7 @@ const baseFormSchema = z.object({
       messages: latestConfigVersionSchema.shape.configData.shape.messages,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
-      llm: llmSchemaWithPreprocessing,
+      llm: llmSchema,
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
       promptingTechnique:
@@ -81,17 +82,17 @@ export function refinedFormSchemaWithModelLimits(
       configData: baseFormSchema.shape.version.shape.configData.extend({
         llm: z
           .object({
-            model: llmSchemaWithPreprocessing.shape.model,
-            temperature: llmSchemaWithPreprocessing.shape.temperature,
-            maxTokens: llmSchemaWithPreprocessing.shape.maxTokens
-              .refine((val) => val <= maxTokenLimit, {
+            model: llmSchema.shape.model,
+            temperature: llmSchema.shape.temperature,
+            maxTokens: llmSchema.shape.maxTokens
+              .refine((val) => val !== undefined && val <= maxTokenLimit, {
                 message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
               })
-              .refine((val) => val >= MIN_MAX_TOKENS, {
+              .refine((val) => val !== undefined && val >= MIN_MAX_TOKENS, {
                 message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
               }),
             // Additional params attached to the LLM config
-            litellmParams: llmSchemaWithPreprocessing.shape.litellmParams,
+            litellmParams: llmSchema.shape.litellmParams,
           })
           .refine(
             (data) => {
