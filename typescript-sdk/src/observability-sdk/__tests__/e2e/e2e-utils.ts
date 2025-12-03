@@ -64,6 +64,7 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
   console.debug("🔧 Calling setupObservability...");
   setupObservability({
     spanProcessors: [spanProcessor],
+    langwatch: 'disabled',
     debug: { logLevel: "debug" },
     advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
   });
