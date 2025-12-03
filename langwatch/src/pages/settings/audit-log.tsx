@@ -72,6 +72,9 @@ function AuditLogPage() {
   // Extract organizationId with fallback for TypeScript
   const organizationId = organization?.id ?? "";
 
+  // Initialize query client (must be before early return)
+  const queryClient = api.useContext();
+
   // Get users for search - we'll search by user ID or name/email
   const { data: organizationMembers } =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
@@ -182,8 +185,6 @@ function AuditLogPage() {
 
   const totalHits = auditLogsData?.totalCount ?? 0;
   const auditLogs = auditLogsData?.auditLogs ?? [];
-
-  const queryClient = api.useContext();
 
   const downloadCSV = async () => {
     if (!organization) return;
