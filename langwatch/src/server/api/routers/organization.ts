@@ -1298,8 +1298,10 @@ export const organizationRouter = createTRPCRouter({
         projectId: z.string().optional(),
         userId: z.string().optional(), // For searching by user
         pageOffset: z.number().min(0).default(0),
-        pageSize: z.number().min(1).max(100).default(25),
+        pageSize: z.number().min(1).max(10000).default(25), // Increased max for exports
         action: z.string().optional(), // For filtering by action type
+        startDate: z.number().optional(), // Start date timestamp (milliseconds)
+        endDate: z.number().optional(), // End date timestamp (milliseconds)
       }),
     )
     .use(checkOrganizationPermission("organization:view"))
@@ -1367,6 +1369,23 @@ export const organizationRouter = createTRPCRouter({
         // When project is selected, show logs for that project OR organization-level (null projectId)
         andConditions.push({
           OR: [{ projectId: input.projectId }, { projectId: null }],
+        });
+      }
+
+      // Add date range filter if provided
+      if (input.startDate !== undefined || input.endDate !== undefined) {
+        const dateFilter: {
+          gte?: Date;
+          lte?: Date;
+        } = {};
+        if (input.startDate !== undefined) {
+          dateFilter.gte = new Date(input.startDate);
+        }
+        if (input.endDate !== undefined) {
+          dateFilter.lte = new Date(input.endDate);
+        }
+        andConditions.push({
+          createdAt: dateFilter,
         });
       }
 

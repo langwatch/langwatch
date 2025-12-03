@@ -1,4 +1,5 @@
 import {
+  Button,
   Card,
   Field,
   HStack,
@@ -11,9 +12,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Search } from "react-feather";
+import { Search, Download } from "react-feather";
 import { useState } from "react";
 import { useRouter } from "next/router";
+import Parse from "papaparse";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { InputGroup } from "../../components/ui/input-group";
@@ -22,10 +24,19 @@ import { api } from "../../utils/api";
 import { MessagesNavigationFooter } from "../../components/messages/MessagesNavigationFooter";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { formatDistanceToNow } from "date-fns";
+import {
+  PeriodSelector,
+  usePeriodSelector,
+} from "../../components/PeriodSelector";
 
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
   const router = useRouter();
+
+  // Date range selector
+  const {
+    period: { startDate, endDate },
+  } = usePeriodSelector(30);
 
   // Get pagination from URL parameters with defaults
   const pageOffsetParam = router.query.pageOffset as string | undefined;
@@ -51,6 +62,7 @@ function AuditLogPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     project?.id ?? null,
   );
+  const [isExporting, setIsExporting] = useState(false);
 
   // Extract organizationId with fallback for TypeScript
   const organizationId = organization?.id ?? "";
@@ -88,6 +100,8 @@ function AuditLogPage() {
         pageOffset,
         pageSize,
         action: actionFilter || undefined,
+        startDate: startDate.getTime(),
+        endDate: endDate.getTime(),
       },
       {
         enabled: !!organization,
@@ -164,6 +178,104 @@ function AuditLogPage() {
   const totalHits = auditLogsData?.totalCount ?? 0;
   const auditLogs = auditLogsData?.auditLogs ?? [];
 
+  const queryClient = api.useContext();
+
+  const downloadCSV = async () => {
+    if (!organization) return;
+
+    setIsExporting(true);
+    try {
+      const allAuditLogs = [];
+      let currentOffset = 0;
+      const batchSize = 5000;
+      let totalCount = 0;
+
+      // Fetch first batch to get total count
+      const initialBatch = await queryClient.organization.getAuditLogs.fetch({
+        organizationId: organization.id,
+        projectId: selectedProjectId ?? undefined,
+        userId: searchUserId,
+        pageOffset: 0,
+        pageSize: batchSize,
+        action: actionFilter || undefined,
+        startDate: startDate.getTime(),
+        endDate: endDate.getTime(),
+      });
+
+      allAuditLogs.push(...(initialBatch.auditLogs ?? []));
+      totalCount = initialBatch.totalCount;
+      currentOffset = batchSize;
+
+      // Loop through remaining pages
+      while (currentOffset < totalCount) {
+        const batch = await queryClient.organization.getAuditLogs.fetch({
+          organizationId: organization.id,
+          projectId: selectedProjectId ?? undefined,
+          userId: searchUserId,
+          pageOffset: currentOffset,
+          pageSize: batchSize,
+          action: actionFilter || undefined,
+          startDate: startDate.getTime(),
+          endDate: endDate.getTime(),
+        });
+
+        if (!batch.auditLogs || batch.auditLogs.length === 0) break;
+
+        allAuditLogs.push(...batch.auditLogs);
+        currentOffset += batchSize;
+      }
+
+      // Define CSV fields
+      const fields = [
+        "Timestamp",
+        "User Name",
+        "User Email",
+        "Action",
+        "Project",
+        "IP Address",
+        "User Agent",
+        "Error",
+        "Args",
+      ];
+
+      // Convert audit logs to CSV rows
+      const csvData = allAuditLogs.map((log) => [
+        new Date(log.createdAt).toISOString(),
+        (log as any).user?.name ?? "",
+        (log as any).user?.email ?? "",
+        log.action,
+        (log as any).project?.name ?? log.projectId ?? "",
+        log.ipAddress ?? "",
+        log.userAgent ?? "",
+        log.error ?? "",
+        log.args ? JSON.stringify(log.args) : "",
+      ]);
+
+      // Generate CSV
+      const csvBlob = Parse.unparse({
+        fields,
+        data: csvData,
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([csvBlob]));
+      const link = document.createElement("a");
+      link.href = url;
+      const today = new Date();
+      const formattedDate = today.toISOString().split("T")[0];
+      const fileName = `audit_logs_${formattedDate}.csv`;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export audit logs:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <SettingsLayout>
       <VStack
@@ -179,43 +291,87 @@ function AuditLogPage() {
             Audit Log
           </Heading>
           <Spacer />
+          <Button
+            colorPalette="black"
+            minWidth="fit-content"
+            variant="ghost"
+            onClick={() => void downloadCSV()}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <>
+                <Spinner size="sm" style={{ marginRight: "8px" }} />
+                Exporting...
+              </>
+            ) : (
+              <>
+                Export CSV <Download style={{ marginLeft: "8px" }} />
+              </>
+            )}
+          </Button>
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
         </HStack>
 
         <Text color="gray.600">
-          View all audit logs for your organization. Filter by project, user, or
-          action type.
+          View all audit logs for your organization. Filter by project, user,
+          action type, or date range.
         </Text>
 
         {/* Filters */}
         <Card.Root width="full">
           <Card.Body width="full" paddingY={4} paddingX={4}>
-            <HStack gap={4} width="full" flexWrap="wrap">
-              <Field.Root width="full" maxWidth="300px">
-                <Field.Label>Search by User</Field.Label>
-                <InputGroup startElement={<Search size={16} />}>
+            <HStack gap={4} width="full" flexWrap="wrap" align="end">
+              <VStack
+                align="start"
+                gap={1}
+                flex="1"
+                minWidth="200px"
+                maxWidth="300px"
+              >
+                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+                  Search by User
+                </Text>
+                <InputGroup startElement={<Search size={16} />} width="full">
                   <Input
                     placeholder="Search by name or email..."
                     value={userSearch}
                     onChange={(e) => handleUserSearchChange(e.target.value)}
+                    width="full"
                   />
                 </InputGroup>
-              </Field.Root>
+              </VStack>
 
-              <Field.Root width="full" maxWidth="300px">
-                <Field.Label>Filter by Action</Field.Label>
+              <VStack
+                align="start"
+                gap={1}
+                flex="1"
+                minWidth="200px"
+                maxWidth="300px"
+              >
+                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+                  Filter by Action
+                </Text>
                 <Input
                   placeholder="Filter by action type..."
                   value={actionFilter}
                   onChange={(e) => handleActionFilterChange(e.target.value)}
+                  width="full"
                 />
-              </Field.Root>
+              </VStack>
 
-              <Field.Root width="full" maxWidth="200px">
-                <Field.Label>Project</Field.Label>
-                <NativeSelect.Root size="sm">
+              <VStack
+                align="start"
+                gap={1}
+                flex="1"
+                minWidth="150px"
+                maxWidth="200px"
+              >
+                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+                  Project
+                </Text>
+                <NativeSelect.Root size="sm" width="full">
                   <NativeSelect.Field
                     value={selectedProjectId ?? "all"}
                     onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
@@ -235,7 +391,33 @@ function AuditLogPage() {
                   </NativeSelect.Field>
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
-              </Field.Root>
+              </VStack>
+
+              <VStack
+                align="start"
+                gap={1}
+                flex="1"
+                minWidth="200px"
+                maxWidth="300px"
+              >
+                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+                  Select Date
+                </Text>
+                <PeriodSelector
+                  period={{ startDate, endDate }}
+                  setPeriod={(start, end) => {
+                    void router.push({
+                      pathname: router.pathname,
+                      query: {
+                        ...router.query,
+                        startDate: start.toISOString(),
+                        endDate: end.toISOString(),
+                        pageOffset: 0,
+                      },
+                    });
+                  }}
+                />
+              </VStack>
             </HStack>
           </Card.Body>
         </Card.Root>
