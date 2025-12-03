@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.1...python-sdk@v0.7.2) (2025-12-03)
+
+
+### Bug Fixes
+
+* **python-sdk:** add httpx.ReadTimeout to transient error skip list ([#910](https://github.com/langwatch/langwatch/issues/910)) ([dbdae14](https://github.com/langwatch/langwatch/commit/dbdae1465b5da364aa23097d9d91ff2072ee6d13)), closes [#909](https://github.com/langwatch/langwatch/issues/909)
+
 ## [0.7.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.0...python-sdk@v0.7.1) (2025-11-28)
 
 
