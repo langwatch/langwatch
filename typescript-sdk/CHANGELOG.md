@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.8.2...typescript-sdk@v0.9.0) (2025-12-03)
+
+
+### Features
+
+* **cli:** add --version command ([#904](https://github.com/langwatch/langwatch/issues/904)) ([e9908a3](https://github.com/langwatch/langwatch/commit/e9908a3808f86869b5011e5ac0f0e11a5a7c2b7b))
+
+
+### Bug Fixes
+
+* **typescript-sdk:** preserve object data in createSafeFallbackValue … ([#907](https://github.com/langwatch/langwatch/issues/907)) ([754525a](https://github.com/langwatch/langwatch/commit/754525af925056c2974dcd35b5d03118c32da7c6))
+
 ## [0.8.2](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.8.1...typescript-sdk@v0.8.2) (2025-11-28)
 
 
