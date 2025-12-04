@@ -13,7 +13,7 @@ import type {
   TraceAggregationCompletedEventData,
 } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { getClickHouseClient } from "../../../../clickhouse/client";
 import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/spanRepositoryClickHouse";
 import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepositoryMemory";
 import type { SpanRepository } from "../../span-ingestion/repositories/spanRepository";
