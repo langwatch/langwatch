@@ -50,7 +50,10 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: z.array(z.string()).optional().nullable(),
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
-        extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional().nullable(),
+        extraHeaders: z
+          .array(z.object({ key: z.string(), value: z.string() }))
+          .optional()
+          .nullable(),
         defaultModel: z.string().optional(),
       }),
     )
@@ -117,7 +120,11 @@ export const modelProviderRouter = createTRPCRouter({
           });
 
       const modelProviderResult = await ctx.prisma.$transaction(async (tx) => {
-        let result: Awaited<ReturnType<typeof tx.modelProvider.update | typeof tx.modelProvider.create>>;
+        let result: Awaited<
+          ReturnType<
+            typeof tx.modelProvider.update | typeof tx.modelProvider.create
+          >
+        >;
 
         if (existingModelProvider) {
           // Smart merging: preserve masked standard keys, but replace extra headers completely
@@ -128,14 +135,6 @@ export const modelProviderRouter = createTRPCRouter({
               any
             >;
 
-            // Standard Azure keys that should preserve masked values
-            const standardAzureKeys = new Set([
-              "AZURE_OPENAI_API_KEY",
-              "AZURE_OPENAI_ENDPOINT",
-              "AZURE_API_GATEWAY_BASE_URL",
-              "AZURE_API_GATEWAY_VERSION",
-            ]);
-
             mergedCustomKeys = {
               // Start with new keys (includes all extra headers)
               ...validatedKeys,
@@ -144,9 +143,8 @@ export const modelProviderRouter = createTRPCRouter({
                 Object.entries(existingKeys)
                   .filter(
                     ([key, _value]) =>
-                      standardAzureKeys.has(key) &&
                       (validatedKeys as any)[key] ===
-                        "HAS_KEY••••••••••••••••••••••••",
+                      "HAS_KEY••••••••••••••••••••••••",
                   )
                   .map(([key, value]) => [key, value]),
               ),
@@ -341,7 +339,9 @@ const getModelOrDefaultEnvKey = (
   envKey: string,
 ) => {
   return (
-    (modelProvider.customKeys as Record<string, string>)?.[envKey] ??
+    // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    (modelProvider.customKeys as Record<string, string>)?.[envKey] ||
     process.env[envKey]
   );
 };
@@ -435,6 +435,7 @@ export const prepareLitellmParams = async ({
   }
 
   if (modelProvider.provider === "bedrock") {
+    delete params.api_key;
     params.aws_access_key_id =
       getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
     params.aws_secret_access_key =
