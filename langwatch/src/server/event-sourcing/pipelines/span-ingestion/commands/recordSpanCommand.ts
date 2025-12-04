@@ -12,7 +12,7 @@ import {
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { getClickHouseClient } from "../../../../clickhouse/client";
 import { SpanRepositoryClickHouse } from "../repositories/spanRepositoryClickHouse";
 import { SpanRepositoryMemory } from "../repositories/spanRepositoryMemory";
 import type { SpanRepository } from "../repositories/spanRepository";

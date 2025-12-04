@@ -1,7 +1,7 @@
 export type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 export { TraceAggregationStateProjectionRepositoryMemory } from "./traceAggregationStateProjectionRepositoryMemory";
 export { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggregationStateProjectionRepositoryClickHouse";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { getClickHouseClient } from "../../../../clickhouse/client";
 import { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggregationStateProjectionRepositoryClickHouse";
 import { TraceAggregationStateProjectionRepositoryMemory } from "./traceAggregationStateProjectionRepositoryMemory";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
