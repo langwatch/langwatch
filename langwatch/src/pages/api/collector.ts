@@ -4,7 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { dependencies } from "../../injection/dependencies.server";
-import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { TracesService } from "../../server/traces/traces.service";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -90,18 +90,18 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-      [project.id],
-      project.team.organizationId
-    );
+    const tracesService = TracesService.create();
+    const limitResult = await tracesService.checkLimit({
+      teamId: project.teamId,
+    });
 
-    const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-      project.team.organizationId
-    );
-
-    if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+    if (limitResult.exceeded) {
       if (dependencies.planLimits) {
         try {
+          const activePlan =
+            await dependencies.subscriptionHandler.getActivePlan(
+              project.team.organizationId
+            );
           await dependencies.planLimits(
             project.team.organizationId,
             activePlan.name ?? "free"
@@ -113,31 +113,20 @@ async function handleCollectorRequest(
           );
         }
       }
-      logger.info(
-        {
-          projectId: project.id,
-          currentMonthMessagesCount,
-          activePlanName: activePlan.name,
-          maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
-        },
-        "Project has reached plan limit"
-      );
+      logger.info({ projectId: project.id }, "Project has reached plan limit");
 
       return res.status(429).json({
-        message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+        message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
       });
     }
   } catch (error) {
     logger.error(
       { error, projectId: project.id },
-      "Error getting current month messages count"
+      "Error checking trace limit"
     );
-    captureException(
-      new Error("Error getting current month messages count"),
-      {
-        extra: { projectId: project.id, zodError: error },
-      }
-    );
+    captureException(new Error("Error checking trace limit"), {
+      extra: { projectId: project.id, error },
+    });
   }
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while

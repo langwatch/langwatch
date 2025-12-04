@@ -18,7 +18,7 @@ import { withAppRouterLogger } from "../../../../../middleware/app-router-logger
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
+import { TracesService } from "../../../../../server/traces/traces.service";
 import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
@@ -85,18 +85,18 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
-        const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-          [project.id],
-          project.team.organizationId,
-        );
+        const tracesService = TracesService.create();
+        const limitResult = await tracesService.checkLimit({
+          teamId: project.teamId,
+        });
 
-        const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-          project.team.organizationId,
-        );
-
-        if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+        if (limitResult.exceeded) {
           if (dependencies.planLimits) {
             try {
+              const activePlan =
+                await dependencies.subscriptionHandler.getActivePlan(
+                  project.team.organizationId,
+                );
               await dependencies.planLimits(
                 project.team.organizationId,
                 activePlan.name ?? "free",
@@ -109,12 +109,7 @@ async function handleTracesRequest(req: NextRequest) {
             }
           }
           logger.info(
-            {
-              projectId: project.id,
-              currentMonthMessagesCount,
-              activePlanName: activePlan.name,
-              maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
-            },
+            { projectId: project.id },
             "Project has reached plan limit",
           );
 
@@ -125,7 +120,7 @@ async function handleTracesRequest(req: NextRequest) {
 
           return NextResponse.json(
             {
-              message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
             },
             { status: 429 },
           );
@@ -133,14 +128,11 @@ async function handleTracesRequest(req: NextRequest) {
       } catch (error) {
         logger.error(
           { error, projectId: project.id },
-          "Error getting current month messages count",
+          "Error checking trace limit",
         );
-        captureException(
-          new Error("Error getting current month messages count"),
-          {
-            extra: { projectId: project.id, zodError: error },
-          },
-        );
+        captureException(new Error("Error checking trace limit"), {
+          extra: { projectId: project.id, error },
+        });
       }
 
       span.setAttribute("langwatch.project.id", project.id);
