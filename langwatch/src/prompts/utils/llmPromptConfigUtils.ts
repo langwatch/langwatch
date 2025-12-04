@@ -9,7 +9,7 @@ import type {
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
-import { formSchema, type PromptConfigFormValues } from "~/prompts";
+import { formSchema, handleSchema, type PromptConfigFormValues } from "~/prompts";
 import { type SaveVersionParams } from "~/prompts/providers/types";
 import {
   versionMetadataToFormFormat,
@@ -394,6 +394,14 @@ export function formValuesToTriggerSaveVersionParams(
 export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt,
 ): PromptConfigFormValues {
+  /**
+   * Because we have old handles that are not valid,
+   * we don't include them in the form values so it
+   * basically forces them to be a "draft" and then the user
+   * must resave the prompt to make it valid.
+   */
+  const isHandleValid = handleSchema.safeParse(prompt.handle).success;
+
   return formSchema.parse({
     configId: prompt.id,
     versionMetadata: {
@@ -401,8 +409,9 @@ export function versionedPromptToPromptConfigFormValues(
       versionNumber: prompt.version,
       versionCreatedAt: prompt.versionCreatedAt,
     },
-    handle: prompt.handle || null,
-    scope: prompt.scope,
+    // Coerce old handles to lowercase -- will then save correctly in the DB
+    handle: isHandleValid ? prompt.handle : null,
+    scope: prompt.scope ,
     version: {
       configData: {
         prompt: prompt.prompt,
