@@ -192,7 +192,7 @@ describe("processSpanInputOutput", () => {
       const result = processSpanInputOutput("raw", complexObj);
 
       expect(result.type).toBe("raw");
-      expect(result.value).toBe("[object]"); // Objects are converted to string representation even for raw type
+      expect(result.value).toBe(JSON.stringify(complexObj)); // Objects are JSON stringified for raw type
     });
   });
 
@@ -425,7 +425,17 @@ describe("processSpanInputOutput", () => {
 
       expect(result.type).toBe("text");
       expect(typeof result.value).toBe("string");
-      expect(result.value).toBe("[object]"); // Objects are converted to '[object]' string representation
+      expect(result.value).toBe(JSON.stringify(obj)); // Objects are JSON stringified for text type
+    });
+
+    it("should handle circular references gracefully", () => {
+      const circular: any = { name: "test" };
+      circular.self = circular;
+
+      const result = processSpanInputOutput("text", circular);
+
+      expect(result.type).toBe("text");
+      expect(result.value).toBe('{"type":"raw","value":"[Non-Serializable]"}');
     });
   });
 });
