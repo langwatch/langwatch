@@ -5,7 +5,7 @@ import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
 import { UsageLimitService } from "~/server/notifications/usage-limit.service";
 import { dependencies } from "~/injection/dependencies.server";
-import { TracesService } from "~/server/traces/traces.service";
+import { TraceUsageService } from "~/server/traces/trace-usage.service";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { env } from "~/env.mjs";
@@ -179,7 +179,7 @@ export default async function handler(
         },
       });
 
-      const tracesService = TracesService.create();
+      const traceUsageService = TraceUsageService.create();
       const organizationRepository = new OrganizationRepository(prisma);
 
       for (const org of organizations) {
@@ -192,7 +192,7 @@ export default async function handler(
             continue;
           }
           const currentMonthMessagesCount =
-            await tracesService.getCurrentMonthCount({
+            await traceUsageService.getCurrentMonthCount({
               organizationId: org.id,
             });
           const activePlan =

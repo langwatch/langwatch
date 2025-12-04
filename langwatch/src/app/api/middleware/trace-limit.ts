@@ -1,12 +1,12 @@
 import type { MiddlewareHandler } from "hono";
-import { TracesService } from "~/server/traces/traces.service";
+import { TraceUsageService } from "~/server/traces/trace-usage.service";
 
 /**
  * Middleware to check trace usage limits before allowing requests
  */
 export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (c, next) => {
   const project = c.get("project");
-  const service = TracesService.create();
+  const service = TraceUsageService.create();
 
   const result = await service.checkLimit({ teamId: project.teamId });
 

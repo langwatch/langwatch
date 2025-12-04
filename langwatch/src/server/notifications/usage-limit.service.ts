@@ -4,7 +4,7 @@ import { createLogger } from "../../utils/logger";
 import { env } from "../../env.mjs";
 import { NOTIFICATION_TYPES } from "./types";
 import { NotificationRepository } from "./repositories/notification.repository";
-import { TracesService } from "../traces/traces.service";
+import { TraceUsageService } from "../traces/trace-usage.service";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
@@ -25,14 +25,14 @@ export interface UsageLimitData {
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
-  private readonly tracesService: TracesService;
+  private readonly traceUsageService: TraceUsageService;
 
   constructor(
     private readonly prisma: PrismaClient,
-    tracesService?: TracesService,
+    traceUsageService?: TraceUsageService,
   ) {
     this.notificationRepository = new NotificationRepository(prisma);
-    this.tracesService = tracesService ?? TracesService.create(prisma);
+    this.traceUsageService = traceUsageService ?? TraceUsageService.create(prisma);
   }
 
   /**
@@ -151,9 +151,9 @@ export class UsageLimitService {
       },
     });
 
-    // Get message counts per project via TracesService
+    // Get message counts per project via TraceUsageService
     const projectIds = projects.map((p) => p.id);
-    const counts = await this.tracesService.getCountByProjects({
+    const counts = await this.traceUsageService.getCountByProjects({
       organizationId,
       projectIds,
     });

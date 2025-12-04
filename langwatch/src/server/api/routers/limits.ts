@@ -7,7 +7,7 @@ import {
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 import { UsageLimitService } from "../../notifications/usage-limit.service";
-import { TracesService } from "../../traces/traces.service";
+import { TraceUsageService } from "../../traces/trace-usage.service";
 import { getCurrentMonthStart } from "../../utils/dateUtils";
 
 export const limitsRouter = createTRPCRouter({
@@ -21,10 +21,10 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const tracesService = TracesService.create();
+      const traceUsageService = TraceUsageService.create();
       const projectsCount = await getOrganizationProjectsCount(organizationId);
       const currentMonthMessagesCount =
-        await tracesService.getCurrentMonthCount({ organizationId });
+        await traceUsageService.getCurrentMonthCount({ organizationId });
       const currentMonthCost = await getCurrentMonthCost(organizationId);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,

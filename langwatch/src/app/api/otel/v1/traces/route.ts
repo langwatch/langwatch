@@ -18,7 +18,7 @@ import { withAppRouterLogger } from "../../../../../middleware/app-router-logger
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { TracesService } from "../../../../../server/traces/traces.service";
+import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
 import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
@@ -85,8 +85,8 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
-        const tracesService = TracesService.create();
-        const limitResult = await tracesService.checkLimit({
+        const traceUsageService = TraceUsageService.create();
+        const limitResult = await traceUsageService.checkLimit({
           teamId: project.teamId,
         });
 
@@ -109,7 +109,12 @@ async function handleTracesRequest(req: NextRequest) {
             }
           }
           logger.info(
-            { projectId: project.id },
+            {
+              projectId: project.id,
+              currentMonthMessagesCount: limitResult.count,
+              activePlanName: limitResult.planName,
+              maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+            },
             "Project has reached plan limit",
           );
 

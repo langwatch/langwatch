@@ -21,9 +21,9 @@ export const clearMonthCountCache = (): void => {
 };
 
 /**
- * Service for trace-related operations
+ * Service for trace usage tracking and limit enforcement
  */
-export class TracesService {
+export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
@@ -31,10 +31,10 @@ export class TracesService {
   ) {}
 
   /**
-   * Static factory method for creating TracesService with proper DI
+   * Static factory method for creating TraceUsageService with proper DI
    */
-  static create(db: PrismaClient = prisma): TracesService {
-    return new TracesService(
+  static create(db: PrismaClient = prisma): TraceUsageService {
+    return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
       dependencies.subscriptionHandler
@@ -48,7 +48,13 @@ export class TracesService {
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ exceeded: boolean; message?: string }> {
+  }): Promise<{
+    exceeded: boolean;
+    message?: string;
+    count?: number;
+    maxMessagesPerMonth?: number;
+    planName?: string;
+  }> {
     const organizationId =
       await this.organizationRepository.getOrganizationIdByTeamId(teamId);
     if (!organizationId) {
@@ -64,6 +70,9 @@ export class TracesService {
       return {
         exceeded: true,
         message: `Monthly limit of ${plan.maxMessagesPerMonth} traces reached`,
+        count,
+        maxMessagesPerMonth: plan.maxMessagesPerMonth,
+        planName: plan.name,
       };
     }
     return { exceeded: false };

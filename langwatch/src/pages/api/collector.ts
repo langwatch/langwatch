@@ -4,7 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { dependencies } from "../../injection/dependencies.server";
-import { TracesService } from "../../server/traces/traces.service";
+import { TraceUsageService } from "../../server/traces/trace-usage.service";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -90,8 +90,8 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const tracesService = TracesService.create();
-    const limitResult = await tracesService.checkLimit({
+    const traceUsageService = TraceUsageService.create();
+    const limitResult = await traceUsageService.checkLimit({
       teamId: project.teamId,
     });
 
@@ -113,7 +113,15 @@ async function handleCollectorRequest(
           );
         }
       }
-      logger.info({ projectId: project.id }, "Project has reached plan limit");
+      logger.info(
+        {
+          projectId: project.id,
+          currentMonthMessagesCount: limitResult.count,
+          activePlanName: limitResult.planName,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+        },
+        "Project has reached plan limit"
+      );
 
       return res.status(429).json({
         message: `ERR_PLAN_LIMIT: ${limitResult.message}`,

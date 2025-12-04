@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TracesService, clearMonthCountCache } from "../traces.service";
+import { TraceUsageService, clearMonthCountCache } from "../trace-usage.service";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
 
-describe("TracesService", () => {
+describe("TraceUsageService", () => {
   const mockOrganizationRepository = {
     getOrganizationIdByTeamId: vi.fn(),
     getProjectIds: vi.fn(),
@@ -18,12 +18,12 @@ describe("TracesService", () => {
     getActivePlan: vi.fn(),
   };
 
-  let service: TracesService;
+  let service: TraceUsageService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     clearMonthCountCache();
-    service = new TracesService(
+    service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
       mockSubscriptionHandler as any
@@ -42,16 +42,21 @@ describe("TracesService", () => {
     });
 
     describe("when count >= maxMessagesPerMonth", () => {
-      it("returns exceeded: true with message", async () => {
+      it("returns exceeded: true with context", async () => {
         vi.mocked(mockOrganizationRepository.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ maxMessagesPerMonth: 1000 });
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ name: "free", maxMessagesPerMonth: 1000 });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
-        expect(result.exceeded).toBe(true);
-        expect(result.message).toBe("Monthly limit of 1000 traces reached");
+        expect(result).toEqual({
+          exceeded: true,
+          message: "Monthly limit of 1000 traces reached",
+          count: 1000,
+          maxMessagesPerMonth: 1000,
+          planName: "free",
+        });
       });
     });
 
@@ -94,3 +99,4 @@ describe("TracesService", () => {
     });
   });
 });
+
