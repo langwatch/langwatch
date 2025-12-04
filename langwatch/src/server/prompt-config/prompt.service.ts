@@ -72,6 +72,10 @@ export type VersionedPrompt = {
   commitMessage?: string;
   updatedAt: Date;
   createdAt: Date;
+  copiedFromPromptId?: string | null;
+  _count?: {
+    copiedPrompts?: number;
+  };
 };
 
 /**
@@ -274,6 +278,7 @@ export class PromptService {
         organizationId,
         scope: params.scope ?? "PROJECT",
         authorId: params.authorId,
+        copiedFromPromptId: null,
       },
       versionData: shouldCreateVersion
         ? {
@@ -796,6 +801,8 @@ export class PromptService {
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
       commitMessage: config.latestVersion.commitMessage,
+      copiedFromPromptId: config.copiedFromPromptId ?? null,
+      _count: config._count ?? undefined,
     };
   }
 

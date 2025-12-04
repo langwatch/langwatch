@@ -34,6 +34,7 @@ export const llmPromptConfigFactory = Factory.define<
   deletedAt: null,
   handle: `test-handle-${sequence}`,
   scope: PromptScope.PROJECT,
+  copiedFromPromptId: null,
 }));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =
