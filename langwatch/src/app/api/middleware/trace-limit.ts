@@ -4,7 +4,7 @@ import { TracesService } from "~/server/traces/traces.service";
 /**
  * Middleware to check trace usage limits before allowing requests
  */
-export const traceLimitMiddleware: MiddlewareHandler = async (c, next) => {
+export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (c, next) => {
   const project = c.get("project");
   const service = TracesService.create();
 

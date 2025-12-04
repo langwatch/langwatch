@@ -7,7 +7,7 @@ import {
   authMiddleware,
   handleError,
   loggerMiddleware,
-  traceLimitMiddleware,
+  blockTraceUsageExceededMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -32,7 +32,7 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
-app.use("/*", traceLimitMiddleware);
+app.use("/*", blockTraceUsageExceededMiddleware);
 app.onError(handleError);
 
 // POST /api/scenario-events - Create a new scenario event

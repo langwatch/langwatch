@@ -2,9 +2,10 @@ import type { PrismaClient } from "@prisma/client";
 import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { createLogger } from "../../utils/logger";
 import { env } from "../../env.mjs";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { NOTIFICATION_TYPES } from "./types";
 import { NotificationRepository } from "./repositories/notification.repository";
+import { TracesService } from "../traces/traces.service";
+import { getCurrentMonthStart } from "../utils/dateUtils";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -24,9 +25,14 @@ export interface UsageLimitData {
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
+  private readonly tracesService: TracesService;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(
+    private readonly prisma: PrismaClient,
+    tracesService?: TracesService,
+  ) {
     this.notificationRepository = new NotificationRepository(prisma);
+    this.tracesService = tracesService ?? TracesService.create(prisma);
   }
 
   /**
@@ -34,96 +40,6 @@ export class UsageLimitService {
    */
   static create(prisma: PrismaClient): UsageLimitService {
     return new UsageLimitService(prisma);
-  }
-
-  /**
-   * Get the start of the current calendar month
-   */
-  private getCurrentMonth(): Date {
-    return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  }
-
-  /**
-   * Process projects in batches to get usage data with concurrency control
-   */
-  private async getProjectUsageDataInBatches(
-    projects: Array<{ id: string; name: string }>,
-    organizationId: string,
-  ): Promise<Array<{ id: string; name: string; messageCount: number }>> {
-    const BATCH_SIZE = 10; // Process 10 projects at a time
-    const results: Array<{ id: string; name: string; messageCount: number }> =
-      [];
-
-    // Process projects in batches
-    for (let i = 0; i < projects.length; i += BATCH_SIZE) {
-      const batch = projects.slice(i, i + BATCH_SIZE);
-
-      const batchResults = await Promise.all(
-        batch.map(async (project) => ({
-          id: project.id,
-          name: project.name,
-          messageCount: await this.getProjectMessageCount(
-            project.id,
-            organizationId,
-          ),
-        })),
-      );
-
-      results.push(...batchResults);
-    }
-
-    return results;
-  }
-
-  /**
-   * Get message count for a single project in the current month
-   */
-  private async getProjectMessageCount(
-    projectId: string,
-    organizationId: string,
-  ): Promise<number> {
-    try {
-      // Lazy-load the elasticsearch module only when this method is called
-      const { esClient, TRACE_INDEX } = await import("../elasticsearch");
-
-      const client = await esClient({ organizationId });
-      const currentMonthStart = this.getCurrentMonth().getTime();
-
-      const result = await client.count({
-        index: TRACE_INDEX.alias,
-        body: {
-          query: {
-            bool: {
-              must: [
-                {
-                  term: {
-                    project_id: projectId,
-                  },
-                },
-                {
-                  range: {
-                    "timestamps.inserted_at": {
-                      gte: currentMonthStart,
-                    },
-                  },
-                },
-              ] as QueryDslBoolQuery["filter"],
-            } as QueryDslBoolQuery,
-          },
-        },
-      });
-
-      return result.count;
-    } catch (error) {
-      logger.error(
-        { error, projectId, organizationId },
-        "Error getting project message count",
-      );
-      throw new Error(
-        `Failed to get message count for project ${projectId} in organization ${organizationId}`,
-        { cause: error },
-      );
-    }
   }
 
   /**
@@ -188,7 +104,7 @@ export class UsageLimitService {
     }
 
     // Check if we've sent a notification for this specific threshold in the current calendar month
-    const currentMonthStart = this.getCurrentMonth();
+    const currentMonthStart = getCurrentMonthStart();
 
     const recentNotifications =
       await this.notificationRepository.findRecentByOrganization(
@@ -235,12 +151,18 @@ export class UsageLimitService {
       },
     });
 
-    // Get message counts per project with concurrency control
-    // Process projects in batches to avoid overwhelming Elasticsearch
-    const projectUsageData = await this.getProjectUsageDataInBatches(
-      projects,
+    // Get message counts per project via TracesService
+    const projectIds = projects.map((p) => p.id);
+    const counts = await this.tracesService.getCountByProjects({
       organizationId,
-    );
+      projectIds,
+    });
+    const countsMap = new Map(counts.map((c) => [c.projectId, c.count]));
+    const projectUsageData = projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      messageCount: countsMap.get(p.id) ?? 0,
+    }));
 
     // Send email to all admin members
     const sentAt = new Date();

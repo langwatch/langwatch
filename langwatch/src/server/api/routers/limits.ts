@@ -8,6 +8,7 @@ import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 import { UsageLimitService } from "../../notifications/usage-limit.service";
 import { TracesService } from "../../traces/traces.service";
+import { getCurrentMonthStart } from "../../utils/dateUtils";
 
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
@@ -68,9 +69,6 @@ export const limitsRouter = createTRPCRouter({
     }),
 });
 
-const getCurrentMonth = () => {
-  return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-};
 
 export const getOrganizationProjectsCount = async (organizationId: string) => {
   return await prisma.project.count({
@@ -102,7 +100,7 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
             in: projectIds,
           },
           createdAt: {
-            gte: getCurrentMonth(),
+            gte: getCurrentMonthStart(),
           },
         },
         _sum: {

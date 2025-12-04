@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TracesService } from "../traces.service";
+import { TracesService, clearMonthCountCache } from "../traces.service";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
 
 describe("TracesService", () => {
@@ -22,6 +22,7 @@ describe("TracesService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearMonthCountCache();
     service = new TracesService(
       mockOrganizationRepository,
       mockEsClientFactory,
@@ -81,13 +82,13 @@ describe("TracesService", () => {
     });
 
     describe("when organization has projects", () => {
-      it("queries ES with all project IDs", async () => {
+      it("sums counts from all projects", async () => {
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
         mockEsClient.count.mockResolvedValue({ count: 42 });
 
         const result = await service.getCurrentMonthCount({ organizationId: "org-123" });
 
-        expect(result).toBe(42);
+        expect(result).toBe(84); // 42 per project * 2 projects
         expect(mockEsClientFactory).toHaveBeenCalledWith({ organizationId: "org-123" });
       });
     });
