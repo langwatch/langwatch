@@ -42,21 +42,32 @@ describe("TraceUsageService", () => {
     });
 
     describe("when count >= maxMessagesPerMonth", () => {
-      it("returns exceeded: true with context", async () => {
+      beforeEach(() => {
         vi.mocked(mockOrganizationRepository.getOrganizationIdByTeamId).mockResolvedValue("org-123");
         vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1"]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
         mockSubscriptionHandler.getActivePlan.mockResolvedValue({ name: "free", maxMessagesPerMonth: 1000 });
+      });
 
+      it("returns exceeded: true", async () => {
         const result = await service.checkLimit({ teamId: "team-123" });
+        expect(result.exceeded).toBe(true);
+      });
 
-        expect(result).toEqual({
-          exceeded: true,
-          message: "Monthly limit of 1000 traces reached",
-          count: 1000,
-          maxMessagesPerMonth: 1000,
-          planName: "free",
-        });
+      it("returns message 'Monthly limit of 1000 traces reached'", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+        expect(result.message).toBe("Monthly limit of 1000 traces reached");
+      });
+
+      it("returns count and maxMessagesPerMonth as 1000", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+        expect(result.count).toBe(1000);
+        expect(result.maxMessagesPerMonth).toBe(1000);
+      });
+
+      it("returns planName as 'free'", async () => {
+        const result = await service.checkLimit({ teamId: "team-123" });
+        expect(result.planName).toBe("free");
       });
     });
 
