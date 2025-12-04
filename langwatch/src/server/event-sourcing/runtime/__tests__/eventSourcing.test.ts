@@ -31,6 +31,9 @@ describe("EventSourcing", () => {
 
     // Disable BUILD_TIME to enable event sourcing in tests
     vi.stubEnv("BUILD_TIME", "");
+    // Explicitly enable event sourcing and ClickHouse
+    vi.stubEnv("ENABLE_EVENT_SOURCING", "true");
+    vi.stubEnv("ENABLE_CLICKHOUSE", "true");
 
     // Reset the mock
     mockGetClickHouseClient.mockReset();
