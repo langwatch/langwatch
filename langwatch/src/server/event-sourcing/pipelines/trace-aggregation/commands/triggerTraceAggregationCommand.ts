@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { getClickHouseClient } from "../../../../clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
 import {
@@ -19,6 +19,7 @@ import type {
   TraceAggregationCompletedEventData,
   TraceAggregationEvent,
 } from "../schemas/events";
+
 import type { TraceAggregationService } from "../services/traceAggregationService";
 import { traceAggregationService as defaultTraceAggregationService } from "../services/traceAggregationService";
 
