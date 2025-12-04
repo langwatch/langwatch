@@ -1,7 +1,7 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
 import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -18,8 +18,34 @@ export default function Accept() {
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;
 
+  const lastAttemptedEmailRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!triggerInvite) return;
+    if (!triggerInvite || !session?.user?.email) return;
+
+    const currentEmail = session.user.email;
+    const isWrongEmailError =
+      acceptInviteMutation.isError &&
+      acceptInviteMutation.error.data?.code === "FORBIDDEN";
+
+    // Prevent duplicate attempts with the same email
+    if (
+      lastAttemptedEmailRef.current === currentEmail &&
+      !isWrongEmailError &&
+      (acceptInviteMutation.isSuccess || acceptInviteMutation.isError)
+    ) {
+      return;
+    }
+
+    if (
+      acceptInviteMutation.isLoading ||
+      acceptInviteMutation.isSuccess ||
+      (acceptInviteMutation.isError && !isWrongEmailError)
+    ) {
+      return;
+    }
+
+    lastAttemptedEmailRef.current = currentEmail;
 
     acceptInviteMutation.mutate(
       { inviteCode },
@@ -52,11 +78,15 @@ export default function Accept() {
             });
           });
         },
-      }
+      },
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerInvite]);
+  }, [triggerInvite, session?.user?.email]);
+
+  const isAlreadyAccepted =
+    acceptInviteMutation.isError &&
+    acceptInviteMutation.error.data?.code === "BAD_REQUEST";
 
   if (
     !triggerInvite ||
@@ -66,7 +96,36 @@ export default function Accept() {
     return <LoadingScreen />;
   }
 
+  if (isAlreadyAccepted) {
+    return (
+      <SetupLayout>
+        <VStack gap={4}>
+          <Alert.Root status="info">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>Invite Already Accepted</Alert.Title>
+              <Alert.Description>
+                This invite has already been accepted. You can now access the
+                organization.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Button
+            colorPalette="blue"
+            onClick={() => {
+              void router.push("/");
+            }}
+          >
+            Go to App
+          </Button>
+        </VStack>
+      </SetupLayout>
+    );
+  }
+
   if (acceptInviteMutation.isError) {
+    const isWrongEmail = acceptInviteMutation.error.data?.code === "FORBIDDEN";
+
     return (
       <SetupLayout>
         <VStack gap={4}>
@@ -81,9 +140,20 @@ export default function Accept() {
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
-          <Button colorPalette="orange" onClick={() => void signOut()}>
-            Log Out and Try Again
-          </Button>
+          {isWrongEmail ? (
+            <Button colorPalette="orange" onClick={() => void signOut()}>
+              Log Out and Try Again
+            </Button>
+          ) : (
+            <Button
+              colorPalette="orange"
+              onClick={() => {
+                void router.push("/");
+              }}
+            >
+              Go to App
+            </Button>
+          )}
         </VStack>
       </SetupLayout>
     );
