@@ -122,6 +122,9 @@ importers:
       '@next/bundle-analyzer':
         specifier: ^15.3.3
         version: 15.3.3(bufferutil@4.0.9)
+      '@next/env':
+        specifier: 15.5.7
+        version: 15.5.7
       '@opensearch-project/opensearch':
         specifier: ^2.11.0
         version: 2.11.0
@@ -263,6 +266,9 @@ importers:
       debug:
         specifier: ^4.3.5
         version: 4.4.1(supports-color@8.1.1)
+      deepmerge:
+        specifier: ^4.3.1
+        version: 4.3.1
       diff:
         specifier: ^7.0.0
         version: 7.0.0
