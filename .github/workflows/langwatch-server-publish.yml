@@ -16,6 +16,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -28,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: |
           cd langwatch
-          npm install
-          npm run build
+          pnpm install --frozen-lockfile
+          pnpm run build
           cd ..
           uv pip install build
 

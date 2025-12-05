@@ -2,11 +2,11 @@
 
 
 install:
-	cd langwatch && npm install
+	pnpm install
 	cd langwatch_nlp && make install
 
 start:
-	cd langwatch && ./node_modules/.bin/concurrently --kill-others 'npm run dev' 'cd ../langwatch_nlp && make start'
+	pnpm exec concurrently --kill-others 'pnpm --filter langwatch run dev' 'cd langwatch_nlp && make start'
 
 python-build:
 	uv pip install build && uv run python -m build
@@ -19,7 +19,7 @@ start/postgres:
 	@docker compose up -d postgres
 
 tsc-watch:
-	cd langwatch && npm run tsc-watch
+	pnpm --filter langwatch run tsc-watch
 
 quickstart: 
 	@echo "Starting Langwatch..."
@@ -29,6 +29,6 @@ quickstart:
 	open http://localhost:5560
 
 sync-all-openapi:
-	npm run task generateOpenAPISpec
-	cd typescript-sdk && npm run generate:openapi-types
+	pnpm --filter langwatch run task generateOpenAPISpec
+	pnpm --filter langwatch run generate:openapi-types
 	cd python-sdk && make generate/api-client

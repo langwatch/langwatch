@@ -137,9 +137,9 @@ const config = {
 
     // Add fallback for pino logger requirements
     if (!config.isServer) {
+      config.resolve.alias["pino-pretty"] = false;
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        "pino-pretty": false,
         fs: false,
         stream: false,
         "node:stream": false,

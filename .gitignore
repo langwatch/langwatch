@@ -3,6 +3,7 @@
 !.env.example
 traceDir
 node_modules
+.pnpm-store
 
 llm-model-costs.json
 quickwit-*
