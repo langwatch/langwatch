@@ -12,7 +12,7 @@ import {
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
 import type { StudioClientEvent } from "../types/events";
-import * as Sentry from "@sentry/node";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger";
 
@@ -33,7 +33,7 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   const configStr = process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
   if (!configStr) {
     throw new Error(
-      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required"
+      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required",
     );
   }
 
@@ -41,7 +41,7 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
     return JSON.parse(configStr) as LangWatchLambdaConfig;
   } catch (error) {
     throw new Error(
-      "Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error)
+      "Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error),
     );
   }
 };
@@ -70,7 +70,7 @@ const createLogsClient = (): CloudWatchLogsClient => {
 
 const checkLambdaExists = async (
   lambda: LambdaClient,
-  functionName: string
+  functionName: string,
 ): Promise<FunctionConfiguration | null> => {
   try {
     const command = new GetFunctionCommand({ FunctionName: functionName });
@@ -86,7 +86,7 @@ const checkLambdaExists = async (
 
 const createLogGroupWithRetention = async (
   functionName: string,
-  retentionInDays = 365
+  retentionInDays = 365,
 ): Promise<void> => {
   const logsClient = createLogsClient();
   const logGroupName = `/aws/lambda/${functionName}`;
@@ -109,14 +109,14 @@ const createLogGroupWithRetention = async (
 
     logger.info(
       { functionName, retentionInDays },
-      `Set log group retention policy to ${retentionInDays} days`
+      `Set log group retention policy to ${retentionInDays} days`,
     );
   } catch (error: any) {
     if (error.name === "ResourceAlreadyExistsException") {
       // Log group already exists, just set retention
       logger.info(
         { functionName },
-        "Log group already exists, setting retention policy"
+        "Log group already exists, setting retention policy",
       );
 
       const retentionCommand = new PutRetentionPolicyCommand({
@@ -127,12 +127,12 @@ const createLogGroupWithRetention = async (
 
       logger.info(
         { functionName, retentionInDays },
-        `Updated existing log group retention policy to ${retentionInDays} days`
+        `Updated existing log group retention policy to ${retentionInDays} days`,
       );
     } else {
       logger.error(
         { functionName, error },
-        "Failed to create log group or set retention policy"
+        "Failed to create log group or set retention policy",
       );
       throw error;
     }
@@ -142,7 +142,7 @@ const createLogGroupWithRetention = async (
 const createProjectLambda = async (
   lambda: LambdaClient,
   functionName: string,
-  config: LangWatchLambdaConfig
+  config: LangWatchLambdaConfig,
 ): Promise<FunctionConfiguration> => {
   const command = new CreateFunctionCommand({
     FunctionName: functionName,
@@ -181,7 +181,7 @@ const createProjectLambda = async (
     // Log the error but don't fail Lambda creation
     logger.warn(
       { functionName, error },
-      "Failed to create log group with retention, Lambda function created successfully"
+      "Failed to create log group with retention, Lambda function created successfully",
     );
   }
 
@@ -192,14 +192,14 @@ const pollLambdaUntilReady = async (
   lambda: LambdaClient,
   functionName: string,
   maxAttempts = 60, // 5 minutes with 5-second intervals
-  intervalMs = 500
+  intervalMs = 500,
 ): Promise<void> => {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const config = await checkLambdaExists(lambda, functionName);
 
     if (!config) {
       throw new Error(
-        `Lambda function ${functionName} disappeared during polling`
+        `Lambda function ${functionName} disappeared during polling`,
       );
     }
 
@@ -211,7 +211,7 @@ const pollLambdaUntilReady = async (
       throw new Error(
         `Lambda function ${functionName} failed to become ready: ${
           config.StateReason ?? config.LastUpdateStatusReason
-        }`
+        }`,
       );
     }
 
@@ -220,7 +220,7 @@ const pollLambdaUntilReady = async (
   }
 
   throw new Error(
-    `Lambda function ${functionName} did not become ready within timeout`
+    `Lambda function ${functionName} did not become ready within timeout`,
   );
 };
 
@@ -228,11 +228,11 @@ const updateProjectLambdaImage = async (
   lambda: LambdaClient,
   functionName: string,
   newImageUri: string,
-  projectId: string
+  projectId: string,
 ): Promise<FunctionConfiguration> => {
   logger.info(
     { projectId },
-    `Updating Lambda function ${functionName} with new image: ${newImageUri}`
+    `Updating Lambda function ${functionName} with new image: ${newImageUri}`,
   );
 
   const command = new UpdateFunctionCodeCommand({
@@ -245,7 +245,7 @@ const updateProjectLambdaImage = async (
 };
 
 export const getProjectLambdaArn = async (
-  projectId: string
+  projectId: string,
 ): Promise<string> => {
   const config = parseLambdaConfig();
   const lambda = createLambdaClient();
@@ -267,7 +267,7 @@ export const getProjectLambdaArn = async (
       ) {
         logger.info(
           { projectId },
-          "Lambda function already exists, skipping creation"
+          "Lambda function already exists, skipping creation",
         );
         await new Promise((resolve) => setTimeout(resolve, 1000));
         lambdaConfig = await checkLambdaExists(lambda, functionName);
@@ -289,14 +289,29 @@ export const getProjectLambdaArn = async (
     if (currentImageUri && currentImageUri !== config.image_uri) {
       logger.info(
         { projectId },
-        `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`
+        `Image URI mismatch for ${functionName}. Current: ${currentImageUri}, Expected: ${config.image_uri}. Updating lambda image`,
       );
-      lambdaConfig = await updateProjectLambdaImage(
-        lambda,
-        functionName,
-        config.image_uri,
-        projectId
-      );
+
+      try {
+        lambdaConfig = await updateProjectLambdaImage(
+          lambda,
+          functionName,
+          config.image_uri,
+          projectId,
+        );
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message.includes("An update is in progress")
+        ) {
+          logger.info(
+            { projectId },
+            "Lambda function update in progress, skipping update",
+          );
+        } else {
+          throw error;
+        }
+      }
     }
   }
 
@@ -314,7 +329,7 @@ export const getProjectLambdaArn = async (
 export const invokeLambda = async (
   projectId: string,
   event: StudioClientEvent,
-  s3CacheKey: string | undefined
+  s3CacheKey: string | undefined,
 ): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
   const payload = {
     body: JSON.stringify(event),
@@ -360,7 +375,7 @@ export const invokeLambda = async (
           for await (const chunk of EventStream) {
             if (chunk.PayloadChunk?.Payload) {
               const payloadText = new TextDecoder().decode(
-                chunk.PayloadChunk.Payload
+                chunk.PayloadChunk.Payload,
               );
               if (statusCode < 200 || statusCode >= 300) {
                 errorMessage += payloadText;
@@ -374,9 +389,9 @@ export const invokeLambda = async (
             }
             if (chunk.InvokeComplete?.ErrorCode) {
               const error = new Error(
-                `Failed run workflow: ${chunk.InvokeComplete.ErrorCode}`
+                `Failed run workflow: ${chunk.InvokeComplete.ErrorCode}`,
               );
-              Sentry.captureException(error, {
+              captureException(error, {
                 extra: { event, details: chunk.InvokeComplete.ErrorDetails },
               });
               throw error;
@@ -393,16 +408,16 @@ export const invokeLambda = async (
                 "\n\n",
                 JSON.stringify(event, null, 2),
                 "\n\nValidation error:\n",
-                errorMessage
+                errorMessage,
               );
               const error = new Error(
-                `Optimization Studio validation failed, please contact support`
+                `Optimization Studio validation failed, please contact support`,
               );
-              Sentry.captureException(error, { extra: { event } });
+              captureException(error, { extra: { event } });
               throw error;
             }
             throw new Error(
-              `Failed run workflow: ${statusCode}\n\n${errorMessage}`
+              `Failed run workflow: ${statusCode}\n\n${errorMessage}`,
             );
           }
           controller.close();
@@ -420,7 +435,7 @@ export const invokeLambda = async (
       {
         method: "POST",
         ...payload,
-      }
+      },
     );
 
     if (!response.ok) {
@@ -434,12 +449,12 @@ export const invokeLambda = async (
           "\n\n",
           JSON.stringify(event, null, 2),
           "\n\nValidation error:\n",
-          body
+          body,
         );
         const error = new Error(
-          `Optimization Studio validation failed, please contact support`
+          `Optimization Studio validation failed, please contact support`,
         );
-        Sentry.captureException(error, { extra: { event } });
+        captureException(error, { extra: { event } });
         throw error;
       }
       throw new Error(`Failed run workflow: ${response.statusText}\n\n${body}`);

@@ -1,20 +1,18 @@
 import { useRouter } from "next/router";
 import { useDisclosure, Button } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { TeamRoleGroup } from "~/server/api/permission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AskIfUserWantsToContinueDraftDialog } from "./AskIfUserWantsToContinueDraftDialog";
 
 export function NewEvaluationButton() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
-  const enabled =
-    !!project && hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE);
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const enabled = !!project && hasPermission("evaluations:manage");
   const router = useRouter();
   const projectId = project?.id ?? "";
   const { data: lastExperiment } = api.experiments.getLastExperiment.useQuery(
     { projectId },
-    { enabled }
+    { enabled },
   );
   const {
     open: isDialogOpen,
@@ -26,11 +24,13 @@ export function NewEvaluationButton() {
   const isLastExperimentADraft = lastExperiment?.name?.startsWith("Draft");
 
   const openNewEvaluation = () => {
-    router.push(`/${project.slug}/evaluations/wizard`);
+    void router.push(`/${project.slug}/evaluations/wizard`);
   };
 
   const handleContinueDraft = () => {
-    router.push(`/${project.slug}/evaluations/wizard/${lastExperiment?.slug}`);
+    void router.push(
+      `/${project.slug}/evaluations/wizard/${lastExperiment?.slug}`,
+    );
   };
 
   const handleOnClick = () => {

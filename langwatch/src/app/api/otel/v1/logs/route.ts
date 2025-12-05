@@ -1,6 +1,6 @@
 import { type IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
@@ -11,6 +11,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
@@ -112,7 +113,7 @@ async function handleLogsRequest(req: NextRequest) {
             "error parsing logs"
           );
 
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               projectId: project.id,
               logRequest: Buffer.from(body).toString("base64"),
@@ -192,4 +193,4 @@ async function handleLogsRequest(req: NextRequest) {
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterLogger(handleLogsRequest);
+export const POST = withAppRouterTracer("langwatch.otel.v1.logs")(withAppRouterLogger(handleLogsRequest));

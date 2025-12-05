@@ -15,7 +15,8 @@ test-tracing:
 	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
 
 # Test bot/chatbot examples (excludes CLI examples)
-test-examples: cli-examples
+# Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
+test-examples:
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
 
 # Test CLI examples separately (they don't need mock messages)
@@ -58,6 +59,8 @@ ensure-openapi-python-client:
 	fi
 
 generate/api-client: ensure-openapi-python-client
+	@echo "Generating OpenAPI spec..."
+	@cd ../langwatch && npm run task generateOpenAPISpec
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."

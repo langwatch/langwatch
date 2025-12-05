@@ -4,29 +4,23 @@ from langchain_openai import ChatOpenAI
 load_dotenv()
 
 import chainlit as cl
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema.runnable import Runnable, RunnableMap
-from langchain.schema.runnable.config import RunnableConfig
-from langchain.memory import ConversationBufferMemory
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.runnables import Runnable, RunnableConfig
+from langchain_core.messages import HumanMessage, AIMessage
 
 import langwatch
 
 
-session_memories: dict = {}
+# Store message history per session
+session_message_histories: dict = {}
 
 
 @cl.on_chat_start
 async def on_chat_start():
-    memory = session_memories.setdefault(
-        cl.user_session.get("session_id"),
-        ConversationBufferMemory(return_messages=True, memory_key="chat_history"),
-    )
-    ingress = RunnableMap(
-        {
-            "input": lambda x: x["input"],
-            "chat_history": lambda x: memory.load_memory_variables(x)["chat_history"],
-        }
-    )
+    # Initialize message history for this session
+    session_id = cl.user_session.get("session_id", "default")
+    message_history = session_message_histories.setdefault(session_id, [])
+    
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "You are a helpful assistant."),
@@ -35,17 +29,20 @@ async def on_chat_start():
         ]
     )
     llm = ChatOpenAI(temperature=1, model="gpt-5", max_tokens=4096)
-    runnable = ingress | prompt | llm
+    runnable = prompt | llm
 
     cl.user_session.set("runnable", runnable)
-    cl.user_session.set("memory", memory)
+    cl.user_session.set("session_id", session_id)
 
 
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
     runnable: Runnable = cl.user_session.get("runnable")  # type: ignore
-    memory = cl.user_session.get("memory")  # type: ignore
+    session_id = cl.user_session.get("session_id", "default")
+    
+    # Get message history for this session
+    message_history = session_message_histories.get(session_id, [])
 
     msg = cl.Message(content="")
 
@@ -54,16 +51,17 @@ async def main(message: cl.Message):
     )
 
     async for chunk in runnable.astream(
-        {"input": message.content},
+        {"input": message.content, "chat_history": message_history},
         config=RunnableConfig(
             callbacks=[
-                cl.LangchainCallbackHandler(),
                 langwatch.get_current_trace().get_langchain_callback(),
             ]
         ),
     ):
         await msg.stream_token(chunk.content)
 
-    memory.save_context({"input": message.content}, {"output": msg.content})  # type: ignore
+    # Save the conversation to message history
+    message_history.append(HumanMessage(content=message.content))
+    message_history.append(AIMessage(content=msg.content))
 
     await msg.send()

@@ -15,7 +15,6 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 import { AddMembersForm } from "../../components/AddMembersForm";
@@ -36,8 +35,9 @@ import type {
 } from "../../server/api/routers/organization";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 const selectOptions = [
   {
@@ -57,7 +57,12 @@ const selectOptions = [
   },
 ];
 
-export default function Members() {
+// Create a Map for fast O(1) lookups instead of O(n) .find() in render
+const roleLabelMap = new Map(
+  selectOptions.map((option) => [option.value, option.label]),
+);
+
+function Members() {
   const { organization } = useOrganizationTeamProject();
 
   const organizationWithMembers =
@@ -65,7 +70,7 @@ export default function Members() {
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const activePlan = api.plan.getActivePlan.useQuery(
     {
@@ -73,7 +78,7 @@ export default function Members() {
     },
     {
       enabled: !!organization,
-    }
+    },
   );
 
   if (!organization || !organizationWithMembers.data || !activePlan.data)
@@ -88,6 +93,10 @@ export default function Members() {
   );
 }
 
+export default withPermissionGuard("organization:view", {
+  layoutComponent: SettingsLayout,
+})(Members);
+
 function MembersList({
   organization,
   teams,
@@ -98,6 +107,8 @@ function MembersList({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
+  const { hasPermission } = useOrganizationTeamProject();
+  const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -122,13 +133,11 @@ function MembersList({
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
-  const updateOrganizationMemberRoleMutation =
-    api.organization.updateMemberRole.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -150,10 +159,12 @@ function MembersList({
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
-          role: invite.role!.value as OrganizationUserRole,
-          teamIds: invite.teamOptions
-            .map((teamOption) => teamOption.value)
-            .join(","),
+          role: invite.orgRole,
+          teams: invite.teams.map((team) => ({
+            teamId: team.teamId,
+            role: team.role,
+            customRoleId: team.customRoleId,
+          })),
         })),
       },
       {
@@ -168,7 +179,7 @@ function MembersList({
               }
               return acc;
             },
-            [] as { inviteCode: string; email: string }[]
+            [] as { inviteCode: string; email: string }[],
           );
 
           setSelectedInvites(newInvites);
@@ -202,54 +213,7 @@ function MembersList({
             },
           });
         },
-      }
-    );
-  };
-
-  const onRoleChange = (userId: string, value: OrganizationUserRole) => {
-    updateOrganizationMemberRoleMutation.mutate(
-      {
-        userId: userId,
-        organizationId: organization.id,
-        role: value,
       },
-      {
-        onSuccess: () => {
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
-            .invalidate()
-            .catch((error) => {
-              Sentry.captureException(error, {
-                tags: {
-                  userId,
-                  organizationId: organization.id,
-                },
-              });
-            });
-          toaster.create({
-            title: "Member role updated successfully",
-            description: `The member role has been updated to ${
-              selectOptions.find((option) => option.value === value)?.label ??
-              value
-            }`,
-            type: "success",
-            duration: 5000,
-          });
-        },
-        onError: (error) => {
-          Sentry.captureException(error, {
-            tags: {
-              userId,
-              organizationId: organization.id,
-            },
-          });
-          toaster.create({
-            title: "Error updating member role",
-            type: "error",
-            description:
-              error.message ?? "There was an error updating the member role",
-          });
-        },
-      }
     );
   };
 
@@ -274,7 +238,7 @@ function MembersList({
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
             .catch((error) => {
-              Sentry.captureException(error, {
+              captureException(error, {
                 tags: {
                   userId,
                   organizationId: organization.id,
@@ -293,7 +257,7 @@ function MembersList({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -323,16 +287,16 @@ function MembersList({
           });
           void pendingInvites.refetch();
         },
-      }
+      },
     );
   };
 
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        b.user.id.localeCompare(a.user.id)
+        b.user.id.localeCompare(a.user.id),
       ),
-    [organization.members]
+    [organization.members],
   );
 
   const currentUserIsAdmin = useMemo(
@@ -340,9 +304,9 @@ function MembersList({
       organization.members.some(
         (member) =>
           member.userId === user?.id &&
-          member.role === OrganizationUserRole.ADMIN
+          member.role === OrganizationUserRole.ADMIN,
       ),
-    [organization.members, user?.id]
+    [organization.members, user?.id],
   );
 
   return (
@@ -352,7 +316,7 @@ function MembersList({
         paddingY={6}
         gap={6}
         width="full"
-        maxWidth="980px"
+        maxWidth="1200px"
         align="start"
       >
         <HStack width="full" marginTop={2}>
@@ -360,8 +324,20 @@ function MembersList({
             Organization Members
           </Heading>
           <Spacer />
-          {!activePlan.overrideAddingLimitations &&
+          {activePlan.overrideAddingLimitations &&
           organization.members.length >= activePlan.maxMembers ? (
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={() => onAddMembersOpen()}
+            >
+              <HStack gap={2}>
+                <Plus size={20} />
+                <Text>(Admin Override) Add members</Text>
+              </HStack>
+            </Button>
+          ) : null}
+          {organization.members.length >= activePlan.maxMembers ? (
             <Tooltip
               content="Upgrade your plan to add more members"
               positioning={{ placement: "top" }}
@@ -403,40 +379,28 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"20%"}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const relevantUpdateRoleMutation =
-                    updateOrganizationMemberRoleMutation.variables?.userId ===
-                      member.userId &&
-                    updateOrganizationMemberRoleMutation.variables
-                      ?.organizationId === organization.id;
-                  const roleUpdateLoading =
-                    updateOrganizationMemberRoleMutation.isLoading &&
-                    relevantUpdateRoleMutation;
+                  const roleLabel =
+                    roleLabelMap.get(member.role) ?? member.role;
+                  const isDeleteDisabled = member.user.id === user?.id;
 
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
-                      <Table.Cell>{member.user.name}</Table.Cell>
-                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
-                        <OrganizationMemberSelect
-                          defaultValue={member.role}
-                          memberId={member.userId}
-                          onRoleChange={(_, value) => {
-                            // Only update the role if it's different
-                            if (member.role !== value) {
-                              onRoleChange(member.userId, value);
-                            }
-                          }}
-                          loading={roleUpdateLoading}
-                          disabled={roleUpdateLoading}
-                        />
+                        <Link href={`/settings/members/${member.userId}`}>
+                          {member.user.name}{" "}
+                          <Text
+                            as="span"
+                            whiteSpace="nowrap"
+                          >{`(Organization ${roleLabel})`}</Text>
+                        </Link>
                       </Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
                         <TeamMembershipsDisplay
                           teamMemberships={member.user.teamMemberships}
@@ -444,37 +408,74 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
+                        <HStack gap={2}>
+                          <Link href={`/settings/members/${member.userId}`}>
+                            <Button size="sm" variant="outline">
+                              View
                             </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="remove"
-                              color="red.600"
-                              disabled={organization.members.length === 1}
-                              onClick={() => deleteMember(member.userId)}
-                            >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Remove Member
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
+                          </Link>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant={"ghost"}>
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to remove members"
+                                    : organization.members.length === 1
+                                    ? "Cannot remove the last member"
+                                    : undefined
+                                }
+                                disabled={
+                                  hasOrganizationManagePermission &&
+                                  organization.members.length > 1
+                                }
+                                positioning={{ placement: "right" }}
+                                showArrow
+                              >
+                                <Menu.Item
+                                  value="remove"
+                                  color="red.600"
+                                  disabled={
+                                    !hasOrganizationManagePermission ||
+                                    organization.members.length === 1
+                                  }
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteMember(member.userId);
+                                    }
+                                  }}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Remove Member
+                                </Menu.Item>
+                              </Tooltip>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </HStack>
                       </Table.Cell>
                     </LinkBox>
                   );
                 })}
               </Table.Body>
             </Table.Root>
+          </Card.Body>
+        </Card.Root>
 
-            {pendingInvites.data && pendingInvites.data.length > 0 && (
-              <>
-                <Heading size="sm" as="h2" paddingY={4} marginLeft={6}>
-                  Pending Invites
-                </Heading>
+        {pendingInvites.data && pendingInvites.data.length > 0 && (
+          <VStack align="start" gap={1} width="full">
+            <Heading size="md" as="h2" paddingY={4}>
+              Pending Invites
+            </Heading>
 
+            <Card.Root width="full">
+              <Card.Body width="full" paddingY={0} paddingX={0}>
                 <Table.Root>
                   <Table.Header>
                     <Table.Row>
@@ -490,7 +491,7 @@ function MembersList({
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>
                           {selectOptions.find(
-                            (option) => option.value === invite.role
+                            (option) => option.value === invite.role,
                           )?.label ?? invite.role}
                         </Table.Cell>
                         <Table.Cell>
@@ -513,23 +514,39 @@ function MembersList({
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={() => deleteInvite(invite.id)}
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to delete invites"
+                                    : undefined
+                                }
+                                disabled={hasOrganizationManagePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash
-                                  size={14}
-                                  style={{ marginRight: "8px" }}
-                                />
-                                Delete
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteInvite(invite.id);
+                                    }
+                                  }}
+                                  disabled={!hasOrganizationManagePermission}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Delete
+                                </Menu.Item>
+                              </Tooltip>
                               <Menu.Item
                                 value="view"
                                 onClick={() =>
                                   viewInviteLink(
                                     invite.inviteCode,
-                                    invite.email
+                                    invite.email,
                                   )
                                 }
                               >
@@ -546,18 +563,18 @@ function MembersList({
                     ))}
                   </Table.Body>
                 </Table.Root>
-              </>
-            )}
-          </Card.Body>
-        </Card.Root>
+              </Card.Body>
+            </Card.Root>
+          </VStack>
+        )}
       </VStack>
 
       <Dialog.Root
         open={isInviteLinkOpen}
         onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
       >
-        <Dialog.Backdrop />
-        <Dialog.Content>
+        <Dialog.Backdrop zIndex={1000} />
+        <Dialog.Content backdrop={false} zIndex={1001}>
           <Dialog.Header>
             <Dialog.Title>
               <HStack>
@@ -602,8 +619,13 @@ function MembersList({
           open ? onAddMembersOpen() : onAddMembersClose()
         }
       >
-        <Dialog.Backdrop />
-        <Dialog.Content width="100%" maxWidth="1024px">
+        <Dialog.Backdrop zIndex={1000} />
+        <Dialog.Content
+          backdrop={false}
+          zIndex={1001}
+          width="100%"
+          maxWidth="1024px"
+        >
           <Dialog.Header>
             <Dialog.Title>Add members</Dialog.Title>
           </Dialog.Header>
@@ -611,6 +633,8 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
+              orgRoleOptions={selectOptions}
+              organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={createInvitesMutation.isLoading}
               hasEmailProvider={hasEmailProvider ?? false}
@@ -621,14 +645,6 @@ function MembersList({
       </Dialog.Root>
     </SettingsLayout>
   );
-}
-
-interface RoleSelectProps {
-  defaultValue?: OrganizationUserRole;
-  onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
-  memberId?: string;
-  loading?: boolean;
-  disabled?: boolean;
 }
 
 interface TeamMembershipsDisplayProps {
@@ -688,56 +704,5 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
         );
       })}
     </Flex>
-  );
-};
-
-const OrganizationMemberSelect = ({
-  defaultValue,
-  onRoleChange,
-  memberId,
-  loading,
-  disabled,
-}: RoleSelectProps) => {
-  return (
-    <MultiSelect
-      size={"sm"}
-      options={selectOptions}
-      defaultValue={selectOptions.find(
-        (option) => option.value === defaultValue
-      )}
-      onChange={(value) => {
-        onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
-      }}
-      isLoading={loading}
-      isDisabled={disabled}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "350px", zIndex: 10 },
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {props.data.description}
-              </Text>
-            </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
   );
 };

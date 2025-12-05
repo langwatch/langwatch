@@ -1,6 +1,6 @@
 [project]
 name = "langwatch"
-version = "0.5.1" # remember to also update it in src/langwatch/__version__.py
+version = "0.7.2" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
 requires-python = ">=3.10,<3.14"
@@ -40,6 +40,7 @@ dependencies = [
     "attrs>=24",
     "pksuid>=1.1.2",
     "pyyaml>=6.0.2",
+    "langchain-core>=1.0.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -75,15 +76,15 @@ examples = [
     "fastapi>=0.115.12",
     "haystack-ai>=2.13.2,<3.0.0",
     "jupyter>=1.0.0,<2.0.0",
-    "langchain>=0.2.11",
-    "langchain_community>=0.2.11",
-    "langchain-openai>=0.1.19",
-    "langchain-text-splitters>=0.3.0,<0.4.0",
-    "langchain-google-vertexai>=1.0.7",
+    "langchain>=1.0.0,<2.0.0",
+    "langchain-community>=0.3.0,<1.0.0",
+    "langchain-openai>=0.3.0,<1.0.0",
+    "langchain-text-splitters>=0.3.0,<1.0.0",
+    "langchain-google-vertexai>=2.0.0,<3.0.0",
     "litellm>=1.52.1",
     "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.53b1",
-    "langgraph>=0.2.35,<0.3.0",
+    "langgraph>=1.0.0,<2.0.0",
     "openai>=1.68.2",
     "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
@@ -95,7 +96,7 @@ examples = [
     "opentelemetry-instrumentation-langchain>=0.40.4",
     "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
-    "strands-agents[otel]>=1.9.0,<2.0.0",
+    "strands-agents[otel]>=1.14.0,<2.0.0",
     "unstructured[pdf]>=0.18.3",
 ]
 tests = ["pytest-asyncio>=0.21.2"]

@@ -16,10 +16,10 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
   versionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 
 const logger = createLogger(
-  "langwatch:prompt-config:llm-config-version-schema"
+  "langwatch:prompt-config:llm-config-version-schema",
 );
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
@@ -47,7 +47,7 @@ const configSchemaV1_0 = z.object({
   configData: z.object({
     prompt: z.string(),
     messages: z.array(messageSchema).default([]),
-    inputs: z.array(inputsSchema).min(1, "At least one input is required"),
+    inputs: z.array(inputsSchema).default([]),
     outputs: z.array(outputsSchema).min(1, "At least one output is required"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
@@ -101,7 +101,7 @@ export function getVersionValidator(schemaVersion: SchemaVersion) {
 export function parseLlmConfigVersion(
   llmConfigVersion:
     | Omit<LlmPromptConfigVersion, "deletedAt">
-    | LlmConfigVersionDTO
+    | LlmConfigVersionDTO,
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 
@@ -110,7 +110,7 @@ export function parseLlmConfigVersion(
   if (!validator) {
     logger.error(
       { schemaVersion, llmConfigVersion },
-      "Unknown schema llmConfigVersion"
+      "Unknown schema llmConfigVersion",
     );
     throw new TRPCError({
       code: "BAD_REQUEST",

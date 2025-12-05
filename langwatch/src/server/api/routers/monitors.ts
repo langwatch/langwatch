@@ -1,6 +1,6 @@
 import { ZodError, z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { slugify } from "~/utils/slugify";
 import { TRPCError } from "@trpc/server";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
@@ -15,7 +15,7 @@ import { EvaluationExecutionMode } from "@prisma/client";
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -29,9 +29,9 @@ export const monitorsRouter = createTRPCRouter({
     }),
   toggle: protectedProcedure
     .input(
-      z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() })
+      z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -57,9 +57,9 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:create"))
     .mutation(async ({ input, ctx }) => {
       const {
         projectId,
@@ -109,9 +109,9 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -149,7 +149,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -169,7 +169,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:delete"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -186,9 +186,9 @@ export const monitorsRouter = createTRPCRouter({
         projectId: z.string(),
         checkId: z.string().optional(),
         name: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:view"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, name } = input;
       const prisma = ctx.prisma;

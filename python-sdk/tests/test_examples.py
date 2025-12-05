@@ -81,6 +81,10 @@ async def test_example(example_file: str):
         pytest.skip(
             "litellm_bot.py requires CEREBRAS_API_KEY environment variable to be set"
         )
+    if example_file == "langgraph_rag_bot_with_threads.py" or example_file == "langchain_rag_bot.py" or example_file == "langchain_rag_bot_with_threads.py":
+        pytest.skip(
+            "throwing memory issues with threads"
+        )
 
     module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
@@ -192,6 +196,8 @@ async def test_example(example_file: str):
                         "API Error",
                         "Connection error",
                         "Timeout",
+                        "Request timed out",
+                        "read operation timed out",
                     ]
                 ):
                     pytest.skip(

@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
 import { Play } from "react-feather";
-import { useForm, type FieldError } from "react-hook-form";
+import { useForm, type FieldError, type FieldErrors } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 
 // Create a simplified field type that matches what we need
@@ -49,13 +49,7 @@ export const ExecutionInputPanel = ({
   const form = useForm<Record<string, string>>({
     defaultValues: defaultValues as Record<string, string>,
     resolver: (values) => {
-      const response: {
-        values: Record<string, string>;
-        errors: Record<string, FieldError>;
-      } = {
-        values,
-        errors: {},
-      };
+      const errors: FieldErrors<Record<string, string>> = {};
 
       // Find required fields that are missing
       const missingFields = fields
@@ -66,13 +60,17 @@ export const ExecutionInputPanel = ({
         );
 
       for (const field of missingFields) {
-        response.errors[field.identifier] = {
+        errors[field.identifier] = {
           type: "required",
           message: "This field is required",
         };
       }
 
-      return response;
+      // Return empty values object when there are errors, otherwise return the values
+      return {
+        values: Object.keys(errors).length > 0 ? {} : values,
+        errors,
+      } as any;
     },
   });
 

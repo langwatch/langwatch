@@ -4,7 +4,7 @@ import { prisma } from "../../../server/db";
 import { createLogger } from "../../../utils/logger";
 
 import { ExperimentType, type Project } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import crypto from "crypto";
 import { z } from "zod";
 import {
@@ -45,7 +45,7 @@ export const config = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -77,7 +77,7 @@ export default async function handler(
       payloadSizeMB: payloadSizeMB.toFixed(2),
       projectId: project.id,
     },
-    "DSPy log_steps request received"
+    "DSPy log_steps request received",
   );
 
   let params: DSPyStepRESTParams[];
@@ -91,10 +91,10 @@ export default async function handler(
         payloadSizeMB: payloadSizeMB.toFixed(2),
         projectId: project.id,
       },
-      "invalid log_steps data received"
+      "invalid log_steps data received",
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -107,7 +107,7 @@ export default async function handler(
     ) {
       logger.error(
         { param, projectId: project.id },
-        "timestamps not in milliseconds for step"
+        "timestamps not in milliseconds for step",
       );
       return res.status(400).json({
         error:
@@ -118,7 +118,7 @@ export default async function handler(
 
   logger.info(
     { stepCount: params.length, projectId: project.id },
-    "Processing DSPy steps"
+    "Processing DSPy steps",
   );
 
   for (const param of params) {
@@ -133,9 +133,9 @@ export default async function handler(
             runId: param.run_id,
             projectId: project.id,
           },
-          "failed to validate data for DSPy step"
+          "failed to validate data for DSPy step",
         );
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: { projectId: project.id, param },
         });
 
@@ -149,9 +149,9 @@ export default async function handler(
             runId: param.run_id,
             projectId: project.id,
           },
-          "internal server error processing DSPy step"
+          "internal server error processing DSPy step",
         );
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: { projectId: project.id, param },
         });
 
@@ -311,7 +311,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
 
     logger.info(
       { stepId: param.index, runId: param.run_id, projectId: project.id },
-      "Successfully stored DSPy step in Elasticsearch"
+      "Successfully stored DSPy step in Elasticsearch",
     );
   } catch (error) {
     logger.error(
@@ -323,7 +323,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         esPayloadSizeMB: esPayloadSizeMB.toFixed(2),
         projectId: project.id,
       },
-      "Failed to store DSPy step in Elasticsearch"
+      "Failed to store DSPy step in Elasticsearch",
     );
     throw error;
   }

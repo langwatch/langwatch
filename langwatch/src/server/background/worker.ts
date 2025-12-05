@@ -41,19 +41,20 @@ type Workers = {
 export const start = (
   runEvaluationMock:
     | ((
-        job: Job<EvaluationJob, any, EvaluatorTypes>
+        job: Job<EvaluationJob, any, EvaluatorTypes>,
       ) => Promise<SingleEvaluationResult>)
     | undefined = undefined,
-  maxRuntimeMs: number | undefined = undefined
+  maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
-      runEvaluationMock ?? runEvaluationJob
+      runEvaluationMock ?? runEvaluationJob,
     );
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+
     startMetricsServer();
     incrementWorkerRestartCount();
 
@@ -88,7 +89,7 @@ export const start = (
 
           setTimeout(() => {
             reject(
-              new WorkersRestart("Max runtime reached, restarting worker")
+              new WorkersRestart("Max runtime reached, restarting worker"),
             );
           }, 0);
         })();
@@ -109,7 +110,7 @@ const incrementWorkerRestartCount = () => {
   try {
     const restartCountFile = path.join(
       "/tmp",
-      "langwatch-worker-restart-count"
+      "langwatch-worker-restart-count",
     );
     let restartCount = 0;
     if (fs.existsSync(restartCountFile)) {

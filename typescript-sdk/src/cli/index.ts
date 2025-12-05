@@ -7,6 +7,8 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 
+declare const __CLI_VERSION__: string;
+
 // Import commands with proper async handling
 const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
@@ -48,6 +50,7 @@ const program = new Command();
 program
   .name("langwatch")
   .description("LangWatch CLI - The npm of prompts")
+  .version(__CLI_VERSION__, "-v, --version", "Display the current version")
   .configureHelp({
     showGlobalOptions: true,
   })

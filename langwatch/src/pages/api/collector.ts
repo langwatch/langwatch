@@ -1,10 +1,10 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import crypto from "crypto";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { dependencies } from "../../injection/dependencies.server";
-import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { TraceUsageService } from "../../server/traces/trace-usage.service";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -27,8 +27,9 @@ import {
 } from "../../server/tracer/types.generated";
 import { createLogger } from "../../utils/logger";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
+import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 
-const logger = createLogger("langwatch:collector");
+const logger = createLogger("langwatch.collector");
 
 export const config = {
   api: {
@@ -89,18 +90,18 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-      [project.id],
-      project.team.organizationId
-    );
+    const traceUsageService = TraceUsageService.create();
+    const limitResult = await traceUsageService.checkLimit({
+      teamId: project.teamId,
+    });
 
-    const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-      project.team.organizationId
-    );
-
-    if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+    if (limitResult.exceeded) {
       if (dependencies.planLimits) {
         try {
+          const activePlan =
+            await dependencies.subscriptionHandler.getActivePlan(
+              project.team.organizationId
+            );
           await dependencies.planLimits(
             project.team.organizationId,
             activePlan.name ?? "free"
@@ -115,28 +116,25 @@ async function handleCollectorRequest(
       logger.info(
         {
           projectId: project.id,
-          currentMonthMessagesCount,
-          activePlanName: activePlan.name,
-          maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
+          currentMonthMessagesCount: limitResult.count,
+          activePlanName: limitResult.planName,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
         },
         "Project has reached plan limit"
       );
 
       return res.status(429).json({
-        message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+        message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
       });
     }
   } catch (error) {
     logger.error(
       { error, projectId: project.id },
-      "Error getting current month messages count"
+      "Error checking trace limit"
     );
-    Sentry.captureException(
-      new Error("Error getting current month messages count"),
-      {
-        extra: { projectId: project.id, zodError: error },
-      }
-    );
+    captureException(new Error("Error checking trace limit"), {
+      extra: { projectId: project.id, error },
+    });
   }
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
@@ -213,7 +211,7 @@ async function handleCollectorRequest(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    Sentry.captureException(new Error("ZodError on parsing body"), {
+    captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
 
@@ -276,7 +274,7 @@ async function handleCollectorRequest(
     }
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
-    Sentry.captureException(new Error("ZodError on parsing metadata"), {
+    captureException(new Error("ZodError on parsing metadata"), {
       extra: {
         projectId: project.id,
         metadata: params.metadata,
@@ -370,7 +368,7 @@ async function handleCollectorRequest(
     return res.status(400).json({ message: "Trace ID not defined" });
   }
 
-  Sentry.getCurrentScope()?.setPropagationContext({
+  getCurrentScope()?.setPropagationContext?.({
     traceId,
     sampleRand: 1,
     propagationSpanId: traceId,
@@ -410,7 +408,7 @@ async function handleCollectorRequest(
     try {
       spans[index] = spanValidatorSchema.parse(span);
     } catch (error) {
-      Sentry.captureException(new Error("ZodError on parsing spans"), {
+      captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },
       });
 
@@ -498,4 +496,4 @@ async function handleCollectorRequest(
 }
 
 // Export the handler wrapped with logging middleware
-export default withPagesRouterLogger(handleCollectorRequest);
+export default withPagesRouterTracer("langwatch.collector")(withPagesRouterLogger(handleCollectorRequest));

@@ -5,6 +5,13 @@ export enum OnboardingScreenIndex {
   ROLE = 3,
 }
 
+export enum ProductScreenIndex {
+  SELECTION = 0,
+  OBSERVABILITY = 1,
+  EVALUATIONS = 2,
+  PROMPT_MANAGEMENT = 3,
+}
+
 export enum OnboardingFlowDirection {
   FORWARD = 1,
   BACKWARD = -1,
@@ -70,6 +77,7 @@ export interface OnboardingScreen {
   component: React.ComponentType<any>;
   heading: string;
   subHeading?: string;
+  widthVariant?: "narrow" | "full";
 }
 
 export interface FormItem<T> {
@@ -100,5 +108,18 @@ export interface OnboardingFlowConfig {
   visibleScreens: OnboardingScreenIndex[];
   first: OnboardingScreenIndex;
   last: OnboardingScreenIndex;
+  total: number;
+}
+
+export type ProductSelection =
+  | "observability"
+  | "evaluations"
+  | "prompt-management";
+
+export interface ProductFlowConfig {
+  variant: "product";
+  visibleScreens: ProductScreenIndex[];
+  first: ProductScreenIndex;
+  last: ProductScreenIndex;
   total: number;
 }

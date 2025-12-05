@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  TeamRoleGroup,
-  checkUserPermissionForProject,
-  backendHasTeamProjectPermission,
-} from "../permission";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
   getProviderModelOptions,
   modelProviders,
@@ -17,27 +13,27 @@ import { KEY_CHECK } from "../../../utils/constants";
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      const hasSetupPermission = await backendHasTeamProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
-        { projectId },
-        TeamRoleGroup.SETUP_PROJECT,
+        projectId,
+        "project:update",
       );
 
       return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const hasSetupPermission = await backendHasTeamProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
-        { projectId },
-        TeamRoleGroup.SETUP_PROJECT,
+        projectId,
+        "project:update",
       );
       return await getProjectModelProvidersForFrontend(
         projectId,
@@ -54,10 +50,14 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: z.array(z.string()).optional().nullable(),
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
-        extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional().nullable(),
+        extraHeaders: z
+          .array(z.object({ key: z.string(), value: z.string() }))
+          .optional()
+          .nullable(),
+        defaultModel: z.string().optional(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -68,6 +68,7 @@ export const modelProviderRouter = createTRPCRouter({
         customModels,
         customEmbeddingsModels,
         extraHeaders,
+        defaultModel,
       } = input;
 
       if (!(provider in modelProviders)) {
@@ -111,69 +112,80 @@ export const modelProviderRouter = createTRPCRouter({
 
       const existingModelProvider = id
         ? await ctx.prisma.modelProvider.findUnique({
-          where: { id, projectId },
-        })
+            where: { id, projectId },
+          })
         : // TOOD: when we go support custom models, this should be skipped
-        await ctx.prisma.modelProvider.findFirst({
-          where: { provider, projectId },
-        });
+          await ctx.prisma.modelProvider.findFirst({
+            where: { provider, projectId },
+          });
 
-      if (existingModelProvider) {
-        // Smart merging: preserve masked standard keys, but replace extra headers completely
-        let mergedCustomKeys: Record<string, any> | null = validatedKeys;
-        if (validatedKeys && existingModelProvider.customKeys) {
-          const existingKeys = existingModelProvider.customKeys as Record<
-            string,
-            any
-          >;
+      const modelProviderResult = await ctx.prisma.$transaction(async (tx) => {
+        let result: Awaited<
+          ReturnType<
+            typeof tx.modelProvider.update | typeof tx.modelProvider.create
+          >
+        >;
 
-          // Standard Azure keys that should preserve masked values
-          const standardAzureKeys = new Set([
-            "AZURE_OPENAI_API_KEY",
-            "AZURE_OPENAI_ENDPOINT",
-            "AZURE_API_GATEWAY_BASE_URL",
-            "AZURE_API_GATEWAY_VERSION",
-          ]);
+        if (existingModelProvider) {
+          // Smart merging: preserve masked standard keys, but replace extra headers completely
+          let mergedCustomKeys: Record<string, any> = validatedKeys ?? {};
+          if (validatedKeys && existingModelProvider.customKeys) {
+            const existingKeys = existingModelProvider.customKeys as Record<
+              string,
+              any
+            >;
 
-          mergedCustomKeys = {
-            // Start with new keys (includes all extra headers)
-            ...validatedKeys,
-            // Override with existing values for masked standard keys
-            ...Object.fromEntries(
-              Object.entries(existingKeys)
-                .filter(
-                  ([key, value]) =>
-                    standardAzureKeys.has(key) &&
-                    (validatedKeys as any)[key] ===
-                    "HAS_KEY••••••••••••••••••••••••",
-                )
-                .map(([key, value]) => [key, value]),
-            ),
-          };
+            mergedCustomKeys = {
+              // Start with new keys (includes all extra headers)
+              ...validatedKeys,
+              // Override with existing values for masked standard keys
+              ...Object.fromEntries(
+                Object.entries(existingKeys)
+                  .filter(
+                    ([key, _value]) =>
+                      (validatedKeys as any)[key] ===
+                      "HAS_KEY••••••••••••••••••••••••",
+                  )
+                  .map(([key, value]) => [key, value]),
+              ),
+            };
+          }
+
+          result = await tx.modelProvider.update({
+            where: { id: existingModelProvider.id, projectId },
+            data: {
+              ...data,
+              customKeys: mergedCustomKeys,
+              customModels: customModels ? customModels : [],
+              customEmbeddingsModels: customEmbeddingsModels
+                ? customEmbeddingsModels
+                : [],
+              extraHeaders: extraHeaders ? extraHeaders : [],
+            },
+          });
+        } else {
+          result = await tx.modelProvider.create({
+            data: {
+              ...data,
+              customModels: customModels ?? undefined,
+              customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+              extraHeaders: extraHeaders ? (extraHeaders as any) : [],
+            },
+          });
         }
 
-        return await ctx.prisma.modelProvider.update({
-          where: { id: existingModelProvider.id, projectId },
-          data: {
-            ...data,
-            customKeys: mergedCustomKeys as any,
-            customModels: customModels ? customModels : [],
-            customEmbeddingsModels: customEmbeddingsModels
-              ? customEmbeddingsModels
-              : [],
-            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-          },
-        });
-      } else {
-        return await ctx.prisma.modelProvider.create({
-          data: {
-            ...data,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-          },
-        });
-      }
+        // Update project's default model if provided
+        if (defaultModel !== void 0) {
+          await tx.project.update({
+            where: { id: projectId },
+            data: { defaultModel },
+          });
+        }
+
+        return result;
+      });
+
+      return modelProviderResult;
     }),
 
   delete: protectedProcedure
@@ -184,7 +196,7 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId, provider } = input;
       if (id) {
@@ -251,7 +263,7 @@ export const getProjectModelProviders = async (
       (modelProvider) =>
         modelProvider.customKeys ??
         modelProvider.enabled !==
-        defaultModelProviders[modelProvider.provider]?.enabled,
+          defaultModelProviders[modelProvider.provider]?.enabled,
     )
     .reduce(
       (acc, modelProvider) => {
@@ -266,7 +278,9 @@ export const getProjectModelProviders = async (
           deploymentMapping: modelProvider.deploymentMapping,
           disabledByDefault:
             defaultModelProviders[modelProvider.provider]?.disabledByDefault,
-          extraHeaders: modelProvider.extraHeaders as { key: string; value: string }[] | null,
+          extraHeaders: modelProvider.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
         };
 
         if (!includeKeys) {
@@ -325,7 +339,9 @@ const getModelOrDefaultEnvKey = (
   envKey: string,
 ) => {
   return (
-    (modelProvider.customKeys as Record<string, string>)?.[envKey] ??
+    // Allow env var to be set to empty string '' on purpose to fallback to process.env defined one
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+    (modelProvider.customKeys as Record<string, string>)?.[envKey] ||
     process.env[envKey]
   );
 };
@@ -419,6 +435,7 @@ export const prepareLitellmParams = async ({
   }
 
   if (modelProvider.provider === "bedrock") {
+    delete params.api_key;
     params.aws_access_key_id =
       getModelOrDefaultEnvKey(modelProvider, "AWS_ACCESS_KEY_ID") ?? "invalid";
     params.aws_secret_access_key =
@@ -447,8 +464,13 @@ export const prepareLitellmParams = async ({
 
     // Pass through all extra headers
     if (modelProvider.extraHeaders) {
-      const extraHeaders = modelProvider.extraHeaders as { key: string; value: string }[];
-      params.extra_headers = JSON.stringify(Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])));
+      const extraHeaders = modelProvider.extraHeaders as {
+        key: string;
+        value: string;
+      }[];
+      params.extra_headers = JSON.stringify(
+        Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])),
+      );
     }
   }
 

@@ -18,14 +18,15 @@ import type {
   FullyLoadedOrganization,
   TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 
-export default function Projects() {
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+
+function Projects() {
   const { organization } = useOrganizationTeamProject();
 
   if (!organization) return null;
@@ -39,7 +40,7 @@ function ProjectsList({
   organization: FullyLoadedOrganization;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
@@ -47,7 +48,7 @@ function ProjectsList({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   return (
@@ -74,10 +75,7 @@ function ProjectsList({
                     <Table.Row>
                       <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
                       <Table.ColumnHeader textAlign="right">
-                        {hasTeamPermission(
-                          TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
-                          team
-                        ) &&
+                        {hasPermission("project:create") &&
                           (!usage.data ||
                           usage.data.projectsCount <
                             usage.data.activePlan.maxProjects ||
@@ -137,13 +135,17 @@ function ProjectsList({
   );
 }
 
+export default withPermissionGuard("project:view", {
+  layoutComponent: SettingsLayout,
+})(Projects);
+
 export function TeamProjectsList({
   team,
 }: {
   team: TeamWithProjectsAndMembers;
 }) {
   const queryClient = api.useContext();
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const archiveProject = api.project.archiveById.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -158,7 +160,7 @@ export function TeamProjectsList({
     if (!project) return;
     if (
       confirm(
-        "Are you sure you want to archive this project? This action cannot be undone."
+        "Are you sure you want to archive this project? This action cannot be undone.",
       )
     ) {
       archiveProject.mutate({
@@ -184,7 +186,7 @@ export function TeamProjectsList({
           </Table.Cell>
           <Table.Cell textAlign="right">
             {teamProject.id !== project?.id &&
-              hasTeamPermission(TeamRoleGroup.ARCHIVE_PROJECT, team) && (
+              hasPermission("project:delete") && (
                 <Menu.Root>
                   <Menu.Trigger className="js-inner-menu">
                     <MoreVertical size={18} />

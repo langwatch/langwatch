@@ -13,7 +13,8 @@ import {
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import {
   ChevronDown,
   Columns,
@@ -88,7 +89,7 @@ export function FieldsDefinition({
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
       setNode: state.setNode,
-    }))
+    })),
   );
   const {
     control,
@@ -168,7 +169,7 @@ export function FieldsDefinition({
           },
           validate: (value) => {
             const identifiers = control._formValues.fields.map(
-              (f: FieldType) => f.identifier
+              (f: FieldType) => f.identifier,
             );
             return (
               identifiers.filter((id: string) => id === value).length === 1 ||
@@ -284,6 +285,27 @@ export function FieldsDefinition({
   );
 }
 
+/**
+ * FieldsForm - Form component for editing node parameters, inputs, or outputs
+ *
+ * Architecture:
+ * - All UI updates flow through react-hook-form state first
+ * - Form changes are watched and debounced before updating the node
+ * - This prevents race conditions and ensures form state stays in sync
+ *
+ * Why form state instead of direct node updates?
+ * - Prevents field resets when other fields change (e.g., LLM config resetting)
+ * - Ensures all fields update atomically through form validation
+ * - Debouncing reduces unnecessary node updates during rapid changes
+ *
+ * Data flow:
+ * 1. User changes field → setValue() updates form state
+ * 2. watch() detects form change → triggers debounced submit
+ * 3. onSubmit() reads form state → updates node via setNode()
+ *
+ * @param node - The workflow node to edit
+ * @param field - Which field array to edit: "parameters", "inputs", or "outputs"
+ */
 export function FieldsForm({
   node,
   field,
@@ -298,13 +320,17 @@ export function FieldsForm({
       setNode: state.setNode,
       default_llm: state.default_llm,
       setNodeParameter: state.setNodeParameter,
-    }))
+    })),
   );
 
+  // Initialize form with current node data
+  // Form state is the source of truth during editing
   const {
     control,
     handleSubmit,
     formState: { errors },
+    setValue,
+    watch,
   } = useForm<FieldArrayForm>({
     defaultValues: {
       fields: node.data[field] ?? [],
@@ -317,25 +343,55 @@ export function FieldsForm({
   });
 
   const updateNodeInternals = useUpdateNodeInternals();
-  const onSubmit = (data: FieldArrayForm) => {
-    setNode({
-      id: node.id,
-      data: { [field]: data.fields },
+
+  /**
+   * onSubmit - Updates the node with form data
+   * Called automatically when form values change (via watch subscription)
+   */
+  const onSubmit = useCallback(
+    (data: FieldArrayForm) => {
+      setNode({
+        id: node.id,
+        data: { [field]: data.fields },
+      });
+      updateNodeInternals(node.id);
+    },
+    [node.id, field, setNode, updateNodeInternals],
+  );
+
+  // Wrapper to handle async form submission
+  const handleSubmit_ = useCallback(() => {
+    void handleSubmit(onSubmit)();
+  }, [handleSubmit, onSubmit]);
+
+  /**
+   * Debounced submit handler
+   * - leading: true - Submit immediately on first change (responsive)
+   * - trailing: false - Don't submit again after debounce period
+   * - 100ms delay - Balances responsiveness with update frequency
+   */
+  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {
+    leading: true,
+    trailing: false,
+  });
+
+  /**
+   * Watch form changes and auto-submit
+   * This ensures any form update (via setValue, register, etc.) triggers node update
+   * Subscription pattern allows cleanup when component unmounts
+   */
+  useEffect(() => {
+    const subscription = watch(() => {
+      handleSubmitDebounced();
     });
-    updateNodeInternals(node.id);
-  };
+
+    return () => subscription.unsubscribe();
+  }, [watch, handleSubmitDebounced]);
 
   const codeEditorModal = useDisclosure();
 
   return (
-    <VStack
-      as="form"
-      align="start"
-      gap={3}
-      width="full"
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onChange={handleSubmit(onSubmit)}
-    >
+    <VStack as="form" align="start" gap={3} width="full">
       {fields.map((field, index) => {
         if (field.type === "llm") {
           return (
@@ -345,17 +401,12 @@ export function FieldsForm({
               defaultLLMConfig={default_llm}
               llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
               onChange={(llmConfig) => {
-                setNode({
-                  id: node.id,
-                  data: {
-                    parameters: node.data.parameters?.map((p) =>
-                      p.identifier === field.identifier
-                        ? { ...p, value: llmConfig }
-                        : p
-                    ),
-                  },
+                // Update form state instead of directly calling setNode
+                // This ensures form state stays in sync and prevents resets
+                // The watch() subscription will automatically trigger onSubmit
+                setValue(`fields.${index}.value`, llmConfig, {
+                  shouldValidate: true,
                 });
-                updateNodeInternals(node.id);
               }}
             />
           );
@@ -363,7 +414,7 @@ export function FieldsForm({
 
         if (field.type === "code") {
           const stateField = parameters?.find(
-            (p) => p.identifier === field.identifier
+            (p) => p.identifier === field.identifier,
           );
           return (
             <Box position="relative" width="full" key={field.id}>
@@ -476,6 +527,10 @@ export function FieldsForm({
   );
 }
 
+export interface PropertySectionTitleProps extends StackProps {
+  tooltip?: React.ReactNode;
+}
+
 export function PropertySectionTitle({
   children,
   tooltip,
@@ -540,7 +595,7 @@ export function BasePropertiesPanel({
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
       setNode: state.setNode,
-    }))
+    })),
   );
 
   const [isEditingName, setIsEditingName] = useState(false);

@@ -14,7 +14,7 @@ import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
 import { nanoid } from "nanoid";
 import { DefaultChatTransport } from "ai";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -28,7 +28,7 @@ export function DatasetGeneration() {
     useShallow((state) => ({
       datasetId: state.getDatasetId(),
       datasetGridRef: state.datasetGridRef,
-    }))
+    })),
   );
 
   // Check if the default model is enabled
@@ -36,7 +36,7 @@ export function DatasetGeneration() {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,
-    "chat"
+    "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -45,7 +45,7 @@ export function DatasetGeneration() {
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   const columnTypes = useMemo(() => {
@@ -166,7 +166,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           if (!rowData.id) {
             rowData.id = nanoid();
@@ -224,7 +224,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           rowData.id = id;
 
@@ -357,7 +357,7 @@ export function DatasetGeneration() {
                 void databaseDataset.refetch();
                 reject(error);
               },
-            }
+            },
           );
         });
 
@@ -382,7 +382,7 @@ export function DatasetGeneration() {
       // Start processing if not already processing
       if (!isProcessing.current) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
+          captureException(error, {
             tags: {
               datasetId: datasetId,
             },
@@ -391,7 +391,7 @@ export function DatasetGeneration() {
         });
       }
     },
-    [datasetId, processQueue]
+    [datasetId, processQueue],
   );
 
   const deleteRecord = useCallback(
@@ -418,10 +418,10 @@ export function DatasetGeneration() {
             });
             void databaseDataset.refetch();
           },
-        }
+        },
       );
     },
-    [databaseDataset, datasetId, project?.id, deleteDatasetRecord]
+    [databaseDataset, datasetId, project?.id, deleteDatasetRecord],
   );
 
   // Cleanup effect to process remaining queue items
@@ -432,10 +432,12 @@ export function DatasetGeneration() {
     return () => {
       if (queue?.length > 0 && !processing) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
-            tags: {
-              datasetId: datasetId,
-            },
+          captureException(error, {
+            ...(datasetId && {
+              tags: {
+                datasetId: datasetId,
+              },
+            }),
           });
           console.error("Error processing queue during cleanup:", error);
         });
@@ -448,10 +450,12 @@ export function DatasetGeneration() {
     if (updateQueue.current?.length > 0 && !isProcessing.current) {
       processQueue().catch((error) => {
         console.error("Error processing queue during dataset change:", error);
-        Sentry.captureException(error, {
-          tags: {
-            datasetId: datasetId,
-          },
+        captureException(error, {
+          ...(datasetId && {
+            tags: {
+              datasetId: datasetId,
+            },
+          }),
         });
         console.error("Error processing queue during cleanup:", error);
       });
@@ -483,7 +487,7 @@ export function DatasetGeneration() {
             dataset: datasetCsv,
             projectId: project?.id,
           },
-        }
+        },
       );
       setInput("");
     }

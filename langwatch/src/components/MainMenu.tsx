@@ -59,7 +59,7 @@ export const MainMenu = React.memo(function MainMenu() {
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   return (
@@ -133,9 +133,9 @@ export const MainMenu = React.memo(function MainMenu() {
           />
 
           <PageMenuLink
-            path={projectRoutes.promptConfigs.path}
+            path={projectRoutes.prompts.path}
             icon={Book}
-            label={projectRoutes.promptConfigs.title}
+            label={projectRoutes.prompts.title}
             project={project}
             isActive={router.pathname.includes("/prompts")}
           />
@@ -158,7 +158,7 @@ export const MainMenu = React.memo(function MainMenu() {
           />
 
           {(!!hasOrganizationPermission(
-            OrganizationRoleGroup.ORGANIZATION_VIEW
+            OrganizationRoleGroup.ORGANIZATION_VIEW,
           ) ||
             isPublicRoute) && (
             <PageMenuLink

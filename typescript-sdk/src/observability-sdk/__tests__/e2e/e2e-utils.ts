@@ -64,6 +64,7 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
   console.debug("🔧 Calling setupObservability...");
   setupObservability({
     spanProcessors: [spanProcessor],
+    langwatch: 'disabled',
     debug: { logLevel: "debug" },
     advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
   });
@@ -243,29 +244,7 @@ export function getRawTraceIdFromSpan(span: OtelSpan): string {
  * This trace ID can be used directly for API lookups.
  */
 export function getTraceIdFromSpan(span: OtelSpan): string {
-  const hexTraceId = getRawTraceIdFromSpan(span);
-  return convertTraceId(hexTraceId);
-}
-
-/**
- * Converts a trace ID from OpenTelemetry format to LangWatch's expected format.
- * This directly applies the backend's conversion logic: Buffer.from(traceId, "base64").toString("hex")
- */
-function convertTraceId(hexTraceId: string): string {
-  if (!hexTraceId || typeof hexTraceId !== 'string') {
-    throw new Error(`Invalid trace ID: expected non-empty string, got ${typeof hexTraceId}: ${hexTraceId}`);
-  }
-
-  const cleanHexTraceId = hexTraceId.trim().toLowerCase();
-
-  if (!/^[0-9a-f]{32}$/i.test(cleanHexTraceId)) {
-    throw new Error(`Invalid hex trace ID format: expected 32 hex characters, got "${cleanHexTraceId}"`);
-  }
-
-  // Apply the exact backend conversion: Buffer.from(values as any, "base64").toString("hex")
-  const backendResult = Buffer.from(cleanHexTraceId as any, "base64").toString("hex");
-
-  return backendResult;
+  return getRawTraceIdFromSpan(span);
 }
 
 // =============================================================================

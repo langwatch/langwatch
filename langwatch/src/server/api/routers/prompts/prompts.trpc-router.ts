@@ -2,8 +2,7 @@ import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
-import { TeamRoleGroup } from "../../permission";
-import { checkUserPermissionForProject } from "../../permission";
+import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import {
@@ -13,13 +12,11 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-} from "~/prompt-configs/schemas";
+} from "~/prompts/schemas";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**
  * Router for handling prompts - the business-facing interface
- * Currently only supports upsert operation
- * TODO: Add other operations as needed
  */
 export const promptsRouter = createTRPCRouter({
   /**
@@ -27,7 +24,7 @@ export const promptsRouter = createTRPCRouter({
    */
   getAllPromptsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllPrompts(input);
@@ -41,9 +38,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         versionId: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -76,9 +73,9 @@ export const promptsRouter = createTRPCRouter({
           demonstrations: nodeDatasetSchema.optional(),
           handle: handleSchema,
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -114,9 +111,9 @@ export const promptsRouter = createTRPCRouter({
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -143,9 +140,9 @@ export const promptsRouter = createTRPCRouter({
           handle: handleSchema,
           scope: z.nativeEnum(PromptScope),
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.updateHandle({
@@ -163,9 +160,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getPromptByIdOrHandle(input);
@@ -180,12 +177,28 @@ export const promptsRouter = createTRPCRouter({
         handle: handleSchema,
         projectId: z.string(),
         scope: z.nativeEnum(PromptScope),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkHandleUniqueness(input);
+    }),
+
+  /**
+   * Check if user can modify/delete a prompt
+   */
+  checkModifyPermission: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.checkModifyPermission(input);
     }),
 
   /**
@@ -196,9 +209,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllVersions(input);
@@ -212,9 +225,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:delete"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.deletePrompt(input);

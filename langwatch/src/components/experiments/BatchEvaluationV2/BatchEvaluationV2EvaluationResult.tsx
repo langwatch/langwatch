@@ -167,7 +167,7 @@ export function BatchEvaluationV2EvaluationResult({
         cellClass: "cell-with-overflow",
         valueGetter: (p: any) => {
           const entry = getRowData(p).datasetEntry;
-          if (entry?.error) return "Error";
+          if (entry?.error) return entry.error;
           let value = (entry?.predicted as any)?.[node]?.[column];
           if (value === void 0 && node === "end")
             value = (entry?.predicted as any)?.[column];

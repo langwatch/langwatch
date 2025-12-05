@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
@@ -87,7 +87,7 @@ export const onboardingRouter = createTRPCRouter({
               }
             );
           } catch (err) {
-            Sentry.captureException(err);
+            captureException(err);
           }
         }
 
@@ -101,7 +101,7 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug: projectResult.projectSlug,
         };
       } catch (error) {
-        Sentry.captureException(error);
+        captureException(error);
         throw error;
       }
     }),

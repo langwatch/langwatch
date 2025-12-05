@@ -120,9 +120,9 @@ export const modelProviders = {
     apiKey: "AWS_ACCESS_KEY_ID",
     endpointKey: undefined,
     keysSchema: z.object({
-      AWS_ACCESS_KEY_ID: z.string().min(1),
-      AWS_SECRET_ACCESS_KEY: z.string().min(1),
-      AWS_REGION_NAME: z.string().min(1),
+      AWS_ACCESS_KEY_ID: z.string().nullable().optional(),
+      AWS_SECRET_ACCESS_KEY: z.string().nullable().optional(),
+      AWS_REGION_NAME: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },

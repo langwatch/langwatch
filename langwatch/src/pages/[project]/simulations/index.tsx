@@ -7,8 +7,9 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function SimulationsPage() {
+function SimulationsPageContent() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [refetchInterval, setRefetchInterval] = useState(4000);
@@ -36,7 +37,7 @@ export default function SimulationsPage() {
     {
       refetchInterval,
       enabled: !!project,
-    }
+    },
   );
 
   const sortedScenarioSetsData = useMemo(() => {
@@ -63,10 +64,10 @@ export default function SimulationsPage() {
           {!isLoading &&
             sortedScenarioSetsData &&
             sortedScenarioSetsData.length > 0 && (
-            <HStack justify="space-between" align="center" w="full">
-              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-            </HStack>
-          )}
+              <HStack justify="space-between" align="center" w="full">
+                <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
+              </HStack>
+            )}
         </PageLayout.Header>
 
         {/* Show loading state */}
@@ -113,3 +114,7 @@ export default function SimulationsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("scenarios:view", {
+  layoutComponent: DashboardLayout,
+})(SimulationsPageContent);

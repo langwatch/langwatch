@@ -31,7 +31,7 @@ import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   commitMessageSchema,
   versionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
@@ -84,9 +84,9 @@ app.get(
     });
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(configs)
+      apiResponsePromptWithVersionDataSchema.array().parse(configs),
     );
-  }
+  },
 );
 
 // Get versions
@@ -98,7 +98,7 @@ app.get(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(
-        z.array(apiResponsePromptWithVersionDataSchema)
+        z.array(apiResponsePromptWithVersionDataSchema),
       ),
       404: {
         description: "Prompt not found",
@@ -116,7 +116,7 @@ app.get(
 
     logger.info(
       { projectId: project.id, promptId: id },
-      "Getting versions for prompt"
+      "Getting versions for prompt",
     );
 
     const versions: ApiResponsePrompt[] = await service.getAllVersions({
@@ -127,13 +127,13 @@ app.get(
 
     logger.info(
       { projectId: project.id, promptId: id, versionCount: versions.length },
-      "Successfully retrieved prompt versions"
+      "Successfully retrieved prompt versions",
     );
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(versions)
+      apiResponsePromptWithVersionDataSchema.array().parse(versions),
     );
-  }
+  },
 );
 
 // Get prompt by ID
@@ -186,7 +186,7 @@ app.get(
     }
 
     return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
-  }
+  },
 );
 
 // Create prompt with initial version
@@ -214,7 +214,7 @@ app.post(
         projectId: project.id,
         organizationId: organization.id,
       },
-      "Creating new prompt with initial version"
+      "Creating new prompt with initial version",
     );
 
     try {
@@ -226,7 +226,7 @@ app.post(
 
       logger.info(
         { promptId: newConfig.id },
-        "Successfully created prompt with initial version"
+        "Successfully created prompt with initial version",
       );
 
       return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
@@ -237,7 +237,7 @@ app.post(
       // Re-throw other errors to be handled by the error middleware
       throw error;
     }
-  }
+  },
 );
 
 // Sync endpoint for upsert operations
@@ -269,7 +269,7 @@ app.post(
                       getLatestConfigVersionSchema().shape.configData,
                   })
                   .optional(),
-              })
+              }),
             ),
           },
         },
@@ -282,7 +282,7 @@ app.post(
       configData: getLatestConfigVersionSchema().shape.configData,
       localVersion: versionSchema.optional(),
       commitMessage: commitMessageSchema.optional(),
-    })
+    }),
   ),
   async (c) => {
     const service = c.get("promptService");
@@ -293,7 +293,7 @@ app.post(
 
     logger.info(
       { projectId: project.id, promptId: id },
-      "Syncing prompt with local content"
+      "Syncing prompt with local content",
     );
 
     try {
@@ -324,14 +324,14 @@ app.post(
           promptId: id,
           action: syncResult.action,
         },
-        "Successfully synced prompt"
+        "Successfully synced prompt",
       );
 
       return c.json(response);
     } catch (error: any) {
       logger.error(
         { projectId: project.id, promptId: id, error },
-        "Error syncing prompt"
+        "Error syncing prompt",
       );
 
       if (error.message.includes("No permission")) {
@@ -343,7 +343,7 @@ app.post(
       // Re-throw other errors to be handled by the error middleware
       throw error;
     }
-  }
+  },
 );
 
 // Update prompt
@@ -389,7 +389,7 @@ app.put(
         handleOrId: id,
         data,
       },
-      "Updating prompt"
+      "Updating prompt",
     );
 
     try {
@@ -412,11 +412,11 @@ app.put(
           handle: updatedConfig.handle,
           scope: updatedConfig.scope,
         },
-        "Successfully updated prompt"
+        "Successfully updated prompt",
       );
 
       return c.json(
-        apiResponsePromptWithVersionDataSchema.parse(updatedConfig)
+        apiResponsePromptWithVersionDataSchema.parse(updatedConfig),
       );
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
@@ -426,7 +426,7 @@ app.put(
       // Re-throw other errors to be handled by the error middleware
       throw error;
     }
-  }
+  },
 );
 // Delete prompt
 app.delete(
@@ -455,14 +455,14 @@ app.delete(
     const result = await service.repository.deleteConfig(
       id,
       project.id,
-      organization.id
+      organization.id,
     );
 
     logger.info(
       { projectId: project.id, promptId: id, success: result.success },
-      "Successfully deleted prompt"
+      "Successfully deleted prompt",
     );
 
     return c.json(successSchema.parse(result));
-  }
+  },
 );

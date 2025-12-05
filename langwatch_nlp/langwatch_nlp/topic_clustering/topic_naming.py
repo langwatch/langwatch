@@ -16,8 +16,11 @@ from langwatch_nlp.topic_clustering.types import Money, Trace
 from langwatch_nlp.topic_clustering.utils import (
     generate_embeddings,
 )
+from langwatch_nlp.logger import get_logger
 
 T = TypeVar("T")
+
+logger = get_logger("topic_clustering.naming")
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
@@ -29,8 +32,8 @@ def generate_topic_names(
     existing: Optional[list[str]] = None,
 ) -> tuple[list[str], Money]:
     example_count = sum([len(examples) for examples in topic_examples])
-    print(
-        f"Generating names for {len(topic_examples)} topics with {example_count} examples total."
+    logger.info(
+        f"Generating names for {len(topic_examples)} topics with {example_count} examples total"
     )
     topic_examples_str = "\n\n\n".join(
         [
@@ -203,8 +206,8 @@ def improve_similar_names(
                 closest_pair = (i, j)
 
     if closest_distance > 0.6 or not closest_pair:
-        print(
-            f"No similar names found (iteration {iteration + 1}), stopping improvement."
+        logger.info(
+            f"No similar names found (iteration {iteration + 1}), stopping improvement"
         )
         return topic_names, cost
 
@@ -216,8 +219,8 @@ def improve_similar_names(
 
     num_examples_a = len(topic_a_examples)
     num_examples_b = len(topic_b_examples)
-    print(
-        f'Improving names (iteration {iteration + 1}) between "{topic_a_name}" ({num_examples_a} examples) and "{topic_b_name}" ({num_examples_b} examples) (cosine distance {closest_distance})'
+    logger.info(
+        f'Improving names (iteration {iteration + 1}) between "{topic_a_name}" ({num_examples_a} examples) and "{topic_b_name}" ({num_examples_b} examples) (cosine distance {closest_distance:.3f})'
     )
 
     new_topic_a_name, new_topic_b_name, cost_ = improve_name_between_two_topics(
@@ -309,7 +312,7 @@ def improve_name_between_two_topics(
     new_topic_a_name = arguments["topic_a"]
     new_topic_b_name = arguments["topic_b"]
 
-    print(f'New names: "{new_topic_a_name}" and "{new_topic_b_name}"')
+    logger.info(f'New names: "{new_topic_a_name}" and "{new_topic_b_name}"')
 
     return new_topic_a_name, new_topic_b_name, Money(amount=total_cost, currency="USD")
 
@@ -322,6 +325,12 @@ def generate_topic_and_subtopic_names(
     existing: Optional[list[str]] = None,
     skip_topic_names: bool = False,
 ) -> tuple[list[Optional[str]], list[list[Optional[str]]], Money]:
+    total_topics = len(hierarchy)
+    total_subtopics = sum(len(subtopics) for subtopics in hierarchy.values())
+    logger.info(
+        f"Starting name generation for {total_topics} topics and {total_subtopics} subtopics..."
+    )
+
     with ThreadPoolExecutor() as executor:
         cost = Money(amount=0, currency="USD")
         topic_examples = [
@@ -343,6 +352,7 @@ def generate_topic_and_subtopic_names(
         ) -> tuple[list[Optional[str]], Money]:
             return list(hierarchy.keys()), Money(amount=0, currency="USD")
 
+        logger.info("Submitting topic naming task...")
         topic_future = executor.submit(
             (
                 noop_topic_names
@@ -358,6 +368,7 @@ def generate_topic_and_subtopic_names(
         subtopic_names = []
         futures: list[Future[tuple[list[Optional[str]], Money]]] = []
 
+        logger.info(f"Submitting {total_topics} subtopic naming tasks...")
         for subtopics in hierarchy.values():
             subtopic_samples = [
                 get_subtopic_samples(samples, n=20) for samples in subtopics.values()
@@ -371,12 +382,18 @@ def generate_topic_and_subtopic_names(
             )
             futures.append(future)
 
+        logger.info("Waiting for topic names to complete...")
         topic_names, cost_ = topic_future.result()
         cost["amount"] += cost_["amount"]
+        logger.info(f"Topic names complete: {len(topic_names)} names generated")
 
-        for future in futures:
+        logger.info(f"Waiting for subtopic names to complete ({len(futures)} tasks)...")
+        for idx, future in enumerate(futures):
             subtopic_names_, cost_ = future.result()
             cost["amount"] += cost_["amount"]
             subtopic_names.append(subtopic_names_)
+            if (idx + 1) % 5 == 0 or idx == len(futures) - 1:
+                logger.info(f"Subtopic naming progress: {idx + 1}/{len(futures)} topics processed")
 
+    logger.info(f"Name generation complete for {len(topic_names)} topics")
     return topic_names, subtopic_names, cost

@@ -1,0 +1,11 @@
+---
+description: Page and component structure
+alwaysApply: false
+---
+
+Page files handle routing concerns (permissions, layout). Components handle UI.
+
+```
+src/pages/[project]/prompts.tsx           # Permissions + NextJS routing
+src/prompt-configs/components/PromptsPage.layout.tsx  # UI component
+```

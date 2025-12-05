@@ -1,3 +1,4 @@
+import "server-only";
 import { PostHog } from "posthog-node";
 import { env } from "../env.mjs";
 
@@ -20,7 +21,7 @@ export function getPostHogInstance(): PostHog | null {
 function handleShutdown() {
   if (_posthogInstance) {
     console.log("Shutting down PostHog client...");
-    _posthogInstance.shutdown();
+    void _posthogInstance.shutdown();
   }
 }
 

@@ -36,9 +36,9 @@ export const sendInviteEmail = async ({
         />
         <Heading as="h1">LangWatch Invite</Heading>
         <p>
-          You have been invited to join {organization.name} Organization on
-          LangWatch. Please click the button below to create your account or
-          login with the email <b>{email}</b>:
+          You have been invited to join the <strong>{organization.name}</strong>
+          Organization on LangWatch. Please click the button below to create your
+          account or login with the email <b>{email}</b>:
         </p>
         <Button
           href={acceptInviteUrl}
@@ -50,7 +50,7 @@ export const sendInviteEmail = async ({
             borderRadius: "6px",
           }}
         >
-          Open Dashboard
+          Accept Invite
         </Button>
         <p>If this is a mistake, you can safely ignore this email</p>
       </Container>

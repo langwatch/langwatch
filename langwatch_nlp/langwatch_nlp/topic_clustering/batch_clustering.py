@@ -21,6 +21,9 @@ from langwatch_nlp.topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
+from langwatch_nlp.logger import get_logger
+
+logger = get_logger("topic_clustering.batch")
 
 
 def build_hierarchy(
@@ -92,25 +95,41 @@ def setup_endpoints(app: FastAPI):
     def topics_batch_clustering(
         params: BatchClusteringParams,
     ) -> TopicClusteringResponse:
+        logger.info(f"Starting batch clustering for {len(params.traces)} traces")
+
         model = params.litellm_params["model"]
         if model.startswith("azure/") and params.deployment_name:
             model = f"azure/{params.deployment_name}"
 
+        logger.info("Step 1/4: Generating embeddings for traces...")
         traces_with_embeddings = fill_embeddings(
             params.traces, params.embeddings_litellm_params
         )
+        logger.info(
+            f"Step 1/4: Embeddings complete - {len(traces_with_embeddings)} traces with valid embeddings"
+        )
 
+        logger.info("Step 2/4: Building hierarchy from embeddings...")
         hierarchy = build_hierarchy(
             traces_with_embeddings, COPHENETIC_DISTANCES_FOR_TOPICS
         )
+        logger.info(f"Step 2/4: Hierarchy built - {len(hierarchy)} topics identified")
+
+        logger.info("Step 3/4: Generating topic and subtopic names...")
         topic_names, subtopic_names, cost = generate_topic_and_subtopic_names(
             model=model,
             litellm_params=params.litellm_params,
             embeddings_litellm_params=params.embeddings_litellm_params,
             hierarchy=hierarchy,
         )
+        logger.info(f"Step 3/4: Names generated for {len(topic_names)} topics")
+
+        logger.info("Step 4/4: Building final response...")
         topics, subtopics, traces_to_assign = build_response(
             hierarchy, topic_names, subtopic_names
+        )
+        logger.info(
+            f"Batch clustering complete - {len(topics)} topics, {len(subtopics)} subtopics, {len(traces_to_assign)} trace assignments"
         )
 
         return {

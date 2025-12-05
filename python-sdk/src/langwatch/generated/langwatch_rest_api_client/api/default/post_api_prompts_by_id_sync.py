@@ -9,6 +9,7 @@ from ...models.post_api_prompts_by_id_sync_body import PostApiPromptsByIdSyncBod
 from ...models.post_api_prompts_by_id_sync_response_200 import PostApiPromptsByIdSyncResponse200
 from ...models.post_api_prompts_by_id_sync_response_400 import PostApiPromptsByIdSyncResponse400
 from ...models.post_api_prompts_by_id_sync_response_401 import PostApiPromptsByIdSyncResponse401
+from ...models.post_api_prompts_by_id_sync_response_422 import PostApiPromptsByIdSyncResponse422
 from ...models.post_api_prompts_by_id_sync_response_500 import PostApiPromptsByIdSyncResponse500
 from ...types import Response
 
@@ -41,6 +42,7 @@ def _parse_response(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -56,6 +58,10 @@ def _parse_response(
         response_401 = PostApiPromptsByIdSyncResponse401.from_dict(response.json())
 
         return response_401
+    if response.status_code == 422:
+        response_422 = PostApiPromptsByIdSyncResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = PostApiPromptsByIdSyncResponse500.from_dict(response.json())
 
@@ -73,6 +79,7 @@ def _build_response(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -94,6 +101,7 @@ def sync_detailed(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -108,7 +116,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse500]]
+        Response[Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse422, PostApiPromptsByIdSyncResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -133,6 +141,7 @@ def sync(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -147,7 +156,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse500]
+        Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse422, PostApiPromptsByIdSyncResponse500]
     """
 
     return sync_detailed(
@@ -167,6 +176,7 @@ async def asyncio_detailed(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -181,7 +191,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse500]]
+        Response[Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse422, PostApiPromptsByIdSyncResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -204,6 +214,7 @@ async def asyncio(
         PostApiPromptsByIdSyncResponse200,
         PostApiPromptsByIdSyncResponse400,
         PostApiPromptsByIdSyncResponse401,
+        PostApiPromptsByIdSyncResponse422,
         PostApiPromptsByIdSyncResponse500,
     ]
 ]:
@@ -218,7 +229,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse500]
+        Union[PostApiPromptsByIdSyncResponse200, PostApiPromptsByIdSyncResponse400, PostApiPromptsByIdSyncResponse401, PostApiPromptsByIdSyncResponse422, PostApiPromptsByIdSyncResponse500]
     """
 
     return (

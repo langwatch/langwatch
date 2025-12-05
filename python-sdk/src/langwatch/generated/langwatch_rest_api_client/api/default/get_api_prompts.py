@@ -8,6 +8,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.get_api_prompts_response_200_item import GetApiPromptsResponse200Item
 from ...models.get_api_prompts_response_400 import GetApiPromptsResponse400
 from ...models.get_api_prompts_response_401 import GetApiPromptsResponse401
+from ...models.get_api_prompts_response_422 import GetApiPromptsResponse422
 from ...models.get_api_prompts_response_500 import GetApiPromptsResponse500
 from ...types import Response
 
@@ -27,6 +28,7 @@ def _parse_response(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -48,6 +50,10 @@ def _parse_response(
         response_401 = GetApiPromptsResponse401.from_dict(response.json())
 
         return response_401
+    if response.status_code == 422:
+        response_422 = GetApiPromptsResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = GetApiPromptsResponse500.from_dict(response.json())
 
@@ -64,6 +70,7 @@ def _build_response(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -83,6 +90,7 @@ def sync_detailed(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -94,7 +102,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
+        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
     """
 
     kwargs = _get_kwargs()
@@ -113,6 +121,7 @@ def sync(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -124,7 +133,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
+        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
     """
 
     return sync_detailed(
@@ -139,6 +148,7 @@ async def asyncio_detailed(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -150,7 +160,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
+        Response[Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]]
     """
 
     kwargs = _get_kwargs()
@@ -167,6 +177,7 @@ async def asyncio(
     Union[
         GetApiPromptsResponse400,
         GetApiPromptsResponse401,
+        GetApiPromptsResponse422,
         GetApiPromptsResponse500,
         list["GetApiPromptsResponse200Item"],
     ]
@@ -178,7 +189,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
+        Union[GetApiPromptsResponse400, GetApiPromptsResponse401, GetApiPromptsResponse422, GetApiPromptsResponse500, list['GetApiPromptsResponse200Item']]
     """
 
     return (

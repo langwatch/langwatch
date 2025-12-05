@@ -12,7 +12,7 @@ import {
   inputsSchema,
   outputsSchema,
   schemaVersionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 
 /**
  * Schema for creating new prompt versions

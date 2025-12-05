@@ -5,7 +5,7 @@ import { prisma } from "../../../server/db";
 import { createLogger } from "../../../utils/logger";
 
 import { CostReferenceType, CostType } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -103,7 +103,7 @@ export default async function handler(
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
     logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -173,7 +173,7 @@ export default async function handler(
     }
   } catch (error) {
     logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

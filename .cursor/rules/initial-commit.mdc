@@ -1,0 +1,5 @@
+---
+alwaysApply: false
+---
+
+We're starting a new PR. Write a conventional commit with no changes (allow empty commit) and then push the changes. Ask if you don't know what the PR is about.

@@ -5,6 +5,9 @@ from scipy.spatial.distance import cdist
 import concurrent.futures
 
 from langwatch_nlp.topic_clustering.types import Trace, TraceWithEmbeddings
+from langwatch_nlp.logger import get_logger
+
+logger = get_logger("topic_clustering.utils")
 
 
 def calculate_centroid_and_distance(samples) -> tuple[np.ndarray, float]:
@@ -48,7 +51,7 @@ def _generate_single_embedding(
             target_dim=dimensions,
         )
     except Exception as e:
-        print(f"[WARN] Error generating single embedding: {e}\n\nText: {text}\n\n")
+        logger.warning(f"Error generating single embedding: {e} | Text: {text[:100]}...")
         raise e  # Re-raise the exception to be handled by the caller
 
 
@@ -69,7 +72,10 @@ def generate_embeddings_threaded(
 
     # Process in smaller chunks to handle errors properly
     chunk_size = 20
-    for i in range(0, len(texts), chunk_size):
+    total_chunks = (len(texts) + chunk_size - 1) // chunk_size
+    logger.info(f"Generating embeddings (threaded) for {len(texts)} texts in {total_chunks} chunks...")
+
+    for chunk_idx, i in enumerate(range(0, len(texts), chunk_size)):
         chunk = texts[i:i + chunk_size]
         futures = []
 
@@ -87,13 +93,16 @@ def generate_embeddings_threaded(
                     embeddings.append(None)
                     errors += 1
                     last_error = e
-                    print(f"[WARN] Error generating embeddings: {e}")
+                    logger.warning(f"Error generating embedding: {e}")
                     if errors >= 3:
-                        print(f"[WARN] Too many errors generating embeddings, reraising")
+                        logger.warning("Too many errors generating embeddings, reraising")
                         raise e
 
+        if (chunk_idx + 1) % 5 == 0 or chunk_idx == total_chunks - 1:
+            logger.info(f"Embeddings progress (threaded): {chunk_idx + 1}/{total_chunks} chunks")
+
     if last_error and errors == len(texts):
-        print(f"[WARN] All embeddings failed to generate, reraising last error")
+        logger.warning("All embeddings failed to generate, reraising last error")
         raise last_error
 
     return embeddings
@@ -105,14 +114,17 @@ def generate_embeddings(
     embeddings = []
     errors = 0
     last_error: Optional[Exception] = None
-    batches = range(0, len(texts), batch_size)
+    batches = list(range(0, len(texts), batch_size))
+    total_batches = len(batches)
 
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
     if "dimensions" in embeddings_litellm_params:
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
         del embeddings_litellm_params["dimensions"]
 
-    for i in batches:
+    logger.info(f"Generating embeddings for {len(texts)} texts in {total_batches} batches...")
+
+    for batch_idx, i in enumerate(batches):
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
         try:
             response = litellm.embedding(
@@ -129,20 +141,24 @@ def generate_embeddings(
         except Exception as e:
             if batch_size > 1:
                 # Instead of falling back to batch_size=1, use threaded implementation
-                print(f"[INFO] Batch embedding failed, falling back to threaded implementation")
+                logger.info("Batch embedding failed, falling back to threaded implementation")
                 return generate_embeddings_threaded(texts, embeddings_litellm_params)
 
             embeddings += [None] * batch_size
 
             errors += 1
             last_error = e
-            print(f"[WARN] Error generating embeddings: {e}\n\nBatch: {batch}\n\n")
+            logger.warning(f"Error generating embeddings: {e} | Batch: {batch[:3]}...")
             if errors >= 3:
-                print(f"[WARN] Too many errors generating embeddings, reraising")
+                logger.warning("Too many errors generating embeddings, reraising")
                 raise e
 
+        # Log progress every 5 batches or at the end
+        if (batch_idx + 1) % 5 == 0 or batch_idx == total_batches - 1:
+            logger.info(f"Embeddings progress: {batch_idx + 1}/{total_batches} batches ({len(embeddings)}/{len(texts)} texts)")
+
     if last_error and errors == len(batches):
-        print(f"[WARN] All embeddings failed to generate, reraising last error")
+        logger.warning("All embeddings failed to generate, reraising last error")
         raise last_error
 
     return embeddings

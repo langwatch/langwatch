@@ -8,10 +8,12 @@ from .delete_api_prompts_by_id_response_200 import DeleteApiPromptsByIdResponse2
 from .delete_api_prompts_by_id_response_400 import DeleteApiPromptsByIdResponse400
 from .delete_api_prompts_by_id_response_401 import DeleteApiPromptsByIdResponse401
 from .delete_api_prompts_by_id_response_404 import DeleteApiPromptsByIdResponse404
+from .delete_api_prompts_by_id_response_422 import DeleteApiPromptsByIdResponse422
 from .delete_api_prompts_by_id_response_500 import DeleteApiPromptsByIdResponse500
 from .delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
 from .delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
 from .delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
+from .delete_api_scenario_events_response_422 import DeleteApiScenarioEventsResponse422
 from .delete_api_scenario_events_response_500 import DeleteApiScenarioEventsResponse500
 from .error import Error
 from .evaluation import Evaluation
@@ -70,6 +72,7 @@ from .get_api_prompts_by_id_response_200_scope import GetApiPromptsByIdResponse2
 from .get_api_prompts_by_id_response_400 import GetApiPromptsByIdResponse400
 from .get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
 from .get_api_prompts_by_id_response_404 import GetApiPromptsByIdResponse404
+from .get_api_prompts_by_id_response_422 import GetApiPromptsByIdResponse422
 from .get_api_prompts_by_id_response_500 import GetApiPromptsByIdResponse500
 from .get_api_prompts_by_id_versions_response_200_item import GetApiPromptsByIdVersionsResponse200Item
 from .get_api_prompts_by_id_versions_response_200_item_demonstrations import (
@@ -139,6 +142,7 @@ from .get_api_prompts_by_id_versions_response_200_item_scope import GetApiPrompt
 from .get_api_prompts_by_id_versions_response_400 import GetApiPromptsByIdVersionsResponse400
 from .get_api_prompts_by_id_versions_response_401 import GetApiPromptsByIdVersionsResponse401
 from .get_api_prompts_by_id_versions_response_404 import GetApiPromptsByIdVersionsResponse404
+from .get_api_prompts_by_id_versions_response_422 import GetApiPromptsByIdVersionsResponse422
 from .get_api_prompts_by_id_versions_response_500 import GetApiPromptsByIdVersionsResponse500
 from .get_api_prompts_response_200_item import GetApiPromptsResponse200Item
 from .get_api_prompts_response_200_item_demonstrations import GetApiPromptsResponse200ItemDemonstrations
@@ -185,6 +189,7 @@ from .get_api_prompts_response_200_item_response_format_type import GetApiPrompt
 from .get_api_prompts_response_200_item_scope import GetApiPromptsResponse200ItemScope
 from .get_api_prompts_response_400 import GetApiPromptsResponse400
 from .get_api_prompts_response_401 import GetApiPromptsResponse401
+from .get_api_prompts_response_422 import GetApiPromptsResponse422
 from .get_api_prompts_response_500 import GetApiPromptsResponse500
 from .get_api_trace_id_response_200 import GetApiTraceIdResponse200
 from .get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
@@ -433,6 +438,7 @@ from .post_api_prompts_by_id_sync_response_200_prompt_response_format_type impor
 from .post_api_prompts_by_id_sync_response_200_prompt_scope import PostApiPromptsByIdSyncResponse200PromptScope
 from .post_api_prompts_by_id_sync_response_400 import PostApiPromptsByIdSyncResponse400
 from .post_api_prompts_by_id_sync_response_401 import PostApiPromptsByIdSyncResponse401
+from .post_api_prompts_by_id_sync_response_422 import PostApiPromptsByIdSyncResponse422
 from .post_api_prompts_by_id_sync_response_500 import PostApiPromptsByIdSyncResponse500
 from .post_api_prompts_response_200 import PostApiPromptsResponse200
 from .post_api_prompts_response_200_demonstrations import PostApiPromptsResponse200Demonstrations
@@ -476,6 +482,7 @@ from .post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
 from .post_api_prompts_response_400 import PostApiPromptsResponse400
 from .post_api_prompts_response_401 import PostApiPromptsResponse401
 from .post_api_prompts_response_409 import PostApiPromptsResponse409
+from .post_api_prompts_response_422 import PostApiPromptsResponse422
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
@@ -490,6 +497,7 @@ from .post_api_scenario_events_body_type_2_messages_item import PostApiScenarioE
 from .post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
 from .post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
 from .post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
+from .post_api_scenario_events_response_422 import PostApiScenarioEventsResponse422
 from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_trace_id_share_response_200 import PostApiTraceIdShareResponse200
 from .post_api_trace_id_unshare_response_200 import PostApiTraceIdUnshareResponse200
@@ -591,10 +599,12 @@ __all__ = (
     "DeleteApiPromptsByIdResponse400",
     "DeleteApiPromptsByIdResponse401",
     "DeleteApiPromptsByIdResponse404",
+    "DeleteApiPromptsByIdResponse422",
     "DeleteApiPromptsByIdResponse500",
     "DeleteApiScenarioEventsResponse200",
     "DeleteApiScenarioEventsResponse400",
     "DeleteApiScenarioEventsResponse401",
+    "DeleteApiScenarioEventsResponse422",
     "DeleteApiScenarioEventsResponse500",
     "Error",
     "Evaluation",
@@ -633,6 +643,7 @@ __all__ = (
     "GetApiPromptsByIdResponse400",
     "GetApiPromptsByIdResponse401",
     "GetApiPromptsByIdResponse404",
+    "GetApiPromptsByIdResponse422",
     "GetApiPromptsByIdResponse500",
     "GetApiPromptsByIdVersionsResponse200Item",
     "GetApiPromptsByIdVersionsResponse200ItemDemonstrations",
@@ -660,6 +671,7 @@ __all__ = (
     "GetApiPromptsByIdVersionsResponse400",
     "GetApiPromptsByIdVersionsResponse401",
     "GetApiPromptsByIdVersionsResponse404",
+    "GetApiPromptsByIdVersionsResponse422",
     "GetApiPromptsByIdVersionsResponse500",
     "GetApiPromptsResponse200Item",
     "GetApiPromptsResponse200ItemDemonstrations",
@@ -686,6 +698,7 @@ __all__ = (
     "GetApiPromptsResponse200ItemScope",
     "GetApiPromptsResponse400",
     "GetApiPromptsResponse401",
+    "GetApiPromptsResponse422",
     "GetApiPromptsResponse500",
     "GetApiTraceIdResponse200",
     "GetApiTraceIdResponse200ErrorType0",
@@ -808,6 +821,7 @@ __all__ = (
     "PostApiPromptsByIdSyncResponse200PromptScope",
     "PostApiPromptsByIdSyncResponse400",
     "PostApiPromptsByIdSyncResponse401",
+    "PostApiPromptsByIdSyncResponse422",
     "PostApiPromptsByIdSyncResponse500",
     "PostApiPromptsResponse200",
     "PostApiPromptsResponse200Demonstrations",
@@ -835,6 +849,7 @@ __all__ = (
     "PostApiPromptsResponse400",
     "PostApiPromptsResponse401",
     "PostApiPromptsResponse409",
+    "PostApiPromptsResponse422",
     "PostApiPromptsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",
@@ -847,6 +862,7 @@ __all__ = (
     "PostApiScenarioEventsResponse201",
     "PostApiScenarioEventsResponse400",
     "PostApiScenarioEventsResponse401",
+    "PostApiScenarioEventsResponse422",
     "PostApiScenarioEventsResponse500",
     "PostApiTraceIdShareResponse200",
     "PostApiTraceIdUnshareResponse200",

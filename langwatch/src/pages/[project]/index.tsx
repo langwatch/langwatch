@@ -9,6 +9,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import type { Permission } from "../../server/api/rbac";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -26,9 +29,9 @@ import { api } from "../../utils/api";
 import GraphsLayout from "../../components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 
-export default function ProjectRouter() {
+function ProjectRouter() {
   const router = useRouter();
 
   const path =
@@ -40,11 +43,11 @@ export default function ProjectRouter() {
     return <Page />;
   }
 
-  return Index();
+  return <IndexContentWithPermission />;
 }
 
 export const getServerSideProps = async (
-  context: GetServerSidePropsContext
+  context: GetServerSidePropsContext,
 ) => {
   const path =
     "/" +
@@ -61,7 +64,7 @@ export const getServerSideProps = async (
   };
 };
 
-function Index() {
+function IndexContent() {
   const { project } = useOrganizationTeamProject();
 
   const router = useRouter();
@@ -79,7 +82,7 @@ function Index() {
       const target = new URL(url, window.location.origin);
       return target.origin === window.location.origin;
     } catch (error) {
-      Sentry.captureException(error, {
+      captureException(error, {
         tags: {
           url,
         },
@@ -136,7 +139,7 @@ function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   const count = documents.data?.totalUniqueDocuments;
@@ -185,3 +188,9 @@ function DocumentsMetrics() {
     </>
   );
 }
+
+const IndexContentWithPermission = withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(IndexContent);
+
+export default ProjectRouter;

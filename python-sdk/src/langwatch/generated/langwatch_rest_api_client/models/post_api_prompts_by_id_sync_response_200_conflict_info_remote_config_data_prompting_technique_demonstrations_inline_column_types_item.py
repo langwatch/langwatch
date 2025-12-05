@@ -4,6 +4,8 @@ from typing import Any, Literal, TypeVar, Union, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 T = TypeVar(
     "T",
     bound="PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrationsInlineColumnTypesItem",
@@ -16,8 +18,9 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
     Attributes:
         name (str):
         type_ (Union[Literal['annotations'], Literal['boolean'], Literal['chat_messages'], Literal['date'],
-            Literal['evaluations'], Literal['json'], Literal['list'], Literal['number'], Literal['rag_contexts'],
-            Literal['spans'], Literal['string']]):
+            Literal['evaluations'], Literal['image'], Literal['json'], Literal['list'], Literal['number'],
+            Literal['rag_contexts'], Literal['spans'], Literal['string']]):
+        id (Union[Unset, str]):
     """
 
     name: str
@@ -27,6 +30,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
         Literal["chat_messages"],
         Literal["date"],
         Literal["evaluations"],
+        Literal["image"],
         Literal["json"],
         Literal["list"],
         Literal["number"],
@@ -34,6 +38,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
         Literal["spans"],
         Literal["string"],
     ]
+    id: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -45,6 +50,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
             Literal["chat_messages"],
             Literal["date"],
             Literal["evaluations"],
+            Literal["image"],
             Literal["json"],
             Literal["list"],
             Literal["number"],
@@ -54,6 +60,8 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
         ]
         type_ = self.type_
 
+        id = self.id
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -62,6 +70,8 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
                 "type": type_,
             }
         )
+        if id is not UNSET:
+            field_dict["id"] = id
 
         return field_dict
 
@@ -78,6 +88,7 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
             Literal["chat_messages"],
             Literal["date"],
             Literal["evaluations"],
+            Literal["image"],
             Literal["json"],
             Literal["list"],
             Literal["number"],
@@ -129,12 +140,19 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTech
             if type_type_10 != "evaluations":
                 raise ValueError(f"type_type_10 must match const 'evaluations', got '{type_type_10}'")
             return type_type_10
+            type_type_11 = cast(Literal["image"], data)
+            if type_type_11 != "image":
+                raise ValueError(f"type_type_11 must match const 'image', got '{type_type_11}'")
+            return type_type_11
 
         type_ = _parse_type_(d.pop("type"))
+
+        id = d.pop("id", UNSET)
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique_demonstrations_inline_column_types_item = cls(
             name=name,
             type_=type_,
+            id=id,
         )
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique_demonstrations_inline_column_types_item.additional_properties = d

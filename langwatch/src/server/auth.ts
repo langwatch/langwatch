@@ -25,7 +25,10 @@ import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import type { Account, Organization } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "../utils/posthogErrorCapture";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("langwatch:auth");
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -47,7 +50,7 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions = (
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
 ): NextAuthOptions => ({
   session: {
     strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
@@ -95,7 +98,10 @@ export const authOptions = (
       };
     },
     signIn: async ({ user, account }) => {
-      if (!user.email) return false;
+      if (!user.email) {
+        logger.error({ user }, "SignIn failed: No email provided");
+        return false;
+      }
 
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
@@ -122,7 +128,7 @@ export const authOptions = (
         await createUserAndAddToOrganization(
           user,
           orgWithSsoDomain,
-          account as Account
+          account as Account,
         );
 
         return true;
@@ -164,17 +170,20 @@ export const authOptions = (
         })
       : env.NEXTAUTH_PROVIDER === "azure-ad"
       ? AzureADProvider({
-          clientId: env.AZURE_CLIENT_ID ?? "",
-          clientSecret: env.AZURE_CLIENT_SECRET ?? "",
-          tenantId: env.AZURE_TENANT_ID ?? "",
+          clientId: env.AZURE_AD_CLIENT_ID ?? "",
+          clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
+          tenantId: env.AZURE_AD_TENANT_ID ?? "",
           authorization: {
-            params: { prompt: "login", scope: "openid email profile" },
+            params: {
+              prompt: "login",
+              scope: "openid email profile User.Read",
+            },
           },
           profile(profile) {
             return {
-              id: profile.sub ?? profile.id,
-              name: profile.displayName,
-              email: profile.mail ?? profile.userPrincipalName,
+              id: profile.sub ?? profile.oid ?? profile.id,
+              name: profile.name ?? profile.displayName,
+              email: profile.email ?? profile.mail ?? profile.userPrincipalName,
               image: null, // Microsoft Graph doesn't return image by default
             };
           },
@@ -265,7 +274,7 @@ export const authOptions = (
             if (!user?.password) return null;
             const passwordMatch = await compare(
               credentials?.password ?? "",
-              user.password
+              user.password,
             );
             if (!passwordMatch) return null;
 
@@ -296,7 +305,7 @@ export const authOptions = (
 const createUserAndAddToOrganization = async (
   user: User,
   organization: Organization,
-  account: Account
+  account: Account,
 ) => {
   const newUser = await prisma.user.create({
     data: {
@@ -334,7 +343,7 @@ const createUserAndAddToOrganization = async (
 
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
-  account: NextAuthAccount
+  account: NextAuthAccount,
 ) => {
   // Wrap operations in a transaction
   try {
@@ -371,7 +380,7 @@ const linkExistingUserToOAuthProvider = async (
   } catch (error: any) {
     // Tying to link an account that already exists will throw a P2002 error, let's ignore it
     if (error.code === "P2002") {
-      Sentry.captureException(error);
+      captureException(error);
       return;
     } else {
       throw error;
@@ -381,11 +390,16 @@ const linkExistingUserToOAuthProvider = async (
 
 const checkIfSsoProviderIsAllowed = async (
   org: Organization,
-  provider: NextAuthAccount
+  provider: NextAuthAccount,
 ) => {
   if (
     org?.ssoProvider &&
-    !provider.providerAccountId.startsWith(org.ssoProvider)
+    !(
+      // Auth0
+      provider.providerAccountId.startsWith(org.ssoProvider) ||
+      // NextAuth
+      provider.provider === org.ssoProvider
+    )
   ) {
     throw new Error("SSO_PROVIDER_NOT_ALLOWED");
   }

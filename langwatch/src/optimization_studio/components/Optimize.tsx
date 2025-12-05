@@ -137,11 +137,11 @@ export function OptimizeModalContent({
       deselectAllNodes,
       setOpenResultsPanelRequest,
       default_llm,
-    })
+    }),
   );
 
   const entryNode = getWorkflow().nodes.find(
-    (node) => node.type === "entry"
+    (node) => node.type === "entry",
   ) as Node<Entry> | undefined;
 
   const { total } = useGetDatasetData({
@@ -162,8 +162,8 @@ export function OptimizeModalContent({
           acc[key] = value ? value : optimizer.params[key];
           return acc;
         },
-        {} as OptimizeForm["params"]
-      )
+        {} as OptimizeForm["params"],
+      ),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form, optimizer]);
@@ -176,7 +176,7 @@ export function OptimizeModalContent({
     {
       trainSize,
       testSize,
-    }
+    },
   );
 
   const { versions, canSaveNewVersion, nextVersion, versionToBeEvaluated } =
@@ -227,7 +227,7 @@ export function OptimizeModalContent({
 
       if (train.length >= 3000) {
         alert(
-          "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more."
+          "Optimiziation is limited to a maximum of 3000 entries total. Please contact support if you need to optimize on more.",
         );
         return;
       }
@@ -287,7 +287,7 @@ export function OptimizeModalContent({
       versionToBeEvaluated.id,
       versions,
       workflowId,
-    ]
+    ],
   );
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
@@ -405,8 +405,8 @@ export function OptimizeModalContent({
           )}
         </VStack>
         <Grid templateColumns="repeat(2, 1fr)" gap={5}>
-          <GridItem>
-            {"num_candidates" in optimizer.params && (
+          {"num_candidates" in optimizer.params && (
+            <GridItem>
               <VStack align="start" gap={2}>
                 <HStack>
                   <SmallLabel color="gray.600">
@@ -423,10 +423,10 @@ export function OptimizeModalContent({
                   max={100}
                 />
               </VStack>
-            )}
-          </GridItem>
-          <GridItem>
-            {"max_bootstrapped_demos" in optimizer.params && (
+            </GridItem>
+          )}
+          {"max_bootstrapped_demos" in optimizer.params && (
+            <GridItem>
               <VStack align="start" width="full" gap={2}>
                 <HStack>
                   <SmallLabel color="gray.600">
@@ -443,10 +443,10 @@ export function OptimizeModalContent({
                   max={100}
                 />
               </VStack>
-            )}
-          </GridItem>
-          <GridItem>
-            {"max_labeled_demos" in optimizer.params && (
+            </GridItem>
+          )}
+          {"max_labeled_demos" in optimizer.params && (
+            <GridItem>
               <VStack align="start" width="full" gap={2}>
                 <HStack>
                   <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
@@ -461,8 +461,8 @@ export function OptimizeModalContent({
                   max={100}
                 />
               </VStack>
-            )}
-          </GridItem>
+            </GridItem>
+          )}
         </Grid>
         {/* {"max_rounds" in optimizer.params && (
           <VStack align="start" width="full" gap={2}>
@@ -541,7 +541,7 @@ const OptimizerSelect = ({
       onChange={undefined}
       onValueChange={(change) => {
         const selectedOption = optimizerOptions.find(
-          (option) => option.value === change.value[0]
+          (option) => option.value === change.value[0],
         );
         field.onChange({
           target: {

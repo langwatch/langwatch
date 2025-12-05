@@ -26,7 +26,7 @@ import {
   type messageSchema,
   type outputsSchema,
   type promptingTechniqueSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -136,7 +136,7 @@ export class PromptService {
         organizationId,
         version: params.version,
         versionId: params.versionId,
-      }
+      },
     );
 
     if (!config) {
@@ -183,7 +183,7 @@ export class PromptService {
       this.transformToVersionedPrompt({
         ...config,
         latestVersion: version,
-      })
+      }),
     );
   }
 
@@ -238,7 +238,7 @@ export class PromptService {
         params.maxTokens !== undefined ||
         params.promptingTechnique !== undefined ||
         params.demonstrations !== undefined ||
-        params.responseFormat !== undefined
+        params.responseFormat !== undefined,
     );
 
     shouldCreateVersion &&
@@ -247,22 +247,22 @@ export class PromptService {
         messages: params.messages,
       });
 
-    // Get the system prompt from the messages
-    const messageSystemPrompt = params.messages?.find(
-      (msg) => msg.role === "system"
-    )?.content;
+    // Normalize system message into prompt
+    const normalizedCreate = this.normalizeSystemMessage({
+      prompt: params.prompt,
+      messages: params.messages,
+    });
+    params.prompt = normalizedCreate.prompt;
+    params.messages = normalizedCreate.messages as unknown as
+      | Array<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }>
+      | undefined;
 
-    // If the system prompt is provided in the messages,
-    // strip it from the messages
-    // and set the prompt to the system prompt
-    if (messageSystemPrompt) {
-      params.messages = params.messages?.filter((msg) => msg.role !== "system");
-      params.prompt ??= messageSystemPrompt;
-    }
-
-    if (!messageSystemPrompt && !params.prompt) {
+    if (!normalizedCreate.prompt && !params.prompt) {
       throw new SystemPromptConflictError(
-        "A system prompt is required when creating a prompt"
+        "A system prompt is required when creating a prompt",
       );
     }
 
@@ -303,6 +303,32 @@ export class PromptService {
   }
 
   /**
+   * Normalize system message rules for prompt/messages.
+   * Single Responsibility: Ensure system content lives in prompt and is removed from messages.
+   */
+  private normalizeSystemMessage(data: {
+    prompt?: string;
+    messages?: Array<{ role: string; content: string }> | undefined;
+  }): { prompt?: string; messages?: Array<{ role: string; content: string }> } {
+    const messageSystemPrompt = data.messages?.find(
+      (msg) => msg.role === "system",
+    )?.content;
+    const normalized: {
+      prompt?: string;
+      messages?: Array<{ role: string; content: string }>;
+    } = { ...data };
+    if (messageSystemPrompt) {
+      normalized.prompt = normalized.prompt ?? messageSystemPrompt;
+      normalized.messages = (normalized.messages ?? []).filter(
+        (msg) => msg.role !== "system",
+      );
+    }
+    return normalized;
+  }
+
+  // Draft persistence removed (client-only draft creation/update)
+
+  /**
    * Updates only the prompt's handle and scope without creating a new version.
    * Single Responsibility: Update the prompt's handle and scope.
    */
@@ -316,16 +342,21 @@ export class PromptService {
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
 
+    await this.assertModifyPermission({
+      idOrHandle,
+      projectId,
+    });
+
     const updatedConfig = await this.repository.updateConfig(
       idOrHandle,
       projectId,
-      data
+      data,
     );
 
     // Get the latest version to return complete prompt
     const latestVersion = (await this.repository.versions.getLatestVersion(
       updatedConfig.id,
-      projectId
+      projectId,
     )) as LatestConfigVersionSchema;
 
     return this.transformToVersionedPrompt({
@@ -336,13 +367,19 @@ export class PromptService {
 
   /**
    * Updates a prompt configuration with the provided data.
-   * Creates a new version. Requires a commit message.
+   * Creates a new version with a commit message tracking the changes.
+   *
+   * Supports partial updates:
+   * - Metadata updates (handle, scope) are applied to the config
+   * - ConfigData updates (prompt, model, etc.) create a new version
+   * - Only provided fields are updated; others preserve existing values
+   * - A commit message is always required to track changes
    *
    * @param params - The parameters object
    * @param params.idOrHandle - The prompt configuration ID or handle
    * @param params.projectId - The project ID for authorization and context
    * @param params.data - The update data (must include commitMessage)
-   * @returns The updated prompt configuration
+   * @returns The updated prompt configuration with new version
    */
   async updatePrompt(params: {
     idOrHandle: string;
@@ -366,27 +403,30 @@ export class PromptService {
     >;
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
-    const { handle, scope, ...newVersionData } = data;
+    const { handle, scope, commitMessage, ...configDataUpdates } = data;
 
-    this.versionService.assertNoSystemPromptConflict(newVersionData);
+    this.versionService.assertNoSystemPromptConflict(configDataUpdates);
 
-    const messageSystemPrompt = newVersionData.messages?.find(
-      (msg) => msg.role === "system"
-    )?.content;
-
-    // We want to ensure that the system prompt is always in the prompt field
-    // and the messages array doesn't contain the system message
-    if (messageSystemPrompt) {
-      newVersionData.prompt = messageSystemPrompt;
-      newVersionData.messages = newVersionData.messages?.filter(
-        (msg) => msg.role !== "system"
-      );
+    // Only normalize system messages if prompt or messages are being updated
+    // This prevents undefined values from overwriting existing database values
+    if (
+      configDataUpdates.prompt !== undefined ||
+      configDataUpdates.messages !== undefined
+    ) {
+      const normalizedUpdate = this.normalizeSystemMessage(configDataUpdates);
+      configDataUpdates.prompt = normalizedUpdate.prompt;
+      configDataUpdates.messages = normalizedUpdate.messages as unknown as
+        | Array<{
+            role: "user" | "assistant" | "system";
+            content: string;
+          }>
+        | undefined;
     }
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        // Update the config
+        // Update the config metadata (handle/scope)
         const updatedConfig = await this.repository.updateConfig(
           idOrHandle,
           projectId,
@@ -394,7 +434,7 @@ export class PromptService {
             handle,
             scope,
           },
-          { tx }
+          { tx },
         );
 
         // Get the latest version
@@ -402,20 +442,22 @@ export class PromptService {
         const latestVersion = (await this.repository.versions.getLatestVersion(
           updatedConfig.id,
           projectId,
-          { tx }
+          { tx },
         )) as LatestConfigVersionSchema;
 
-        // Create the new version directly
+        // Create the new version with updated configData
+        // Note: Even if only metadata (handle/scope) changed, we create a version
+        // to track the change via commitMessage
         const updatedVersion: LlmPromptConfigVersion =
           await this.versionService.createVersion({
             db: tx,
             data: {
               configId: updatedConfig.id,
               projectId,
-              commitMessage: newVersionData.commitMessage,
+              commitMessage,
               configData: this.transformToDbFormat({
                 ...latestVersion.configData,
-                ...newVersionData,
+                ...configDataUpdates,
               }) as LatestConfigVersionSchema["configData"],
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
@@ -426,7 +468,7 @@ export class PromptService {
           ...updatedConfig,
           latestVersion: updatedVersion,
         } as LlmConfigWithLatestVersion);
-      }
+      },
     );
 
     return result;
@@ -580,17 +622,11 @@ export class PromptService {
     }
 
     // Check modify permissions
-    const permission = await this.repository.checkModifyPermission({
+    await this.assertModifyPermission({
       idOrHandle,
       projectId,
-      organizationId,
+      organizationId: organizationId,
     });
-
-    if (!permission.hasPermission) {
-      throw new Error(
-        permission.reason ?? "No permission to modify this prompt"
-      );
-    }
 
     const remoteVersion = existingPrompt.version;
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
@@ -607,7 +643,7 @@ export class PromptService {
     if (localVersion === remoteVersion) {
       const comparison = this.repository.compareConfigContent(
         localConfigData,
-        remoteConfigData
+        remoteConfigData,
       );
 
       if (comparison.isEqual) {
@@ -646,7 +682,7 @@ export class PromptService {
       if (localBaseVersion) {
         const baseComparison = this.repository.compareConfigContent(
           localConfigData,
-          localBaseVersion.configData as Record<string, unknown>
+          localBaseVersion.configData as Record<string, unknown>,
         );
 
         if (baseComparison.isEqual) {
@@ -664,7 +700,7 @@ export class PromptService {
           differences:
             this.repository.compareConfigContent(
               localConfigData,
-              remoteConfigData
+              remoteConfigData,
             ).differences ?? [],
           remoteConfigData,
         },
@@ -680,7 +716,7 @@ export class PromptService {
         differences:
           this.repository.compareConfigContent(
             localConfigData,
-            remoteConfigData
+            remoteConfigData,
           ).differences ?? [],
         remoteConfigData,
       },
@@ -689,6 +725,9 @@ export class PromptService {
 
   /**
    * Delete a prompt
+   *
+   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
+   * otherwise it will throw with a permission error.
    */
   async deletePrompt(params: {
     idOrHandle: string;
@@ -698,10 +737,17 @@ export class PromptService {
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    await this.assertModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+
     const result = await this.repository.deleteConfig(
       params.idOrHandle,
       params.projectId,
-      organizationId
+      organizationId,
     );
     return result;
   }
@@ -711,7 +757,7 @@ export class PromptService {
    * expected by the API and service layer.
    */
   private transformToVersionedPrompt(
-    config: Omit<LlmConfigWithLatestVersion, "deletedAt">
+    config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
@@ -754,7 +800,7 @@ export class PromptService {
   }
 
   private async getOrganizationIdFromProjectId(
-    projectId: string
+    projectId: string,
   ): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -789,5 +835,51 @@ export class PromptService {
       }),
       ...(responseFormat !== undefined && { response_format: responseFormat }),
     };
+  }
+
+  /**
+   * Assert permission to modify/delete a prompt
+   */
+  private async assertModifyPermission(params: {
+    idOrHandle: string;
+    projectId: string;
+    // Deduced from projectId if not provided
+    organizationId?: string;
+  }): Promise<void> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    const permission = await this.repository.checkModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    if (!permission.hasPermission) {
+      throw new Error(
+        permission.reason ?? "You don't have permission to modify this prompt",
+      );
+    }
+  }
+
+  /**
+   * Check if user has permission to modify/delete a prompt
+   * Single Responsibility: Delegate permission check to repository with proper context
+   */
+  async checkModifyPermission(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<{ hasPermission: boolean; reason?: string }> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    return await this.repository.checkModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
   }
 }

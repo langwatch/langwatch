@@ -8,7 +8,7 @@ import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTea
 import { useRouter } from "next/router";
 import { useShallow } from "zustand/react/shallow";
 import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { toaster } from "../../../ui/toaster";
 import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
 
@@ -140,7 +140,7 @@ const useAutosaveWizard = () => {
               closable: true,
             },
           });
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               context: "Failed to autosave evaluation",
               projectId: project.id,

@@ -1,5 +1,190 @@
 # Changelog
 
+## [1.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.9.0...langwatch@v1.10.0) (2025-12-04)
+
+
+### Features
+
+* add global filters negation ([#888](https://github.com/langwatch/langwatch/issues/888)) ([a332ded](https://github.com/langwatch/langwatch/commit/a332dedc58c4a06d2912c3ec58cf44fccc3d6f29))
+* add message deletion to prompt playground chat   ([#855](https://github.com/langwatch/langwatch/issues/855)) ([2a820ee](https://github.com/langwatch/langwatch/commit/2a820ee8bd4e6cdf64c8851fdfdcd13fbfc739ed))
+* event sourcing 2, electric boogaloo ([#860](https://github.com/langwatch/langwatch/issues/860)) ([19eeecf](https://github.com/langwatch/langwatch/commit/19eeecfd9c4bec1826c087854a40f5c1f8722351))
+* improve trace message loading with retry logic and caching ([#852](https://github.com/langwatch/langwatch/issues/852)) ([4a76815](https://github.com/langwatch/langwatch/commit/4a76815c2b36a5f608f2fc4c97d4f36995db3fcc))
+
+
+### Bug Fixes
+
+* add cap and no decimal ([#851](https://github.com/langwatch/langwatch/issues/851)) ([e0efafd](https://github.com/langwatch/langwatch/commit/e0efafd540501fa77720f0e1f48fc6ff83556a20))
+* add robust FormErrorDisplay component for form validation errors ([#870](https://github.com/langwatch/langwatch/issues/870)) ([c3d50a5](https://github.com/langwatch/langwatch/commit/c3d50a5ca64326a0697068eecf2250cf547da639))
+* bump litellm and other dependencies to the latest version to fix bedrock embedding issues ([b522e89](https://github.com/langwatch/langwatch/commit/b522e89eccd91ae0de814e6bdd743bff0da52d04))
+* **hotfix:** fix api_key being set breaking bedrock for newer versions of litellm, has_key being set instead of the actual value, and allowing for empty bedrock values to use env vars instead for onprem deployments ([ade0a84](https://github.com/langwatch/langwatch/commit/ade0a84d59426f796de02f0e150c2e8e32c991f6))
+* **hotfix:** parse input and output for mastra ([cdb8766](https://github.com/langwatch/langwatch/commit/cdb876685981993ab79713f5cdb009e8dd195348))
+* **hotfix:** remove eval usage limits ([7a48498](https://github.com/langwatch/langwatch/commit/7a48498277f1f7c93dbf8db33cbe4b32eff85b11))
+* intelligent minmax for model settings so that users dont have to be surprised with a failure ([#859](https://github.com/langwatch/langwatch/issues/859)) ([0b6b498](https://github.com/langwatch/langwatch/commit/0b6b498d88d2ee71c65fe04a9189465bec6e2d8d))
+* langwatch/package.json & langwatch/package-lock.json to reduce vulnerabilities ([a9eeb12](https://github.com/langwatch/langwatch/commit/a9eeb12921f5304a193263d46d07e4aa303c293e))
+* managed llm providers ([bddfa70](https://github.com/langwatch/langwatch/commit/bddfa70036252b3c4975cad3242b0f2b9bb03017))
+* otel trace/span id parsing was not decoding base64 span/trace ids ([#861](https://github.com/langwatch/langwatch/issues/861)) ([19abbac](https://github.com/langwatch/langwatch/commit/19abbacf9b11fe48bc74330ac29ca3e7bd2bf067))
+* **prompts:** make maxTokens and temperature optional in form schema ([#913](https://github.com/langwatch/langwatch/issues/913)) ([73a2705](https://github.com/langwatch/langwatch/commit/73a2705a15d85da5b69a40b8938cc832cdeb4d40)), closes [#912](https://github.com/langwatch/langwatch/issues/912)
+* **prompts:** make prompts.get throw error instead of returning null/undefined ([#867](https://github.com/langwatch/langwatch/issues/867)) ([9705201](https://github.com/langwatch/langwatch/commit/97052015061f40fc63069c78bb1e702cbf12fa29))
+* **python-sdk:** add httpx.ReadTimeout to transient error skip list ([#910](https://github.com/langwatch/langwatch/issues/910)) ([dbdae14](https://github.com/langwatch/langwatch/commit/dbdae1465b5da364aa23097d9d91ff2072ee6d13)), closes [#909](https://github.com/langwatch/langwatch/issues/909)
+* resolve LLM config modal value reversion by adding proper format… ([#874](https://github.com/langwatch/langwatch/issues/874)) ([85daeb2](https://github.com/langwatch/langwatch/commit/85daeb250abc729c1687688e6d049cfc18c55390))
+* **secutity:** upgrade next from 15.5.4 to 15.5.7 ([#914](https://github.com/langwatch/langwatch/issues/914)) ([a9eeb12](https://github.com/langwatch/langwatch/commit/a9eeb12921f5304a193263d46d07e4aa303c293e))
+* type errors ([#872](https://github.com/langwatch/langwatch/issues/872)) ([f1f3333](https://github.com/langwatch/langwatch/commit/f1f3333a2057a0aed04bd6b4c9e50852ea4cb936))
+
+
+### Miscellaneous
+
+* add better logging for topic clustering ([587861b](https://github.com/langwatch/langwatch/commit/587861b93b91ff07a5b097d6d1013d7a962f08c0))
+* add delete confirmation workflow ([#856](https://github.com/langwatch/langwatch/issues/856)) ([a1a50f5](https://github.com/langwatch/langwatch/commit/a1a50f5679cc6fa9b64c2719bf25f32d7f460e8e))
+* event sourcing library ([#815](https://github.com/langwatch/langwatch/issues/815)) ([1e327c8](https://github.com/langwatch/langwatch/commit/1e327c88e2313d368c23ddc6e4e503532fda83ad))
+* **main:** release python-sdk 0.7.1 ([#881](https://github.com/langwatch/langwatch/issues/881)) ([df09d83](https://github.com/langwatch/langwatch/commit/df09d83b1034b87fb4ca206a0339169d75798d88))
+* **main:** release python-sdk 0.7.2 ([#911](https://github.com/langwatch/langwatch/issues/911)) ([7a1e545](https://github.com/langwatch/langwatch/commit/7a1e5451cf87a1d741a7b986edeba2b9fafe7401))
+* rework add members modal ([#812](https://github.com/langwatch/langwatch/issues/812)) ([066f197](https://github.com/langwatch/langwatch/commit/066f197220c103fae4048df2fd790a94035ce711))
+
+## [1.9.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.8.0...langwatch@v1.9.0) (2025-11-17)
+
+
+### Features
+
+* make the prompt playground public ([#831](https://github.com/langwatch/langwatch/issues/831)) ([85f26f5](https://github.com/langwatch/langwatch/commit/85f26f5b89529a17a0edf8b79d57aa9cf82bd0ec))
+* span ingestion consume and write to clickhouse ([#814](https://github.com/langwatch/langwatch/issues/814)) ([16cf9f5](https://github.com/langwatch/langwatch/commit/16cf9f506d03fcb69e5ca858af32b2fa0289df14))
+
+
+### Bug Fixes
+
+* add back copilot css to the page ([#838](https://github.com/langwatch/langwatch/issues/838)) ([3cc1c79](https://github.com/langwatch/langwatch/commit/3cc1c79fa5e01f8da7377fa249e4402363600b9a))
+* demo ([#833](https://github.com/langwatch/langwatch/issues/833)) ([049a9b1](https://github.com/langwatch/langwatch/commit/049a9b19c42e860a1bb6e11fa309aa7cb8eaa5d9))
+* skip setting default llm if its not needed (e.g. evaluations) to prevent error from default llms even though not being used (e.g. gpt-5 with wrong temperature) ([#834](https://github.com/langwatch/langwatch/issues/834)) ([f59420b](https://github.com/langwatch/langwatch/commit/f59420bc8a67df312166bafbb5aec809d8e9fd2f))
+
+
+### Miscellaneous
+
+* remove sentry ([#827](https://github.com/langwatch/langwatch/issues/827)) ([2990c98](https://github.com/langwatch/langwatch/commit/2990c98abc8584ebc8b41296114fc8787a885d63))
+
+## [1.8.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.7.0...langwatch@v1.8.0) (2025-11-13)
+
+
+### Features
+
+* add dataset error visibly to frontend ([#797](https://github.com/langwatch/langwatch/issues/797)) ([6515d54](https://github.com/langwatch/langwatch/commit/6515d54405ee34db79a6004ceb88953626cfe2f5))
+* feature flag for clickhouse migration ([#802](https://github.com/langwatch/langwatch/issues/802)) ([8c14b3d](https://github.com/langwatch/langwatch/commit/8c14b3de6d1a590ea256af73812f23632992e645))
+* improved observability setup ([#806](https://github.com/langwatch/langwatch/issues/806)) ([7846a76](https://github.com/langwatch/langwatch/commit/7846a76b5d19f74d6151159d11d29435b977049b))
+* new span ingestion with producer for ingestion write queue ([#808](https://github.com/langwatch/langwatch/issues/808)) ([29fcf22](https://github.com/langwatch/langwatch/commit/29fcf2220003d7b13673a63f8d6bc1886203e141))
+* prompt studio ([#734](https://github.com/langwatch/langwatch/issues/734)) ([3686d50](https://github.com/langwatch/langwatch/commit/3686d50eebb727bb78085b83155e3f2f863b395f))
+* **ui:** apply consistent max-width to all prompt studio tabs ([#798](https://github.com/langwatch/langwatch/issues/798)) ([021021d](https://github.com/langwatch/langwatch/commit/021021d121754c8d4fc8a2eccb1e21927484f4dc))
+* usage notification ([#805](https://github.com/langwatch/langwatch/issues/805)) ([799925f](https://github.com/langwatch/langwatch/commit/799925f4c849591939a3e47eb2e1ce7c5c02047f))
+
+
+### Bug Fixes
+
+* convert empty string handles to null ([#800](https://github.com/langwatch/langwatch/issues/800)) ([9829e79](https://github.com/langwatch/langwatch/commit/9829e7921ca554b70f087c8c2afb474cea085971))
+* convert empty string handles to null in versionedPromptToPromptConfigFormValues ([9829e79](https://github.com/langwatch/langwatch/commit/9829e7921ca554b70f087c8c2afb474cea085971))
+* demo ([#811](https://github.com/langwatch/langwatch/issues/811)) ([562a22e](https://github.com/langwatch/langwatch/commit/562a22ed4690332381b2c7b68193a958741950c0))
+* disable auto instruementation of undici to prevent double-setting of traceparent for elastic search clients ([#807](https://github.com/langwatch/langwatch/issues/807)) ([a99cd5f](https://github.com/langwatch/langwatch/commit/a99cd5f35449a578c24169661e9fcac0f4a768be))
+* handle corrupted workflow data gracefully with intelligent salvage ([#795](https://github.com/langwatch/langwatch/issues/795)) ([fc967ad](https://github.com/langwatch/langwatch/commit/fc967addbf868a75ffd5788c4f199f4319e8a558))
+* **prompt-configs:** hide new conversation button on other tabs ([#794](https://github.com/langwatch/langwatch/issues/794)) ([1e457bf](https://github.com/langwatch/langwatch/commit/1e457bf7c0e02ea699bef4de6797a98cbe1e9cd6))
+* **prompt-studio:** prevent zod errors when managing output fields  ([#793](https://github.com/langwatch/langwatch/issues/793)) ([22c7148](https://github.com/langwatch/langwatch/commit/22c7148b1d37460b9c1c76f8d95a585883fa8777))
+* **studio:** enforce GPT-5 constraints and normalize LLM config format for DSPy ([#796](https://github.com/langwatch/langwatch/issues/796)) ([f8274cf](https://github.com/langwatch/langwatch/commit/f8274cffa15e7ba486c3c5301c17a9e1dfcbc69f))
+
+
+### Miscellaneous
+
+* fix otel export url path ([#810](https://github.com/langwatch/langwatch/issues/810)) ([5ab142a](https://github.com/langwatch/langwatch/commit/5ab142a4320d633f548d6db3e259b5897a89e4c2))
+
+## [1.7.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.6.0...langwatch@v1.7.0) (2025-11-07)
+
+
+### Features
+
+* add password change from settings for email auth ([#789](https://github.com/langwatch/langwatch/issues/789)) ([c91e114](https://github.com/langwatch/langwatch/commit/c91e11458d8f987c327ce99d0ad526addf33c95a))
+* added langchain and langgraph to python onboarding + improvements from testing ([#782](https://github.com/langwatch/langwatch/issues/782)) ([99b2f25](https://github.com/langwatch/langwatch/commit/99b2f25654b0c6b440a4680ffe36b37a7579d1d1))
+* evaluation and prompt onboarding flows ([#775](https://github.com/langwatch/langwatch/issues/775)) ([094831d](https://github.com/langwatch/langwatch/commit/094831d79444bf435f1d289482ac751a2830b808))
+
+
+### Bug Fixes
+
+* **langwatch_nlp:** remove unused langchain-community dependency ([9ad61f7](https://github.com/langwatch/langwatch/commit/9ad61f7e2d7ef3e06de27f24adad326b56969f17))
+* remove unused langchain-community dependency ([#787](https://github.com/langwatch/langwatch/issues/787)) ([9ad61f7](https://github.com/langwatch/langwatch/commit/9ad61f7e2d7ef3e06de27f24adad326b56969f17))
+* simulations page crashing browser ([#784](https://github.com/langwatch/langwatch/issues/784)) ([e731a5f](https://github.com/langwatch/langwatch/commit/e731a5ff366b8bbc497c88888f38b8bfaf690ddb))
+
+
+### Miscellaneous
+
+* separate the admin override add memebers button so we can see like the users see it ([b6e06d7](https://github.com/langwatch/langwatch/commit/b6e06d75e2b2e6ae83cd790cc18e0fe4f5299404))
+
+## [1.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.5.1...langwatch@v1.6.0) (2025-11-05)
+
+
+### Features
+
+* include workflow name in export filename ([#768](https://github.com/langwatch/langwatch/issues/768)) ([c4397bf](https://github.com/langwatch/langwatch/commit/c4397bf83bf0b24befb98b0d2d1f88673233f575))
+* new product onboarding ([#722](https://github.com/langwatch/langwatch/issues/722)) ([5a134fb](https://github.com/langwatch/langwatch/commit/5a134fbd9d68a16203095db74355a9e4a2d67b7a))
+* new rbac system ([#724](https://github.com/langwatch/langwatch/issues/724)) ([1cde6d4](https://github.com/langwatch/langwatch/commit/1cde6d4a21e16aee97cead8d025cabd9a31a32c4))
+* support langchain/langgraph 1.0.0 in python sdk ([#780](https://github.com/langwatch/langwatch/issues/780)) ([70d4814](https://github.com/langwatch/langwatch/commit/70d4814528465d8e58d1ab4f82849ea13d6f564d))
+
+
+### Bug Fixes
+
+* api snipper dialog header ([#772](https://github.com/langwatch/langwatch/issues/772)) ([d472065](https://github.com/langwatch/langwatch/commit/d472065312e70953163744c70ce6ac236efdac13))
+* grid layout in optimization modal ([#773](https://github.com/langwatch/langwatch/issues/773)) ([e5cd90e](https://github.com/langwatch/langwatch/commit/e5cd90e7baae0bb9c1bbf1992b81f8daa072a302))
+* observability onboarding fixes ([#774](https://github.com/langwatch/langwatch/issues/774)) ([422660c](https://github.com/langwatch/langwatch/commit/422660c47b09e0093f4ff211a86ff1a6c2765188))
+* onboarding light theme fix ([#771](https://github.com/langwatch/langwatch/issues/771)) ([3f3ec72](https://github.com/langwatch/langwatch/commit/3f3ec72737eb5042016e60fcdda5e32972b86fd3))
+* parsing of Long values comming from Strands, add support for gen_ai.server.time_to_first_token ([c060766](https://github.com/langwatch/langwatch/commit/c060766fa093a6c6a881244267c1ed9929c9246b))
+* prevent users from removing themselves from the org ([c99ad0b](https://github.com/langwatch/langwatch/commit/c99ad0ba5d5d570a9d018f38ee2dd20e1881305a))
+* update guards ([#781](https://github.com/langwatch/langwatch/issues/781)) ([3e9330f](https://github.com/langwatch/langwatch/commit/3e9330f5a1c8fef5ab19a497a4d66494d046a5e0))
+
+
+### Miscellaneous
+
+* cleanup orphaned hot traces for cold trace migrations that possibly failed in the middle ([9a72dc1](https://github.com/langwatch/langwatch/commit/9a72dc1d3b3980c6f3abf4f294f91b78cd1a46da))
+* ignore false-positive an update is in progress errors ([3760b96](https://github.com/langwatch/langwatch/commit/3760b961839e04b565ce5af7d418e1ef09997978))
+* refactor model providers logic ([#777](https://github.com/langwatch/langwatch/issues/777)) ([05a8a2b](https://github.com/langwatch/langwatch/commit/05a8a2b2f375878814e72829c6a24f0278e5d414))
+* update invite email copy ([#770](https://github.com/langwatch/langwatch/issues/770)) ([e9162d1](https://github.com/langwatch/langwatch/commit/e9162d15f1dc5cded6cdd81464c662eb61dafd5b))
+
+## [1.5.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.5.0...langwatch@v1.5.1) (2025-10-31)
+
+
+### Bug Fixes
+
+* add missing field for azure-ad sso auth ([34988ea](https://github.com/langwatch/langwatch/commit/34988ea135b44a299da5a8547ad5c1fc7b0e55a1))
+* dataset slug name sync ([#759](https://github.com/langwatch/langwatch/issues/759)) ([d9f87e4](https://github.com/langwatch/langwatch/commit/d9f87e4dc4df610e876f931094d3e86f2c5254d1))
+
+## [1.5.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.4.0...langwatch@v1.5.0) (2025-10-31)
+
+
+### Features
+
+* exporter filter span logic ([#733](https://github.com/langwatch/langwatch/issues/733)) ([0db9b16](https://github.com/langwatch/langwatch/commit/0db9b1629a3a362f37113aaf26a5543b8dee2ead))
+
+## [1.4.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.3.1...langwatch@v1.4.0) (2025-10-31)
+
+
+### Features
+
+* delete dataset confirmation ([#762](https://github.com/langwatch/langwatch/issues/762)) ([f13366e](https://github.com/langwatch/langwatch/commit/f13366e486dd538fc7dc023f20d26c8a325fe6c7))
+* enable cron worker for local dev ([#673](https://github.com/langwatch/langwatch/issues/673)) ([536e9fa](https://github.com/langwatch/langwatch/commit/536e9fa2fe88b86728c2a5bd4394a5b4de5bee4d))
+* upgrade to dspy v3 ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+* upgrade to DSPy v3 🎉 ([#752](https://github.com/langwatch/langwatch/issues/752)) ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+
+
+### Bug Fixes
+
+* azure ad extra required permission and env var names ([#764](https://github.com/langwatch/langwatch/issues/764)) ([5bfabd3](https://github.com/langwatch/langwatch/commit/5bfabd381e1aa4c34870fbb7b8357c75fbc87cf1))
+* ci failing ([#748](https://github.com/langwatch/langwatch/issues/748)) ([0b25070](https://github.com/langwatch/langwatch/commit/0b250705aea823c50ef27d06852dc8d3a354ad40))
+* dataset routes ([#756](https://github.com/langwatch/langwatch/issues/756)) ([da736e0](https://github.com/langwatch/langwatch/commit/da736e025280208ceed620cd1bb8c43366120f0e))
+* error handling ([#747](https://github.com/langwatch/langwatch/issues/747)) ([732a7ef](https://github.com/langwatch/langwatch/commit/732a7ef0520b58ef44ec716831110d5f61d8edd7))
+* ignore 'Function already exist' lambda errors due to race conditions and use existing lambda ([c7b7787](https://github.com/langwatch/langwatch/commit/c7b77876e0f9d64edda0de2d698e65af0d50770b))
+* integration tests for typescript sdk ([#757](https://github.com/langwatch/langwatch/issues/757)) ([bfd79bb](https://github.com/langwatch/langwatch/commit/bfd79bbdbcb00668720709bf53789aceb79b0466))
+* mermaid sequence diagram sanitization for tricky span names ([cae4077](https://github.com/langwatch/langwatch/commit/cae4077ebd3913ce2cde6a60be0846b157f0d8a7))
+* **next.js-15:** Register NodeTracerProvider globally when ProxyTracerProvider detected ([87c1f1f](https://github.com/langwatch/langwatch/commit/87c1f1fd890b89c64ecf39997d5236dc506dd3cf))
+* register NodeTracerProvider globally when ProxyTracerProvider detected ([#754](https://github.com/langwatch/langwatch/issues/754)) ([87c1f1f](https://github.com/langwatch/langwatch/commit/87c1f1fd890b89c64ecf39997d5236dc506dd3cf))
+* rerendering loop issues on component type workflows on the studio ([8225238](https://github.com/langwatch/langwatch/commit/82252381637a50d490e905d3cde68e5041cebcae))
+
+
+### Miscellaneous
+
+* bump typescript sdk to v0.7.4 ([#755](https://github.com/langwatch/langwatch/issues/755)) ([697792c](https://github.com/langwatch/langwatch/commit/697792cc9242e31c091adbf18c37aca305b9a21d))
+* temp disable e2e tests for typescript sdk ([#758](https://github.com/langwatch/langwatch/issues/758)) ([21376dc](https://github.com/langwatch/langwatch/commit/21376dcc48e7871e61fcaa02d54ae55b854be5aa))
+
 ## [1.3.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.3.0...langwatch@v1.3.1) (2025-10-27)
 
 

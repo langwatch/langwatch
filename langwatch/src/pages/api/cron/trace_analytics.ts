@@ -3,10 +3,16 @@ import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
+import { UsageLimitService } from "~/server/notifications/usage-limit.service";
+import { dependencies } from "~/injection/dependencies.server";
+import { TraceUsageService } from "~/server/traces/trace-usage.service";
+import { OrganizationRepository } from "~/server/repositories/organization.repository";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { env } from "~/env.mjs";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "GET") {
     return res.status(405).end();
@@ -45,7 +51,7 @@ export default async function handler(
     0,
     0,
     0,
-    0
+    0,
   );
   const endTimestamp = Date.UTC(
     yesterdayEnd.getUTCFullYear(),
@@ -54,7 +60,7 @@ export default async function handler(
     0,
     0,
     0,
-    0
+    0,
   );
 
   // Create a multi-search query for all projects
@@ -110,7 +116,7 @@ export default async function handler(
         } as Prisma.AnalyticsCreateManyInput;
       })
       .filter(
-        (entry): entry is Prisma.AnalyticsCreateManyInput => entry !== null
+        (entry): entry is Prisma.AnalyticsCreateManyInput => entry !== null,
       );
 
     if (analyticsToCreate.length > 0) {
@@ -130,8 +136,8 @@ export default async function handler(
       const newAnalyticsToCreate = analyticsToCreate.filter(
         (entry) =>
           !existingEntries.some(
-            (existing) => existing.projectId === entry.projectId
-          )
+            (existing) => existing.projectId === entry.projectId,
+          ),
       );
 
       if (newAnalyticsToCreate.length > 0) {
@@ -143,24 +149,108 @@ export default async function handler(
         console.log(
           `[Trace Analytics] Created ${
             newAnalyticsToCreate.length
-          } entries for ${yesterday.toISOString().split("T")[0]}`
+          } entries for ${yesterday.toISOString().split("T")[0]}`,
         );
       } else {
         console.log(
           `[Trace Analytics] All entries exist for ${
             yesterday.toISOString().split("T")[0]
-          }`
+          }`,
         );
       }
     } else {
       console.log(
         `[Trace Analytics] No traces found for ${
           yesterday.toISOString().split("T")[0]
-        }`
+        }`,
       );
     }
   } catch (error) {
     console.error("[Trace Analytics] Error:", error);
+  }
+
+  // Check usage limits for all organizations and send notifications if needed
+  // Only run in SaaS environment
+  if (env.IS_SAAS) {
+    try {
+      const organizations = await prisma.organization.findMany({
+        select: {
+          id: true,
+        },
+      });
+
+      const traceUsageService = TraceUsageService.create();
+      const organizationRepository = new OrganizationRepository(prisma);
+
+      for (const org of organizations) {
+        try {
+          const projectIds = await organizationRepository.getProjectIds(org.id);
+          if (projectIds.length === 0) {
+            console.log(
+              `[Trace Analytics] Organization ${org.id} has no projects, skipping`,
+            );
+            continue;
+          }
+          const currentMonthMessagesCount =
+            await traceUsageService.getCurrentMonthCount({
+              organizationId: org.id,
+            });
+          const activePlan =
+            await dependencies.subscriptionHandler.getActivePlan(org.id);
+
+          // Guard against null/undefined activePlan or invalid maxMessagesPerMonth
+          if (
+            !activePlan ||
+            typeof activePlan.maxMessagesPerMonth !== "number" ||
+            activePlan.maxMessagesPerMonth <= 0
+          ) {
+            console.log(
+              `[Trace Analytics] Organization ${org.id} has invalid or missing plan configuration, skipping`,
+            );
+            continue;
+          }
+
+          const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
+
+          const usagePercentage =
+            maxMessagesPerMonth > 0
+              ? (currentMonthMessagesCount / maxMessagesPerMonth) * 100
+              : 0;
+
+          if (currentMonthMessagesCount > 1) {
+            console.log(
+              `[Trace Analytics] Organization ${
+                org.id
+              }: ${currentMonthMessagesCount.toLocaleString()} / ${maxMessagesPerMonth.toLocaleString()} messages (${usagePercentage.toFixed(
+                1,
+              )}%) - ${projectIds.length} project(s)`,
+            );
+          }
+
+          const service = UsageLimitService.create(prisma);
+          await service.checkAndSendWarning({
+            organizationId: org.id,
+            currentMonthMessagesCount,
+            maxMonthlyUsageLimit: maxMessagesPerMonth,
+          });
+        } catch (error) {
+          console.error(
+            `[Trace Analytics] Error checking usage limits for organization ${org.id}:`,
+            error,
+          );
+          captureException(error, {
+            extra: { organizationId: org.id },
+          });
+        }
+      }
+    } catch (error) {
+      console.error("[Trace Analytics] Error checking usage limits:", error);
+      captureException(error);
+    }
+  } else {
+    console.log(
+      "[Trace Analytics] Skipping usage limit notifications (not SaaS)",
+    );
   }
 
   return res.status(200).json({ success: true });

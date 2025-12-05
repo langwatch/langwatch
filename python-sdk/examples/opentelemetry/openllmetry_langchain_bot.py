@@ -6,10 +6,9 @@ import langwatch
 load_dotenv()
 
 import chainlit as cl
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import StrOutputParser
-from langchain.schema.runnable import Runnable
-from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import Runnable, RunnableConfig
 
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 
@@ -43,9 +42,6 @@ async def main(message: cl.Message):
     async for chunk in runnable.astream(
         {"question": message.content},
         config=RunnableConfig(
-            callbacks=[
-                cl.LangchainCallbackHandler(),
-            ],
             metadata={
                 "user_id": "123",
                 "thread_id": "789",

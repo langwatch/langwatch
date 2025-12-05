@@ -2,8 +2,10 @@ import { Box } from "@chakra-ui/react";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function Annotations() {
+function AnnotationsContent() {
   return (
     <AnnotationsLayout>
       <Box backgroundColor="white" width="full" overflowX="auto">
@@ -17,3 +19,7 @@ export default function Annotations() {
     </AnnotationsLayout>
   );
 }
+
+export default withPermissionGuard("annotations:view", {
+  layoutComponent: DashboardLayout,
+})(AnnotationsContent);

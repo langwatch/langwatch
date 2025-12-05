@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.7.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.1...python-sdk@v0.7.2) (2025-12-03)
+
+
+### Bug Fixes
+
+* **python-sdk:** add httpx.ReadTimeout to transient error skip list ([#910](https://github.com/langwatch/langwatch/issues/910)) ([dbdae14](https://github.com/langwatch/langwatch/commit/dbdae1465b5da364aa23097d9d91ff2072ee6d13)), closes [#909](https://github.com/langwatch/langwatch/issues/909)
+
+## [0.7.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.0...python-sdk@v0.7.1) (2025-11-28)
+
+
+### Bug Fixes
+
+* **prompts:** make prompts.get throw error instead of returning null/undefined ([#867](https://github.com/langwatch/langwatch/issues/867)) ([9705201](https://github.com/langwatch/langwatch/commit/97052015061f40fc63069c78bb1e702cbf12fa29))
+
+## [0.7.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.1...python-sdk@v0.7.0) (2025-11-05)
+
+
+### Features
+
+* support langchain/langgraph 1.0.0 in python sdk ([#780](https://github.com/langwatch/langwatch/issues/780)) ([70d4814](https://github.com/langwatch/langwatch/commit/70d4814528465d8e58d1ab4f82849ea13d6f564d))
+
+
+### Bug Fixes
+
+* parsing of Long values comming from Strands, add support for gen_ai.server.time_to_first_token ([c060766](https://github.com/langwatch/langwatch/commit/c060766fa093a6c6a881244267c1ed9929c9246b))
+
+## [0.6.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.0...python-sdk@v0.6.1) (2025-10-31)
+
+
+### Bug Fixes
+
+* dataset slug name sync ([#759](https://github.com/langwatch/langwatch/issues/759)) ([d9f87e4](https://github.com/langwatch/langwatch/commit/d9f87e4dc4df610e876f931094d3e86f2c5254d1))
+
+## [0.6.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.1...python-sdk@v0.6.0) (2025-10-31)
+
+
+### Features
+
+* upgrade to dspy v3 ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+* upgrade to DSPy v3 🎉 ([#752](https://github.com/langwatch/langwatch/issues/752)) ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+
+
+### Bug Fixes
+
+* dataset routes ([#756](https://github.com/langwatch/langwatch/issues/756)) ([da736e0](https://github.com/langwatch/langwatch/commit/da736e025280208ceed620cd1bb8c43366120f0e))
+
 ## [0.5.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.0...python-sdk@v0.5.1) (2025-10-24)
 
 

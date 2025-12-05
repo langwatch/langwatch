@@ -9,7 +9,7 @@ import {
   type ExperimentType,
   type Project,
 } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { slugify } from "~/utils/slugify";
@@ -65,7 +65,7 @@ export default async function handler(
   } catch (error) {
     logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
