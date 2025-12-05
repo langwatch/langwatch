@@ -1,0 +1,31 @@
+import type { PrismaClient } from "@prisma/client";
+
+/**
+ * Repository for organization-related data access
+ */
+export class OrganizationRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Gets all project IDs for an organization
+   */
+  async getProjectIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((p) => p.id);
+  }
+
+  /**
+   * Gets organizationId from teamId
+   */
+  async getOrganizationIdByTeamId(teamId: string): Promise<string | null> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
+    return team?.organizationId ?? null;
+  }
+}
+

@@ -7,6 +7,7 @@ import {
   authMiddleware,
   handleError,
   loggerMiddleware,
+  blockTraceUsageExceededMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -31,6 +32,7 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
+app.use("/*", blockTraceUsageExceededMiddleware);
 app.onError(handleError);
 
 // POST /api/scenario-events - Create a new scenario event
@@ -73,7 +75,7 @@ app.post(
 
     if (!base) {
       logger.error(
-        "BASE_HOST is not set, but required for scenario event url payload"
+        "BASE_HOST is not set, but required for scenario event url payload",
       );
 
       return c.json({ success: false }, 500);
@@ -82,7 +84,7 @@ app.post(
     const url = `${base}${path}`;
 
     return c.json({ success: true, url }, 201);
-  }
+  },
 );
 
 // DELETE /api/scenario-events - Delete all events for a project
@@ -109,7 +111,7 @@ export const route = app.delete(
     });
 
     return c.json({ success: true }, 200);
-  }
+  },
 );
 
 export type ScenarioEventsAppType = typeof route;
