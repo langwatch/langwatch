@@ -31,8 +31,6 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,7 +38,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: cd .. && pnpm install --frozen-lockfile
 
       - name: Install TypeScript Native Preview
         run: pnpm install -D @typescript/native-preview
@@ -120,53 +118,40 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10.12.1
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # Install LangWatch app dependencies
-      - name: Setup Node for LangWatch
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
-
-      - name: Install LangWatch app dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+      # Install all workspace dependencies
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare LangWatch files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm run start:prepare:files
 
       - name: Setup database
         working-directory: langwatch
-        run: npm run prisma:migrate
+        run: pnpm run prisma:migrate
 
       - name: Seed test project
         working-directory: langwatch
-        run: npm run prisma:seed
+        run: pnpm run prisma:seed
 
       - name: Setup Elasticsearch
         working-directory: langwatch
-        run: npm run elastic:migrate
+        run: pnpm run elastic:migrate
 
       # Start LangWatch server in background
       - name: Start LangWatch server
         working-directory: langwatch
         run: |
-          npm run start &
+          pnpm run start &
           # Wait for server to be ready (check Next.js is responding)
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
-
-      - name: Install SDK dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build SDK
         run: pnpm run build

@@ -1,0 +1,6 @@
+packages:
+  - 'langwatch'
+  - 'langwatch/saas-src'
+  - 'typescript-sdk'
+  - 'mcp-server'
+

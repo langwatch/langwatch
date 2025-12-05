@@ -27,8 +27,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -36,7 +34,6 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        working-directory: langwatch
         run: pnpm install --frozen-lockfile
 
       - name: Prepare files
@@ -65,8 +62,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -74,7 +69,6 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        working-directory: langwatch
         run: pnpm install --frozen-lockfile
 
       - name: Prepare files
@@ -168,8 +162,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -177,7 +169,6 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        working-directory: langwatch
         run: pnpm install --frozen-lockfile
 
       - name: Prepare files
@@ -212,8 +203,6 @@ jobs:
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -227,12 +216,11 @@ jobs:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('pnpm-lock.yaml') }}-
 
       - name: Install dependencies
-        working-directory: langwatch
         run: pnpm install --frozen-lockfile
 
       - name: Build
