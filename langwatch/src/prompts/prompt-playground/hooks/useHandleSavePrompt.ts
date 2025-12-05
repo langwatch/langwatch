@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash.clonedeep";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import { formValuesToTriggerSaveVersionParams } from "~/prompts/utils/llmPromptConfigUtils";
 import { toaster } from "~/components/ui/toaster";

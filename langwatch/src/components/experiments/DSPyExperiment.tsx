@@ -1221,13 +1221,13 @@ export function DSPyRunsScoresChart({
             }
           }}
           onMouseMove={(state) => {
-            if (state.isTooltipActive) {
-              const runId = state.activePayload?.[0]?.name;
+            if (state.isTooltipActive && state.activeIndex !== undefined) {
+              const runId = data[state.activeIndex as number]?.runId;
               const index = state.activeLabel;
               if (runId && index !== undefined) {
                 setHoveredRunIndex({
-                  runId,
-                  index,
+                  runId: runId.toString(),
+                  index: index.toString(),
                 });
               } else {
                 setHoveredRunIndex(null);

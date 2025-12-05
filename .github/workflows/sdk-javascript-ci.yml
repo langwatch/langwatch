@@ -32,7 +32,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10.12.1
+          version: 10.24.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -61,7 +61,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    
+
     env:
       # LangWatch server config
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -72,7 +72,7 @@ jobs:
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
-    
+
     services:
       redis:
         image: redis:alpine
@@ -123,7 +123,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10.12.1
+          version: 10.24.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -137,34 +137,34 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install LangWatch app dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Prepare LangWatch files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm start:prepare:files
 
       - name: Setup database
         working-directory: langwatch
-        run: npm run prisma:migrate
+        run: pnpm prisma:migrate
 
       - name: Seed test project
         working-directory: langwatch
-        run: npm run prisma:seed
+        run: pnpm prisma:seed
 
       - name: Setup Elasticsearch
         working-directory: langwatch
-        run: npm run elastic:migrate
+        run: pnpm elastic:migrate
 
       # Start LangWatch server in background
       - name: Start LangWatch server
         working-directory: langwatch
         run: |
-          npm run start &
+          pnpm run start &
           # Wait for server to be ready (check Next.js is responding)
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"

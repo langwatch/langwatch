@@ -100,7 +100,7 @@ export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
 
 const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [
-    typeof LineChart | typeof BarChart | typeof AreaChart | typeof PieChart,
+    typeof LineChart | typeof PieChart,
     typeof Line | typeof Bar | typeof Area | typeof Scatter,
   ];
 }> = {
@@ -480,7 +480,7 @@ const CustomGraph_ = React.memo(
               nameKey="name"
               dataKey="value"
               labelLine={false}
-              label={pieChartPercentageLabel}
+              label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
             >
               {summaryData.current.map((entry, index) => (
@@ -615,7 +615,9 @@ const CustomGraph_ = React.memo(
             top: 10,
             left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
             right: 24,
+            bottom: 0,
           }}
+          // @ts-ignore
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
           <CartesianGrid
