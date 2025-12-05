@@ -180,8 +180,8 @@ importers:
         specifier: ^0.0.10
         version: 0.0.10(react@19.1.0)
       '@react-email/heading':
-        specifier: ^0.0.9
-        version: 0.0.9(@types/react@19.0.10)
+        specifier: ^0.0.15
+        version: 0.0.15(react@19.1.0)
       '@react-email/html':
         specifier: ^0.0.6
         version: 0.0.6(react@19.1.0)
@@ -195,8 +195,8 @@ importers:
         specifier: 0.0.16
         version: 0.0.16(react@19.1.0)
       '@react-email/text':
-        specifier: ^0.1.5
-        version: 0.1.5(react@19.1.0)
+        specifier: 0.1.1
+        version: 0.1.1(react@19.1.0)
       '@sendgrid/mail':
         specifier: ^8.1.1
         version: 8.1.1(debug@4.4.1)
@@ -3724,24 +3724,6 @@ packages:
   '@protobufjs/utf8@1.1.0':
     resolution: {integrity: sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==}
 
-  '@radix-ui/react-compose-refs@1.0.1':
-    resolution: {integrity: sha512-fDSBgd44FKHa1FRMU59qBMPFcl2PZE+2nmqunj+BWFyYYjnhIDWL2ItDs3rrbJDQOtzt5nIebLCQc4QRfz6LJw==}
-    peerDependencies:
-      '@types/react': '*'
-      react: ^16.8 || ^17.0 || ^18.0
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-
-  '@radix-ui/react-slot@1.0.2':
-    resolution: {integrity: sha512-YeTpuq4deV+6DusvVUW4ivBgnkHwECUu0BiN43L5UCDFgdhsRUWAghhTF5MbvNTPzmiFOx90asDSUjWuCNapwg==}
-    peerDependencies:
-      '@types/react': '*'
-      react: ^16.8 || ^17.0 || ^18.0
-    peerDependenciesMeta:
-      '@types/react':
-        optional: true
-
   '@react-aria/focus@3.20.3':
     resolution: {integrity: sha512-rR5uZUMSY4xLHmpK/I8bP1V6vUNHFo33gTvrvNUsAKKqvMfa7R2nu5A6v97dr5g6tVH6xzpdkPsOJCWh90H2cw==}
     peerDependencies:
@@ -3845,10 +3827,6 @@ packages:
     peerDependencies:
       react: ^18.0 || ^19.0 || ^19.0.0-rc
 
-  '@react-email/heading@0.0.9':
-    resolution: {integrity: sha512-xzkcGlm+/aFrNlJZBKzxRKkRYJ2cRx92IqmSKAuGnwuKQ/uMKomXzPsHPu3Dclmnhn3wVKj4uprkgQOoxP6uXQ==}
-    engines: {node: '>=16.0.0'}
-
   '@react-email/hr@0.0.11':
     resolution: {integrity: sha512-S1gZHVhwOsd1Iad5IFhpfICwNPMGPJidG/Uysy1AwmspyoAP5a4Iw3OWEpINFdgh9MHladbxcLKO2AJO+cA9Lw==}
     engines: {node: '>=18.0.0'}
@@ -3924,12 +3902,6 @@ packages:
 
   '@react-email/text@0.1.1':
     resolution: {integrity: sha512-Zo9tSEzkO3fODLVH1yVhzVCiwETfeEL5wU93jXKWo2DHoMuiZ9Iabaso3T0D0UjhrCB1PBMeq2YiejqeToTyIQ==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      react: ^18.0 || ^19.0 || ^19.0.0-rc
-
-  '@react-email/text@0.1.5':
-    resolution: {integrity: sha512-o5PNHFSE085VMXayxH+SJ1LSOtGsTv+RpNKnTiJDrJUwoBu77G3PlKOsZZQHCNyD28WsQpl9v2WcJLbQudqwPg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^18.0 || ^19.0 || ^19.0.0-rc
@@ -9760,10 +9732,6 @@ packages:
     peerDependencies:
       react: '>=16.6.0'
       react-dom: '>=16.6.0'
-
-  react@18.2.0:
-    resolution: {integrity: sha512-/3IjMdb2L9QbBdWiW5e3P2/npwMBaU9mHCSCUzNln0ZCYbcfTsGbTJrU/kGemdH2IWmB2ioZ+zkxtmq6g09fGQ==}
-    engines: {node: '>=0.10.0'}
 
   react@19.1.0:
     resolution: {integrity: sha512-FS+XFBNvn3GTAWq26joslQgWNoFu08F4kl0J4CgdNKADkdSGXQyTCnKteIAJy96Br6YbpEU1LSzV5dYtjMkMDg==}
@@ -15637,21 +15605,6 @@ snapshots:
 
   '@protobufjs/utf8@1.1.0': {}
 
-  '@radix-ui/react-compose-refs@1.0.1(@types/react@19.0.10)(react@18.2.0)':
-    dependencies:
-      '@babel/runtime': 7.27.6
-      react: 18.2.0
-    optionalDependencies:
-      '@types/react': 19.0.10
-
-  '@radix-ui/react-slot@1.0.2(@types/react@19.0.10)(react@18.2.0)':
-    dependencies:
-      '@babel/runtime': 7.27.6
-      '@radix-ui/react-compose-refs': 1.0.1(@types/react@19.0.10)(react@18.2.0)
-      react: 18.2.0
-    optionalDependencies:
-      '@types/react': 19.0.10
-
   '@react-aria/focus@3.20.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
       '@react-aria/interactions': 3.25.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -15765,13 +15718,6 @@ snapshots:
     dependencies:
       react: 19.1.0
 
-  '@react-email/heading@0.0.9(@types/react@19.0.10)':
-    dependencies:
-      '@radix-ui/react-slot': 1.0.2(@types/react@19.0.10)(react@18.2.0)
-      react: 18.2.0
-    transitivePeerDependencies:
-      - '@types/react'
-
   '@react-email/hr@0.0.11(react@19.1.0)':
     dependencies:
       react: 19.1.0
@@ -15826,10 +15772,6 @@ snapshots:
       react: 19.1.0
 
   '@react-email/text@0.1.1(react@19.1.0)':
-    dependencies:
-      react: 19.1.0
-
-  '@react-email/text@0.1.5(react@19.1.0)':
     dependencies:
       react: 19.1.0
 
@@ -23388,10 +23330,6 @@ snapshots:
       prop-types: 15.8.1
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
-
-  react@18.2.0:
-    dependencies:
-      loose-envify: 1.4.0
 
   react@19.1.0: {}
 

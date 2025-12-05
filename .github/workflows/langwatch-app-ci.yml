@@ -88,7 +88,7 @@ jobs:
 
       - name: Run unit tests with coverage
         working-directory: langwatch
-        run: pnpm test:unit -- --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
 
       - name: Upload unit test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -202,7 +202,7 @@ jobs:
 
       - name: Run integration tests with coverage
         working-directory: langwatch
-        run: pnpm test:integration -- --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text
 
       - name: Upload integration test coverage to Codecov
         uses: codecov/codecov-action@v5
