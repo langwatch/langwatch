@@ -32,7 +32,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10.12.1
+          version: 10.24.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -123,7 +123,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
         with:
-          version: 10.12.1
+          version: 10.24.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
