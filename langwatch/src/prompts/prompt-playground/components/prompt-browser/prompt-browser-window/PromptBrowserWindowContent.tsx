@@ -10,8 +10,8 @@ import {
   type TabData,
 } from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import debounce from "lodash/debounce";
-import { cloneDeep } from "lodash";
+import debounce from "lodash.debounce";
+import cloneDeep from "lodash.clonedeep";
 import { useTabId } from "../ui/TabContext";
 
 export { useTabId } from "../ui/TabContext";

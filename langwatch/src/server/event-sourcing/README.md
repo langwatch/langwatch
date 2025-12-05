@@ -196,7 +196,7 @@ const pipeline = eventSourcing
 **Run tests:**
 
 ```bash
-npm test src/server/event-sourcing/library
+pnpm test src/server/event-sourcing/library
 ```
 
 ### Common Pitfalls

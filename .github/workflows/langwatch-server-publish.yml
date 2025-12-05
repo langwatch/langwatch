@@ -28,8 +28,8 @@ jobs:
       - name: Install dependencies
         run: |
           cd langwatch
-          npm install
-          npm run build
+          pnpm install
+          pnpm build
           cd ..
           uv pip install build
 

@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash.clonedeep";
 import { createLogger } from "~/utils/logger";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { z } from "zod";

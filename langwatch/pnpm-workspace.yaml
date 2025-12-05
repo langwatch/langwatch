@@ -1,0 +1,14 @@
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@scarf/scarf'
+  - bcrypt
+  - bufferutil
+  - core-js
+  - cpu-features
+  - esbuild
+  - msgpackr-extract
+  - prisma
+  - protobufjs
+  - sharp
+  - ssh2
