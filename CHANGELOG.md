@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.10.0...langwatch@v1.11.0) (2025-12-06)
+
+
+### Features
+
+* migrate from npm to pnpm ([#940](https://github.com/langwatch/langwatch/issues/940)) ([ce52474](https://github.com/langwatch/langwatch/commit/ce52474c3023ccb4714e4a33373d3c644f1496bf))
+* **scenario-events:** add trace limit middleware to block requests w… ([#935](https://github.com/langwatch/langwatch/issues/935)) ([7af7793](https://github.com/langwatch/langwatch/commit/7af77934be2486359dcf43fe2612b1792ca57bf1))
+
+
+### Bug Fixes
+
+* defaults for gpt-5 and default model deleting during execution ([6d3d8a8](https://github.com/langwatch/langwatch/commit/6d3d8a8235f5c4e7d96b3231284284e3f24ff726))
+
 ## [1.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.9.0...langwatch@v1.10.0) (2025-12-04)
 
 
