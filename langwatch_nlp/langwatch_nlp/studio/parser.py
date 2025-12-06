@@ -467,13 +467,22 @@ def workflow_inputs(workflow: Workflow) -> List[Field]:
     return [field for field in (entry_node.data.outputs or [])]
 
 
+def has_llm_node_using_default_llm(workflow: Workflow) -> bool:
+    for node in workflow.nodes:
+        if node.type != "signature" or not node.data.parameters:
+            continue
+        llm_param = next((p for p in node.data.parameters if p.type == "llm"), None)
+        if not llm_param or not llm_param.value:
+            return True
+    return False
+
+
 def normalized_workflow(workflow: Workflow) -> Workflow:
     workflow = copy.deepcopy(workflow)
     for node in workflow.nodes:
         normalized_node(node, mutate=True)
 
-    has_llm_node = any(node.type == "llm" for node in workflow.nodes)
-    if not has_llm_node:
+    if not has_llm_node_using_default_llm(workflow):
         workflow.default_llm = None
 
     for edge in workflow.edges:

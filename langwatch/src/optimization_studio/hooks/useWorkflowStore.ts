@@ -29,6 +29,7 @@ import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
 import { LlmConfigInputTypes } from "../../types";
 import { nanoid } from "nanoid";
+import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
@@ -120,8 +121,8 @@ export type WorkflowStore = State & {
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
   model: "openai/gpt-5",
-  temperature: 0,
-  max_tokens: 2048,
+  temperature: 1.0,
+  max_tokens: DEFAULT_MAX_TOKENS,
 };
 
 export const initialDSL: Workflow = {
