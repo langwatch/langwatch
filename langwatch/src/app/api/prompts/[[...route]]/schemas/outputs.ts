@@ -1,14 +1,9 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
-import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
-import {
-  inputsSchema,
-  messageSchema,
-  outputsSchema,
-  promptingTechniqueSchema,
-  responseFormatSchema,
-} from "~/prompts/schemas";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
+const configDataSchema = getLatestConfigVersionSchema().shape.configData;
 
 /**
  * Base schema for API Response (only llm config)
@@ -25,7 +20,7 @@ const apiResponsePromptSchemaBase = z.object({
 
 /**
  * Schema for version output responses
- * Extends the input schema with metadata about the created version
+ * Derives configData fields from storage schema to prevent drift
  */
 const apiResponseVersionOutputSchema = z.object({
   configId: z.string(),
@@ -35,16 +30,17 @@ const apiResponseVersionOutputSchema = z.object({
   version: z.number(),
   createdAt: z.date(),
   commitMessage: z.string().optional().nullable(),
-  prompt: z.string(),
-  messages: z.array(messageSchema).default([]),
-  inputs: z.array(inputsSchema).min(1, "At least one input is required"),
-  outputs: z.array(outputsSchema).min(1, "At least one output is required"),
-  model: z.string().min(1, "Model identifier cannot be empty"),
-  temperature: z.number().optional(),
-  maxTokens: z.number().optional(),
-  demonstrations: nodeDatasetSchema.optional(),
-  promptingTechnique: promptingTechniqueSchema.optional(),
-  responseFormat: responseFormatSchema.optional(),
+  // Derived from storage schema
+  prompt: configDataSchema.shape.prompt,
+  messages: configDataSchema.shape.messages,
+  inputs: configDataSchema.shape.inputs,
+  outputs: configDataSchema.shape.outputs,
+  model: configDataSchema.shape.model,
+  temperature: configDataSchema.shape.temperature,
+  maxTokens: configDataSchema.shape.max_tokens,
+  demonstrations: configDataSchema.shape.demonstrations,
+  promptingTechnique: configDataSchema.shape.prompting_technique,
+  responseFormat: configDataSchema.shape.response_format,
 });
 
 /**
