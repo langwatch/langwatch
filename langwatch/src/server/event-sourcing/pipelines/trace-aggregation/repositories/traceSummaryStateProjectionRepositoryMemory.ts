@@ -39,7 +39,7 @@ export class TraceSummaryStateProjectionRepositoryMemory<
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
     return await this.tracer.withActiveSpan(
-      "TraceAggregationStateProjectionRepositoryMemory.getProjection",
+      `${this.constructor.name}.getProjection`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -51,7 +51,7 @@ export class TraceSummaryStateProjectionRepositoryMemory<
         // Validate tenant context
         EventUtils.validateTenantId(
           context,
-          "TraceAggregationStateProjectionRepositoryMemory.getProjection",
+          `${this.constructor.name}.getProjection`,
         );
 
         const key = `${context.tenantId}:${aggregateId}`;
@@ -71,7 +71,7 @@ export class TraceSummaryStateProjectionRepositoryMemory<
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
-      "TraceAggregationStateProjectionRepositoryMemory.storeProjection",
+      `${this.constructor.name}.storeProjection`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -83,7 +83,7 @@ export class TraceSummaryStateProjectionRepositoryMemory<
         // Validate tenant context
         EventUtils.validateTenantId(
           context,
-          "TraceAggregationStateProjectionRepositoryMemory.storeProjection",
+          `${this.constructor.name}.storeProjection`,
         );
 
         // Validate projection
