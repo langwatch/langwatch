@@ -1,191 +1,256 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
-	"vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
-	"files": { "ignoreUnknown": false },
-	"formatter": { "enabled": true, "indentStyle": "tab" },
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": false,
-			"complexity": {
-				"noBannedTypes": "error",
-				"noUselessThisAlias": "error",
-				"noUselessTypeConstraint": "error",
-				"useLiteralKeys": "error",
-				"useOptionalChain": "error"
-			},
-			"correctness": {
-				"noPrecisionLoss": "error",
-				"noUnusedVariables": "warn"
-			},
-			"nursery": {
-				"noFloatingPromises": "error",
-				"noForIn": "error",
-				"noMisusedPromises": "error",
-				"noNextAsyncClientComponent": "warn",
-				"noSyncScripts": "error"
-			},
-			"performance": {
-				"noImgElement": "warn",
-				"noUnwantedPolyfillio": "warn",
-				"useGoogleFontPreconnect": "warn"
-			},
-			"style": {
-				"noHeadElement": "warn",
-				"noInferrableTypes": "error",
-				"noNamespace": "error",
-				"noRestrictedImports": "error",
-				"useArrayLiterals": "error",
-				"useAsConstAssertion": "error",
-				"useConsistentArrayType": "off",
-				"useConsistentTypeDefinitions": "off",
-				"useForOf": "error",
-				"useImportType": {
-					"level": "warn"
-				},
-				"useShorthandFunctionType": "error"
-			},
-			"suspicious": {
-				"noDocumentImportInPage": "error",
-				"noEmptyBlockStatements": "error",
-				"noEmptyInterface": "error",
-				"noExplicitAny": "off",
-				"noExtraNonNullAssertion": "error",
-				"noHeadImportInDocument": "error",
-				"noMisleadingInstantiator": "error",
-				"noNonNullAssertedOptionalChain": "error",
-				"noTsIgnore": "off",
-				"noUnsafeDeclarationMerging": "error",
-				"useAdjacentOverloadSignatures": "error",
-				"useAwait": "off",
-				"useGoogleFontDisplay": "warn",
-				"useNamespaceKeyword": "error"
-			}
-		}
-	},
-	"javascript": { "formatter": { "quoteStyle": "double" } },
-	"overrides": [
-		{
-			"includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
-			"linter": {
-				"rules": {
-					"complexity": { "noArguments": "error" },
-					"correctness": {
-						"noConstAssign": "off",
-						"noGlobalObjectCalls": "off",
-						"noInvalidConstructorSuper": "off",
-						"noSetterReturn": "off",
-						"noUndeclaredVariables": "off",
-						"noUnreachable": "off",
-						"noUnreachableSuper": "off"
-					},
-					"style": { "useConst": "error" },
-					"suspicious": {
-						"noDuplicateClassMembers": "off",
-						"noDuplicateObjectKeys": "off",
-						"noDuplicateParameters": "off",
-						"noFunctionAssign": "off",
-						"noImportAssign": "off",
-						"noRedeclare": "off",
-						"noUnsafeNegation": "off",
-						"noVar": "error",
-						"useGetterReturn": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
-			"linter": {
-				"rules": {
-					"complexity": { "noArguments": "error" },
-					"correctness": {
-						"noConstAssign": "off",
-						"noGlobalObjectCalls": "off",
-						"noInvalidConstructorSuper": "off",
-						"noSetterReturn": "off",
-						"noUndeclaredVariables": "off",
-						"noUnreachable": "off",
-						"noUnreachableSuper": "off"
-					},
-					"style": { "useConst": "error" },
-					"suspicious": {
-						"noDuplicateClassMembers": "off",
-						"noDuplicateObjectKeys": "off",
-						"noDuplicateParameters": "off",
-						"noFunctionAssign": "off",
-						"noImportAssign": "off",
-						"noRedeclare": "off",
-						"noUnsafeNegation": "off",
-						"noVar": "error",
-						"useGetterReturn": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
-			"linter": {
-				"rules": {
-					"complexity": { "noArguments": "error" },
-					"correctness": {
-						"noConstAssign": "off",
-						"noGlobalObjectCalls": "off",
-						"noInvalidConstructorSuper": "off",
-						"noSetterReturn": "off",
-						"noUndeclaredVariables": "off",
-						"noUnreachable": "off",
-						"noUnreachableSuper": "off"
-					},
-					"nursery": { "useSpread": "error" },
-					"style": { "useConst": "error" },
-					"suspicious": {
-						"noDuplicateClassMembers": "off",
-						"noDuplicateObjectKeys": "off",
-						"noDuplicateParameters": "off",
-						"noFunctionAssign": "off",
-						"noImportAssign": "off",
-						"noRedeclare": "off",
-						"noUnsafeNegation": "off",
-						"noVar": "error",
-						"useGetterReturn": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["*.ts", "*.tsx", "*.mts", "*.cts"],
-			"linter": {
-				"rules": {
-					"complexity": { "noArguments": "error" },
-					"correctness": {
-						"noConstAssign": "off",
-						"noGlobalObjectCalls": "off",
-						"noInvalidConstructorSuper": "off",
-						"noSetterReturn": "off",
-						"noUndeclaredVariables": "off",
-						"noUnreachable": "off",
-						"noUnreachableSuper": "off"
-					},
-					"nursery": { "useSpread": "error" },
-					"style": { "useConst": "error" },
-					"suspicious": {
-						"noDuplicateClassMembers": "off",
-						"noDuplicateObjectKeys": "off",
-						"noDuplicateParameters": "off",
-						"noFunctionAssign": "off",
-						"noImportAssign": "off",
-						"noRedeclare": "off",
-						"noUnsafeNegation": "off",
-						"noVar": "error",
-						"useGetterReturn": "off"
-					}
-				}
-			}
-		}
-	],
-	"assist": {
-		"enabled": true,
-		"actions": { "source": { "organizeImports": "on" } }
-	}
+  "$schema": "https://biomejs.dev/schemas/2.3.8/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": false
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "tab"
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "complexity": {
+        "noBannedTypes": "error",
+        "noUselessThisAlias": "error",
+        "noUselessTypeConstraint": "error",
+        "useLiteralKeys": "error",
+        "useOptionalChain": "error"
+      },
+      "correctness": {
+        "noPrecisionLoss": "error",
+        "noUnusedVariables": "warn"
+      },
+      "nursery": {
+        "noFloatingPromises": "error",
+        "noForIn": "error",
+        "noMisusedPromises": "error",
+        "noNextAsyncClientComponent": "warn",
+        "noSyncScripts": "error"
+      },
+      "performance": {
+        "noImgElement": "warn",
+        "noUnwantedPolyfillio": "warn",
+        "useGoogleFontPreconnect": "warn"
+      },
+      "style": {
+        "noHeadElement": "warn",
+        "noInferrableTypes": "error",
+        "noNamespace": "error",
+        "noRestrictedImports": "error",
+        "useArrayLiterals": "error",
+        "useAsConstAssertion": "error",
+        "useConsistentArrayType": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useForOf": "error",
+        "useImportType": {
+          "level": "warn"
+        },
+        "useShorthandFunctionType": "error"
+      },
+      "suspicious": {
+        "noDocumentImportInPage": "error",
+        "noEmptyBlockStatements": "error",
+        "noEmptyInterface": "error",
+        "noExplicitAny": "off",
+        "noExtraNonNullAssertion": "error",
+        "noHeadImportInDocument": "error",
+        "noMisleadingInstantiator": "error",
+        "noNonNullAssertedOptionalChain": "error",
+        "noTsIgnore": "off",
+        "noUnsafeDeclarationMerging": "error",
+        "useAdjacentOverloadSignatures": "error",
+        "useAwait": "off",
+        "useGoogleFontDisplay": "warn",
+        "useNamespaceKeyword": "error"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "always",
+      "indentStyle": "space",
+      "indentWidth": 2,
+      "bracketSameLine": false,
+      "bracketSpacing": true,
+      "jsxQuoteStyle": "double",
+      "quoteProperties": "asNeeded",
+      "semicolons": "always",
+      "trailingCommas": "all"
+    }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "*.ts",
+        "*.tsx",
+        "*.mts",
+        "*.cts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noArguments": "error"
+          },
+          "correctness": {
+            "noConstAssign": "off",
+            "noGlobalObjectCalls": "off",
+            "noInvalidConstructorSuper": "off",
+            "noSetterReturn": "off",
+            "noUndeclaredVariables": "off",
+            "noUnreachable": "off",
+            "noUnreachableSuper": "off"
+          },
+          "style": {
+            "useConst": "error"
+          },
+          "suspicious": {
+            "noDuplicateClassMembers": "off",
+            "noDuplicateObjectKeys": "off",
+            "noDuplicateParameters": "off",
+            "noFunctionAssign": "off",
+            "noImportAssign": "off",
+            "noRedeclare": "off",
+            "noUnsafeNegation": "off",
+            "noVar": "error",
+            "useGetterReturn": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "*.ts",
+        "*.tsx",
+        "*.mts",
+        "*.cts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noArguments": "error"
+          },
+          "correctness": {
+            "noConstAssign": "off",
+            "noGlobalObjectCalls": "off",
+            "noInvalidConstructorSuper": "off",
+            "noSetterReturn": "off",
+            "noUndeclaredVariables": "off",
+            "noUnreachable": "off",
+            "noUnreachableSuper": "off"
+          },
+          "style": {
+            "useConst": "error"
+          },
+          "suspicious": {
+            "noDuplicateClassMembers": "off",
+            "noDuplicateObjectKeys": "off",
+            "noDuplicateParameters": "off",
+            "noFunctionAssign": "off",
+            "noImportAssign": "off",
+            "noRedeclare": "off",
+            "noUnsafeNegation": "off",
+            "noVar": "error",
+            "useGetterReturn": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "*.ts",
+        "*.tsx",
+        "*.mts",
+        "*.cts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noArguments": "error"
+          },
+          "correctness": {
+            "noConstAssign": "off",
+            "noGlobalObjectCalls": "off",
+            "noInvalidConstructorSuper": "off",
+            "noSetterReturn": "off",
+            "noUndeclaredVariables": "off",
+            "noUnreachable": "off",
+            "noUnreachableSuper": "off"
+          },
+          "nursery": {
+            "useSpread": "error"
+          },
+          "style": {
+            "useConst": "error"
+          },
+          "suspicious": {
+            "noDuplicateClassMembers": "off",
+            "noDuplicateObjectKeys": "off",
+            "noDuplicateParameters": "off",
+            "noFunctionAssign": "off",
+            "noImportAssign": "off",
+            "noRedeclare": "off",
+            "noUnsafeNegation": "off",
+            "noVar": "error",
+            "useGetterReturn": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "*.ts",
+        "*.tsx",
+        "*.mts",
+        "*.cts"
+      ],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noArguments": "error"
+          },
+          "correctness": {
+            "noConstAssign": "off",
+            "noGlobalObjectCalls": "off",
+            "noInvalidConstructorSuper": "off",
+            "noSetterReturn": "off",
+            "noUndeclaredVariables": "off",
+            "noUnreachable": "off",
+            "noUnreachableSuper": "off"
+          },
+          "nursery": {
+            "useSpread": "error"
+          },
+          "style": {
+            "useConst": "error"
+          },
+          "suspicious": {
+            "noDuplicateClassMembers": "off",
+            "noDuplicateObjectKeys": "off",
+            "noDuplicateParameters": "off",
+            "noFunctionAssign": "off",
+            "noImportAssign": "off",
+            "noRedeclare": "off",
+            "noUnsafeNegation": "off",
+            "noVar": "error",
+            "useGetterReturn": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
 }

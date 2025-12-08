@@ -250,7 +250,6 @@
     "jest-mock-extended": "^4.0.0-beta1",
     "node-mocks-http": "^1.17.2",
     "playwright": "1.52.0",
-    "prettier": "^3.0.3",
     "prisma": "5.7.0",
     "raw-loader": "^4.0.2",
     "simple-statistics": "^7.8.3",
