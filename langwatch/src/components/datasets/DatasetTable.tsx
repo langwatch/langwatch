@@ -537,13 +537,21 @@ export function DatasetTable({
                 minWidth="fit-content"
                 onClick={() =>
                   openDrawer("uploadCSV", {
-                    onSuccess: ({ datasetId: datasetId_ }) => {
+                    onSuccess: ({
+                      datasetId: datasetId_,
+                    }: {
+                      datasetId: string;
+                    }) => {
                       setDatasetId(datasetId_);
                       void databaseDataset.refetch();
                     },
                     onCreateFromScratch: () => {
                       openDrawer("addOrEditDataset", {
-                        onSuccess: ({ datasetId: datasetId_ }) => {
+                        onSuccess: ({
+                          datasetId: datasetId_,
+                        }: {
+                          datasetId: string;
+                        }) => {
                           setDatasetId(datasetId_);
                           void databaseDataset.refetch();
                         },

@@ -1214,7 +1214,11 @@ function SeriesField({
                     openDrawer("seriesFilters", {
                       filters:
                         field.value ?? ({} as Record<FilterField, FilterParam>),
-                      onChange: ({ filters }) => {
+                      onChange: ({
+                        filters,
+                      }: {
+                        filters: Record<FilterField, FilterParam>;
+                      }) => {
                         form.setValue(`series.${index}.filters`, filters);
                       },
                     })
