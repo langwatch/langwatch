@@ -7,7 +7,14 @@ const logger = createLogger("langwatch:clickhouse:migrations");
 /**
  * Goose migration wrapper for ClickHouse
  *
+ * Database Handling:
+ * - Database name is extracted from CLICKHOUSE_URL path (e.g., /langwatch)
+ * - Connection to ClickHouse is made at the SERVER level (no database in URL)
+ * - Database name is passed to migrations via CLICKHOUSE_DATABASE env var
+ * - This allows migrations to CREATE DATABASE without connection errors
+ *
  * Configuration via environment variables:
+ * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/dbname)
  * - CLICKHOUSE_REPLICATED: 'true' for ReplicatedMergeTree (HA with Keeper)
  *
  * @see https://github.com/pressly/goose
@@ -19,6 +26,7 @@ const MIGRATIONS_DIR = path.join(
 );
 
 interface GooseOptions {
+  database?: string;
   connectionUrl?: string;
   migrationsDir?: string;
   verbose?: boolean;
@@ -30,6 +38,16 @@ interface ClickHouseConfig {
   replicated: boolean;
 }
 
+/**
+ * Parse connection URL and extract database name
+ *
+ * The database name is read from the URL path but is NOT included in the
+ * returned connection string. This allows migrations to create the database
+ * by connecting at the server level without specifying a database.
+ *
+ * @param connectionUrl - Optional connection URL, defaults to CLICKHOUSE_URL env var
+ * @returns Object with database name and server-level connection string (no database in path)
+ */
 function parseConnectionUrl(connectionUrl?: string): {
   database: string;
   connectionString: string;
@@ -47,6 +65,9 @@ function parseConnectionUrl(connectionUrl?: string): {
   if (parsed.protocol === "http:" || parsed.protocol === "https:") {
     parsed.protocol = "clickhouse:";
   }
+
+  // Strip database from connection URL - connect at server level only
+  parsed.pathname = "/";
 
   return { database, connectionString: parsed.toString() };
 }
@@ -110,10 +131,26 @@ function logConfig(config: ClickHouseConfig): void {
   );
 }
 
+/**
+ * Execute a goose command
+ *
+ * Parses the database name from either options.database or the connection URL path,
+ * then connects to ClickHouse at the server level (without database in URL).
+ * The database name is made available to migrations via CLICKHOUSE_DATABASE env var.
+ *
+ * @param command - Goose command to execute (up, down, status, etc.)
+ * @param options - Configuration options including connection URL and database override
+ * @returns Standard output from the goose command
+ */
 function executeGoose(command: string, options: GooseOptions = {}): string {
-  const { database, connectionString } = parseConnectionUrl(
+  // Parse connection URL to extract database and get server-level connection string
+  const { database: parsedDatabase, connectionString } = parseConnectionUrl(
     options.connectionUrl,
   );
+
+  // Allow explicit database override, otherwise use parsed value
+  const database = options.database ?? parsedDatabase;
+
   const config = getConfig(database, connectionString);
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars(config);
@@ -122,6 +159,7 @@ function executeGoose(command: string, options: GooseOptions = {}): string {
     logConfig(config);
   }
 
+  // Connection string is already server-level (no database in path)
   const args = ["-dir", migrationsDir, "clickhouse", connectionString, command];
 
   if (options.verbose) {
@@ -181,6 +219,9 @@ export function getMigrateStatus(options: GooseOptions = {}): string {
 
 /**
  * Run migrations if ENABLE_CLICKHOUSE and CLICKHOUSE_URL are configured
+ *
+ * The database name will be automatically extracted from the connection URL
+ * and the connection will be made at the server level (without database in path).
  */
 export async function runMigrationsIfConfigured(
   options: GooseOptions = {},
@@ -200,13 +241,10 @@ export async function runMigrationsIfConfigured(
     return;
   }
 
-  const connectionUrlNoDatabase = new URL(connectionUrlStr);
-  connectionUrlNoDatabase.pathname = "";
-
   try {
     migrateUp({
       ...options,
-      connectionUrl: connectionUrlNoDatabase.toString(),
+      connectionUrl: connectionUrlStr,
     });
   } catch (error) {
     logger.error({ error }, "Failed to run ClickHouse migrations");
