@@ -211,5 +211,7 @@ export const prewarmTiktokenModels = async () => {
 };
 
 if (isBuildOrNoRedis) {
-  await prewarmTiktokenModels();
+  prewarmTiktokenModels().catch((error) => {
+    logger.error({ error }, "error prewarming tiktoken models");
+  });
 }
