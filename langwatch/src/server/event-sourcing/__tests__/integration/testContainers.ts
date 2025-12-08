@@ -322,10 +322,10 @@ async function initializeClickHouseSchema(
     `,
   });
 
-  // Create trace_projections table
+  // Create trace_overviews table
   await client.exec({
     query: `
-      CREATE TABLE IF NOT EXISTS "test_langwatch".trace_projections
+      CREATE TABLE IF NOT EXISTS "test_langwatch".trace_overviews
       (
         Id String CODEC(ZSTD(1)),
         TenantId String CODEC(ZSTD(1)),
@@ -399,7 +399,7 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "test_langwatch".trace_projections DELETE WHERE TenantId = {tenantId:String}
+        ALTER TABLE "test_langwatch".trace_overviews DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
     });
@@ -426,7 +426,7 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
     });
 
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".trace_projections`,
+      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".trace_overviews`,
     });
 
     // Clean up test_event_handler_log table (created in testPipelines.ts)

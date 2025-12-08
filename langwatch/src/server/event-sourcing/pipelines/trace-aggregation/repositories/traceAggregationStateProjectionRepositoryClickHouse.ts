@@ -20,10 +20,10 @@ import type {
 } from "../projections/traceAggregationStateProjection";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
-const TABLE_NAME = "trace_projections" as const;
+const TABLE_NAME = "trace_overviews" as const;
 
 /**
- * ClickHouse record matching the trace_projections table schema.
+ * ClickHouse record matching the trace_overviews table schema.
  * Version is stored as DateTime64(9) in ClickHouse (nanoseconds since epoch).
  */
 interface ClickHouseProjectionRecord {
@@ -71,7 +71,7 @@ function dateTime64ToTimestamp(dateTime64: string): number {
 
 /**
  * ClickHouse projection repository for trace projections.
- * Stores trace metrics in ClickHouse matching the trace_projections table schema.
+ * Stores trace metrics in ClickHouse matching the trace_overviews table schema.
  * Uses ReplacingMergeTree with Version to keep the latest projection per trace.
  */
 export class TraceAggregationStateProjectionRepositoryClickHouse<

@@ -15,7 +15,7 @@ import type { TraceAggregationStateProjectionRepository } from "./traceAggregati
 
 /**
  * In-memory projection repository for trace projections.
- * Stores trace metrics matching the trace_projections ClickHouse schema.
+ * Stores trace metrics matching the trace_overviews ClickHouse schema.
  *
  * **WARNING: NOT THREAD-SAFE**
  * This implementation is NOT safe for concurrent access.

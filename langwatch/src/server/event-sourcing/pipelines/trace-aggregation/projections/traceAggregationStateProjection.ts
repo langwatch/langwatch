@@ -9,7 +9,7 @@ import { isTraceAggregationCompletedEvent } from "../schemas/events";
 
 /**
  * Projection data for trace metrics.
- * Matches the trace_projections ClickHouse table schema.
+ * Matches the trace_overviews ClickHouse table schema.
  */
 export interface TraceProjectionData {
   // Basic trace info

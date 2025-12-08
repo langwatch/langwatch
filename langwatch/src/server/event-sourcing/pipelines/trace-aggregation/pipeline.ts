@@ -8,6 +8,6 @@ export const traceAggregationPipeline = eventSourcing
   .registerPipeline<TraceAggregationEvent, TraceProjection>()
   .withName("trace_aggregation")
   .withAggregateType("trace_aggregation")
-  .withProjection("traceAggregation", TraceAggregationStateProjectionHandler)
+  .withProjection("traceOverview", TraceAggregationStateProjectionHandler)
   .withCommand("triggerTraceAggregation", TriggerTraceAggregationCommand)
   .build();

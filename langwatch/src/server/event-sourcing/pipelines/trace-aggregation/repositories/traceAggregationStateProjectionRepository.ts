@@ -7,7 +7,7 @@ import type {
 
 /**
  * Repository interface for trace projection storage operations.
- * Stores computed trace metrics matching the trace_projections ClickHouse schema,
+ * Stores computed trace metrics matching the trace_overviews ClickHouse schema,
  * including all aggregated trace data and computed metrics.
  */
 export interface TraceAggregationStateProjectionRepository<

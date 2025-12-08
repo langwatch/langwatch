@@ -37,7 +37,7 @@ export const traceAggregationEventMetadataSchema =
 
 /**
  * Zod schema for TraceAggregationCompletedEventData.
- * Contains all computed trace metrics matching the trace_projections ClickHouse schema.
+ * Contains all computed trace metrics matching the trace_overviews ClickHouse schema.
  */
 export const traceAggregationCompletedEventDataSchema = z.object({
   traceId: z.string(),
