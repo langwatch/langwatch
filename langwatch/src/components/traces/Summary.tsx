@@ -5,6 +5,7 @@ import qs from "qs";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
 import { availableFilters } from "../../server/filters/registry";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
@@ -110,53 +111,15 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
     const shouldShowCost = hasTraceCost() || hasSpanCosts();
 
     /**
-     * Maps metadata keys to their corresponding filter URL keys.
-     */
-    const metadataKeyToUrlKey: Record<string, string> = {
-      user_id: "user_id",
-      thread_id: "thread_id",
-      customer_id: "customer_id",
-      labels: "labels",
-      prompt_ids: "prompt_id",
-    };
-
-    /**
      * Handle metadata tag click.
      * Navigates to the messages page with the appropriate filter applied.
-     *
-     * @param key - The key of the metadata tag.
-     * @param value - The value of the metadata tag (display string, may be comma-joined for arrays).
-     * @param originalValue - The original value from trace metadata.
      */
     const handleMetadataTagClick = (
       key: string,
       value: string,
       originalValue: unknown,
     ) => {
-      let filterParams: Record<string, string>;
-
-      if (key === "trace_id") {
-        // Use query_string search for trace_id
-        filterParams = { query: `trace_id:${value}` };
-      } else {
-        const urlKey = metadataKeyToUrlKey[key];
-        if (urlKey) {
-          // For arrays, use first value only to avoid space-after-comma parse issues
-          const filterValue =
-            Array.isArray(originalValue) && originalValue.length > 0
-              ? String(originalValue[0])
-              : value;
-          filterParams = { [urlKey]: filterValue };
-        } else {
-          // Custom metadata: use middle dot for keys with dots
-          // metadata.value filter requires nested structure: metadata.{key}=value
-          const urlSafeKey = key.replaceAll(".", "·");
-          filterParams = {
-            metadata_key: urlSafeKey,
-            [`metadata.${urlSafeKey}`]: value,
-          };
-        }
-      }
+      const filterParams = buildMetadataFilterParams(key, value, originalValue);
 
       // Remove existing filters, keep other query params (drawer, view, etc)
       const nonFilterParams = Object.fromEntries(
