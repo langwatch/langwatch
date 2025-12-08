@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
+import { ArrowRight } from "lucide-react";
 import { Select as MultiSelect } from "chakra-react-select";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetRecordEntry } from "../../server/datasets/types";

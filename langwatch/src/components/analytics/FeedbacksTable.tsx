@@ -9,7 +9,7 @@ import {
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
 import { SummaryMetricValue } from "./SummaryMetric";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 import { useDrawer } from "../CurrentDrawer";
 import { Tooltip } from "../ui/tooltip";
 

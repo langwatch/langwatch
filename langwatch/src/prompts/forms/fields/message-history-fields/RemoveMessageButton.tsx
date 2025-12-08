@@ -1,5 +1,5 @@
 import { Button } from "@chakra-ui/react";
-import { Minus } from "react-feather";
+import { Minus } from "lucide-react";
 
 /**
  * RemoveMessageButton

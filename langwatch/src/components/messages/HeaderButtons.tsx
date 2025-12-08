@@ -2,7 +2,7 @@ import { Box, Button, HStack } from "@chakra-ui/react";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { List, Table, TrendingUp } from "react-feather";
+import { List, Table, TrendingUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useLocalStorage } from "usehooks-ts";
 

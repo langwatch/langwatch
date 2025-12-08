@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import Ajv from "ajv";
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown } from "react-feather";
+import { ChevronDown } from "lucide-react";
 import { LuBraces } from "react-icons/lu";
 import { fromZodError } from "zod-validation-error";
 

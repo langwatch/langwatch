@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
-import { HelpCircle } from "react-feather";
+import { HelpCircle } from "lucide-react";
 import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { OverflownTextWithTooltip } from "../OverflownText";

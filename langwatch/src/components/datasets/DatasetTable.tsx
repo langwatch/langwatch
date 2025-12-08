@@ -26,7 +26,7 @@ import {
   Play,
   Plus,
   Upload,
-} from "react-feather";
+} from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";

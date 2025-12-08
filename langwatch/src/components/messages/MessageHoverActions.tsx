@@ -6,7 +6,7 @@ import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { TextCursorInput, Bug } from "lucide-react";
 
-import { Edit, Italic, Search } from "react-feather";
+import { Edit, Italic, Search } from "lucide-react";
 import { getExtractedInput } from "../../utils/traceExtraction";
 
 import { useDrawer } from "../../components/CurrentDrawer";

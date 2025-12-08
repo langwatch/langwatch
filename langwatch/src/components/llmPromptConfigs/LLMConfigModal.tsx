@@ -1,5 +1,5 @@
 import { Button, HStack, Input, Text, VStack, Field } from "@chakra-ui/react";
-import { Settings } from "react-feather";
+import { Settings } from "lucide-react";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
 import { HorizontalFormControl } from "../HorizontalFormControl";

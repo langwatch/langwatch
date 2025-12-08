@@ -1,5 +1,5 @@
 import { Button, Text } from "@chakra-ui/react";
-import { Save } from "react-feather";
+import { Save } from "lucide-react";
 import { Tooltip } from "../../../../components/ui/tooltip";
 
 /**

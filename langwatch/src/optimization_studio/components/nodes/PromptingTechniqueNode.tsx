@@ -3,7 +3,7 @@ import { NodeToolbar, type Node, type NodeProps } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
-import { MoreHorizontal, Trash2 } from "react-feather";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { ComponentType, PromptingTechnique } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";

@@ -1,5 +1,5 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Book } from "react-feather";
+import { Book } from "lucide-react";
 import { formatTimeAgo } from "../../../../../../utils/formatTimeAgo";
 
 // Prompt List Component

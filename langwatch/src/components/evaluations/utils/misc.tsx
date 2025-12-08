@@ -1,4 +1,4 @@
-import { AlertCircle, CheckCircle, Activity } from "react-feather";
+import { AlertCircle, CheckCircle, Activity } from "lucide-react";
 import type { ReactNode } from "react";
 
 type StatusType = "error" | "warning" | "healthy";

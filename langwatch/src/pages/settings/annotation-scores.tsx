@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AnnotationScoreDataType } from "@prisma/client";
-import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
+import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
 import { useDrawer } from "~/components/CurrentDrawer";
 
 import { useEffect, useState } from "react";

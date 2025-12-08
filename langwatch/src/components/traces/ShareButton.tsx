@@ -3,7 +3,7 @@ import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
 import { PublicShareResourceTypes, type Project } from "@prisma/client";
 import { useCallback, useState } from "react";
-import { Globe, Share } from "react-feather";
+import { Globe, Share } from "lucide-react";
 import { CopyInput } from "../CopyInput";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

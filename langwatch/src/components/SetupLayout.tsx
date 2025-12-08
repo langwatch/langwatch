@@ -9,7 +9,7 @@ import {
 import Head from "next/head";
 import { type PropsWithChildren } from "react";
 import { signOut } from "next-auth/react";
-import { LogOut } from "react-feather";
+import { LogOut } from "lucide-react";
 
 export const SetupLayout = ({
   children,

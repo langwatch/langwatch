@@ -1,6 +1,6 @@
 import { useDisclosure } from "@chakra-ui/react";
 import { HStack, Button, Spacer, Box, Text } from "@chakra-ui/react";
-import { X } from "react-feather";
+import { X } from "lucide-react";
 
 import type { ModelOption } from "~/server/topicClustering/types";
 

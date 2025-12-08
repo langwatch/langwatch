@@ -18,7 +18,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink } from "react-feather";
+import { Download, ExternalLink } from "lucide-react";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";

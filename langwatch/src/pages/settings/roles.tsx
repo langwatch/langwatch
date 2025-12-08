@@ -10,7 +10,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Eye, Plus, Shield, Users } from "react-feather";
+import { Eye, Plus, Shield, Users } from "lucide-react";
 import { ShieldUser } from "lucide-react";
 
 import { useState } from "react";

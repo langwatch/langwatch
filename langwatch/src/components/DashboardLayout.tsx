@@ -27,7 +27,7 @@ import {
   Plus,
   Search,
   Info,
-} from "react-feather";
+} from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";

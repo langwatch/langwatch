@@ -13,7 +13,7 @@ import Parse from "papaparse";
 import React, { useEffect, useRef, useState } from "react";
 import numeral from "numeral";
 import { getEvaluationColumns } from "./utils";
-import { Download, ExternalLink, MoreVertical } from "react-feather";
+import { Download, ExternalLink, MoreVertical } from "lucide-react";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
@@ -331,7 +331,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       isFinished,
     });
 
-    
+
 
     const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV(
       {

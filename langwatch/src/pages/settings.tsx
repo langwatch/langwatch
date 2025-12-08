@@ -37,7 +37,7 @@ import { Select } from "../components/ui/select";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Switch } from "../components/ui/switch";
 import { Dialog } from "../components/ui/dialog";
-import { Lock } from "react-feather";
+import { Lock } from "lucide-react";
 
 import { withPermissionGuard } from "../components/WithPermissionGuard";
 

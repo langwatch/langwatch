@@ -7,7 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import React, { useEffect, useState } from "react";
-import { Search } from "react-feather";
+import { Search } from "lucide-react";
 
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";

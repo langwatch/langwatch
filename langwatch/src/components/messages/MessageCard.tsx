@@ -23,7 +23,7 @@ import {
   MinusCircle,
   Shield,
   XCircle,
-} from "react-feather";
+} from "lucide-react";
 import type {
   EvaluationResult,
   Trace,

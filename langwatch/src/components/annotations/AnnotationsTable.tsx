@@ -17,7 +17,7 @@ import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 
 import { useRouter } from "next/router";
-import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { ChevronDown, Edit, MessageCircle, MoreVertical } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import type { Annotation } from "@prisma/client";

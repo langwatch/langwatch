@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useEffect, useState } from "react";
-import { Pause, Play, RefreshCw, Search } from "react-feather";
+import { Pause, Play, RefreshCw, Search } from "lucide-react";
 import { type UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { useColorRawValue } from "../../components/ui/color-mode";

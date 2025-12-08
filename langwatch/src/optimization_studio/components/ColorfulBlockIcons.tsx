@@ -7,7 +7,7 @@ import {
   Box as BoxIcon,
   BookOpen,
   Code,
-} from "react-feather";
+} from "lucide-react";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
 import type { ComponentType } from "../types/dsl";

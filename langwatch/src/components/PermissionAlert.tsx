@@ -1,5 +1,5 @@
 import { Alert, Box, Text } from "@chakra-ui/react";
-import { Lock } from "react-feather";
+import { Lock } from "lucide-react";
 import type { Permission } from "../server/api/rbac";
 
 interface PermissionAlertProps {

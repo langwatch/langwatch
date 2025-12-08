@@ -3,7 +3,7 @@ import { VStack, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useRouter } from "next/router";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
-import { ArrowRight } from "react-feather";
+import { ArrowRight } from "lucide-react";
 import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 import type { ModelProviderKey } from "../../regions/model-providers/types";

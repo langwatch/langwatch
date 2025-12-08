@@ -4,7 +4,7 @@ import type { PromptConfigFormValues } from "~/prompts";
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
 import { HStack, useDisclosure } from "@chakra-ui/react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import { ChevronDown } from "react-feather";
+import { ChevronDown } from "lucide-react";
 
 /**
  * Model Select Field Mini

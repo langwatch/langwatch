@@ -19,7 +19,7 @@ import Parse from "papaparse";
 import { api } from "~/utils/api";
 import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
-import { Download } from "react-feather";
+import { Download } from "lucide-react";
 
 export default function BatchEvaluation({
   project,

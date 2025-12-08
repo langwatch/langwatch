@@ -21,7 +21,7 @@ import {
   Play,
   Share2,
   XCircle,
-} from "react-feather";
+} from "lucide-react";
 import { RenderCode } from "~/components/code/RenderCode";
 import { SmallLabel } from "../../components/SmallLabel";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -35,7 +35,7 @@ import { useVersionState, VersionToBeUsed } from "./History";
 import { Separator } from "@chakra-ui/react";
 import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import { type Edge } from "@xyflow/react";
-import { ChevronDown } from "react-feather";
+import { ChevronDown } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
 import { Dialog } from "../../components/ui/dialog";

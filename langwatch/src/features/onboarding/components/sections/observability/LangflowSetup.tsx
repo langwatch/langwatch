@@ -3,7 +3,7 @@ import { VStack, Text, Separator, Accordion } from "@chakra-ui/react";
 import { CodePreview } from "./CodePreview";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { Link } from "../../../../../components/ui/link";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 
 export function LangflowSetup(): React.ReactElement {
   const { project } = useActiveProject();

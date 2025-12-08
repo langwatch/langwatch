@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
-import { Shield, Plus } from "react-feather";
+import { Shield, Plus } from "lucide-react";
 import type { UseFormReturn } from "react-hook-form";
 import {
   AVAILABLE_EVALUATORS,

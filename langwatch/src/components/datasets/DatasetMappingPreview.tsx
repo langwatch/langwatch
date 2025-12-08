@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Edit2 } from "react-feather";
+import { Edit2 } from "lucide-react";
 import type {
   DatasetColumns,
   DatasetRecordEntry,

@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 
 import { type AnnotationQueueItem } from "@prisma/client";
-import { Check, ChevronLeft, ChevronRight } from "react-feather";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

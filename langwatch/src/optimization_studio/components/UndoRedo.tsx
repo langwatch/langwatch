@@ -1,6 +1,6 @@
 import { Button } from "@chakra-ui/react";
 
-import { RotateCcw, RotateCw } from "react-feather";
+import { RotateCcw, RotateCw } from "lucide-react";
 import { _useWorkflowStore } from "../hooks/useWorkflowStore";
 import { useEffect } from "react";
 import { useLoadWorkflow } from "../hooks/useLoadWorkflow";

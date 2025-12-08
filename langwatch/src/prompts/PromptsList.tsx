@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
-import { Edit, MoreVertical, Trash2 } from "react-feather";
+import { Edit, MoreVertical, Trash2 } from "lucide-react";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 

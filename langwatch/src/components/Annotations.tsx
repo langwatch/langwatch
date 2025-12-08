@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
+import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";

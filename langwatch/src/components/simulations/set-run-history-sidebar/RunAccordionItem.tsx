@@ -14,7 +14,7 @@ import {
   Calendar,
   Clock,
   ChevronDown,
-} from "react-feather";
+} from "lucide-react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { Run } from "./types";
 import { RunHistoryItem } from "./RunHistoryItem";

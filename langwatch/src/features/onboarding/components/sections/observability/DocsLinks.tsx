@@ -1,6 +1,6 @@
 import React from "react";
 import { HStack, Text, Icon } from "@chakra-ui/react";
-import { BookOpen, ExternalLink } from "react-feather";
+import { BookOpen, ExternalLink } from "lucide-react";
 import { Link } from "../../../../../components/ui/link";
 
 interface DocsLinksProps {

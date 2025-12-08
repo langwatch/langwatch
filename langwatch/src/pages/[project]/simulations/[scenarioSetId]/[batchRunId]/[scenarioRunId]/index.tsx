@@ -1,6 +1,6 @@
 import { Box, Button, HStack, Text, VStack, Skeleton } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { ArrowLeft, Clock, Check, X } from "react-feather";
+import { ArrowLeft, Clock, Check, X } from "lucide-react";
 
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import {

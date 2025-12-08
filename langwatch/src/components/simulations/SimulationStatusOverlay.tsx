@@ -1,6 +1,6 @@
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { Box, VStack, Text } from "@chakra-ui/react";
-import { Check, AlertCircle, X } from "react-feather";
+import { Check, AlertCircle, X } from "lucide-react";
 
 // Component for the status overlay when simulation is complete
 export function SimulationStatusOverlay({

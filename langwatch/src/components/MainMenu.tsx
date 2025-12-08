@@ -17,14 +17,12 @@ import {
   BookOpen,
   CheckSquare,
   Edit,
-  GitHub,
-  Globe,
   PlayCircle,
   Settings,
   Table,
   TrendingUp,
-} from "react-feather";
-
+} from "lucide-react";
+import { FiGithub as GitHub } from "react-icons/fi";
 import {
   Activity,
   Bug,

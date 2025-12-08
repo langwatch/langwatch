@@ -1,7 +1,7 @@
 import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "react-feather";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
