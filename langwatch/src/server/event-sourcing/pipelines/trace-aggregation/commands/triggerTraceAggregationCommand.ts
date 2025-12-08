@@ -14,13 +14,15 @@ import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/span
 import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepositoryMemory";
 import type { TriggerTraceAggregationCommandData } from "../schemas/commands";
 import { triggerTraceAggregationCommandDataSchema } from "../schemas/commands";
-import type {
-  TraceAggregationCompletedEvent,
-  TraceAggregationCompletedEventData,
-  TraceAggregationEvent,
+import {
+  type TraceAggregationSummaryCompletedEvent,
+  traceAggregationSummaryCompletedEventDataSchema,
+  type TraceAggregationEvent,
+  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
 } from "../schemas/events";
 import type { TraceAggregationService } from "../services/traceAggregationService";
 import { traceAggregationService as defaultTraceAggregationService } from "../services/traceAggregationService";
+import { TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE } from "../schemas/typeIdentifiers";
 
 /**
  * Command handler for triggering trace aggregation.
@@ -34,7 +36,7 @@ export class TriggerTraceAggregationCommand
     >
 {
   static readonly schema = defineCommandSchema(
-    "lw.obs.trace_aggregation.trigger",
+    TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE,
     triggerTraceAggregationCommandDataSchema,
     "Command to trigger trace aggregation",
   );
@@ -106,7 +108,7 @@ export class TriggerTraceAggregationCommand
           traceId,
         );
 
-        let aggregatedData: TraceAggregationCompletedEventData;
+        let aggregatedData: TraceAggregationSummaryCompletedEvent["data"];
 
         if (spans.length === 0) {
           this.logger.warn(
@@ -136,11 +138,11 @@ export class TriggerTraceAggregationCommand
 
         // Emit completed event with all computed metrics
         const completedEvent =
-          EventUtils.createEvent<TraceAggregationCompletedEvent>(
+          EventUtils.createEvent<TraceAggregationSummaryCompletedEvent>(
             "trace_aggregation",
             traceId,
             tenantIdObj,
-            "lw.obs.trace_aggregation.completed",
+            TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
             aggregatedData,
             {
               traceId,
@@ -158,7 +160,7 @@ export class TriggerTraceAggregationCommand
    */
   private createEmptyAggregationData(
     traceId: string,
-  ): TraceAggregationCompletedEventData {
+  ): TraceAggregationSummaryCompletedEvent["data"] {
     const now = Date.now();
     return {
       traceId,

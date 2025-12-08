@@ -8,12 +8,12 @@
 -- ============================================================================
 
 -- ============================================================================
--- Table: trace_overviews
+-- Table: trace_summaries
 -- ============================================================================
 -- Aggregated trace-level overviews for dashboards and analytics.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_overviews
+CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries
 (
     Id String CODEC(ZSTD(1)),
     TenantId String CODEC(ZSTD(1)),
@@ -61,7 +61,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'tiered';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.trace_overviews SYNC;
+DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

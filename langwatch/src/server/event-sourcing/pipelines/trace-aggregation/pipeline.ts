@@ -1,13 +1,13 @@
 import { eventSourcing } from "../../runtime";
 import { TriggerTraceAggregationCommand } from "./commands/triggerTraceAggregationCommand";
-import { TraceAggregationStateProjectionHandler } from "./projections";
-import type { TraceProjection } from "./projections/traceAggregationStateProjection";
+import { TraceSummaryStateProjectionHandler } from "./projections";
+import type { TraceSummary } from "./projections/traceSummaryStateProjection";
 import type { TraceAggregationEvent } from "./schemas/events";
 
 export const traceAggregationPipeline = eventSourcing
-  .registerPipeline<TraceAggregationEvent, TraceProjection>()
+  .registerPipeline<TraceAggregationEvent, TraceSummary>()
   .withName("trace_aggregation")
   .withAggregateType("trace_aggregation")
-  .withProjection("traceOverview", TraceAggregationStateProjectionHandler)
+  .withProjection("traceSummary", TraceSummaryStateProjectionHandler)
   .withCommand("triggerTraceAggregation", TriggerTraceAggregationCommand)
   .build();

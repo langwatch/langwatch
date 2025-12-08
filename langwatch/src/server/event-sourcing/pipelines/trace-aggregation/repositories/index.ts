@@ -1,14 +1,14 @@
-export type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
-export { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggregationStateProjectionRepositoryClickHouse";
+export type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
+export { TraceSummaryStateProjectionRepositoryClickHouse } from "./traceSummaryStateProjectionRepositoryClickHouse";
 
 import { getClickHouseClient } from "~/server/clickhouse/client";
-import { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggregationStateProjectionRepositoryClickHouse";
-import { TraceAggregationStateProjectionRepositoryMemory } from "./traceAggregationStateProjectionRepositoryMemory";
-import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
+import { TraceSummaryStateProjectionRepositoryClickHouse } from "./traceSummaryStateProjectionRepositoryClickHouse";
+import { TraceSummaryStateProjectionRepositoryMemory } from "./traceSummaryStateProjectionRepositoryMemory";
+import type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
 
 const clickHouseClient = getClickHouseClient();
 
-export const traceAggregationStateProjectionRepository: TraceAggregationStateProjectionRepository =
+export const traceSummaryStateProjectionRepository: TraceSummaryStateProjectionRepository =
   clickHouseClient
-    ? new TraceAggregationStateProjectionRepositoryClickHouse(clickHouseClient)
-    : new TraceAggregationStateProjectionRepositoryMemory();
+    ? new TraceSummaryStateProjectionRepositoryClickHouse(clickHouseClient)
+    : new TraceSummaryStateProjectionRepositoryMemory();
