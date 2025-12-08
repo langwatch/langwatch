@@ -192,17 +192,19 @@ export async function runMigrationsIfConfigured(
     return;
   }
 
-  const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
-
-  if (!connectionUrl) {
+  const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
+  if (!connectionUrlStr) {
     logger.info(
       "CLICKHOUSE_URL not configured, skipping ClickHouse migrations.",
     );
     return;
   }
 
+  const connectionUrlNoDatabase = new URL(connectionUrlStr);
+  connectionUrlNoDatabase.pathname = "";
+
   try {
-    migrateUp({ ...options, connectionUrl });
+    migrateUp({ ...options, connectionUrl: connectionUrlNoDatabase.toString() });
   } catch (error) {
     logger.error({ error }, "Failed to run ClickHouse migrations");
     throw error;
