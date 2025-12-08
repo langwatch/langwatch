@@ -130,7 +130,10 @@ function executeGoose(command: string, options: GooseOptions = {}): string {
   });
 
   if (result.error) {
-    throw new Error(`Goose migration failed: ${result.error.message}`);
+    const message = result.error.message.includes('ENOENT')
+      ? 'Goose binary not found. Install from https://github.com/pressly/goose'
+      : result.error.message;
+    throw new Error(`Goose migration failed: ${message}`);
   }
 
   if (result.status !== 0) {
