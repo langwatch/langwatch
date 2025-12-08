@@ -16,7 +16,7 @@ export function ShareButton({
   traceId: string;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
+  const { open, onOpen, onClose } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
       projectId: project.id,

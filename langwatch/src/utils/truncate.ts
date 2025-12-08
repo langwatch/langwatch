@@ -56,7 +56,7 @@ const truncateWithSizeLimit = (
     const entries = Object.entries(data);
     let result: Record<string, unknown> = {};
 
-    // eslint-disable-next-line @typescript-eslint/prefer-for-of
+    // biome-ignore lint/style/useForOf: this is a fair use case for a for loop, as we need to access the index of the entries array.
     for (let i = 0; i < entries.length; i++) {
       const tempResult = {
         ...result,

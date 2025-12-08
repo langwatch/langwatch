@@ -8,7 +8,7 @@ export const isJson = (input: string) => {
   try {
     JSON.parse(input);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };

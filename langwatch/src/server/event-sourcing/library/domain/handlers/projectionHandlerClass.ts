@@ -7,7 +7,7 @@ import type { ProjectionHandler } from "./projectionHandler";
  * These are accessed via the constructor (class) rather than instances.
  */
 export interface ProjectionHandlerClassStatic<
-  EventType extends Event,
+  _EventType extends Event,
   ProjectionType extends Projection,
 > {
   /**

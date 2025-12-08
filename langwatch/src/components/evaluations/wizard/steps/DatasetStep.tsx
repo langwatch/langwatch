@@ -101,15 +101,6 @@ export function DatasetStep() {
     [datasets.data, focusElementById, setDatasetId],
   );
 
-  const handleContinue = (
-    dataSource: "from_production" | "manual" | "upload",
-  ) => {
-    setWizardState({
-      step: "execution",
-      dataSource,
-    });
-  };
-
   // Handle CSV upload success
   const handleCSVUploadSuccess = (
     datasetId: string,

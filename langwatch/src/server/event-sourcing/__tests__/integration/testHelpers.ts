@@ -187,10 +187,10 @@ export async function waitForQueueProcessing(
                   errorMessages.push(
                     `\n  ${queueName}:${jobId}\n    Error: ${failedReason}\n    Payload: ${jobPayload}${stacktrace ? `\n    Stack: ${stacktrace.substring(0, 300)}` : ""}`,
                   );
-                } catch (jobError) {
+                } catch {
                   // If we can't get job details, at least report the job ID
                   errorMessages.push(
-                    `\n  ${queueName}:${jobId}\n    Error: Could not retrieve job details`,
+                    `\n  ${queueName}:${jobId}\n    Error: Could not retrieve job details, Error: ${error}`,
                   );
                 }
               }

@@ -264,7 +264,7 @@ const getCustomModels = (
 
   const customProviders: string[] = [];
 
-  for (const provider in modelProviders) {
+  for (const provider of Object.keys(modelProviders)) {
     if (
       modelProviders[provider].enabled &&
       modelProviders[provider].models &&
@@ -291,10 +291,12 @@ const getCustomModels = (
   if (customProviders.length > 0) {
     options.forEach((option) => {
       const optionProvider = option.split("/")[0]!;
+
       if (!customProviders.includes(optionProvider)) {
         models.push(option);
       }
     });
+
     return models;
   }
 

@@ -109,24 +109,6 @@ const promptingTechniques: PromptingTechnique[] = [
   },
 ];
 
-const retrieverInputsAndOutputs: {
-  inputs: Field[];
-  outputs: Field[];
-} = {
-  inputs: [
-    {
-      identifier: "query",
-      type: "str",
-    },
-  ],
-  outputs: [
-    {
-      identifier: "contexts",
-      type: "list[str]",
-    },
-  ],
-};
-
 const ALLOWED_EVALUATORS = [
   "langevals/exact_match",
   "langevals/llm_answer_match",

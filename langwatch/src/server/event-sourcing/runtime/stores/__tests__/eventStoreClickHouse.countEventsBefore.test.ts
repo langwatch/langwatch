@@ -10,7 +10,6 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
   const aggregateType: AggregateType = "span_ingestion";
-  const eventType = EVENT_TYPES[0];
 
   let mockClickHouseClient: ClickHouseClient;
   let store: EventStoreClickHouse;

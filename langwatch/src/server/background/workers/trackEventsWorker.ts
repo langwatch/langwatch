@@ -126,10 +126,10 @@ export const startTrackEventsWorker = () => {
     logger.info("track event worker active, waiting for jobs!");
   });
 
-  trackEventsWorker.on("failed", (job, err) => {
+  trackEventsWorker.on("failed", async (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
     getJobProcessingCounter("track_event", "failed").inc();
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "trackEvents");
       scope.setExtra?.("job", job?.data);
       captureException(err);

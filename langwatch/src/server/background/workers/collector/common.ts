@@ -15,8 +15,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
 
   const topmostInputs = topmostSpans.filter(
     (span) =>
-      span.input &&
-      span.input.value &&
+      span.input?.value &&
       span.type !== "evaluation" &&
       span.type !== "guardrail" &&
       (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
@@ -85,8 +84,7 @@ export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
 
 export const getLastOutputAsText = (spans: Span[]): string => {
   const nonEmptySpan = (span: Span) =>
-    span.output &&
-    span.output.value &&
+    span.output?.value &&
     span.type !== "evaluation" &&
     span.type !== "guardrail" &&
     (span.output.type !== "json" || !isEmptyJson(span.output.value));
@@ -143,7 +141,7 @@ export const typedValueToText = (
     }
     try {
       return JSON.stringify(value_);
-    } catch (e) {
+    } catch {
       return value_.toString();
     }
   };

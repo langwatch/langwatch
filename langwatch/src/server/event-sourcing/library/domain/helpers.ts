@@ -17,7 +17,7 @@ import { EventSchema, ProjectionSchema } from "./types";
  * type TraceId = ExtractAggregateId<MyEvent>; // "trace-123"
  * ```
  */
-export type ExtractAggregateId<TEvent extends Event> = string;
+export type ExtractAggregateId<_TEvent extends Event> = string;
 
 /**
  * Extracts the payload type from an Event type.

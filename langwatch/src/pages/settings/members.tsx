@@ -386,7 +386,6 @@ function MembersList({
                 {sortedMembers.map((member) => {
                   const roleLabel =
                     roleLabelMap.get(member.role) ?? member.role;
-                  const isDeleteDisabled = member.user.id === user?.id;
 
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>

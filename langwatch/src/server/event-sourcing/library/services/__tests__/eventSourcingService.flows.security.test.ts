@@ -671,7 +671,7 @@ describe("EventSourcingService - Security Flows", () => {
     });
 
     it("recovery operations validate tenant context", async () => {
-      const eventStore = createMockEventStore<Event>();
+      createMockEventStore<Event>();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );

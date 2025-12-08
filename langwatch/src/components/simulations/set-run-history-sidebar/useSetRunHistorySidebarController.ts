@@ -70,7 +70,6 @@ export const useSetRunHistorySidebarController = () => {
     );
 
   const totalCount = countData?.count ?? 0;
-  const hasMore = runData?.hasMore ?? false;
   const currentPage = cursorHistory.length + 1;
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -143,7 +142,7 @@ export const useSetRunHistorySidebarController = () => {
       setCursorHistory([]);
     } else if (newPage > currentPage) {
       // Navigate forward from current position
-      const stepsForward = newPage - currentPage;
+      // const stepsForward = newPage - currentPage;
       // This is simplified - in practice you'd need to fetch each page
       // For now, just allow forward navigation
     }

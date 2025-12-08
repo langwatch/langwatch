@@ -12,7 +12,6 @@ const logger = createLogger("useLocalStorageSelectedDataSetId");
  */
 export const useLocalStorageSelectedDataSetId = () => {
   const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
   const trpc = api.useContext();
   const [selectedDataSetId, setSelectedDataSetId] = useLocalStorage<string>(
     "selectedDatasetId",

@@ -219,7 +219,7 @@ describe("EventHandlerDispatcher", () => {
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
 
-      const logger = createMockLogger();
+      createMockLogger();
       const dispatcher = createDispatcher({
         eventHandlers,
         processorCheckpointStore: checkpointStore,
@@ -330,7 +330,7 @@ describe("EventHandlerDispatcher", () => {
         .fn()
         .mockResolvedValue(null);
 
-      const logger = createMockLogger();
+      createMockLogger();
       const dispatcher = createDispatcher({
         processorCheckpointStore: checkpointStore,
       });

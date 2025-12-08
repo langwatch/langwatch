@@ -14,7 +14,7 @@ import type { DistributedLock } from "../../library/utils/distributedLock";
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
+  _ProjectionType extends Projection = Projection,
 > {
   /**
    * Logical name for this pipeline, used for logging/metrics.

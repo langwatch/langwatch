@@ -269,7 +269,7 @@ export function CustomDragLayer() {
 
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (item && item.node && ref.current) {
+    if (item?.node && ref.current) {
       const { width, height } = ref.current.getBoundingClientRect();
       item.node.width = width;
       item.node.height = height;

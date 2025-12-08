@@ -39,11 +39,7 @@ export default withPermissionGuard("team:view", {
 })(Teams);
 
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
-  const {
-    hasPermission,
-    project,
-    team: currentTeam,
-  } = useOrganizationTeamProject();
+  const { hasPermission, project } = useOrganizationTeamProject();
   const hasTeamManagePermission = hasPermission("team:manage");
   const queryClient = api.useContext();
   const archiveTeam = api.team.archiveById.useMutation({

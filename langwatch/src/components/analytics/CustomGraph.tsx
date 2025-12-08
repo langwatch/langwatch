@@ -855,7 +855,7 @@ const collectAllDays = (
   const result: Record<string, number[]> = {};
 
   for (const entry of data) {
-    for (const key in entry) {
+    for (const key of Object.keys(entry)) {
       if (key === "date") continue;
       if (!result[key]) {
         result[key] = [];

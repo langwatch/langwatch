@@ -11,6 +11,7 @@ import {
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import {
   DocumentsCountsSummary,
@@ -27,7 +28,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
 import { api } from "../../utils/api";
-import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 
 function ProjectRouter() {
   const router = useRouter();

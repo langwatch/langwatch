@@ -1343,7 +1343,7 @@ export function DSPyExperimentSummary({
   onApply?: (appliedOptimizations: AppliedOptimization[]) => void;
   onViewLogs?: () => void;
 }) {
-  const { selectedPoint, setSelectedPoint } = useDSPyExperimentState({
+  const { selectedPoint } = useDSPyExperimentState({
     project,
     experiment,
   });

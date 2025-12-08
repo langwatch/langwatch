@@ -242,7 +242,7 @@ const isValidRegex = (pattern: string): boolean => {
   try {
     new RegExp(pattern);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };

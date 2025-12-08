@@ -38,7 +38,9 @@ describe("usePromptConfigForm", () => {
     it("salvages valid parts and uses defaults for invalid parts", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
 
       const defaults = buildDefaultFormValues();
       const corruptedValues = {

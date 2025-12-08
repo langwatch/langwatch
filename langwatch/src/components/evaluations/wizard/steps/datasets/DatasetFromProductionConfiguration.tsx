@@ -29,10 +29,7 @@ export function DatasetFromProductionConfiguration({
             value={dataset.id}
             width="full"
           >
-            <DatasetRadioCard
-              dataset={dataset}
-              handleDatasetSelect={() => {}}
-            />
+            <DatasetRadioCard dataset={dataset} />
           </RadioCard.Root>
         ) : (
           <VStack alignItems="flex-start">

@@ -176,7 +176,7 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onEditOpen();
-    } catch (error) {
+    } catch {
       toaster.create({
         title: "Failed to load role",
         description: "Could not load role details for editing",
@@ -195,7 +195,7 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onViewOpen();
-    } catch (error) {
+    } catch {
       toaster.create({
         title: "Failed to load role",
         description: "Could not load role details for viewing",

@@ -22,7 +22,7 @@ export const translateRouter = createTRPCRouter({
         });
         const { text } = response;
         return { translation: text };
-      } catch (error) {
+      } catch {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to get translation from OpenAI",

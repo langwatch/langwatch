@@ -55,7 +55,7 @@ async function cleanupQueue(queueName: string): Promise<void> {
     const queue = new Queue(queueName, { connection });
     await queue.obliterate({ force: true });
     await queue.close();
-  } catch (error) {
+  } catch {
     // Ignore cleanup errors - queue might not exist
   }
 }
@@ -73,7 +73,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
     for (const processor of processors) {
       try {
         await processor.close();
-      } catch (error) {
+      } catch {
         // Ignore cleanup errors
       }
     }

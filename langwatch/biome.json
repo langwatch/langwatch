@@ -35,7 +35,7 @@
         "noSyncScripts": "error"
       },
       "performance": {
-        "noImgElement": "warn",
+        "noImgElement": "off",
         "noUnwantedPolyfillio": "warn",
         "useGoogleFontPreconnect": "warn"
       },

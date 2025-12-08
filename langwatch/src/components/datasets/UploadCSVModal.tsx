@@ -306,7 +306,7 @@ export function CSVReaderComponent({
             let jsonContents;
             try {
               jsonContents = JSON.parse(contents);
-            } catch (error) {
+            } catch {
               // If the file is not a valid JSON, try to parse it as a JSONL file
               jsonContents = JSON.parse(
                 "[" +

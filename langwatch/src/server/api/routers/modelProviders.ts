@@ -97,7 +97,7 @@ export const modelProviderRouter = createTRPCRouter({
             validatedKeys = null;
           }
         }
-      } catch (e) {
+      } catch {
         throw new Error(`Invalid keys for ${provider}`);
       }
 

@@ -141,7 +141,7 @@ export function DatasetGeneration() {
 
                 columnNames = ["id", ...dataColumns];
               }
-            } catch (error) {
+            } catch {
               toaster.create({
                 title: "Error",
                 description: "Failed to get grid columns via fallback",
@@ -210,7 +210,7 @@ export function DatasetGeneration() {
 
                 columnNames = ["id", ...dataColumns];
               }
-            } catch (error) {
+            } catch {
               toaster.create({
                 title: "Error",
                 description: "Failed to get grid columns via fallback",

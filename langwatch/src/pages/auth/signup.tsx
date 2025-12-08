@@ -115,7 +115,7 @@ function SignUpForm() {
       if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
       }
-    } catch (e) {
+    } catch {
       toaster.create({
         title: "Error",
         description: "Failed to sign up",

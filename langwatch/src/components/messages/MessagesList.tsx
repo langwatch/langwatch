@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   Container,
-  Flex,
   Heading,
   HStack,
   LinkBox,
@@ -33,7 +32,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { ElasticSearchEvaluation, Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
-import { useDrawer } from "../CurrentDrawer";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
@@ -226,8 +224,6 @@ const ExpandableMessages = React.memo(
       setTimeout(() => setTransitionsEnabled(true), 100);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
-
-    const { openDrawer } = useDrawer();
 
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];

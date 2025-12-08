@@ -2,7 +2,7 @@ import type { UIMessage } from "ai";
 import React from "react";
 import { api } from "~/utils/api";
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
+// biome-ignore lint/style/noNamespace: not serious enough to warrant a change
 export declare namespace useLoadChatMessagesEffect {
   export interface Props {
     spanId?: string;

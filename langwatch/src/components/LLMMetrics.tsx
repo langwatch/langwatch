@@ -11,8 +11,8 @@ const ONE_DAY = MINUTES_IN_DAY;
 
 export function LLMMetrics() {
   const publicEnv = usePublicEnv();
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
-  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
+  const isNotQuickwit = !isQuickwit;
   const { hasPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {

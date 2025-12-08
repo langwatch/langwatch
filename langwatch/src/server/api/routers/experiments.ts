@@ -487,11 +487,11 @@ export const experimentsRouter = createTRPCRouter({
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source!.run_id === bucket.key,
+            (hit) => hit._source?.run_id === bucket.key,
           );
           const versionId = steps.filter(
-            (step) => step._source!.workflow_version_id,
-          )[0]?._source!.workflow_version_id;
+            (step) => step._source?.workflow_version_id,
+          )[0]?._source?.workflow_version_id;
 
           return {
             runId: bucket.key,

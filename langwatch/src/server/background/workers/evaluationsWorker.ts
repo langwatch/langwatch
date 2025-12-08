@@ -558,7 +558,9 @@ export const runEvaluation = async ({
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
-      } catch {}
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
       throw `${response.status} ${statusText}`;
     }
   }
@@ -707,10 +709,10 @@ export const startEvaluationsWorker = (
     logger.info("trace worker active, waiting for jobs!");
   });
 
-  traceChecksWorker.on("failed", (job, err) => {
+  traceChecksWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
     logger.error({ jobId: job?.id, error: err }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "traceChecks");
       scope.setExtra?.("job", job?.data);
       captureException(err);

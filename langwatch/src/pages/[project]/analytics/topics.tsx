@@ -82,27 +82,6 @@ const mostDisucussedTopics = {
   height: 300,
 };
 
-const inputSentiment = {
-  graphId: "custom",
-  graphType: "donnut",
-  series: [
-    {
-      name: "Sum messages count per message",
-      colorSet: "positiveNegativeNeutral",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "trace_id",
-        aggregation: "sum",
-      },
-    },
-  ],
-  groupBy: "sentiment.input_sentiment",
-  includePrevious: false,
-  timeScale: "full",
-  height: 300,
-};
-
 function TopicsContent() {
   return (
     <GraphsLayout>

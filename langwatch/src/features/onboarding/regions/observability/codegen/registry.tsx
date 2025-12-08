@@ -36,7 +36,7 @@ import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts";
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
   python?: { pip: string; uv: string };
-  go?: { ["go get"]: string };
+  go?: { "go get": string };
 }
 
 export interface SnippetRef {

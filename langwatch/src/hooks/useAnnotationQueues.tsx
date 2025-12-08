@@ -61,7 +61,7 @@ export function useAnnotationQueues(
       };
     }
 
-    const { assignedQueueItems, totalCount, queues } = optimizedData.data;
+    const { assignedQueueItems, totalCount } = optimizedData.data;
 
     return {
       assignedQueueItems,

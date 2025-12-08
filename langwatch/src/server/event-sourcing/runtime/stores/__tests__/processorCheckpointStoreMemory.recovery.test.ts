@@ -510,7 +510,6 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
 
     it("handles non-existent checkpoints gracefully", async () => {
       const processorName = "test-handler";
-      const processorType = "handler" as const;
       const nonExistentAggregateId = "non-existent-aggregate-id";
 
       // Try to clear non-existent checkpoint - should not throw

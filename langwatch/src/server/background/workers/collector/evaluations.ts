@@ -14,7 +14,7 @@ import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
 
-const logger = createLogger("langwatch:workers:collector:evaluations");
+const _logger = createLogger("langwatch:workers:collector:evaluations");
 
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {

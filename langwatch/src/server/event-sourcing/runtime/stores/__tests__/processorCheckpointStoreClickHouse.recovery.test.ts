@@ -461,7 +461,6 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
   describe("clearCheckpoint", () => {
     it("removes checkpoint for specific aggregate", async () => {
       const processorName = "test-handler";
-      const processorType = "handler" as const;
       const checkpointKey = buildCheckpointKey(
         tenantId,
         pipelineName,
@@ -492,7 +491,6 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
 
     it("handles non-existent checkpoints gracefully", async () => {
       const processorName = "test-handler";
-      const processorType = "handler" as const;
       const nonExistentAggregateId = "non-existent-aggregate-id";
 
       // Mock ClickHouse command (DELETE on non-existent row succeeds)
@@ -515,7 +513,6 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
 
     it("only removes checkpoint for specified processor", async () => {
       const processorName1 = "handler1";
-      const processorType = "handler" as const;
       const checkpointKey = buildCheckpointKey(
         tenantId,
         pipelineName,
@@ -572,7 +569,6 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
 
     it("handles ClickHouse command errors gracefully", async () => {
       const processorName = "test-handler";
-      const processorType = "handler" as const;
 
       const commandError = new Error("ClickHouse connection failed");
       (

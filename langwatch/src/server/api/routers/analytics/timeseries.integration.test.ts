@@ -1,17 +1,11 @@
-import { nanoid } from "nanoid";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { esClient } from "../../../elasticsearch";
-import type { ElasticSearchTrace } from "../../../tracer/types";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
 describe.skip("Timeseries Graph Integration Tests", () => {
-  const traceId = `test-trace-id-${nanoid()}`;
-  const traceId2 = `test-trace-id-${nanoid()}`;
-  const traceId3 = `test-trace-id-${nanoid()}`;
-
   beforeAll(async () => {
     await prisma.topic.createMany({
       data: [
@@ -35,7 +29,7 @@ describe.skip("Timeseries Graph Integration Tests", () => {
       skipDuplicates: true,
     });
 
-    const client = await esClient({ test: true });
+    await esClient({ test: true });
   });
 
   it.skip("should return the right data for metrics", async () => {

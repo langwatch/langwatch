@@ -207,7 +207,7 @@ const extractRedactionsForObject = (object: any): string[] => {
     try {
       const json = JSON.parse(object);
       return extractRedactionsForObject(json);
-    } catch (e) {
+    } catch {
       const json_ = parsePythonInsideJson(object as any);
       if (typeof json_ === "object") {
         return extractRedactionsForObject(json_);
@@ -233,7 +233,7 @@ const redactObject = <T>(object: T, redactions: Set<string>): T => {
     try {
       const json = JSON.parse(object);
       return JSON.stringify(redactObject(json, redactions)) as T;
-    } catch (e) {
+    } catch {
       const json_ = parsePythonInsideJson(object as any);
       if (typeof json_ === "object") {
         return JSON.stringify(redactObject(json_, redactions)) as T;

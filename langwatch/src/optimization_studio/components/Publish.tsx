@@ -209,7 +209,7 @@ const exportWorkflow = async (
     document.body.appendChild(link);
     link.click();
     link.remove();
-  } catch (error) {
+  } catch {
     toaster.create({
       title: "Error exporting workflow",
       description: "An error occurred while exporting the workflow.",
@@ -333,7 +333,7 @@ function PublishMenu({
     },
   );
 
-  const planAllowsToPublish = usage.data && usage.data?.activePlan.canPublish;
+  const planAllowsToPublish = usage.data?.activePlan.canPublish;
   const publishDisabledLabel = !publishedWorkflow.data?.version
     ? "Publish a version to enable this option"
     : undefined;
@@ -374,8 +374,8 @@ function PublishMenu({
     );
   };
 
-  const handleExportWorkflow = () => {
-    exportWorkflow(workflow, datasetRecords.data ?? undefined);
+  const handleExportWorkflow = async () => {
+    await exportWorkflow(workflow, datasetRecords.data ?? undefined);
   };
 
   return (
@@ -447,7 +447,7 @@ function PublishMenu({
         <Code size={16} /> View API Reference
       </SubscriptionMenuItem>
       <SubscriptionMenuItem
-        onClick={handleExportWorkflow}
+        onClick={() => void handleExportWorkflow()}
         value="export-workflow"
       >
         <Share2 size={16} /> Export Workflow

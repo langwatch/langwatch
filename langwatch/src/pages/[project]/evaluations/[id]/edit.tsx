@@ -51,7 +51,7 @@ export default function EditTraceCheck() {
       });
       void router.push(`/${project.slug}/evaluations`);
       check.remove();
-    } catch (error) {
+    } catch {
       toaster.create({
         title: "Failed to update check",
         description: "Please try again",

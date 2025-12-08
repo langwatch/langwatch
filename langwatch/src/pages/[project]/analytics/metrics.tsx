@@ -21,22 +21,6 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
 
-const userCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "blueTones",
-      metric: "metadata.user_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: true,
-  timeScale: ONE_DAY,
-  height: 550,
-};
-
 const LLMMetrics = {
   graphId: "custom",
   graphType: "summary",

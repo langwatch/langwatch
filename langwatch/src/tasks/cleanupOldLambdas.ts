@@ -73,7 +73,7 @@ const getLastEventTime = async (
 
     const response = await logsClient.send(command);
 
-    if (response.logStreams && response.logStreams[0]?.lastEventTimestamp) {
+    if (response.logStreams?.[0]?.lastEventTimestamp) {
       return new Date(response.logStreams[0].lastEventTimestamp);
     }
 

@@ -328,13 +328,6 @@ const Panel = ({
   );
 };
 
-type InputOutputExecutablePanelComponent =
-  typeof InputOutputExecutablePanelComponent & {
-    LeftDrawer: React.FC<Required<PropsWithChildren>>;
-    CenterContent: React.FC<Required<PropsWithChildren>>;
-    RightDrawer: React.FC<Required<PropsWithChildren>>;
-  };
-
 const LeftDrawer = ({ children }: { children: React.ReactNode }) => children;
 LeftDrawer.displayName = "InputOutputExecutablePanel.LeftDrawer";
 

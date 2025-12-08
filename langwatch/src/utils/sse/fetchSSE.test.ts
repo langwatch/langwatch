@@ -37,13 +37,13 @@ describe("fetchSSE", () => {
 
     // Default successful connection
     mockFetchEventSource.mockImplementation(
-      (url: string, options: FetchEventSourceMockOptions) => {
-        Promise.resolve().then(() => {
+      (_url: string, options: FetchEventSourceMockOptions) => {
+        void Promise.resolve().then(async () => {
           if (options.signal.aborted) {
             options.onerror(new Error("Aborted"));
             return;
           }
-          options.onopen({
+          void options.onopen({
             ok: true,
             headers: { get: () => "text/event-stream" },
           });
@@ -79,8 +79,8 @@ describe("fetchSSE", () => {
     const shouldStopProcessing = vi.fn((event) => event.type === "stop");
 
     mockFetchEventSource.mockImplementation(
-      (url: string, options: FetchEventSourceMockOptions) => {
-        options.onopen({
+      (_url: string, options: FetchEventSourceMockOptions) => {
+        void options.onopen({
           ok: true,
           headers: { get: () => "text/event-stream" },
         });
@@ -135,8 +135,8 @@ describe("fetchSSE", () => {
         const onError = vi.fn();
 
         mockFetchEventSource.mockImplementation(
-          (url: string, options: FetchEventSourceMockOptions) => {
-            options.onopen({
+          (_url: string, options: FetchEventSourceMockOptions) => {
+            void options.onopen({
               ok: true,
               headers: { get: () => "text/event-stream" },
             });
@@ -178,8 +178,8 @@ describe("fetchSSE", () => {
     describe("without onError callback", () => {
       it("should throw errors when no onError callback is provided", async () => {
         mockFetchEventSource.mockImplementation(
-          (url: string, options: FetchEventSourceMockOptions) => {
-            options.onopen({
+          (_url: string, options: FetchEventSourceMockOptions) => {
+            void options.onopen({
               ok: true,
               headers: { get: () => "text/event-stream" },
             });
@@ -201,7 +201,7 @@ describe("fetchSSE", () => {
         vi.useFakeTimers();
 
         await expect(async () => {
-          fetchSSE({
+          void fetchSSE({
             endpoint: "/api/test",
             payload: {},
             onEvent: vi.fn(),

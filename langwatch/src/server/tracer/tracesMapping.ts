@@ -41,7 +41,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => {
       try {
         return getRAGInfo(trace.spans ?? []).contexts ?? [];
-      } catch (e) {
+      } catch {
         return [];
       }
     },
@@ -620,7 +620,7 @@ export function mergeThreadAndTraceMappings(
 const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
     return z.array(datasetSpanSchema).parse(spans);
-  } catch (e) {
+  } catch {
     return spans as any;
   }
 };
@@ -732,7 +732,7 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
         return parsed as unknown as StringTypeToType[T];
       }
       throw new Error("Failed to parse to a valid type, falling back");
-    } catch (e) {
+    } catch {
       if (type === "string[]") {
         return [
           tryAndConvertTo(value, "string"),

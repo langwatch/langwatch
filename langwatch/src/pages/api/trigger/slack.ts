@@ -64,7 +64,7 @@ export default async function handler(
   try {
     const validatedData = schema.parse(req.body);
 
-    const trigger = await prisma.trigger.create({
+    await prisma.trigger.create({
       data: {
         projectId: project.id,
         action: TriggerAction.SEND_SLACK_MESSAGE,

@@ -141,9 +141,9 @@ export async function aggregateTraces<
   ) as Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>;
 
   if (result.aggregations) {
-    for (const key in result.aggregations) {
-      out[key] = getBucketsFromAggregation(result.aggregations[key]);
-    }
+    Object.entries(result.aggregations).forEach(([key, value]) => {
+      out[key as keyof Aggs] = getBucketsFromAggregation(value);
+    });
   }
 
   return out;

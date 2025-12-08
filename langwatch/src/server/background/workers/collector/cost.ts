@@ -211,5 +211,5 @@ export const prewarmTiktokenModels = async () => {
 };
 
 if (isBuildOrNoRedis) {
-  prewarmTiktokenModels();
+  await prewarmTiktokenModels();
 }

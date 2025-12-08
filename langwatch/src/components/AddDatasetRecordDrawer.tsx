@@ -159,7 +159,9 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               if (column?.type !== "string") {
                 try {
                   entry = JSON.parse(value as string);
-                } catch {}
+                } catch {
+                  /* this is just a safe json parse fallback */
+                }
               }
 
               return [key, entry];
@@ -213,7 +215,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
     // We do this here since if we do it before, or attempt to do keep the
     // datasetId in sync, it will force a re-render and the drawers will close.
-    setLocalStorageDatasetId(_data.datasetId);
+    await setLocalStorageDatasetId(_data.datasetId);
   };
 
   // State for row data from dataset

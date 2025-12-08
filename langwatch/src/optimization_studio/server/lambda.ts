@@ -383,7 +383,9 @@ export const invokeLambda = async (
               if (payloadText.includes('{"statusCode":')) {
                 try {
                   statusCode = parseInt(JSON.parse(payloadText).statusCode);
-                } catch {}
+                } catch {
+                  /* this is just a safe json parse fallback */
+                }
               }
               controller.enqueue(chunk.PayloadChunk.Payload);
             }
@@ -401,7 +403,10 @@ export const invokeLambda = async (
           if (statusCode < 200 || statusCode >= 300) {
             try {
               errorMessage = JSON.parse(errorMessage.trim());
-            } catch {}
+            } catch {
+              /* this is just a safe json parse fallback */
+            }
+
             if (statusCode === 422) {
               console.error(
                 "Optimization Studio validation failed, please contact support",
@@ -442,7 +447,10 @@ export const invokeLambda = async (
       let body = await response.text();
       try {
         body = JSON.parse(body);
-      } catch {}
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
+
       if (response.status === 422) {
         console.error(
           "Optimization Studio validation failed, please contact support",

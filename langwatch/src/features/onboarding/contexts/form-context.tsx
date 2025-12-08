@@ -32,19 +32,6 @@ export function useOnboardingFormContext(): OnboardingFormContextValue {
   return ctx;
 }
 
-type Handlers = {
-  setOrganizationName: (value: string) => void;
-  setAgreement: (value: boolean) => void;
-  setUsageStyle: (value: UsageStyle | undefined) => void;
-  setPhoneNumber: (value: string) => void;
-  setPhoneHasValue: (value: boolean) => void;
-  setPhoneIsValid: (value: boolean) => void;
-  setCompanySize: (value: CompanySize) => void;
-  setSolutionType: (value: SolutionType | undefined) => void;
-  setDesires: (value: DesireType[]) => void;
-  setRole: (value: RoleType | undefined) => void;
-};
-
 export const OnboardingFormProvider: React.FC<
   React.PropsWithChildren<{ value: OnboardingFormContextValue }>
 > = ({ value, children }) => (

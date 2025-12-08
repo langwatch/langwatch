@@ -1205,7 +1205,7 @@ describe("Span organizing and flattening tests", () => {
       spans.map(elasticSearchSpanToSpan as any),
     );
 
-    // expect(input).toBe("Hello");
+    expect(input).toBe("Hello");
     expect(output).toBe(
       "Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let's set sail on a grand adventure! Arrr! 🏴‍☠️",
     );

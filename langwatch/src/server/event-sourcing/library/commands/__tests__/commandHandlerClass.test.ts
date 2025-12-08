@@ -17,7 +17,7 @@ interface TestMetadata extends EventMetadataBase {
   correlationId: string;
 }
 
-type TestCommandType = (typeof COMMAND_TYPES)[number];
+// type _TestCommandType = (typeof COMMAND_TYPES)[number];
 type TestEventType = (typeof EVENT_TYPES)[number];
 
 interface TestEvent extends Event<{ result: string }, TestMetadata> {

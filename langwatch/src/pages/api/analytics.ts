@@ -12,7 +12,7 @@ import { prisma } from "../../server/db"; // Adjust the import based on your set
 
 import { createLogger } from "../../utils/logger";
 
-const logger = createLogger("langwatch:analytics");
+const _logger = createLogger("langwatch:analytics");
 
 export default async function handler(
   req: NextApiRequest,

@@ -17,7 +17,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { EmbeddingsModel, TopicClusteringModel } from "./model-providers";
 
 function TopicClusteringSettings() {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 

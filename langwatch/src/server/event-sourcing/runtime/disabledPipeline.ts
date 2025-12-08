@@ -50,7 +50,11 @@ class DisabledEventSourcingService {
 
   getQueueManager() {
     return {
-      initializeCommandQueues: () => {},
+      initializeCommandQueues: () => {
+        logger.debug(
+          "initializeCommandQueues ignored: event sourcing is disabled",
+        );
+      },
       getCommandQueueProcessors: () => new Map(),
     };
   }

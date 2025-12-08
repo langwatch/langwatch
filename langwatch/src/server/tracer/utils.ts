@@ -73,14 +73,18 @@ export const getRAGInfo = (
     if (typeof input !== "string") {
       input = JSON.stringify(input);
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   try {
     output = JSON.parse(output);
     if (typeof output !== "string") {
       output = JSON.stringify(output);
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   return { input, output, contexts };
 };
@@ -94,7 +98,7 @@ export const elasticSearchToTypedValue = (
       value:
         typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
     } as any;
-  } catch (e) {
+  } catch {
     return {
       type: "raw",
       value: typed.value,

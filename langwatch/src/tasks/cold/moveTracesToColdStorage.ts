@@ -90,9 +90,9 @@ const pollReindexTask = async (
           hasChildTasks = true;
 
           // Aggregate progress from all child tasks
-          for (const nodeId in allTasksResponse.nodes) {
+          for (const nodeId of Object.keys(allTasksResponse.nodes)) {
             const nodeTasks = allTasksResponse.nodes[nodeId]!.tasks;
-            for (const childTaskId in nodeTasks) {
+            for (const childTaskId of Object.keys(nodeTasks)) {
               const childTask = nodeTasks[childTaskId]!;
               if (childTask.status) {
                 totalCreated += childTask.status.created || 0;

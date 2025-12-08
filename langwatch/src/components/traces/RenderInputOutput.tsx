@@ -36,7 +36,9 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
     if (typeof value === "object" && value !== null) {
       json = value;
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   const propsWithoutValue = { ...props };
   delete propsWithoutValue.value;
@@ -65,7 +67,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
                     title: "Copied to clipboard",
                     type: "success",
                   });
-                } catch (e) {
+                } catch {
                   if (
                     window.location.protocol === "http:" &&
                     window.location.hostname !== "localhost" &&

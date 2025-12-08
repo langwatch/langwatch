@@ -23,17 +23,16 @@ export default function IndividualScenarioRunPage() {
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
   // Fetch scenario run data using the correct API
-  const { data: scenarioState, isLoading: isScenarioStateLoading } =
-    api.scenarios.getRunState.useQuery(
-      {
-        scenarioRunId: scenarioRunId ?? "",
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioRunId,
-        refetchInterval: 1000,
-      },
-    );
+  const { data: scenarioState } = api.scenarios.getRunState.useQuery(
+    {
+      scenarioRunId: scenarioRunId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!scenarioRunId,
+      refetchInterval: 1000,
+    },
+  );
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;

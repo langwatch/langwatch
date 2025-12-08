@@ -12,8 +12,7 @@ const SAFE_RETURN_TO_REGEX = /^\/(?!\/)[^\r\n]*$/;
 export function getSafeReturnToPath(
   returnTo?: string | string[] | null,
 ): string | null {
-  const normalizedValue =
-    typeof returnTo === "string" ? returnTo : null;
+  const normalizedValue = typeof returnTo === "string" ? returnTo : null;
 
   if (!normalizedValue) {
     return null;
@@ -25,4 +24,3 @@ export function getSafeReturnToPath(
 
   return normalizedValue;
 }
-

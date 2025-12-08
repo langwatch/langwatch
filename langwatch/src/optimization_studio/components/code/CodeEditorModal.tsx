@@ -103,7 +103,7 @@ export function CodeEditorModal({
 }
 
 const onKeyDown = {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: this is a fair use case for a function expression as a third party client may need to access the fn property of the object.
   fn: () => {},
 };
 

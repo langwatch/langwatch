@@ -63,8 +63,7 @@ export function DatasetMappingPreview({
   setDatasetTriggerMapping,
 }: DatasetMappingPreviewProps) {
   const [isThreadMapping, setIsThreadMapping] = useState(false);
-  const [threadMappingState, setThreadMappingState] =
-    useState<ThreadMappingState>();
+  const [, setThreadMappingState] = useState<ThreadMappingState>();
 
   const { project } = useOrganizationTeamProject();
 

@@ -356,7 +356,7 @@ export const cleanupPIIs = async (
             clearPIIPromises.push(clearPII(context.content, [i], options));
           }
         } else if (typeof context.content === "object") {
-          for (const key in context.content) {
+          for (const key of Object.keys(context.content)) {
             clearPIIPromises.push(clearPII(context.content, [key], options));
           }
         } else {

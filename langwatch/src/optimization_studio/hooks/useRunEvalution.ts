@@ -129,7 +129,7 @@ export const useRunEvalution = () => {
                 newDsl: getWorkflow(),
               });
             commitMessage = (commitMessageResponse as string) ?? "autosaved";
-          } catch (error) {
+          } catch {
             toaster.create({
               title: "Error auto-generating version description",
               type: "error",
@@ -157,7 +157,7 @@ export const useRunEvalution = () => {
           });
 
           void trpc.workflow.getVersions.invalidate();
-        } catch (error) {
+        } catch {
           toaster.create({
             title: "Error saving version",
             type: "error",

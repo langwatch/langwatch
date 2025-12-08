@@ -8,8 +8,8 @@ export const LLMSummary = () => {
   const publicEnv = usePublicEnv();
   const { hasPermission } = useOrganizationTeamProject();
 
-  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
+  const isNotQuickwit = !isQuickwit;
 
   const llmSummary: CustomGraphInput = {
     graphId: "llmSummary",

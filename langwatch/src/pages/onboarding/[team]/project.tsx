@@ -22,10 +22,10 @@ import {
 } from "~/components/TechStack";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
-import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { trackEvent } from "../../../utils/tracking";
 
 type RadioCardProps = {
@@ -125,12 +125,12 @@ export default function ProjectOnboarding() {
       },
       {
         onSuccess: (data) => {
-      if (safeReturnToPath) {
-        void router.push(safeReturnToPath);
-        return;
-      }
+          if (safeReturnToPath) {
+            void router.push(safeReturnToPath);
+            return;
+          }
 
-      void router.push(`/${data.projectSlug}/messages`);
+          void router.push(`/${data.projectSlug}/messages`);
         },
       },
     );
@@ -187,35 +187,34 @@ export default function ProjectOnboarding() {
             <Field.Label>Project Name</Field.Label>
             <Input {...form.register("name", { required: true })} />
           </Field.Root>
-          {teams.data &&
-            teams.data.some((team) => team.projects.length > 0) && (
-              <>
+          {teams.data?.some((team) => team.projects.length > 0) && (
+            <>
+              <Field.Root>
+                <Field.Label>Team</Field.Label>
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    {...form.register("teamId", { required: true })}
+                  >
+                    {teams.data?.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                    <option value="NEW">(+) Create new team</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Field.Root>
+              {teamId == "NEW" && (
                 <Field.Root>
-                  <Field.Label>Team</Field.Label>
-                  <NativeSelect.Root>
-                    <NativeSelect.Field
-                      {...form.register("teamId", { required: true })}
-                    >
-                      {teams.data?.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                      <option value="NEW">(+) Create new team</option>
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
+                  <Field.Label>New Team Name</Field.Label>
+                  <Input
+                    {...form.register("newTeamName", { required: true })}
+                  />
                 </Field.Root>
-                {teamId == "NEW" && (
-                  <Field.Root>
-                    <Field.Label>New Team Name</Field.Label>
-                    <Input
-                      {...form.register("newTeamName", { required: true })}
-                    />
-                  </Field.Root>
-                )}
-              </>
-            )}
+              )}
+            </>
+          )}
           <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">

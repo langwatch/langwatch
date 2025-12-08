@@ -47,10 +47,10 @@ export const startTopicClusteringWorker = () => {
     logger.info("topic clustering worker active, waiting for jobs!");
   });
 
-  topicClusteringWorker.on("failed", (job, err) => {
+  topicClusteringWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("topic_clustering", "failed").inc();
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "topicClustering");
       scope.setExtra?.("job", job?.data);
       captureException(err);

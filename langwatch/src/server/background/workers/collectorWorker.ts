@@ -906,7 +906,7 @@ export const startCollectorWorker = () => {
     logger.debug("collector worker active, waiting for jobs!");
   });
 
-  collectorWorker.on("failed", (job, err) => {
+  collectorWorker.on("failed", async (job, err) => {
     if (
       job?.data &&
       "action" in job.data &&
@@ -917,7 +917,7 @@ export const startCollectorWorker = () => {
       getJobProcessingCounter("collector", "failed").inc();
     }
     logger.debug({ jobId: job?.id, error: err.message }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "collector");
       scope.setExtra?.("job", job?.data);
       captureException(err);

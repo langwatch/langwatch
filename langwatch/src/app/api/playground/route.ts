@@ -120,7 +120,9 @@ export async function POST(req: NextRequest) {
           status: 401,
         });
       }
-    } catch {}
+    } catch {
+      /* this is just a safe json parse fallback */
+    }
     throw e;
   }
 }

@@ -522,6 +522,14 @@ const addOpenTelemetrySpanAsSpan = (
               value: parsed,
             };
           } catch (error) {
+            logger.error(
+              {
+                error,
+                customerTraceId: trace.traceId,
+              },
+              "error parsing gen_ai.prompt",
+            );
+
             output = {
               type: "text",
               value: attributesMap.gen_ai.prompt,
@@ -718,6 +726,14 @@ const addOpenTelemetrySpanAsSpan = (
               value: parsed,
             };
           } catch (error) {
+            logger.error(
+              {
+                error,
+                customerTraceId: trace.traceId,
+              },
+              "error parsing gen_ai.completion",
+            );
+
             output = {
               type: "text",
               value: attributesMap.gen_ai.completion,
@@ -978,7 +994,9 @@ const addOpenTelemetrySpanAsSpan = (
           try {
             name =
               (input?.value as any).agent.match(/role='(.*?)'/)?.[1] ?? name;
-          } catch {}
+          } catch {
+            /* this is just a safe json parse fallback */
+          }
         }
 
         // vercel
@@ -1193,6 +1211,7 @@ const addOpenTelemetrySpanAsSpan = (
 };
 
 type RecursiveRecord = {
+  // biome-ignore lint/complexity/noBannedTypes: this is a trick to get rich key types + arbitrary strings
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 

@@ -146,7 +146,7 @@ export default async function execute() {
         createdAt: Date;
       }> = [];
 
-      for (const { counts, key, name } of allCounts) {
+      for (const { counts, key } of allCounts) {
         for (const bucket of counts) {
           if (
             bucket.doc_count > 0 &&

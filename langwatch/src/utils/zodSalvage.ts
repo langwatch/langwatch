@@ -143,7 +143,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
             // If parse fails and no defaults, leave salvaged[key] undefined
             // merge() will use the default from schemaDefaults
           }
-        } catch (error) {
+        } catch {
           // If salvage fails (e.g., required fields missing in optional nested object),
           // silently fall back to the default from schemaDefaults (may be undefined)
           salvaged[key] = nestedDefaults;

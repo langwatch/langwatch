@@ -610,7 +610,7 @@ function CustomGraphForm({
   const addGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    if (graphJson && graphJson.hasOwnProperty("height")) {
+    if (graphJson?.hasOwnProperty("height")) {
       graphJson.height = 300;
     }
 

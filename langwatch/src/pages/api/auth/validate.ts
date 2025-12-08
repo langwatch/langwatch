@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 import { createLogger } from "../../../utils/logger";
 
-const logger = createLogger("langwatch:auth:validate");
+const _logger = createLogger("langwatch:auth:validate");
 
 export default async function handler(
   req: NextApiRequest,

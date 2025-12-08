@@ -38,7 +38,7 @@ export default async function handler(
       if (body) {
         try {
           req.body = JSON.parse(body);
-        } catch (e) {
+        } catch {
           req.body = body;
         }
       }

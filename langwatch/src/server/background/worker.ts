@@ -140,7 +140,9 @@ const startMetricsServer = () => {
           .catch(() => {
             res.writeHead(500).end();
           });
-      } catch (err) {
+      } catch (error) {
+        logger.error({ error }, "error getting metrics");
+
         res.writeHead(500).end();
       }
     } else {

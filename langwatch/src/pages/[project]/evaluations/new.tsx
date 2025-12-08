@@ -31,7 +31,7 @@ export default function NewTraceCheckConfig() {
         },
       });
       await router.push(`/${project.slug}/evaluations`);
-    } catch (error) {
+    } catch {
       toaster.create({
         title: "Failed to create check",
         description: "Please try again",

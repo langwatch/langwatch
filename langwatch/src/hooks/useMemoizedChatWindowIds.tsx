@@ -1,6 +1,6 @@
 import * as React from "react";
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
+// biome-ignore lint/style/noNamespace: this isn't serious enough to warrant a change
 export declare namespace useMemoizedChatWindowIds {
   export interface Props {
     chatWindows?: Array<{ id: string }>;

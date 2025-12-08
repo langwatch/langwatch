@@ -154,7 +154,7 @@ export function PromptTextArea({
         <MentionsInput
           value={value ?? ""}
           onChange={(event) => {
-            onChange && onChange(event);
+            onChange?.(event);
           }}
           onBlur={() => {
             setTimeout(() => {

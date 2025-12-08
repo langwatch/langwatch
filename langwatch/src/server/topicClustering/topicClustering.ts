@@ -629,7 +629,9 @@ export const fetchTopicsBatchClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch {
+      /* this is just a safe json parse fallback */
+    }
     throw new Error(
       `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`,
     );
@@ -672,7 +674,10 @@ export const fetchTopicsIncrementalClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch {
+      /* this is just a safe json parse fallback */
+    }
+
     throw new Error(
       `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`,
     );

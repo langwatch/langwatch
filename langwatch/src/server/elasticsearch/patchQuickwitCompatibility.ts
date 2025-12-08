@@ -35,7 +35,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
         if (params.format === "epoch_millis") {
           delete params.format;
         }
-        for (const key in params) {
+        for (const key of Object.keys(params)) {
           patchParams(params[key]);
         }
       } else if (Array.isArray(params)) {

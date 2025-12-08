@@ -1,7 +1,10 @@
 import crypto from "crypto";
 import { env } from "../env.mjs";
+import { createLogger } from "./logger";
 
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+
+const logger = createLogger("langwatch.utils.encryption");
 
 function getEncryptionKey(): Uint8Array {
   const CREDENTIALS_SECRET = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
@@ -60,6 +63,8 @@ export function decrypt(encryptedString: string): string {
 
     return decrypted;
   } catch (error) {
+    logger.error(error, "decryption failure");
+
     throw new Error(
       "Failed to decrypt: Data may be corrupted or tampered with",
     );

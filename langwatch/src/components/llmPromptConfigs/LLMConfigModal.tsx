@@ -66,8 +66,11 @@ function normalizeMaxTokens(
 ): LlmConfigModalValues {
   const usesCamelCase = values.maxTokens !== undefined;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { maxTokens, max_tokens, ...rest } = values;
+  const {
+    maxTokens: _sunkMaxTokens,
+    max_tokens: _sunkMaxTokens2,
+    ...rest
+  } = values;
 
   if (usesCamelCase) {
     return { ...rest, maxTokens: tokenValue } as LlmConfigModalValues;

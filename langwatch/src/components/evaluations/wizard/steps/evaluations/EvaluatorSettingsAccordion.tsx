@@ -6,7 +6,6 @@ import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
@@ -17,7 +16,6 @@ export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
   const { wizardState, getFirstEvaluatorNode, setFirstEvaluator } =
     useEvaluationWizardStore();
-  const publicEnv = usePublicEnv();
 
   const evaluator = getFirstEvaluatorNode();
   const evaluatorType = evaluator?.data.evaluator;

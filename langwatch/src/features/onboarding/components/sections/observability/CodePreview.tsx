@@ -91,7 +91,7 @@ export function CodePreview({
           closable: true,
         },
       });
-    } catch (err) {
+    } catch {
       toaster.create({
         title: "Failed to copy",
         description: "Could not copy to clipboard",

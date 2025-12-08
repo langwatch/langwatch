@@ -11,7 +11,6 @@ import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
 // Time unit conversion constants
@@ -78,26 +77,6 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
-  timeScale: ONE_DAY,
-  height: 300,
-};
-
-const averageDailyThreadsPerUser = {
-  graphId: "custom",
-  graphType: "bar",
-  series: [
-    {
-      name: "Average threads count per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
   timeScale: ONE_DAY,
   height: 300,
 };
@@ -200,8 +179,8 @@ const userThreads = {
 
 function UsersContent() {
   const publicEnv = usePublicEnv();
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
-  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
+  const isNotQuickwit = !isQuickwit;
 
   return (
     <GraphsLayout>
