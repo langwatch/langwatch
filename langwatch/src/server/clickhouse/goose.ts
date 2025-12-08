@@ -204,7 +204,10 @@ export async function runMigrationsIfConfigured(
   connectionUrlNoDatabase.pathname = "";
 
   try {
-    migrateUp({ ...options, connectionUrl: connectionUrlNoDatabase.toString() });
+    migrateUp({
+      ...options,
+      connectionUrl: connectionUrlNoDatabase.toString(),
+    });
   } catch (error) {
     logger.error({ error }, "Failed to run ClickHouse migrations");
     throw error;

@@ -1,5 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { getClickHouseClient } from "~/server/clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
 import {
@@ -17,7 +18,6 @@ import {
 } from "../schemas/commands";
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
-import { getClickHouseClient } from "~/server/clickhouse/client";
 
 /**
  * Self-contained command handler for span ingestion record commands.

@@ -1,6 +1,6 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { env } from "../../env.mjs";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "~/utils/logger";
+import { env } from "../../env.mjs";
 
 const logger = createLogger("langwatch:clickhouse:client");
 
