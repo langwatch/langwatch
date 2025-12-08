@@ -23,7 +23,7 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "../../hooks/useDrawer";
 import { toaster } from "../ui/toaster";
 import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";

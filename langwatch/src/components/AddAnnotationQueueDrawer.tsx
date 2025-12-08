@@ -20,7 +20,7 @@ import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
-import { useDrawer } from "./CurrentDrawer";
+import { useDrawer } from "../hooks/useDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
