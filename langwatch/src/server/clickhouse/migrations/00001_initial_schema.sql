@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log
     INDEX idx_tenant_aggregate_event_id (TenantId, AggregateType, AggregateId, EventId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_MERGETREE:-MergeTree()}
-PARTITION BY TenantId, toYYYYMM(EventTimestamp)
+PARTITION BY (TenantId, toYYYYMM(EventTimestamp))
 ORDER BY (TenantId, AggregateType, AggregateId, EventTimestamp, EventId)
 TTL toDateTime(EventTimestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1, storage_policy = 'tiered';
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.ingested_spans
     INDEX idx_tenant_trace_span (TenantId, TraceId, SpanId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}Timestamp)
-PARTITION BY TenantId, toYYYYMM(Timestamp)
+PARTITION BY (TenantId, toYYYYMM(Timestamp))
 ORDER BY (TenantId, TraceId, SpanId)
 TTL toDateTime(Timestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1, storage_policy = 'tiered';
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_projections
     INDEX idx_tenant_trace_version (TenantId, TraceId, Version) TYPE minmax GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}LastUpdatedAt)
-PARTITION BY TenantId, toYYYYMM(CreatedAt)
+PARTITION BY (TenantId, toYYYYMM(CreatedAt))
 ORDER BY (TenantId, TraceId)
 TTL toDateTime(CreatedAt) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, ttl_only_drop_parts = 1, storage_policy = 'tiered';
