@@ -183,6 +183,11 @@ Our JavaScript SDK supports the following instrumentors:
 
 Are you using a platform that could benefit from a direct LangWatch integration? We'd love to hear from you, please [**fill out this very quick form.**](https://www.notion.so/1e35e165d48280468247fcbdc3349077?pvs=21)
 
+
+### Agent Simulation 
+
+Test your agents before they hit production using [Scenarios](https://github.com/langwatch/scenario) — our lightweight simulation framework for stress testing agents against real-world situations.
+
 ## 🥰 Community
 
 - Join our [Discord](https://discord.gg/kT4PhDS2gH) community
