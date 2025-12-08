@@ -4,6 +4,7 @@ export { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggr
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggregationStateProjectionRepositoryClickHouse";
 import { TraceAggregationStateProjectionRepositoryMemory } from "./traceAggregationStateProjectionRepositoryMemory";
+import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
 const clickHouseClient = getClickHouseClient();
 
