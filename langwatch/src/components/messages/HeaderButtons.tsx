@@ -1,10 +1,10 @@
 import { Box, Button, HStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { List, Table, TrendingUp } from "react-feather";
-import { useLocalStorage } from "usehooks-ts";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { List, Table, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocalStorage } from "usehooks-ts";
 
 export function useTableView() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export function useTableView() {
         },
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
     setLocalStorageTableView(view);
   };
@@ -140,7 +140,7 @@ export function ToggleAnalytics() {
               },
             },
             undefined,
-            { shallow: true },
+            { shallow: true }
           );
         }}
       >

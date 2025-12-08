@@ -20,7 +20,7 @@ import {
   MoreVertical,
   Plus,
   Trash2,
-} from "react-feather";
+} from "lucide-react";
 import {
   CustomGraph,
   type CustomGraphInput,

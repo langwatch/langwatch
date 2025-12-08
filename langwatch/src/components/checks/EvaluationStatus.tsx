@@ -1,4 +1,4 @@
-import { CheckCircle, Clock, MinusCircle, XCircle } from "react-feather";
+import { CheckCircle, Clock, MinusCircle, XCircle } from "lucide-react";
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 
 export function CheckStatusIcon({

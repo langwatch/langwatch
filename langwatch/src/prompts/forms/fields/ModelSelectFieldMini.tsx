@@ -1,10 +1,10 @@
-import { HStack, useDisclosure } from "@chakra-ui/react";
 import React from "react";
-import { ChevronDown } from "react-feather";
-import { Controller, useFormContext } from "react-hook-form";
-import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
-import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import { useFormContext, Controller } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
+import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
+import { HStack, useDisclosure } from "@chakra-ui/react";
+import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
+import { ChevronDown } from "lucide-react";
 
 /**
  * Model Select Field Mini

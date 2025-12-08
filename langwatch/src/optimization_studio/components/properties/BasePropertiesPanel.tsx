@@ -23,7 +23,7 @@ import {
   Plus,
   Trash2,
   X,
-} from "react-feather";
+} from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";

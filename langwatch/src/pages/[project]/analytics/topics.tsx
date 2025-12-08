@@ -2,12 +2,13 @@ import {
   Box,
   Card,
   GridItem,
-  Heading,
-  HStack,
   SimpleGrid,
+  HStack,
+  Heading,
   VStack,
 } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
+import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -17,11 +18,10 @@ import {
   DocumentsCountsTable,
 } from "~/components/analytics/DocumentsCountsTable";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
-import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -77,6 +77,27 @@ const mostDisucussedTopics = {
     },
   ],
   groupBy: "topics.topics",
+  includePrevious: false,
+  timeScale: "full",
+  height: 300,
+};
+
+const inputSentiment = {
+  graphId: "custom",
+  graphType: "donnut",
+  series: [
+    {
+      name: "Sum messages count per message",
+      colorSet: "positiveNegativeNeutral",
+      metric: "metadata.trace_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "trace_id",
+        aggregation: "sum",
+      },
+    },
+  ],
+  groupBy: "sentiment.input_sentiment",
   includePrevious: false,
   timeScale: "full",
   height: 300,

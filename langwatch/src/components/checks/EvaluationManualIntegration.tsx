@@ -1,24 +1,26 @@
 import {
   Box,
-  Heading,
   HStack,
-  Tabs,
+  Heading,
   Tag,
   Text,
   VStack,
+  Tabs,
 } from "@chakra-ui/react";
-import { EvaluationExecutionMode } from "@prisma/client";
-import { Info } from "react-feather";
-import type { UseFormReturn } from "react-hook-form";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { AVAILABLE_EVALUATORS } from "../../server/evaluations/evaluators.generated";
-import { api } from "../../utils/api";
-import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
-import { RenderCode } from "../code/RenderCode";
 import { Checkbox } from "../ui/checkbox";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type {
+  AVAILABLE_EVALUATORS,
+} from "../../server/evaluations/evaluators.generated";
+import { api } from "../../utils/api";
+import { RenderCode } from "../code/RenderCode";
+import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
+import { EvaluationExecutionMode } from "@prisma/client";
+import type { UseFormReturn } from "react-hook-form";
 import type { CheckConfigFormData } from "./CheckConfigForm";
+import { Info } from "lucide-react";
 
 export function EvaluationManualIntegration({
   slug,
@@ -52,42 +54,42 @@ export function EvaluationManualIntegration({
     },
     {
       enabled: !!project,
-    },
+    }
   );
 
   const PythonInstructions = ({ async }: { async: boolean }) => {
     const nameParam = storeSettingsOnCode ? `\n        name="${name}",` : "";
     const contextsParams = evaluatorDefinition.requiredFields.includes(
-      "contexts",
+      "contexts"
     )
       ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"],`
       : evaluatorDefinition.optionalFields.includes("contexts")
-        ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
-        : "";
+      ? `\n        contexts=["retrieved snippet 1", "retrieved snippet 2"], # optional`
+      : "";
     const inputParams = evaluatorDefinition.requiredFields.includes("input")
       ? `\n        input=user_input,`
       : evaluatorDefinition.optionalFields.includes("input")
-        ? `\n        input=user_input, # optional`
-        : "";
+      ? `\n        input=user_input, # optional`
+      : "";
     const outputParams = evaluatorDefinition.requiredFields.includes("output")
       ? `\n        output=generated_response,`
       : evaluatorDefinition.optionalFields.includes("output")
-        ? `\n        output=generated_response, # optional`
-        : "";
+      ? `\n        output=generated_response, # optional`
+      : "";
     const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
-      "expected_output",
+      "expected_output"
     )
       ? `\n        expected_output=gold_answer,`
       : evaluatorDefinition.optionalFields.includes("expected_output")
-        ? `\n        expected_output=gold_answer, # optional`
-        : "";
+      ? `\n        expected_output=gold_answer, # optional`
+      : "";
     const conversationParams = evaluatorDefinition.requiredFields.includes(
-      "conversation",
+      "conversation"
     )
       ? `\n        conversation=conversation_history,`
       : evaluatorDefinition.optionalFields.includes("conversation")
-        ? `\n        conversation=conversation_history, # optional`
-        : "";
+      ? `\n        conversation=conversation_history, # optional`
+      : "";
     const settingsParams = storeSettingsOnCode
       ? `\n        settings=${JSON.stringify(settings ?? {}, null, 2)
           .replace(/true/g, "True")
@@ -154,36 +156,36 @@ ${
   const TypeScriptInstructions = () => {
     const nameParam = storeSettingsOnCode ? `\n        name: "${name}",` : "";
     const contextsParams = evaluatorDefinition.requiredFields.includes(
-      "contexts",
+      "contexts"
     )
       ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"],`
       : evaluatorDefinition.optionalFields.includes("contexts")
-        ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"], // optional`
-        : "";
+      ? `\n        contexts: ["retrieved snippet 1", "retrieved snippet 2"], // optional`
+      : "";
     const inputParams = evaluatorDefinition.requiredFields.includes("input")
       ? `\n        input: message,`
       : evaluatorDefinition.optionalFields.includes("input")
-        ? `\n        input: message, // optional`
-        : "";
+      ? `\n        input: message, // optional`
+      : "";
     const outputParams = evaluatorDefinition.requiredFields.includes("output")
       ? `\n        output: generatedResponse,`
       : evaluatorDefinition.optionalFields.includes("output")
-        ? `\n        output: generatedResponse, // optional`
-        : "";
+      ? `\n        output: generatedResponse, // optional`
+      : "";
     const expectedOutputParams = evaluatorDefinition.requiredFields.includes(
-      "expected_output",
+      "expected_output"
     )
       ? `\n        expectedOutput: goldAnswer,`
       : evaluatorDefinition.optionalFields.includes("expected_output")
-        ? `\n        expectedOutput: goldAnswer, // optional`
-        : "";
+      ? `\n        expectedOutput: goldAnswer, // optional`
+      : "";
     const conversationParams = evaluatorDefinition.requiredFields.includes(
-      "conversation",
+      "conversation"
     )
       ? `\n        conversation: conversationHistory,`
       : evaluatorDefinition.optionalFields.includes("conversation")
-        ? `\n        conversation: conversationHistory, // optional`
-        : "";
+      ? `\n        conversation: conversationHistory, // optional`
+      : "";
     const settingsParams = storeSettingsOnCode
       ? `\n        settings: ${JSON.stringify(settings ?? {}, null, 2)
           // remove quotes on json keys that have only safe characters in it
@@ -287,7 +289,7 @@ ${
               <Tag.Root key={field}>
                 <Tag.Label>{field} (optional)</Tag.Label>
               </Tag.Root>
-            )),
+            ))
           )}
       </HStack>
       <Text fontSize="14px">
@@ -346,8 +348,8 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
       .map((field) => `"${field}": "${field} content"`)
       .concat(
         evaluatorDefinition.optionalFields.map(
-          (field) => `"${field}": "${field} content (optional)"`,
-        ),
+          (field) => `"${field}": "${field} content (optional)"`
+        )
       )
       .join(",\n    ")}
   }${isGuardrail ? `,\n  "as_guardrail": true` : ""}${settingsParamsCurl}
@@ -367,7 +369,7 @@ EOF`}
                     details: "possible explanation",
                   },
                   null,
-                  2,
+                  2
                 )}
                 language="json"
               />

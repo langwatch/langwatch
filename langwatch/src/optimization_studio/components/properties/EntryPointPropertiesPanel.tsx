@@ -13,7 +13,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { Folder, Info } from "react-feather";
+import { Folder, Info } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";

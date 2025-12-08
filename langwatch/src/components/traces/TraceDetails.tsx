@@ -8,12 +8,12 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { PublicShare } from "@prisma/client";
-import { ChevronDownIcon } from "lucide-react";
+import { type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
-import { Maximize2, Minimize2 } from "react-feather";
+import { Maximize2, Minimize2 } from "lucide-react";
+
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
@@ -23,9 +23,9 @@ import { useDrawer } from "../CurrentDrawer";
 import { Conversation } from "../messages/Conversation";
 import { Drawer } from "../ui/drawer";
 import { Link } from "../ui/link";
-import { Menu } from "../ui/menu";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
+
 import { AddParticipants } from "./AddParticipants";
 import {
   Blocked,
@@ -34,10 +34,12 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
-import { SequenceDiagramContainer } from "./SequenceDiagram";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
+import { Menu } from "../ui/menu";
+import { ChevronDownIcon } from "lucide-react";
+import { SequenceDiagramContainer } from "./SequenceDiagram";
 
 export function TraceDetails(props: {
   traceId: string;

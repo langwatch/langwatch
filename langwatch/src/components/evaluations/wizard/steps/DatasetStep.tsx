@@ -8,25 +8,25 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, FilePlus, FileText, UploadCloud } from "react-feather";
-import { useShallow } from "zustand/react/shallow";
-import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
+import { Database, FilePlus, FileText, UploadCloud } from "lucide-react";
 import {
   DATA_SOURCE_TYPES,
-  type State,
   useEvaluationWizardStore,
+  type State,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
-import type { DatasetColumns } from "../../../../server/datasets/types";
-import { toaster } from "../../../ui/toaster";
-import { DatasetRadioCard } from "../components/DatasetRadioCard";
-import { StepAccordion } from "../components/StepAccordion";
 import { StepRadio } from "../components/StepButton";
-import { DatasetFromProductionConfiguration } from "./datasets/DatasetFromProductionConfiguration";
+import type { DatasetColumns } from "../../../../server/datasets/types";
+import { StepAccordion } from "../components/StepAccordion";
+import { useAnimatedFocusElementById } from "../../../../hooks/useAnimatedFocusElementById";
+import { InlineUploadCSVForm } from "~/components/datasets/UploadCSVModal";
+import { toaster } from "../../../ui/toaster";
+import { useShallow } from "zustand/react/shallow";
 import { DatasetGeneration } from "./datasets/DatasetGeneration";
+import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
+import { DatasetFromProductionConfiguration } from "./datasets/DatasetFromProductionConfiguration";
+import { DatasetRadioCard } from "../components/DatasetRadioCard";
 
 export function DatasetStep() {
   const { clear: clearSelectedDataSetId, selectedDataSetId } =
@@ -55,23 +55,23 @@ export function DatasetStep() {
         setDatasetId,
         getDatasetId,
         clearDatasetId,
-      }),
-    ),
+      })
+    )
   );
   const { project } = useOrganizationTeamProject();
 
   const [accordeonValue, setAccordeonValue] = useState(
-    wizardState.dataSource ? ["configuration"] : ["data-source"],
+    wizardState.dataSource ? ["configuration"] : ["data-source"]
   );
 
   // Fetch datasets
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project },
+    { enabled: !!project }
   );
   const selectedDataset = useMemo(
     () => datasets.data?.find((d) => d.id === selectedDataSetId),
-    [datasets.data, selectedDataSetId],
+    [datasets.data, selectedDataSetId]
   );
 
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -83,7 +83,7 @@ export function DatasetStep() {
       });
       setAccordeonValue(["configuration"]);
     },
-    [setWizardState, setAccordeonValue],
+    [setWizardState, setAccordeonValue]
   );
 
   const focusElementById = useAnimatedFocusElementById();
@@ -98,13 +98,22 @@ export function DatasetStep() {
 
       focusElementById("js-next-step-button");
     },
-    [datasets.data, focusElementById, setDatasetId],
+    [datasets.data, focusElementById, setDatasetId]
   );
+
+  const handleContinue = (
+    dataSource: "from_production" | "manual" | "upload"
+  ) => {
+    setWizardState({
+      step: "execution",
+      dataSource,
+    });
+  };
 
   // Handle CSV upload success
   const handleCSVUploadSuccess = (
     datasetId: string,
-    columnTypes: DatasetColumns,
+    columnTypes: DatasetColumns
   ) => {
     setDatasetId(datasetId, columnTypes);
     setTimeout(() => {
@@ -167,7 +176,7 @@ export function DatasetStep() {
             },
           });
         },
-      },
+      }
     );
   }, [
     experimentId,
@@ -224,7 +233,7 @@ export function DatasetStep() {
                   e.value as Exclude<
                     State["wizardState"]["dataSource"],
                     undefined
-                  >,
+                  >
                 )
               }
             >

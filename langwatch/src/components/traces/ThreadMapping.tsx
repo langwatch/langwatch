@@ -10,7 +10,7 @@ import {
 
 import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
+import { ArrowRight } from "lucide-react";
 import type { Trace } from "~/server/tracer/types";
 import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";

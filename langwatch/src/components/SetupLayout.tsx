@@ -1,8 +1,15 @@
-import { Box, Button, Card, Container, HStack, Spacer } from "@chakra-ui/react";
+import {
+  Box,
+  Card,
+  Container,
+  HStack,
+  Spacer,
+  Button,
+} from "@chakra-ui/react";
 import Head from "next/head";
+import { type PropsWithChildren } from "react";
 import { signOut } from "next-auth/react";
-import type { PropsWithChildren } from "react";
-import { LogOut } from "react-feather";
+import { LogOut } from "lucide-react";
 
 export const SetupLayout = ({
   children,

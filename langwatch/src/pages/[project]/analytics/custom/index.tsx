@@ -44,7 +44,7 @@ import {
   Trash,
   TrendingUp,
   Triangle,
-} from "react-feather";
+} from "lucide-react";
 import {
   Controller,
   type ControllerRenderProps,

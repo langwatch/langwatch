@@ -1,9 +1,9 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import { Check } from "react-feather";
-import type { Action, Permission, Resource } from "../../server/api/rbac";
+import { Check } from "lucide-react";
+import type { Permission, Resource, Action } from "../../server/api/rbac";
 import {
-  getValidActionsForResource,
   orderedResources,
+  getValidActionsForResource,
 } from "../../utils/permissionsConfig";
 
 /**

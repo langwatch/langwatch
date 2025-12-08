@@ -1,18 +1,18 @@
-import { Button, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
 import clsx from "clsx";
-import { Edit3 } from "react-feather";
 import { useFormContext } from "react-hook-form";
+import { Edit3 } from "lucide-react";
 
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
-import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
+import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
-import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const logger = createLogger(
   "langwatch:prompt-configs:editable-prompt-handle-field",

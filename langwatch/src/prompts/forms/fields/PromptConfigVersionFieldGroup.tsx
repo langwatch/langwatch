@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { Trash2 } from "react-feather";
+import { Trash2 } from "lucide-react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import { Tooltip } from "~/components/ui/tooltip";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";

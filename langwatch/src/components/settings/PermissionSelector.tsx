@@ -7,14 +7,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { Info } from "react-feather";
-import type { Action, Permission, Resource } from "../../server/api/rbac";
-import {
-  getValidActionsForResource,
-  orderedResources,
-} from "../../utils/permissionsConfig";
+import { Info } from "lucide-react";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip } from "../ui/tooltip";
+import type { Permission, Resource, Action } from "../../server/api/rbac";
+import {
+  orderedResources,
+  getValidActionsForResource,
+} from "../../utils/permissionsConfig";
 
 /**
  * PermissionSelector component

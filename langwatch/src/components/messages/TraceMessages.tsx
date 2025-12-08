@@ -10,32 +10,35 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { type PropsWithChildren, useEffect, useState } from "react";
-import { CornerDownRight } from "react-feather";
-import { stringifyIfObject } from "~/utils/stringifyIfObject";
-import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
+import React, { useEffect, useState, type PropsWithChildren } from "react";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { Trace } from "../../server/tracer/types";
+
+import { CornerDownRight } from "lucide-react";
 import { Annotations } from "../../components/Annotations";
-import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
   getSlicedExpectedOutput,
   MessageCardJsonOutput,
 } from "../../components/messages/MessageCard";
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace } from "../../server/tracer/types";
-import { api } from "../../utils/api";
+import { getExtractedInput } from "../../utils/traceExtraction";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { isJson } from "../../utils/isJson";
 import { isPythonRepr } from "../../utils/parsePythonInsideJson";
-import { getExtractedInput } from "../../utils/traceExtraction";
+
+import { Markdown } from "../../components/Markdown";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { api } from "../../utils/api";
 import { SmallLabel } from "../SmallLabel";
-import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import {
   MessageHoverActions,
   useTranslationState,
 } from "./MessageHoverActions";
+
+import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
+import { RedactedField } from "../ui/RedactedField";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
@@ -49,7 +52,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     index: "only" | "first" | "last" | "other";
     loadingMore?: boolean;
   },
-  ref,
+  ref
 ) {
   const { project } = useOrganizationTeamProject();
 
@@ -70,7 +73,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
       projectId: project?.id ?? "",
       traceId: trace.trace_id,
     },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id }
   );
 
   const showAnnotations = action == "new" || conversationHasSomeComments;
@@ -108,8 +111,8 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           paddingY={4}
           borderX="1px solid"
           borderTop={
-            (highlighted ??
-            (!loadingMore && (index === "first" || index === "only")))
+            highlighted ??
+            (!loadingMore && (index === "first" || index === "only"))
               ? "1px solid"
               : "none"
           }
@@ -117,16 +120,14 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             loadingMore
               ? "0"
               : index === "only"
-                ? "4px"
-                : index === "first"
-                  ? "4px 4px 0 0"
-                  : index === "last"
-                    ? "0 0 4px 4px"
-                    : "0"
+              ? "4px"
+              : index === "first"
+              ? "4px 4px 0 0"
+              : index === "last"
+              ? "0 0 4px 4px"
+              : "0"
           }
-          borderBottom={
-            (highlighted ?? index === "last") ? "1px solid" : "none"
-          }
+          borderBottom={highlighted ?? index === "last" ? "1px solid" : "none"}
           borderColor={highlighted ? "blue.200" : "gray.200"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}

@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
-import { Info, Plus, Trash2, X } from "react-feather";
+import { Info, Plus, Trash2, X } from "lucide-react";
 import {
   Controller,
   type FieldErrors,

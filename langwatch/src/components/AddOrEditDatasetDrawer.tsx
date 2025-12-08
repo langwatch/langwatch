@@ -2,8 +2,8 @@ import {
   Box,
   Button,
   Field,
-  Heading,
   HStack,
+  Heading,
   Input,
   NativeSelect,
   Text,
@@ -11,8 +11,8 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { Trash2 } from "react-feather";
-import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import { Trash2 } from "lucide-react";
+import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -25,11 +25,11 @@ import type {
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
 import { useDrawer } from "./CurrentDrawer";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetPreview } from "./datasets/DatasetPreview";
-import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
-import { HorizontalFormControl } from "./HorizontalFormControl";
+import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 
 interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -87,7 +87,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       const result = await zodResolver(datasetRecordFormSchema)(
         data,
         context,
-        options,
+        options
       );
 
       if (!data.name || data.name.trim() === "") {
@@ -165,9 +165,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 tryToMapPreviousColumnsToNewColumns(
                   props.datasetToSave.datasetRecords,
                   props.datasetToSave.columnTypes,
-                  data.columnTypes,
+                  data.columnTypes
                 ),
-                data.columnTypes,
+                data.columnTypes
               ),
             }
           : {}),
@@ -183,8 +183,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             title: props.datasetToSave?.datasetId
               ? "Dataset Updated"
               : props.datasetToSave
-                ? "Dataset Saved"
-                : "Dataset Created",
+              ? "Dataset Saved"
+              : "Dataset Created",
             description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
@@ -200,9 +200,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         },
         onError: (error) => {
           // Check if it's a slug conflict error from backend
-          const isConflictError =
-            error.message.includes("already exists") ||
-            (error as any).data?.code === "CONFLICT";
+          const isConflictError = error.message.includes("already exists") ||
+                                  (error as any).data?.code === "CONFLICT";
 
           toaster.create({
             title: props.datasetToSave?.datasetId
@@ -217,7 +216,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             },
           });
         },
-      },
+      }
     );
   };
 
@@ -235,8 +234,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               {props.datasetToSave?.datasetId
                 ? "Edit Dataset"
                 : props.datasetToSave
-                  ? "Save Dataset"
-                  : "New Dataset"}
+                ? "Save Dataset"
+                : "New Dataset"}
             </Text>
           </HStack>
         </Drawer.Header>
@@ -324,9 +323,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                         tryToMapPreviousColumnsToNewColumns(
                           props.datasetToSave.datasetRecords.slice(0, 5),
                           props.datasetToSave.columnTypes,
-                          columnTypes,
+                          columnTypes
                         ),
-                        columnTypes,
+                        columnTypes
                       )}
                       columns={columnTypes.slice(0, 50)}
                     />
@@ -351,10 +350,10 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
 export const tryToConvertRowsToAppropriateType = (
   datasetRecords: DatasetRecordEntry[],
-  columnTypes: DatasetColumns,
+  columnTypes: DatasetColumns
 ) => {
   const typeForColumn = Object.fromEntries(
-    columnTypes.map((col) => [col.name, col.type]),
+    columnTypes.map((col) => [col.name, col.type])
   );
   return datasetRecords.map((record) => {
     const convertedRecord = { ...record };
@@ -369,7 +368,7 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type === "boolean") {
         if (
           ["true", "1", "yes", "y", "on", "ok"].includes(
-            `${value ?? ""}`.toLowerCase(),
+            `${value ?? ""}`.toLowerCase()
           )
         ) {
           convertedRecord[key] = true;
@@ -399,9 +398,7 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type !== "string") {
         try {
           convertedRecord[key] = JSON.parse(value);
-        } catch {
-          /* */
-        }
+        } catch {}
       }
     }
     return convertedRecord;

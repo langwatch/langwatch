@@ -7,26 +7,27 @@ import {
   Separator,
   Spinner,
   Text,
-  useDisclosure,
   VStack,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { TeamUserRole } from "@prisma/client";
+import { Eye, Plus, Shield, Users } from "lucide-react";
 import { ShieldUser } from "lucide-react";
 
 import { useState } from "react";
-import { Eye, Plus, Shield, Users } from "react-feather";
-import SettingsLayout from "../../components/SettingsLayout";
-import { PermissionViewer } from "../../components/settings/PermissionViewer";
-import { RoleCard } from "../../components/settings/RoleCard";
-import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
 import { Dialog } from "../../components/ui/dialog";
-import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { toaster } from "../../components/ui/toaster";
+import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
-import { api } from "../../utils/api";
+import { TeamUserRole } from "@prisma/client";
+
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { RoleCard } from "../../components/settings/RoleCard";
+import { PermissionViewer } from "../../components/settings/PermissionViewer";
+import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
 
 /**
  * Role Management Settings Page
@@ -176,7 +177,7 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onEditOpen();
-    } catch {
+    } catch (error) {
       toaster.create({
         title: "Failed to load role",
         description: "Could not load role details for editing",
@@ -195,7 +196,7 @@ function RolesManagement({
         permissions: role.permissions as Permission[],
       });
       onViewOpen();
-    } catch {
+    } catch (error) {
       toaster.create({
         title: "Failed to load role",
         description: "Could not load role details for viewing",

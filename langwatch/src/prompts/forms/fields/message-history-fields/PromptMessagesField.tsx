@@ -1,29 +1,30 @@
 import {
   Box,
-  Collapsible,
   Field,
   HStack,
   Icon,
   Spacer,
   useDisclosure,
+  Collapsible,
 } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { ChevronDown } from "react-feather";
 import {
-  Controller,
-  type UseFieldArrayReturn,
   useFormContext,
+  type UseFieldArrayReturn,
+  Controller,
 } from "react-hook-form";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { PromptConfigFormValues } from "~/prompts";
 import { PropertySectionTitle } from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
 } from "../../../components/ui/PromptTextArea";
+import type { PromptConfigFormValues } from "~/prompts";
+
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { AddMessageButton } from "./AddMessageButton";
-import { MessageRoleLabel } from "./MessageRoleLabel";
 import { RemoveMessageButton } from "./RemoveMessageButton";
+import { MessageRoleLabel } from "./MessageRoleLabel";
 
 /**
  * Type for message field errors
@@ -83,8 +84,8 @@ export function PromptMessagesField({
           .map((message) => message.content?.message)
           .join(", ")
       : typeof errors.version?.configData?.messages === "string"
-        ? errors.version?.configData?.messages
-        : undefined;
+      ? errors.version?.configData?.messages
+      : undefined;
   }, [errors]);
   const { open, setOpen } = useDisclosure();
 

@@ -1,22 +1,18 @@
 import {
-  Box,
   Button,
   Card,
-  Heading,
   HStack,
+  Heading,
   Table,
   Text,
   VStack,
+  Box,
 } from "@chakra-ui/react";
 import React from "react";
-import { Archive, MoreVertical, Plus } from "react-feather";
+import { Menu } from "../../components/ui/menu";
+import { Archive, MoreVertical, Plus } from "lucide-react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
-import { Link } from "../../components/ui/link";
-import { Menu } from "../../components/ui/menu";
-import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
@@ -24,6 +20,11 @@ import type {
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
+import { toaster } from "../../components/ui/toaster";
+
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();

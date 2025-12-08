@@ -2,17 +2,16 @@ import {
   Badge,
   Box,
   Button,
-  Heading,
   HStack,
+  Heading,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useMemo } from "react";
 import type { Project } from "@prisma/client";
 import numeral from "numeral";
-import { useMemo } from "react";
-import { Clock, Play, Settings } from "react-feather";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
+import { Clock, Play, Settings } from "lucide-react";
 import type {
   ErrorCapture,
   EvaluationResult,
@@ -24,11 +23,12 @@ import {
   evaluationPassed,
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
-import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
-import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
+import { OverflownTextWithTooltip } from "../OverflownText";
+import { RedactedField } from "../ui/RedactedField";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 
 /**
  * Displays detailed information about a trace span, including metadata, timing, tokens, cost, and input/output.
@@ -368,8 +368,8 @@ export const SpanTypeTag = ({ span }: { span: Span }) => {
                     ? evaluationStatusColor(evaluationResult).split(".")[0]
                     : "gray"
                   : evaluationPassed_
-                    ? "green"
-                    : "red",
+                  ? "green"
+                  : "red",
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
@@ -396,7 +396,7 @@ export const SpanDuration = ({
 }) => {
   const startedAt = span.timestamps.started_at;
   const finishedAt = renderFirstTokenDuration
-    ? (span.timestamps.first_token_at ?? startedAt)
+    ? span.timestamps.first_token_at ?? startedAt
     : span.timestamps.finished_at;
   const duration = finishedAt - startedAt;
 

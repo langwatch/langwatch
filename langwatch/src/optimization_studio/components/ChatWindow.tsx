@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
-import { Play, Send } from "react-feather";
+import { Play, Send } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { SmallLabel } from "~/components/SmallLabel";
 import { Dialog } from "~/components/ui/dialog";

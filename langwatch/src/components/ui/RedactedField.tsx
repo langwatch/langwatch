@@ -1,8 +1,8 @@
-import { HStack, Icon, Skeleton, Text } from "@chakra-ui/react";
-import type React from "react";
-import { Lock } from "react-feather";
-import { useFieldRedaction } from "~/hooks/useFieldRedaction";
+import { Lock } from "lucide-react";
+import { HStack, Text, Icon, Skeleton } from "@chakra-ui/react";
 import { Tooltip } from "./tooltip";
+import { useFieldRedaction } from "~/hooks/useFieldRedaction";
+import React from "react";
 
 interface RedactedFieldProps {
   field: "input" | "output";

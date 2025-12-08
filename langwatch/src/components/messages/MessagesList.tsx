@@ -4,8 +4,9 @@ import {
   Button,
   Card,
   Container,
-  Heading,
+  Flex,
   HStack,
+  Heading,
   LinkBox,
   Separator,
   Skeleton,
@@ -22,8 +23,7 @@ import {
   Layers,
   Maximize2,
   RefreshCw,
-} from "react-feather";
-import { formatMilliseconds } from "~/utils/formatMilliseconds";
+} from "lucide-react";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -32,15 +32,17 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { ElasticSearchEvaluation, Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
-import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
+import { useDrawer } from "../CurrentDrawer";
+import { formatMilliseconds } from "~/utils/formatMilliseconds";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -60,13 +62,13 @@ export function MessagesList() {
       pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
     },
-    queryOpts,
+    queryOpts
   );
   navigationFooter.useUpdateTotalHits(traceGroups);
 
   const traceIds =
     traceGroups.data?.groups.flatMap((group) =>
-      group.map((trace) => trace.trace_id),
+      group.map((trace) => trace.trace_id)
     ) ?? [];
   const evaluations = api.traces.getEvaluationsMultiple.useQuery(
     { projectId: project?.id ?? "", traceIds },
@@ -74,7 +76,7 @@ export function MessagesList() {
       enabled: traceIds.length > 0,
       refetchInterval: evaluationsCheckInterval,
       refetchOnWindowFocus: false,
-    },
+    }
   );
 
   const {
@@ -90,7 +92,7 @@ export function MessagesList() {
           (check) =>
             (check.status == "scheduled" || check.status == "in_progress") &&
             (check.timestamps.inserted_at ?? 0) >
-              new Date().getTime() - 1000 * 60 * 60 * 1,
+              new Date().getTime() - 1000 * 60 * 60 * 1
         );
       if (pendingEvaluations.length > 0) {
         setEvaluationsCheckInterval(5000);
@@ -224,6 +226,8 @@ const ExpandableMessages = React.memo(
       setTimeout(() => setTransitionsEnabled(true), 100);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
+
+    const { openDrawer } = useDrawer();
 
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
@@ -422,7 +426,7 @@ const ExpandableMessages = React.memo(
       JSON.stringify(prevProps.checksMap) ===
         JSON.stringify(nextProps.checksMap)
     );
-  },
+  }
 );
 
 function MessageSkeleton() {
@@ -467,7 +471,7 @@ const useGroupBy = () => {
         },
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
   };
 

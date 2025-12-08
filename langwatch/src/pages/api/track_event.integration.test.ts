@@ -1,6 +1,5 @@
 import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
-import debug from "debug";
 import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
@@ -152,7 +151,6 @@ describe.skip("/api/track_event", () => {
   });
 
   it("should return an error for invalid event data", async () => {
-    const namespaces = debug.disable();
     const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
       method: "POST",
       headers: {
@@ -168,7 +166,6 @@ describe.skip("/api/track_event", () => {
     });
 
     await handler(req, res);
-    debug.enable(namespaces);
 
     expect(res.statusCode).toBe(400);
   });

@@ -2,24 +2,40 @@ import {
   Box,
   Card,
   GridItem,
-  Heading,
   HStack,
+  Heading,
   SimpleGrid,
 } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
+import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
+
+const userCount = {
+  graphId: "custom",
+  graphType: "summary",
+  series: [
+    {
+      name: "",
+      colorSet: "blueTones",
+      metric: "metadata.user_id",
+      aggregation: "cardinality",
+    },
+  ],
+  includePrevious: true,
+  timeScale: ONE_DAY,
+  height: 550,
+};
 
 const LLMMetrics = {
   graphId: "custom",

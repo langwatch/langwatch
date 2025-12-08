@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
-import { ChevronRight, MoreVertical, Trash } from "react-feather";
+import { ChevronRight, MoreVertical, Trash } from "lucide-react";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";

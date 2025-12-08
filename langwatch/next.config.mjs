@@ -83,7 +83,7 @@ const config = {
     scrollRestoration: true,
     optimizePackageImports: [
       "@chakra-ui/react",
-      "react-feather",
+      "lucide-react",
       "@zag-js",
       "@mui",
     ],

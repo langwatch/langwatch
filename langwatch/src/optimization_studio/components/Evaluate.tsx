@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckSquare } from "react-feather";
+import { CheckSquare } from "lucide-react";
 import {
   Controller,
   type ControllerRenderProps,

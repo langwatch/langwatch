@@ -1,21 +1,23 @@
 import { Box, Image, Spinner, VStack } from "@chakra-ui/react";
-import { Bug, TextCursorInput } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
-import { Edit, Italic, Search } from "react-feather";
-import { useDrawer } from "../../components/CurrentDrawer";
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 import { api } from "../../utils/api";
+import { TextCursorInput, Bug } from "lucide-react";
+
+import { Edit, Italic, Search } from "lucide-react";
 import { getExtractedInput } from "../../utils/traceExtraction";
+
+import { useDrawer } from "../../components/CurrentDrawer";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 
 export const useTranslationState = () => {
   const [translatedTextInput, setTranslatedTextInput] = useState<string | null>(
-    null,
+    null
   );
   const [translatedTextOutput, setTranslatedTextOutput] = useState<
     string | null
@@ -140,7 +142,7 @@ export const MessageHoverActions = ({
                 traceId: trace.trace_id,
                 selectedTab: "traceDetails",
               },
-              { replace: true },
+              { replace: true }
             );
           } else {
             openDrawer("traceDetails", {

@@ -29,7 +29,7 @@ import {
   Play,
   Plus,
   Upload,
-} from "react-feather";
+} from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 import type {

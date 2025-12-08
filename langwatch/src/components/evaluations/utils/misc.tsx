@@ -1,11 +1,11 @@
+import { AlertCircle, CheckCircle, Activity } from "lucide-react";
 import type { ReactNode } from "react";
-import { Activity, AlertCircle, CheckCircle } from "react-feather";
 
 type StatusType = "error" | "warning" | "healthy";
 
 export const getStatusColor = (
   status: StatusType,
-  value: number,
+  value: number
 ): Record<string, string> => {
   if (status === "error")
     return { bg: "red.50", color: "red.800", borderColor: "red.200" };

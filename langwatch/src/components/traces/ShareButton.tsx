@@ -1,12 +1,12 @@
-import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
-import { type Project, PublicShareResourceTypes } from "@prisma/client";
-import { useCallback, useState } from "react";
-import { Globe, Share } from "react-feather";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { CopyInput } from "../CopyInput";
+import { Button, HStack, Text, VStack, useDisclosure } from "@chakra-ui/react";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
+import { PublicShareResourceTypes, type Project } from "@prisma/client";
+import { useCallback, useState } from "react";
+import { Globe, Share } from "lucide-react";
+import { CopyInput } from "../CopyInput";
+import { api } from "../../utils/api";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export function ShareButton({
   project,
@@ -16,7 +16,7 @@ export function ShareButton({
   traceId: string;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
-  const { open, onOpen, onClose } = useDisclosure();
+  const { open, onOpen, onClose, setOpen } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
       projectId: project.id,

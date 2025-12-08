@@ -1,17 +1,17 @@
 import { Box, type BoxProps } from "@chakra-ui/react";
 import {
-  BookOpen,
-  Box as BoxIcon,
   Check,
-  Code,
   Flag,
   Home,
   Shield,
-} from "react-feather";
+  Box as BoxIcon,
+  BookOpen,
+  Code,
+} from "lucide-react";
 import { EqualsIcon } from "../../components/icons/EqualsIcon";
 import { LLMIcon } from "../../components/icons/LLMIcon";
-import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
 import type { ComponentType } from "../types/dsl";
+import { WeaviateIcon } from "../../components/icons/WeaviateIcon";
 
 const sizeMap = {
   xs: "16px",
@@ -157,7 +157,7 @@ export function WorkflowIcon({
   return (
     <Box
       background={`url('data:image/svg+xml;utf8,${encodeURIComponent(
-        reactflowBg,
+        reactflowBg
       )}')`}
       borderRadius="4px"
       border="1px solid"

@@ -14,14 +14,15 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import type { AlertType, Monitor, TriggerAction } from "@prisma/client";
-import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
+import type { Monitor, TriggerAction } from "@prisma/client";
+import { type AlertType } from "@prisma/client";
+import { Bell, Edit2, Filter, MoreVertical, Trash } from "lucide-react";
 import {
-  type Control,
   Controller,
+  useForm,
+  type Control,
   type SubmitHandler,
   type UseFormHandleSubmit,
-  useForm,
 } from "react-hook-form";
 import { z } from "zod";
 import { useDrawer } from "~/components/CurrentDrawer";
@@ -37,10 +38,10 @@ import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function Triggers() {
   const { project, organizations } = useOrganizationTeamProject();

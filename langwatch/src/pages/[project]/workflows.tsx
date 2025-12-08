@@ -10,7 +10,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Lock, Plus } from "react-feather";
+import { Lock, Plus } from "lucide-react";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";

@@ -12,20 +12,21 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AnnotationScoreDataType } from "@prisma/client";
-import { useEffect, useState } from "react";
-import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
+import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
 import { useDrawer } from "~/components/CurrentDrawer";
+
+import { useEffect, useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
-import { Tooltip } from "../../components/ui/tooltip";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { api } from "../../utils/api";
+import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function AnnotationScorePage() {
   const { project, hasPermission } = useOrganizationTeamProject();

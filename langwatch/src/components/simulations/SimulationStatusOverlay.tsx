@@ -1,6 +1,6 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
-import { AlertCircle, Check, X } from "react-feather";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { Box, VStack, Text } from "@chakra-ui/react";
+import { Check, AlertCircle, X } from "lucide-react";
 
 // Component for the status overlay when simulation is complete
 export function SimulationStatusOverlay({
@@ -23,8 +23,8 @@ export function SimulationStatusOverlay({
   const bgColor = isPass
     ? "rgba(72, 187, 120, 0.9)" // Green for success
     : isCancelled
-      ? "rgba(113, 128, 150, 0.9)" // Gray for cancelled
-      : "rgba(245, 101, 101, 0.9)"; // Red for failed/error
+    ? "rgba(113, 128, 150, 0.9)" // Gray for cancelled
+    : "rgba(245, 101, 101, 0.9)"; // Red for failed/error
 
   // Determine icon and text based on status
   const Icon = isPass ? Check : isCancelled ? AlertCircle : X;

@@ -3,11 +3,11 @@ import {
   Field,
   HStack,
   Spacer,
-  type SystemStyleObject,
   VStack,
+  type SystemStyleObject,
 } from "@chakra-ui/react";
-import type { PropsWithChildren, ReactNode } from "react";
-import { Info } from "react-feather";
+import { type PropsWithChildren, type ReactNode } from "react";
+import { Info } from "lucide-react";
 import type { FieldErrors } from "react-hook-form";
 
 import { FormErrorDisplay } from "~/components/FormErrorDisplay";

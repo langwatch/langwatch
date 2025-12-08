@@ -1,7 +1,7 @@
 import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import type { PropsWithChildren } from "react";
-import { Check, Edit, Inbox, Plus, Users } from "react-feather";
+import { type PropsWithChildren } from "react";
+import { Check, Edit, Inbox, Plus, Users } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -21,17 +21,17 @@ export default function AnnotationsLayout({
   // Use optimized count endpoints instead of fetching full data
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id }
   );
 
   const assignedItemsCount = api.annotation.getAssignedItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id }
   );
 
   const queueItemsCounts = api.annotation.getQueueItemsCounts.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
+    { enabled: !!project?.id }
   );
 
   const menuItems = {

@@ -24,7 +24,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import "@xyflow/react/dist/style.css";
 import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
 import {
   type ImperativePanelHandle,
   Panel,

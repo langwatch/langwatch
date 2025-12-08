@@ -1,5 +1,5 @@
 import { Badge, Button, Card, HStack, Text, VStack } from "@chakra-ui/react";
-import { Edit, Eye, Shield, Trash2 } from "react-feather";
+import { Edit, Eye, Shield, Trash2 } from "lucide-react";
 import type { Permission } from "../../server/api/rbac";
 
 /**

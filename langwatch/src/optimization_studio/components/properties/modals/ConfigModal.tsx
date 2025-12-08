@@ -6,9 +6,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-import { X } from "react-feather";
 import { Popover } from "../../../../components/ui/popover";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 
 export function ConfigModal({
   open,

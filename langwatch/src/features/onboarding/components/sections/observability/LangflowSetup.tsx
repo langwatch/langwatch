@@ -1,10 +1,9 @@
-import { Accordion, Separator, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
-import { useState } from "react";
-import { ExternalLink } from "react-feather";
-import { Link } from "../../../../../components/ui/link";
-import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import React, { useState } from "react";
+import { VStack, Text, Separator, Accordion } from "@chakra-ui/react";
 import { CodePreview } from "./CodePreview";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { Link } from "../../../../../components/ui/link";
+import { ExternalLink } from "lucide-react";
 
 export function LangflowSetup(): React.ReactElement {
   const { project } = useActiveProject();
@@ -46,29 +45,27 @@ langwatch.get_current_trace().update(
     {
       value: "custom-io",
       title: "Defining custom input and output",
-      description:
-        "You can customize what LangWatch captures as the final input and output of your Langflow component for better observability.",
+      description: "You can customize what LangWatch captures as the final input and output of your Langflow component for better observability.",
       code: customInputOutputCode,
       filename: "component_code.py",
       instructions: [
-        "Click on the <> Code button in any appropriate component",
-        "Scroll down to find the def responsible for execution of that component",
-        "Paste the code above, mapping the variables as needed for your case",
-      ],
+        'Click on the <> Code button in any appropriate component',
+        'Scroll down to find the def responsible for execution of that component',
+        'Paste the code above, mapping the variables as needed for your case'
+      ]
     },
     {
       value: "metadata",
       title: "Capturing additional metadata",
-      description:
-        "You can capture additional metadata from your Langflow component. This can be useful for capturing information about the user, the conversation, or any specific information from your system.",
+      description: "You can capture additional metadata from your Langflow component. This can be useful for capturing information about the user, the conversation, or any specific information from your system.",
       code: metadataCode,
       filename: "component_code.py",
       instructions: [
-        "Use the same <> Code button access method as above",
-        "Add the metadata update call in the execution function",
-        "Common fields to capture: user_id, thread_id (groups messages from same conversation)",
-      ],
-    },
+        'Use the same <> Code button access method as above',
+        'Add the metadata update call in the execution function',
+        'Common fields to capture: user_id, thread_id (groups messages from same conversation)'
+      ]
+    }
   ];
 
   return (
@@ -87,9 +84,8 @@ langwatch.get_current_trace().update(
           Setup
         </Text>
         <Text textStyle="sm">
-          Add the following environment variable to your Langflow configuration.
-          This will automatically enable LangWatch tracing for all your Langflow
-          components.
+          Add the following environment variable to your Langflow configuration. This will automatically
+          enable LangWatch tracing for all your Langflow components.
         </Text>
         <CodePreview
           code={envVarsCode}
@@ -112,8 +108,7 @@ langwatch.get_current_trace().update(
           codeLanguage="bash"
         />
         <Text textStyle="sm" color="fg.muted">
-          Run a message through your Langflow project and check the LangWatch
-          dashboard for monitoring and observability.
+          Run a message through your Langflow project and check the LangWatch dashboard for monitoring and observability.
         </Text>
       </VStack>
 
@@ -124,8 +119,7 @@ langwatch.get_current_trace().update(
           Advanced Configuration
         </Text>
         <Text textStyle="sm" color="fg.muted">
-          Optional: Customize what LangWatch captures from your Langflow
-          components
+          Optional: Customize what LangWatch captures from your Langflow components
         </Text>
 
         <Accordion.Root
@@ -172,3 +166,4 @@ langwatch.get_current_trace().update(
     </VStack>
   );
 }
+

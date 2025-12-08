@@ -1,10 +1,14 @@
-import { Box, Button, Grid, HStack } from "@chakra-ui/react";
-import type React from "react";
-import { createContext, useContext, useLayoutEffect, useState } from "react";
-import { ZoomIn, ZoomOut } from "react-feather";
+import React, {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useState,
+} from "react";
+import { Grid, Box, Button, HStack } from "@chakra-ui/react";
+import { ZoomIn, ZoomOut } from "lucide-react";
+import { SimulationChatViewer } from "./SimulationChatViewer";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
-import { SimulationChatViewer } from "./SimulationChatViewer";
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
@@ -12,7 +16,7 @@ const useZoomContext = () => {
   const context = useContext(ZoomContext);
   if (!context) {
     throw new Error(
-      "Zoom components must be used within SimulationZoomGrid.Root",
+      "Zoom components must be used within SimulationZoomGrid.Root"
     );
   }
   return context;
@@ -102,7 +106,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
     // Calculate how many cards can fit, accounting for gaps
     // Formula: (availableWidth + gap) / (cardWidth + gap)
     const maxColumns = Math.floor(
-      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP),
+      (containerWidth + GRID_GAP) / (effectiveCardWidth + GRID_GAP)
     );
 
     return Math.max(1, maxColumns);

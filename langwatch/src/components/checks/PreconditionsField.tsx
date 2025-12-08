@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { X } from "react-feather";
+import { X } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import type {

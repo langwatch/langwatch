@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical } from "react-feather";
+import { MoreVertical } from "lucide-react";
 import {
   LuCircleCheckBig,
   LuCircleX,

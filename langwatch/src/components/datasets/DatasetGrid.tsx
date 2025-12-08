@@ -1,30 +1,32 @@
-import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
-import type { ColDef, GridOptions } from "@ag-grid-community/core";
-import { ModuleRegistry } from "@ag-grid-community/core";
+import type { GridOptions } from "@ag-grid-community/core";
 import {
   AgGridReact,
   type AgGridReactProps,
   type CustomCellEditorProps,
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
-import { Box, Field, Image, Text, VStack } from "@chakra-ui/react";
+import { Box, Field, Text, Image, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
+import type { ColDef } from "@ag-grid-community/core";
+import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
+import { ModuleRegistry } from "@ag-grid-community/core";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
 
 import React from "react";
-import { Minus } from "react-feather";
-import { useDebounce } from "use-debounce";
 import {
-  type DatasetColumnType,
   datasetColumnTypeMapping,
   jsonSchema,
+  type DatasetColumnType,
 } from "../../server/datasets/types";
-import { ExternalImage, getImageUrl } from "../ExternalImage";
 import { RenderInputOutput } from "../traces/RenderInputOutput";
-import { Checkbox } from "../ui/checkbox";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
+import { Checkbox } from "../ui/checkbox";
+import { Minus } from "lucide-react";
+import { useDebounce } from "use-debounce";
+
+import { ExternalImage, getImageUrl } from "../ExternalImage";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
@@ -108,7 +110,7 @@ export const DatasetGrid = React.memo(
     props: any & {
       columnDefs: DatasetColumnDef[];
     },
-    ref,
+    ref
   ) {
     const gridOptions: GridOptions = useMemo(
       () => ({
@@ -120,7 +122,7 @@ export const DatasetGrid = React.memo(
         groupSelectsChildren: true,
         suppressRowClickSelection: true,
       }),
-      [],
+      []
     );
 
     const columnDefsMemo = useMemo(() => {
@@ -191,11 +193,11 @@ export const DatasetGrid = React.memo(
                 column.type_ === "string"
                   ? "text"
                   : column.type_ === "date"
-                    ? "dateString"
-                    : column.type_,
+                  ? "dateString"
+                  : column.type_,
             };
           }
-        },
+        }
       );
     }, [props.columnDefs]);
 
@@ -313,8 +315,8 @@ export const DatasetGrid = React.memo(
                           0,
                           0,
                           0,
-                          0,
-                        ),
+                          0
+                        )
                       ).toISOString()
                     : undefined,
               },
@@ -333,7 +335,7 @@ export const DatasetGrid = React.memo(
         JSON.stringify(nextProps.columnDefs) &&
       prevProps.onCellValueChanged === nextProps.onCellValueChanged
     );
-  },
+  }
 );
 
 export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
@@ -353,7 +355,7 @@ export function HeaderCheckboxComponent(props: CustomCellRendererProps) {
         }
       });
       setCheckboxState(
-        allChecked ? "checked" : allUnchecked ? "unchecked" : "indeterminate",
+        allChecked ? "checked" : allUnchecked ? "unchecked" : "indeterminate"
       );
     };
 

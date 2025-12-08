@@ -1,5 +1,5 @@
 import { Box, HStack } from "@chakra-ui/react";
-import { Filter } from "react-feather";
+import { Filter } from "lucide-react";
 import { HoverableBigText } from "../HoverableBigText";
 
 interface FilterDisplayProps {

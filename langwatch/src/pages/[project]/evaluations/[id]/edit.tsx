@@ -1,24 +1,24 @@
+import { useRouter } from "next/router";
 import {
-  Alert,
   Button,
   Card,
   Container,
-  Heading,
   HStack,
+  Heading,
   Skeleton,
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { MoreVertical } from "react-feather";
+import { Alert } from "@chakra-ui/react";
+import { Menu } from "../../../../components/ui/menu";
+import { toaster } from "../../../../components/ui/toaster";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/checks/CheckConfigForm";
-import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { Menu } from "../../../../components/ui/menu";
-import { toaster } from "../../../../components/ui/toaster";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../../utils/api";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { MoreVertical } from "lucide-react";
 
 export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();
@@ -27,7 +27,7 @@ export default function EditTraceCheck() {
   const checkId = typeof router.query.id == "string" ? router.query.id : "";
   const check = api.monitors.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
-    { enabled: !!project },
+    { enabled: !!project }
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
@@ -51,7 +51,7 @@ export default function EditTraceCheck() {
       });
       void router.push(`/${project.slug}/evaluations`);
       check.remove();
-    } catch {
+    } catch (error) {
       toaster.create({
         title: "Failed to update check",
         description: "Please try again",
@@ -90,7 +90,7 @@ export default function EditTraceCheck() {
               },
             });
           },
-        },
+        }
       );
     }
   };

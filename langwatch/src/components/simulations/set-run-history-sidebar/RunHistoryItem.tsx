@@ -1,9 +1,9 @@
-import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import React from "react";
-import { Check, XCircle } from "react-feather";
+import { HStack, Text, Icon, Box } from "@chakra-ui/react";
+import { Check, XCircle } from "lucide-react";
+import { useColorModeValue } from "../../ui/color-mode";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
-import { useColorModeValue } from "../../ui/color-mode";
 import type { RunItem } from "./types";
 
 // Single test case row

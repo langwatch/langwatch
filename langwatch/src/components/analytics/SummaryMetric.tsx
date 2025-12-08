@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
+import { ArrowDown, ArrowUp, HelpCircle } from "lucide-react";
 import { Delayed } from "../Delayed";
 import { Tooltip } from "../ui/tooltip";
 

@@ -1,12 +1,12 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import { type ComponentProps, useMemo } from "react";
-import { ErrorBoundary } from "react-error-boundary";
-import { Edit2 } from "react-feather";
+import { useMemo, type ComponentProps } from "react";
+import { Edit2 } from "lucide-react";
+import { DatasetGrid, type DatasetColumnDef } from "./DatasetGrid";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { type DatasetColumnDef, DatasetGrid } from "./DatasetGrid";
+import { ErrorBoundary } from "react-error-boundary";
 
 export function DatasetPreview({
   rows,

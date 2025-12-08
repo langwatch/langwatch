@@ -7,27 +7,27 @@ import {
   HStack,
   Input,
   Portal,
-  Progress,
   Spacer,
-  type StackProps,
   Text,
   VStack,
+  Progress,
+  type StackProps,
 } from "@chakra-ui/react";
-import type { Organization, Project, Team } from "@prisma/client";
+import { type Organization, type Project, type Team } from "@prisma/client";
+import { signIn, signOut } from "next-auth/react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Info,
   Lock,
   Plus,
   Search,
-} from "react-feather";
+  Info,
+} from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -39,10 +39,10 @@ import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { HoverableBigText } from "./HoverableBigText";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
-import { ChecklistIcon } from "./icons/Checklist";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH } from "./MainMenu";
 import { ProjectTechStackIcon } from "./TechStack";
+import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
@@ -63,7 +63,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
             <Link
               href={projectRoutes[currentRoute.parent].path.replace(
                 "[project]",
-                project?.slug ?? "",
+                project?.slug ?? ""
               )}
             >
               {projectRoutes[currentRoute.parent].title}
@@ -95,15 +95,15 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
+      ? 1
+      : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
       organization,
       team,
       projects: team.projects.sort(sortByName),
-    })),
+    }))
   );
 
   return (
@@ -136,8 +136,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                 {projectGroups
                   .filter((projectGroup) =>
                     projectGroup.team.members.some(
-                      (member) => member.userId === session?.user.id,
-                    ),
+                      (member) => member.userId === session?.user.id
+                    )
                   )
                   .map((projectGroup) => (
                     <Menu.ItemGroup
@@ -164,7 +164,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               const hasProjectInRoute =
                                 currentRoute?.path.includes("[project]");
                               const hasProjectInPath = currentPath.includes(
-                                project.slug,
+                                project.slug
                               );
 
                               if (hasProjectInRoute) {
@@ -175,7 +175,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               } else if (hasProjectInPath) {
                                 return currentPath.replace(
                                   project.slug,
-                                  project_.slug,
+                                  project_.slug
                                 );
                               } else {
                                 return `/${
@@ -223,7 +223,7 @@ export const AddProjectButton = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    },
+    }
   );
 
   return !usage.data ||
@@ -287,7 +287,7 @@ export const DashboardLayout = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    },
+    }
   );
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
@@ -298,7 +298,7 @@ export const DashboardLayout = ({
 
   const integrationsLeft = useMemo(() => {
     return Object.entries(integrationChecks.data ?? {}).filter(
-      ([key, value]) => key !== "integrated" && !value,
+      ([key, value]) => key !== "integrated" && !value
     ).length;
   }, [integrationChecks.data]);
 
@@ -489,8 +489,8 @@ export const DashboardLayout = ({
                 } else {
                   void router.push(
                     `/${project.slug}/messages?query=${encodeURIComponent(
-                      query,
-                    )}`,
+                      query
+                    )}`
                   );
                 }
               }}
@@ -525,7 +525,7 @@ export const DashboardLayout = ({
                 max={usage.data?.activePlan.maxMessagesPerMonth}
                 value={Math.min(
                   usage.data?.currentMonthMessagesCount,
-                  usage.data?.activePlan.maxMessagesPerMonth,
+                  usage.data?.activePlan.maxMessagesPerMonth
                 )}
                 maxW="150px"
                 colorPalette="orange"

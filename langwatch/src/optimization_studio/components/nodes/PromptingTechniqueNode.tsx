@@ -1,19 +1,19 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { type Node, type NodeProps, NodeToolbar } from "@xyflow/react";
+import { NodeToolbar, type Node, type NodeProps } from "@xyflow/react";
 import type { Ref } from "react";
 import { forwardRef } from "react";
 import { useDrop } from "react-dnd";
-import { MoreHorizontal, Trash2 } from "react-feather";
-import { Menu } from "../../../components/ui/menu";
+import { MoreHorizontal, Trash2 } from "lucide-react";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { ComponentType, PromptingTechnique } from "../../types/dsl";
 import { ComponentIcon } from "../ColorfulBlockIcons";
 import { ComponentNode, selectionColor } from "./Nodes";
+import { Menu } from "../../../components/ui/menu";
 
 export const PromptingTechniqueDraggingNode = forwardRef(
   function PromptingTechniqueDraggingNode(
     props: NodeProps<Node<PromptingTechnique>>,
-    ref: Ref<HTMLDivElement>,
+    ref: Ref<HTMLDivElement>
   ) {
     return (
       <ComponentNode
@@ -22,16 +22,16 @@ export const PromptingTechniqueDraggingNode = forwardRef(
         hideOutputHandles
       />
     );
-  },
+  }
 );
 
 export const PromptingTechniqueNode = forwardRef(
   function PromptingTechniqueNode(
     _props: NodeProps<Node<PromptingTechnique>>,
-    _ref: Ref<HTMLDivElement>,
+    _ref: Ref<HTMLDivElement>
   ) {
     return null;
-  },
+  }
 );
 
 export function PromptingTechniqueDropArea({
@@ -71,7 +71,7 @@ export function PromptingTechniqueWrapper({
       setNode: state.setNode,
       deleteNode: state.deleteNode,
       deselectAllNodes: state.deselectAllNodes,
-    }),
+    })
   );
   const hovered = false;
 

@@ -3,22 +3,22 @@ import {
   Box,
   Button,
   Card,
-  Heading,
   HStack,
+  Heading,
   Skeleton,
   Spacer,
   Spinner,
-  type StackProps,
   Text,
   VStack,
+  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Download, ExternalLink } from "react-feather";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Download, ExternalLink } from "lucide-react";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
@@ -27,7 +27,6 @@ import type { AppRouter } from "../../server/api/root";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
-import { OverflownTextWithTooltip } from "../OverflownText";
 import {
   BatchEvaluationV2EvaluationSummary,
   formatEvaluationSummary,
@@ -37,6 +36,8 @@ import {
   BatchEvaluationV2EvaluationResults,
   useBatchEvaluationDownloadCSV,
 } from "./BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
+import React from "react";
+import { OverflownTextWithTooltip } from "../OverflownText";
 
 export function BatchEvaluationV2({
   project,
@@ -175,7 +176,7 @@ export const useBatchEvaluationState = ({
       {
         refetchInterval: keepFetching ? 1 : isSomeRunning ? 3000 : 10_000,
         enabled: !!project && !!experiment,
-      },
+      }
     );
 
   const router = useRouter();
@@ -186,7 +187,7 @@ export const useBatchEvaluationState = ({
       (typeof router.query.runId === "string" ? router.query.runId : null) ??
       batchEvaluationRuns.data?.runs[0]?.run_id;
     const selectedRun = batchEvaluationRuns.data?.runs.find(
-      (r) => r.run_id === selectedRunId_,
+      (r) => r.run_id === selectedRunId_
     );
     return { selectedRunId_, selectedRun };
   }, [selectedRunId, router.query.runId, batchEvaluationRuns.data?.runs]);
@@ -210,7 +211,7 @@ export const useBatchEvaluationState = ({
         void router.push({ query: { ...router.query, runId } });
       }
     },
-    [router, setSelectedRunId],
+    [router, setSelectedRunId]
   );
 
   const isFinished = useMemo(() => {
@@ -225,7 +226,7 @@ export const useBatchEvaluationState = ({
   useEffect(() => {
     if (
       batchEvaluationRuns.data?.runs.some(
-        (r) => getFinishedAt(r.timestamps, new Date().getTime()) === undefined,
+        (r) => getFinishedAt(r.timestamps, new Date().getTime()) === undefined
       )
     ) {
       setIsSomeRunning(true);
@@ -268,7 +269,7 @@ export function BatchEvaluationV2RunList({
   size?: "sm" | "md";
 } & StackProps) {
   const hasAnyVersion = batchEvaluationRuns.data?.runs.some(
-    (run) => run.workflow_version,
+    (run) => run.workflow_version
   );
 
   return (
@@ -311,7 +312,7 @@ export function BatchEvaluationV2RunList({
       ) : (
         <>
           {!batchEvaluationRuns.data?.runs.find(
-            (r) => r.run_id === selectedRunId,
+            (r) => r.run_id === selectedRunId
           ) && (
             <HStack
               paddingX={size === "sm" ? 2 : 4}
@@ -440,7 +441,7 @@ export function BatchEvaluationV2RunList({
                         ? formatTimeAgo(
                             run.timestamps.created_at,
                             "yyyy-MM-dd HH:mm",
-                            5,
+                            5
                           )
                         : "Waiting for steps..."}
                     </Text>

@@ -1,5 +1,5 @@
 import { Alert, HStack, Text } from "@chakra-ui/react";
-import { Info } from "react-feather";
+import { Info } from "lucide-react";
 import { Tooltip } from "../ui/tooltip";
 
 export function QuickwitNote() {

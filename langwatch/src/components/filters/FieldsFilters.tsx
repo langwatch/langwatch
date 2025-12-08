@@ -19,7 +19,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo } from "react";
-import { ChevronDown, Search, X } from "react-feather";
+import { ChevronDown, Search, X } from "lucide-react";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

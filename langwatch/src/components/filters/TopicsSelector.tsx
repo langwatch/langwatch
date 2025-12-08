@@ -1,20 +1,20 @@
 import {
-  Heading,
-  HStack,
   Separator,
+  HStack,
+  Heading,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
-import { HelpCircle } from "react-feather";
-import { useFilterParams } from "../../hooks/useFilterParams";
+import { HelpCircle } from "lucide-react";
 import { api } from "../../utils/api";
-import { Delayed } from "../Delayed";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { OverflownTextWithTooltip } from "../OverflownText";
-import { Checkbox } from "../ui/checkbox";
+import { Delayed } from "../Delayed";
 import { Tooltip } from "../ui/tooltip";
+import { Checkbox } from "../ui/checkbox";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
@@ -50,7 +50,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     {
       ...queryOpts,
       keepPreviousData: true,
-    },
+    }
   );
 
   const handleTopicChange = (topicId: string, checked: boolean) => {
@@ -61,11 +61,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     let newSubtopics = selectedSubtopics;
     if (!checked) {
       const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
-        (subtopic) => subtopic.parentId === topicId,
+        (subtopic) => subtopic.parentId === topicId
       );
       if (subtopics) {
         newSubtopics = selectedSubtopics.filter(
-          (t) => !subtopics.map((s) => s.id).includes(t),
+          (t) => !subtopics.map((s) => s.id).includes(t)
         );
       }
     }
@@ -85,7 +85,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         },
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
   };
 
@@ -104,7 +104,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
           },
         },
         undefined,
-        { shallow: true },
+        { shallow: true }
       );
     }, 0);
 
@@ -119,7 +119,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       const currentHeight = topicSelectorRef.current.clientHeight;
 
       setMinHeight((minHeight) =>
-        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight,
+        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight
       );
     }
   }, [topicCountsQuery.data]);
@@ -204,7 +204,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             onChange={(e) =>
                               handleSubtopicChange(
                                 subtopic.id,
-                                e.target.checked,
+                                e.target.checked
                               )
                             }
                           >

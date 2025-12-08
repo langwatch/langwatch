@@ -23,7 +23,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp } from "react-feather";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   CartesianGrid,
   Label,

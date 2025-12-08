@@ -10,33 +10,36 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { TriggerAction } from "@prisma/client";
-import { useEffect, useState } from "react";
-import { CheckSquare } from "react-feather";
-import { useForm } from "react-hook-form";
-import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { AddParticipants } from "~/components/traces/AddParticipants";
 
-import { useFilterParams } from "~/hooks/useFilterParams";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  DatasetColumns,
-  DatasetRecordEntry,
-} from "~/server/datasets/types";
-import { api } from "~/utils/api";
 // Import from our UI components
 import { Drawer } from "../components/ui/drawer";
 import { Popover } from "../components/ui/popover";
 import { Radio, RadioGroup } from "../components/ui/radio";
 import { toaster } from "../components/ui/toaster";
 import { Tooltip } from "../components/ui/tooltip";
+
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { HorizontalFormControl } from "./HorizontalFormControl";
+
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { useLocalStorage } from "usehooks-ts";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "~/server/datasets/types";
+import { api } from "~/utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
-import type { MappingState } from "../server/tracer/tracesMapping";
-import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
+import { AddParticipants } from "~/components/traces/AddParticipants";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
-import { HorizontalFormControl } from "./HorizontalFormControl";
+
+import { CheckSquare } from "lucide-react";
+import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
+import type { MappingState } from "../server/tracer/tracesMapping";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -49,7 +52,7 @@ export function TriggerDrawer() {
   const teamSlug = team?.slug;
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false },
+    { enabled: !!project, refetchOnWindowFocus: false }
   );
 
   const teamWithMembers = api.team.getTeamWithMembers.useQuery(
@@ -57,11 +60,11 @@ export function TriggerDrawer() {
       slug: teamSlug ?? "",
       organizationId: organization?.id ?? "",
     },
-    { enabled: typeof teamSlug === "string" && !!organization?.id },
+    { enabled: typeof teamSlug === "string" && !!organization?.id }
   );
 
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    [],
+    []
   );
 
   const { closeDrawer } = useDrawer();
@@ -102,7 +105,7 @@ export function TriggerDrawer() {
   const datasetId = watch("datasetId");
 
   const selectedDataset = datasets.data?.find(
-    (dataset) => dataset.id === datasetId,
+    (dataset) => dataset.id === datasetId
   );
 
   const tracesWithSpans = api.traces.getSampleTracesDataset.useQuery(
@@ -113,7 +116,7 @@ export function TriggerDrawer() {
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
-    },
+    }
   );
 
   useEffect(() => {
@@ -198,7 +201,7 @@ export function TriggerDrawer() {
             ? {
                 mapping: actionParams.datasetMapping.mapping,
                 expansions: Array.from(
-                  actionParams.datasetMapping.expansions ?? [],
+                  actionParams.datasetMapping.expansions ?? []
                 ),
               }
             : undefined,
@@ -227,7 +230,7 @@ export function TriggerDrawer() {
             },
           });
         },
-      },
+      }
     );
   };
 
@@ -280,7 +283,7 @@ export function TriggerDrawer() {
                         const email = member.user.email ?? "";
                         if (selectedMembers.includes(email)) {
                           setSelectedMembers(
-                            selectedMembers.filter((m) => m !== email),
+                            selectedMembers.filter((m) => m !== email)
                           );
                         } else {
                           setSelectedMembers([...selectedMembers, email]);

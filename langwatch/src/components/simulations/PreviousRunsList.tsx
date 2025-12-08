@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Check } from "react-feather";
+import { Check } from "lucide-react";
 
 import "@copilotkit/react-ui/styles.css";
 import { LuCircleOff } from "react-icons/lu";

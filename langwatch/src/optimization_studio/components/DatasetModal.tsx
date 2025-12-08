@@ -5,7 +5,7 @@ import {
   useUpdateNodeInternals,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "react-feather";
+import { ArrowLeft } from "lucide-react";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { Dialog } from "../../components/ui/dialog";
 import type { DatasetColumns } from "../../server/datasets/types";

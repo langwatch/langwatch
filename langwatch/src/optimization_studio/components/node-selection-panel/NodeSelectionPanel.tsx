@@ -10,7 +10,8 @@ import {
 import type { Node, XYPosition } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
-import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
+import { BookOpen, Box as BoxIcon, ChevronsLeft } from "lucide-react";
+import { FiGithub as GitHub } from "react-icons/fi";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { IconWrapper } from "../../../components/IconWrapper";

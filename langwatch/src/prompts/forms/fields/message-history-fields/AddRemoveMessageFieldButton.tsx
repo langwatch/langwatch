@@ -1,8 +1,8 @@
 import { Button, HStack } from "@chakra-ui/react";
-import { Minus, Plus } from "react-feather";
 import type { UseFieldArrayReturn } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { Menu } from "../../../../components/ui/menu";
+import { Minus, Plus } from "lucide-react";
 
 /**
  * AddRemoveMessageFieldButton

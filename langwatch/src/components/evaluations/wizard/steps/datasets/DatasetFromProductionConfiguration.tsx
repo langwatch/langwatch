@@ -1,8 +1,8 @@
-import { Box, RadioCard, Text, VStack } from "@chakra-ui/react";
-import type { Dataset } from "@prisma/client";
-import { ArrowLeft, Download } from "react-feather";
-import { DatasetRadioCard } from "../../components/DatasetRadioCard";
 import { DatasetGenerationTemplate } from "./DatasetGenerationTemplate";
+import { Download, ArrowLeft } from "lucide-react";
+import { Text, RadioCard, VStack, Box } from "@chakra-ui/react";
+import type { Dataset } from "@prisma/client";
+import { DatasetRadioCard } from "../../components/DatasetRadioCard";
 
 interface DatasetFromProductionConfigurationProps {
   dataset?: Dataset & { _count: { datasetRecords: number } };
@@ -29,7 +29,10 @@ export function DatasetFromProductionConfiguration({
             value={dataset.id}
             width="full"
           >
-            <DatasetRadioCard dataset={dataset} />
+            <DatasetRadioCard
+              dataset={dataset}
+              handleDatasetSelect={() => {}}
+            />
           </RadioCard.Root>
         ) : (
           <VStack alignItems="flex-start">

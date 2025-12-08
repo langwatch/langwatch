@@ -1,12 +1,14 @@
 import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
-import { Edit2, Info } from "react-feather";
-import { Controller, useFormContext } from "react-hook-form";
+import { Edit2, Info } from "lucide-react";
+import { useFormContext, Controller } from "react-hook-form";
+
+import type { PromptConfigFormValues } from "~/prompts";
+import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
+
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";
 import { Tooltip } from "~/components/ui/tooltip";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { PromptConfigFormValues } from "~/prompts";
 import { transposeColumnsFirstToRowsFirstWithId } from "../../../optimization_studio/utils/datasetUtils";
-import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 
 /**
  * Field for managing demonstrations (few-shot examples) in prompt configurations
@@ -21,7 +23,7 @@ export function DemonstrationsField() {
   const { open, onOpen, onClose } = useDisclosure();
   const demonstrations = watch("version.configData.demonstrations");
   const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
-    demonstrations?.inline?.records ?? {},
+    demonstrations?.inline?.records ?? {}
   );
   const total = transposedRecords.length;
 

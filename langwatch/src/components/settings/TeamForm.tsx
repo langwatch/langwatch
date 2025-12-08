@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
 import { Select as MultiSelect } from "chakra-react-select";
-import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
+import { ChevronRight, HelpCircle, Plus, Trash } from "lucide-react";
 import {
   Controller,
   type SubmitHandler,

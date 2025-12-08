@@ -1,17 +1,18 @@
-import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { Card, GridItem, HStack, Heading, SimpleGrid } from "@chakra-ui/react";
+import { BarChart2 } from "lucide-react";
+import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
-import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -77,6 +78,26 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
+  timeScale: ONE_DAY,
+  height: 300,
+};
+
+const averageDailyThreadsPerUser = {
+  graphId: "custom",
+  graphType: "bar",
+  series: [
+    {
+      name: "Average threads count per user",
+      colorSet: "greenTones",
+      metric: "metadata.thread_id",
+      aggregation: "cardinality",
+      pipeline: {
+        field: "user_id",
+        aggregation: "avg",
+      },
+    },
+  ],
+  includePrevious: false,
   timeScale: ONE_DAY,
   height: 300,
 };
@@ -179,8 +200,8 @@ const userThreads = {
 
 function UsersContent() {
   const publicEnv = usePublicEnv();
-  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
-  const isNotQuickwit = !isQuickwit;
+  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
 
   return (
     <GraphsLayout>

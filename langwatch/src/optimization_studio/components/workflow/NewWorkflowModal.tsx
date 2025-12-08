@@ -1,21 +1,21 @@
+import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  Box,
   Button,
+  Separator,
   Grid,
   HStack,
-  Separator,
   Text,
+  Box,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, File, Upload } from "react-feather";
 import { Dialog } from "../../../components/ui/dialog";
-import { toaster } from "../../../components/ui/toaster";
-import { TEMPLATES } from "../../templates/registry";
-import type { Workflow } from "../../types/dsl";
-import { workflowJsonSchema } from "../../types/dsl";
-import { NewWorkflowForm } from "./NewWorkflowForm";
 import { WorkflowCard } from "./WorkflowCard";
+import { ChevronLeft, File, Upload } from "lucide-react";
+import { NewWorkflowForm } from "./NewWorkflowForm";
+import type { Workflow } from "../../types/dsl";
+import { TEMPLATES } from "../../templates/registry";
+import { toaster } from "../../../components/ui/toaster";
+import { workflowJsonSchema } from "../../types/dsl";
 
 /** Maximum allowed file size for workflow imports (5MB) */
 const MAX_WORKFLOW_FILE_SIZE = 5 * 1024 * 1024;
@@ -47,7 +47,7 @@ function useFileDrop(onFileSelect: (file: File) => void) {
       const file = e.dataTransfer.files[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect],
+    [onFileSelect]
   );
 
   const handleClick = useCallback(() => {
@@ -59,7 +59,7 @@ function useFileDrop(onFileSelect: (file: File) => void) {
       const file = e.target.files?.[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect],
+    [onFileSelect]
   );
 
   return {
@@ -127,7 +127,7 @@ export const NewWorkflowModal = ({
       };
       reader.readAsText(file);
     },
-    [setStep],
+    [setStep]
   );
 
   const {

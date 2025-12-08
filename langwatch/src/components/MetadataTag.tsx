@@ -1,7 +1,7 @@
 import { HStack, Text } from "@chakra-ui/react";
 import Mustache from "mustache";
 import { useState } from "react";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 

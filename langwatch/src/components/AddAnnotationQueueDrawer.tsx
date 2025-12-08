@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useState } from "react";
-import { Plus } from "react-feather";
+import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

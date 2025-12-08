@@ -1,26 +1,26 @@
 import {
-  Alert,
   Box,
   Card,
   GridItem,
-  Heading,
   HStack,
+  Heading,
   SimpleGrid,
   Text,
+  Alert,
 } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { Link } from "~/components/ui/link";
+import { BarChart2 } from "lucide-react";
+import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import GraphsLayout from "~/components/GraphsLayout";
-import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

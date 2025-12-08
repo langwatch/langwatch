@@ -1,5 +1,5 @@
 import { Heading, RadioCard, Text, VStack } from "@chakra-ui/react";
-import { Activity, Edit3 } from "react-feather";
+import { Activity, Edit3 } from "lucide-react";
 import { LuBadgeCheck, LuListChecks, LuShield } from "react-icons/lu";
 import {
   type State,
