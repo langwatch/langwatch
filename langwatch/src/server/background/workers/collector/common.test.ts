@@ -1181,7 +1181,7 @@ describe("Span organizing and flattening tests", () => {
         trace_id: "56392841-f392-4c5a-84b0-934119d162d2",
         input: {
           type: "json",
-          value: "{}",
+          value: '"Hello"',
         },
         output: {
           type: "json",
