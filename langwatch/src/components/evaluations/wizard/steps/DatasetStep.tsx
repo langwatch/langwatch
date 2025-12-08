@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Database, FilePlus, FileText, UploadCloud } from "react-feather";
+import { Database, FilePlus, FileText, UploadCloud } from "lucide-react";
 import {
   DATA_SOURCE_TYPES,
   useEvaluationWizardStore,

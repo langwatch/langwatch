@@ -18,7 +18,7 @@ import CheckConfigForm, {
 import { api } from "../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { MoreVertical } from "react-feather";
+import { MoreVertical } from "lucide-react";
 
 export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();

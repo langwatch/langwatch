@@ -5,7 +5,7 @@ import React, {
   useState,
 } from "react";
 import { Grid, Box, Button, HStack } from "@chakra-ui/react";
-import { ZoomIn, ZoomOut } from "react-feather";
+import { ZoomIn, ZoomOut } from "lucide-react";
 import { SimulationChatViewer } from "./SimulationChatViewer";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";

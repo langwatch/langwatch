@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import React from "react";
 import { Menu } from "../../components/ui/menu";
-import { Archive, MoreVertical, Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "lucide-react";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

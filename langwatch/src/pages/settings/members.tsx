@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
-import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
+import { Lock, Mail, MoreVertical, Plus, Trash } from "lucide-react";
 import { CopyInput } from "../../components/CopyInput";
 import { AddMembersForm } from "../../components/AddMembersForm";
 import type { MembersForm } from "../../components/AddMembersForm";

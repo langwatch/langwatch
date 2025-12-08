@@ -4,7 +4,7 @@ import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 import { Avatar, Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { ExternalLink } from "react-feather";
+import { ExternalLink } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Link } from "../../../components/ui/link";

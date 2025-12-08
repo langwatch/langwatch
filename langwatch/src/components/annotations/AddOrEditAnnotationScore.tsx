@@ -14,7 +14,7 @@ import {
 import { useForm } from "react-hook-form";
 
 import { useEffect, useState } from "react";
-import { Plus, X } from "react-feather";
+import { Plus, X } from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 

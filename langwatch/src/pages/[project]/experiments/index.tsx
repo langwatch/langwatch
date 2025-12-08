@@ -9,7 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import router from "next/router";
-import { Play } from "react-feather";
+import { Play } from "lucide-react";
 
 import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";

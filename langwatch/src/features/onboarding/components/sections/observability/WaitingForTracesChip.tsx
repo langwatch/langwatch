@@ -4,7 +4,7 @@ import { useColorRawValue } from "../../../../../components/ui/color-mode";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { api } from "~/utils/api";
 import { useRouter } from "next/router";
-import { CheckCircle } from "react-feather";
+import { CheckCircle } from "lucide-react";
 
 export function WaitingForTracesChip(): React.ReactElement {
   const accent = useColorRawValue("orange.400");

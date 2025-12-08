@@ -7,7 +7,7 @@ import {
   useDisclosure,
   Collapsible,
 } from "@chakra-ui/react";
-import { ChevronDown } from "react-feather";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import {
   useFormContext,

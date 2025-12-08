@@ -1,5 +1,5 @@
 import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
-import { Edit2, Info } from "react-feather";
+import { Edit2, Info } from "lucide-react";
 import { useFormContext, Controller } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "~/prompts";

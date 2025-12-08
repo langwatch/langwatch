@@ -13,7 +13,7 @@ import { DocsLinks } from "./observability/DocsLinks";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useRouter } from "next/router";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
-import { ArrowRight } from "react-feather";
+import { ArrowRight } from "lucide-react";
 
 export function ObservabilityScreen(): React.ReactElement {
   const router = useRouter();

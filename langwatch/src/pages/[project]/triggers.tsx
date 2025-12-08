@@ -16,7 +16,7 @@ import {
 } from "@chakra-ui/react";
 import type { Monitor, TriggerAction } from "@prisma/client";
 import { type AlertType } from "@prisma/client";
-import { Bell, Edit2, Filter, MoreVertical, Trash } from "react-feather";
+import { Bell, Edit2, Filter, MoreVertical, Trash } from "lucide-react";
 import {
   Controller,
   useForm,

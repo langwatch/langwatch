@@ -23,7 +23,7 @@ import {
   Settings,
   Table,
   TrendingUp,
-} from "react-feather";
+} from "lucide-react";
 
 import {
   Activity,

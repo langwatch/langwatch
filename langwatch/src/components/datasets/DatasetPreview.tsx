@@ -1,6 +1,6 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
 import { useMemo, type ComponentProps } from "react";
-import { Edit2 } from "react-feather";
+import { Edit2 } from "lucide-react";
 import { DatasetGrid, type DatasetColumnDef } from "./DatasetGrid";
 import type {
   DatasetColumns,

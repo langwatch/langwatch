@@ -1,6 +1,6 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { Check, X } from "react-feather";
+import { Check, X } from "lucide-react";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 

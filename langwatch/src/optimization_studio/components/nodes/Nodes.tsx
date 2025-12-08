@@ -27,7 +27,7 @@ import {
   Square,
   Trash2,
   X,
-} from "react-feather";
+} from "lucide-react";
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";

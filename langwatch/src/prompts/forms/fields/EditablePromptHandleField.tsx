@@ -1,7 +1,7 @@
 import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
 import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
-import { Edit3 } from "react-feather";
+import { Edit3 } from "lucide-react";
 
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";

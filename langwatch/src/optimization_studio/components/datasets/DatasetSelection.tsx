@@ -4,7 +4,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
-import { MoreHorizontal, Plus, Trash2 } from "react-feather";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";

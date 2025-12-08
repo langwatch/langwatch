@@ -11,7 +11,7 @@ import {
 import { useMemo } from "react";
 import type { Project } from "@prisma/client";
 import numeral from "numeral";
-import { Clock, Play, Settings } from "react-feather";
+import { Clock, Play, Settings } from "lucide-react";
 import type {
   ErrorCapture,
   EvaluationResult,

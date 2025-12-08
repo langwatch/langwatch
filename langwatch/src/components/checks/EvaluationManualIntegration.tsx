@@ -20,7 +20,7 @@ import { langwatchEndpoint } from "../code/langwatchEndpointEnv";
 import { EvaluationExecutionMode } from "@prisma/client";
 import type { UseFormReturn } from "react-hook-form";
 import type { CheckConfigFormData } from "./CheckConfigForm";
-import { Info } from "react-feather";
+import { Info } from "lucide-react";
 
 export function EvaluationManualIntegration({
   slug,

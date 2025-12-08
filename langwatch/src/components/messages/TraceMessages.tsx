@@ -14,7 +14,7 @@ import React, { useEffect, useState, type PropsWithChildren } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";
 
-import { CornerDownRight } from "react-feather";
+import { CornerDownRight } from "lucide-react";
 import { Annotations } from "../../components/Annotations";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {

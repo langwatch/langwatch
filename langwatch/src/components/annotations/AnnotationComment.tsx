@@ -20,7 +20,7 @@ import { Popover } from "../ui/popover";
 import { Checkbox, CheckboxGroup } from "../ui/checkbox";
 import { Radio, RadioGroup } from "../ui/radio";
 
-import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
+import { ChevronDown, MoreVertical, Trash2 } from "lucide-react";
 
 import type { AnnotationScoreDataType } from "@prisma/client";
 import Link from "next/link";

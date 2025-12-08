@@ -1,5 +1,5 @@
 import { DatasetGenerationTemplate } from "./DatasetGenerationTemplate";
-import { Download, ArrowLeft } from "react-feather";
+import { Download, ArrowLeft } from "lucide-react";
 import { Text, RadioCard, VStack, Box } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
 import { DatasetRadioCard } from "../../components/DatasetRadioCard";

@@ -17,7 +17,7 @@ import {
 } from "date-fns";
 import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
-import { Calendar, ChevronDown } from "react-feather";
+import { Calendar, ChevronDown } from "lucide-react";
 import { Popover } from "./ui/popover";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>

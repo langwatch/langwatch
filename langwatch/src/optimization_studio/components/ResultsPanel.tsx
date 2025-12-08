@@ -17,7 +17,7 @@ import {
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, X } from "react-feather";
+import { ChevronDown, X } from "lucide-react";
 import { LuSquareCheckBig } from "react-icons/lu";
 import {
   BatchEvaluationV2RunList,

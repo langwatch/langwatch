@@ -17,7 +17,7 @@ import {
   Table as TableIcon,
   Edit,
   Trash2,
-} from "react-feather";
+} from "lucide-react";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";

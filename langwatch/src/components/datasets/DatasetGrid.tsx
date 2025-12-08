@@ -23,7 +23,7 @@ import {
 import { RenderInputOutput } from "../traces/RenderInputOutput";
 import { MultilineJSONCellEditor } from "./MultilineJSONCellEditor";
 import { Checkbox } from "../ui/checkbox";
-import { Minus } from "react-feather";
+import { Minus } from "lucide-react";
 import { useDebounce } from "use-debounce";
 
 import { ExternalImage, getImageUrl } from "../ExternalImage";

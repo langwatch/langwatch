@@ -1,5 +1,5 @@
 import { Card, GridItem, HStack, Heading, SimpleGrid } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
 import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,

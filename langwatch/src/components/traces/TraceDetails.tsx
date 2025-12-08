@@ -12,7 +12,7 @@ import { type PublicShare } from "@prisma/client";
 import { useRouter } from "next/router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
-import { Maximize2, Minimize2 } from "react-feather";
+import { Maximize2, Minimize2 } from "lucide-react";
 
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

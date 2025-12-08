@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, Plus, Eye, EyeOff } from "react-feather";
+import { Trash2, Plus, Eye, EyeOff } from "lucide-react";
 import React, { useEffect } from "react";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";

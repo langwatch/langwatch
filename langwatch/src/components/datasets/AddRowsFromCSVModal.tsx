@@ -7,7 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowRight } from "react-feather";
+import { ArrowRight } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   newDatasetEntriesSchema,

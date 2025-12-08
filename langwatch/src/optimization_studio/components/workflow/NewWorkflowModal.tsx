@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { Dialog } from "../../../components/ui/dialog";
 import { WorkflowCard } from "./WorkflowCard";
-import { ChevronLeft, File, Upload } from "react-feather";
+import { ChevronLeft, File, Upload } from "lucide-react";
 import { NewWorkflowForm } from "./NewWorkflowForm";
 import type { Workflow } from "../../types/dsl";
 import { TEMPLATES } from "../../templates/registry";

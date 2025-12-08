@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
-import { Play } from "react-feather";
+import { Play } from "lucide-react";
 import { useForm, type FieldError, type FieldErrors } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 

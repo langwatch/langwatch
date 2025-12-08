@@ -1,5 +1,5 @@
 import { VStack, List, Text } from "@chakra-ui/react";
-import { Circle, CheckCircle } from "react-feather";
+import { Circle, CheckCircle } from "lucide-react";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { trackEventOnce } from "../utils/tracking";

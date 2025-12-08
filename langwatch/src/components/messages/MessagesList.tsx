@@ -23,7 +23,7 @@ import {
   Layers,
   Maximize2,
   RefreshCw,
-} from "react-feather";
+} from "lucide-react";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";

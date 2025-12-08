@@ -8,7 +8,7 @@ import {
   Toast,
   createToaster,
 } from "@chakra-ui/react";
-import { Info } from "react-feather";
+import { Info } from "lucide-react";
 
 const toaster_ = createToaster({
   placement: "top-end",

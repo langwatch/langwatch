@@ -12,7 +12,7 @@ import {
   Button,
   Icon,
 } from "@chakra-ui/react";
-import { ChevronLeft, ChevronRight } from "react-feather";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useColorModeValue } from "../../ui/color-mode";
 import { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarController";
 import { RunAccordionItem } from "./RunAccordionItem";

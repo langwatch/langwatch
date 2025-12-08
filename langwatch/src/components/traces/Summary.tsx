@@ -1,7 +1,7 @@
 import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, { type PropsWithChildren } from "react";
-import { HelpCircle } from "react-feather";
+import { HelpCircle } from "lucide-react";
 
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";

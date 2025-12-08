@@ -10,7 +10,7 @@ import {
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
-import { MoreVertical } from "react-feather";
+import { MoreVertical } from "lucide-react";
 import { api } from "../../../utils/api";
 import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";

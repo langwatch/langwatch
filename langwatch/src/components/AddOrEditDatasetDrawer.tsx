@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { Trash2 } from "react-feather";
+import { Trash2 } from "lucide-react";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";

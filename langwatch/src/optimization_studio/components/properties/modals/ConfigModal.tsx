@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { Popover } from "../../../../components/ui/popover";
 import { useState, useEffect } from "react";
-import { X } from "react-feather";
+import { X } from "lucide-react";
 
 export function ConfigModal({
   open,

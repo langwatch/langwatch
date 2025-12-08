@@ -1,6 +1,6 @@
 import { RadioCard, Text, VStack } from "@chakra-ui/react";
 import type { Dataset } from "@prisma/client";
-import { Folder } from "react-feather";
+import { Folder } from "lucide-react";
 import { OverflownTextWithTooltip } from "../../../OverflownText";
 
 interface DatasetRadioCardProps {

@@ -29,7 +29,7 @@ import {
   List,
   RefreshCw,
   Shield,
-} from "react-feather";
+} from "lucide-react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";

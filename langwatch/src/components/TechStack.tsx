@@ -1,7 +1,7 @@
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { type PropsWithChildren } from "react";
-import { Code } from "react-feather";
+import { Code } from "lucide-react";
 import { Controller, type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
 import { Azure } from "./icons/Azure";

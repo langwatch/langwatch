@@ -37,7 +37,7 @@ import { AddParticipants } from "~/components/traces/AddParticipants";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 
-import { CheckSquare } from "react-feather";
+import { CheckSquare } from "lucide-react";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import type { MappingState } from "../server/tracer/tracesMapping";
 

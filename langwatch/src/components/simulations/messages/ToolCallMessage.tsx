@@ -1,7 +1,7 @@
 import { VStack, Box, Text, HStack } from "@chakra-ui/react";
 import type { ActionExecutionMessage } from "@copilotkit/runtime-client-gql";
 import { RenderInputOutput } from "../../traces/RenderInputOutput";
-import { Settings } from "react-feather";
+import { Settings } from "lucide-react";
 
 export const ToolCallMessage = ({
   message,

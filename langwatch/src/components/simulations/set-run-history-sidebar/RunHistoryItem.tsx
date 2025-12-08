@@ -1,6 +1,6 @@
 import React from "react";
 import { HStack, Text, Icon, Box } from "@chakra-ui/react";
-import { Check, XCircle } from "react-feather";
+import { Check, XCircle } from "lucide-react";
 import { useColorModeValue } from "../../ui/color-mode";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
