@@ -8,7 +8,7 @@
   },
   "scripts": {
     "build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint",
-    "lint": "next lint",
+    "lint": "pnpm exec run biome check src/",
     "dev": "pnpm run start:prepare:files && NODE_ENV=development pnpm run start",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.ts",
