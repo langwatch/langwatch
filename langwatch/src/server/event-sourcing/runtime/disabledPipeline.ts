@@ -1,13 +1,13 @@
 import { createLogger } from "~/utils/logger";
 import type { AggregateType, Event, Projection } from "../library";
 import type {
-  EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
 } from "../library/queues";
 import type { EventSourcingService } from "../library/services/eventSourcingService";
 import type {
-  RegisteredPipeline,
   PipelineWithCommandHandlers,
+  RegisteredPipeline,
 } from "./pipeline/types";
 
 const logger = createLogger("langwatch:event-sourcing:disabled");
@@ -50,7 +50,11 @@ class DisabledEventSourcingService {
 
   getQueueManager() {
     return {
-      initializeCommandQueues: () => {},
+      initializeCommandQueues: () => {
+        logger.debug(
+          "initializeCommandQueues ignored: event sourcing is disabled",
+        );
+      },
       getCommandQueueProcessors: () => new Map(),
     };
   }

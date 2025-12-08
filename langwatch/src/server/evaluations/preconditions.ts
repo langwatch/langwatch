@@ -1,13 +1,9 @@
-import {
-  type ElasticSearchTrace,
-  type RAGSpan,
-  type Span,
-} from "../tracer/types";
-import { getEvaluatorDefinitions } from "./getEvaluator";
-import type { CheckPreconditions } from "./types";
-import { extractRAGTextualContext } from "../background/workers/collector/rag";
 import safe from "safe-regex2";
 import { createLogger } from "../../utils/logger";
+import { extractRAGTextualContext } from "../background/workers/collector/rag";
+import type { ElasticSearchTrace, RAGSpan, Span } from "../tracer/types";
+import { getEvaluatorDefinitions } from "./getEvaluator";
+import type { CheckPreconditions } from "./types";
 
 const logger = createLogger("langwatch:evaluations:preconditions");
 
@@ -21,7 +17,7 @@ export function evaluatePreconditions(
   evaluatorType: string,
   trace: PreconditionTrace,
   spans: Span[],
-  preconditions: CheckPreconditions
+  preconditions: CheckPreconditions,
 ): boolean {
   const evaluator = getEvaluatorDefinitions(evaluatorType);
 
@@ -31,7 +27,7 @@ export function evaluatePreconditions(
       !spans.some(
         (span) =>
           span.type === "rag" &&
-          extractRAGTextualContext((span as RAGSpan).contexts).length > 0
+          extractRAGTextualContext((span as RAGSpan).contexts).length > 0,
       )
     ) {
       return false;
@@ -62,7 +58,7 @@ export function evaluatePreconditions(
       case "contains":
         if (
           !valueToCheckArrayOrLowercase.includes(
-            precondition.value.toLowerCase()
+            precondition.value.toLowerCase(),
           )
         ) {
           return false;
@@ -71,7 +67,7 @@ export function evaluatePreconditions(
       case "not_contains":
         if (
           valueToCheckArrayOrLowercase.includes(
-            precondition.value.toLowerCase()
+            precondition.value.toLowerCase(),
           )
         ) {
           return false;
@@ -89,7 +85,10 @@ export function evaluatePreconditions(
             return false;
           }
         } catch (error) {
-          logger.error({ error, precondition: precondition.value }, "Invalid regex in preconditions");
+          logger.error(
+            { error, precondition: precondition.value },
+            "Invalid regex in preconditions",
+          );
           return false;
         }
         break;

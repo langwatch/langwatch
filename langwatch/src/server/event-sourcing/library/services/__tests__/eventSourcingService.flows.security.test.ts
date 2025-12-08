@@ -1,25 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourcingService } from "../eventSourcingService";
-import type { Event } from "../../domain/types";
-import {
-  createMockEventStore,
-  createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
-  createMockProjectionDefinition,
-  createMockEventHandler,
-  createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
-  createTestAggregateType,
-  TEST_CONSTANTS,
-} from "./testHelpers";
-import { buildCheckpointKey } from "../../utils/checkpointKey";
-import type { AggregateType } from "../../domain/aggregateType";
 import { EventStoreMemory } from "../../../runtime/stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../../runtime/stores/repositories/eventRepositoryMemory";
 import { ProcessorCheckpointStoreMemory } from "../../../runtime/stores/processorCheckpointStoreMemory";
 import { CheckpointRepositoryMemory } from "../../../runtime/stores/repositories/checkpointRepositoryMemory";
+import { EventRepositoryMemory } from "../../../runtime/stores/repositories/eventRepositoryMemory";
+import type { AggregateType } from "../../domain/aggregateType";
+import type { Event } from "../../domain/types";
+import { buildCheckpointKey } from "../../utils/checkpointKey";
+import { EventSourcingService } from "../eventSourcingService";
+import {
+  createMockEventHandler,
+  createMockEventHandlerDefinition,
+  createMockEventReactionHandler,
+  createMockEventStore,
+  createMockProcessorCheckpointStore,
+  createMockProjectionDefinition,
+  createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestTenantId,
+  TEST_CONSTANTS,
+} from "./testHelpers";
 
 describe("EventSourcingService - Security Flows", () => {
   const aggregateType = createTestAggregateType();
@@ -671,7 +671,7 @@ describe("EventSourcingService - Security Flows", () => {
     });
 
     it("recovery operations validate tenant context", async () => {
-      const eventStore = createMockEventStore<Event>();
+      createMockEventStore<Event>();
       const checkpointStore = new ProcessorCheckpointStoreMemory(
         new CheckpointRepositoryMemory(),
       );

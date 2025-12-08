@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
-import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
+import { useMemo } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
-import { useMemo } from "react";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 
 /**
  * PromptMessagesEditor

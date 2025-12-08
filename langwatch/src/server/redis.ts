@@ -1,7 +1,7 @@
 import IORedis, { Cluster } from "ioredis";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger";
-import { PHASE_PRODUCTION_BUILD } from "next/constants";
 
 const logger = createLogger("langwatch:redis");
 
@@ -24,7 +24,7 @@ export let connection: IORedis | Cluster | undefined;
 if (!isBuildOrNoRedis) {
   if (useCluster) {
     const clusterEndpoints = parseClusterEndpoints(
-      env.REDIS_CLUSTER_ENDPOINTS ?? ""
+      env.REDIS_CLUSTER_ENDPOINTS ?? "",
     );
     connection = new Cluster(clusterEndpoints, {
       redisOptions: {
@@ -32,7 +32,7 @@ if (!isBuildOrNoRedis) {
         offlineQueue: false,
       },
       dnsLookup: (address, callback) => callback(null, address),
-      scaleReads: 'all'
+      scaleReads: "all",
     });
 
     connection.on("connect", async () => {

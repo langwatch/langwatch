@@ -1,10 +1,9 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import type { EventHandler } from "../../../library";
-import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
+import type { EventHandler } from "../../../library";
 import { traceAggregationPipeline } from "../../trace-aggregation/pipeline";
+import type { SpanIngestionRecordedEvent } from "../schemas/events";
 
 export class TraceAggregationTriggerHandler
   implements EventHandler<SpanIngestionRecordedEvent>

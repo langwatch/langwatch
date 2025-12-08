@@ -1,10 +1,10 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { getPostHogInstance } from "../../server/posthog";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { getPostHogInstance } from "../../server/posthog";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 

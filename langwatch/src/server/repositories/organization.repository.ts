@@ -28,4 +28,3 @@ export class OrganizationRepository {
     return team?.organizationId ?? null;
   }
 }
-

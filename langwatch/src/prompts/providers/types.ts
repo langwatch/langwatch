@@ -1,5 +1,5 @@
-import { type RouterInputs } from "~/utils/api";
-import { type VersionedPrompt } from "~/server/prompt-config";
+import type { VersionedPrompt } from "~/server/prompt-config";
+import type { RouterInputs } from "~/utils/api";
 
 /**
  * Parameters for creating a new prompt configuration

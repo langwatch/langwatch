@@ -1,4 +1,3 @@
-import React from "react";
 import {
   Button,
   Field,
@@ -10,6 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, Trash2 } from "lucide-react";
+import React from "react";
 import type { ExtraHeader } from "../../../../../hooks/useModelProviderForm";
 import { InputWithPrefix } from "../shared/InputWithPrefix";
 

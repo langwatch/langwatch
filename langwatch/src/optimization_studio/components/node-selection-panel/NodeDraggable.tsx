@@ -1,19 +1,19 @@
 import { Box, HStack, Spacer } from "@chakra-ui/react";
+import { type Node, useReactFlow, type XYPosition } from "@xyflow/react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useDrag } from "react-dnd";
 import { getEmptyImage } from "react-dnd-html5-backend";
-import { useReactFlow, type Node, type XYPosition } from "@xyflow/react";
-import { useCallback, useEffect, useMemo } from "react";
 import { LuGripVertical } from "react-icons/lu";
+import type { NodeWithOptionalPosition } from "~/types";
+import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
 import {
   updateCodeClassName,
   useWorkflowStore,
 } from "../../hooks/useWorkflowStore";
-import { ComponentIcon } from "../ColorfulBlockIcons";
-import { HoverableBigText } from "../../../components/HoverableBigText";
-import { findLowestAvailableName, nameToId } from "../../utils/nodeUtils";
 import type { Component, ComponentType } from "../../types/dsl";
-import type { NodeWithOptionalPosition } from "~/types";
+import { findLowestAvailableName, nameToId } from "../../utils/nodeUtils";
+import { ComponentIcon } from "../ColorfulBlockIcons";
 
 /**
  * This is the component that is used to drag and drop a node from the node selection panel
@@ -34,13 +34,13 @@ export const NodeDraggable = (props: {
       deleteNode: state.deleteNode,
       nodes: state.nodes,
       propertiesExpanded: state.propertiesExpanded,
-    })
+    }),
   );
 
   const createNewNode = useCallback(() => {
     const { name: newName, id: newId } = findLowestAvailableName(
       nodes.map((node) => node.id),
-      props.component.name ?? "Component"
+      props.component.name ?? "Component",
     );
     const newNode = {
       id: newId,
@@ -54,7 +54,7 @@ export const NodeDraggable = (props: {
               parameters: updateCodeClassName(
                 props.component.parameters ?? [],
                 nameToId(props.component.name ?? ""),
-                newId
+                newId,
               ),
             }
           : {}),
@@ -143,7 +143,7 @@ export const NodeDraggable = (props: {
         content={
           props.disableDrag
             ? "You cannot add the same component as your workflow"
-            : props.component.description ?? ""
+            : (props.component.description ?? "")
         }
       >
         <Box

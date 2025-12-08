@@ -129,7 +129,10 @@ describe("salvageValidData", () => {
         optional: { required: "valid", other: "not-a-number" }, // other is invalid
       };
 
-      const result = salvageValidData(optionalNestedSchema, corruptedOptionalNested);
+      const result = salvageValidData(
+        optionalNestedSchema,
+        corruptedOptionalNested,
+      );
 
       expect(result.name).toBe("John");
       expect(result.optional?.required).toBe("valid");
@@ -151,11 +154,13 @@ describe("salvageValidData", () => {
         optional: { other: "unexpected field" }, // Missing required field
       };
 
-      const result = salvageValidData(optionalNestedSchema, missingRequiredNested);
+      const result = salvageValidData(
+        optionalNestedSchema,
+        missingRequiredNested,
+      );
 
       expect(result.name).toBe("John");
       expect(result.optional).toBeUndefined(); // Falls back to undefined
     });
   });
 });
-

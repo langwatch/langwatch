@@ -1,13 +1,21 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
-import { ProductScreenIndex, OnboardingFlowDirection, type ProductSelection, type ProductFlowConfig } from "../types/types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { PRODUCT_FLOW_CONFIG } from "../constants/product-flow";
+import {
+  OnboardingFlowDirection,
+  type ProductFlowConfig,
+  ProductScreenIndex,
+  type ProductSelection,
+} from "../types/types";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow";
 
 export function useProductFlow() {
   const router = useRouter();
-  const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(undefined);
-  const [flowConfig, setFlowConfig] = useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
+  const [selectedProduct, setSelectedProduct] = useState<
+    ProductSelection | undefined
+  >(undefined);
+  const [flowConfig, setFlowConfig] =
+    useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
 
   // Initialize selected product from URL: prefer product, then step, then slug
   useEffect(() => {
@@ -22,16 +30,31 @@ export function useProductFlow() {
 
     let inferred: ProductSelection | undefined = undefined;
 
-    if (productFromQuery && typeof productFromQuery === "string" && validProducts.includes(productFromQuery as ProductSelection)) {
+    if (
+      productFromQuery &&
+      typeof productFromQuery === "string" &&
+      validProducts.includes(productFromQuery as ProductSelection)
+    ) {
       inferred = productFromQuery as ProductSelection;
-    } else if (stepFromQuery && typeof stepFromQuery === "string" && validProducts.includes(stepFromQuery as ProductSelection)) {
+    } else if (
+      stepFromQuery &&
+      typeof stepFromQuery === "string" &&
+      validProducts.includes(stepFromQuery as ProductSelection)
+    ) {
       inferred = stepFromQuery as ProductSelection;
     } else {
-      const currentPath: string = typeof router.asPath === "string" ? router.asPath : "";
+      const currentPath: string =
+        typeof router.asPath === "string" ? router.asPath : "";
       const pathNoQuery = currentPath.split("?")[0] ?? "";
-      const segments = pathNoQuery.split("/").filter((seg): seg is string => !!seg && seg.length > 0);
-      const lastSegment = segments.length > 0 ? segments[segments.length - 1] : undefined;
-      if (lastSegment && validProducts.includes(lastSegment as ProductSelection)) {
+      const segments = pathNoQuery
+        .split("/")
+        .filter((seg): seg is string => !!seg && seg.length > 0);
+      const lastSegment =
+        segments.length > 0 ? segments[segments.length - 1] : undefined;
+      if (
+        lastSegment &&
+        validProducts.includes(lastSegment as ProductSelection)
+      ) {
         inferred = lastSegment as ProductSelection;
       }
     }
@@ -84,12 +107,17 @@ export function useProductFlow() {
   const canProceed = useCallback(() => true, []);
 
   // Use generic flow hook for navigation (with URL sync)
-  const { currentScreenIndex, direction, navigation, canGoBack, setCurrentScreenIndex } =
-    useGenericOnboardingFlow(flowConfig, canProceed, {
-      queryParamName: "step",
-      screenIdMap,
-      firstScreenId: "product-selection",
-    });
+  const {
+    currentScreenIndex,
+    direction,
+    navigation,
+    canGoBack,
+    setCurrentScreenIndex,
+  } = useGenericOnboardingFlow(flowConfig, canProceed, {
+    queryParamName: "step",
+    screenIdMap,
+    firstScreenId: "product-selection",
+  });
 
   // If product inferred but step missing, land on product screen and sync URL
   useEffect(() => {
@@ -107,31 +135,34 @@ export function useProductFlow() {
   }, [selectedProduct, router.query.step, direction, setCurrentScreenIndex]);
 
   // Handle product selection
-  const handleSelectProduct = useCallback((product: ProductSelection) => {
-    setSelectedProduct(product);
+  const handleSelectProduct = useCallback(
+    (product: ProductSelection) => {
+      setSelectedProduct(product);
 
-    // Update URL with product parameter
-    const currentQuery = { ...router.query };
-    currentQuery.step = product; // Use product name as step ID
+      // Update URL with product parameter
+      const currentQuery = { ...router.query };
+      currentQuery.step = product; // Use product name as step ID
 
-    void router.push(
-      {
-        pathname: router.pathname,
-        query: currentQuery,
-      },
-      undefined,
-      { shallow: true }
-    );
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: currentQuery,
+        },
+        undefined,
+        { shallow: true },
+      );
 
-    // Navigate to the product screen
-    const productScreenMap: Record<ProductSelection, ProductScreenIndex> = {
-      observability: ProductScreenIndex.OBSERVABILITY,
-      evaluations: ProductScreenIndex.EVALUATIONS,
-      "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
-    };
+      // Navigate to the product screen
+      const productScreenMap: Record<ProductSelection, ProductScreenIndex> = {
+        observability: ProductScreenIndex.OBSERVABILITY,
+        evaluations: ProductScreenIndex.EVALUATIONS,
+        "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
+      };
 
-    setCurrentScreenIndex(productScreenMap[product]);
-  }, [router, setCurrentScreenIndex]);
+      setCurrentScreenIndex(productScreenMap[product]);
+    },
+    [router, setCurrentScreenIndex],
+  );
 
   return {
     selectedProduct,

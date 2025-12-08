@@ -52,7 +52,7 @@ export const apiResponsePromptWithVersionDataSchema =
   apiResponsePromptSchemaBase.merge(
     apiResponseVersionOutputSchema.omit({
       configId: true,
-    })
+    }),
   );
 
 export type ApiResponsePrompt = z.infer<

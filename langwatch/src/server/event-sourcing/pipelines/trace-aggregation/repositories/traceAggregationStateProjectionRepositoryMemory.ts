@@ -1,17 +1,16 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
+import { createLogger } from "../../../../../utils/logger";
 import type {
+  Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../library";
-import type { Projection } from "../../../library";
 import { EventUtils } from "../../../library";
 import {
-  ValidationError,
   SecurityError,
+  ValidationError,
 } from "../../../library/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
 /**

@@ -4,23 +4,23 @@ import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatMoney } from "../../utils/formatMoney";
 import { filterFieldsEnum } from "../filters/types";
 import {
+  type AggregationTypes,
+  type AnalyticsGroup,
+  type AnalyticsMetric,
   aggregationTypesEnum,
   allAggregationTypes,
   numericAggregationTypes,
+  type PercentileAggregationTypes,
+  type PipelineAggregationTypes,
+  type PipelineFields,
   percentileAggregationTypes,
   pipelineAggregationTypesEnum,
   pipelineFieldsEnum,
   sharedFiltersInputSchema,
-  type AggregationTypes,
-  type AnalyticsGroup,
-  type AnalyticsMetric,
-  type PercentileAggregationTypes,
-  type PipelineAggregationTypes,
-  type PipelineFields,
 } from "./types";
 
 const simpleFieldAnalytics = (
-  field: string
+  field: string,
 ): Omit<
   AnalyticsMetric,
   "label" | "colorSet" | "allowedAggregations" | "quickwitSupport"
@@ -42,7 +42,7 @@ const simpleFieldAnalytics = (
 });
 
 const numericFieldAnalyticsWithPercentiles = (
-  field: string
+  field: string,
 ): Omit<
   AnalyticsMetric,
   "label" | "colorSet" | "increaseIs" | "quickwitSupport"
@@ -428,7 +428,7 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality"
+        (agg) => agg != "cardinality",
       ),
       requiresKey: {
         filter: "events.event_type",
@@ -439,7 +439,7 @@ export const analyticsMetrics = {
       aggregation: (index: number, aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
-            `Key and subkey are required for event_score ${aggregation} metric`
+            `Key and subkey are required for event_score ${aggregation} metric`,
           );
 
         return {
@@ -486,7 +486,7 @@ export const analyticsMetrics = {
         index: number,
         aggregation: AggregationTypes,
         key,
-        subkey
+        subkey,
       ) => {
         return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
@@ -507,7 +507,7 @@ export const analyticsMetrics = {
       aggregation: (index: number, aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
-            `Key and subkey are required for event_details ${aggregation} metric`
+            `Key and subkey are required for event_details ${aggregation} metric`,
           );
 
         return {
@@ -556,7 +556,7 @@ export const analyticsMetrics = {
         index: number,
         aggregation: AggregationTypes,
         key,
-        subkey
+        subkey,
       ) => {
         return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
@@ -570,7 +570,7 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "neutral",
       allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality" && agg != "terms"
+        (agg) => agg != "cardinality" && agg != "terms",
       ),
       requiresKey: {
         filter: "evaluations.evaluator_id",
@@ -611,7 +611,7 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "good",
       allowedAggregations: allAggregationTypes.filter(
-        (agg) => agg != "cardinality" && agg != "terms"
+        (agg) => agg != "cardinality" && agg != "terms",
       ),
       requiresKey: {
         filter: "evaluations.evaluator_id",
@@ -767,11 +767,11 @@ export type FlattenAnalyticsMetricsEnum = {
 }[AnalyticsMetricsGroupsEnum];
 
 export const flattenAnalyticsMetricsEnum = Object.keys(
-  analyticsMetrics
+  analyticsMetrics,
 ).flatMap((key) =>
   Object.keys(analyticsMetrics[key as AnalyticsMetricsGroupsEnum]).map(
-    (subkey) => [key, subkey].join(".")
-  )
+    (subkey) => [key, subkey].join("."),
+  ),
 ) as [FlattenAnalyticsMetricsEnum, ...FlattenAnalyticsMetricsEnum[]];
 
 export const analyticsPipelines: {
@@ -1176,12 +1176,12 @@ export type FlattenAnalyticsGroupsEnum = {
 export const flattenAnalyticsGroupsEnum = Object.keys(analyticsGroups).flatMap(
   (key) =>
     Object.keys(analyticsGroups[key as AnalyticsGroupsGroupsEnum]).map(
-      (subkey) => [key, subkey].join(".")
-    )
+      (subkey) => [key, subkey].join("."),
+    ),
 ) as [FlattenAnalyticsGroupsEnum, ...FlattenAnalyticsGroupsEnum[]];
 
 export const getMetric = (
-  groupMetric: FlattenAnalyticsMetricsEnum
+  groupMetric: FlattenAnalyticsMetricsEnum,
 ): AnalyticsMetric => {
   const [group, metric_] = groupMetric.split(".") as [
     AnalyticsMetricsGroupsEnum,
@@ -1191,7 +1191,7 @@ export const getMetric = (
 };
 
 export const getGroup = (
-  groupMetric: FlattenAnalyticsGroupsEnum
+  groupMetric: FlattenAnalyticsGroupsEnum,
 ): AnalyticsGroup => {
   const [group, field] = groupMetric.split(".") as [
     AnalyticsGroupsGroupsEnum,
@@ -1209,7 +1209,7 @@ export const seriesInput = z.object({
     z.object({
       field: pipelineFieldsEnum,
       aggregation: pipelineAggregationTypesEnum,
-    })
+    }),
   ),
   filters: z.optional(
     z.record(
@@ -1218,8 +1218,8 @@ export const seriesInput = z.object({
         z.array(z.string()),
         z.record(z.string(), z.array(z.string())),
         z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-      ])
-    )
+      ]),
+    ),
   ),
   asPercent: z.optional(z.boolean()),
 });
@@ -1237,7 +1237,7 @@ export const timeseriesSeriesInput = z.object({
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;
 
 export const timeseriesInput = sharedFiltersInputSchema.extend(
-  timeseriesSeriesInput.shape
+  timeseriesSeriesInput.shape,
 );
 
 export type TimeseriesInputType = z.infer<typeof timeseriesInput>;

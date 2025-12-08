@@ -2,33 +2,33 @@ import {
   Badge,
   Box,
   Card,
-  HStack,
   Heading,
+  HStack,
   IconButton,
   SimpleGrid,
   Text,
 } from "@chakra-ui/react";
+import type { TRPCClientErrorLike } from "@trpc/react-query";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
-import { Menu } from "../../components/ui/menu";
-import { CustomGraph } from "../analytics/CustomGraph";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import {
   LuChevronDown,
   LuChevronUp,
   LuEllipsis,
   LuPause,
-  LuPlay,
   LuPencil,
+  LuPlay,
   LuTrash,
 } from "react-icons/lu";
-import { Link } from "../ui/link";
+import { Menu } from "../../components/ui/menu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useRouter } from "next/router";
-import { api } from "../../utils/api";
-import type { TRPCClientErrorLike } from "@trpc/react-query";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../server/api/root";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import { api } from "../../utils/api";
+import { CustomGraph } from "../analytics/CustomGraph";
+import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
 
 type MonitorsSectionProps = {

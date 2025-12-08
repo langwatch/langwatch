@@ -1,4 +1,4 @@
-import { type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import { forwardRef, type Ref } from "react";
 import type { Signature } from "../../types/dsl";
 import { ComponentNode } from "./Nodes";
@@ -24,10 +24,10 @@ import {
  */
 export const SignatureNode = forwardRef(function SignatureNode(
   props: NodeProps<Node<Signature>>,
-  ref: Ref<HTMLDivElement>
+  ref: Ref<HTMLDivElement>,
 ) {
   const parameters = Object.fromEntries(
-    props.data.parameters?.map((p) => [p.identifier, p]) ?? []
+    props.data.parameters?.map((p) => [p.identifier, p]) ?? [],
   );
 
   return (

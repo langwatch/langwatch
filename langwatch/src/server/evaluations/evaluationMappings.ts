@@ -23,7 +23,7 @@ export const DEFAULT_MAPPINGS: MappingState = {
 };
 
 export const migrateLegacyMappings = (
-  mappings: Record<string, string>
+  mappings: Record<string, string>,
 ): MappingState => {
   if (mappings.mapping) {
     return mappings as any as MappingState;
@@ -60,7 +60,7 @@ export const migrateLegacyMappings = (
       Object.entries(mappings).map(([key, value]) => [
         key,
         LEGACY_EVALUATOR_MAPPING_OPTIONS[value]!,
-      ])
+      ]),
     ),
     expansions: [],
   };

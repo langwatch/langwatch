@@ -1,13 +1,13 @@
 import { z } from "zod";
 import {
-  SPAN_INGESTION_RECORD_COMMAND_TYPE,
   SPAN_INGESTION_COMMAND_TYPES,
+  SPAN_INGESTION_RECORD_COMMAND_TYPE,
 } from "./typeIdentifiers";
 
 export type { SpanIngestionCommandType } from "./typeIdentifiers";
 export {
-  SPAN_INGESTION_RECORD_COMMAND_TYPE,
   SPAN_INGESTION_COMMAND_TYPES,
+  SPAN_INGESTION_RECORD_COMMAND_TYPE,
 } from "./typeIdentifiers";
 
 /**

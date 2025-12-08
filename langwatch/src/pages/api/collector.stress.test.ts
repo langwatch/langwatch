@@ -1,9 +1,9 @@
 import { nanoid } from "nanoid";
-import { beforeAll, describe, expect, test } from "vitest";
-import { TRACE_INDEX, esClient } from "../../server/elasticsearch";
-import { type CollectorRESTParams } from "../../server/tracer/types";
-import { getTestProject } from "../../utils/testUtils";
 import { mean, median, standardDeviation } from "simple-statistics";
+import { beforeAll, describe, expect, test } from "vitest";
+import { esClient, TRACE_INDEX } from "../../server/elasticsearch";
+import type { CollectorRESTParams } from "../../server/tracer/types";
+import { getTestProject } from "../../utils/testUtils";
 
 const LANGWATCH_ENDPOINT =
   process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560";
@@ -100,7 +100,7 @@ describe("Collector API stress test", () => {
     const responseTimes = await Promise.all(
       Array(NUMBER_OF_RUNS)
         .fill(null)
-        .map(() => makeApiCall())
+        .map(() => makeApiCall()),
     );
 
     const sortedTimes = [...responseTimes].sort((a, b) => a - b);

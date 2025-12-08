@@ -1,8 +1,8 @@
-import { ESpanKind } from "@opentelemetry/otlp-transformer";
+import type { Attributes, AttributeValue } from "@opentelemetry/api";
 import { SpanKind } from "@opentelemetry/api";
-import type { DeepPartial } from "../../../../../utils/types";
 import type { IAnyValue, IKeyValue } from "@opentelemetry/otlp-transformer";
-import type { AttributeValue, Attributes } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer";
+import type { DeepPartial } from "../../../../../utils/types";
 
 /**
  * Branded type for Unix nanoseconds timestamp

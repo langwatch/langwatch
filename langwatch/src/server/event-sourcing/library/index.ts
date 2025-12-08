@@ -7,37 +7,9 @@
  */
 
 export type {
-  Event,
-  EventMetadataBase,
-  EventOrderingStrategy,
-  Projection,
-  ProjectionEnvelope,
-  ProjectionMetadata,
-  ProcessorCheckpoint,
-} from "./domain/types";
-export {
-  EventSchema,
-  ProjectionSchema,
-  EventMetadataBaseSchema,
-  ProjectionMetadataSchema,
-  ProjectionEnvelopeSchema,
-  createProjectionEnvelopeSchema,
-  ProcessorCheckpointSchema,
-} from "./domain/types";
-export type { ProjectionType } from "./domain/types";
-export type { AggregateType } from "./domain/aggregateType";
-export { AggregateTypeSchema } from "./domain/aggregateType";
-export type { CommandType } from "./domain/commandType";
-export { CommandTypeSchema } from "./domain/commandType";
-export type { EventType } from "./domain/eventType";
-export { EventTypeSchema } from "./domain/eventType";
-export type { TenantId } from "./domain/tenantId";
-export { TenantIdSchema, createTenantId } from "./domain/tenantId";
-
-export { EventStream } from "./streams/eventStream";
-export type { EventStreamMetadata } from "./streams/eventStream";
-export { EventStreamMetadataSchema } from "./streams/eventStream";
-
+  EventSourcingPipelineDefinition,
+  RegisteredPipeline,
+} from "../runtime/pipeline";
 export type {
   Command,
   CommandHandler,
@@ -48,46 +20,86 @@ export {
   createCommand,
   validateCommand,
 } from "./commands/command";
-export type { CommandSchema as CommandSchemaType } from "./commands/commandSchema";
-export { defineCommandSchema } from "./commands/commandSchema";
 export type {
   CommandHandlerClass,
   CommandHandlerClassStatic,
+  ExtractCommandHandlerEvent,
   ExtractCommandHandlerPayload,
   ExtractCommandHandlerType,
-  ExtractCommandHandlerEvent,
 } from "./commands/commandHandlerClass";
-
+export type { CommandSchema as CommandSchemaType } from "./commands/commandSchema";
+export { defineCommandSchema } from "./commands/commandSchema";
+export type { AggregateType } from "./domain/aggregateType";
+export { AggregateTypeSchema } from "./domain/aggregateType";
+export type { CommandType } from "./domain/commandType";
+export { CommandTypeSchema } from "./domain/commandType";
+export type { EventType } from "./domain/eventType";
+export { EventTypeSchema } from "./domain/eventType";
 export type { EventHandler } from "./domain/handlers/eventHandler";
 export type {
   EventHandlerClass,
   EventHandlerClassStatic,
   ExtractEventHandlerEvent,
 } from "./domain/handlers/eventHandlerClass";
-
 export type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 export type {
-  ProjectionHandlerClass,
-  ProjectionHandlerClassStatic,
   ExtractProjectionHandlerEvent,
   ExtractProjectionHandlerProjection,
+  ProjectionHandlerClass,
+  ProjectionHandlerClassStatic,
 } from "./domain/handlers/projectionHandlerClass";
-
 export type {
   ExtractAggregateId,
   ExtractEventPayload,
   ExtractProjectionData,
+  InferEventStoreEvent,
   InferProjectionHandlerEvent,
   InferProjectionHandlerProjection,
-  InferEventStoreEvent,
   InferProjectionStoreProjection,
 } from "./domain/helpers";
 export { isEvent, isProjection } from "./domain/helpers";
-
+export type { TenantId } from "./domain/tenantId";
+export { createTenantId, TenantIdSchema } from "./domain/tenantId";
+export type {
+  Event,
+  EventMetadataBase,
+  EventOrderingStrategy,
+  ProcessorCheckpoint,
+  Projection,
+  ProjectionEnvelope,
+  ProjectionMetadata,
+  ProjectionType,
+} from "./domain/types";
+export {
+  createProjectionEnvelopeSchema,
+  EventMetadataBaseSchema,
+  EventSchema,
+  ProcessorCheckpointSchema,
+  ProjectionEnvelopeSchema,
+  ProjectionMetadataSchema,
+  ProjectionSchema,
+} from "./domain/types";
+export type {
+  ProjectionDefinition,
+  ProjectionDefinitions,
+} from "./projection.types";
+export type { EventPublisher } from "./publishing/eventPublisher.types";
+export type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+  EventSourcedQueueProcessorOptions,
+} from "./queues";
+export { EventSourcingService } from "./services/eventSourcingService";
+export type {
+  EventSourcingOptions,
+  ReplayEventsOptions,
+  UpdateProjectionOptions,
+} from "./services/eventSourcingService.types";
+export type { ProcessorCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
 export type {
   EventStore,
-  ReadOnlyEventStore,
   EventStoreReadContext,
+  ReadOnlyEventStore,
 } from "./stores/eventStore.types";
 export { EventStoreReadContextSchema } from "./stores/eventStore.types";
 export type {
@@ -96,54 +108,31 @@ export type {
   ProjectionStoreWriteContext,
 } from "./stores/projectionStore.types";
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
-export type { ProcessorCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
-
-export type {
-  EventSourcedQueueProcessor,
-  EventSourcedQueueDefinition,
-  EventSourcedQueueProcessorOptions,
-} from "./queues";
-
-export { EventSourcingService } from "./services/eventSourcingService";
-export type {
-  EventSourcingOptions,
-  UpdateProjectionOptions,
-  ReplayEventsOptions,
-} from "./services/eventSourcingService.types";
-export type {
-  ProjectionDefinition,
-  ProjectionDefinitions,
-} from "./projection.types";
-export type { EventPublisher } from "./publishing/eventPublisher.types";
-export type {
-  EventSourcingPipelineDefinition,
-  RegisteredPipeline,
-} from "../runtime/pipeline";
-
-export {
-  createEvent,
-  createEventStream,
-  createProjection,
-  eventBelongsToAggregate,
-  sortEventsByTimestamp,
-  filterEventsByType,
-  getLatestProjection,
-  isValidEvent,
-  isValidProjection,
-  buildProjectionMetadata,
-  buildEventMetadataWithCurrentProcessingTraceparent,
-  EventUtils,
-} from "./utils/event.utils";
-export type { CreateEventOptions } from "./utils/event.utils";
-
+export type { EventStreamMetadata } from "./streams/eventStream";
+export { EventStream, EventStreamMetadataSchema } from "./streams/eventStream";
 export type {
   DistributedLock,
   LockHandle,
   RedisClient,
 } from "./utils/distributedLock";
 export {
-  LockHandleSchema,
-  InMemoryDistributedLock,
-  RedisDistributedLock,
   DistributedLockUtils,
+  InMemoryDistributedLock,
+  LockHandleSchema,
+  RedisDistributedLock,
 } from "./utils/distributedLock";
+export type { CreateEventOptions } from "./utils/event.utils";
+export {
+  buildEventMetadataWithCurrentProcessingTraceparent,
+  buildProjectionMetadata,
+  createEvent,
+  createEventStream,
+  createProjection,
+  EventUtils,
+  eventBelongsToAggregate,
+  filterEventsByType,
+  getLatestProjection,
+  isValidEvent,
+  isValidProjection,
+  sortEventsByTimestamp,
+} from "./utils/event.utils";

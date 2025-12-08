@@ -1,26 +1,26 @@
 import {
-  type ZodRawShape,
   type UnknownKeysParam,
-  ZodObject,
-  type ZodTypeAny,
   ZodArray,
-  ZodOptional,
   ZodNullable,
+  ZodObject,
+  ZodOptional,
+  type ZodRawShape,
   ZodTuple,
   type ZodTupleItems,
+  type ZodTypeAny,
 } from "zod";
 
 type ZodObjectMapper<T extends ZodRawShape, U extends UnknownKeysParam> = (
-  o: ZodObject<T>
+  o: ZodObject<T>,
 ) => ZodObject<T, U>;
 
 function deepApplyObject(
   schema: ZodTypeAny,
-  map: ZodObjectMapper<any, any>
+  map: ZodObjectMapper<any, any>,
 ): any {
   if (schema instanceof ZodObject) {
     const newShape: Record<string, ZodTypeAny> = {};
-    for (const key in schema.shape) {
+    for (const key of Object.keys(schema.shape)) {
       const fieldSchema = schema.shape[key];
       newShape[key] = deepApplyObject(fieldSchema, map);
     }
@@ -37,7 +37,7 @@ function deepApplyObject(
     return ZodNullable.create(deepApplyObject(schema.unwrap(), map));
   } else if (schema instanceof ZodTuple) {
     return ZodTuple.create(
-      schema.items.map((item: any) => deepApplyObject(item, map))
+      schema.items.map((item: any) => deepApplyObject(item, map)),
     );
   } else {
     return schema;
@@ -56,26 +56,26 @@ type DeepUnknownKeys<
       Catchall
     >
   : T extends ZodArray<infer Type, infer Card>
-  ? ZodArray<DeepUnknownKeys<Type, UnknownKeys>, Card>
-  : T extends ZodOptional<infer Type>
-  ? ZodOptional<DeepUnknownKeys<Type, UnknownKeys>>
-  : T extends ZodNullable<infer Type>
-  ? ZodNullable<DeepUnknownKeys<Type, UnknownKeys>>
-  : T extends ZodTuple<infer Items>
-  ? {
-      [k in keyof Items]: Items[k] extends ZodTypeAny
-        ? DeepUnknownKeys<Items[k], UnknownKeys>
-        : never;
-    } extends infer PI
-    ? PI extends ZodTupleItems
-      ? ZodTuple<PI>
-      : never
-    : never
-  : T;
+    ? ZodArray<DeepUnknownKeys<Type, UnknownKeys>, Card>
+    : T extends ZodOptional<infer Type>
+      ? ZodOptional<DeepUnknownKeys<Type, UnknownKeys>>
+      : T extends ZodNullable<infer Type>
+        ? ZodNullable<DeepUnknownKeys<Type, UnknownKeys>>
+        : T extends ZodTuple<infer Items>
+          ? {
+              [k in keyof Items]: Items[k] extends ZodTypeAny
+                ? DeepUnknownKeys<Items[k], UnknownKeys>
+                : never;
+            } extends infer PI
+            ? PI extends ZodTupleItems
+              ? ZodTuple<PI>
+              : never
+            : never
+          : T;
 
 type DeepPassthrough<T extends ZodTypeAny> = DeepUnknownKeys<T, "passthrough">;
 export function deepPassthrough<T extends ZodTypeAny>(
-  schema: T
+  schema: T,
 ): DeepPassthrough<T> {
   return deepApplyObject(schema, (s) => s.passthrough()) as DeepPassthrough<T>;
 }
@@ -88,7 +88,7 @@ export function deepStrip<T extends ZodTypeAny>(schema: T): DeepStrip<T> {
 type DeepStrict<T extends ZodTypeAny> = DeepUnknownKeys<T, "strict">;
 export function deepStrict<T extends ZodTypeAny>(
   schema: T,
-  error?: Error
+  error?: Error,
 ): DeepStrict<T> {
   return deepApplyObject(schema, (s) => s.strict(error)) as DeepStrict<T>;
 }
@@ -102,12 +102,14 @@ export interface ZodIssue {
 }
 
 export interface ZodErrorStructure {
-  issues: Array<ZodIssue & {
-    unionErrors?: Array<{
-      issues: ZodIssue[];
-      name: string;
-    }>;
-  }>;
+  issues: Array<
+    ZodIssue & {
+      unionErrors?: Array<{
+        issues: ZodIssue[];
+        name: string;
+      }>;
+    }
+  >;
 }
 
 /**
@@ -115,23 +117,25 @@ export interface ZodErrorStructure {
  */
 export function getZodIssueMessage(issue: ZodIssue): string {
   // For invalid_type with undefined, show "Required"
-  if (issue.code === 'invalid_type' && issue.received === 'undefined') {
-    return 'This field is required';
+  if (issue.code === "invalid_type" && issue.received === "undefined") {
+    return "This field is required";
   }
 
   // For other invalid_type errors
-  if (issue.code === 'invalid_type') {
+  if (issue.code === "invalid_type") {
     return `Expected ${issue.expected}, received ${issue.received}`;
   }
 
   // For other error codes, return the message or a default
-  return issue.message || 'Invalid value';
+  return issue.message || "Invalid value";
 }
 
 /**
  * Parses Zod error to extract field-specific error messages
  */
-export function parseZodFieldErrors(zodError: ZodErrorStructure): Record<string, string> {
+export function parseZodFieldErrors(
+  zodError: ZodErrorStructure,
+): Record<string, string> {
   const fieldErrors: Record<string, string> = {};
 
   // Handle union errors by flattening them
@@ -143,7 +147,11 @@ export function parseZodFieldErrors(zodError: ZodErrorStructure): Record<string,
           unionError.issues?.forEach((nestedIssue) => {
             if (nestedIssue.path && nestedIssue.path.length > 0) {
               const fieldName = nestedIssue.path[0];
-              if (fieldName && typeof fieldName === 'string' && !fieldErrors[fieldName]) {
+              if (
+                fieldName &&
+                typeof fieldName === "string" &&
+                !fieldErrors[fieldName]
+              ) {
                 fieldErrors[fieldName] = getZodIssueMessage(nestedIssue);
               }
             }
@@ -151,7 +159,11 @@ export function parseZodFieldErrors(zodError: ZodErrorStructure): Record<string,
         });
       } else if (issue.path && issue.path.length > 0) {
         const fieldName = issue.path[0];
-        if (fieldName && typeof fieldName === 'string' && !fieldErrors[fieldName]) {
+        if (
+          fieldName &&
+          typeof fieldName === "string" &&
+          !fieldErrors[fieldName]
+        ) {
           fieldErrors[fieldName] = getZodIssueMessage(issue);
         }
       }

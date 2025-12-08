@@ -1,8 +1,8 @@
+import type { ConnectionOptions } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
 import { connection } from "../../redis";
-import { QueueWithFallback } from "./queueWithFallback";
 import { runTrackEventJob } from "../workers/trackEventsWorker";
-import type { ConnectionOptions } from "bullmq";
+import { QueueWithFallback } from "./queueWithFallback";
 
 export const TRACK_EVENTS_QUEUE_NAME = "{track_events}";
 

@@ -1,10 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";
-import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
+import type { ElasticSearchTrace } from "../../../tracer/types";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
-import type { ElasticSearchTrace } from "../../../tracer/types";
 
 describe.skip("Data For Filter Integration Tests", () => {
   const traceId = `test-trace-id-${nanoid()}`;

@@ -1,18 +1,12 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { Experiment, ExperimentType, Project } from "@prisma/client";
+import { nanoid } from "nanoid";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
-
-import { createLogger } from "../../../utils/logger";
-
-import {
-  type Experiment,
-  type ExperimentType,
-  type Project,
-} from "@prisma/client";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { nanoid } from "nanoid";
-import { z } from "zod";
 import { slugify } from "~/utils/slugify";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:dspy:init");
 
@@ -37,7 +31,7 @@ const dspyInitParamsSchema = z
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -63,7 +57,10 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid init data received",
+    );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
     captureException(error, { extra: { projectId: project.id } });
 

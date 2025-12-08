@@ -1,17 +1,17 @@
-import { setupObservability } from "langwatch/observability/node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import {
+  CompositePropagator,
+  W3CBaggagePropagator,
+  W3CTraceContextPropagator,
+} from "@opentelemetry/core";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
+import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
+import { detectResources } from "@opentelemetry/resources";
 import {
   BatchSpanProcessor,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
-import { detectResources } from "@opentelemetry/resources";
-import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
-import {
-  CompositePropagator,
-  W3CTraceContextPropagator,
-  W3CBaggagePropagator,
-} from "@opentelemetry/core";
+import { setupObservability } from "langwatch/observability/node";
 
 const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const isProd = process.env.NODE_ENV === "production";

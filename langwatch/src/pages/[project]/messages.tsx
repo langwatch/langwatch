@@ -1,14 +1,14 @@
+import { useEffect, useState } from "react";
 import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import WelcomeLayout from "../../components/welcome/WelcomeLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { MessagesList } from "../../components/messages/MessagesList";
 import { useTableView } from "../../components/messages/HeaderButtons";
-import { api } from "../../utils/api";
-import { useEffect, useState } from "react";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { useFieldRedaction } from "../../hooks/useFieldRedaction";
+import { MessagesList } from "../../components/messages/MessagesList";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import WelcomeLayout from "../../components/welcome/WelcomeLayout";
+import { useFieldRedaction } from "../../hooks/useFieldRedaction";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
 function MessagesOrIntegrationGuideContent() {
   const { project } = useOrganizationTeamProject();

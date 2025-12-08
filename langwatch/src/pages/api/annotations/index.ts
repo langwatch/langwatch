@@ -1,4 +1,4 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
 import { createLogger } from "../../../utils/logger";
@@ -7,7 +7,7 @@ const logger = createLogger("langwatch:annotations:index");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "GET") {
     return res.status(405).end(); // Only accept GET requests
@@ -42,7 +42,10 @@ export default async function handler(
 
     return res.status(200).json({ data: annotations });
   } catch (e) {
-    logger.error({ error: e, projectId: project.id }, 'error fetching annotations');
+    logger.error(
+      { error: e, projectId: project.id },
+      "error fetching annotations",
+    );
     return res
       .status(500)
       .json({ status: "error", message: "Internal server error." });

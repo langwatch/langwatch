@@ -1,3 +1,4 @@
+import type { Node } from "@xyflow/react";
 import { getFullDataset } from "../../server/api/routers/datasetRecord";
 import type { Component, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
@@ -7,11 +8,10 @@ import {
   transposeColumnsFirstToRowsFirstWithId,
   transpostRowsFirstToColumnsFirstWithoutId,
 } from "../utils/datasetUtils";
-import { type Node } from "@xyflow/react";
 
 export const loadDatasets = async (
   event: StudioClientEvent,
-  projectId: string
+  projectId: string,
 ): Promise<StudioClientEvent> => {
   if (!("workflow" in event.payload)) {
     return event;
@@ -43,7 +43,7 @@ export const loadDatasets = async (
         }
 
         const records = transposeColumnsFirstToRowsFirstWithId(
-          node.data.dataset.inline.records
+          node.data.dataset.inline.records,
         );
         const selectedRecords = (
           typeof entrySelection === "number"
@@ -51,10 +51,10 @@ export const loadDatasets = async (
               ? [records[entrySelection]!]
               : [records[0]!]
             : entrySelection == "random"
-            ? [records[Math.floor(Math.random() * records.length)]!]
-            : entrySelection === "last"
-            ? [records[records.length - 1]!]
-            : [records[0]!]
+              ? [records[Math.floor(Math.random() * records.length)]!]
+              : entrySelection === "last"
+                ? [records[records.length - 1]!]
+                : [records[0]!]
         ).filter((record) => record);
 
         return {
@@ -101,7 +101,7 @@ export const loadDatasets = async (
           dataset: inlineDataset,
         },
       } as Node<Component>;
-    })
+    }),
   );
 
   const workflow: Workflow = {

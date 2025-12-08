@@ -1,19 +1,26 @@
-import React, { useMemo, useState } from "react";
-import { VStack, Grid, Box, Button, HStack, Text } from "@chakra-ui/react";
-import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
-import type { FrameworkKey, PlatformKey } from "../../regions/observability/types";
-import { ApiIntegrationInfoCard } from "./observability/ApiIntegrationInfoCard";
-import { FrameworkGrid } from "./observability/FrameworkGrid";
-import { PlatformGrid } from "./observability/PlatformGrid";
-import { PLATFORM_OPTIONS, FRAMEWORKS_BY_PLATFORM } from "../../regions/observability/ui-options";
-import { InstallPreview } from "./observability/InstallPreview";
-import { getRegistryEntry } from "../../regions/observability/codegen/registry";
-import { FrameworkIntegrationCode } from "./observability/FrameworkIntegrationCode";
-import { DocsLinks } from "./observability/DocsLinks";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Box, Button, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import type React from "react";
+import { useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
+import { Tooltip } from "../../../../components/ui/tooltip";
+import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import { getRegistryEntry } from "../../regions/observability/codegen/registry";
+import type {
+  FrameworkKey,
+  PlatformKey,
+} from "../../regions/observability/types";
+import {
+  FRAMEWORKS_BY_PLATFORM,
+  PLATFORM_OPTIONS,
+} from "../../regions/observability/ui-options";
+import { ApiIntegrationInfoCard } from "./observability/ApiIntegrationInfoCard";
+import { DocsLinks } from "./observability/DocsLinks";
+import { FrameworkGrid } from "./observability/FrameworkGrid";
+import { FrameworkIntegrationCode } from "./observability/FrameworkIntegrationCode";
+import { InstallPreview } from "./observability/InstallPreview";
+import { PlatformGrid } from "./observability/PlatformGrid";
+import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 
 export function ObservabilityScreen(): React.ReactElement {
   const router = useRouter();
@@ -39,12 +46,20 @@ export function ObservabilityScreen(): React.ReactElement {
   }, [selectedPlatform]);
 
   const selectedEntry = useMemo(() => {
-    return getRegistryEntry(selectedPlatform, hasFrameworks ? selectedFramework : undefined);
+    return getRegistryEntry(
+      selectedPlatform,
+      hasFrameworks ? selectedFramework : undefined,
+    );
   }, [selectedPlatform, selectedFramework, hasFrameworks]);
 
   return (
     <>
-      <Grid templateColumns={{ base: "1fr", "xl": "1fr 1fr" }} gap={{ base: 6, "xl": 32 }} alignItems="start" mb={20}>
+      <Grid
+        templateColumns={{ base: "1fr", xl: "1fr 1fr" }}
+        gap={{ base: 6, xl: 32 }}
+        alignItems="start"
+        mb={20}
+      >
         <VStack align="stretch" gap={6}>
           <PlatformGrid
             selectedLanguage={selectedPlatform}
@@ -66,7 +81,10 @@ export function ObservabilityScreen(): React.ReactElement {
           {selectedEntry?.customComponent ? (
             <>
               <selectedEntry.customComponent />
-              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
+              <DocsLinks
+                docs={selectedEntry?.docs}
+                label={selectedEntry?.label ?? ""}
+              />
             </>
           ) : (
             <VStack align="stretch" gap={3} minW={0} w="full">
@@ -76,11 +94,15 @@ export function ObservabilityScreen(): React.ReactElement {
                   platform={selectedPlatform}
                   framework={selectedFramework}
                   languageIconUrl={
-                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.iconUrl
+                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)
+                      ?.iconUrl
                   }
                 />
               </Box>
-              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
+              <DocsLinks
+                docs={selectedEntry?.docs}
+                label={selectedEntry?.label ?? ""}
+              />
             </VStack>
           )}
         </VStack>
@@ -90,7 +112,12 @@ export function ObservabilityScreen(): React.ReactElement {
 
       {project?.slug && (
         <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Tooltip content="Continue to LangWatch — skip onboarding" positioning={{ placement: "left" }} showArrow openDelay={0}>
+          <Tooltip
+            content="Continue to LangWatch — skip onboarding"
+            positioning={{ placement: "left" }}
+            showArrow
+            openDelay={0}
+          >
             <Button
               onClick={() => void router.push(`/${project.slug}`)}
               aria-label="Continue to LangWatch"
@@ -108,7 +135,9 @@ export function ObservabilityScreen(): React.ReactElement {
               py={2}
             >
               <HStack gap={{ base: 0, md: 2 }}>
-                <Text display={{ base: "none", md: "inline" }}>Continue to LangWatch</Text>
+                <Text display={{ base: "none", md: "inline" }}>
+                  Continue to LangWatch
+                </Text>
                 <ArrowRight size={16} />
               </HStack>
             </Button>

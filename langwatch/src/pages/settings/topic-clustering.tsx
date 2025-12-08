@@ -4,21 +4,20 @@ import {
   Card,
   Heading,
   HStack,
+  Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Spacer } from "@chakra-ui/react";
+import { PermissionAlert } from "~/components/PermissionAlert";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TopicClusteringModel } from "./model-providers";
-import { EmbeddingsModel } from "./model-providers";
-import { PermissionAlert } from "~/components/PermissionAlert";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { EmbeddingsModel, TopicClusteringModel } from "./model-providers";
 
 function TopicClusteringSettings() {
-  const { project, hasPermission } = useOrganizationTeamProject({
+  const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 

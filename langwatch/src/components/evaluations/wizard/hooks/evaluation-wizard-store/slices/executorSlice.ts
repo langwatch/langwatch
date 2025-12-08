@@ -1,9 +1,9 @@
-import { type StateCreator } from "zustand";
-import { type Component } from "~/optimization_studio/types/dsl";
-import { type Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
+import type { StateCreator } from "zustand";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import type { CodeExecutionSlice } from "./codeExecutionSlice";
+import type { Component } from "~/optimization_studio/types/dsl";
 import type { BaseNodeSlice } from "./baseNodeSlice";
+import type { CodeExecutionSlice } from "./codeExecutionSlice";
 import type { LlmSignatureNodeSlice } from "./llmSignatureNodeSlice";
 
 export const EXECUTOR_NODE_TYPES = ["signature", "code"] as string[];
@@ -44,7 +44,7 @@ export const createExecutorSlice: StateCreator<
 > = (_set, get) => {
   const createNodeByType = (
     type: "signature" | "code",
-    project?: { defaultModel?: string | null }
+    project?: { defaultModel?: string | null },
   ) => {
     switch (type) {
       case "signature":
@@ -61,7 +61,7 @@ export const createExecutorSlice: StateCreator<
     getFirstExecutorNode: () => {
       const workflow = get().workflowStore.getWorkflow();
       return workflow.nodes.find(
-        (node) => node.type && EXECUTOR_NODE_TYPES.includes(node.type)
+        (node) => node.type && EXECUTOR_NODE_TYPES.includes(node.type),
       );
     },
     upsertExecutorNodeByType: ({ type, project }) => {

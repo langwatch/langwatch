@@ -1,3 +1,4 @@
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import {
   ESpanKind,
   type Fixed64,
@@ -7,9 +8,19 @@ import {
   type IKeyValue,
   type ISpan,
 } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
 import cloneDeep from "lodash-es/cloneDeep";
+import Long from "long";
+import { z } from "zod";
+import { createLogger } from "~/utils/logger";
 import type { DeepPartial } from "../../utils/types";
 import type { CollectorJob } from "../background/types";
+import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
+import {
+  extractStrandsAgentsInputOutput,
+  extractStrandsAgentsMetadata,
+  isStrandsAgentsInstrumentation,
+} from "./span-event-processing/strands-agents";
 import type {
   BaseSpan,
   ChatMessage,
@@ -22,25 +33,14 @@ import type {
 import {
   chatMessageSchema,
   customMetadataSchema,
-  reservedTraceMetadataSchema,
   rESTEvaluationSchema,
+  reservedSpanParamsSchema,
+  reservedTraceMetadataSchema,
+  spanMetricsSchema,
+  spanTimestampsSchema,
   spanTypesSchema,
   typedValueChatMessagesSchema,
-  spanMetricsSchema,
-  reservedSpanParamsSchema,
-  spanTimestampsSchema,
 } from "./types.generated";
-import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
-import { createLogger } from "~/utils/logger";
-import { z } from "zod";
-import {
-  isStrandsAgentsInstrumentation,
-  extractStrandsAgentsInputOutput,
-  extractStrandsAgentsMetadata,
-} from "./span-event-processing/strands-agents";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import Long from "long";
 import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
@@ -91,12 +91,10 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
 
         const traces: TraceForCollection[] = traceIds.map((traceId) =>
           openTelemetryTraceRequestToTraceForCollection(traceId, {
-            resourceSpans: otelTrace.resourceSpans?.filter(
-              (resourceSpan) =>
-                resourceSpan?.scopeSpans?.some(
-                  (scopeSpan) =>
-                    scopeSpan?.spans?.some((span) => span?.traceId === traceId),
-                ),
+            resourceSpans: otelTrace.resourceSpans?.filter((resourceSpan) =>
+              resourceSpan?.scopeSpans?.some((scopeSpan) =>
+                scopeSpan?.spans?.some((span) => span?.traceId === traceId),
+              ),
             ),
           }),
         );
@@ -125,25 +123,28 @@ const decodeOpenTelemetryIds = (
       for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
         for (const span of scopeSpan?.spans ?? []) {
           if (span?.traceId) {
-            const decoded = typeof span.traceId === "string"
-              ? decodeBase64OpenTelemetryId(span.traceId)
-              : decodeOpenTelemetryId(span.traceId);
+            const decoded =
+              typeof span.traceId === "string"
+                ? decodeBase64OpenTelemetryId(span.traceId)
+                : decodeOpenTelemetryId(span.traceId);
             if (decoded) {
               span.traceId = decoded;
             }
           }
           if (span?.spanId) {
-            const decoded = typeof span.spanId === "string"
-              ? decodeBase64OpenTelemetryId(span.spanId)
-              : decodeOpenTelemetryId(span.spanId);
+            const decoded =
+              typeof span.spanId === "string"
+                ? decodeBase64OpenTelemetryId(span.spanId)
+                : decodeOpenTelemetryId(span.spanId);
             if (decoded) {
               span.spanId = decoded;
             }
           }
           if (span?.parentSpanId) {
-            const decoded = typeof span.parentSpanId === "string"
-              ? decodeBase64OpenTelemetryId(span.parentSpanId)
-              : decodeOpenTelemetryId(span.parentSpanId);
+            const decoded =
+              typeof span.parentSpanId === "string"
+                ? decodeBase64OpenTelemetryId(span.parentSpanId)
+                : decodeOpenTelemetryId(span.parentSpanId);
             if (decoded) {
               span.parentSpanId = decoded;
             }
@@ -232,8 +233,8 @@ const parseTimestamp = (
     typeof timestamp === "number"
       ? timestamp
       : typeof timestamp === "string"
-      ? parseInt(timestamp, 10)
-      : maybeConvertLongBits(timestamp);
+        ? parseInt(timestamp, 10)
+        : maybeConvertLongBits(timestamp);
 
   return unixNano ? Math.round(unixNano / 1000 / 1000) : undefined;
 };
@@ -521,6 +522,14 @@ const addOpenTelemetrySpanAsSpan = (
               value: parsed,
             };
           } catch (error) {
+            logger.error(
+              {
+                error,
+                customerTraceId: trace.traceId,
+              },
+              "error parsing gen_ai.prompt",
+            );
+
             output = {
               type: "text",
               value: attributesMap.gen_ai.prompt,
@@ -717,6 +726,14 @@ const addOpenTelemetrySpanAsSpan = (
               value: parsed,
             };
           } catch (error) {
+            logger.error(
+              {
+                error,
+                customerTraceId: trace.traceId,
+              },
+              "error parsing gen_ai.completion",
+            );
+
             output = {
               type: "text",
               value: attributesMap.gen_ai.completion,
@@ -977,7 +994,9 @@ const addOpenTelemetrySpanAsSpan = (
           try {
             name =
               (input?.value as any).agent.match(/role='(.*?)'/)?.[1] ?? name;
-          } catch {}
+          } catch {
+            /* this is just a safe json parse fallback */
+          }
         }
 
         // vercel
@@ -1192,6 +1211,7 @@ const addOpenTelemetrySpanAsSpan = (
 };
 
 type RecursiveRecord = {
+  // biome-ignore lint/complexity/noBannedTypes: this is a trick to get rich key types + arbitrary strings
   [key: string]: (RecursiveRecord & (string | {})) | undefined;
 };
 

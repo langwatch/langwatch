@@ -1,14 +1,15 @@
-import React, { useMemo } from "react";
-import { VStack, Text } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
+import type React from "react";
+import { useMemo } from "react";
+import { ModelProviderScreen } from "../components/sections/ModelProviderScreen";
+import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
+import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
+import type { ProductFlowConfig } from "../types/types";
 import {
   type OnboardingScreen,
-  type ProductSelection,
   ProductScreenIndex,
+  type ProductSelection,
 } from "../types/types";
-import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
-import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
-import { ModelProviderScreen } from "../components/sections/ModelProviderScreen";
-import type { ProductFlowConfig } from "../types/types";
 
 interface UseProductScreensProps {
   flow: ProductFlowConfig;

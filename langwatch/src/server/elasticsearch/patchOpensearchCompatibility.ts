@@ -1,4 +1,4 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   const originalExists = esClient.indices.exists.bind(esClient.indices);

@@ -3,8 +3,8 @@ import {
   Button,
   Card,
   Field,
-  HStack,
   Heading,
+  HStack,
   Icon,
   Input,
   Spacer,
@@ -18,22 +18,22 @@ import { Select as MultiSelect } from "chakra-react-select";
 import { ChevronRight, HelpCircle, Plus, Trash } from "react-feather";
 import {
   Controller,
-  useFieldArray,
   type SubmitHandler,
   type UseFormReturn,
+  useFieldArray,
 } from "react-hook-form";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
   TeamRoleSelect,
-  teamRolesOptions,
   type TeamUserRoleForm,
+  teamRolesOptions,
 } from "./TeamUserRoleField";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export type TeamFormData = {
   name: string;

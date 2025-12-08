@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { scoreSatisfactionFromInput } from "./satisfaction";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
-import type { Trace } from "../../../tracer/types";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestProject } from "~/utils/testUtils";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
+import type { Trace } from "../../../tracer/types";
+import { scoreSatisfactionFromInput } from "./satisfaction";
 
 describe("Satisfaction Scoring Integration Test", () => {
   let project;

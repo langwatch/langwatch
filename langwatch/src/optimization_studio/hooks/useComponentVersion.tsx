@@ -5,7 +5,7 @@ import { api } from "../../utils/api";
 import type { Custom } from "../types/dsl";
 
 export const useComponentVersion = (
-  node: NodeProps<Node<Custom>> | Node<Custom>
+  node: NodeProps<Node<Custom>> | Node<Custom>,
 ) => {
   const { project } = useOrganizationTeamProject();
 
@@ -23,15 +23,15 @@ export const useComponentVersion = (
     },
     {
       enabled: !!project?.id && !!node.data.workflow_id,
-    }
+    },
   );
 
   const currentVersion = getVersions.data?.find(
-    (v) => String(v.id).trim() === String(componentsVersionId).trim()
+    (v) => String(v.id).trim() === String(componentsVersionId).trim(),
   );
 
   const publishedVersion = getVersions.data?.find(
-    (v) => v.isPublishedVersion === true
+    (v) => v.isPublishedVersion === true,
   );
 
   if (!currentVersion || !project) {

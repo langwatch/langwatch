@@ -1,10 +1,9 @@
-import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { analyticsMetrics } from "../../server/analytics/registry";
-import { GridItem, Card, Tabs, VStack, Grid, Heading } from "@chakra-ui/react";
-
-import { SatisfactionGraphs } from "./SatisfactionGraph";
-import { TopicsSelector } from "../filters/TopicsSelector";
+import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { analyticsMetrics } from "../../server/analytics/registry";
+import { TopicsSelector } from "../filters/TopicsSelector";
+import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
+import { SatisfactionGraphs } from "./SatisfactionGraph";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

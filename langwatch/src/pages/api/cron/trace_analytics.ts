@@ -1,14 +1,14 @@
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { env } from "~/env.mjs";
+import { dependencies } from "~/injection/dependencies.server";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { type Prisma } from "@prisma/client";
-import { ANALYTICS_KEYS } from "~/types";
 import { UsageLimitService } from "~/server/notifications/usage-limit.service";
-import { dependencies } from "~/injection/dependencies.server";
-import { TraceUsageService } from "~/server/traces/trace-usage.service";
 import { OrganizationRepository } from "~/server/repositories/organization.repository";
+import { TraceUsageService } from "~/server/traces/trace-usage.service";
+import { ANALYTICS_KEYS } from "~/types";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { env } from "~/env.mjs";
 
 export default async function handler(
   req: NextApiRequest,

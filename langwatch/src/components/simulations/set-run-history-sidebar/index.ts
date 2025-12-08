@@ -4,5 +4,5 @@ import { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarCont
 
 export const SetRunHistorySidebar = withController(
   SetRunHistorySidebarComponent,
-  useSetRunHistorySidebarController
+  useSetRunHistorySidebarController,
 );

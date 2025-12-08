@@ -46,7 +46,7 @@ export const AddParticipants = ({
     },
     {
       enabled: !!project,
-    }
+    },
   );
 
   const selectedValues = annotators.map((a) => a.id);
@@ -58,7 +58,7 @@ export const AddParticipants = ({
       },
       {
         enabled: !!organization,
-      }
+      },
     );
 
   const userOptions = users.data?.members.map((member) => ({
@@ -80,7 +80,7 @@ export const AddParticipants = ({
     })),
   });
   const participantsLeft = participantsCollection.items.filter(
-    (item) => !annotators.some((a) => a.id === item.value)
+    (item) => !annotators.some((a) => a.id === item.value),
   );
 
   return (
@@ -94,13 +94,13 @@ export const AddParticipants = ({
           value={selectedValues}
           onValueChange={(newValues) => {
             const selectedOptions = options.filter((opt) =>
-              newValues.value.includes(opt.value)
+              newValues.value.includes(opt.value),
             );
             setAnnotators(
               selectedOptions.map((v) => ({
                 id: v.value,
                 name: v.label,
-              }))
+              })),
             );
           }}
         >
@@ -139,7 +139,7 @@ export const AddParticipants = ({
                           onClick={(e) => {
                             e.stopPropagation();
                             setAnnotators(
-                              annotators.filter((a) => a.id !== item.value)
+                              annotators.filter((a) => a.id !== item.value),
                             );
                           }}
                         />

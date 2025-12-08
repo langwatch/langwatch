@@ -1,9 +1,8 @@
 import type { Node } from "@xyflow/react";
-
+import { useFormContext } from "react-hook-form";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompts";
-import { useFormContext } from "react-hook-form";
 import { api } from "~/utils/api";
 
 export function useVersionDrift(node: Node<LlmPromptConfigComponent>) {
@@ -24,7 +23,7 @@ export function useVersionDrift(node: Node<LlmPromptConfigComponent>) {
     },
     {
       enabled: !!idOrHandle && !!project?.id,
-    }
+    },
   );
 
   return {

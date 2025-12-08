@@ -1,10 +1,10 @@
-import { VStack, List, Text } from "@chakra-ui/react";
-import { Circle, CheckCircle } from "react-feather";
-import { api } from "../utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { trackEventOnce } from "../utils/tracking";
+import { List, Text, VStack } from "@chakra-ui/react";
 import { useEffect } from "react";
+import { CheckCircle, Circle } from "react-feather";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Link } from "../components/ui/link";
+import { api } from "../utils/api";
+import { trackEventOnce } from "../utils/tracking";
 
 export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
@@ -16,7 +16,7 @@ export const useIntegrationChecks = () => {
       refetchOnWindowFocus: true,
       refetchOnMount: false,
       staleTime: Infinity,
-    }
+    },
   );
 
   useEffect(() => {

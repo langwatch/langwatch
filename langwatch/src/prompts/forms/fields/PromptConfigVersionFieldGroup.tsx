@@ -10,12 +10,11 @@ import {
 import { Plus } from "lucide-react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
-
+import { Tooltip } from "~/components/ui/tooltip";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompts";
 import { TypeSelector } from "~/prompts/components/ui/TypeSelector";
 import { generateUniqueIdentifier } from "~/prompts/utils/identifierUtils";
-import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * ConfigFieldGroup

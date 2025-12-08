@@ -1,5 +1,5 @@
-import { type LLMSpan, type Span } from "../server/tracer/types";
 import { RandomIdGenerator } from "@opentelemetry/sdk-trace-web";
+import type { LLMSpan, Span } from "../server/tracer/types";
 
 export const getSpanNameOrModel = (span: Span) => {
   return (

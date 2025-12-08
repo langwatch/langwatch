@@ -1,11 +1,10 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
 import { z } from "zod";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
-
-import { nanoid } from "nanoid";
-import { checkProjectPermission } from "../rbac";
 
 export const triggerRouter = createTRPCRouter({
   create: protectedProcedure

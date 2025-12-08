@@ -1,8 +1,17 @@
+import type { Logger } from "pino";
 import { vi } from "vitest";
-import type { Event, Projection } from "../../domain/types";
-import type { TenantId } from "../../domain/tenantId";
-import type { EventType } from "../../domain/eventType";
 import type { AggregateType } from "../../domain/aggregateType";
+import type { EventType } from "../../domain/eventType";
+import { EVENT_TYPES } from "../../domain/eventType";
+import type { EventHandler } from "../../domain/handlers/eventHandler";
+import type { ProjectionHandler } from "../../domain/handlers/projectionHandler";
+import type { TenantId } from "../../domain/tenantId";
+import { createTenantId } from "../../domain/tenantId";
+import type { Event, Projection } from "../../domain/types";
+import type { EventHandlerDefinition } from "../../eventHandler.types";
+import type { ProjectionDefinition } from "../../projection.types";
+import type { EventPublisher } from "../../publishing/eventPublisher.types";
+import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type {
   EventStore,
   EventStoreReadContext,
@@ -11,16 +20,7 @@ import type {
   ProjectionStore,
   ProjectionStoreReadContext,
 } from "../../stores/projectionStore.types";
-import type { EventPublisher } from "../../publishing/eventPublisher.types";
-import type { EventHandler } from "../../domain/handlers/eventHandler";
-import type { ProjectionHandler } from "../../domain/handlers/projectionHandler";
-import type { EventHandlerDefinition } from "../../eventHandler.types";
-import type { ProjectionDefinition } from "../../projection.types";
 import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
-import type { Logger } from "pino";
-import { createTenantId } from "../../domain/tenantId";
-import { EVENT_TYPES } from "../../domain/eventType";
 
 /**
  * Creates a mock EventStore with default implementations.
@@ -182,7 +182,8 @@ export function createTestEvent(
   id?: string,
 ): Event {
   const uniqueId =
-    id ?? `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
+    id ??
+    `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${testEventIdCounter++}`;
   return {
     id: uniqueId,
     aggregateId,

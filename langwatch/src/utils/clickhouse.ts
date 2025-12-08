@@ -1,4 +1,4 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { env } from "../env.mjs";
 
 let clickHouseClient: ClickHouseClient | null = null;

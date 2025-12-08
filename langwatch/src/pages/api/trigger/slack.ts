@@ -1,10 +1,9 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../../../server/db";
-
-import { createLogger } from "../../../utils/logger";
-import { TriggerAction, AlertType } from "@prisma/client";
+import { AlertType, TriggerAction } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
+import { prisma } from "../../../server/db";
 import { filterFieldsEnum } from "../../../server/filters/types";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:trigger:slack");
 
@@ -26,13 +25,13 @@ const filterSchema = z
       z.array(z.string()),
       z.record(z.string(), z.array(z.string())),
       z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-    ])
+    ]),
   )
   .default({});
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -65,7 +64,7 @@ export default async function handler(
   try {
     const validatedData = schema.parse(req.body);
 
-    const trigger = await prisma.trigger.create({
+    await prisma.trigger.create({
       data: {
         projectId: project.id,
         action: TriggerAction.SEND_SLACK_MESSAGE,

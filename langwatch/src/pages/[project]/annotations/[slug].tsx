@@ -6,14 +6,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
-
 import { useRouter } from "next/router";
+import AnnotationsLayout from "~/components/AnnotationsLayout";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
-import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { api } from "~/utils/api";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 export default function Annotations() {
   const router = useRouter();
@@ -26,7 +25,7 @@ export default function Annotations() {
       projectId: project?.id ?? "",
       slug: slug as string,
     },
-    { enabled: !!project?.id && typeof slug === "string" && !!slug }
+    { enabled: !!project?.id && typeof slug === "string" && !!slug },
   );
 
   const queueMembers = queue.data?.members?.map((member) => member.user);

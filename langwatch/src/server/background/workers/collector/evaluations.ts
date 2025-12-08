@@ -1,21 +1,20 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import crypto from "crypto";
-import { slugify } from "../../../../utils/slugify";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import {
   evaluatePreconditions,
   type PreconditionTrace,
 } from "../../../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
+import { createLogger } from "../../../../utils/logger";
+import { slugify } from "../../../../utils/slugify";
 import { prisma } from "../../../db";
-import type { ElasticSearchEvaluation } from "../../../tracer/types";
-import { type Span } from "../../../tracer/types";
+import type { ElasticSearchEvaluation, Span } from "../../../tracer/types";
 import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
-import { createLogger } from "../../../../utils/logger";
 
-const logger = createLogger("langwatch:workers:collector:evaluations");
+const _logger = createLogger("langwatch:workers:collector:evaluations");
 
 export const evaluationNameAutoslug = (name: string) => {
   const autoslug = slugify(name || "unnamed", {
@@ -26,7 +25,7 @@ export const evaluationNameAutoslug = (name: string) => {
 };
 
 export const mapEvaluations = (
-  data: CollectorJob
+  data: CollectorJob,
 ): ElasticSearchEvaluation[] | undefined => {
   const evaluations = data.evaluations?.map((evaluation) => {
     const evaluationMD5 = crypto
@@ -60,7 +59,7 @@ export const mapEvaluations = (
         (evaluation, index, self) =>
           evaluation &&
           index ===
-            self.findIndex((t) => t.evaluation_id === evaluation.evaluation_id)
+            self.findIndex((t) => t.evaluation_id === evaluation.evaluation_id),
       )
       .toReversed();
 
@@ -69,7 +68,7 @@ export const mapEvaluations = (
 
 export const scheduleEvaluations = async (
   trace: EvaluationJob["trace"] & PreconditionTrace,
-  spans: Span[]
+  spans: Span[],
 ) => {
   const isOutputEmpty = !trace.output?.value;
   const lastOutput = spans.toReversed()[0]?.output;
@@ -97,7 +96,7 @@ export const scheduleEvaluations = async (
         check.checkType,
         trace,
         spans,
-        preconditions
+        preconditions,
       );
       if (preconditionsMet) {
         traceChecksSchedulings.push(
@@ -109,7 +108,7 @@ export const scheduleEvaluations = async (
               name: check.name,
             },
             trace: trace,
-          })
+          }),
         );
       }
     }

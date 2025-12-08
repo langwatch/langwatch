@@ -12,7 +12,7 @@ export const useSimulationRouter = () => {
     scenarioRunId: string;
   }) => {
     router.push(
-      `/${project?.slug}/simulations/${ids.scenarioSetId}/${ids.batchRunId}/${ids.scenarioRunId}`
+      `/${project?.slug}/simulations/${ids.scenarioSetId}/${ids.batchRunId}/${ids.scenarioRunId}`,
     );
   };
 
@@ -25,15 +25,15 @@ export const useSimulationRouter = () => {
     simulationBatchId: string,
     options?: {
       replace?: boolean;
-    }
+    },
   ) => {
     if (options?.replace) {
       router.replace(
-        `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`
+        `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`,
       );
     } else {
       router.push(
-        `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`
+        `/${project?.slug}/simulations/${scenarioSetId}/${simulationBatchId}`,
       );
     }
   };

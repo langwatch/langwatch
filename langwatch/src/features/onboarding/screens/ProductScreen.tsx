@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { OnboardingContainer } from "../components/containers/OnboardingContainer";
-import { AnalyticsBoundary } from "react-contextual-analytics";
-import { useProductFlow } from "../hooks/use-product-flow";
-import { useCreateProductScreens } from "./create-product-screens";
-import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
 import { Box } from "@chakra-ui/react";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AnalyticsBoundary } from "react-contextual-analytics";
+import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
+import { OnboardingContainer } from "../components/containers/OnboardingContainer";
+import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
 import { ActiveProjectProvider } from "../contexts/ActiveProjectContext";
-import { LoadingScreen } from "~/components/LoadingScreen";
+import { useProductFlow } from "../hooks/use-product-flow";
+import { useCreateProductScreens } from "./create-product-screens";
 
 export const ProductScreen: React.FC = () => {
   const {
@@ -37,13 +38,20 @@ export const ProductScreen: React.FC = () => {
     };
   }, [isLoading]);
 
-  const screens = useCreateProductScreens({ flow, onSelectProduct: handleSelectProduct });
+  const screens = useCreateProductScreens({
+    flow,
+    onSelectProduct: handleSelectProduct,
+  });
 
   const currentVisibleIndex = useMemo(
-    () => flow.visibleScreens.findIndex((s) => Number(s) === Number(currentScreenIndex)),
-    [flow.visibleScreens, currentScreenIndex]
+    () =>
+      flow.visibleScreens.findIndex(
+        (s) => Number(s) === Number(currentScreenIndex),
+      ),
+    [flow.visibleScreens, currentScreenIndex],
   );
-  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
+  const currentScreen =
+    currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
   if (!currentScreen) {
     return null;
   }
@@ -65,8 +73,12 @@ export const ProductScreen: React.FC = () => {
       >
         <Box w="full" position="relative">
           <OnboardingMeshBackground opacity={0.4} blurPx={90} />
-          <ActiveProjectProvider value={{ project: activeProject, organization }}>
-            {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
+          <ActiveProjectProvider
+            value={{ project: activeProject, organization }}
+          >
+            {!isLoading && currentScreen.component ? (
+              <currentScreen.component />
+            ) : null}
           </ActiveProjectProvider>
         </Box>
       </OnboardingContainer>

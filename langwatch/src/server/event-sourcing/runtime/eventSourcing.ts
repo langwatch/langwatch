@@ -1,10 +1,10 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event, Projection, EventStore } from "../library";
-import { PipelineBuilder } from "./pipeline";
+import type { Event, EventStore, Projection } from "../library";
 import { DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
+import { PipelineBuilder } from "./pipeline";
 
 /**
  * Singleton that manages shared event sourcing infrastructure.

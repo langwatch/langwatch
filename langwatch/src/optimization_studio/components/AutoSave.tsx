@@ -37,11 +37,11 @@ export function AutoSave() {
       hasPendingChanges,
       getWorkflow,
       getPreviousWorkflow,
-    })
+    }),
   );
   const stateWorkflow = useWorkflowStore(
     // Use shallow to compare equality of the workflow values only, since object is always re-created
-    useShallow((state) => state.getWorkflow())
+    useShallow((state) => state.getWorkflow()),
   );
 
   const trpc = api.useContext();
@@ -57,7 +57,7 @@ export function AutoSave() {
         const setAsLatestVersion = hasDSLChanged(
           previousWorkflow,
           stateWorkflow,
-          false
+          false,
         );
         autosave.mutate(
           {
@@ -85,14 +85,14 @@ export function AutoSave() {
                 setPreviousWorkflow(stateWorkflow);
               })();
             },
-          }
+          },
         );
       } else {
         setPreviousWorkflow(stateWorkflow);
       }
     },
     1000,
-    { leading: false, trailing: true, maxWait: 30_000 }
+    { leading: false, trailing: true, maxWait: 30_000 },
   );
 
   useEffect(() => {

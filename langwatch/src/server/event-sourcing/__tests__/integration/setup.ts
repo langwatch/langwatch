@@ -1,8 +1,8 @@
-import { beforeAll, afterAll } from "vitest";
+import { afterAll, beforeAll } from "vitest";
 import {
+  cleanupTestData,
   startTestContainers,
   stopTestContainers,
-  cleanupTestData,
 } from "./testContainers";
 
 /**

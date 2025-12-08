@@ -9,17 +9,16 @@ import {
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
 import { Edit, MoreVertical, Trash2 } from "react-feather";
-
-import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
+import { LuBuilding } from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
-import { LuBuilding } from "react-icons/lu";
+import { formatTimeAgo } from "../utils/formatTimeAgo";
+import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 
 /**
  * Flat interface for prompt list items

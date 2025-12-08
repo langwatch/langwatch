@@ -10,6 +10,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
+import {
+  Activity,
+  Bug,
+  LifeBuoy,
+  Lightbulb,
+  MessageCircle,
+} from "lucide-react";
 import { useRouter } from "next/router";
 import React from "react";
 import {
@@ -24,22 +31,12 @@ import {
   Table,
   TrendingUp,
 } from "react-feather";
-
-import {
-  Activity,
-  Bug,
-  Lightbulb,
-  LifeBuoy,
-  MessageCircle,
-} from "lucide-react";
-
+import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
 import { projectRoutes } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
-
-import { LuListTree } from "react-icons/lu";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";

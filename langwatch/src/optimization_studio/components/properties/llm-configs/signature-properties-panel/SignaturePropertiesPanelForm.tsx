@@ -1,5 +1,5 @@
 import { VStack } from "@chakra-ui/react";
-import { useUpdateNodeInternals, type Node } from "@xyflow/react";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import debounce from "lodash.debounce";
 import { useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
@@ -8,12 +8,10 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
-import {
-  usePromptConfigForm,
-  type PromptConfigFormValues,
-} from "~/prompts";
+import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
 import type { PromptTextAreaOnAddMention } from "~/prompts/components/ui/PromptTextArea";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
@@ -21,13 +19,11 @@ import {
 import { PromptField } from "~/prompts/forms/fields/PromptField";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
-  versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
+  versionedPromptToPromptConfigFormValues,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";

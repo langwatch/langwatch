@@ -1,10 +1,9 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { getProtectionsForProject } from "~/server/api/utils";
 import { prisma } from "~/server/db";
-
+import { getTraceById } from "~/server/elasticsearch/traces";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { formatTimeAgo } from "../../../utils/formatTimeAgo";
-import { getTraceById } from "~/server/elasticsearch/traces";
-import { getProtectionsForProject } from "~/server/api/utils";
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };
 
@@ -36,11 +35,11 @@ export const generateAsciiTree = (spans: Span[]): string => {
       acc[span.span_id] = span;
       return acc;
     },
-    {} as Record<string, Span>
+    {} as Record<string, Span>,
   );
 
   const rootSpans = spans.filter(
-    (s) => !s.parent_id || !spansById[s.parent_id]
+    (s) => !s.parent_id || !spansById[s.parent_id],
   );
 
   let result = ".\n";
@@ -49,7 +48,7 @@ export const generateAsciiTree = (spans: Span[]): string => {
   const buildAsciiTree = (
     span: SpanWithChildren,
     prefix: string,
-    isLast: boolean
+    isLast: boolean,
   ): void => {
     // Add current span to result
     const connector = isLast ? "└── " : "├── ";
@@ -80,7 +79,7 @@ export const generateAsciiTree = (spans: Span[]): string => {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "GET") {
     return res.status(405).end();
@@ -104,7 +103,9 @@ export default async function handler(
   const traceId = req.query.id as string;
   const llmMode = req.query.llmMode === "true" || req.query.llmMode === "1";
 
-  const protections = await getProtectionsForProject(prisma, { projectId: project?.id });
+  const protections = await getProtectionsForProject(prisma, {
+    projectId: project?.id,
+  });
   const trace = await getTraceById({
     connConfig: { projectId: project?.id },
     traceId,
@@ -120,9 +121,7 @@ export default async function handler(
   const asciiTree = generateAsciiTree(trace?.spans);
 
   return res.status(200).json({
-    ...(llmMode
-      ? toLLMModeTrace(trace, asciiTree)
-      : {}),
+    ...(llmMode ? toLLMModeTrace(trace, asciiTree) : {}),
     spans: trace.spans,
     evaluations: trace.evaluations,
     ascii_tree: asciiTree,
@@ -132,7 +131,7 @@ export default async function handler(
 
 export const toLLMModeTrace = (
   trace: Trace,
-  asciiTree?: string
+  asciiTree?: string,
 ): LLMModeTrace => {
   return {
     ...trace,

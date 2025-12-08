@@ -1,23 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { QueueProcessorManager } from "../queueProcessorManager";
+import { z } from "zod";
+import type { Command, CommandHandler } from "../../../commands/command";
+import type { CommandHandlerClass } from "../../../commands/commandHandlerClass";
+import { defineCommandSchema } from "../../../commands/commandSchema";
+import type { CommandType } from "../../../domain/commandType";
+import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
-import type { CommandHandlerClass } from "../../../commands/commandHandlerClass";
-import type { Command, CommandHandler } from "../../../commands/command";
-import type { CommandType } from "../../../domain/commandType";
-import { defineCommandSchema } from "../../../commands/commandSchema";
 import {
+  createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
   createMockProjectionDefinition,
-  createMockEventHandler,
+  createTestAggregateType,
   createTestEvent,
   createTestTenantId,
-  createTestAggregateType,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { EVENT_TYPES } from "../../../domain/eventType";
-import { z } from "zod";
+import { QueueProcessorManager } from "../queueProcessorManager";
 
 /**
  * Creates a mock command handler class for testing.

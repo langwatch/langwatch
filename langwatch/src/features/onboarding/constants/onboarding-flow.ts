@@ -1,4 +1,7 @@
-import { OnboardingScreenIndex, type OnboardingFlowConfig } from "../types/types";
+import {
+  type OnboardingFlowConfig,
+  OnboardingScreenIndex,
+} from "../types/types";
 
 export const ONBOARDING_FLOW_FULL: OnboardingFlowConfig = {
   variant: "full",

@@ -1,10 +1,6 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
-
-import { PromptService } from "~/server/prompt-config";
-import { checkProjectPermission } from "../../rbac";
-import { createTRPCRouter, protectedProcedure } from "../../trpc";
-
+import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import {
   handleSchema,
   inputsSchema,
@@ -13,7 +9,9 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
 } from "~/prompts/schemas";
-import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
+import { PromptService } from "~/server/prompt-config";
+import { checkProjectPermission } from "../../rbac";
+import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 /**
  * Router for handling prompts - the business-facing interface

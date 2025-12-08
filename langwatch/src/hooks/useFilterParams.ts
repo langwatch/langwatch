@@ -1,10 +1,10 @@
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { usePeriodSelector } from "../components/PeriodSelector";
 import { useRouter } from "next/router";
+import qs from "qs";
+import { usePeriodSelector } from "../components/PeriodSelector";
+import { filterOutEmptyFilters } from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
-import qs from "qs";
-import { filterOutEmptyFilters } from "../server/analytics/utils";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export type FilterParam =
   | string[]
@@ -155,9 +155,7 @@ export const useFilterParams = () => {
     endDate: endDate.getTime(),
     filters: filters,
     ...(queryParams.query ? { query: queryParams.query as string } : {}),
-    ...(queryParams.negateFilters === "true"
-      ? { negateFilters: true }
-      : {}),
+    ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
   };
 
   const getLatestFilters = () => {
@@ -166,7 +164,11 @@ export const useFilterParams = () => {
 
   const setNegateFilters = (negateFilters: boolean) => {
     void router.push(
-      "?" + qs.stringify({ ...queryParams, negateFilters: negateFilters ? "true" : "false" }),
+      "?" +
+        qs.stringify({
+          ...queryParams,
+          negateFilters: negateFilters ? "true" : "false",
+        }),
       undefined,
       { shallow: true, scroll: false },
     );

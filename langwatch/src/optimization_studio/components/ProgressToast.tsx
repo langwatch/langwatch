@@ -6,10 +6,10 @@ import {
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
-import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
 
 export function ProgressToast() {
   return (
@@ -25,7 +25,7 @@ export function EvaluationProgressToast() {
     ({ state, setOpenResultsPanelRequest }) => ({
       evaluationState: state.evaluation,
       setOpenResultsPanelRequest,
-    })
+    }),
   );
 
   const { stopEvaluationExecution } = useEvaluationExecution();
@@ -57,7 +57,7 @@ export function OptimizationProgressToast() {
     ({ state, setOpenResultsPanelRequest }) => ({
       optimizationState: state.optimization,
       setOpenResultsPanelRequest,
-    })
+    }),
   );
 
   const { stopOptimizationExecution } = useOptimizationExecution();

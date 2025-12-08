@@ -1,6 +1,6 @@
-import { type z } from "zod";
+import type { z } from "zod";
 
-import { type formSchema } from "./schemas";
+import type { formSchema } from "./schemas";
 
 /**
  * Represents a code snippet for API usage

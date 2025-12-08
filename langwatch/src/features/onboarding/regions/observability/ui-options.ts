@@ -1,6 +1,6 @@
-import type { FrameworkKey, PlatformKey, Option as BaseOption } from "./types";
+import type { IconData } from "../shared/types";
 import { deriveFrameworksByPlatform } from "./codegen/registry";
-import { type IconData } from "../shared/types";
+import type { Option as BaseOption, FrameworkKey, PlatformKey } from "./types";
 
 type PlatformOption = BaseOption<PlatformKey> & { iconUrl?: string };
 

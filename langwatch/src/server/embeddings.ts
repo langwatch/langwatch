@@ -1,6 +1,6 @@
-import { prisma } from "./db";
-import { getProjectModelProviders } from "./api/routers/modelProviders";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../utils/constants";
+import { getProjectModelProviders } from "./api/routers/modelProviders";
+import { prisma } from "./db";
 
 export const getProjectEmbeddingsModel = async (projectId: string) => {
   const project = await prisma.project.findUnique({

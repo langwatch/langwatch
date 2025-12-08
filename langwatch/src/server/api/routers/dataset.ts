@@ -1,15 +1,14 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-
 import { nanoid } from "nanoid";
+import { z } from "zod";
+import { slugify } from "~/utils/slugify";
+import { DatasetService } from "../../datasets/dataset.service";
+import { datasetErrorHandler } from "../../datasets/middleware";
 import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
 import { checkProjectPermission } from "../rbac";
-import { DatasetService } from "../../datasets/dataset.service";
-import { datasetErrorHandler } from "../../datasets/middleware";
-import { slugify } from "~/utils/slugify";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
  * Dataset Router - Manages dataset CRUD operations

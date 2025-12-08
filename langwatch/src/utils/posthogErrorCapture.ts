@@ -88,7 +88,11 @@ export function captureMessage(
       if (posthog?.__loaded) {
         posthog.capture("$exception", exceptionProperties);
       } else {
-        console.error("PostHog not initialized, logging message:", message, options);
+        console.error(
+          "PostHog not initialized, logging message:",
+          message,
+          options,
+        );
       }
     } catch (err) {
       console.error("Failed to capture message with client PostHog:", err);
@@ -107,8 +111,8 @@ export function captureException(
     error instanceof Error
       ? error.message
       : typeof error === "string"
-      ? error
-      : "Unknown error";
+        ? error
+        : "Unknown error";
 
   const errorStack =
     error instanceof Error && error.stack ? error.stack : undefined;

@@ -1,27 +1,26 @@
+import { Card, Heading, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import type { TeamUserRole } from "@prisma/client";
+import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useState } from "react";
-import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
+import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
+import { PermissionAlert } from "~/components/PermissionAlert";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
   type TeamFormData,
 } from "../../../components/settings/TeamForm";
+import {
+  type RoleOption,
+  teamRolesOptions,
+} from "../../../components/settings/TeamUserRoleField";
 import { toaster } from "../../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
-
-import {
-  teamRolesOptions,
-  type RoleOption,
-} from "../../../components/settings/TeamUserRoleField";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { PermissionAlert } from "~/components/PermissionAlert";
-import { Card, Heading, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { TRPCClientError } from "@trpc/client";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {

@@ -11,18 +11,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn, useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { api } from "../../utils/api";
-import SettingsLayout from "../../components/SettingsLayout";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { titleCase } from "../../utils/stringCasing";
-import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LuKeyRound, LuX } from "react-icons/lu";
-import { toaster } from "../../components/ui/toaster";
+import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { HorizontalFormControl } from "../../components/HorizontalFormControl";
+import SettingsLayout from "../../components/SettingsLayout";
+import { toaster } from "../../components/ui/toaster";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { api } from "../../utils/api";
+import { titleCase } from "../../utils/stringCasing";
 
 const getProviderDisplayName = (
   provider: string,

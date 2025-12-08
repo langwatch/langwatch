@@ -1,12 +1,13 @@
-import React, { useState } from "react";
-import { VStack, Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Tooltip } from "../../../../components/ui/tooltip";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import type React from "react";
+import { useState } from "react";
 import { ArrowRight } from "react-feather";
+import { Tooltip } from "../../../../components/ui/tooltip";
+import { useActiveProject } from "../../contexts/ActiveProjectContext";
+import type { ModelProviderKey } from "../../regions/model-providers/types";
 import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
-import type { ModelProviderKey } from "../../regions/model-providers/types";
 
 interface ModelProviderScreenProps {
   variant: "evaluations" | "prompts";
@@ -72,4 +73,4 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
       )}
     </>
   );
-}
+};

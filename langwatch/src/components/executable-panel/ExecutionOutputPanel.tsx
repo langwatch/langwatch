@@ -1,18 +1,18 @@
 import {
   Box,
+  type BoxProps,
   Button,
   Heading,
   HStack,
   Spacer,
   Text,
   VStack,
-  type BoxProps,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
+import { useDrawer } from "~/components/CurrentDrawer";
 import { RenderInputOutput } from "~/components/traces/RenderInputOutput";
 import { SpanDuration } from "~/components/traces/SpanDetails";
-import { useDrawer } from "~/components/CurrentDrawer";
 import { RedactedField } from "~/components/ui/RedactedField";
 import type { ExecutionState } from "~/optimization_studio/types/dsl";
 
@@ -33,7 +33,7 @@ export const ExecutionOutputPanel = ({
 }: OutputPanelProps) => {
   const [isWaitingLong] = useDebounceValue(
     executionState?.status === "waiting",
-    600
+    600,
   );
 
   const isExecutionComplete =
@@ -53,14 +53,12 @@ export const ExecutionOutputPanel = ({
           Outputs
         </Heading>
         <Spacer />
-        {
-          executionState?.timestamps &&
-          isExecutionComplete && (
-            <ExecutionMetadata
-              executionState={executionState}
-              isTracingEnabled={isTracingEnabled}
-            />
-          )}
+        {executionState?.timestamps && isExecutionComplete && (
+          <ExecutionMetadata
+            executionState={executionState}
+            isTracingEnabled={isTracingEnabled}
+          />
+        )}
       </HStack>
 
       {renderExecutionContent(executionState, isWaitingLong, nodeType)}
@@ -134,7 +132,7 @@ const ExecutionMetadata = ({
 const renderExecutionContent = (
   executionState?: ExecutionState,
   isWaitingLong?: boolean,
-  nodeType?: string
+  nodeType?: string,
 ) => {
   if (!executionState) {
     return <Text color="gray.500">Waiting for execution</Text>;
@@ -154,7 +152,7 @@ const renderExecutionContent = (
  */
 const renderExecutionStatus = (
   executionState: ExecutionState,
-  isWaitingLong?: boolean
+  isWaitingLong?: boolean,
 ) => {
   if (isWaitingLong && executionState.status === "waiting") {
     return <Text>Waiting for runner</Text>;
@@ -199,7 +197,7 @@ const renderExecutionError = (executionState: ExecutionState) => {
  */
 const renderExecutionOutputs = (
   executionState: ExecutionState,
-  nodeType?: string
+  nodeType?: string,
 ) => {
   if (executionState.status !== "success" || !executionState.outputs) {
     return null;
@@ -223,10 +221,10 @@ const renderExecutionOutputs = (
       const textColor = isSkipped
         ? "yellow.600"
         : isFail
-        ? "red.600"
-        : isSuccess
-        ? "green.600"
-        : "gray.600";
+          ? "red.600"
+          : isSuccess
+            ? "green.600"
+            : "gray.600";
 
       return (
         <VStack
@@ -238,10 +236,10 @@ const renderExecutionOutputs = (
             isSkipped
               ? "yellow.600"
               : isFail
-              ? "red.600"
-              : isSuccess
-              ? "green.600"
-              : undefined
+                ? "red.600"
+                : isSuccess
+                  ? "green.600"
+                  : undefined
           }
         >
           <Text

@@ -8,8 +8,8 @@ import {
   MessagesSnapshotEventSchema,
 } from "@ag-ui/core";
 import { z } from "zod";
-import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
 import { chatMessageSchema } from "../../../../../server/tracer/types.generated";
+import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
 
 /**
  * AG-UI Base Event Schema
@@ -100,10 +100,10 @@ export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
         z.object({
           id: z.string().optional(),
           trace_id: z.string().optional(),
-        })
-      )
+        }),
+      ),
     ),
-  })
+  }),
 );
 
 /**

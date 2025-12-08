@@ -1,8 +1,7 @@
-import fs from "fs";
-import path from "path";
-
 import deepmerge from "deepmerge";
+import fs from "fs";
 import { generateSpecs } from "hono-openapi";
+import path from "path";
 
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
@@ -62,11 +61,11 @@ export default async function execute() {
           };
         }
       },
-    }
+    },
   );
 
   fs.writeFileSync(
     path.join(__dirname, "../app/api/openapiLangWatch.json"),
-    JSON.stringify(mergedSpec, null, 2)
+    JSON.stringify(mergedSpec, null, 2),
   );
 }

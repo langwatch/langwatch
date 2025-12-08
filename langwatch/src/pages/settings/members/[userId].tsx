@@ -2,8 +2,8 @@ import {
   Button,
   Card,
   Field,
-  HStack,
   Heading,
+  HStack,
   Icon,
   Table,
   Text,
@@ -13,9 +13,9 @@ import { useRouter } from "next/router";
 import { useMemo } from "react";
 import { ChevronRight, MoreVertical, Trash } from "react-feather";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
+import SettingsLayout from "../../../components/SettingsLayout";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
 import { TeamUserRoleField } from "../../../components/settings/TeamUserRoleField";
-import SettingsLayout from "../../../components/SettingsLayout";
 import { Link } from "../../../components/ui/link";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
@@ -168,8 +168,8 @@ export default function UserDetailsPage() {
                   {memberData.role === "ADMIN"
                     ? "Organization Admin"
                     : memberData.role === "MEMBER"
-                    ? "Organization Member"
-                    : memberData.role}
+                      ? "Organization Member"
+                      : memberData.role}
                 </Text>
               )}
             </HorizontalFormControl>
@@ -222,14 +222,14 @@ export default function UserDetailsPage() {
                           {tm.role === "CUSTOM" && tm.assignedRole
                             ? tm.assignedRole.name
                             : tm.role === "CUSTOM"
-                            ? "Custom"
-                            : tm.role === "ADMIN"
-                            ? "Admin"
-                            : tm.role === "MEMBER"
-                            ? "Member"
-                            : tm.role === "VIEWER"
-                            ? "Viewer"
-                            : tm.role}
+                              ? "Custom"
+                              : tm.role === "ADMIN"
+                                ? "Admin"
+                                : tm.role === "MEMBER"
+                                  ? "Member"
+                                  : tm.role === "VIEWER"
+                                    ? "Viewer"
+                                    : tm.role}
                         </Text>
                       )}
                     </Table.Cell>

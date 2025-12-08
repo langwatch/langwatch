@@ -1,19 +1,22 @@
-import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { createLogger } from "../../../utils/logger";
-import { connection } from "../../redis";
-import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
-import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
+import { connection } from "../../redis";
+import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
+import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
 
 const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
 export async function runTopicClusteringJob(
-  job: Job<TopicClusteringJob, void, string>
+  job: Job<TopicClusteringJob, void, string>,
 ) {
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
@@ -37,17 +40,17 @@ export const startTopicClusteringWorker = () => {
     {
       connection,
       concurrency: 3,
-    }
+    },
   );
 
   topicClusteringWorker.on("ready", () => {
     logger.info("topic clustering worker active, waiting for jobs!");
   });
 
-  topicClusteringWorker.on("failed", (job, err) => {
+  topicClusteringWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("topic_clustering", "failed").inc();
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "topicClustering");
       scope.setExtra?.("job", job?.data);
       captureException(err);

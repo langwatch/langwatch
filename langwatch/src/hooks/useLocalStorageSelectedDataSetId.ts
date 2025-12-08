@@ -1,8 +1,8 @@
+import { useCallback } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { api } from "~/utils/api";
-import { useCallback } from "react";
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 const logger = createLogger("useLocalStorageSelectedDataSetId");
 
@@ -12,11 +12,10 @@ const logger = createLogger("useLocalStorageSelectedDataSetId");
  */
 export const useLocalStorageSelectedDataSetId = () => {
   const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
   const trpc = api.useContext();
   const [selectedDataSetId, setSelectedDataSetId] = useLocalStorage<string>(
     "selectedDatasetId",
-    ""
+    "",
   );
 
   const clear = () => {
@@ -44,7 +43,7 @@ export const useLocalStorageSelectedDataSetId = () => {
         } else {
           logger.warn(
             { datasetId },
-            "Tried to set selected dataset to local storage, but it does not exist"
+            "Tried to set selected dataset to local storage, but it does not exist",
           );
 
           clear();
@@ -54,7 +53,7 @@ export const useLocalStorageSelectedDataSetId = () => {
         clear();
       }
     },
-    [setSelectedDataSetId, trpc]
+    [setSelectedDataSetId, trpc],
   );
 
   return {

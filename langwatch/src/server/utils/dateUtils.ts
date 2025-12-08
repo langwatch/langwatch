@@ -12,4 +12,3 @@ export const getCurrentMonthStartMs = (): number => {
 export const getCurrentMonthStart = (): Date => {
   return new Date(getCurrentMonthStartMs());
 };
-

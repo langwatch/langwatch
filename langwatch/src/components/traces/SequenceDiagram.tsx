@@ -1,9 +1,9 @@
 import {
   Box,
+  createListCollection,
   HStack,
   Spacer,
   VStack,
-  createListCollection,
 } from "@chakra-ui/react";
 import { intervalToDuration } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -156,7 +156,7 @@ const getSpanDuration = (span: Span): number => {
  */
 export const generateMermaidSyntax = (
   spans: Span[],
-  includedSpanTypes?: SpanTypes[]
+  includedSpanTypes?: SpanTypes[],
 ): string => {
   // Filter spans based on included types (default to all types except 'span')
   const typesToInclude = includedSpanTypes ?? defaultSelectedSpanTypes;
@@ -166,7 +166,7 @@ export const generateMermaidSyntax = (
 
   // Helper function to find the next included descendant(s) of a span
   const findIncludedDescendants = (
-    span: SpanWithChildren
+    span: SpanWithChildren,
   ): SpanWithChildren[] => {
     const descendants: SpanWithChildren[] = [];
 
@@ -189,12 +189,12 @@ export const generateMermaidSyntax = (
 
   // Only collect participants from included spans
   const includedSpans = spans.filter((span) =>
-    typesToInclude.includes(span.type)
+    typesToInclude.includes(span.type),
   );
 
   // Sort included spans by start time to maintain chronological order
   const sortedSpans = [...includedSpans].sort(
-    (a, b) => a.timestamps.started_at - b.timestamps.started_at
+    (a, b) => a.timestamps.started_at - b.timestamps.started_at,
   );
 
   // Collect all participants first
@@ -243,7 +243,7 @@ export const generateMermaidSyntax = (
       // Handle tool spans as self-calls to their parent LLM
       if (span.type === "tool" && parentParticipant && span.name) {
         messages.push(
-          `    ${parentParticipant}->>${parentParticipant}: tool: ${span.name}`
+          `    ${parentParticipant}->>${parentParticipant}: tool: ${span.name}`,
         );
         // Process tool's children (like agents called by the tool)
         span.children
@@ -287,7 +287,7 @@ export const generateMermaidSyntax = (
 
         // Create the call message
         messages.push(
-          `    ${parentParticipant}->>${currentParticipant}: ${label}`
+          `    ${parentParticipant}->>${currentParticipant}: ${label}`,
         );
 
         // Activate the target participant
@@ -310,7 +310,7 @@ export const generateMermaidSyntax = (
       ) {
         // Create a return message with invisible character
         messages.push(
-          `    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`
+          `    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`,
         );
 
         // Deactivate the current participant
@@ -331,7 +331,7 @@ export const generateMermaidSyntax = (
   // Find root spans from all spans (no parent or parent not in spans)
   const allSpanMap = new Map(spans.map((span) => [span.span_id, span]));
   const rootSpans = spans.filter(
-    (s) => !s.parent_id || !allSpanMap.has(s.parent_id)
+    (s) => !s.parent_id || !allSpanMap.has(s.parent_id),
   );
 
   // Process each root span
@@ -413,7 +413,8 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
             activationBkgColor: "#DBEAFE",
             activationBorderColor: "#60A5FA",
             // Font
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+            fontFamily:
+              '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
             fontSize: "14px",
           },
           sequence: {
@@ -456,7 +457,7 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
             <div style="padding: 20px; text-align: center; color: #666;">
               <p>Error rendering sequence diagram</p>
               <pre style="font-size: 12px; margin-top: 10px;">${String(
-                error
+                error,
               )}</pre>
             </div>
           `;
@@ -556,7 +557,10 @@ type SequenceDiagramProps = {
  * Count unique participants in spans for given span types
  * Single Responsibility: Calculate number of participants that would be rendered
  */
-const countParticipants = (spans: Span[], includedTypes: SpanTypes[]): number => {
+const countParticipants = (
+  spans: Span[],
+  includedTypes: SpanTypes[],
+): number => {
   const participants = new Set<string>();
   spans
     .filter((span) => includedTypes.includes(span.type))
@@ -577,7 +581,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
   const { traceId, trace } = useTraceDetailsState(props.traceId);
   const { project } = useOrganizationTeamProject();
   const [selectedSpanTypes, setSelectedSpanTypes] = useState<SpanTypes[]>(
-    defaultSelectedSpanTypes
+    defaultSelectedSpanTypes,
   );
 
   const [keepRefetching, setKeepRefetching] = useState(false);
@@ -587,16 +591,19 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: false,
       refetchInterval: keepRefetching ? 1_000 : undefined,
-    }
+    },
   );
 
   // Auto-include "span" types if there are too few participants
   useEffect(() => {
     if (!spans.data || spans.data.length === 0) return;
-    
+
     // Count participants with default selection (without "span")
-    const participantCount = countParticipants(spans.data, defaultSelectedSpanTypes);
-    
+    const participantCount = countParticipants(
+      spans.data,
+      defaultSelectedSpanTypes,
+    );
+
     // If 2 or fewer participants, automatically include "span" type
     if (participantCount <= 2 && !selectedSpanTypes.includes("span")) {
       setSelectedSpanTypes([...defaultSelectedSpanTypes, "span"]);

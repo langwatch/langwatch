@@ -1,5 +1,5 @@
-import { useMemo } from "react";
 import { useRouter } from "next/router";
+import { useMemo } from "react";
 
 export interface MinimalProject {
   id: string;
@@ -23,9 +23,7 @@ export interface MinimalOrganization {
  * Get a project by slug (from router query `projectSlug`) or fallback to the
  * latest-created project across all teams in the provided organization.
  */
-export function useProjectBySlugOrLatest(
-  organization?: MinimalOrganization
-) {
+export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
   const router = useRouter();
 
   const project = useMemo(() => {
@@ -33,7 +31,7 @@ export function useProjectBySlugOrLatest(
 
     const allProjects: MinimalProject[] = (organization.teams ?? [])
       .flatMap((team) => team?.projects ?? [])
-      .filter(Boolean) ;
+      .filter(Boolean);
 
     if (!allProjects.length) return undefined;
 
@@ -50,16 +48,16 @@ export function useProjectBySlugOrLatest(
     if (slug) {
       const matching = allProjects
         .filter((p) => p.slug === slug)
-        .sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt));
+        .sort(
+          (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
+        );
       if (matching[0]) return matching[0];
     }
 
     return allProjects.sort(
-      (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt)
+      (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
     )[0];
   }, [organization, router.query.projectSlug]);
 
   return { project };
 }
-
-

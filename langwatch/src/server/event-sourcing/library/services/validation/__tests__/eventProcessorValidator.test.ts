@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventProcessorValidator } from "../eventProcessorValidator";
+import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
+import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import {
   createMockEventStore,
   createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
   createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { EVENT_TYPES } from "../../../domain/eventType";
-import { buildCheckpointKey } from "../../../utils/checkpointKey";
+import { EventProcessorValidator } from "../eventProcessorValidator";
 
 describe("EventProcessorValidator", () => {
   const aggregateType = createTestAggregateType();

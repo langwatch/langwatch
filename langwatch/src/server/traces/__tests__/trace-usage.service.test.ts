@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { TraceUsageService, clearMonthCountCache } from "../trace-usage.service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
+import {
+  clearMonthCountCache,
+  TraceUsageService,
+} from "../trace-usage.service";
 
 describe("TraceUsageService", () => {
   const mockOrganizationRepository = {
@@ -26,27 +29,36 @@ describe("TraceUsageService", () => {
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
-      mockSubscriptionHandler as any
+      mockSubscriptionHandler as any,
     );
   });
 
   describe("checkLimit", () => {
     describe("when organizationId is not found", () => {
       it("throws an error", async () => {
-        vi.mocked(mockOrganizationRepository.getOrganizationIdByTeamId).mockResolvedValue(null);
+        vi.mocked(
+          mockOrganizationRepository.getOrganizationIdByTeamId,
+        ).mockResolvedValue(null);
 
-        await expect(service.checkLimit({ teamId: "team-123" })).rejects.toThrow(
-          "Team team-123 has no organization"
-        );
+        await expect(
+          service.checkLimit({ teamId: "team-123" }),
+        ).rejects.toThrow("Team team-123 has no organization");
       });
     });
 
     describe("when count >= maxMessagesPerMonth", () => {
       beforeEach(() => {
-        vi.mocked(mockOrganizationRepository.getOrganizationIdByTeamId).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1"]);
+        vi.mocked(
+          mockOrganizationRepository.getOrganizationIdByTeamId,
+        ).mockResolvedValue("org-123");
+        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
+          "proj-1",
+        ]);
         mockEsClient.count.mockResolvedValue({ count: 1000 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ name: "free", maxMessagesPerMonth: 1000 });
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+          name: "free",
+          maxMessagesPerMonth: 1000,
+        });
       });
 
       it("returns exceeded: true", async () => {
@@ -73,10 +85,16 @@ describe("TraceUsageService", () => {
 
     describe("when count < maxMessagesPerMonth", () => {
       it("returns exceeded: false", async () => {
-        vi.mocked(mockOrganizationRepository.getOrganizationIdByTeamId).mockResolvedValue("org-123");
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1"]);
+        vi.mocked(
+          mockOrganizationRepository.getOrganizationIdByTeamId,
+        ).mockResolvedValue("org-123");
+        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
+          "proj-1",
+        ]);
         mockEsClient.count.mockResolvedValue({ count: 500 });
-        mockSubscriptionHandler.getActivePlan.mockResolvedValue({ maxMessagesPerMonth: 1000 });
+        mockSubscriptionHandler.getActivePlan.mockResolvedValue({
+          maxMessagesPerMonth: 1000,
+        });
 
         const result = await service.checkLimit({ teamId: "team-123" });
 
@@ -88,9 +106,13 @@ describe("TraceUsageService", () => {
   describe("getCurrentMonthCount", () => {
     describe("when organization has no projects", () => {
       it("returns 0 without querying ES", async () => {
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([]);
+        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(
+          [],
+        );
 
-        const result = await service.getCurrentMonthCount({ organizationId: "org-123" });
+        const result = await service.getCurrentMonthCount({
+          organizationId: "org-123",
+        });
 
         expect(result).toBe(0);
         expect(mockEsClientFactory).not.toHaveBeenCalled();
@@ -99,15 +121,21 @@ describe("TraceUsageService", () => {
 
     describe("when organization has projects", () => {
       it("sums counts from all projects", async () => {
-        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue(["proj-1", "proj-2"]);
+        vi.mocked(mockOrganizationRepository.getProjectIds).mockResolvedValue([
+          "proj-1",
+          "proj-2",
+        ]);
         mockEsClient.count.mockResolvedValue({ count: 42 });
 
-        const result = await service.getCurrentMonthCount({ organizationId: "org-123" });
+        const result = await service.getCurrentMonthCount({
+          organizationId: "org-123",
+        });
 
         expect(result).toBe(84); // 42 per project * 2 projects
-        expect(mockEsClientFactory).toHaveBeenCalledWith({ organizationId: "org-123" });
+        expect(mockEsClientFactory).toHaveBeenCalledWith({
+          organizationId: "org-123",
+        });
       });
     });
   });
 });
-

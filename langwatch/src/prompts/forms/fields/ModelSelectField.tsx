@@ -1,15 +1,14 @@
-import { useFormContext, Controller } from "react-hook-form";
-
-import type { PromptConfigFormValues } from "~/prompts";
+import { VStack } from "@chakra-ui/react";
+import { Controller, useFormContext } from "react-hook-form";
 
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "~/components/ModelSelector";
+import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
-import { VStack } from "@chakra-ui/react";
+import type { PromptConfigFormValues } from "~/prompts";
 
 export function ModelSelectField() {
   const { control, formState, watch, trigger } =

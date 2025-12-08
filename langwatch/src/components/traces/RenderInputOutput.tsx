@@ -1,22 +1,21 @@
-import React from "react";
-import { Box, Button, HStack, Text, type ButtonProps } from "@chakra-ui/react";
-import { Tooltip } from "../ui/tooltip";
-import { toaster } from "../ui/toaster";
+import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import React, { useState } from "react";
+import type { SpanInputOutput } from "~/server/tracer/types";
 import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
 import { CopyIcon } from "../icons/Copy";
-import type { SpanInputOutput } from "~/server/tracer/types";
+import { toaster } from "../ui/toaster";
+import { Tooltip } from "../ui/tooltip";
 
 export const RenderInputOutput = React.memo(function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & {
-    value: SpanInputOutput['value'] | string | undefined;
+    value: SpanInputOutput["value"] | string | undefined;
     showTools?: boolean | "copy-only";
-  }
+  },
 ) {
   let { value } = props;
   const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
@@ -37,7 +36,9 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
     if (typeof value === "object" && value !== null) {
       json = value;
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   const propsWithoutValue = { ...props };
   delete propsWithoutValue.value;
@@ -57,16 +58,16 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
                     json
                       ? JSON.stringify(json, null, 2)
                       : value
-                      ? typeof value === "string"
-                        ? value
-                        : (value as any).toString()
-                      : `${value}`
+                        ? typeof value === "string"
+                          ? value
+                          : (value as any).toString()
+                        : `${value}`,
                   );
                   toaster.create({
                     title: "Copied to clipboard",
                     type: "success",
                   });
-                } catch (e) {
+                } catch {
                   if (
                     window.location.protocol === "http:" &&
                     window.location.hostname !== "localhost" &&
@@ -190,4 +191,3 @@ function TinyButton(props: ButtonProps) {
     />
   );
 }
-

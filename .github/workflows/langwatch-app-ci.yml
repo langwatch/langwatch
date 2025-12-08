@@ -212,6 +212,20 @@ jobs:
           name: integration-tests
           fail_ci_if_error: false
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: mongolyy/reviewdog-action-biome@v2
+        with:
+          reporter: github-pr-review
+          fail_level: error
+          biome_flags: "./src"
+
   build:
     runs-on: ubuntu-latest
     steps:

@@ -10,7 +10,7 @@ export const monokaiTheme: PrismTheme = {
     {
       types: ["comment"],
       style: {
-        color: "#88846f"
+        color: "#88846f",
       },
     },
     {
@@ -47,7 +47,7 @@ export const monokaiTheme: PrismTheme = {
       types: ["function"],
       style: {
         color: "#A6E22E",
-      }
+      },
     },
     {
       types: ["keyword", "tag", "deleted"],

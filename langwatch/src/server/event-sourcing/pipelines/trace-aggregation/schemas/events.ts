@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { EventSchema } from "../../../library/domain/types";
 import type { TenantId } from "../../../library";
+import { EventSchema } from "../../../library/domain/types";
 import {
   TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
   TRACE_AGGREGATION_EVENT_TYPES,

@@ -1,11 +1,11 @@
 import {
+  Card,
   Container,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Text,
   VStack,
-  Card,
 } from "@chakra-ui/react";
 import { CopyInput } from "../components/CopyInput";
 import {

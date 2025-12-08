@@ -1,16 +1,16 @@
-import { Box, HStack, Tabs, IconButton } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Tabs } from "@chakra-ui/react";
+import { useRef, useState } from "react";
+import { useFormContext } from "react-hook-form";
+import { LuPencil } from "react-icons/lu";
+import type { z } from "zod";
+import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
+import type { PromptConfigFormValues } from "~/prompts/types";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
-import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts/types";
 import { SettingsTabContent } from "./SettingsTabContent";
-import { useState, useRef } from "react";
 import { VariablesForm } from "./VariablesForm";
-import type { z } from "zod";
-import { type runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
-import { LuPencil } from "react-icons/lu";
 
 enum PromptTab {
   Conversation = "conversation",

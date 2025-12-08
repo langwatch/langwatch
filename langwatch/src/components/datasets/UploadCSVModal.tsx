@@ -9,23 +9,23 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import {
-  type DatasetColumns,
-  type DatasetRecordEntry,
-} from "../../server/datasets/types";
-import {
   formatFileSize,
   jsonToCSV as papaparseJsonToCSV,
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
-import type { InMemoryDataset } from "./DatasetTable";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { createLogger } from "~/utils/logger";
+import { Dialog } from "../../components/ui/dialog";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "../../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../CurrentDrawer";
-import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../ui/toaster";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { createLogger } from "~/utils/logger";
+import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -306,7 +306,7 @@ export function CSVReaderComponent({
             let jsonContents;
             try {
               jsonContents = JSON.parse(contents);
-            } catch (error) {
+            } catch {
               // If the file is not a valid JSON, try to parse it as a JSONL file
               jsonContents = JSON.parse(
                 "[" +
@@ -315,7 +315,7 @@ export function CSVReaderComponent({
                     .split("\n")
                     .filter((line) => line.trim() !== "")
                     .join(", ") +
-                  "]"
+                  "]",
               );
             }
             readString(jsonToCSV(jsonContents), {
@@ -382,11 +382,11 @@ function jsonToCSV(jsonContents: object[]): string {
           return [key, JSON.stringify(value)];
         }
         return [key, value];
-      })
+      }),
     );
   });
   const columns = new Set(
-    stringifiedNestedValues.flatMap((item) => Object.keys(item))
+    stringifiedNestedValues.flatMap((item) => Object.keys(item)),
   );
 
   return papaparseJsonToCSV(stringifiedNestedValues, {

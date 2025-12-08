@@ -1,18 +1,24 @@
 import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
   type Connection,
   type Edge,
   type EdgeChange,
   type Node,
   type NodeChange,
-  addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
 } from "@xyflow/react";
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
+import { nanoid } from "nanoid";
+import React from "react";
 import { temporal } from "zundo";
 import { create } from "zustand";
-
+import { useShallow } from "zustand/react/shallow";
+import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
+import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
+import { LlmConfigInputTypes } from "../../types";
 import { snakeCaseToPascalCase } from "../../utils/stringCasing";
 import type {
   BaseComponent,
@@ -22,14 +28,7 @@ import type {
   Workflow,
 } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
-import React from "react";
-import { WizardContext } from "../../components/evaluations/wizard/hooks/useWizardContext";
-import { useEvaluationWizardStore } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useShallow } from "zustand/react/shallow";
 import { findLowestAvailableName, nameToId } from "../utils/nodeUtils";
-import { LlmConfigInputTypes } from "../../types";
-import { nanoid } from "nanoid";
-import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
 
 export type SocketStatus = "disconnected" | "connecting-python" | "connected";
 
@@ -57,11 +56,11 @@ export type WorkflowStore = State & {
   setWorkflow: (
     workflow:
       | (Partial<Workflow> & { workflow_id?: string })
-      | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string })
+      | ((current: Workflow) => Partial<Workflow> & { workflow_id?: string }),
   ) => void;
   setPreviousWorkflow: (workflow: Workflow | undefined) => void;
   setSocketStatus: (
-    status: SocketStatus | ((status: SocketStatus) => SocketStatus)
+    status: SocketStatus | ((status: SocketStatus) => SocketStatus),
   ) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
@@ -72,7 +71,7 @@ export type WorkflowStore = State & {
   edgeConnectToNewHandle: (
     source: string,
     sourceHandle: string,
-    target: string
+    target: string,
   ) => string;
   /**
    * Update a node in the workflow.
@@ -88,22 +87,22 @@ export type WorkflowStore = State & {
       identifier: string;
       type: Field["type"];
       value?: any;
-    }
+    },
   ) => void;
   deleteNode: (id: string) => void;
   duplicateNode: (id: string) => void;
   setComponentExecutionState: (
     id: string,
-    executionState: BaseComponent["execution_state"]
+    executionState: BaseComponent["execution_state"],
   ) => void;
   setWorkflowExecutionState: (
-    executionState: Partial<Workflow["state"]["execution"]>
+    executionState: Partial<Workflow["state"]["execution"]>,
   ) => void;
   setEvaluationState: (
-    evaluationState: Partial<Workflow["state"]["evaluation"]>
+    evaluationState: Partial<Workflow["state"]["evaluation"]>,
   ) => void;
   setOptimizationState: (
-    optimizationState: Partial<Workflow["state"]["optimization"]>
+    optimizationState: Partial<Workflow["state"]["optimization"]>,
   ) => void;
   setHoveredNodeId: (nodeId: string | undefined) => void;
   setSelectedNode: (nodeId: string) => void;
@@ -112,7 +111,7 @@ export type WorkflowStore = State & {
   setTriggerValidation: (triggerValidation: boolean) => void;
   setWorkflowSelected: (selected: boolean) => void;
   setOpenResultsPanelRequest: (
-    request: "evaluations" | "optimizations" | "closed" | undefined
+    request: "evaluations" | "optimizations" | "closed" | undefined,
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
   stopWorkflowIfRunning: (message: string | undefined) => void;
@@ -181,9 +180,9 @@ export const store = (
       | WorkflowStore
       | Partial<WorkflowStore>
       | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>),
-    replace?: boolean | undefined
+    replace?: boolean | undefined,
   ) => void,
-  get: () => WorkflowStore
+  get: () => WorkflowStore,
 ): WorkflowStore => ({
   ...initialState,
   reset() {
@@ -205,7 +204,7 @@ export const store = (
     return hasDSLChanged(previousWorkflow, currentWorkflow, true);
   },
   setWorkflow: (
-    workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>)
+    workflow: Partial<Workflow> | ((current: Workflow) => Partial<Workflow>),
   ) => {
     set(workflow);
   },
@@ -213,7 +212,7 @@ export const store = (
     set({ previousWorkflow: workflow });
   },
   setSocketStatus: (
-    status: SocketStatus | ((status: SocketStatus) => SocketStatus)
+    status: SocketStatus | ((status: SocketStatus) => SocketStatus),
   ) => {
     set({
       socketStatus:
@@ -240,7 +239,7 @@ export const store = (
     const existingConnection = currentEdges.find(
       (edge) =>
         edge.target === connection.target &&
-        edge.targetHandle === connection.targetHandle
+        edge.targetHandle === connection.targetHandle,
     );
     if (existingConnection) {
       return {
@@ -263,7 +262,7 @@ export const store = (
   edgeConnectToNewHandle: (
     source: string,
     sourceHandle: string,
-    target: string
+    target: string,
   ) => {
     const nodes = get().nodes;
     const edges = get().edges;
@@ -307,7 +306,7 @@ export const store = (
                     ],
               } as Component,
             }
-          : node
+          : node,
       ),
       edges: [
         ...edges,
@@ -342,7 +341,7 @@ export const store = (
                             n.data?.parameters ??
                             [],
                           n.id,
-                          newId
+                          newId,
                         ),
                       }
                     : {}),
@@ -354,20 +353,20 @@ export const store = (
                             (node.data?.parameters as Field[]) ??
                               n.data?.parameters ??
                               [],
-                            (node.data?.inputs ?? []) as Field[]
+                            (node.data?.inputs ?? []) as Field[],
                           ),
                           n.data.outputs ?? [],
-                          (node.data?.outputs ?? []) as Field[]
+                          (node.data?.outputs ?? []) as Field[],
                         ),
                       }
                     : {}),
                 },
                 id: newId ? newId : n.id,
               }
-            : n
+            : n,
         ),
         edges: get().edges,
-      })
+      }),
     );
   },
   setNodeParameter: (
@@ -376,7 +375,7 @@ export const store = (
       identifier: string;
       type: Field["type"];
       value?: any;
-    }
+    },
   ) => {
     set({
       nodes: get().nodes.map((node) => {
@@ -385,7 +384,7 @@ export const store = (
         }
 
         const existingParameter = node.data.parameters?.find(
-          (p) => p.identifier === parameter.identifier
+          (p) => p.identifier === parameter.identifier,
         );
 
         return {
@@ -396,7 +395,7 @@ export const store = (
               ? (node.data.parameters ?? []).map((p) =>
                   p.identifier === parameter.identifier
                     ? { ...p, ...parameter }
-                    : p
+                    : p,
                 )
               : [...(node.data.parameters ?? []), parameter],
           },
@@ -408,10 +407,10 @@ export const store = (
     set(
       removeInvalidEdges({
         nodes: removeInvalidDecorations(
-          get().nodes.filter((node) => node.id !== id)
+          get().nodes.filter((node) => node.id !== id),
         ),
         edges: get().edges,
-      })
+      }),
     );
   },
   duplicateNode: (id: string) => {
@@ -422,7 +421,7 @@ export const store = (
 
     const { name: newName, id: newId } = findLowestAvailableName(
       get().nodes.map((node) => node.id),
-      currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component"
+      currentNode.data.name?.replace(/ \(.*?\)$/, "") ?? "Component",
     );
 
     const newNode = {
@@ -447,7 +446,7 @@ export const store = (
   },
   setComponentExecutionState: (
     id: string,
-    executionState: BaseComponent["execution_state"]
+    executionState: BaseComponent["execution_state"],
   ) => {
     set({
       nodes: get().nodes.map((node) => {
@@ -477,7 +476,7 @@ export const store = (
     });
   },
   setWorkflowExecutionState: (
-    executionState: Partial<Workflow["state"]["execution"]>
+    executionState: Partial<Workflow["state"]["execution"]>,
   ) => {
     set({
       state: {
@@ -493,7 +492,7 @@ export const store = (
     });
   },
   setEvaluationState: (
-    evaluationState: Partial<Workflow["state"]["evaluation"]>
+    evaluationState: Partial<Workflow["state"]["evaluation"]>,
   ) => {
     set({
       state: {
@@ -509,7 +508,7 @@ export const store = (
     });
   },
   setOptimizationState: (
-    optimizationState: Partial<Workflow["state"]["optimization"]>
+    optimizationState: Partial<Workflow["state"]["optimization"]>,
   ) => {
     set({
       state: {
@@ -556,7 +555,7 @@ export const store = (
   setSelectedNode: (nodeId: string) => {
     set({
       nodes: get().nodes.map((node) =>
-        node.id === nodeId ? { ...node, selected: true } : node
+        node.id === nodeId ? { ...node, selected: true } : node,
       ),
     });
   },
@@ -626,7 +625,7 @@ export const _useWorkflowStore = create<WorkflowStore>()(
         // create two or more entries on the undo. We then store the pastState as soon as the debounce begins,
         // and only try to store again if more than 100ms has passed since the last state change.
         100,
-        { leading: true, trailing: false }
+        { leading: true, trailing: false },
       );
     },
     equality: (pastState, currentState) => {
@@ -653,7 +652,7 @@ export const _useWorkflowStore = create<WorkflowStore>()(
       };
       return isDeepEqual(partialize(pastState), partialize(currentState));
     },
-  })
+  }),
 );
 
 type UseWorkflowStoreType = typeof _useWorkflowStore;
@@ -671,7 +670,7 @@ export const useWorkflowStore = ((
       useShallow(({ workflowStore }) => {
         return selector(workflowStore);
       }),
-      equalityFn
+      equalityFn,
     );
   }
 
@@ -719,7 +718,7 @@ export const removeInvalidDecorations = (nodes: Node[]) => {
             (p.value as { ref: string })?.ref &&
             !nodeIds.has((p.value as { ref: string }).ref)
               ? { ...p, value: undefined }
-              : p
+              : p,
           ),
         },
       };
@@ -731,7 +730,7 @@ export const removeInvalidDecorations = (nodes: Node[]) => {
 export const updateCodeClassName = (
   parameters: Field[],
   _oldId: string,
-  newId: string
+  newId: string,
 ): Field[] => {
   return parameters.map((p) =>
     p.identifier === "code"
@@ -739,10 +738,10 @@ export const updateCodeClassName = (
           ...p,
           value: (p.value as string).replace(
             /class .*?\(dspy\.Module\):/,
-            `class ${snakeCaseToPascalCase(newId)}(dspy.Module):`
+            `class ${snakeCaseToPascalCase(newId)}(dspy.Module):`,
           ),
         }
-      : p
+      : p,
   );
 };
 
@@ -778,7 +777,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
         /def forward\([\s\S]*?\):/,
         `def forward(self, ${inputs
           .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
-          .join(", ")}):`
+          .join(", ")}):`,
       );
       if (code.includes(": Any") && !code.includes("from typing import Any")) {
         code = `from typing import Any\n${code}`;
@@ -795,7 +794,7 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
 export const updateOutputFields = (
   parameters: Field[],
   previousOutputs: Field[],
-  outputs: Field[]
+  outputs: Field[],
 ) => {
   if (previousOutputs.length !== outputs.length) {
     return parameters;
@@ -807,9 +806,9 @@ export const updateOutputFields = (
       for (const [index, output] of outputs.entries()) {
         code = code.replace(
           new RegExp(
-            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${previousOutputs[index]?.identifier}"`
+            `(return[\\s\\n\\t]+?\\{[^\\}]*?)"${previousOutputs[index]?.identifier}"`,
           ),
-          `$1"${output.identifier}"`
+          `$1"${output.identifier}"`,
         );
       }
 

@@ -1,4 +1,4 @@
-import { Center, EmptyState, Button } from "@chakra-ui/react";
+import { Button, Center, EmptyState } from "@chakra-ui/react";
 import { LuSparkles } from "react-icons/lu";
 import { useCreateDraftPrompt } from "../../../hooks/useCreateDraftPrompt";
 
@@ -33,4 +33,3 @@ export function NoPromptsOnboardingState() {
     </Center>
   );
 }
-

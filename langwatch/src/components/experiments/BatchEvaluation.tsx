@@ -3,8 +3,8 @@ import {
   Button,
   Card,
   Container,
-  HStack,
   Heading,
+  HStack,
   Icon,
   Skeleton,
   Spacer,
@@ -16,10 +16,10 @@ import type { BatchEvaluation, Experiment, Project } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import numeral from "numeral";
 import Parse from "papaparse";
+import { Download } from "react-feather";
 import { api } from "~/utils/api";
 import { Tooltip } from "../../components/ui/tooltip";
 import { formatMoney } from "../../utils/formatMoney";
-import { Download } from "react-feather";
 
 export default function BatchEvaluation({
   project,
@@ -110,7 +110,7 @@ export default function BatchEvaluation({
         ? curr
         : acc;
     },
-    undefined
+    undefined,
   );
   const latestEvaluation = evaluations.data?.reduce(
     (acc: BatchEvaluation | undefined, curr) => {
@@ -118,7 +118,7 @@ export default function BatchEvaluation({
         ? curr
         : acc;
     },
-    undefined
+    undefined,
   );
   const runtime =
     latestEvaluation && earliestEvaluation
@@ -142,10 +142,10 @@ export default function BatchEvaluation({
         curr.status === "processed"
           ? "processed"
           : curr.status === "error"
-          ? "error"
-          : curr.status === "skipped"
-          ? "skipped"
-          : "unknown"
+            ? "error"
+            : curr.status === "skipped"
+              ? "skipped"
+              : "unknown"
       ].push(curr);
       return acc;
     },
@@ -158,7 +158,7 @@ export default function BatchEvaluation({
         skipped: BatchEvaluation[];
         unknown: BatchEvaluation[];
       }
-    >
+    >,
   );
 
   const passedOrScoreMetric: Record<string, "passed" | "score"> =
@@ -171,8 +171,8 @@ export default function BatchEvaluation({
               ? "score"
               : "passed",
           ];
-        }
-      )
+        },
+      ),
     );
 
   const averageScoresPerEvaluation = Object.fromEntries(
@@ -191,8 +191,8 @@ export default function BatchEvaluation({
               .length / evaluations.processed.length,
           ];
         }
-      }
-    )
+      },
+    ),
   );
 
   return (
@@ -245,7 +245,7 @@ export default function BatchEvaluation({
                         ? numeral(score).format(
                             passedOrScoreMetric[evaluation] === "score"
                               ? "0.00"
-                              : "0%"
+                              : "0%",
                           )
                         : score}
                     </Text>
@@ -297,7 +297,7 @@ export default function BatchEvaluation({
                 </VStack>
               </Card.Body>
             </Card.Root>
-          )
+          ),
         )}
         <Card.Root>
           <Card.Body>
@@ -362,10 +362,10 @@ export default function BatchEvaluation({
               ([evaluationKey, evaluations]) => {
                 const hasExpectedOutput = evaluations.all.some(
                   (evaluation) =>
-                    (evaluation.data as JsonObject)?.expected_output
+                    (evaluation.data as JsonObject)?.expected_output,
                 );
                 const hasDetails = evaluations.all.some(
-                  (evaluation) => evaluation.details
+                  (evaluation) => evaluation.details,
                 );
 
                 return (
@@ -461,8 +461,8 @@ export default function BatchEvaluation({
                                     evaluation.status === "skipped"
                                       ? "yellow.700"
                                       : evaluation.status === "error"
-                                      ? "red.700"
-                                      : undefined
+                                        ? "red.700"
+                                        : undefined
                                   }
                                 >
                                   {evaluation.status}
@@ -478,16 +478,16 @@ export default function BatchEvaluation({
                                           ? "red.500"
                                           : "green.500"
                                         : evaluation.passed
-                                        ? "green.500"
-                                        : "red.500"
+                                          ? "green.500"
+                                          : "red.500"
                                     }
                                   >
                                     {passedOrScoreMetric[evaluationKey] ===
                                     "score"
                                       ? numeral(evaluation.score).format("0.00")
                                       : evaluation.passed
-                                      ? "True"
-                                      : "False"}
+                                        ? "True"
+                                        : "False"}
                                   </Table.Cell>
                                 ) : (
                                   <Table.Cell textAlign="center">-</Table.Cell>
@@ -499,8 +499,8 @@ export default function BatchEvaluation({
                                       evaluation.status === "skipped"
                                         ? "yellow.700"
                                         : evaluation.status === "error"
-                                        ? "red.700"
-                                        : undefined
+                                          ? "red.700"
+                                          : undefined
                                     }
                                   >
                                     <Tooltip content={evaluation.details}>
@@ -524,7 +524,7 @@ export default function BatchEvaluation({
                                 </Table.Cell>
                                 <Table.Cell>
                                   {new Date(
-                                    evaluation.createdAt
+                                    evaluation.createdAt,
                                   ).toLocaleString()}
                                 </Table.Cell>
                               </Table.Row>
@@ -535,7 +535,7 @@ export default function BatchEvaluation({
                     </Box>
                   </VStack>
                 );
-              }
+              },
             )
           )}
         </VStack>

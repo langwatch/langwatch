@@ -1,19 +1,18 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
-import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
-import type { TenantId } from "../../library/domain/tenantId";
-import type { AggregateType } from "../../library/domain/aggregateType";
-import { EventUtils } from "../../library";
-import {
-  parseCheckpointKey,
-  buildCheckpointKey,
-} from "../../library/utils/checkpointKey";
 import { createLogger } from "../../../../utils/logger";
+import { EventUtils } from "../../library";
+import type { AggregateType } from "../../library/domain/aggregateType";
+import type { TenantId } from "../../library/domain/tenantId";
+import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
+import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import {
+  buildCheckpointKey,
+  parseCheckpointKey,
+} from "../../library/utils/checkpointKey";
 import type {
-  CheckpointRepository,
   CheckpointRecord,
+  CheckpointRepository,
 } from "./repositories/checkpointRepository.types";
 
 /**

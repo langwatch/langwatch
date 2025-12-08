@@ -1,12 +1,13 @@
-import React, { useMemo } from "react";
 import {
+  ClientOnly,
   CodeBlock,
-  Tabs,
   createShikiAdapter,
   IconButton,
+  Tabs,
   useTabs,
-  ClientOnly,
 } from "@chakra-ui/react";
+import type React from "react";
+import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import type { InstallMatrix } from "../../../regions/observability/codegen/registry";
@@ -44,7 +45,7 @@ export function InstallPreview({
     });
   }, [colorMode]);
 
-  if (tabItems[0] && !tabItems.find(t => t.key === tabs.value)) {
+  if (tabItems[0] && !tabItems.find((t) => t.key === tabs.value)) {
     tabs.setValue(tabItems[0].key);
   }
 

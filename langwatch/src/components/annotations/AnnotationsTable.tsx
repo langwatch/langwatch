@@ -10,28 +10,24 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-
+import type { Annotation } from "@prisma/client";
+import { useRouter } from "next/router";
+import { useMemo, useState } from "react";
+import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
+import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { Trace } from "~/server/tracer/types";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
-
-import { useRouter } from "next/router";
-import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import type { Annotation } from "@prisma/client";
-import { useMemo, useState } from "react";
-import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
-import { NoDataInfoBlock } from "../NoDataInfoBlock";
-import { RedactedField } from "../ui/RedactedField";
-
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "../messages/MessagesNavigationFooter";
-import type { Trace } from "~/server/tracer/types";
+import { NoDataInfoBlock } from "../NoDataInfoBlock";
+import { RedactedField } from "../ui/RedactedField";
 import UserAvatarGroup from "./AvatarGroup";
 
 type ScoreOption = Record<
@@ -91,7 +87,7 @@ export const AnnotationsTable = ({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { scoreOptions } = useAnnotationQueues();
-  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+  const { openDrawer } = useDrawer();
 
   const navigationFooter = useMessagesNavigationFooter();
 
@@ -103,7 +99,7 @@ export const AnnotationsTable = ({
       selectedAnnotations,
       queueId,
       showQueueAndUser,
-    }
+    },
   );
 
   // Transform assignedQueueItems to UnifiedQueueItem format with proper type safety
@@ -142,7 +138,7 @@ export const AnnotationsTable = ({
 
   const openAnnotationQueue = (queueItemId: string) => {
     void router.push(
-      `/${project?.slug}/annotations/my-queue?queue-item=${queueItemId}`
+      `/${project?.slug}/annotations/my-queue?queue-item=${queueItemId}`,
     );
   };
 
@@ -156,7 +152,7 @@ export const AnnotationsTable = ({
   const handleTraceClick = (
     traceId: string,
     queueItemId: string,
-    doneAt: Date | null
+    doneAt: Date | null,
   ) => {
     if (isDone ?? doneAt) {
       openTraceDrawer(traceId);
@@ -174,7 +170,7 @@ export const AnnotationsTable = ({
 
   const annotationScoreValues = (
     annotations: AnnotationWithUser[],
-    scoreOptionsIDArray: string[]
+    scoreOptionsIDArray: string[],
   ) => {
     if (scoreOptionsIDArray.length > 0 && annotations.length > 0) {
       return scoreOptionsIDArray.map((id) => (
@@ -191,7 +187,7 @@ export const AnnotationsTable = ({
                         {(scoreOptions[id]?.value as string[]).map(
                           (val, index) => (
                             <Badge key={index}>{val}</Badge>
-                          )
+                          ),
                         )}
                       </HStack>
                     ) : (
@@ -228,30 +224,28 @@ export const AnnotationsTable = ({
   const hasExpectedOutput = () => {
     if (groupedAnnotations) {
       return groupedAnnotations.some((annotation) =>
-        annotation.annotations.some((annotation) => annotation.expectedOutput)
+        annotation.annotations.some((annotation) => annotation.expectedOutput),
       );
     }
-    return allQueueItems.some(
-      (item: UnifiedQueueItem) =>
-        item.annotations?.some(
-          (annotation: AnnotationWithUser) => annotation.expectedOutput
-        )
+    return allQueueItems.some((item: UnifiedQueueItem) =>
+      item.annotations?.some(
+        (annotation: AnnotationWithUser) => annotation.expectedOutput,
+      ),
     );
   };
 
   const hasComments = () => {
     if (
       groupedAnnotations?.some((annotation) =>
-        annotation.annotations.some((annotation) => annotation.comment)
+        annotation.annotations.some((annotation) => annotation.comment),
       )
     ) {
       return true;
     }
-    return allQueueItems.some(
-      (item: UnifiedQueueItem) =>
-        item.annotations?.some(
-          (annotation: AnnotationWithUser) => annotation.comment
-        )
+    return allQueueItems.some((item: UnifiedQueueItem) =>
+      item.annotations?.some(
+        (annotation: AnnotationWithUser) => annotation.comment,
+      ),
     );
   };
 
@@ -429,7 +423,7 @@ export const AnnotationsTable = ({
                               handleTraceClick(
                                 item.traceId,
                                 item.id,
-                                item.doneAt
+                                item.doneAt,
                               )
                             }
                             backgroundColor={item.doneAt ? "gray.50" : "white"}
@@ -448,15 +442,15 @@ export const AnnotationsTable = ({
 
                                     {item.annotations
                                       .map(
-                                        (a: AnnotationWithUser) => a.user?.name
+                                        (a: AnnotationWithUser) => a.user?.name,
                                       )
                                       .filter(
                                         (name): name is string =>
-                                          name !== null && name !== undefined
+                                          name !== null && name !== undefined,
                                       )
                                       .filter(
                                         (name, index, self) =>
-                                          self.indexOf(name) === index
+                                          self.indexOf(name) === index,
                                       )
                                       .map((name) => (
                                         <Text key={name}>{name}</Text>
@@ -480,7 +474,7 @@ export const AnnotationsTable = ({
                                         "en-US",
                                         {
                                           month: "short",
-                                        }
+                                        },
                                       )}`
                                     : "-"}
                                 </Text>
@@ -540,7 +534,7 @@ export const AnnotationsTable = ({
                                         >
                                           {annotation.expectedOutput}
                                         </Text>
-                                      ) : null
+                                      ) : null,
                                   )}
                                 </VStack>
                               </Table.Cell>
@@ -562,7 +556,7 @@ export const AnnotationsTable = ({
                                         >
                                           {annotation.comment}
                                         </Text>
-                                      ) : null
+                                      ) : null,
                                   )}
                                 </VStack>
                               </Table.Cell>
@@ -571,11 +565,11 @@ export const AnnotationsTable = ({
                               scoreOptions.data.length > 0 &&
                               annotationScoreValues(
                                 item.annotations,
-                                scoreOptionsIDArray
+                                scoreOptionsIDArray,
                               )}
                             <Table.Cell>
                               {new Date(
-                                item.trace?.timestamps.started_at ?? ""
+                                item.trace?.timestamps.started_at ?? "",
                               ).toLocaleDateString()}
                             </Table.Cell>
                           </Table.Row>

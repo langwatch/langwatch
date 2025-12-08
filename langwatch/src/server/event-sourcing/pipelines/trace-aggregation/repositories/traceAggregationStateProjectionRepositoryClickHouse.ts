@@ -1,23 +1,24 @@
-import { type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import type {
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../../library";
-import type { Projection } from "../../../library";
-import { EventUtils, createTenantId } from "../../../library";
-import { createLogger } from "../../../../../utils/logger";
-import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
-import type { TraceProjectionData } from "../projections/traceAggregationStateProjection";
-import type { TraceProjection } from "../projections/traceAggregationStateProjection";
 import {
   ErrorCategory,
   SecurityError,
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/library/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
+import type {
+  Projection,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext,
+} from "../../../library";
+import { createTenantId, EventUtils } from "../../../library";
+import type {
+  TraceProjection,
+  TraceProjectionData,
+} from "../projections/traceAggregationStateProjection";
+import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
 const TABLE_NAME = "trace_projections" as const;
 

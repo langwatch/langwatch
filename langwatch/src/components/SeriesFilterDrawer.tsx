@@ -1,11 +1,11 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { useDrawer } from "~/components/CurrentDrawer";
-import { type FilterParam } from "~/hooks/useFilterParams";
+import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { FieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { Drawer } from "./ui/drawer";
-import { useEffect, useState } from "react";
 
 export function SeriesFiltersDrawer({
   onClose,
@@ -59,8 +59,8 @@ export function SeriesFiltersDrawer({
               setFilters={(filters) => {
                 const updatedFilters = Object.fromEntries(
                   Object.entries(filters).filter(
-                    ([_, value]) => value !== undefined
-                  )
+                    ([_, value]) => value !== undefined,
+                  ),
                 ) as Record<FilterField, FilterParam>;
                 onChange({
                   filters: updatedFilters,

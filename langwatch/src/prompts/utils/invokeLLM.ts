@@ -3,9 +3,9 @@ import { nanoid } from "nanoid";
 
 import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
 import type {
+  ExecutionState,
   LlmPromptConfigComponent,
   Workflow,
-  ExecutionState,
 } from "~/optimization_studio/types/dsl";
 import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { createLogger } from "~/utils/logger";
@@ -124,7 +124,7 @@ export async function invokeLLM({
 function createWorkflow(
   workflowId: string,
   nodeId: string,
-  data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"]
+  data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"],
 ): Workflow {
   return {
     spec_version: "1.4",
@@ -156,7 +156,7 @@ function createWorkflow(
  * Extracts input values from the prompt configuration data
  */
 function extractInputs(
-  data: Node<Pick<LlmPromptConfigComponent, "inputs">>["data"]
+  data: Node<Pick<LlmPromptConfigComponent, "inputs">>["data"],
 ): Record<string, string> {
   return (
     data.inputs?.reduce(
@@ -164,7 +164,7 @@ function extractInputs(
         acc[input.identifier] = input.value as string;
         return acc;
       },
-      {} as Record<string, string>
+      {} as Record<string, string>,
     ) || {}
   );
 }
@@ -176,7 +176,7 @@ function createEventPayload(
   traceId: string,
   workflow: Workflow,
   nodeId: string,
-  inputs: Record<string, string>
+  inputs: Record<string, string>,
 ) {
   return {
     type: "execute_component",

@@ -1,6 +1,6 @@
-import { SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
+import { SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 
 export interface ScenarioAnalyticsQueryOptions {
   projectId: string;
@@ -33,7 +33,7 @@ export interface ScenarioAnalyticsQueryOptionsForAllEventTypes {
  * @returns Array containing index and query objects for msearch
  */
 export function createScenarioAnalyticsQuery(
-  options: ScenarioAnalyticsQueryOptions
+  options: ScenarioAnalyticsQueryOptions,
 ) {
   const {
     projectId,
@@ -107,7 +107,7 @@ export function createScenarioAnalyticsQuery(
  * @returns Array of query objects for msearch
  */
 export function createScenarioAnalyticsQueriesForAllEventTypes(
-  options: ScenarioAnalyticsQueryOptionsForAllEventTypes
+  options: ScenarioAnalyticsQueryOptionsForAllEventTypes,
 ) {
   const {
     projectId,
@@ -131,7 +131,7 @@ export function createScenarioAnalyticsQueriesForAllEventTypes(
       endTime,
       includeDateHistogram,
       dateHistogramOptions,
-    })
+    }),
   );
 
   return queries;

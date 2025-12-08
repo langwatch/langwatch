@@ -1,8 +1,8 @@
 import { Input } from "@chakra-ui/react";
-import { toaster } from "../components/ui/toaster";
-import { InputGroup, type InputGroupProps } from "./ui/input-group";
 import { useState } from "react";
 import { FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import { toaster } from "../components/ui/toaster";
+import { InputGroup, type InputGroupProps } from "./ui/input-group";
 
 export function CopyInput(
   props: {
@@ -15,7 +15,7 @@ export function CopyInput(
      * Copy will always copy the real value.
      */
     secureMode?: boolean;
-  } & Omit<InputGroupProps, "children">
+  } & Omit<InputGroupProps, "children">,
 ) {
   const [visible, setVisible] = useState(false);
   const isSecure = !!props.secureMode;
@@ -68,10 +68,12 @@ export function CopyInput(
                 padding: 0,
                 color: "#888",
               }}
-              aria-label={visible ? `Hide ${props.label}` : `Show ${props.label}`}
-              onClick={e => {
+              aria-label={
+                visible ? `Hide ${props.label}` : `Show ${props.label}`
+              }
+              onClick={(e) => {
                 e.stopPropagation();
-                setVisible(v => !v);
+                setVisible((v) => !v);
               }}
             >
               {visible ? <FiEyeOff size={18} /> : <FiEye size={18} />}

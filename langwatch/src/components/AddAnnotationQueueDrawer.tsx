@@ -7,16 +7,16 @@ import {
   Spacer,
   Text,
   Textarea,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useForm } from "react-hook-form";
-import { slugify } from "~/utils/slugify";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
@@ -45,7 +45,7 @@ export const AddAnnotationQueueDrawer = ({
     },
     {
       enabled: !!project && !!queueId,
-    }
+    },
   );
 
   const handleClose = () => {
@@ -65,7 +65,7 @@ export const AddAnnotationQueueDrawer = ({
     },
     {
       enabled: !!project,
-    }
+    },
   );
 
   const { closeDrawer } = useDrawer();
@@ -82,7 +82,7 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         enabled: !!organization,
-      }
+      },
     );
   const {
     register,
@@ -111,7 +111,7 @@ export const AddAnnotationQueueDrawer = ({
     queue.data?.members.map((member) => ({
       id: member.user.id,
       name: member.user.name,
-    })) ?? []
+    })) ?? [],
   );
 
   const [scoreTypes, setScoreTypes] = useState<
@@ -120,7 +120,7 @@ export const AddAnnotationQueueDrawer = ({
     queue.data?.AnnotationQueueScores.map((score) => ({
       id: score.annotationScore.id,
       name: score.annotationScore.name,
-    })) ?? []
+    })) ?? [],
   );
 
   const onSubmit = (data: FormData) => {
@@ -168,7 +168,7 @@ export const AddAnnotationQueueDrawer = ({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -218,7 +218,7 @@ export const AddAnnotationQueueDrawer = ({
                       newValue.map((v) => ({
                         id: v.value,
                         name: v.label,
-                      }))
+                      })),
                     );
                   }}
                   value={participants.map((p) => ({
@@ -305,7 +305,7 @@ export const AddAnnotationQueueDrawer = ({
                           newValue.map((v) => ({
                             id: v.value,
                             name: v.label,
-                          }))
+                          })),
                         );
                       }}
                       value={scoreTypes.map((v) => ({

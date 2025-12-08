@@ -1,7 +1,6 @@
-import { describe, it, expect } from "vitest";
-
-import { LLMConfigFormatUtils } from "../llm-config-format-utils";
+import { describe, expect, it } from "vitest";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import { LLMConfigFormatUtils } from "../llm-config-format-utils";
 
 /**
  * Tests for WrappedOptimizationStudioLLMConfigField conversion functions

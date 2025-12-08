@@ -1,29 +1,29 @@
 import { vi } from "vitest";
 import { z } from "zod";
-import type { Event, Projection } from "../../../library/domain/types";
+import type { AggregateType } from "~/server/event-sourcing/library";
+import type { Command } from "../../../library/commands/command";
+import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
+import type { CommandSchema } from "../../../library/commands/commandSchema";
+import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import type { CommandType } from "../../../library/domain/commandType";
-import type { EventStore } from "../../../library/stores/eventStore.types";
-import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
-import type { EventPublisher } from "../../../library/publishing/eventPublisher.types";
+import { COMMAND_TYPES } from "../../../library/domain/commandType";
+import { EVENT_TYPES } from "../../../library/domain/eventType";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
 import type { EventHandlerClass } from "../../../library/domain/handlers/eventHandlerClass";
 import type { ProjectionHandler } from "../../../library/domain/handlers/projectionHandler";
 import type { ProjectionHandlerClass } from "../../../library/domain/handlers/projectionHandlerClass";
-import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
-import type { CommandSchema } from "../../../library/commands/commandSchema";
-import type { Command } from "../../../library/commands/command";
-import type {
-  EventSourcedQueueProcessor,
-  EventSourcedQueueDefinition,
-} from "../../../library/queues";
-import type { QueueProcessorFactory } from "../../queue";
-import { COMMAND_TYPES } from "../../../library/domain/commandType";
-import { EVENT_TYPES } from "../../../library/domain/eventType";
-import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import { createTenantId } from "../../../library/domain/tenantId";
+import type { Event, Projection } from "../../../library/domain/types";
+import type { EventPublisher } from "../../../library/publishing/eventPublisher.types";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+} from "../../../library/queues";
 import { createTestEvent } from "../../../library/services/__tests__/testHelpers";
+import type { EventStore } from "../../../library/stores/eventStore.types";
+import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
+import type { QueueProcessorFactory } from "../../queue";
 import { PipelineBuilder } from "../builder";
-import type { AggregateType } from "~/server/event-sourcing/library";
 
 /**
  * Creates a mock EventStore with spyable methods.

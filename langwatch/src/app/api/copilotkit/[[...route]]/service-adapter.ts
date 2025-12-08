@@ -4,8 +4,10 @@ import type {
   CopilotServiceAdapter,
 } from "@copilotkit/runtime";
 import { randomUUID } from "@copilotkit/shared";
-
+import type z from "zod";
 import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
+import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import type {
   LlmPromptConfigComponent,
   Workflow,
@@ -14,15 +16,12 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
-import { addEnvs } from "~/optimization_studio/server/addEnvs";
-import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
-import type { ChatMessage } from "~/server/tracer/types";
-import type { PromptConfigFormValues } from "~/prompts/types";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
-import type z from "zod";
-import { generateOtelTraceId } from "~/utils/trace";
+import type { PromptConfigFormValues } from "~/prompts/types";
+import type { ChatMessage } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
+import { generateOtelTraceId } from "~/utils/trace";
+import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 
 const logger = createLogger("PromptStudioAdapter");
 

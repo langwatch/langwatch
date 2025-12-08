@@ -1,5 +1,5 @@
 import { HStack, VStack } from "@chakra-ui/react";
-import { type PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

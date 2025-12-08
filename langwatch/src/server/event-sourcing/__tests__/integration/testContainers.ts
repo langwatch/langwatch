@@ -1,3 +1,4 @@
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   ClickHouseContainer,
   type StartedClickHouseContainer,
@@ -6,7 +7,6 @@ import {
   RedisContainer,
   type StartedRedisContainer,
 } from "@testcontainers/redis";
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import IORedis, { type Redis } from "ioredis";
 import { createLogger } from "~/utils/logger";
 

@@ -1,5 +1,5 @@
+import { describe, expect, it } from "vitest";
 import { getDisplayHandle } from "../PublishedPromptsList";
-import { expect, describe, it } from "vitest";
 
 describe("getDisplayHandle", () => {
   describe("when handle is missing or nullish", () => {

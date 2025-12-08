@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { Event, EventOrderingStrategy } from "../../domain/types";
+import type { AggregateType } from "../../domain/aggregateType";
 import { EVENT_TYPES } from "../../domain/eventType";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
+import type { Event, EventOrderingStrategy } from "../../domain/types";
 import { EventStream } from "../eventStream";
-import type { AggregateType } from "../../domain/aggregateType";
 
 type TestEvent = Event<{ value: string }>;
 

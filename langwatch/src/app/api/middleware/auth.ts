@@ -1,5 +1,5 @@
 import type { Project } from "@prisma/client";
-import { type MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";
 
@@ -44,7 +44,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
         hasApiKey: !!apiKey,
         apiKeyPrefix: apiKey?.substring(0, 8) + "...", // Safe logging of key prefix
       },
-      "Database error during authentication"
+      "Database error during authentication",
     );
 
     // Return 500 since auth failure due to database issues is a server error,
@@ -54,7 +54,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
         error: "Internal Server Error",
         message: "Authentication service error",
       },
-      500
+      500,
     );
   }
 

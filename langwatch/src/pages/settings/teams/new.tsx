@@ -1,18 +1,18 @@
+import { TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
-import { TeamUserRole } from "@prisma/client";
+import { type SubmitHandler, useForm } from "react-hook-form";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
   type TeamFormData,
 } from "../../../components/settings/TeamForm";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
+import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import type { FullyLoadedOrganization } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
-import { toaster } from "../../../components/ui/toaster";
 
 export default function NewTeamPage() {
   const { organization } = useOrganizationTeamProject();

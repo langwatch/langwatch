@@ -1,23 +1,23 @@
-import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
+import { Box, type BoxProps } from "@chakra-ui/react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import {
   AssistantMessage,
-  UserMessage,
   CopilotChat,
+  UserMessage,
 } from "@copilotkit/react-ui";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { PromptConfigFormValues } from "~/prompts/types";
-import type { z } from "zod";
-import { type runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
-import { SyncedChatInput } from "./SyncedChatInput";
-import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
-import { DeletableMessage } from "./DeletableMessage";
-import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
+import { forwardRef, useEffect, useImperativeHandle, useMemo } from "react";
+import type { z } from "zod";
+import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
+import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
+import type { PromptConfigFormValues } from "~/prompts/types";
+import type { ChatMessage } from "~/server/tracer/types";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
-import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
-import type { ChatMessage } from "~/server/tracer/types";
+import { DeletableMessage } from "./DeletableMessage";
+import { SyncedChatInput } from "./SyncedChatInput";
 
 interface PromptPlaygroundChatProps extends BoxProps {
   formValues: PromptConfigFormValues;

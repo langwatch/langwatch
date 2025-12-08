@@ -1,9 +1,11 @@
-import { TRACE_COLD_INDEX, esClient } from "../../server/elasticsearch";
+import { esClient, TRACE_COLD_INDEX } from "../../server/elasticsearch";
 
 export const debugColdStorage = async (organizationId?: string) => {
   console.log("🔍 Debugging cold storage index allocation...");
 
-  const client = await esClient(organizationId ? { organizationId } : undefined);
+  const client = await esClient(
+    organizationId ? { organizationId } : undefined,
+  );
 
   try {
     // 1. Check cluster health
@@ -53,7 +55,9 @@ export const debugColdStorage = async (organizationId?: string) => {
       console.log(`    * ${node.name}:`);
       console.log(`      - Role: ${node["node.role"]}`);
       console.log(`      - Data attr: ${node["node.attr.data"] || "none"}`);
-      console.log(`      - Disk used: ${node["disk.used_percent"] || "unknown"}%`);
+      console.log(
+        `      - Disk used: ${node["disk.used_percent"] || "unknown"}%`,
+      );
       console.log(`      - Heap used: ${node["heap.percent"] || "unknown"}%`);
     });
 
@@ -85,10 +89,11 @@ export const debugColdStorage = async (organizationId?: string) => {
     // 7. Suggest fixes
     console.log(`\n💡 Potential Solutions:`);
     console.log(`  1. Check if cold nodes have enough disk space`);
-    console.log(`  2. Verify cold nodes are properly configured with data tier`);
+    console.log(
+      `  2. Verify cold nodes are properly configured with data tier`,
+    );
     console.log(`  3. Try relaxing allocation requirements temporarily`);
     console.log(`  4. Check cluster routing allocation settings`);
-
   } catch (error) {
     console.error("❌ Debug failed:", error);
     throw error;

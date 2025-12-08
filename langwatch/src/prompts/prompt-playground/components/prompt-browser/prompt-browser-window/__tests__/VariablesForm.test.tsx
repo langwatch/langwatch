@@ -12,4 +12,3 @@ describe("VariablesForm", () => {
     it.todo("uses type as placeholder for other types");
   });
 });
-

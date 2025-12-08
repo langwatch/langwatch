@@ -1,9 +1,12 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import type { PrismaClient } from "@prisma/client";
-import { esClient as defaultEsClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { prisma } from "~/server/db";
-import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { dependencies } from "~/injection/dependencies.server";
+import { prisma } from "~/server/db";
+import {
+  esClient as defaultEsClient,
+  TRACE_INDEX,
+} from "~/server/elasticsearch";
+import { OrganizationRepository } from "~/server/repositories/organization.repository";
 import { getCurrentMonthStartMs } from "~/server/utils/dateUtils";
 import { TtlCache } from "~/server/utils/ttlCache";
 
@@ -27,7 +30,7 @@ export class TraceUsageService {
   constructor(
     private readonly organizationRepository: OrganizationRepository,
     private readonly esClientFactory: EsClientFactory,
-    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler
+    private readonly subscriptionHandler: typeof dependencies.subscriptionHandler,
   ) {}
 
   /**
@@ -37,18 +40,14 @@ export class TraceUsageService {
     return new TraceUsageService(
       new OrganizationRepository(db),
       defaultEsClient,
-      dependencies.subscriptionHandler
+      dependencies.subscriptionHandler,
     );
   }
 
   /**
    * Checks if team's organization has exceeded trace limit
    */
-  async checkLimit({
-    teamId,
-  }: {
-    teamId: string;
-  }): Promise<{
+  async checkLimit({ teamId }: { teamId: string }): Promise<{
     exceeded: boolean;
     message?: string;
     count?: number;
@@ -97,7 +96,10 @@ export class TraceUsageService {
       return 0;
     }
 
-    const counts = await this.getCountByProjects({ organizationId, projectIds });
+    const counts = await this.getCountByProjects({
+      organizationId,
+      projectIds,
+    });
     const total = counts.reduce((sum, c) => sum + c.count, 0);
 
     monthCountCache.set(organizationId, total);
@@ -146,7 +148,7 @@ export class TraceUsageService {
             },
           });
           return { projectId, count: result.count };
-        })
+        }),
       );
 
       results.push(...batchResults);
@@ -155,4 +157,3 @@ export class TraceUsageService {
     return results;
   }
 }
-

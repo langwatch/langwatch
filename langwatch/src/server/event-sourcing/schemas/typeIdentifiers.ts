@@ -5,12 +5,12 @@
  */
 
 import {
-  SPAN_INGESTION_EVENT_TYPES,
   SPAN_INGESTION_COMMAND_TYPES,
+  SPAN_INGESTION_EVENT_TYPES,
 } from "../pipelines/span-ingestion/schemas/typeIdentifiers";
 import {
-  TRACE_AGGREGATION_EVENT_TYPES,
   TRACE_AGGREGATION_COMMAND_TYPES,
+  TRACE_AGGREGATION_EVENT_TYPES,
 } from "../pipelines/trace-aggregation/schemas/typeIdentifiers";
 
 /**

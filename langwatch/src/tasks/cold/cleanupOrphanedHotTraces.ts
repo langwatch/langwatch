@@ -1,10 +1,10 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import {
-  TRACE_INDEX,
-  TRACE_COLD_INDEX,
-  esClient,
   COLD_STORAGE_AGE_DAYS,
+  esClient,
+  TRACE_COLD_INDEX,
+  TRACE_INDEX,
 } from "../../server/elasticsearch";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 const buildOldTracesQuery = (ageDays: number) => {
   const cutoffDate = new Date().getTime() - ageDays * 24 * 60 * 60 * 1000;
@@ -249,9 +249,7 @@ const verifyCleanup = async (ageDays: number, organizationId?: string) => {
   console.log(`  - Total traces in cold storage: ${coldCount.count}`);
 
   if (hotCount.count > 0) {
-    console.warn(
-      `⚠️  ${hotCount.count} old traces still remain in hot storage`,
-    );
+    console.warn(`⚠️  ${hotCount.count} old traces still remain in hot storage`);
     console.log(`💡 These may be traces that don't exist in cold storage yet`);
   } else {
     console.log(`✅ No old traces remaining in hot storage`);

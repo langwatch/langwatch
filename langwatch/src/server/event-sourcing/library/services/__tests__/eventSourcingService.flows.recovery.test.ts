@@ -1,25 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourcingService } from "../eventSourcingService";
+import { EventStoreMemory } from "../../../runtime/stores/eventStoreMemory";
+import { ProcessorCheckpointStoreMemory } from "../../../runtime/stores/processorCheckpointStoreMemory";
+import { CheckpointRepositoryMemory } from "../../../runtime/stores/repositories/checkpointRepositoryMemory";
+import { EventRepositoryMemory } from "../../../runtime/stores/repositories/eventRepositoryMemory";
+import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
+import { buildCheckpointKey } from "../../utils/checkpointKey";
+import { EventSourcingService } from "../eventSourcingService";
 import {
+  cleanupTestEnvironment,
+  createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
   createMockProjectionDefinition,
-  createMockEventHandler,
   createMockProjectionStore,
+  createTestContext,
   createTestEvent,
   createTestProjection,
-  TEST_CONSTANTS,
   setupTestEnvironment,
-  cleanupTestEnvironment,
-  createTestContext,
+  TEST_CONSTANTS,
 } from "./testHelpers";
-import { EVENT_TYPES } from "../../domain/eventType";
-import { EventStoreMemory } from "../../../runtime/stores/eventStoreMemory";
-import { EventRepositoryMemory } from "../../../runtime/stores/repositories/eventRepositoryMemory";
-import { ProcessorCheckpointStoreMemory } from "../../../runtime/stores/processorCheckpointStoreMemory";
-import { CheckpointRepositoryMemory } from "../../../runtime/stores/repositories/checkpointRepositoryMemory";
-import { buildCheckpointKey } from "../../utils/checkpointKey";
 
 describe("EventSourcingService - Recovery Flows", () => {
   const { aggregateType, tenantId, context } = createTestContext();

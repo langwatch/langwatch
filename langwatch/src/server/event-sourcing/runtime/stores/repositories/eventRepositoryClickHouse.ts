@@ -1,6 +1,6 @@
-import { type ClickHouseClient } from "@clickhouse/client";
-import type { EventRepository, EventRecord } from "./eventRepository.types";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
+import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 

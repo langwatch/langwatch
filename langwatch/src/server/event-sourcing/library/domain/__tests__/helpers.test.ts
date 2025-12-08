@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
-
+import type { AggregateType } from "../aggregateType";
 import { EVENT_TYPES } from "../eventType";
+import { isEvent, isProjection } from "../helpers";
 import { createTenantId, type TenantId } from "../tenantId";
 import type { Event, Projection } from "../types";
-import { isEvent, isProjection } from "../helpers";
-import type { AggregateType } from "../aggregateType";
 
 function createValidEvent(
   id = "event-1",

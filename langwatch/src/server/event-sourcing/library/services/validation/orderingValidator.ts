@@ -1,6 +1,6 @@
+import { createLogger } from "~/utils/logger";
 import type { Event } from "../../domain/types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
-import { createLogger } from "~/utils/logger";
 import { SequentialOrderingError } from "../errorHandling";
 
 /**

@@ -1,22 +1,24 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
+import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
-import { EventUtils, createTenantId } from "../../../library";
-import { defineCommandSchema } from "../../../library";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "../../../library";
 import { ValidationError } from "../../../library/services/errorHandling";
+import type { SpanRepository } from "../../span-ingestion/repositories/spanRepository";
+import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/spanRepositoryClickHouse";
+import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepositoryMemory";
 import type { TriggerTraceAggregationCommandData } from "../schemas/commands";
 import { triggerTraceAggregationCommandDataSchema } from "../schemas/commands";
 import type {
-  TraceAggregationEvent,
   TraceAggregationCompletedEvent,
   TraceAggregationCompletedEventData,
+  TraceAggregationEvent,
 } from "../schemas/events";
-import { createLogger } from "../../../../../utils/logger";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
-import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/spanRepositoryClickHouse";
-import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepositoryMemory";
-import type { SpanRepository } from "../../span-ingestion/repositories/spanRepository";
 import type { TraceAggregationService } from "../services/traceAggregationService";
 import { traceAggregationService as defaultTraceAggregationService } from "../services/traceAggregationService";
 

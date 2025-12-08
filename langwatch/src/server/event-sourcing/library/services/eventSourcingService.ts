@@ -1,28 +1,30 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "~/utils/logger";
+import type { AggregateType } from "../domain/aggregateType";
 import type { Event, Projection } from "../domain/types";
+import type { EventHandlerDefinition } from "../eventHandler.types";
+import type { ProjectionDefinition } from "../projection.types";
+import type { EventPublisher } from "../publishing/eventPublisher.types";
+import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
+import type {
+  EventStore,
+  EventStoreReadContext,
+} from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
-import { DEFAULT_UPDATE_LOCK_TTL_MS } from "./eventSourcingService.types";
+import { CheckpointManager } from "./checkpoints/checkpointManager";
+import { ConfigurationError } from "./errorHandling";
 import type {
   EventSourcingOptions,
   EventSourcingServiceOptions,
-  UpdateProjectionOptions,
   ReplayEventsOptions,
+  UpdateProjectionOptions,
 } from "./eventSourcingService.types";
-import type { ProjectionDefinition } from "../projection.types";
-import type { AggregateType } from "../domain/aggregateType";
-import type { EventStore } from "../stores/eventStore.types";
-import type { EventStoreReadContext } from "../stores/eventStore.types";
-import type { EventHandlerDefinition } from "../eventHandler.types";
-import type { EventPublisher } from "../publishing/eventPublisher.types";
-import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
-import { createLogger } from "~/utils/logger";
-import { EventProcessorValidator } from "./validation/eventProcessorValidator";
-import { CheckpointManager } from "./checkpoints/checkpointManager";
-import { QueueProcessorManager } from "./queues/queueProcessorManager";
+import { DEFAULT_UPDATE_LOCK_TTL_MS } from "./eventSourcingService.types";
 import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
-import { ConfigurationError } from "./errorHandling";
+import { QueueProcessorManager } from "./queues/queueProcessorManager";
+import { EventProcessorValidator } from "./validation/eventProcessorValidator";
 
 /**
  * Main service that orchestrates event sourcing.

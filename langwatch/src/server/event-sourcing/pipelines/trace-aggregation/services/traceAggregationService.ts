@@ -1,7 +1,7 @@
-import type { SpanData } from "../../span-ingestion/schemas/commands";
-import type { TraceAggregationCompletedEventData } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { ValidationError } from "../../../library/services/errorHandling";
+import type { SpanData } from "../../span-ingestion/schemas/commands";
+import type { TraceAggregationCompletedEventData } from "../schemas/events";
 
 /**
  * Service that handles the business logic of aggregating spans into trace metadata.

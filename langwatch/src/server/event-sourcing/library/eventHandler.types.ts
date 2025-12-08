@@ -2,8 +2,8 @@
  * Types for managing event handlers per pipeline.
  */
 
-import type { Event } from "./domain/types";
 import type { EventHandler } from "./domain/handlers/eventHandler";
+import type { Event } from "./domain/types";
 
 /**
  * Options for configuring an event handler.

@@ -1,9 +1,9 @@
 import { Avatar, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { useEffect, useState } from "react";
 
 export const AnnotationExpectedOutputs = ({
   traceId,
@@ -25,7 +25,7 @@ export const AnnotationExpectedOutputs = ({
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   return (
@@ -50,7 +50,7 @@ export const AnnotationExpectedOutputs = ({
         )}
       {annotations.data?.some(
         (annotation: { expectedOutput?: string | null }) =>
-          annotation.expectedOutput
+          annotation.expectedOutput,
       ) && (
         <>
           <Text fontWeight="bold">Expected Output:</Text>
@@ -83,8 +83,8 @@ export const AnnotationExpectedOutputs = ({
                         backgroundColor="white"
                         value={
                           commentState.expectedOutputAction === "edit"
-                            ? expectedOutput ?? ""
-                            : annotation.expectedOutput ?? ""
+                            ? (expectedOutput ?? "")
+                            : (annotation.expectedOutput ?? "")
                         }
                         placeholder="Enter your expected output here..."
                         onClick={(e) => {

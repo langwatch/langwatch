@@ -3,12 +3,12 @@ import {
   Box,
   Button,
   createListCollection,
+  Grid,
+  GridItem,
   HStack,
   Input,
   Skeleton,
   Spacer,
-  Grid,
-  GridItem,
   Text,
   useDisclosure,
   VStack,
@@ -18,9 +18,9 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckSquare, Info, TrendingUp } from "react-feather";
 import {
   Controller,
-  useForm,
   type ControllerRenderProps,
   type UseFormReturn,
+  useForm,
 } from "react-hook-form";
 
 import { SmallLabel } from "../../components/SmallLabel";
@@ -140,9 +140,9 @@ export function OptimizeModalContent({
     }),
   );
 
-  const entryNode = getWorkflow().nodes.find(
-    (node) => node.type === "entry",
-  ) as Node<Entry> | undefined;
+  const entryNode = getWorkflow().nodes.find((node) => node.type === "entry") as
+    | Node<Entry>
+    | undefined;
 
   const { total } = useGetDatasetData({
     dataset: entryNode?.data.dataset,
@@ -326,10 +326,10 @@ export function OptimizeModalContent({
     train.length < 20
       ? "You need at least 20 entries to run the automated optimizer"
       : hasProvidersWithoutCustomKeys
-      ? "Set up your API keys to run optimizations"
-      : !hasEvaluator
-      ? "You need at least one evaluator node in your workflow to run optimizations"
-      : false;
+        ? "Set up your API keys to run optimizations"
+        : !hasEvaluator
+          ? "You need at least one evaluator node in your workflow to run optimizations"
+          : false;
 
   const llmConfig = form.watch("params.llm");
 

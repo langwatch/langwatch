@@ -1,19 +1,16 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
-
 import {
-  PrismaClient,
-  PublicShareResourceTypes,
   type AnnotationQueueItem,
+  type PrismaClient,
+  PublicShareResourceTypes,
 } from "@prisma/client";
-import type { Session } from "next-auth";
-
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
+import type { Session } from "next-auth";
+import { z } from "zod";
 import {
+  esClient,
   TRACE_COLD_INDEX,
   TRACE_INDEX,
-  esClient,
   traceIndexId,
 } from "~/server/elasticsearch";
 import { slugify } from "~/utils/slugify";
@@ -21,6 +18,7 @@ import { createLogger } from "../../../utils/logger";
 import type { Protections } from "../../elasticsearch/protections";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 import { getTracesWithSpans } from "./traces";
 
@@ -691,8 +689,8 @@ export const annotationRouter = createTRPCRouter({
           input.selectedAnnotations === "pending"
             ? null
             : input.selectedAnnotations === "completed"
-            ? { not: null }
-            : undefined,
+              ? { not: null }
+              : undefined,
       };
 
       if (input.queueId) {

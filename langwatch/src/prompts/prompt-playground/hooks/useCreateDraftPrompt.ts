@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { DEFAULT_MODEL, DEFAULT_MAX_TOKENS } from "~/utils/constants";
+import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
  * Hook to create a draft prompt in the database and add it to the prompt browser.

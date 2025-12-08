@@ -1,13 +1,13 @@
 import {
-  OrganizationUserRole,
+  type CustomRole,
   type Organization,
   type OrganizationUser,
+  OrganizationUserRole,
   type Project,
   type Team,
   type TeamUser,
-  type User,
-  type CustomRole,
   TeamUserRole,
+  type User,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -17,17 +17,14 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
-
+import { decrypt, encrypt } from "~/utils/encryption";
+import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
 import { skipPermissionCheck } from "../permission";
-import { checkTeamPermission, checkOrganizationPermission } from "../rbac";
-
+import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
-
-import { decrypt, encrypt } from "~/utils/encryption";
-import { slugify } from "~/utils/slugify";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
@@ -92,7 +89,7 @@ export const organizationRouter = createTRPCRouter({
 
       const orgName = input.orgName
         ? input.orgName
-        : ctx.session.user.name ?? "My Organization";
+        : (ctx.session.user.name ?? "My Organization");
       const orgNanoId = nanoid();
       const orgId = `organization_${orgNanoId}`;
       const orgSlug =

@@ -3,23 +3,24 @@ import {
   Box,
   Button,
   Card,
+  CloseButton,
   Container,
-  HStack,
   Heading,
+  HStack,
   Icon,
+  Portal,
   Progress,
   Skeleton,
   Spacer,
   Table,
   Tag,
   Text,
-  VStack,
   useDisclosure,
-  Portal,
-  CloseButton,
+  VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
+import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
@@ -30,45 +31,42 @@ import {
   RefreshCw,
   Shield,
 } from "react-feather";
+import { LuChevronsUpDown } from "react-icons/lu";
+import { useLocalStorage } from "usehooks-ts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
-
-import Parse from "papaparse";
-import { LuChevronsUpDown } from "react-icons/lu";
-import { useLocalStorage } from "usehooks-ts";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { useDrawer } from "../CurrentDrawer";
+import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { Delayed } from "../Delayed";
+import { FilterSidebar } from "../filters/FilterSidebar";
+import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
 import { HoverableBigText } from "../HoverableBigText";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
-import { evaluationStatusColor } from "../checks/EvaluationStatus";
-import { FilterSidebar } from "../filters/FilterSidebar";
-import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
+import { AddParticipants } from "../traces/AddParticipants";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
-import { Popover } from "../ui/popover";
-import { toaster } from "../ui/toaster";
-import { Tooltip } from "../ui/tooltip";
 import { Dialog } from "../ui/dialog";
 import { Link } from "../ui/link";
+import { Popover } from "../ui/popover";
+import { RedactedField } from "../ui/RedactedField";
+import { toaster } from "../ui/toaster";
+import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
-
-import { AddParticipants } from "../traces/AddParticipants";
-import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { RedactedField } from "../ui/RedactedField";
-import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -110,7 +108,7 @@ export function MessagesTable({
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
-    queryOpts
+    queryOpts,
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
@@ -121,7 +119,7 @@ export function MessagesTable({
       enabled: project?.id !== undefined,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   const downloadTraces = api.traces.getAllForDownload.useMutation();
@@ -137,13 +135,13 @@ export function MessagesTable({
 
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(
-      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
+      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {},
     ).flatMap((checks) =>
       checks.map((check: any) => [
         `evaluations.${check.evaluator_id}`,
         check.name,
-      ])
-    )
+      ]),
+    ),
   );
 
   const [scrollXPosition, setScrollXPosition] = useState(0);
@@ -208,7 +206,7 @@ export function MessagesTable({
     render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
     value: (
       trace: TraceWithGuardrail,
-      evaluations: ElasticSearchEvaluation[]
+      evaluations: ElasticSearchEvaluation[],
     ) => string | number | Date;
   };
 
@@ -228,7 +226,7 @@ export function MessagesTable({
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
-            traceCheck_.evaluator_id === checkId
+            traceCheck_.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -264,7 +262,7 @@ export function MessagesTable({
       value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
         const checkId = columnKey.split(".")[1];
         const traceCheck = evaluations.find(
-          (evaluation) => evaluation.evaluator_id === checkId
+          (evaluation) => evaluation.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -274,7 +272,7 @@ export function MessagesTable({
               ? "Pass"
               : "Fail"
             : formatEvaluationSingleValue(traceCheck)
-          : traceCheck?.status ?? "-";
+          : (traceCheck?.status ?? "-");
       },
     };
   };
@@ -418,10 +416,10 @@ export function MessagesTable({
                   {safeOutputValue
                     ? safeOutputValue
                     : trace.lastGuardrail
-                    ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
-                        .filter((x) => x)
-                        .join(": ")
-                    : undefined}
+                      ? [trace.lastGuardrail.name, trace.lastGuardrail.details]
+                          .filter((x) => x)
+                          .join(": ")
+                      : undefined}
                 </Box>
               }
             >
@@ -637,7 +635,7 @@ export function MessagesTable({
           <Text>
             {
               topics.data?.find(
-                (topic) => topic.id === trace.metadata.subtopic_id
+                (topic) => topic.id === trace.metadata.subtopic_id,
               )?.name
             }
           </Text>
@@ -661,8 +659,8 @@ export function MessagesTable({
         ([columnKey, checkName]) => [
           columnKey,
           headerColumnForEvaluation({ columnKey, checkName }),
-        ]
-      )
+        ],
+      ),
     ),
   };
 
@@ -684,8 +682,8 @@ export function MessagesTable({
               enabled: key !== "trace.trace_id",
               name: column.name,
             },
-          ])
-        )
+          ]),
+        ),
   );
 
   const isFirstRender = useRef(true);
@@ -758,9 +756,10 @@ export function MessagesTable({
           ...Object.fromEntries(
             Object.entries(traceCheckColumnsAvailable)
               .filter(
-                ([key]) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+                ([key]) =>
+                  !Object.keys(prevSelectedHeaderColumns).includes(key),
               )
-              .map(([key, name]) => [key, { enabled: true, name }])
+              .map(([key, name]) => [key, { enabled: true, name }]),
           ),
         }));
       }
@@ -769,7 +768,7 @@ export function MessagesTable({
 
   const { open, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
-    selectedHeaderColumns
+    selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -851,7 +850,7 @@ export function MessagesTable({
   };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    []
+    [],
   );
 
   const dialog = useDisclosure();
@@ -887,20 +886,20 @@ export function MessagesTable({
             },
           });
         },
-      }
+      },
     );
   };
 
   const downloadCSV_ = async (selection = false) => {
     const traceGroups_ = selection
-      ? traceGroups.data ?? {
+      ? (traceGroups.data ?? {
           groups: [],
           traceChecks: {} as Record<string, ElasticSearchEvaluation[]>,
-        }
+        })
       : await fetchAllTraces();
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked"
+      ([column, _]) => column !== "checked",
     );
 
     const evaluations: Record<string, ElasticSearchEvaluation[]> =
@@ -909,12 +908,12 @@ export function MessagesTable({
     const getValueForColumn = (
       trace: TraceWithGuardrail,
       column: string,
-      name: string
+      name: string,
     ) => {
       return (
         headerColumns[column]?.value?.(
           trace,
-          evaluations[trace.trace_id] ?? []
+          evaluations[trace.trace_id] ?? [],
         ) ??
         headerColumnForEvaluation({
           columnKey: column,
@@ -931,9 +930,9 @@ export function MessagesTable({
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
               checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name)
-              )
-            )
+                getValueForColumn(trace, column, name),
+              ),
+            ),
         )
         .filter((row) => row.some((cell) => cell !== ""));
     } else {
@@ -941,8 +940,10 @@ export function MessagesTable({
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries_
             .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) => getValueForColumn(trace, column, name))
-        )
+            .map(([column, { name }]) =>
+              getValueForColumn(trace, column, name),
+            ),
+        ),
       );
     }
 
@@ -976,8 +977,8 @@ export function MessagesTable({
     } else {
       setSelectedTraceIds(
         traceGroups.data?.groups.flatMap((traceGroup) =>
-          traceGroup.map((trace) => trace.trace_id)
-        ) ?? []
+          traceGroup.map((trace) => trace.trace_id),
+        ) ?? [],
       );
     }
   };
@@ -1206,10 +1207,10 @@ export function MessagesTable({
                                   headerColumnForEvaluation({
                                     columnKey: column,
                                     checkName: name,
-                                  })?.render(trace, index)
+                                  })?.render(trace, index),
                               )}
                             </Table.Row>
-                          ))
+                          )),
                         )}
                         {traceGroups.isLoading &&
                           Array.from({ length: 3 }).map((_, i) => (

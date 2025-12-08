@@ -1,12 +1,12 @@
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../utils/api";
+import type { Step } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import {
   EXECUTION_METHODS,
   STEPS,
+  TASK_TYPES,
+  useEvaluationWizardStore,
 } from "./evaluation-wizard-store/useEvaluationWizardStore";
-import { TASK_TYPES } from "./evaluation-wizard-store/useEvaluationWizardStore";
-import type { Step } from "./evaluation-wizard-store/useEvaluationWizardStore";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../../utils/api";
-import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 
 export const useStepCompletedValue = () => {
   const { project } = useOrganizationTeamProject();
@@ -24,7 +24,7 @@ export const useStepCompletedValue = () => {
         setWizardState,
         datasetId: getDatasetId(),
         evaluator: getFirstEvaluatorNode(),
-      })
+      }),
     );
 
   const databaseDataset = api.datasetRecord.getAll.useQuery(
@@ -32,14 +32,14 @@ export const useStepCompletedValue = () => {
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   const getStepValue = (step: Step | "all") => {
     switch (step) {
       case "all":
         return STEPS.every((step) =>
-          (getStepValue as (step: Step) => boolean)(step)
+          (getStepValue as (step: Step) => boolean)(step),
         );
       case "task":
         return task ? TASK_TYPES[task] : undefined;

@@ -1,4 +1,4 @@
-import { type Alert } from "@chakra-ui/react";
+import type { Alert } from "@chakra-ui/react";
 import { SlugAlert } from "./SlugAlert";
 
 /**

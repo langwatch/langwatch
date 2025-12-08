@@ -30,13 +30,13 @@ vi.mock("../../../../redis", async () => {
   };
 });
 
-import {
-  DefaultQueueProcessorFactory,
-  BullmqQueueProcessorFactory,
-  MemoryQueueProcessorFactory,
-  defaultQueueProcessorFactory,
-} from "../factory";
 import * as redisModule from "../../../../redis";
+import {
+  BullmqQueueProcessorFactory,
+  DefaultQueueProcessorFactory,
+  defaultQueueProcessorFactory,
+  MemoryQueueProcessorFactory,
+} from "../factory";
 
 describe("DefaultQueueProcessorFactory", () => {
   let factory: DefaultQueueProcessorFactory;

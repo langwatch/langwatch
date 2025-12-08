@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Queue } from "bullmq";
 import { SpanKind } from "@opentelemetry/api";
-import type { EventSourcedQueueDefinition } from "../../../library/queues";
+import { Queue } from "bullmq";
 import type { SemConvAttributes } from "langwatch/observability";
-import { EventSourcedQueueProcessorBullMq } from "../bullmq";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connection } from "../../../../redis";
+import type { EventSourcedQueueDefinition } from "../../../library/queues";
+import { EventSourcedQueueProcessorBullMq } from "../bullmq";
 
 const mockLogger = {
   info: vi.fn(),
@@ -55,7 +55,7 @@ async function cleanupQueue(queueName: string): Promise<void> {
     const queue = new Queue(queueName, { connection });
     await queue.obliterate({ force: true });
     await queue.close();
-  } catch (error) {
+  } catch {
     // Ignore cleanup errors - queue might not exist
   }
 }
@@ -73,7 +73,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
     for (const processor of processors) {
       try {
         await processor.close();
-      } catch (error) {
+      } catch {
         // Ignore cleanup errors
       }
     }

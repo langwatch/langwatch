@@ -1,4 +1,4 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { runWorkflow } from "../workflows/[workflowId]/[versionId]/run";
 
 /**
@@ -6,7 +6,7 @@ import { runWorkflow } from "../workflows/[workflowId]/[versionId]/run";
  */
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   const { params } = req.query;
   const [workflowId, versionId] = params as [string, string];

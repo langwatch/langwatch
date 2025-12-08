@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { apiResponsePromptWithVersionDataSchema } from "../outputs";
@@ -40,7 +40,7 @@ describe("Schema compatibility", () => {
       };
 
       expect(() =>
-        apiResponsePromptWithVersionDataSchema.parse(apiResponse)
+        apiResponsePromptWithVersionDataSchema.parse(apiResponse),
       ).not.toThrow();
     });
   });

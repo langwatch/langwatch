@@ -1,8 +1,8 @@
-import { Button, useDisclosure, VStack, Text } from "@chakra-ui/react";
+import { Button, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { Dialog } from "../components/ui/dialog";
+import { Link } from "../components/ui/link";
 import { Discord } from "./icons/Discord";
 import { GitHub } from "./icons/GitHub";
-import { Link } from "../components/ui/link";
-import { Dialog } from "../components/ui/dialog";
 
 export function FeedbackLink() {
   const { open, onOpen, setOpen } = useDisclosure();

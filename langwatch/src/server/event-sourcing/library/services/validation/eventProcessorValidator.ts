@@ -1,14 +1,16 @@
 import { getLangWatchTracer } from "langwatch";
-import type { Event } from "../../domain/types";
-import type { EventStore } from "../../stores/eventStore.types";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import { createLogger } from "~/utils/logger";
-import { SequenceNumberCalculator } from "./sequenceNumberCalculator";
+import type { AggregateType } from "../../domain/aggregateType";
+import type { Event } from "../../domain/types";
+import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type {
+  EventStore,
+  EventStoreReadContext,
+} from "../../stores/eventStore.types";
+import { FailureDetector } from "./failureDetector";
 import { IdempotencyChecker } from "./idempotencyChecker";
 import { OrderingValidator } from "./orderingValidator";
-import { FailureDetector } from "./failureDetector";
+import { SequenceNumberCalculator } from "./sequenceNumberCalculator";
 
 /**
  * Orchestrates event processing validation by coordinating sequence number calculation,

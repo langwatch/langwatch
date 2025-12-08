@@ -1,16 +1,25 @@
+import {
+  type PrismaClient,
+  type Project,
+  ProjectSensitiveDataVisibilityLevel,
+  TeamUserRole,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { slugify } from "~/utils/slugify";
+import { customAlphabet, nanoid } from "nanoid";
+import type { Session } from "next-auth";
 import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { encrypt } from "~/utils/encryption";
+import { slugify } from "~/utils/slugify";
 import { env } from "../../../env.mjs";
-import { customAlphabet, nanoid } from "nanoid";
+import { dependencies } from "../../../injection/dependencies.server";
 import {
-  OrganizationRoleGroup,
   checkUserPermissionForOrganization,
+  OrganizationRoleGroup,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../permission";
@@ -20,15 +29,6 @@ import {
   hasProjectPermission,
 } from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
-import { dependencies } from "../../../injection/dependencies.server";
-import {
-  ProjectSensitiveDataVisibilityLevel,
-  type Project,
-  type PrismaClient,
-  TeamUserRole,
-} from "@prisma/client";
-import { encrypt } from "~/utils/encryption";
-import type { Session } from "next-auth";
 import { revokeAllTraceShares } from "./share";
 
 export const projectRouter = createTRPCRouter({

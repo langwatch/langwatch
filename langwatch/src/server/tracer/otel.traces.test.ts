@@ -1,17 +1,17 @@
 // @ts-ignore
-import {
-  type ESpanKind,
-  type EStatusCode,
-  type IEvent,
-  type IExportTraceServiceRequest,
+import type {
+  ESpanKind,
+  EStatusCode,
+  IEvent,
+  IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
+import Long from "long";
 import { assert, describe, expect, it } from "vitest";
-import { z, type ZodError } from "zod";
+import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryTraceRequestToTracesForCollection } from "./otel.traces";
 import { spanSchema } from "./types.generated";
-import Long from "long";
 
 const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
   resourceSpans: [
