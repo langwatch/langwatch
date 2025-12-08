@@ -31,7 +31,7 @@ import type { InMemoryDataset } from "./datasets/DatasetTable";
 import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
-interface AddDatasetDrawerProps {
+export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
     datasetRecords?: InMemoryDataset["datasetRecords"];

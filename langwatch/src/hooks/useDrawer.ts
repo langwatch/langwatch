@@ -17,8 +17,11 @@ export type DrawerType =
   | "editTriggerFilter"
   | "seriesFilters";
 
+/** Generic callback type for drawer props - callers must narrow before use */
+type DrawerCallback = (...args: unknown[]) => void;
+
 // workaround to pass complexProps to drawers
-let complexProps = {} as Record<string, (...args: any[]) => void>;
+let complexProps = {} as Record<string, DrawerCallback>;
 
 export function getComplexProps() {
   return complexProps;
@@ -40,7 +43,7 @@ export function useDrawer() {
         ([_key, value]) =>
           typeof value === "function" || typeof value === "object",
       ),
-    ) as Record<string, (...args: any[]) => void>;
+    ) as Record<string, DrawerCallback>;
 
     void router[replace ? "replace" : "push"](
       "?" +

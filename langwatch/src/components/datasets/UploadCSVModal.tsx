@@ -22,7 +22,10 @@ import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
+import {
+  AddOrEditDatasetDrawer,
+  type AddDatasetDrawerProps,
+} from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "../../hooks/useDrawer";
 import { toaster } from "../ui/toaster";
 import type { InMemoryDataset } from "./DatasetTable";
@@ -39,7 +42,7 @@ export function UploadCSVModal({
 }: {
   isOpen?: boolean;
   onClose?: () => void;
-  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+  onSuccess: AddDatasetDrawerProps["onSuccess"];
   onCreateFromScratch?: () => void;
 }) {
   const { closeDrawer } = useDrawer();
@@ -107,7 +110,7 @@ export function UploadCSVModal({
 export function InlineUploadCSVForm({
   onSuccess,
 }: {
-  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+  onSuccess: AddDatasetDrawerProps["onSuccess"];
 }) {
   const addDatasetDrawer = useDisclosure();
   const [uploadedDataset, setUploadedDataset] = useState<
@@ -354,7 +357,13 @@ export function CSVReaderComponent({
         ProgressBar,
         getRemoveFileProps,
         Remove,
-      }: any) => {
+      }: {
+        getRootProps: () => Record<string, unknown>;
+        acceptedFile: File | null;
+        ProgressBar: React.ComponentType;
+        getRemoveFileProps: () => Record<string, unknown>;
+        Remove: React.ComponentType;
+      }) => {
         return (
           <>
             <CSVReaderBox
@@ -406,10 +415,10 @@ function CSVReaderBox({
   acceptedFile: File | null;
   setAcceptedFile: (file: File | null) => void;
   zoneHover: boolean;
-  getRootProps: () => any;
-  getRemoveFileProps: () => any;
-  Remove: () => any;
-  ProgressBar: () => any;
+  getRootProps: () => Record<string, unknown>;
+  getRemoveFileProps: () => Record<string, unknown>;
+  Remove: React.ComponentType;
+  ProgressBar: React.ComponentType;
 }) {
   useEffect(() => {
     setAcceptedFile(acceptedFile);
