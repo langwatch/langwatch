@@ -17,7 +17,7 @@ import {
 } from "../schemas/commands";
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
-import { getClickHouseClient } from "../../../../clickhouse/client";
+import { getClickHouseClient } from "~/server/clickhouse/client";
 
 /**
  * Self-contained command handler for span ingestion record commands.
