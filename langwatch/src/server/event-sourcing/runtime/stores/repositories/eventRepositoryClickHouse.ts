@@ -37,6 +37,8 @@ function normalizePayloadValue(value: unknown): unknown {
 /**
  * ClickHouse implementation of EventRepository.
  * Handles raw data access to ClickHouse without business logic.
+ *
+ * Schema in /server/clickhouse/migrations/00002_create_event_log.sql
  */
 export class EventRepositoryClickHouse implements EventRepository {
   private readonly logger = createLogger(

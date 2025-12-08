@@ -5,7 +5,7 @@ const { mockGetClickHouseClient } = vi.hoisted(() => ({
   mockGetClickHouseClient: vi.fn(),
 }));
 
-vi.mock("~/utils/clickhouse", () => ({
+vi.mock("~/server/clickhouse/client", () => ({
   getClickHouseClient: mockGetClickHouseClient,
 }));
 
@@ -31,9 +31,9 @@ describe("EventSourcing", () => {
 
     // Disable BUILD_TIME to enable event sourcing in tests
     vi.stubEnv("BUILD_TIME", "");
-    // Explicitly enable event sourcing and ClickHouse
     vi.stubEnv("ENABLE_EVENT_SOURCING", "true");
     vi.stubEnv("ENABLE_CLICKHOUSE", "true");
+    vi.stubEnv("NODE_ENV", "test");
 
     // Reset the mock
     mockGetClickHouseClient.mockReset();
