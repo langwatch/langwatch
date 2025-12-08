@@ -9,19 +9,19 @@ vi.mock("~/utils/clickhouse", () => ({
   getClickHouseClient: mockGetClickHouseClient,
 }));
 
+import type { ClickHouseClient } from "@clickhouse/client";
+import type { Event } from "../../library";
+import type { TenantId } from "../../library/domain/tenantId";
+import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
+import { DisabledPipelineBuilder } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
 import {
   EventSourcingRuntime,
   resetEventSourcingRuntime,
 } from "../eventSourcingRuntime";
+import { PipelineBuilder } from "../pipeline";
 import { EventStoreClickHouse } from "../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../stores/eventStoreMemory";
-import { PipelineBuilder } from "../pipeline";
-import { DisabledPipelineBuilder } from "../disabledPipeline";
-import type { Event } from "../../library";
-import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
-import type { ClickHouseClient } from "@clickhouse/client";
-import type { TenantId } from "../../library/domain/tenantId";
 
 describe("EventSourcing", () => {
   beforeEach(() => {

@@ -1,15 +1,18 @@
-import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
+import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
+import { collectUsageStats } from "~/server/collectUsageStats";
 import { createLogger } from "../../../utils/logger";
-import { connection } from "../../redis";
-import { USAGE_STATS_QUEUE_NAME } from "../queues/usageStatsQueue";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
-import { collectUsageStats } from "~/server/collectUsageStats";
-import { env } from "~/env.mjs";
+import { connection } from "../../redis";
+import { USAGE_STATS_QUEUE_NAME } from "../queues/usageStatsQueue";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 

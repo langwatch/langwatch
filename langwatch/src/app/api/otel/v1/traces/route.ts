@@ -1,25 +1,25 @@
-import { NextResponse, type NextRequest } from "next/server";
-import {
-  type IExportTraceServiceRequest,
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type {
+  IExportTraceServiceRequest,
   // @ts-ignore
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
-import { captureException } from "~/utils/posthogErrorCapture";
 import * as crypto from "crypto";
+import { getLangWatchTracer } from "langwatch";
+import { type NextRequest, NextResponse } from "next/server";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { dependencies } from "../../../../../injection/dependencies.server";
+import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
+import { prisma } from "../../../../../server/db";
 import { spanIngestionService } from "../../../../../server/event-sourcing/pipelines/span-ingestion/services/spanIngestionService";
-import { createLogger } from "../../../../../utils/logger";
-import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
-import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
-import { dependencies } from "../../../../../injection/dependencies.server";
+import { createLogger } from "../../../../../utils/logger";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
@@ -257,7 +257,9 @@ async function handleTracesRequest(req: NextRequest) {
         if (clickHouseTasks.length > 0) {
           try {
             await Promise.allSettled(clickHouseTasks);
-          } catch { /* ignore, errors non-blocking and caught by tracing layer */}
+          } catch {
+            /* ignore, errors non-blocking and caught by tracing layer */
+          }
         }
         return NextResponse.json({ message: "No changes" });
       }
@@ -273,7 +275,9 @@ async function handleTracesRequest(req: NextRequest) {
       if (clickHouseTasks.length > 0) {
         try {
           await Promise.allSettled(clickHouseTasks);
-        } catch { /* ignore, errors non-blocking and caught by tracing layer */}
+        } catch {
+          /* ignore, errors non-blocking and caught by tracing layer */
+        }
       }
 
       return NextResponse.json({ message: "Trace received successfully." });
@@ -282,4 +286,6 @@ async function handleTracesRequest(req: NextRequest) {
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterTracer("langwatch.otel.v1.traces")(withAppRouterLogger(handleTracesRequest));
+export const POST = withAppRouterTracer("langwatch.otel.v1.traces")(
+  withAppRouterLogger(handleTracesRequest),
+);

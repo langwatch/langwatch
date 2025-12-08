@@ -11,11 +11,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type GetServerSidePropsContext } from "next";
-import { type Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import type { GetServerSidePropsContext } from "next";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import type { Session } from "next-auth";
+import { getSession, signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -48,7 +48,7 @@ export default function SignIn({ session }: { session: Session | null }) {
         () => {
           void signIn(isAuthProvider, { callbackUrl });
         },
-        error ? 2000 : 0
+        error ? 2000 : 0,
       );
     }
   }, [publicEnv.data, session, callbackUrl, isAuthProvider, error]);
@@ -69,7 +69,7 @@ export default function SignIn({ session }: { session: Session | null }) {
 }
 
 export const getServerSideProps = async (
-  context: GetServerSidePropsContext
+  context: GetServerSidePropsContext,
 ) => {
   const session = await getSession(context);
 

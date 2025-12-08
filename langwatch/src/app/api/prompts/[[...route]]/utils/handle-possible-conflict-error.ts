@@ -11,7 +11,7 @@ import { HTTPException } from "hono/http-exception";
  */
 export const handlePossibleConflictError = (
   error: any,
-  scope: PromptScope = PromptScope.PROJECT
+  scope: PromptScope = PromptScope.PROJECT,
 ) => {
   if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
     throw new HTTPException(409, {

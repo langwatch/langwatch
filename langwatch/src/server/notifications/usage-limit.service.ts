@@ -1,11 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
-import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
-import { createLogger } from "../../utils/logger";
 import { env } from "../../env.mjs";
-import { NOTIFICATION_TYPES } from "./types";
-import { NotificationRepository } from "./repositories/notification.repository";
+import { createLogger } from "../../utils/logger";
+import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { TraceUsageService } from "../traces/trace-usage.service";
 import { getCurrentMonthStart } from "../utils/dateUtils";
+import { NotificationRepository } from "./repositories/notification.repository";
+import { NOTIFICATION_TYPES } from "./types";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -32,7 +32,8 @@ export class UsageLimitService {
     traceUsageService?: TraceUsageService,
   ) {
     this.notificationRepository = new NotificationRepository(prisma);
-    this.traceUsageService = traceUsageService ?? TraceUsageService.create(prisma);
+    this.traceUsageService =
+      traceUsageService ?? TraceUsageService.create(prisma);
   }
 
   /**

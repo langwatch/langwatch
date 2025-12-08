@@ -1,11 +1,12 @@
-import React, { createContext, useContext } from "react";
-import {
-  type OnboardingFormData,
-  type UsageStyle,
-  type CompanySize,
-  type SolutionType,
-  type DesireType,
-  type RoleType,
+import type React from "react";
+import { createContext, useContext } from "react";
+import type {
+  CompanySize,
+  DesireType,
+  OnboardingFormData,
+  RoleType,
+  SolutionType,
+  UsageStyle,
 } from "../types/types";
 
 interface OnboardingFormContextValue extends OnboardingFormData {

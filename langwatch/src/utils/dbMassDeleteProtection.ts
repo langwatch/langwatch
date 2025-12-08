@@ -1,6 +1,7 @@
 // From: https://github.com/prisma/prisma/issues/20169
+
+import type { Prisma } from "@prisma/client";
 import isEmpty from "lodash-es/isEmpty";
-import { type Prisma } from "@prisma/client";
 
 /**
  * Middleware featured below
@@ -47,7 +48,7 @@ const _guardEnMasse = ({
     // Don't allow delete all queries
     if (isEmpty(params.args.where)) {
       throw new Error(
-        `It looks like you just tried to perform a ${params.action} on all of the ${params.model}s. If this was intentional, pass 'where: ${safeWord}'`
+        `It looks like you just tried to perform a ${params.action} on all of the ${params.model}s. If this was intentional, pass 'where: ${safeWord}'`,
       );
     }
   }

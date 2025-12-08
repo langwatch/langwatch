@@ -15,14 +15,14 @@ const thresholds = {
 
 export const durationColor = (
   metric: keyof typeof thresholds,
-  duration: number | null | undefined
+  duration: number | null | undefined,
 ) => {
   if (duration == null || duration === undefined) {
-    return 'gray.500';
+    return "gray.500";
   }
   return duration > thresholds[metric].red
-    ? 'red'
+    ? "red"
     : duration > thresholds[metric].yellow
-    ? 'yellow.600'
-    : 'green';
+      ? "yellow.600"
+      : "green";
 };

@@ -1,11 +1,11 @@
 import {
-  Box,
-  Text,
-  VStack,
   Badge,
+  Box,
+  EmptyState,
   Flex,
   Skeleton,
-  EmptyState,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
 import React from "react";
 import { Check } from "react-feather";
@@ -31,7 +31,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
       },
       {
         enabled: !!project?.id && !!scenarioId,
-      }
+      },
     );
 
   return (

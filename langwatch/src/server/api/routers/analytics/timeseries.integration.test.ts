@@ -84,7 +84,7 @@ describe.skip("Timeseries Graph Integration Tests", () => {
       "sentiment.thumbs_up_down/min": -1,
     });
     expect(
-      (response.previousPeriod[1] as any)["metadata.trace_id/cardinality"]
+      (response.previousPeriod[1] as any)["metadata.trace_id/cardinality"],
     ).toBe(1);
   });
 

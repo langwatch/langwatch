@@ -1,26 +1,26 @@
+import { trace } from "@opentelemetry/api";
 import {
-  Queue,
-  Worker,
   type Job,
   type JobsOptions,
+  Queue,
   type QueueOptions,
+  Worker,
   type WorkerOptions,
 } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import { connection } from "../../../redis";
-import { createLogger } from "../../../../utils/logger";
-import { trace } from "@opentelemetry/api";
 import type { SemConvAttributes } from "langwatch/observability";
+import { createLogger } from "../../../../utils/logger";
+import { connection } from "../../../redis";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
 import {
-  isSequentialOrderingError,
-  extractPreviousSequenceNumber,
   ConfigurationError,
+  extractPreviousSequenceNumber,
+  isSequentialOrderingError,
   QueueError,
 } from "../../library/services/errorHandling";
 

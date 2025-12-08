@@ -1,13 +1,12 @@
-import { Button, HStack, Input, Text, VStack, Field } from "@chakra-ui/react";
+import { Button, Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "react-feather";
-
+import { useModelLimits } from "~/hooks/useModelLimits";
+import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import { MIN_MAX_TOKENS, FALLBACK_MAX_TOKENS } from "~/utils/constants";
-import { useModelLimits } from "~/hooks/useModelLimits";
 
 export type LlmConfigModalValues = {
   model: string;

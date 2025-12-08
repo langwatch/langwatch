@@ -1,19 +1,22 @@
-import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { createLogger } from "../../../utils/logger";
-import { connection } from "../../redis";
-import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
-import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
+import { connection } from "../../redis";
+import { clusterTopicsForProject } from "../../topicClustering/topicClustering";
+import { TOPIC_CLUSTERING_QUEUE_NAME } from "../queues/topicClusteringQueue";
 
 const logger = createLogger("langwatch:workers:topicClusteringWorker");
 
 export async function runTopicClusteringJob(
-  job: Job<TopicClusteringJob, void, string>
+  job: Job<TopicClusteringJob, void, string>,
 ) {
   getJobProcessingCounter("topic_clustering", "processing").inc();
   const start = Date.now();
@@ -37,7 +40,7 @@ export const startTopicClusteringWorker = () => {
     {
       connection,
       concurrency: 3,
-    }
+    },
   );
 
   topicClusteringWorker.on("ready", () => {

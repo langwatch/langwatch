@@ -14,8 +14,8 @@ import {
   Controls,
   Panel as FlowPanel,
   ReactFlow,
-  ReactFlowProvider,
   type ReactFlowProps,
+  ReactFlowProvider,
 } from "@xyflow/react";
 
 import { DndProvider, useDrop } from "react-dnd";
@@ -26,20 +26,23 @@ import Head from "next/head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {
+  type ImperativePanelHandle,
   Panel,
   PanelGroup,
   PanelResizeHandle,
-  type ImperativePanelHandle,
 } from "react-resizable-panels";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../components/CurrentDrawer";
+import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { useColorRawValue } from "../../components/ui/color-mode";
 import { Link } from "../../components/ui/link";
+import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { titleCase } from "../../utils/stringCasing";
 import { useAskBeforeLeaving } from "../hooks/useAskBeforeLeaving";
+import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { AutoSave } from "./AutoSave";
 import { PlaygroundButton } from "./ChatWindow";
@@ -47,21 +50,18 @@ import DefaultEdge from "./Edge";
 import { Evaluate } from "./Evaluate";
 import { RunningStatus } from "./ExecutionState";
 import { History } from "./History";
-import { NodeComponents } from "./nodes";
 import {
   CustomDragLayer,
   NodeSelectionPanel,
   NodeSelectionPanelButton,
 } from "./node-selection-panel/NodeSelectionPanel";
+import { NodeComponents } from "./nodes";
 import { Optimize } from "./Optimize";
 import { ProgressToast } from "./ProgressToast";
-import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { Publish } from "./Publish";
+import { PropertiesPanel } from "./properties/PropertiesPanel";
 import { ResultsPanel } from "./ResultsPanel";
 import { UndoRedo } from "./UndoRedo";
-import { toaster } from "../../components/ui/toaster";
-import { WizardProvider } from "../../components/evaluations/wizard/hooks/useWizardContext";
-import { PostEventProvider, usePostEvent } from "../hooks/usePostEvent";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -119,7 +119,7 @@ export default function OptimizationStudio() {
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
       };
-    })
+    }),
   );
 
   const { project } = useOrganizationTeamProject();
@@ -139,7 +139,7 @@ export default function OptimizationStudio() {
   };
 
   const [defaultTab, setDefaultTab] = useState<"evaluations" | "optimizations">(
-    "evaluations"
+    "evaluations",
   );
 
   useEffect(() => {
@@ -208,7 +208,7 @@ export default function OptimizationStudio() {
                     </Link>
                     <RunningStatus />
                     {!["waiting", "running"].includes(
-                      executionStatus ?? ""
+                      executionStatus ?? "",
                     ) && <AutoSave />}
                   </HStack>
                   <HStack width="full" justify="center">
@@ -325,8 +325,8 @@ export default function OptimizationStudio() {
                                     ? "16px"
                                     : "122px"
                                   : !isResultsPanelCollapsed
-                                  ? "180px"
-                                  : "262px",
+                                    ? "180px"
+                                    : "262px",
                                 marginBottom: "15px",
                               }}
                             />
@@ -415,8 +415,8 @@ function StatusCircle({
             status === "connected"
               ? "green.500"
               : status === "disconnected"
-              ? "red.300"
-              : "yellow.500"
+                ? "red.300"
+                : "yellow.500"
           }
           borderRadius="full"
         />
@@ -453,7 +453,7 @@ export function OptimizationStudioCanvas({
         x: 100,
         y: Math.round(
           ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) ||
-            300) / 2
+            300) / 2,
         ),
       }}
       proOptions={{ hideAttribution: true }}

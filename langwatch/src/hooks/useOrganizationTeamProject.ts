@@ -1,24 +1,22 @@
+import type { OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-
 import {
-  organizationRolePermissionMapping,
   type OrganizationRoleGroup,
+  organizationRolePermissionMapping,
   type TeamRoleGroup,
   teamRolePermissionMapping,
 } from "../server/api/permission";
+import {
+  hasPermissionWithHierarchy,
+  organizationRoleHasPermission,
+  type Permission,
+  teamRoleHasPermission,
+} from "../server/api/rbac";
 import { api } from "../utils/api";
-
-import { type OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 import { publicRoutes, useRequiredSession } from "./useRequiredSession";
-import {
-  teamRoleHasPermission,
-  organizationRoleHasPermission,
-  hasPermissionWithHierarchy,
-  type Permission,
-} from "../server/api/rbac";
 
 export const useOrganizationTeamProject = (
   {
@@ -126,46 +124,48 @@ export const useOrganizationTeamProject = (
   // For demo mode, find the organization that contains the demo project
   // (backend returns all user orgs + demo org, so we need to find the one with demo project)
   const organization = isDemo
-    ? organizations.data?.find((org) =>
+    ? (organizations.data?.find((org) =>
         org.teams.some((team) =>
           team.projects.some(
             (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
           ),
         ),
-      ) ?? organizations.data?.[0] // Fallback to first if not found
+      ) ?? organizations.data?.[0]) // Fallback to first if not found
     : teamsMatchingSlug?.[0]
-    ? teamsMatchingSlug?.[0].organization
-    : projectsTeamsOrganizationsMatchingSlug?.[0]
-    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
-    : organizations.data
-    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
-      organizations.data[0]
-    : undefined;
+      ? teamsMatchingSlug?.[0].organization
+      : projectsTeamsOrganizationsMatchingSlug?.[0]
+        ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+        : organizations.data
+          ? (organizations.data.find(
+              (org) => org.id == localStorageOrganizationId,
+            ) ?? organizations.data[0])
+          : undefined;
 
   const team = isDemo
-    ? organization?.teams.find((t) =>
+    ? (organization?.teams.find((t) =>
         t.projects.some(
           (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
         ),
       ) ??
       organization?.teams.find((t) => t.projects.length > 0) ??
-      organization?.teams[0] // Find team with demo project, or any team with projects
+      organization?.teams[0]) // Find team with demo project, or any team with projects
     : projectsTeamsOrganizationsMatchingSlug?.[0]
-    ? projectsTeamsOrganizationsMatchingSlug?.[0].team
-    : organization
-    ? organization.teams.find((team) => team.id == localStorageTeamId) ??
-      organization.teams.find((team) => team.projects.length > 0) ??
-      organization.teams[0]
-    : undefined;
+      ? projectsTeamsOrganizationsMatchingSlug?.[0].team
+      : organization
+        ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
+          organization.teams.find((team) => team.projects.length > 0) ??
+          organization.teams[0])
+        : undefined;
 
   // For demo mode, find the project with the demo slug
   const project = isDemo
-    ? team?.projects.find(
+    ? (team?.projects.find(
         (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
-      ) ?? team?.projects[0] // Find demo project by slug, or fallback to first
+      ) ?? team?.projects[0]) // Find demo project by slug, or fallback to first
     : team
-    ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
-    : undefined;
+      ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ??
+        team.projects[0])
+      : undefined;
 
   // Override project slug for demo projects so it matches the URL
   const finalProject = useMemo(() => {

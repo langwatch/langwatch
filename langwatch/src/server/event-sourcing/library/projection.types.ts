@@ -2,8 +2,8 @@
  * Types for managing multiple projections per aggregate.
  */
 
-import type { Event, Projection } from "./domain/types";
 import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
+import type { Event, Projection } from "./domain/types";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**

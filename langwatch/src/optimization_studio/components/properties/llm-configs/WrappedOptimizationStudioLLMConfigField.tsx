@@ -1,11 +1,9 @@
-import { Controller, useFormContext } from "react-hook-form";
-
-import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
-
 import { VStack } from "@chakra-ui/react";
+import { Controller, useFormContext } from "react-hook-form";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
 import { LLMConfigFormatUtils } from "./llm-config-format-utils";
+import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigField";
 
 /**
  * Wrapped OptimizationStudioLLMConfigField that works with

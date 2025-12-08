@@ -6,4 +6,3 @@ describe("MainContentEmptyState", () => {
     it.todo("renders NoTabsOpenState when prompts exist but none are open");
   });
 });
-

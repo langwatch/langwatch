@@ -36,7 +36,7 @@ const FilterLabel = ({ children }: { children: React.ReactNode }) => {
   const text = String(children)
     .split(".")
     .filter(
-      (word, index) => index !== 0 || word.toLowerCase() === "evaluations"
+      (word, index) => index !== 0 || word.toLowerCase() === "evaluations",
     )
     .join(" ");
 
@@ -77,7 +77,7 @@ export const FilterDisplay = ({
             <FilterContainer key={key} hasBorder={hasBorder}>
               <FilterLabel>{key}</FilterLabel>
               <FilterValue>{value.join(", ")}</FilterValue>
-            </FilterContainer>
+            </FilterContainer>,
           );
         }
       } else if (typeof value === "object" && value !== null) {
@@ -94,7 +94,7 @@ export const FilterDisplay = ({
             <FilterContainer key={key} hasBorder={hasBorder}>
               <FilterLabel>{key}</FilterLabel>
               <FilterValue>{nestedResult}</FilterValue>
-            </FilterContainer>
+            </FilterContainer>,
           );
         }
       } else {
@@ -102,7 +102,7 @@ export const FilterDisplay = ({
           <FilterContainer key={key} fontSize="xs" hasBorder={hasBorder}>
             <FilterLabel>{key}</FilterLabel>
             <FilterValue>{String(value)}</FilterValue>
-          </FilterContainer>
+          </FilterContainer>,
         );
       }
     }

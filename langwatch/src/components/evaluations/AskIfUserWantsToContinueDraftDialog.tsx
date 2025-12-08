@@ -1,5 +1,5 @@
-import { HStack, Text, Button } from "@chakra-ui/react";
-import { type DialogRootProps, Dialog } from "~/components/ui/dialog";
+import { Button, HStack, Text } from "@chakra-ui/react";
+import { Dialog, type DialogRootProps } from "~/components/ui/dialog";
 
 interface AskIfUserWantsToContinueDraftDialogProps
   extends Omit<DialogRootProps, "children"> {

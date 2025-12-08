@@ -1,14 +1,14 @@
-import { useCallback, useEffect, useState } from "react";
 import { nanoid } from "nanoid";
-import { usePostEvent } from "./usePostEvent";
-import { useShallow } from "zustand/react/shallow";
-import { api } from "../../utils/api";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
+import { useShallow } from "zustand/react/shallow";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 import { useVersionState } from "../components/History";
 import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
+import { usePostEvent } from "./usePostEvent";
 
 import { useWorkflowStore } from "./useWorkflowStore";
 
@@ -22,7 +22,7 @@ export const useRunEvalution = () => {
       setEvaluationState: state.setEvaluationState,
       getWorkflow: state.getWorkflow,
       setWorkflow: state.setWorkflow,
-    }))
+    })),
   );
 
   const { postEvent, isLoading } = usePostEvent();
@@ -128,7 +128,7 @@ export const useRunEvalution = () => {
                 prevDsl: previousVersion?.dsl,
                 newDsl: getWorkflow(),
               });
-            commitMessage = commitMessageResponse as string ?? "autosaved";
+            commitMessage = (commitMessageResponse as string) ?? "autosaved";
           } catch (error) {
             toaster.create({
               title: "Error auto-generating version description",
@@ -201,7 +201,7 @@ export const useRunEvalution = () => {
       nextVersion,
       setWorkflow,
       trpc.workflow.getVersions,
-    ]
+    ],
   );
 
   const stopEvaluation = useCallback(
@@ -229,7 +229,7 @@ export const useRunEvalution = () => {
         });
       }, 10_000);
     },
-    [setEvaluationState]
+    [setEvaluationState],
   );
 
   return {

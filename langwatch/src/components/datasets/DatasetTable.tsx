@@ -1,3 +1,4 @@
+import type { AgGridReact } from "@ag-grid-community/react";
 import {
   Alert,
   Box,
@@ -10,15 +11,17 @@ import {
   Text,
   useDisclosure,
 } from "@chakra-ui/react";
+import { nanoid } from "nanoid";
 import Parse from "papaparse";
 import {
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import {
   ChevronDown,
   Download,
@@ -28,28 +31,24 @@ import {
   Upload,
 } from "react-feather";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { useDrawer } from "../CurrentDrawer";
-import {
-  DatasetGrid,
-  datasetValueToGridValue,
-  HeaderCheckboxComponent,
-  type DatasetColumnDef,
-} from "./DatasetGrid";
-
-import type { AgGridReact } from "@ag-grid-community/react";
-import { nanoid } from "nanoid";
 import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
+import { api } from "../../utils/api";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
+import { useDrawer } from "../CurrentDrawer";
+import { Menu } from "../ui/menu";
 
 import { toaster } from "../ui/toaster";
-import { Menu } from "../ui/menu";
-import { ErrorBoundary } from "react-error-boundary";
+import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
+import {
+  type DatasetColumnDef,
+  DatasetGrid,
+  datasetValueToGridValue,
+  HeaderCheckboxComponent,
+} from "./DatasetGrid";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -115,7 +114,7 @@ export function DatasetTable({
           meta: { closable: true },
         });
       },
-    }
+    },
   );
 
   const dataset = useMemo(
@@ -125,7 +124,7 @@ export function DatasetTable({
         : inMemoryDataset,
     // Do not update for parent inMemoryDataset updates on purpose, only on network data load, keep local state local and sync manually to avoid rerenders
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [databaseDataset.data]
+    [databaseDataset.data],
   );
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
   const downloadDataset = api.datasetRecord.download.useMutation();
@@ -133,7 +132,7 @@ export function DatasetTable({
   const gridRef = useRef<AgGridReact>(null);
 
   const [columnTypes, setColumnTypes] = useState<DatasetColumns>(
-    dataset?.columnTypes ?? []
+    dataset?.columnTypes ?? [],
   );
   useEffect(() => {
     setColumnTypes(dataset?.columnTypes ?? []);
@@ -185,8 +184,8 @@ export function DatasetTable({
   const setParentRowData = useCallback(
     (
       callback: (
-        rows: DatasetRecordEntry[] | undefined
-      ) => DatasetRecordEntry[] | undefined
+        rows: DatasetRecordEntry[] | undefined,
+      ) => DatasetRecordEntry[] | undefined,
     ) => {
       if (datasetId) return;
       setParentRowData_((rows) => {
@@ -200,11 +199,11 @@ export function DatasetTable({
         return rows_;
       });
     },
-    [columnTypes, dataset?.name, datasetId, onUpdateDataset]
+    [columnTypes, dataset?.name, datasetId, onUpdateDataset],
   );
 
   const [selectedEntryIds, setSelectedEntryIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   const [localRowData, setLocalRowData] = useState<
@@ -261,13 +260,13 @@ export function DatasetTable({
     const csvData =
       data.datasetRecords
         .filter((record) =>
-          selectedOnly ? selectedEntryIds.has(record.id) : true
+          selectedOnly ? selectedEntryIds.has(record.id) : true,
         )
         .map((record) =>
           columnTypes.map((col) => {
             const value = record[col.name];
             return datasetValueToGridValue(value, col.type);
-          })
+          }),
         ) ?? [];
 
     const csv = Parse.unparse({
@@ -360,7 +359,7 @@ export function DatasetTable({
             void databaseDataset.refetch();
             setSavingStatus("");
           },
-        }
+        },
       );
     },
     [
@@ -369,14 +368,14 @@ export function DatasetTable({
       updateDatasetRecord,
       project?.id,
       databaseDataset,
-    ]
+    ],
   );
 
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setParentRowData(
-        (rows) => rows?.filter((row) => !recordIds.includes(row.id))
+      setParentRowData((rows) =>
+        rows?.filter((row) => !recordIds.includes(row.id)),
       );
 
       const grid = parentGridRef ?? gridRef;
@@ -423,7 +422,7 @@ export function DatasetTable({
             });
             void databaseDataset.refetch();
           },
-        }
+        },
       );
     }
   }, [
@@ -449,7 +448,7 @@ export function DatasetTable({
     });
 
     const firstEditableColumn = columnDefs.find(
-      (col) => col.editable !== false && col.field !== "selected"
+      (col) => col.editable !== false && col.field !== "selected",
     );
 
     const result = grid.current.api.applyTransaction({ add: [newRow] });
@@ -501,8 +500,8 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                      ? ""
-                      : DEFAULT_DATASET_NAME
+                        ? ""
+                        : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
@@ -526,8 +525,8 @@ export function DatasetTable({
           {savingStatus === "saving"
             ? "Saving..."
             : savingStatus === "saved"
-            ? "Saved"
-            : ""}
+              ? "Saved"
+              : ""}
         </Text>
         <Spacer />
         {!hideButtons && (

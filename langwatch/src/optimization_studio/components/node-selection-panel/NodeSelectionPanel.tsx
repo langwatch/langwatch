@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Node, type XYPosition } from "@xyflow/react";
+import type { Node, XYPosition } from "@xyflow/react";
 import { useEffect, useRef } from "react";
 import { useDragLayer } from "react-dnd";
 import { BookOpen, Box as BoxIcon, ChevronsLeft, GitHub } from "react-feather";
@@ -18,7 +18,7 @@ import { DiscordOutlineIcon } from "../../../components/icons/DiscordOutline";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { MODULES } from "../../registry";
-import { type ComponentType, type Custom, type Field } from "../../types/dsl";
+import type { ComponentType, Custom, Field } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
 import { NodeComponents } from "../nodes";
 import { PromptingTechniqueDraggingNode } from "../nodes/PromptingTechniqueNode";
@@ -74,18 +74,18 @@ export const NodeSelectionPanel = ({
     {
       enabled: !!project?.id && !!workflow?.workflow_id,
       refetchOnWindowFocus: true,
-    }
+    },
   );
 
   const createCustomComponent = (custom: Custom) => {
     const publishedId = custom.publishedId ?? "";
     const publishedVersion = custom.versions?.find(
-      (version: any) => version.id === publishedId
+      (version: any) => version.id === publishedId,
     );
 
     const { inputs, outputs } = getInputsOutputs(
       publishedVersion?.dsl.edges,
-      publishedVersion?.dsl.nodes
+      publishedVersion?.dsl.nodes,
     ) as { inputs: Field[]; outputs: Field[] };
 
     return {

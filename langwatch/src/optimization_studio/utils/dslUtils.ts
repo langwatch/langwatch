@@ -1,10 +1,10 @@
-import type { workflowJsonSchema } from "../types/dsl";
-import type { z } from "zod";
 import type { Node } from "@xyflow/react";
+import type { z } from "zod";
+import type { workflowJsonSchema } from "../types/dsl";
 
 export const clearDsl = (
   dsl: z.infer<typeof workflowJsonSchema>,
-  includeExecutionStates = false
+  includeExecutionStates = false,
 ) => {
   return {
     ...dsl,
@@ -38,18 +38,18 @@ export const clearDsl = (
 export const hasDSLChanged = (
   dslCurrent: z.infer<typeof workflowJsonSchema>,
   dslPrevious: z.infer<typeof workflowJsonSchema>,
-  includeExecutionStates: boolean
+  includeExecutionStates: boolean,
 ) => {
   return (
     JSON.stringify(
       recursiveAlphabeticallySortedKeys(
-        clearDsl(dslCurrent, includeExecutionStates)
-      )
+        clearDsl(dslCurrent, includeExecutionStates),
+      ),
     ) !==
     JSON.stringify(
       recursiveAlphabeticallySortedKeys(
-        clearDsl(dslPrevious, includeExecutionStates)
-      )
+        clearDsl(dslPrevious, includeExecutionStates),
+      ),
     )
   );
 };
@@ -64,6 +64,6 @@ export const recursiveAlphabeticallySortedKeys = <T>(obj: T): T => {
   return Object.fromEntries(
     Object.entries(obj)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, value]) => [key, recursiveAlphabeticallySortedKeys(value)])
+      .map(([key, value]) => [key, recursiveAlphabeticallySortedKeys(value)]),
   ) as T;
 };

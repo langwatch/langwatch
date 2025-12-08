@@ -1,17 +1,17 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { useEffect } from "react";
-import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
-import { Dialog } from "../../../components/ui/dialog";
-import { useRouter } from "next/router";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { isNotFound } from "../../../utils/trpcError";
 import ErrorPage from "next/error";
-import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useRouter } from "next/router";
+import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { LoadingScreen } from "../../../components/LoadingScreen";
+import { CurrentDrawer } from "../../../components/CurrentDrawer";
+import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
+import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
 import { useInitialLoadExperiment } from "../../../components/evaluations/wizard/hooks/useInitialLoadExperiment";
-import { CurrentDrawer } from "../../../components/CurrentDrawer";
+import { LoadingScreen } from "../../../components/LoadingScreen";
+import { Dialog } from "../../../components/ui/dialog";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { isNotFound } from "../../../utils/trpcError";
 
 export default function EvaluationWizard() {
   const { open, setOpen } = useDisclosure();
@@ -34,7 +34,7 @@ export default function EvaluationWizard() {
         skipNextAutosave: state.skipNextAutosave,
         reset: state.reset,
       };
-    })
+    }),
   );
 
   useEffect(() => {

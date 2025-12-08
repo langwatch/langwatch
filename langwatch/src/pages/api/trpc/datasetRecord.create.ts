@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import trpc from "./[trpc]";
 import { getPayloadSizeHistogram } from "../../../server/metrics";
+import trpc from "./[trpc]";
 
 export const config = {
   api: {
@@ -13,11 +13,11 @@ export const config = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   req.query.trpc = "datasetRecord.create";
   getPayloadSizeHistogram("dataset_record").observe(
-    JSON.stringify(req.body).length
+    JSON.stringify(req.body).length,
   );
   return trpc(req, res);
 }

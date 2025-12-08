@@ -1,17 +1,19 @@
-import { useDisclosure } from "@chakra-ui/react";
-import { HStack, Button, Spacer, Box, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
 import { X } from "react-feather";
-
-import type { ModelOption } from "~/server/topicClustering/types";
-
-import { Sliders2 } from "../icons/Sliders2";
-import { Tooltip } from "../ui/tooltip";
-
-import { LLMModelDisplay } from "./LLMModelDisplay";
-
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import type { ModelOption } from "~/server/topicClustering/types";
+import { Sliders2 } from "../icons/Sliders2";
+import { Tooltip } from "../ui/tooltip";
+import { LLMModelDisplay } from "./LLMModelDisplay";
 
 interface LLMConfigFieldProps {
   llmConfig: LLMConfig;

@@ -1,17 +1,17 @@
-import { VStack, Text } from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
+import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
-import type { Field } from "../../../../../optimization_studio/types/dsl";
 import { StepAccordion } from "../../components/StepAccordion";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { usePublicEnv } from "../../../../../hooks/usePublicEnv";
 
 export const EvaluatorSettingsAccordion = () => {
   const { project } = useOrganizationTeamProject();
@@ -38,7 +38,7 @@ export const EvaluatorSettingsAccordion = () => {
     (evaluator?.data.parameters ?? []).map(({ identifier, value }) => [
       identifier,
       value,
-    ])
+    ]),
   );
 
   const defaultSettings:
@@ -47,11 +47,11 @@ export const EvaluatorSettingsAccordion = () => {
     Object.keys(settingsFromParameters).length > 0
       ? (settingsFromParameters as any)
       : evaluatorType && availableEvaluators
-      ? getEvaluatorDefaultSettings(
-          availableEvaluators[evaluatorType as EvaluatorTypes],
-          project
-        )
-      : undefined;
+        ? getEvaluatorDefaultSettings(
+            availableEvaluators[evaluatorType as EvaluatorTypes],
+            project,
+          )
+        : undefined;
 
   const form = useForm<{
     settings: typeof defaultSettings;
@@ -77,13 +77,13 @@ export const EvaluatorSettingsAccordion = () => {
                 identifier,
                 type: "str",
                 value: value,
-              }) as Field
+              }) as Field,
           ),
         },
-        availableEvaluators
+        availableEvaluators,
       );
     },
-    [availableEvaluators, evaluatorType, setFirstEvaluator]
+    [availableEvaluators, evaluatorType, setFirstEvaluator],
   );
 
   const formRenderedFor = useRef<string>(evaluatorType);

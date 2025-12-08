@@ -17,4 +17,3 @@ export function MainContentEmptyState() {
 
   return <NoTabsOpenState />;
 }
-

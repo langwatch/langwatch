@@ -21,7 +21,7 @@ import type { RouteResponse } from "../../../shared/types";
  * ```
  */
 export const buildStandardSuccessResponse = (
-  zodSchema: ZodSchema
+  zodSchema: ZodSchema,
 ): RouteResponse => {
   return {
     description: "Success",

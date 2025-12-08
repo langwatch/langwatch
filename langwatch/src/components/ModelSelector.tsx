@@ -11,11 +11,10 @@ import { Search } from "react-feather";
 
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
+import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
-
 import { InputGroup } from "./ui/input-group";
 import { Select } from "./ui/select";
-import { allLitellmModels } from "../server/modelProviders/registry";
 
 export type ModelOption = {
   label: string;
@@ -26,7 +25,7 @@ export type ModelOption = {
 };
 
 export const modelSelectorOptions: ModelOption[] = Object.entries(
-  allLitellmModels
+  allLitellmModels,
 ).map(([key, value]) => ({
   label: key,
   value: key,
@@ -38,24 +37,24 @@ export const modelSelectorOptions: ModelOption[] = Object.entries(
 }));
 
 export const allModelOptions = modelSelectorOptions.map(
-  (option) => option.value
+  (option) => option.value,
 );
 
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
-  mode: "chat" | "embedding" = "chat"
+  mode: "chat" | "embedding" = "chat",
 ) => {
   const { project } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id, refetchOnMount: false }
+    { enabled: !!project?.id, refetchOnMount: false },
   );
 
   const customModels = getCustomModels(
     modelProviders.data ?? {},
     options,
-    mode
+    mode,
   );
 
   const selectOptions: Record<string, ModelOption> = Object.fromEntries(
@@ -73,7 +72,7 @@ export const useModelSelectionOptions = (
           mode: mode,
         },
       ];
-    })
+    }),
   );
 
   const modelOption = selectOptions[model];
@@ -110,14 +109,14 @@ export const ModelSelector = React.memo(function ModelSelector({
     items: options_.filter(
       (item) =>
         item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-        item.value.toLowerCase().includes(modelSearch.toLowerCase())
+        item.value.toLowerCase().includes(modelSearch.toLowerCase()),
     ),
   });
 
   const selectedItem = options_.find((option) => option.value === model);
 
   const isDisabled = selectOptions.find(
-    (option) => option.value === selectedItem?.value
+    (option) => option.value === selectedItem?.value,
   )?.isDisabled;
 
   const isDeprecated = !selectedItem;
@@ -155,12 +154,12 @@ export const ModelSelector = React.memo(function ModelSelector({
   );
 
   const [highlightedValue, setHighlightedValue] = useState<string | null>(
-    model
+    model,
   );
 
   useEffect(() => {
     const highlightedItem = modelCollection.items.find(
-      (item) => item.value === highlightedValue
+      (item) => item.value === highlightedValue,
     );
     if (!highlightedItem) {
       setHighlightedValue(modelCollection.items[0]?.value ?? null);
@@ -259,7 +258,7 @@ export const ModelSelector = React.memo(function ModelSelector({
 const getCustomModels = (
   modelProviders: Record<string, any>,
   options: string[],
-  mode: "chat" | "embedding" = "chat"
+  mode: "chat" | "embedding" = "chat",
 ) => {
   const models: string[] = [];
 

@@ -1,12 +1,12 @@
 import type { Monitor, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
-import { prisma } from "../../../../../server/db";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import handler from "./evaluate";
+import { prisma } from "../../../../../server/db";
 import { getTestProject } from "../../../../../utils/testUtils";
+import handler from "./evaluate";
 
 describe("Guardrail API Endpoint", () => {
   let project: Project | undefined;

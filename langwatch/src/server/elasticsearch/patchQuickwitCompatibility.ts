@@ -1,7 +1,6 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
-
-import { env } from "../../env.mjs";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import throttle from "lodash-es/throttle";
+import { env } from "../../env.mjs";
 
 // Hold a temporary in-memory db to accumulate the updates together and send just the latest to quickwit
 const inMemoryDb: Record<string, Record<string, unknown>> = {};
@@ -120,7 +119,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
 
     const quickwitUrl = env.ELASTICSEARCH_NODE_URL?.replace(
       "quickwit://",
-      "http://"
+      "http://",
     ).replace(/\/api\/v1\/_elastic\/?/, "");
     if (!quickwitUrl) {
       throw new Error("Quickwit URL not configured");
@@ -134,7 +133,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(deleteQuery),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -169,7 +168,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
     const inMemoryDoc = inMemoryDb[params.id] ?? {};
     const existingDoc = mergeDocs(
       (await getDocumentById(params.index, params.id)) as any,
-      inMemoryDoc
+      inMemoryDoc,
     );
 
     let finalDoc: Record<string, unknown>;
@@ -183,7 +182,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
         finalDoc = params.doc_as_upsert ? params.doc : params.upsert!;
       } else {
         throw new Error(
-          `Document with id ${params.id} not found and no upsert provided`
+          `Document with id ${params.id} not found and no upsert provided`,
         );
       }
     }
@@ -244,7 +243,7 @@ export const patchForQuickwitCompatibility = (esClient: ElasticClient) => {
 
     if (result.errors) {
       throw new Error(
-        `Bulk operation failed: ${JSON.stringify(result.errors)}`
+        `Bulk operation failed: ${JSON.stringify(result.errors)}`,
       );
     }
 
@@ -306,14 +305,14 @@ const mergeArrays = (a: object[], b: object[], idField: string) => {
       [...a, ...b].map((item) => [
         (item as any)[idField] ?? Math.random().toString(),
         item,
-      ])
-    )
+      ]),
+    ),
   );
 };
 
 const mergeDocs = (
   doc1_: Record<string, unknown>,
-  doc2_: Record<string, unknown>
+  doc2_: Record<string, unknown>,
 ) => {
   const doc1 = doc1_ ?? {};
   const doc2 = doc2_ ?? {};
@@ -331,7 +330,7 @@ const mergeDocs = (
     merged.spans = mergeArrays(
       (doc1 as any).spans ?? [],
       (doc2 as any).spans ?? [],
-      "span_id"
+      "span_id",
     );
   }
 

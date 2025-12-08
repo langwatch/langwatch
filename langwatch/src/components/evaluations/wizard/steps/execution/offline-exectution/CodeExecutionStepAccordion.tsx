@@ -1,9 +1,9 @@
-import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { VStack } from "@chakra-ui/react";
-import type { Field } from "~/optimization_studio/types/dsl";
 import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
+import type { Field } from "~/optimization_studio/types/dsl";
+import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
+import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
 export const CODE_EXECUTION_STEP_ACCORDION_VALUE = "offline_code_execution";
 
@@ -19,7 +19,7 @@ export function CodeExecutionStepAccordion() {
         getNodesByType,
         setNodeInputs,
         setNodeOutputs,
-      }))
+      })),
     );
 
   const executorNode = getNodesByType("code")[0];
@@ -29,7 +29,7 @@ export function CodeExecutionStepAccordion() {
       if (!executorNode) return;
       setNodeInputs(executorNode.id, data.fields);
     },
-    [executorNode, setNodeInputs]
+    [executorNode, setNodeInputs],
   );
 
   const handleOnOutputsChange = useCallback(
@@ -37,7 +37,7 @@ export function CodeExecutionStepAccordion() {
       if (!executorNode) return;
       setNodeOutputs(executorNode.id, data.fields);
     },
-    [executorNode, setNodeOutputs]
+    [executorNode, setNodeOutputs],
   );
 
   if (!executorNode) {

@@ -1,11 +1,12 @@
-import type { UsageStatsJob } from "~/server/background/types";
-import { connection } from "../../redis";
-import { QueueWithFallback } from "./queueWithFallback";
-import { runUsageStatsJob } from "../workers/usageStatsWorker";
 import type { ConnectionOptions } from "bullmq";
-import { prisma } from "../../db";
-import { createLogger } from "../../../utils/logger";
 import { env } from "~/env.mjs";
+import type { UsageStatsJob } from "~/server/background/types";
+import { createLogger } from "../../../utils/logger";
+import { prisma } from "../../db";
+import { connection } from "../../redis";
+import { runUsageStatsJob } from "../workers/usageStatsWorker";
+import { QueueWithFallback } from "./queueWithFallback";
+
 const logger = createLogger("langwatch:usageStatsQueue");
 
 export const USAGE_STATS_QUEUE_NAME = "{usage_stats}";
@@ -68,9 +69,9 @@ export const scheduleUsageStats = async () => {
           repeat: {
             pattern: "0 12 * * *", // Run at noon every day
           },
-        }
+        },
       );
-    })
+    }),
   );
 
   // Log any failures
@@ -78,7 +79,7 @@ export const scheduleUsageStats = async () => {
   if (failures.length > 0) {
     logger.error(
       { count: failures.length, total: organizations.length },
-      "Failed to schedule some usage stats jobs"
+      "Failed to schedule some usage stats jobs",
     );
   }
 };
@@ -102,6 +103,6 @@ export const scheduleUsageStatsForOrganization = async (organization: {
     },
     {
       jobId: `usage_stats_${instanceId}_${yyyymmdd}`,
-    }
+    },
   );
 };

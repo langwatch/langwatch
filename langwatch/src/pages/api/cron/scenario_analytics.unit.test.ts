@@ -1,6 +1,6 @@
-import { describe, expect, it, vi, beforeEach, beforeAll } from "vitest";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
 import { ANALYTICS_KEYS } from "~/types";
 import handler from "./scenario_analytics";
@@ -100,7 +100,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       const expectedEnd = new Date("2024-01-15T00:00:00.000Z");
 
       expect(
-        createScenarioAnalyticsQueriesForAllEventTypes
+        createScenarioAnalyticsQueriesForAllEventTypes,
       ).toHaveBeenCalledWith({
         projectId: "test-project-1",
         startTime: expectedStart.getTime(),
@@ -296,7 +296,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
   describe("Error Handling", () => {
     it("should handle database errors", async () => {
       (prisma.project.findMany as any).mockRejectedValue(
-        new Error("Database connection failed")
+        new Error("Database connection failed"),
       );
 
       const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
@@ -358,7 +358,7 @@ describe("Scenario Analytics Cron Job - Unit Tests", () => {
       (prisma.project.findMany as any).mockResolvedValue(mockProjects);
       (prisma.analytics.findMany as any).mockResolvedValue([]);
       (prisma.analytics.createMany as any).mockRejectedValue(
-        new Error("Analytics creation failed")
+        new Error("Analytics creation failed"),
       );
 
       const { esClient } = await import("~/server/elasticsearch");

@@ -2,10 +2,10 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { Client as OpenSearchClient } from "@opensearch-project/opensearch";
 
 import { env } from "../env.mjs";
+import { decrypt } from "../utils/encryption";
+import { prisma } from "./db";
 import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearchCompatibility";
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
-import { prisma } from "./db";
-import { decrypt } from "../utils/encryption";
 
 export type IndexSpec = {
   alias: string;
@@ -62,7 +62,7 @@ const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
 };
 
 export const esClient = async (
-  args?: { projectId: string } | { organizationId: string } | { test: true }
+  args?: { projectId: string } | { organizationId: string } | { test: true },
 ) => {
   let elasticsearchNodeUrl: string | null = null;
   let elasticsearchApiKey: string | null = null;
@@ -88,7 +88,7 @@ export const esClient = async (
         : null;
     } else if ("projectId" in args) {
       const project = await getOrgElasticsearchDetailsFromProject(
-        args.projectId
+        args.projectId,
       );
       orgElasticsearchNodeUrl = project?.elasticsearchNodeUrl
         ? decrypt(project.elasticsearchNodeUrl)
@@ -102,10 +102,10 @@ export const esClient = async (
     const useOrgSettings = orgElasticsearchNodeUrl && orgElasticsearchApiKey;
     elasticsearchNodeUrl = useOrgSettings
       ? orgElasticsearchNodeUrl
-      : env.ELASTICSEARCH_NODE_URL ?? null;
+      : (env.ELASTICSEARCH_NODE_URL ?? null);
     elasticsearchApiKey = useOrgSettings
       ? orgElasticsearchApiKey
-      : env.ELASTICSEARCH_API_KEY ?? null;
+      : (env.ELASTICSEARCH_API_KEY ?? null);
   }
 
   const client =

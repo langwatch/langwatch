@@ -1,20 +1,19 @@
-import {
-  type Prisma,
-  type LlmPromptConfig,
-  type LlmPromptConfigVersion,
-  type PrismaClient,
-  type User,
+import type {
+  LlmPromptConfig,
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
+  User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 
-import { type SchemaVersion } from "../enums";
-
-import {
-  type LatestConfigVersionSchema,
-  getVersionValidator,
-} from "./llm-config-version-schema";
+import type { SchemaVersion } from "../enums";
 import { LlmConfigRepository } from "./llm-config.repository";
+import {
+  getVersionValidator,
+  type LatestConfigVersionSchema,
+} from "./llm-config-version-schema";
 
 /**
  * Interface for LLM Config Version data transfer objects
@@ -117,7 +116,7 @@ export class LlmConfigVersionsRepository {
     projectId: string,
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<LlmPromptConfigVersion & { author: User | null }> {
     const { tx } = options ?? {};
     const client = tx ?? this.prisma;

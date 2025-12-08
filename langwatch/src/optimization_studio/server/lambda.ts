@@ -1,20 +1,20 @@
 import {
-  LambdaClient,
-  InvokeWithResponseStreamCommand,
-  CreateFunctionCommand,
-  GetFunctionCommand,
-  UpdateFunctionCodeCommand,
-} from "@aws-sdk/client-lambda";
-import {
   CloudWatchLogsClient,
-  PutRetentionPolicyCommand,
   CreateLogGroupCommand,
+  PutRetentionPolicyCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
-import type { StudioClientEvent } from "../types/events";
-import { captureException } from "../../utils/posthogErrorCapture";
+import {
+  CreateFunctionCommand,
+  GetFunctionCommand,
+  InvokeWithResponseStreamCommand,
+  LambdaClient,
+  UpdateFunctionCodeCommand,
+} from "@aws-sdk/client-lambda";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger";
+import { captureException } from "../../utils/posthogErrorCapture";
+import type { StudioClientEvent } from "../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 

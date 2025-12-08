@@ -38,4 +38,3 @@ export class TtlCache<T> {
     this.cache.clear();
   }
 }
-

@@ -1,35 +1,35 @@
-import { Link } from "../../components/ui/link";
 import {
   Alert,
   Box,
   Card,
-  HStack,
   Heading,
+  HStack,
   Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { PermissionAlert } from "../../components/PermissionAlert";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import type { Permission } from "../../server/api/rbac";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "../../components/analytics/DocumentsCountsTable";
 import { UserMetrics } from "../../components/analytics/UserMetrics";
 import { FilterSidebar } from "../../components/filters/FilterSidebar";
+import GraphsLayout from "../../components/GraphsLayout";
+import { LLMMetrics } from "../../components/LLMMetrics";
+import { PermissionAlert } from "../../components/PermissionAlert";
+import { Link } from "../../components/ui/link";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
+import type { Permission } from "../../server/api/rbac";
 import { api } from "../../utils/api";
-import GraphsLayout from "../../components/GraphsLayout";
-import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
-import { LLMMetrics } from "../../components/LLMMetrics";
-import { captureException } from "~/utils/posthogErrorCapture";
 
 function ProjectRouter() {
   const router = useRouter();

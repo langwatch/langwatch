@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Field,
   HStack,
   Input,
   NativeSelect,
@@ -9,7 +10,6 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Tooltip } from "../../../components/ui/tooltip";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
@@ -17,6 +17,7 @@ import { Folder, Info } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import type { Entry } from "../../types/dsl";
@@ -25,7 +26,6 @@ import {
   BasePropertiesPanel,
   PropertySectionTitle,
 } from "./BasePropertiesPanel";
-import { Field } from "@chakra-ui/react";
 
 export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
   const { open, onOpen, onClose } = useDisclosure();
@@ -86,7 +86,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
               path: ["test_size"],
             });
           }
-        })
+        }),
     ),
   });
 
@@ -103,7 +103,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [],
   );
 
   const unitField = form.register("unit");
@@ -267,7 +267,7 @@ export function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
                   onChange={(e) => {
                     form.setValue(
                       "unit",
-                      e.target.value as "percent" | "entries"
+                      e.target.value as "percent" | "entries",
                     );
                   }}
                 >

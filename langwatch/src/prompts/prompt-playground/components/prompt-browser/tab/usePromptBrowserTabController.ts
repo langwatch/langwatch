@@ -1,6 +1,6 @@
-import { useTabId } from "../ui/TabContext";
-import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useHasUnsavedChanges } from "../../../hooks/useHasUnsavedChanges";
+import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
+import { useTabId } from "../ui/TabContext";
 
 /**
  * Manages tab state and provides close handler with unsaved changes confirmation.

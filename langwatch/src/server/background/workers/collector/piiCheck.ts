@@ -2,19 +2,19 @@ import { DlpServiceClient } from "@google-cloud/dlp";
 import type { google } from "@google-cloud/dlp/build/protos/protos";
 import type { PIIRedactionLevel } from "@prisma/client";
 import { env } from "../../../../env.mjs";
+import { createLogger } from "../../../../utils/logger";
+import { startSpan } from "../../../../utils/posthogErrorCapture";
 import type { BatchEvaluationResult } from "../../../evaluations/evaluators.generated";
-import type {
-  ElasticSearchSpan,
-  ElasticSearchTrace,
-  Trace,
-} from "../../../tracer/types";
 import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../../metrics";
-import { startSpan } from "../../../../utils/posthogErrorCapture";
-import { createLogger } from "../../../../utils/logger";
+import type {
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  Trace,
+} from "../../../tracer/types";
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
 
@@ -110,7 +110,7 @@ const essentialInfoTypes = {
 
 const dlpCheck = async (
   text: string,
-  piiRedactionLevel: PIIRedactionLevel
+  piiRedactionLevel: PIIRedactionLevel,
 ): Promise<google.privacy.dlp.v2.IFinding[]> => {
   const [response] = await dlp.inspectContent({
     parent: `projects/${credentials.project_id}/locations/global`,
@@ -137,7 +137,7 @@ const dlpCheck = async (
 const clearPII = async (
   object: Record<string | number, any>,
   keysPath: (string | number)[],
-  options: PIICheckOptions
+  options: PIICheckOptions,
 ) => {
   const { piiRedactionLevel, mainMethod, enforced } = options;
 
@@ -177,14 +177,14 @@ const clearPII = async (
         throw e;
       } else {
         logger.warn(
-          "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
+          "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default.",
         );
         return;
       }
     }
     logger.debug(
       { error: e as any },
-      `error running ${firstMethod} PII check, running ${secondMethod} as fallback`
+      `error running ${firstMethod} PII check, running ${secondMethod} as fallback`,
     );
 
     try {
@@ -194,7 +194,7 @@ const clearPII = async (
         throw e;
       }
       logger.warn(
-        "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default."
+        "⚠️  WARNING: Fail to redact PII with error but allowed to continue, this will fail in production by default.",
       );
     }
   }
@@ -203,7 +203,7 @@ const clearPII = async (
 const googleDLPClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
-  piiRedactionLevel: PIIRedactionLevel
+  piiRedactionLevel: PIIRedactionLevel,
 ): Promise<void> => {
   getPiiChecksCounter("google_dlp").inc();
   const [text, remaining] = [
@@ -230,7 +230,7 @@ const googleDLPClearPII = async (
 const presidioClearPII = async (
   currentObject: Record<string | number, any>,
   lastKey: string | number,
-  piiRedactionLevel: PIIRedactionLevel
+  piiRedactionLevel: PIIRedactionLevel,
 ): Promise<void> => {
   getPiiChecksCounter("presidio").inc();
   const timeout = 60_000;
@@ -258,14 +258,14 @@ const presidioClearPII = async (
             (piiRedactionLevel === "ESSENTIAL"
               ? essentialInfoTypes
               : strictInfoTypes
-            ).presidio.map((name) => [name.toLowerCase(), true])
+            ).presidio.map((name) => [name.toLowerCase(), true]),
           ),
           min_threshold: 0.5,
         },
         env: {},
       }),
       signal: controller.signal,
-    }
+    },
   );
 
   clearTimeout(timeoutId);
@@ -306,7 +306,7 @@ type PIICheckOptions = {
 export const cleanupPIIs = async (
   trace: Trace | Omit<ElasticSearchTrace, "spans">,
   spans: ElasticSearchSpan[],
-  options: PIICheckOptions
+  options: PIICheckOptions,
 ): Promise<void> => {
   return await startSpan({ name: "cleanupPIIs" }, async () => {
     const { enforced, mainMethod } = options;
@@ -314,22 +314,22 @@ export const cleanupPIIs = async (
     if (!credentials && mainMethod === "google_dlp") {
       if (enforced) {
         throw new Error(
-          "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed"
+          "GOOGLE_APPLICATION_CREDENTIALS is not set, PII check cannot be performed",
         );
       }
       logger.warn(
-        "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+        "⚠️  WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default",
       );
       return;
     }
     if (mainMethod === "presidio" && !process.env.LANGEVALS_ENDPOINT) {
       if (enforced) {
         throw new Error(
-          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed"
+          "LANGEVALS_ENDPOINT is not set, PII check cannot be performed",
         );
       }
       logger.warn(
-        "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default"
+        "⚠️  WARNING: LANGEVALS_ENDPOINT is not set, so PII check will not be performed, you are risking storing PII on the database, please set them if you wish to avoid that, this will fail in production by default",
       );
       return;
     }

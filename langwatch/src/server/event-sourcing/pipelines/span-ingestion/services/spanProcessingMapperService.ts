@@ -1,38 +1,38 @@
-import type { ReadableSpan, TimedEvent } from "@opentelemetry/sdk-trace-base";
 import {
-  type IExportTraceServiceRequest,
-  type ISpan,
-  type IResource,
-  type IInstrumentationScope,
-} from "@opentelemetry/otlp-transformer";
-import {
-  SpanKind,
-  SpanStatusCode,
-  type SpanContext,
-  type HrTime,
-  type Link,
   type Attributes,
   type AttributeValue,
+  type HrTime,
+  type Link,
+  type SpanContext,
+  SpanKind,
   type SpanStatus,
+  SpanStatusCode,
 } from "@opentelemetry/api";
-import type { Resource } from "@opentelemetry/resources";
 import type { InstrumentationScope } from "@opentelemetry/core";
-import type { TraceForCollection } from "../../../../tracer/otel.traces";
-import type { Span, RAGSpan } from "../../../../tracer/types";
+import type {
+  IExportTraceServiceRequest,
+  IInstrumentationScope,
+  IResource,
+  ISpan,
+} from "@opentelemetry/otlp-transformer";
+import type { Resource } from "@opentelemetry/resources";
+import type { ReadableSpan, TimedEvent } from "@opentelemetry/sdk-trace-base";
+import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "../../../../../utils/logger";
 import type { DeepPartial } from "../../../../../utils/types";
+import type { TraceForCollection } from "../../../../tracer/otel.traces";
+import type { RAGSpan, Span } from "../../../../tracer/types";
+import type { SpanData } from "../schemas/commands";
 import {
-  unixNanoToMs,
-  msToUnixNano,
   convertSpanKind,
   convertSpanTypeToGenAiOperationName,
+  type Milliseconds,
+  msToUnixNano,
   otelAttributesToRecord,
   otelValueToJs,
   type SpanType,
-  type Milliseconds,
+  unixNanoToMs,
 } from "../utils/otelConversions";
-import { createLogger } from "../../../../../utils/logger";
-import { getLangWatchTracer } from "langwatch";
-import type { SpanData } from "../schemas/commands";
 
 const logger = createLogger("langwatch:span-ingestion:mapper");
 const tracer = getLangWatchTracer("langwatch.span-ingestion.mapper");

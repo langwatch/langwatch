@@ -1,10 +1,10 @@
-import { useMemo, useState, useEffect } from "react";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
-import type { Run, RunItem } from "./types";
+import { useEffect, useMemo, useState } from "react";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
+import type { Run, RunItem } from "./types";
 
 const logger = createLogger("useSetRunHistorySidebarController");
 
@@ -21,13 +21,14 @@ const logger = createLogger("useSetRunHistorySidebarController");
  * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
 export const useSetRunHistorySidebarController = () => {
-  const { goToSimulationBatchRuns, scenarioSetId, batchRunId } = useSimulationRouter();
+  const { goToSimulationBatchRuns, scenarioSetId, batchRunId } =
+    useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
   // Cursor-based pagination state
   const [cursor, setCursor] = useState<string | undefined>();
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>(
-    []
+    [],
   );
   const limit = 8; // Fixed limit for now
 
@@ -53,7 +54,7 @@ export const useSetRunHistorySidebarController = () => {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
       enabled: !!project?.id && !!scenarioSetId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   // Fetch total count for pagination info
@@ -65,7 +66,7 @@ export const useSetRunHistorySidebarController = () => {
       },
       {
         enabled: !!project?.id && !!scenarioSetId,
-      }
+      },
     );
 
   const totalCount = countData?.count ?? 0;
@@ -85,7 +86,9 @@ export const useSetRunHistorySidebarController = () => {
     if (scenarioSetId && !batchRunId && runData?.runs?.length) {
       const lastRun = runData.runs[runData.runs.length - 1];
       if (lastRun) {
-        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, { replace: true });
+        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, {
+          replace: true,
+        });
       }
     }
   }, [scenarioSetId, batchRunId, runData?.runs, goToSimulationBatchRuns]);
@@ -98,7 +101,7 @@ export const useSetRunHistorySidebarController = () => {
       runData.runs,
       currentPage,
       limit,
-      totalCount
+      totalCount,
     );
   }, [runData?.runs, currentPage, limit, totalCount]);
 
@@ -112,7 +115,7 @@ export const useSetRunHistorySidebarController = () => {
       }
       goToSimulationBatchRuns(scenarioSetId, batchRunId);
     },
-    [scenarioSetId, goToSimulationBatchRuns]
+    [scenarioSetId, goToSimulationBatchRuns],
   );
 
   // Cursor-based pagination handlers
@@ -184,7 +187,7 @@ const transformRunDataToBatchRuns = (
   runData: ScenarioRunData[],
   currentPage: number,
   limit: number,
-  totalCount: number
+  totalCount: number,
 ): Run[] => {
   // Group runs by batchRunId using a functional reduce approach
   // Each batch run contains metadata and an array of individual scenario runs
@@ -207,7 +210,7 @@ const transformRunDataToBatchRuns = (
       acc[batchRunId]!.items.push(createRunItem(run));
       return acc;
     },
-    {} as Record<string, Omit<Run, "label" | "date">>
+    {} as Record<string, Omit<Run, "label" | "date">>,
   );
 
   // Sort by timestamp (numerical) for accurate chronological ordering

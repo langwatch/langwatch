@@ -69,7 +69,7 @@ export const WizardSidebar = memo(function WizardSidebar({
         evaluatorNode: state.getFirstEvaluatorNode(),
         entryNodeDatasetId: state.entryNodeDatasetId,
       };
-    })
+    }),
   );
 
   const [showSpinner, setShowSpinner] = useState(false);
@@ -79,7 +79,7 @@ export const WizardSidebar = memo(function WizardSidebar({
       () => {
         setShowSpinner(isLoading);
       },
-      isLoading ? 400 : 0
+      isLoading ? 400 : 0,
     );
   }, [isLoading]);
 
@@ -91,7 +91,7 @@ export const WizardSidebar = memo(function WizardSidebar({
         ([entry]) => {
           setIsSticky(!!entry && entry.intersectionRatio < 1);
         },
-        { threshold: [1] }
+        { threshold: [1] },
       );
 
       const current = stickyRef.current;
@@ -331,7 +331,7 @@ export const WizardSidebar = memo(function WizardSidebar({
                               },
                             });
                           },
-                        }
+                        },
                       );
                     }}
                   >

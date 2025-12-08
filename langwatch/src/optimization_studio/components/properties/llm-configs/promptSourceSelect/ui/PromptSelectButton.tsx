@@ -7,9 +7,7 @@ interface PromptSelectionButtonProps {
   onClick: () => void;
 }
 
-export function PromptSelectionButton({
-  onClick,
-}: PromptSelectionButtonProps) {
+export function PromptSelectionButton({ onClick }: PromptSelectionButtonProps) {
   return (
     <Tooltip
       content="Select another prompt"

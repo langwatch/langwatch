@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { describe, expect, it, vi } from "vitest";
 import { EventRepositoryClickHouse } from "../eventRepositoryClickHouse";
 
 function createMockClient(payload: unknown) {

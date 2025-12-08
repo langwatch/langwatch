@@ -24,6 +24,7 @@ import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
+import { roleRouter } from "./routers/role";
 import { scenarioRouter } from "./routers/scenario";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
@@ -34,8 +35,6 @@ import { translateRouter } from "./routers/translate";
 import { triggerRouter } from "./routers/triggers";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
-
-import { roleRouter } from "./routers/role";
 /**
  * This is the primary router for your server.
  *

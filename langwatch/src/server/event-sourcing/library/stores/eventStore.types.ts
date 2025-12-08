@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { Event } from "../domain/types";
 import type { AggregateType } from "../domain/aggregateType";
-import { TenantIdSchema, type TenantId } from "../domain/tenantId";
+import { type TenantId, TenantIdSchema } from "../domain/tenantId";
+import type { Event } from "../domain/types";
 
 /**
  * Zod schema for event store read context.

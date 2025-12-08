@@ -97,13 +97,13 @@ export default async function execute() {
       const totalDays = Math.max(...allCounts.map((c) => c.counts.length));
       logger.info(
         { projectId: project.id, totalDays },
-        "Found days with scenario events for project"
+        "Found days with scenario events for project",
       );
 
       if (totalDays === 0) {
         logger.info(
           { projectId: project.id },
-          "No scenario events found for project"
+          "No scenario events found for project",
         );
         continue;
       }
@@ -134,8 +134,8 @@ export default async function execute() {
       // Create a set of existing analytics entries (date + key)
       const existingEntries = new Set(
         existingAnalytics.map(
-          (a) => `${a.createdAt.toISOString().split("T")[0]}-${a.key}`
-        )
+          (a) => `${a.createdAt.toISOString().split("T")[0]}-${a.key}`,
+        ),
       );
 
       // Prepare batch of analytics to create
@@ -175,7 +175,7 @@ export default async function execute() {
             acc[entry.key] = (acc[entry.key] ?? 0) + 1;
             return acc;
           },
-          {} as Record<string, number>
+          {} as Record<string, number>,
         );
 
         logger.info(
@@ -184,18 +184,18 @@ export default async function execute() {
             analyticsByType,
             totalCreated: analyticsToCreate.length,
           },
-          "Created analytics entries for project"
+          "Created analytics entries for project",
         );
       } else {
         logger.info(
           { projectId: project.id },
-          "No new analytics needed for project"
+          "No new analytics needed for project",
         );
       }
     } catch (error) {
       logger.error(
         { projectId: project.id, error },
-        "Error processing project"
+        "Error processing project",
       );
       logger.info("Continuing with next project...");
     }

@@ -2,13 +2,12 @@ import {
   Box,
   Card,
   GridItem,
-  SimpleGrid,
-  HStack,
   Heading,
+  HStack,
+  SimpleGrid,
   VStack,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -18,10 +17,11 @@ import {
   DocumentsCountsTable,
 } from "~/components/analytics/DocumentsCountsTable";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day

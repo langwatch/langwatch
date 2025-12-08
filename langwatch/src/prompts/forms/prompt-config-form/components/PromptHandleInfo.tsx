@@ -1,9 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { PromptConfigFormValues } from "~/prompts";
 import { GenerateApiSnippetButton } from "../../../../components/GenerateApiSnippetButton";
 import { GeneratePromptApiSnippetDialog } from "../../../components/GeneratePromptApiSnippetDialog";
-import type { PromptConfigFormValues } from "~/prompts";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EditablePromptHandleField } from "../../fields/EditablePromptHandleField";
 
 export function PromptHandleInfo() {

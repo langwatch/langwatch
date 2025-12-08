@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 

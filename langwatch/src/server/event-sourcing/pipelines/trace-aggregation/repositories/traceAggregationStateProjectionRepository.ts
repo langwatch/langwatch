@@ -1,9 +1,9 @@
 import type {
+  Projection,
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../library";
-import type { Projection } from "../../../library";
 
 /**
  * Repository interface for trace projection storage operations.

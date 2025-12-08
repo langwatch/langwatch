@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
-import { api } from "../utils/api";
 import { toaster } from "../components/ui/toaster";
+import { api } from "../utils/api";
 
 export function useEmbeddingsModel(params: {
   projectId: string | undefined;

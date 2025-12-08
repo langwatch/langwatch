@@ -9,6 +9,6 @@ export const datasetOutputSchema = z.object({
       entry: z.record(z.string(), z.any()),
       createdAt: z.date(),
       updatedAt: z.date(),
-    })
+    }),
   ),
 });

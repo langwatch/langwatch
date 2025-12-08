@@ -1,23 +1,23 @@
+import type { AgGridReact } from "@ag-grid-community/react";
 import { Box, Button, Card, HStack, Tabs, VStack } from "@chakra-ui/react";
-import { DatasetTable } from "../../datasets/DatasetTable";
-import {
-  useEvaluationWizardStore,
-  type State,
-} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 import { Controls, useUpdateNodeInternals } from "@xyflow/react";
 import { memo, useEffect, useRef } from "react";
-import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
-import { useShallow } from "zustand/react/shallow";
-import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
-import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
-import type { AgGridReact } from "@ag-grid-community/react";
-import { toaster } from "../../ui/toaster";
-import { Link } from "../../ui/link";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
 import { LuArrowUpRight } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
+import {
+  type State,
+  useEvaluationWizardStore,
+} from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { OptimizationStudioCanvas } from "../../../optimization_studio/components/OptimizationStudio";
+import { EvaluationResults } from "../../../optimization_studio/components/ResultsPanel";
+import { EvaluationManualIntegration } from "../../checks/EvaluationManualIntegration";
+import { DatasetTable } from "../../datasets/DatasetTable";
+import { Link } from "../../ui/link";
+import { toaster } from "../../ui/toaster";
 import { ImportFromProduction } from "./components/ImportFromProduction";
 
 export const WizardWorkspace = memo(function WizardWorkspace() {
@@ -52,7 +52,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
           state.wizardState.executionMethod === "realtime_manually"),
       setDatasetGridRef: state.setDatasetGridRef,
       handleDatasetUpdate: state.handleDatasetUpdate,
-    }))
+    })),
   );
 
   const datasetGridRef = useRef<AgGridReact<any>>(null);
@@ -73,7 +73,7 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
     "code-implementation": hasCodeImplementation,
   };
   const firstAvailableTab = Object.entries(availableTabs).find(
-    ([_, hasTab]) => hasTab
+    ([_, hasTab]) => hasTab,
   )?.[0];
   const workspaceTab =
     workspaceTab_ && !availableTabs[workspaceTab_]
@@ -243,7 +243,7 @@ const WizardOptimizationStudioCanvas = memo(
           onNodesChange: state.workflowStore.onNodesChange,
           onEdgesChange: state.workflowStore.onEdgesChange,
           onConnect: state.workflowStore.onConnect,
-        }))
+        })),
       );
 
     const updateNodeInternals = useUpdateNodeInternals();
@@ -292,7 +292,7 @@ const WizardOptimizationStudioCanvas = memo(
         <Controls position="bottom-center" orientation="horizontal" />
       </OptimizationStudioCanvas>
     );
-  }
+  },
 );
 
 function CodeImplementation() {
@@ -308,9 +308,9 @@ function CodeImplementation() {
             ?.data.parameters?.map((field) => [
               field.identifier,
               field.value,
-            ]) ?? []
+            ]) ?? [],
         ),
-      }))
+      })),
     );
 
   const availableEvaluators = useAvailableEvaluators();

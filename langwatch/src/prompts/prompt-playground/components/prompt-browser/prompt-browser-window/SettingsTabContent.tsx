@@ -1,9 +1,9 @@
 import { VStack } from "@chakra-ui/react";
+import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
-import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 
 /**
  * SettingsTabContent

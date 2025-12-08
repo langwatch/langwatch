@@ -1,16 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CheckpointManager } from "../checkpointManager";
+import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
+import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import {
+  createMockLogger,
   createMockProcessorCheckpointStore,
+  createTestAggregateType,
   createTestEvent,
   createTestTenantId,
-  createTestAggregateType,
-  createMockLogger,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { EVENT_TYPES } from "../../../domain/eventType";
-import { buildCheckpointKey } from "../../../utils/checkpointKey";
+import { CheckpointManager } from "../checkpointManager";
 
 describe("CheckpointManager", () => {
   const aggregateType = createTestAggregateType();

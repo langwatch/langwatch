@@ -2,13 +2,6 @@
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
-import { createLogger } from "../../../utils/logger";
-import { SchemaVersion } from "../enums";
-
-import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
-
 import {
   inputsSchema,
   messageSchema,
@@ -17,6 +10,10 @@ import {
   responseFormatSchema,
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
+import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
+import { createLogger } from "../../../utils/logger";
+import { SchemaVersion } from "../enums";
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema",

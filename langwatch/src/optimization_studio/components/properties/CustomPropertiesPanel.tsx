@@ -1,21 +1,18 @@
-import type { Node } from "@xyflow/react";
-import type { Custom } from "../../types/dsl";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
-
 import { Avatar, Badge, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import type { Node } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import { ExternalLink } from "react-feather";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { Link } from "../../../components/ui/link";
 import { toaster } from "../../../components/ui/toaster";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { useComponentVersion } from "../../hooks/useComponentVersion";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-
-import { formatTimeAgo } from "../../../utils/formatTimeAgo";
-import type { Workflow } from "../../types/dsl";
+import type { Custom, Workflow } from "../../types/dsl";
 import { getInputsOutputs } from "../../utils/nodeUtils";
 import { VersionBox } from "../History";
+import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 export function CustomPropertiesPanel({ node }: { node: Node<Custom> }) {
   return (
@@ -37,14 +34,14 @@ const CustomComponentInfo = ({ node }: { node: Node<Custom> }) => {
     useShallow(({ setNode, deselectAllNodes }) => ({
       setNode,
       deselectAllNodes,
-    }))
+    })),
   );
   const updateNodeInternals = useUpdateNodeInternals();
 
   const updateToLatestVersion = () => {
     const { inputs, outputs } = getInputsOutputs(
       (publishedVersion?.dsl as unknown as Workflow).edges,
-      (publishedVersion?.dsl as unknown as Workflow).nodes
+      (publishedVersion?.dsl as unknown as Workflow).nodes,
     );
 
     setNode({

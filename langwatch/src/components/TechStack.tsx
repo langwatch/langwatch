@@ -1,6 +1,6 @@
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { type PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { Code } from "react-feather";
 import { Controller, type UseFormReturn } from "react-hook-form";
 import { RadioCard } from "~/pages/onboarding/[team]/project";
@@ -8,10 +8,10 @@ import { Azure } from "./icons/Azure";
 import { DSPy } from "./icons/DSPy";
 import { LangChainParrot } from "./icons/LangChainParrot";
 import { OpenAI } from "./icons/OpenAI";
+import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { Python } from "./icons/Python";
 import { TypeScript } from "./icons/TypeScript";
 import { Vercel } from "./icons/Vercel";
-import { PuzzleIcon } from "./icons/PuzzleIcon";
 
 export type ProjectFormData = {
   name: string;
@@ -176,9 +176,9 @@ export function TechStackSelector<
 
   const handleLanguageChange = (value: string) => {
     const availableForLanguage = Object.entries(
-      techStackFrameworkOptions
+      techStackFrameworkOptions,
     ).filter(([_, framework]) =>
-      Object.keys(framework.languages).includes(value)
+      Object.keys(framework.languages).includes(value),
     );
 
     form.setValue("language", value);
@@ -213,7 +213,7 @@ export function TechStackSelector<
                         </Box>
                       </VStack>
                     </RadioCard>
-                  )
+                  ),
                 )}
               </HStack>
             </RadioGroup.Root>
@@ -231,8 +231,8 @@ export function TechStackSelector<
                 {Object.entries(techStackFrameworkOptions)
                   .filter(([_, option]) =>
                     Object.keys(option.languages).includes(
-                      currentLanguage ?? ""
-                    )
+                      currentLanguage ?? "",
+                    ),
                   )
                   .map(([key, option]) => (
                     <RadioCard key={key} value={key}>

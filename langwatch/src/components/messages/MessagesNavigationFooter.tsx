@@ -1,11 +1,10 @@
 import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "react-feather";
-
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "react-feather";
 import type { AppRouter } from "../../server/api/root";
 
 export const useMessagesNavigationFooter = () => {
@@ -46,7 +45,7 @@ export const useMessagesNavigationFooter = () => {
     traceGroups: UseTRPCQueryResult<
       inferRouterOutputs<AppRouter>["traces"]["getAllForProject"],
       TRPCClientErrorLike<AppRouter>
-    >
+    >,
   ) => {
     useEffect(() => {
       if (traceGroups.isFetched) {

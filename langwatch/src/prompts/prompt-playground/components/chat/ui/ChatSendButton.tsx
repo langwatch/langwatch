@@ -1,4 +1,4 @@
-import { Button, Icon, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps, Icon } from "@chakra-ui/react";
 import { LuSend } from "react-icons/lu";
 
 /**

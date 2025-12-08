@@ -1,24 +1,23 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import type {
-  EventStore as BaseEventStore,
-  EventStoreReadContext,
-  Event,
-  AggregateType,
-} from "../../library";
-import { EventUtils, createTenantId } from "../../library";
 import { createLogger } from "../../../../utils/logger";
 import type {
-  EventRepository,
-  EventRecord,
-} from "./repositories/eventRepository.types";
+  AggregateType,
+  EventStore as BaseEventStore,
+  Event,
+  EventStoreReadContext,
+} from "../../library";
+import { createTenantId, EventUtils } from "../../library";
 import {
-  ValidationError,
+  ErrorCategory,
   SecurityError,
   StoreError,
-  ErrorCategory,
+  ValidationError,
 } from "../../library/services/errorHandling";
+import type {
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types";
 
 export class EventStoreClickHouse<EventType extends Event = Event>
   implements BaseEventStore<EventType>

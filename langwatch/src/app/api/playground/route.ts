@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
+import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { NextResponse, type NextRequest } from "next/server";
 import { env } from "../../../env.mjs";
 import { backendHasTeamProjectPermission } from "../../../server/api/permission";
 import {
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to access this endpoint." },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -28,19 +28,19 @@ export async function POST(req: NextRequest) {
   if (!projectId) {
     return NextResponse.json(
       { error: "Missing projectId header" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const hasPermission = await backendHasTeamProjectPermission(
     { prisma, session },
     { projectId },
-    "PLAYGROUND"
+    "PLAYGROUND",
   );
   if (!hasPermission) {
     return NextResponse.json(
       { error: "You do not have permission to access this endpoint." },
-      { status: 403 }
+      { status: 403 },
     );
   }
 
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   if (!model) {
     return NextResponse.json(
       { error: "Missing model header" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   if (!modelProvider) {
     return NextResponse.json(
       { error: `Provider not configured: ${providerKey.toString()}` },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       {
         error: `Provider ${providerKey.toString()} is disabled, go to settings to enable it`,
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,
       value,
-    ])
+    ]),
   );
 
   const vercelProvider = createOpenAI({

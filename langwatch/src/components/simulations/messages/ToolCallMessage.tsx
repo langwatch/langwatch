@@ -1,7 +1,7 @@
-import { VStack, Box, Text, HStack } from "@chakra-ui/react";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ActionExecutionMessage } from "@copilotkit/runtime-client-gql";
-import { RenderInputOutput } from "../../traces/RenderInputOutput";
 import { Settings } from "react-feather";
+import { RenderInputOutput } from "../../traces/RenderInputOutput";
 
 export const ToolCallMessage = ({
   message,

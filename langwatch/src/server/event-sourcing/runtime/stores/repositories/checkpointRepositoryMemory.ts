@@ -1,8 +1,8 @@
+import type { createLogger } from "~/utils/logger";
 import type {
-  CheckpointRepository,
   CheckpointRecord,
+  CheckpointRepository,
 } from "./checkpointRepository.types";
-import { type createLogger } from "~/utils/logger";
 
 /**
  * In-memory implementation of CheckpointRepository.

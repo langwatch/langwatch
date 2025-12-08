@@ -1,15 +1,15 @@
 import { HStack, Spacer } from "@chakra-ui/react";
-import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
-import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { useFormContext } from "react-hook-form";
+import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
+import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
+import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
-import { SavePromptButton } from "./SavePromptButton";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { SavePromptButton } from "./SavePromptButton";
 
 /**
  * Header bar for the prompt browser with handle, model selector, and action buttons.

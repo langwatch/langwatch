@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
 import { setEnvironment } from "@langwatch/ksuid";
+import dotenv from "dotenv";
 
 dotenv.config();
 setEnvironment(process.env.NODE_ENV ?? "dev");

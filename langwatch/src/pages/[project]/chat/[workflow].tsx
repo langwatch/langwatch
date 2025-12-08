@@ -1,23 +1,23 @@
-import dynamic from "next/dynamic";
 import { Box, Card as ChakraCard } from "@chakra-ui/react";
+import type { Edge, Node } from "@xyflow/react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
-import { FullLogo } from "../../../components/icons/FullLogo";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../utils/api";
-import { type Edge, type Node } from "@xyflow/react";
-import { type Workflow } from "../../../optimization_studio/types/dsl";
-import { LoadingScreen } from "../../../components/LoadingScreen";
 import { useEffect, useState } from "react";
+import { FullLogo } from "../../../components/icons/FullLogo";
+import { LoadingScreen } from "../../../components/LoadingScreen";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import type { Workflow } from "../../../optimization_studio/types/dsl";
+import { api } from "../../../utils/api";
 
 const ChatBox = dynamic(
   () =>
     import("../../../optimization_studio/components/ChatWindow").then(
-      (mod) => mod.ChatBox
+      (mod) => mod.ChatBox,
     ),
   {
     ssr: false,
     loading: () => <LoadingScreen />,
-  }
+  },
 );
 
 function ChatContent() {
@@ -32,7 +32,7 @@ function ChatContent() {
     },
     {
       enabled: !!project?.id && !!workflowId,
-    }
+    },
   );
 
   const [isClient, setIsClient] = useState(false);

@@ -1,7 +1,7 @@
+import { Badge, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { VStack, Textarea, HStack, Text, Badge } from "@chakra-ui/react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { useMemo, useEffect } from "react";
 import type { z } from "zod";
 import { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 
@@ -71,8 +71,8 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
                 input.type === "image"
                   ? "image url"
                   : input.type === "str"
-                  ? undefined
-                  : input.type
+                    ? undefined
+                    : input.type
               }
               size="sm"
             />

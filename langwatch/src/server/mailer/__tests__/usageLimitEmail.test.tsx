@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendUsageLimitEmail } from "../usageLimitEmail";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { sendEmail } from "../emailSender";
+import { sendUsageLimitEmail } from "../usageLimitEmail";
 
 // Mock the email sender
 vi.mock("../emailSender", () => ({

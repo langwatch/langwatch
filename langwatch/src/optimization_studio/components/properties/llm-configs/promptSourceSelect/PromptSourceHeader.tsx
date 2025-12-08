@@ -8,7 +8,7 @@ import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { type PromptConfigFormValues } from "~/prompts";
+import type { PromptConfigFormValues } from "~/prompts";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
 import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
@@ -21,10 +21,9 @@ import {
 import type { VersionedPrompt } from "~/server/prompt-config";
 
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
-
+import { useSyncPromptHandle } from "../signature-properties-panel/hooks/useSyncPromptHandle";
 import { PromptSource } from "./PromptSource";
 import { VersionedPromptLabel } from "./VersionedPromptLabel";
-import { useSyncPromptHandle } from "../signature-properties-panel/hooks/useSyncPromptHandle";
 
 /**
  * Header for the prompt source select in the optimization studio

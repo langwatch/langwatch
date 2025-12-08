@@ -1,15 +1,15 @@
+import { SpanKind } from "@opentelemetry/api";
 import {
   Job,
-  Queue,
   type JobsOptions,
+  Queue,
   type QueueOptions,
   type RedisClient,
 } from "bullmq";
 import { EventEmitter } from "events";
-import { connection } from "../../redis";
-import { createLogger } from "../../../utils/logger";
 import { getLangWatchTracer } from "langwatch";
-import { SpanKind } from "@opentelemetry/api";
+import { createLogger } from "../../../utils/logger";
+import { connection } from "../../redis";
 
 const logger = createLogger("langwatch:queueWithFallback");
 
@@ -64,7 +64,9 @@ export class QueueWithFallback<
             setTimeout(() => {
               if (timeoutState.state === "waiting") {
                 reject(
-                  new Error(`Timed out after 3s trying to insert on the queue ${this.name}`),
+                  new Error(
+                    `Timed out after 3s trying to insert on the queue ${this.name}`,
+                  ),
                 );
               } else {
                 resolve(undefined);

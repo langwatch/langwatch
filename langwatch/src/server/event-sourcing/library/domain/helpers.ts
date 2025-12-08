@@ -2,11 +2,11 @@
  * Helper types for better TypeScript inference and type safety.
  */
 
-import type { Event, Projection } from "./types";
-import { EventSchema, ProjectionSchema } from "./types";
-import type { ProjectionHandler } from "./handlers/projectionHandler";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStore } from "../stores/projectionStore.types";
+import type { ProjectionHandler } from "./handlers/projectionHandler";
+import type { Event, Projection } from "./types";
+import { EventSchema, ProjectionSchema } from "./types";
 
 /**
  * Extracts the aggregate ID type from an Event type.

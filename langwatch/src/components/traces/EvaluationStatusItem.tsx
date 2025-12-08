@@ -1,15 +1,15 @@
-import { Box, HStack, Text, VStack, Spacer } from "@chakra-ui/react";
-import type { ElasticSearchEvaluation } from "../../server/tracer/types";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
-import numeral from "numeral";
+import { Box, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
+import numeral from "numeral";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import {
   CheckStatusIcon,
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
-import { Tooltip } from "../ui/tooltip";
 import { HoverableBigText } from "../HoverableBigText";
+import { Tooltip } from "../ui/tooltip";
 export function formatEvaluationSingleValue(evaluation: {
   score?: number | null;
   passed?: boolean | null;
@@ -19,12 +19,12 @@ export function formatEvaluationSingleValue(evaluation: {
   return evaluation.label !== undefined && evaluation.label !== null
     ? evaluation.label
     : evaluation.score !== undefined && evaluation.score !== null
-    ? formatEvaluationScore(evaluation.score)
-    : evaluation.passed !== undefined && evaluation.passed !== null
-    ? evaluation.passed
-      ? "Pass"
-      : "Fail"
-    : "N/A";
+      ? formatEvaluationScore(evaluation.score)
+      : evaluation.passed !== undefined && evaluation.passed !== null
+        ? evaluation.passed
+          ? "Pass"
+          : "Fail"
+        : "N/A";
 }
 
 export function formatEvaluationScore(score: number | null | undefined) {

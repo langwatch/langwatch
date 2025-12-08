@@ -1,7 +1,7 @@
 import type { NextPage } from "next";
 import type React from "react";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import type { UseFormReturn } from "react-hook-form";
+import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 
 export interface Dependencies {
   SubscriptionPage?: React.FC;

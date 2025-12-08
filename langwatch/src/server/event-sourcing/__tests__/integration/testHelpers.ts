@@ -1,29 +1,29 @@
-import { EventSourcing } from "../../runtime/eventSourcing";
-import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
-import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
-import { ProcessorCheckpointStoreClickHouse } from "../../runtime/stores/processorCheckpointStoreClickHouse";
-import { EventRepositoryClickHouse } from "../../runtime/stores/repositories/eventRepositoryClickHouse";
-import { CheckpointRepositoryClickHouse } from "../../runtime/stores/repositories/checkpointRepositoryClickHouse";
-import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
-import { RedisDistributedLock } from "../../library/utils/distributedLock";
-import type {
-  RegisteredPipeline,
-  PipelineWithCommandHandlers,
-} from "../../runtime/pipeline/types";
+import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../../library";
 import { createTenantId } from "../../library";
 import { buildCheckpointKey } from "../../library/utils/checkpointKey";
+import { RedisDistributedLock } from "../../library/utils/distributedLock";
+import { EventSourcing } from "../../runtime/eventSourcing";
+import { EventSourcingRuntime } from "../../runtime/eventSourcingRuntime";
+import type {
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
+} from "../../runtime/pipeline/types";
+import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
+import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
+import { ProcessorCheckpointStoreClickHouse } from "../../runtime/stores/processorCheckpointStoreClickHouse";
+import { CheckpointRepositoryClickHouse } from "../../runtime/stores/repositories/checkpointRepositoryClickHouse";
+import { EventRepositoryClickHouse } from "../../runtime/stores/repositories/eventRepositoryClickHouse";
 import {
+  cleanupTestData,
   getTestClickHouseClient,
   getTestRedisConnection,
-  cleanupTestData,
 } from "./testContainers";
 import {
   TestCommandHandler,
   TestEventHandler,
   TestProjectionHandler,
 } from "./testPipelines";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:integration:test-helpers",

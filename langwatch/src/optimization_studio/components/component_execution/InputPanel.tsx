@@ -2,16 +2,16 @@ import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type ExecuteData,
   ExecutionInputPanel,
   type InputField,
-  type ExecuteData,
 } from "~/components/executable-panel/ExecutionInputPanel";
 import {
   getInputsForExecution,
   useComponentExecution,
 } from "../../hooks/useComponentExecution";
-import type { Component } from "../../types/dsl";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { Component } from "../../types/dsl";
 
 /**
  * InputPanel component that handles the display and execution of component inputs
@@ -28,7 +28,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     (state) => ({
       triggerValidation: state.triggerValidation,
       setTriggerValidation: state.setTriggerValidation,
-    })
+    }),
   );
 
   // Hook to execute the component
@@ -36,14 +36,16 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
 
   // Convert node inputs to the format expected by ExecutionInputPanel
   const inputFields: InputField[] = useMemo(() => {
-    return node.data.inputs?.map((input) => ({
-      identifier: input.identifier,
-      type: input.type,
-      optional: !missingFields.some(
-        (field) => field.identifier === input.identifier
-      ),
-      value: inputs[input.identifier],
-    })) ?? [];
+    return (
+      node.data.inputs?.map((input) => ({
+        identifier: input.identifier,
+        type: input.type,
+        optional: !missingFields.some(
+          (field) => field.identifier === input.identifier,
+        ),
+        value: inputs[input.identifier],
+      })) ?? []
+    );
   }, [node.data.inputs, missingFields, inputs]);
 
   // Handle execution when the user submits the form
@@ -51,7 +53,7 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     (data: ExecuteData) => {
       startComponentExecution({ node, inputs: data });
     },
-    [node, startComponentExecution]
+    [node, startComponentExecution],
   );
 
   // Set animation finished after initial delay
@@ -77,13 +79,13 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
               field.identifier,
               typeof field.value === "object"
                 ? JSON.stringify(field.value)
-                : field.value?.toString() ?? "",
-            ])
+                : (field.value?.toString() ?? ""),
+            ]),
           );
           onExecute(formData);
         }
       },
-      animationFinished ? 0 : 700
+      animationFinished ? 0 : 700,
     );
 
     setTriggerValidation(false);

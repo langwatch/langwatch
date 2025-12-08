@@ -1,10 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { hash, compare } from "bcrypt";
+import { compare, hash } from "bcrypt";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
+import { env } from "../../../env.mjs";
 
 import { skipPermissionCheck } from "../permission";
-import { env } from "../../../env.mjs";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure
@@ -13,7 +13,7 @@ export const userRouter = createTRPCRouter({
         name: z.string(),
         email: z.string(),
         password: z.string(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
@@ -86,7 +86,7 @@ export const userRouter = createTRPCRouter({
     .input(
       z.object({
         accountId: z.string(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
@@ -132,16 +132,17 @@ export const userRouter = createTRPCRouter({
     .input(
       z.object({
         currentPassword: z.string(),
-        newPassword: z.string().min(8, "Password must be at least 8 characters"),
-      })
+        newPassword: z
+          .string()
+          .min(8, "Password must be at least 8 characters"),
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
       if (env.NEXTAUTH_PROVIDER !== "email") {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message:
-            "Password changes are not available for this auth provider",
+          message: "Password changes are not available for this auth provider",
         });
       }
 

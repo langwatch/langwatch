@@ -105,7 +105,7 @@ export function salvageValidData<T extends z.ZodObject<any>>(
               // If that fails, try to construct defaults from schema shape
               // This helps with optional nested objects that have required fields
               const constructedDefaults: Record<string, unknown> = {};
-              for (const nestedKey in objectSchema.shape) {
+              for (const nestedKey of Object.keys(objectSchema.shape)) {
                 if (
                   Object.prototype.hasOwnProperty.call(
                     objectSchema.shape,

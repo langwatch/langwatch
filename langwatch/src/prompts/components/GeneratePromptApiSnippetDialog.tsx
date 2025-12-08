@@ -1,10 +1,8 @@
 import { Text, VStack } from "@chakra-ui/react";
-import React from "react";
-
-import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
-
+import type React from "react";
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import { Link } from "~/components/ui/link";
+import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
 
 interface GeneratePromptApiSnippetButtonProps {
   promptHandle?: string | null;

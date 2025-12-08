@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Queue } from "bullmq";
 import { SpanKind } from "@opentelemetry/api";
-import type { EventSourcedQueueDefinition } from "../../../library/queues";
+import { Queue } from "bullmq";
 import type { SemConvAttributes } from "langwatch/observability";
-import { EventSourcedQueueProcessorBullMq } from "../bullmq";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { connection } from "../../../../redis";
+import type { EventSourcedQueueDefinition } from "../../../library/queues";
+import { EventSourcedQueueProcessorBullMq } from "../bullmq";
 
 const mockLogger = {
   info: vi.fn(),

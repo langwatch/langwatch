@@ -1,26 +1,26 @@
-import { Input, Button, Text, HStack, VStack, Spinner } from "@chakra-ui/react";
-import { LuSparkles, LuBot, LuChevronRight } from "react-icons/lu";
-import { toaster } from "../../../../ui/toaster";
 import { useChat } from "@ai-sdk/react";
-import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useShallow } from "zustand/react/shallow";
-import { api } from "../../../../../utils/api";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { DefaultChatTransport } from "ai";
+import { nanoid } from "nanoid";
 import Parse from "papaparse";
-import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuBot, LuChevronRight, LuSparkles } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
+import { api } from "../../../../../utils/api";
+import { DEFAULT_MODEL } from "../../../../../utils/constants";
+import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
-import { nanoid } from "nanoid";
-import { DefaultChatTransport } from "ai";
-import { captureException } from "~/utils/posthogErrorCapture";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "../../../../ModelSelector";
-import { DEFAULT_MODEL } from "../../../../../utils/constants";
-import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
+import { toaster } from "../../../../ui/toaster";
+import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
 export function DatasetGeneration() {
   const { project } = useOrganizationTeamProject();

@@ -1,8 +1,8 @@
 import { Card, Heading } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export const LLMSummary = () => {
   const publicEnv = usePublicEnv();

@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 /**
  * Higher-Order Component that wraps a component with a controller hook.

@@ -1,11 +1,11 @@
-import { type NextRequest, type NextResponse } from "next/server";
-import { createLogger } from "../utils/logger";
 import { context as otContext, trace } from "@opentelemetry/api";
+import type { NextRequest, NextResponse } from "next/server";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:app-router:logger");
 
 export function withAppRouterLogger(
-  handler: (req: NextRequest) => Promise<NextResponse>
+  handler: (req: NextRequest) => Promise<NextResponse>,
 ) {
   return async (req: NextRequest) => {
     const startTime = Date.now();
@@ -24,7 +24,6 @@ export function withAppRouterLogger(
     try {
       // Execute the handler
       response = await handler(req);
-
     } catch (err) {
       error = err as Error;
       throw err;
@@ -70,7 +69,9 @@ function extractContextFromPath(req: NextRequest): Record<string, unknown> {
   const authHeader = req.headers.get("authorization");
   const hasAuthToken = !!(
     xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ") ? authHeader.slice(7) : null)
+    (authHeader?.toLowerCase().startsWith("bearer ")
+      ? authHeader.slice(7)
+      : null)
   );
 
   // Note: In Next.js middleware, we don't have access to user/project/org context

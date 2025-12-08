@@ -1,21 +1,19 @@
-import { type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  vi,
-  beforeAll,
   afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
 } from "vitest";
-
-import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
-import { LlmConfigRepository } from "./llm-config.repository";
-
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
+import { LlmConfigRepository } from "./llm-config.repository";
+import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
 
 describe("LlmConfigRepository", () => {
   let prisma: PrismaClient;

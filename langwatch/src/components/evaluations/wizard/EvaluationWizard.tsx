@@ -14,13 +14,13 @@ import { LuPanelLeft, LuPanelLeftOpen } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { PostEventProvider } from "../../../optimization_studio/hooks/usePostEvent";
 import { LogoIcon } from "../../icons/LogoIcon";
 import { Dialog } from "../../ui/dialog";
 import { Tooltip } from "../../ui/tooltip";
-import { WizardWorkspace } from "./WizardWorkspace";
-import { WizardProvider } from "./hooks/useWizardContext";
 import { WizardSidebar } from "./EvaluationWizardSidebar";
-import { PostEventProvider } from "../../../optimization_studio/hooks/usePostEvent";
+import { WizardProvider } from "./hooks/useWizardContext";
+import { WizardWorkspace } from "./WizardWorkspace";
 
 export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
   const router = useRouter();
@@ -34,7 +34,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
         name: state.wizardState.name,
         workflowId: state.getDSL().workflow_id,
       };
-    })
+    }),
   );
 
   const { isAutosaving } = useEvaluationWizardStore(
@@ -48,7 +48,7 @@ export function EvaluationWizard({ isLoading }: { isLoading: boolean }) {
       return {
         isAutosaving: state.isAutosaving,
       };
-    })
+    }),
   );
 
   return (

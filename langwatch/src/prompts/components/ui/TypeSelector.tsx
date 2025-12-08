@@ -3,8 +3,8 @@ import {
   Button,
   HStack,
   NativeSelect,
-  useDisclosure,
   Text,
+  useDisclosure,
 } from "@chakra-ui/react";
 import Ajv from "ajv";
 import { useCallback, useEffect, useState } from "react";
@@ -177,7 +177,7 @@ function JsonSchemaDialog({
         setError(null);
       }
     },
-    [setError]
+    [setError],
   );
 
   return (

@@ -1,8 +1,11 @@
-import { Dialog } from "~/components/ui/dialog";
 import { Box, Button, Heading } from "@chakra-ui/react";
 import { DatasetTable } from "~/components/datasets/DatasetTable";
+import { Dialog } from "~/components/ui/dialog";
 import type { PromptConfigFormValues } from "~/prompts";
-import { transposeColumnsFirstToRowsFirstWithId, transpostRowsFirstToColumnsFirstWithoutId } from "../../optimization_studio/utils/datasetUtils";
+import {
+  transposeColumnsFirstToRowsFirstWithId,
+  transpostRowsFirstToColumnsFirstWithoutId,
+} from "../../optimization_studio/utils/datasetUtils";
 
 type Demonstrations =
   PromptConfigFormValues["version"]["configData"]["demonstrations"];
@@ -19,7 +22,7 @@ export function DemonstrationsModal({
   onChange: (demonstrations: Demonstrations) => void;
 }) {
   const transposedRecords = transposeColumnsFirstToRowsFirstWithId(
-    demonstrations?.inline?.records ?? {}
+    demonstrations?.inline?.records ?? {},
   );
 
   return (
@@ -47,12 +50,16 @@ export function DemonstrationsModal({
                 datasetRecords: transposedRecords,
                 columnTypes: demonstrations?.inline?.columnTypes ?? [],
               }}
-              onUpdateDataset={(dataset) => onChange({
-                inline: {
-                  columnTypes: dataset.columnTypes,
-                  records: transpostRowsFirstToColumnsFirstWithoutId(dataset.datasetRecords),
-                }
-              })}
+              onUpdateDataset={(dataset) =>
+                onChange({
+                  inline: {
+                    columnTypes: dataset.columnTypes,
+                    records: transpostRowsFirstToColumnsFirstWithoutId(
+                      dataset.datasetRecords,
+                    ),
+                  },
+                })
+              }
               canEditDatasetRecord={false}
             />
             {/** This is a hacky way to get a button on here, but we're pressed for time */}

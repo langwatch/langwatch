@@ -1,25 +1,19 @@
-import { z } from "zod";
-
-import {
-  type SearchResponse,
-  type SearchTotalHits,
-  type Sort,
+import type {
+  SearchResponse,
+  SearchTotalHits,
+  Sort,
 } from "@elastic/elasticsearch/lib/api/types";
-import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
+import { type PrismaClient, PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
+import { z } from "zod";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import type { Protections } from "../../elasticsearch/protections";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
-import { evaluatePreconditions } from "../../evaluations/preconditions";
-import { checkPreconditionSchema } from "../../evaluations/types.generated";
-
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import {
   aggregateTraces,
   getTraceById,
@@ -28,8 +22,12 @@ import {
 } from "~/server/elasticsearch/traces";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
 import { sharedFiltersInputSchema } from "../../analytics/types";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import { type ElasticSearchTrace, type Trace } from "../../tracer/types";
+import { esClient, TRACE_INDEX } from "../../elasticsearch";
+import type { Protections } from "../../elasticsearch/protections";
+import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { evaluatePreconditions } from "../../evaluations/preconditions";
+import { checkPreconditionSchema } from "../../evaluations/types.generated";
+import type { ElasticSearchTrace, Trace } from "../../tracer/types";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
@@ -558,29 +556,29 @@ export const getAllTracesForProject = async ({
                 } as Sort,
               }
             : input.sortBy.startsWith("evaluations.")
-            ? {
-                sort: {
-                  "evaluations.score": {
-                    order: input.sortDirection ?? "desc",
-                    nested: {
-                      path: "evaluations",
-                      filter: {
-                        term: {
-                          "evaluations.evaluator_id":
-                            input.sortBy.split(".")[1],
+              ? {
+                  sort: {
+                    "evaluations.score": {
+                      order: input.sortDirection ?? "desc",
+                      nested: {
+                        path: "evaluations",
+                        filter: {
+                          term: {
+                            "evaluations.evaluator_id":
+                              input.sortBy.split(".")[1],
+                          },
                         },
                       },
                     },
-                  },
-                } as Sort,
-              }
-            : {
-                sort: {
-                  [input.sortBy]: {
-                    order: input.sortDirection ?? "desc",
-                  },
-                } as Sort,
-              }
+                  } as Sort,
+                }
+              : {
+                  sort: {
+                    [input.sortBy]: {
+                      order: input.sortDirection ?? "desc",
+                    },
+                  } as Sort,
+                }
           : {
               sort: {
                 "timestamps.started_at": {

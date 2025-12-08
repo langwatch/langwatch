@@ -1,8 +1,11 @@
-import type { ProjectionHandler, EventStream } from "../../../library";
-import type { Projection } from "../../../library";
+import type {
+  EventStream,
+  Projection,
+  ProjectionHandler,
+} from "../../../library";
+import { traceAggregationStateProjectionRepository } from "../repositories";
 import type { TraceAggregationEvent } from "../schemas/events";
 import { isTraceAggregationCompletedEvent } from "../schemas/events";
-import { traceAggregationStateProjectionRepository } from "../repositories";
 
 /**
  * Projection data for trace metrics.

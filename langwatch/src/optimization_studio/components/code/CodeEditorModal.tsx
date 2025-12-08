@@ -10,10 +10,10 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <div style={{ padding: "0 16px" }}>Loading editor...</div>,
 });
 
-import monokaiTheme from "./Monokai.json";
-import { useCallback, useEffect, useState } from "react";
 import { registerCompletion } from "monacopilot";
+import { useCallback, useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import monokaiTheme from "./Monokai.json";
 
 export function CodeEditorModal({
   code,

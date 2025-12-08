@@ -1,5 +1,5 @@
-import { Box, Field, Spacer, VStack, type StackProps } from "@chakra-ui/react";
-import { type PropsWithChildren, type ReactNode } from "react";
+import { Box, Field, Spacer, type StackProps, VStack } from "@chakra-ui/react";
+import type { PropsWithChildren, ReactNode } from "react";
 
 export function FullWidthFormControl({
   label,

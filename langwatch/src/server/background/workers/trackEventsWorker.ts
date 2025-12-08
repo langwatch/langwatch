@@ -1,19 +1,22 @@
-import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { TrackEventJob } from "~/server/background/types";
-import {
-  type ElasticSearchEvent,
-  type ElasticSearchTrace,
+import type {
+  ElasticSearchEvent,
+  ElasticSearchTrace,
 } from "../../../server/tracer/types";
 import { createLogger } from "../../../utils/logger";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import { connection } from "../../redis";
-import { elasticSearchEventSchema } from "../../tracer/types.generated";
-import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
+import { connection } from "../../redis";
+import { elasticSearchEventSchema } from "../../tracer/types.generated";
+import { TRACK_EVENTS_QUEUE_NAME } from "../queues/trackEventsQueue";
 
 const logger = createLogger("langwatch:workers:trackEventWorker");
 
@@ -106,7 +109,7 @@ export async function runTrackEventJob(job: Job<TrackEventJob, void, string>) {
 
 export const startTrackEventsWorker = () => {
   if (!connection) {
-  logger.info(" no redis connection, skipping track events worker");
+    logger.info(" no redis connection, skipping track events worker");
     return;
   }
 
@@ -116,7 +119,7 @@ export const startTrackEventsWorker = () => {
     {
       connection,
       concurrency: 3,
-    }
+    },
   );
 
   trackEventsWorker.on("ready", () => {

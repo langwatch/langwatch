@@ -1,11 +1,11 @@
 import type { ComponentType } from "../../types/dsl";
+import { CustomNode } from "./CustomNode";
+import { EndNode } from "./EndNode";
 import { EntryNode } from "./EntryNode";
 import { EvaluatorNode } from "./EvaluatorNode";
 import { ComponentNode } from "./Nodes";
-import { SignatureNode } from "./SignatureNode";
-import { EndNode } from "./EndNode";
-import { CustomNode } from "./CustomNode";
 import { PromptingTechniqueNode } from "./PromptingTechniqueNode";
+import { SignatureNode } from "./SignatureNode";
 
 export const NodeComponents: Record<
   ComponentType,

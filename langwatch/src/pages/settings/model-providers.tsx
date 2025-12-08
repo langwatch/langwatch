@@ -15,40 +15,38 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, Plus, Eye, EyeOff } from "react-feather";
 import React, { useEffect } from "react";
+import { Eye, EyeOff, Plus, Trash2 } from "react-feather";
+import CreatableSelect from "react-select/creatable";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
+import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
 import { SmallLabel } from "../../components/SmallLabel";
+import { Switch } from "../../components/ui/switch";
+import { useDefaultModel } from "../../hooks/useDefaultModel";
+import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
+import { useModelProviderForm } from "../../hooks/useModelProviderForm";
+import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useTopicClusteringModel } from "../../hooks/useTopicClusteringModel";
+import { dependencies } from "../../injection/dependencies.client";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import {
   getProviderModelOptions,
-  modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
+  modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
-
-import CreatableSelect from "react-select/creatable";
-import { Switch } from "../../components/ui/switch";
-
 import {
   DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
   DEFAULT_MODEL,
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
   KEY_CHECK,
 } from "../../utils/constants";
-import { dependencies } from "../../injection/dependencies.client";
-import { PermissionAlert } from "../../components/PermissionAlert";
-import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
-import { useModelProviderForm } from "../../hooks/useModelProviderForm";
-import { useDefaultModel } from "../../hooks/useDefaultModel";
-import { useTopicClusteringModel } from "../../hooks/useTopicClusteringModel";
-import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
 
 // (moved: multi-create logic now lives inside the per-provider hook)
 
@@ -184,7 +182,7 @@ function ModelProviderRow({
     if (ManagedModelProviderAny) {
       actions.setManaged(true);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(state.customKeys)]);
 
   return (

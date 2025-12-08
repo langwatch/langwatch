@@ -1,10 +1,10 @@
-import { Button, HStack, Heading, Spacer } from "@chakra-ui/react";
-import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
-import { FilterToggle } from "../filters/FilterToggle";
+import { Button, Heading, HStack, Spacer } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { Tooltip } from "../ui/tooltip";
 import { LuListTree } from "react-icons/lu";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { FilterToggle } from "../filters/FilterToggle";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
+import { Tooltip } from "../ui/tooltip";
 
 export function AnalyticsHeader({ title }: { title: string }) {
   const router = useRouter();
@@ -37,7 +37,7 @@ export function AnalyticsHeader({ title }: { title: string }) {
                   },
                 },
                 undefined,
-                { shallow: true }
+                { shallow: true },
               );
             }}
           >

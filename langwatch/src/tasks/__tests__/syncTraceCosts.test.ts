@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 // Test the Painless script logic (simulated in JavaScript)
 const calculateTraceCostFromSpans = (spans: any[]): number | null => {

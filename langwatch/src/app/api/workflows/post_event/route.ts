@@ -1,24 +1,24 @@
-import { Hono } from "hono";
-import { handle } from "hono/vercel";
-import { loadDatasets } from "../../../../optimization_studio/server/loadDatasets";
-import { addEnvs } from "../../../../optimization_studio/server/addEnvs";
-import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
-import { prisma } from "../../../../server/db";
-import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
-import { authOptions } from "../../../../server/auth";
-import { getServerSession } from "next-auth";
-import { studioBackendPostEvent } from "./post-event";
+import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
+import { handle } from "hono/vercel";
+import type { NextRequest } from "next/server";
+import { getServerSession } from "next-auth";
+import { z } from "zod";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { addEnvs } from "../../../../optimization_studio/server/addEnvs";
+import { loadDatasets } from "../../../../optimization_studio/server/loadDatasets";
 import {
-  studioClientEventSchema,
   type StudioClientEvent,
   type StudioServerEvent,
+  studioClientEventSchema,
 } from "../../../../optimization_studio/types/events";
+import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { authOptions } from "../../../../server/auth";
+import { prisma } from "../../../../server/db";
 import { createLogger } from "../../../../utils/logger";
-import type { NextRequest } from "next/server";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { loggerMiddleware } from "../../middleware/logger";
+import { studioBackendPostEvent } from "./post-event";
 
 const logger = createLogger("langwatch:post_message");
 
@@ -32,31 +32,31 @@ app.post(
     z.object({
       projectId: z.string(),
       event: studioClientEventSchema,
-    })
+    }),
   ),
   async (c) => {
     const { event: eventWithoutEnvs, projectId } = await c.req.json();
     logger.info({ event: eventWithoutEnvs.type, projectId }, "post_event");
 
     const session = await getServerSession(
-      authOptions(c.req.raw as NextRequest)
+      authOptions(c.req.raw as NextRequest),
     );
     if (!session) {
       return c.json(
         { error: "You must be logged in to access this endpoint." },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     const hasPermission = await backendHasTeamProjectPermission(
       { prisma, session },
       { projectId },
-      "WORKFLOWS_MANAGE"
+      "WORKFLOWS_MANAGE",
     );
     if (!hasPermission) {
       return c.json(
         { error: "You do not have permission to access this endpoint." },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -64,7 +64,7 @@ app.post(
     try {
       message = await loadDatasets(
         await addEnvs(eventWithoutEnvs, projectId),
-        projectId
+        projectId,
       );
     } catch (error) {
       logger.error({ error, projectId }, "error");
@@ -90,7 +90,7 @@ app.post(
         return c.json(
           //@ts-expect-error
           { error: `Unknown event type on server: ${message.type}` },
-          { status: 400 }
+          { status: 400 },
         );
     }
 
@@ -146,7 +146,7 @@ app.post(
       // Wait for the stream to be done
       await streamDone;
     });
-  }
+  },
 );
 
 export const GET = handle(app);

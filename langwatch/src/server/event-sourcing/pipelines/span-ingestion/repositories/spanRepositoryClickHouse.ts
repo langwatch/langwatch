@@ -1,14 +1,13 @@
-import { type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { generate } from "@langwatch/ksuid";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { generate } from "@langwatch/ksuid";
-
-import type { SpanRepository } from "./spanRepository";
-import type {
-  StoreSpanIngestionCommandData,
-  SpanData,
-} from "../schemas/commands";
 import { createLogger } from "../../../../../utils/logger";
+import type {
+  SpanData,
+  StoreSpanIngestionCommandData,
+} from "../schemas/commands";
+import type { SpanRepository } from "./spanRepository";
 
 export class SpanRepositoryClickHouse implements SpanRepository {
   tracer = getLangWatchTracer("langwatch.span-repository.clickhouse");

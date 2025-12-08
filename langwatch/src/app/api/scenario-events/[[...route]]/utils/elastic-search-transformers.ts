@@ -21,7 +21,7 @@ export const ES_FIELDS = {
  * Transforms camelCase field names to snake_case for Elasticsearch storage
  */
 export function transformToElasticsearch(
-  event: Record<string, unknown>
+  event: Record<string, unknown>,
 ): Record<string, unknown> {
   const result = { ...event };
 
@@ -39,7 +39,7 @@ export function transformToElasticsearch(
  * Transforms snake_case field names back to camelCase for application use
  */
 export function transformFromElasticsearch(
-  doc: Record<string, unknown>
+  doc: Record<string, unknown>,
 ): Record<string, unknown> {
   const result = { ...doc };
 

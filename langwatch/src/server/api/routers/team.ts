@@ -1,15 +1,14 @@
 import { TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
 import { z } from "zod";
-
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { slugify } from "~/utils/slugify";
 import {
   checkUserPermissionForOrganization,
   OrganizationRoleGroup,
 } from "../permission";
 import { checkTeamPermission } from "../rbac";
-import { nanoid } from "nanoid";
-import { slugify } from "~/utils/slugify";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z

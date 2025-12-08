@@ -1,7 +1,7 @@
 import type { NextApiRequest } from "next";
 
 export function getClientIp(
-  req: NextApiRequest | undefined
+  req: NextApiRequest | undefined,
 ): string | undefined {
   if (!req) {
     return undefined;

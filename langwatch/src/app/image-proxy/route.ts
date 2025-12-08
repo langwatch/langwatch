@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     if (!response.ok) {
       return NextResponse.json(
         { error: `Failed to fetch image: ${response.statusText}` },
-        { status: response.status }
+        { status: response.status },
       );
     }
 
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     if (!contentType?.startsWith("image/")) {
       return NextResponse.json(
         { error: "URL does not point to an image" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -31,11 +31,10 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "public, max-age=31536000",
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch image" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
-

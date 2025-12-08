@@ -1,22 +1,36 @@
-import { type NextRequest, type NextResponse } from "next/server";
-import { context as otContext, propagation, trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import {
+  context as otContext,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
+import type { NextRequest, NextResponse } from "next/server";
 
 const headersGetter = {
   keys: (carrier: Headers): string[] => Array.from(carrier.keys()),
-  get: (carrier: Headers, key: string): string | string[] | undefined => carrier.get(key) ?? void 0,
+  get: (carrier: Headers, key: string): string | string[] | undefined =>
+    carrier.get(key) ?? void 0,
 };
 
 export function withAppRouterTracer(name?: string) {
   return (handler: (req: NextRequest) => Promise<NextResponse>) => {
     return async (req: NextRequest) => {
-      const parentCtx = propagation.extract(otContext.active(), req.headers, headersGetter);
+      const parentCtx = propagation.extract(
+        otContext.active(),
+        req.headers,
+        headersGetter,
+      );
       const spanName = `${req.method} ${name ?? req.nextUrl.pathname}`;
       const tracer = trace.getTracer("langwatch:next:app");
 
       return otContext.with(parentCtx, async () => {
         return tracer.startActiveSpan(
           spanName,
-          { kind: SpanKind.SERVER, attributes: name ? { "service.name": name } : void 0 },
+          {
+            kind: SpanKind.SERVER,
+            attributes: name ? { "service.name": name } : void 0,
+          },
           async (span) => {
             let response: NextResponse | null = null;
             try {
@@ -41,7 +55,7 @@ export function withAppRouterTracer(name?: string) {
             }
 
             return response;
-          }
+          },
         );
       });
     };

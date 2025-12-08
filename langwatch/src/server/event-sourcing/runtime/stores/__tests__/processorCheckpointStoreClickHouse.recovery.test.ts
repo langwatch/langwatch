@@ -1,11 +1,11 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type AggregateType, EventUtils } from "../../../library";
+import { EVENT_TYPES } from "../../../library/domain/eventType";
+import { createTenantId } from "../../../library/domain/tenantId";
+import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 import { ProcessorCheckpointStoreClickHouse } from "../processorCheckpointStoreClickHouse";
 import { CheckpointRepositoryClickHouse } from "../repositories/checkpointRepositoryClickHouse";
-import { EventUtils, type AggregateType } from "../../../library";
-import { createTenantId } from "../../../library/domain/tenantId";
-import { EVENT_TYPES } from "../../../library/domain/eventType";
-import type { ClickHouseClient } from "@clickhouse/client";
-import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 
 describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
   const pipelineName = "test-pipeline";

@@ -1,14 +1,13 @@
-import { Box, Button, Spacer, Text, VStack, HStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import type { AnnotationQueueItem } from "@prisma/client";
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../../../components/DashboardLayout";
-
-import { type AnnotationQueueItem } from "@prisma/client";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useEffect, useMemo, useState } from "react";
+import { DashboardLayout } from "../../../components/DashboardLayout";
 import { TasksDone } from "../../../components/icons/TasksDone";
 import { Conversation } from "../../../components/messages/Conversation";
 
@@ -54,7 +53,7 @@ export default function TraceAnnotations() {
       projectId: project?.id ?? "",
       traceId: currentQueueItem?.trace?.trace_id ?? "",
     },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -132,12 +131,12 @@ const AnnotationQueuePicker = ({
   const { project } = useOrganizationTeamProject();
 
   const currentQueueItemIndex = queueItems.findIndex(
-    (item) => item.id === currentQueueItem.id
+    (item) => item.id === currentQueueItem.id,
   );
 
   const navigateToQueue = (queueId: string) => {
     void router.replace(
-      `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`
+      `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`,
     );
   };
 
@@ -159,7 +158,7 @@ const AnnotationQueuePicker = ({
             await router.replace(`/${project?.slug}/annotations/my-queue`);
           }
         },
-      }
+      },
     );
   };
 

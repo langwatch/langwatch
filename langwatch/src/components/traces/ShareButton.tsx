@@ -1,12 +1,12 @@
-import { Button, HStack, Text, VStack, useDisclosure } from "@chakra-ui/react";
-import { Popover } from "../ui/popover";
-import { toaster } from "../ui/toaster";
-import { PublicShareResourceTypes, type Project } from "@prisma/client";
+import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { type Project, PublicShareResourceTypes } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { Globe, Share } from "react-feather";
-import { CopyInput } from "../CopyInput";
-import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
+import { CopyInput } from "../CopyInput";
+import { Popover } from "../ui/popover";
+import { toaster } from "../ui/toaster";
 
 export function ShareButton({
   project,

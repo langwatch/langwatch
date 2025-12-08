@@ -26,7 +26,7 @@ export function useMemoizedChatWindowIds({
     // the state changes, so we can use the hash to determine if the
     // chat window ids have changed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [chatWindowMemoHash]
+    [chatWindowMemoHash],
   );
 
   return memoizedChatWindowIds;

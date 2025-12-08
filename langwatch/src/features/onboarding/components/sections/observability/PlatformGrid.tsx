@@ -1,7 +1,7 @@
-import React from "react";
 import { HStack, Text, VStack } from "@chakra-ui/react";
-import { PLATFORM_OPTIONS } from "../../../regions/observability/ui-options";
+import type React from "react";
 import type { PlatformKey } from "../../../regions/observability/types";
+import { PLATFORM_OPTIONS } from "../../../regions/observability/ui-options";
 import { SelectableIconCard } from "../shared/SelectableIconCard";
 
 interface PlatformGridProps {
@@ -11,7 +11,7 @@ interface PlatformGridProps {
 
 export const PlatformGrid: React.FC<PlatformGridProps> = ({
   selectedLanguage,
-  onSelectLanguage
+  onSelectLanguage,
 }) => {
   return (
     <VStack align="stretch" gap={3}>
@@ -20,7 +20,8 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           Select your platform or language
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Choose the platform or language you are using to see a guide on how to instrument it.
+          Choose the platform or language you are using to see a guide on how to
+          instrument it.
         </Text>
       </VStack>
       <HStack gap={3} wrap="wrap">
@@ -41,6 +42,6 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           />
         ))}
       </HStack>
-  </VStack>
+    </VStack>
   );
-}
+};

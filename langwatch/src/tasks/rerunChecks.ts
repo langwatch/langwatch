@@ -7,7 +7,7 @@ import {
   esClient,
   TRACE_INDEX,
 } from "../server/elasticsearch";
-import { type ElasticSearchEvaluation } from "../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../server/tracer/types";
 // import {
 //   scheduleTraceCheck,
 //   traceChecksQueue,

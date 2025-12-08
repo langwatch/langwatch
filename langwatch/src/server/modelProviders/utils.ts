@@ -1,11 +1,11 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { env } from "../../env.mjs";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
 import { prisma } from "../db";
-import { env } from "../../env.mjs";
 
 export const getVercelAIModel = async (projectId: string, model?: string) => {
   const project = await prisma.project.findUnique({
@@ -24,7 +24,7 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
 
   if (!modelProvider || !modelProvider.enabled) {
     throw new Error(
-      `Model provider ${providerKey} not configured or disabled for project, go to settings to enable it.`
+      `Model provider ${providerKey} not configured or disabled for project, go to settings to enable it.`,
     );
   }
 
@@ -37,7 +37,7 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
     Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,
       value,
-    ])
+    ]),
   );
 
   const vercelProvider = createOpenAICompatible({

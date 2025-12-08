@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
-import {
-  getProviderModelOptions,
-  modelProviders,
-  type MaybeStoredModelProvider,
-} from "../../modelProviders/registry";
-import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 import { KEY_CHECK } from "../../../utils/constants";
+import { prisma } from "../../db";
+import {
+  getProviderModelOptions,
+  type MaybeStoredModelProvider,
+  modelProviders,
+} from "../../modelProviders/registry";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure

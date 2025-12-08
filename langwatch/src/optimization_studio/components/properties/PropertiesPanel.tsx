@@ -32,7 +32,7 @@ export function PropertiesPanel() {
       workflowSelected: state.workflowSelected,
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
-    }))
+    })),
   );
 
   const ComponentPropertiesPanelMap: Record<

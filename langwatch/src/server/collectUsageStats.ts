@@ -1,6 +1,5 @@
 import { prisma } from "~/server/db";
-import { SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
-import { esClient } from "./elasticsearch";
+import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
 export async function collectUsageStats(instanceId: string) {
   const organizationId = instanceId.split("__")[1];

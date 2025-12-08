@@ -1,18 +1,25 @@
-import { Box, Separator, HStack, Spacer, Text, VStack, Button } from "@chakra-ui/react";
-import { Tooltip } from "../../../components/ui/tooltip";
+import {
+  Box,
+  Button,
+  HStack,
+  Separator,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import numeral from "numeral";
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { FormatMoney } from "../../../optimization_studio/components/FormatMoney";
 import type { AppRouter } from "../../../server/api/root";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
-import { EvaluationProgressBar } from "./EvaluationProgressBar";
 import { HoverableBigText } from "../../HoverableBigText";
-import React from "react";
+import { EvaluationProgressBar } from "./EvaluationProgressBar";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,
@@ -38,7 +45,7 @@ export function BatchEvaluationV2EvaluationSummary({
       ? (finishedAt ?? currentTimestamp) -
           new Date(run.timestamps.created_at).getTime()
       : 0,
-    0
+    0,
   );
 
   useEffect(() => {
@@ -108,7 +115,7 @@ export function BatchEvaluationV2EvaluationSummary({
                             amount: run.summary.dataset_average_cost,
                             currency: "USD",
                           },
-                          "$0.00[00]"
+                          "$0.00[00]",
                         )
                       : "-"}
                   </Text>
@@ -120,7 +127,7 @@ export function BatchEvaluationV2EvaluationSummary({
                             amount: run.summary.evaluations_average_cost,
                             currency: "USD",
                           },
-                          "$0.00[00]"
+                          "$0.00[00]",
                         )
                       : "-"}
                   </Text>
@@ -147,7 +154,7 @@ export function BatchEvaluationV2EvaluationSummary({
                   Evaluation mean duration:{" "}
                   {run.summary.evaluations_average_duration
                     ? formatMilliseconds(
-                        run.summary.evaluations_average_duration
+                        run.summary.evaluations_average_duration,
                       )
                     : "-"}
                 </Text>
@@ -158,7 +165,7 @@ export function BatchEvaluationV2EvaluationSummary({
             <Text>
               {formatMilliseconds(
                 (run.summary.dataset_average_duration ?? 0) +
-                  (run.summary.evaluations_average_duration ?? 0)
+                  (run.summary.evaluations_average_duration ?? 0),
               )}
             </Text>
           </Tooltip>
@@ -186,7 +193,7 @@ export function BatchEvaluationV2EvaluationSummary({
                             amount: run.summary.dataset_cost,
                             currency: "USD",
                           },
-                          "$0.00[00]"
+                          "$0.00[00]",
                         )
                       : "-"}
                   </Text>
@@ -198,7 +205,7 @@ export function BatchEvaluationV2EvaluationSummary({
                             amount: run.summary.evaluations_cost,
                             currency: "USD",
                           },
-                          "$0.00[00]"
+                          "$0.00[00]",
                         )
                       : "-"}
                   </Text>
@@ -269,7 +276,7 @@ export function BatchEvaluationV2EvaluationSummary({
 
 export const getFinishedAt = (
   timestamps: ESBatchEvaluation["timestamps"],
-  currentTimestamp: number
+  currentTimestamp: number,
 ) => {
   if (timestamps.finished_at) {
     return timestamps.finished_at;
@@ -288,7 +295,7 @@ export const formatEvaluationSummary = (
     average_score: number;
     average_passed?: number;
   },
-  short = false
+  short = false,
 ): string => {
   return evaluation.average_passed !== undefined
     ? numeral(evaluation.average_passed).format("0.[0]%") +
@@ -296,7 +303,7 @@ export const formatEvaluationSummary = (
         (short || evaluation.average_passed == evaluation.average_score
           ? ""
           : ` (${numeral(evaluation.average_score).format(
-              "0.0[0]"
+              "0.0[0]",
             )} avg. score)`)
     : numeral(evaluation.average_score).format("0.[00]");
 };

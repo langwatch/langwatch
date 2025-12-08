@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const topicsRouter = createTRPCRouter({
   getAll: protectedProcedure

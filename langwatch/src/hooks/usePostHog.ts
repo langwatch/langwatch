@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import posthog from "posthog-js";
 import { useRouter } from "next/router";
+import posthog from "posthog-js";
+import { useEffect } from "react";
 import { usePublicEnv } from "./usePublicEnv";
 
 export function usePostHog() {

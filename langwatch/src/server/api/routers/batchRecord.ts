@@ -1,8 +1,8 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { checkProjectPermission } from "../rbac";
-import { TRPCError } from "@trpc/server";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure

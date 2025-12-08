@@ -1,7 +1,7 @@
-import { fetchSSE } from "./fetchSSE";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FetchSSETimeoutError } from "./errors";
+import { fetchSSE } from "./fetchSSE";
 
 vi.mock("~/utils/logger", () => ({
   createLogger: (name: string) => ({
@@ -49,7 +49,7 @@ describe("fetchSSE", () => {
           });
         });
         return Promise.resolve();
-      }
+      },
     );
   });
 
@@ -70,7 +70,7 @@ describe("fetchSSE", () => {
           Accept: "text/event-stream",
         }),
         body: JSON.stringify({ test: "data" }),
-      })
+      }),
     );
   });
 
@@ -87,7 +87,7 @@ describe("fetchSSE", () => {
         options.onmessage({ data: JSON.stringify({ type: "test", value: 1 }) });
         options.onmessage({ data: JSON.stringify({ type: "stop", value: 2 }) });
         return Promise.resolve();
-      }
+      },
     );
 
     await fetchSSE({
@@ -118,7 +118,7 @@ describe("fetchSSE", () => {
               headers: { get: () => "application/json" },
             });
             return Promise.resolve();
-          }
+          },
         );
 
         await fetchSSE({
@@ -142,7 +142,7 @@ describe("fetchSSE", () => {
             });
             options.onmessage({ data: "invalid json" });
             return Promise.resolve();
-          }
+          },
         );
 
         await fetchSSE({
@@ -185,7 +185,7 @@ describe("fetchSSE", () => {
             });
             options.onmessage({ data: "invalid json" });
             return Promise.resolve();
-          }
+          },
         );
 
         await expect(
@@ -193,7 +193,7 @@ describe("fetchSSE", () => {
             endpoint: "/api/test",
             payload: {},
             onEvent: vi.fn(),
-          })
+          }),
         ).rejects.toThrow();
       });
 

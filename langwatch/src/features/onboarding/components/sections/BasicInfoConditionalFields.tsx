@@ -1,14 +1,14 @@
-import { VStack, Field, SegmentGroup, NativeSelect } from "@chakra-ui/react";
+import { Field, NativeSelect, SegmentGroup, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useEffect, useState } from "react";
-import { useAnalytics, AnalyticsBoundary } from "react-contextual-analytics";
+import { useEffect, useRef, useState } from "react";
+import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";
+import { IconRadioCardGroup } from "../../../../components/forms/IconRadioCardGroup";
+import { PhoneNumberInput } from "../../../../components/inputs/PhoneNumberInput";
 import {
   companySizeItems,
   solutionTypeItems,
 } from "../../constants/onboarding-data";
 import type { CompanySize, SolutionType, UsageStyle } from "../../types/types";
-import { IconRadioCardGroup } from "../../../../components/forms/IconRadioCardGroup";
-import { PhoneNumberInput } from "../../../../components/inputs/PhoneNumberInput";
 
 interface BasicInfoConditionalFieldsProps {
   usageStyle: UsageStyle | undefined;

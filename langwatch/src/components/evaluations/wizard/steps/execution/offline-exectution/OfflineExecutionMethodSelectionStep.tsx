@@ -1,5 +1,12 @@
 import { Accordion, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import type { WizardState } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import {
+  CODE_EXECUTION_STEP_ACCORDION_VALUE,
+  CodeExecutionStepAccordion,
+} from "./CodeExecutionStepAccordion";
 import {
   EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE,
   ExecutionMethodSelectionStepAccordion,
@@ -8,16 +15,9 @@ import {
   LLM_PROMPT_PROPERTIES_STEP_ACCORDION_VALUE,
   LlmPromptPropertiesStepAccordion,
 } from "./LlmPromptPropertiesStepAccordion";
-import type { WizardState } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useShallow } from "zustand/react/shallow";
-import {
-  CODE_EXECUTION_STEP_ACCORDION_VALUE,
-  CodeExecutionStepAccordion,
-} from "./CodeExecutionStepAccordion";
 
 const ExecutionMethodStepAccordionFactory = (
-  executionMethod?: WizardState["executionMethod"]
+  executionMethod?: WizardState["executionMethod"],
 ) => {
   switch (executionMethod) {
     case "offline_prompt":
@@ -37,7 +37,7 @@ export function OfflineExecutionMethodSelectionStep() {
   const { executionMethod } = useEvaluationWizardStore(
     useShallow(({ wizardState }) => ({
       executionMethod: wizardState.executionMethod,
-    }))
+    })),
   );
 
   const updateAccordionValue = useCallback(() => {

@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-
+import type { AggregateType } from "../../domain/aggregateType";
 import { COMMAND_TYPES } from "../../domain/commandType";
 import { EVENT_TYPES } from "../../domain/eventType";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, EventMetadataBase } from "../../domain/types";
 import type { Command } from "../command";
 import { defineCommandSchema } from "../commandSchema";
-import type { AggregateType } from "../../domain/aggregateType";
 
 interface TestPayload {
   id: string;

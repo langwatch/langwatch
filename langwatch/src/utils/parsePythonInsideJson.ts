@@ -92,7 +92,7 @@ export const parsePythonInsideJson = <T extends object>(item: T): T => {
       Object.entries(item).map(([key, value]) => [
         key,
         parsePythonInsideJson(value),
-      ])
+      ]),
     ) as T;
   } else if (typeof item === "string" && isPythonRepr(item)) {
     const match = grammar.match(item);
@@ -107,7 +107,7 @@ export const parsePythonInsideJson = <T extends object>(item: T): T => {
             Object.keys(value as any).length === 1
               ? (value as any).arg0
               : value,
-          ])
+          ]),
         );
       }
       return result;

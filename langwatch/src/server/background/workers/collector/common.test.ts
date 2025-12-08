@@ -1,12 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
+import type { BaseSpan } from "../../../tracer/types";
 import {
-  organizeSpansIntoTree,
   flattenSpanTree,
   getFirstInputAsText,
   getLastOutputAsText,
+  organizeSpansIntoTree,
 } from "./common"; // replace with your actual module path
-import type { BaseSpan } from "../../../tracer/types";
-import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
 
 const elasticSearchSpanToSpan = transformElasticSearchSpanToSpan(
   {
@@ -14,7 +14,7 @@ const elasticSearchSpanToSpan = transformElasticSearchSpanToSpan(
     canSeeCapturedOutput: true,
     canSeeCosts: true,
   },
-  new Set()
+  new Set(),
 );
 describe("Span organizing and flattening tests", () => {
   const commonSpanProps = {
@@ -120,21 +120,21 @@ describe("Span organizing and flattening tests", () => {
 
   it("uses http method and target as input if there are no inputs, for opentelemetry http cases", () => {
     const input = getFirstInputAsText(
-      spans.map((span) => ({ ...span, input: undefined }))
+      spans.map((span) => ({ ...span, input: undefined })),
     );
     expect(input).toBe("GET /ws/socket.io");
   });
 
   it("uses span name as input if there are no inputs, for non-http opentelemetry cases", () => {
     const input = getFirstInputAsText(
-      spans.map((span) => ({ ...span, input: undefined, params: undefined }))
+      spans.map((span) => ({ ...span, input: undefined, params: undefined })),
     );
     expect(input).toBe("topmost span");
   });
 
   it("uses http status code as output if there are no outputs, for opentelemetry http cases", () => {
     const output = getLastOutputAsText(
-      spans.map((span) => ({ ...span, output: undefined }))
+      spans.map((span) => ({ ...span, output: undefined })),
     );
     expect(output).toBe("404");
   });
@@ -528,10 +528,10 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
 
     expect(input).toEqual("hello");
@@ -782,10 +782,10 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
 
     expect(input).toEqual("1");
@@ -1004,10 +1004,10 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
 
     expect(input).toEqual("hey there");
@@ -1199,15 +1199,15 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
 
     // expect(input).toBe("Hello");
     expect(output).toBe(
-      "Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let's set sail on a grand adventure! Arrr! 🏴‍☠️"
+      "Ahoy there, matey! What brings ye to these treacherous waters? Speak yer mind, and let's set sail on a grand adventure! Arrr! 🏴‍☠️",
     );
   });
 
@@ -1244,15 +1244,15 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     expect(input).toBe("ohai");
 
     const output = getLastOutputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     expect(output).toBe(
-      "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!"
+      "You're welcome! If you have any more questions or need assistance, feel free to ask. Have a great day!",
     );
   });
 
@@ -1275,7 +1275,7 @@ describe("Span organizing and flattening tests", () => {
     ];
 
     const input = getFirstInputAsText(
-      spans.map(elasticSearchSpanToSpan as any)
+      spans.map(elasticSearchSpanToSpan as any),
     );
     expect(input).toBe("how much is 2+2?");
   });

@@ -1,11 +1,9 @@
 import { HStack, Text } from "@chakra-ui/react";
-
-import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
-
 import {
   ScenarioRunStatus,
   Verdict,
 } from "~/app/api/scenario-events/[[...route]]/enums";
+import { CONSOLE_COLORS, STATUS_DISPLAY_TEXT_MAP } from "./constants";
 
 interface StatusDisplayProps {
   status?: string;
@@ -34,8 +32,8 @@ export function StatusDisplay({ status, verdict }: StatusDisplayProps) {
       return verdict === Verdict.SUCCESS
         ? "PASSED"
         : verdict === Verdict.FAILURE
-        ? "FAILED"
-        : "INCONCLUSIVE";
+          ? "FAILED"
+          : "INCONCLUSIVE";
     }
     return STATUS_DISPLAY_TEXT_MAP[
       status as keyof typeof STATUS_DISPLAY_TEXT_MAP

@@ -1,14 +1,15 @@
-import React, { useMemo } from "react";
 import {
   Card,
-  VStack,
-  Text,
+  ClientOnly,
   CodeBlock,
+  createShikiAdapter,
   Float,
   IconButton,
-  createShikiAdapter,
-  ClientOnly,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import type React from "react";
+import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import bashSnippet from "../../../regions/observability/codegen/snippets/noandlo/n8n.snippet.sh";
@@ -72,4 +73,4 @@ export const NoLoN8nSetup: React.FC = () => {
       </Card.Body>
     </Card.Root>
   );
-}
+};

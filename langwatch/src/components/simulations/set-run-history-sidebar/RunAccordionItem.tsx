@@ -1,23 +1,23 @@
-import React from "react";
 import {
-  VStack,
-  HStack,
-  Text,
-  Icon,
   Accordion,
   Button,
+  HStack,
+  Icon,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import React from "react";
 import {
-  CheckCircle,
-  XCircle,
   AlertCircle,
   Calendar,
-  Clock,
+  CheckCircle,
   ChevronDown,
+  Clock,
+  XCircle,
 } from "react-feather";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { Run } from "./types";
 import { RunHistoryItem } from "./RunHistoryItem";
+import type { Run } from "./types";
 
 // Run accordion section
 export const RunAccordionItem = ({
@@ -81,15 +81,15 @@ export const RunAccordionItem = ({
                   passedCount > 0 && failedCount === 0
                     ? CheckCircle
                     : failedCount > 0
-                    ? XCircle
-                    : AlertCircle
+                      ? XCircle
+                      : AlertCircle
                 }
                 color={
                   passedCount > 0 && failedCount === 0
                     ? "green.400"
                     : failedCount > 0
-                    ? "red.400"
-                    : "yellow.400"
+                      ? "red.400"
+                      : "yellow.400"
                 }
                 boxSize={3}
               />

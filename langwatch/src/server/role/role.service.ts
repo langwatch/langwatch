@@ -1,17 +1,17 @@
 import type { PrismaClient } from "@prisma/client";
 import {
-  RoleRepository,
-  type CreateRoleParams,
-  type UpdateRoleParams,
-} from "./repositories/role.repository";
-import {
-  RoleNotFoundError,
   RoleDuplicateNameError,
   RoleInUseError,
-  TeamNotFoundError,
+  RoleNotFoundError,
   RoleOrganizationMismatchError,
+  TeamNotFoundError,
   UserNotTeamMemberError,
 } from "./errors";
+import {
+  type CreateRoleParams,
+  RoleRepository,
+  type UpdateRoleParams,
+} from "./repositories/role.repository";
 
 /**
  * Service layer for custom role management

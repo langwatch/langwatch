@@ -1,28 +1,28 @@
-import {
-  elasticSearchToTypedValue,
-  elasticSearchEventsToEvents,
-  elasticSearchEvaluationsToEvaluations,
-} from "../tracer/utils";
-import {
-  type ElasticSearchSpan,
-  type ElasticSearchTrace,
-  type Evaluation,
-  type ReservedTraceMetadata,
-  type Span,
-  type SpanInputOutput,
-  type Event,
-  type Trace,
-  type SpanMetrics,
-  type TraceInput,
-  type TraceOutput,
-  type DatasetSpan,
-} from "../tracer/types";
-import { datasetSpanSchema } from "../datasets/types";
 import { z } from "zod";
-import { reservedTraceMetadataSchema } from "../tracer/types.generated";
-import type { Protections } from "./protections";
 import { createLogger } from "../../utils/logger";
 import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
+import { datasetSpanSchema } from "../datasets/types";
+import type {
+  DatasetSpan,
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  Evaluation,
+  Event,
+  ReservedTraceMetadata,
+  Span,
+  SpanInputOutput,
+  SpanMetrics,
+  Trace,
+  TraceInput,
+  TraceOutput,
+} from "../tracer/types";
+import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+import {
+  elasticSearchEvaluationsToEvaluations,
+  elasticSearchEventsToEvents,
+  elasticSearchToTypedValue,
+} from "../tracer/utils";
+import type { Protections } from "./protections";
 
 const logger = createLogger("langwatch:elasticsearch:transformers");
 
@@ -37,7 +37,7 @@ export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
 
 export const transformElasticSearchTraceToTrace = (
   elasticSearchTrace: ElasticSearchTrace,
-  protections: Protections
+  protections: Protections,
 ): Trace => {
   const {
     metadata = {},
@@ -52,8 +52,8 @@ export const transformElasticSearchTraceToTrace = (
 
   const reservedMetadata = Object.fromEntries(
     Object.entries(metadata).filter(
-      ([key]) => key in reservedTraceMetadataSchema.shape
-    )
+      ([key]) => key in reservedTraceMetadataSchema.shape,
+    ),
   ) as ReservedTraceMetadata;
   const customMetadata = metadata.custom ?? {};
 
@@ -111,7 +111,7 @@ export const transformElasticSearchTraceToTrace = (
   if (spans) {
     for (const span of spans) {
       transformedSpans.push(
-        transformElasticSearchSpanToSpan(protections, redactions)(span)
+        transformElasticSearchSpanToSpan(protections, redactions)(span),
       );
     }
   }
@@ -165,7 +165,7 @@ export const transformElasticSearchSpanToSpan =
     if (transformedOutput) {
       transformedOutput.value = redactObject(
         transformedOutput.value,
-        redactions
+        redactions,
       );
     }
 
@@ -187,18 +187,18 @@ export const transformElasticSearchSpanToSpan =
   };
 
 const extractRedactionsFromAllSpanInputs = (
-  spans: ElasticSearchTrace["spans"]
+  spans: ElasticSearchTrace["spans"],
 ): string[] => {
   return (spans || []).flatMap((span) =>
-    extractRedactionsForObject(span.input?.value)
+    extractRedactionsForObject(span.input?.value),
   );
 };
 
 const extractRedactionsFromAllSpanOutputs = (
-  spans: ElasticSearchTrace["spans"]
+  spans: ElasticSearchTrace["spans"],
 ): string[] => {
   return (spans || []).flatMap((span) =>
-    extractRedactionsForObject(span.output?.value)
+    extractRedactionsForObject(span.output?.value),
   );
 };
 
@@ -239,7 +239,7 @@ const redactObject = <T>(object: T, redactions: Set<string>): T => {
         return JSON.stringify(redactObject(json_, redactions)) as T;
       }
       return Array.from(redactions).filter((redaction) =>
-        object.includes(redaction)
+        object.includes(redaction),
       ).length > 0
         ? ("[REDACTED]" as T)
         : object;
@@ -253,7 +253,7 @@ const redactObject = <T>(object: T, redactions: Set<string>): T => {
       Object.entries(object).map(([key, value]) => [
         key,
         redactObject(value, redactions),
-      ])
+      ]),
     ) as T;
   }
   return object;

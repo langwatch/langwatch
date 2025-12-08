@@ -1,5 +1,5 @@
+import { performance } from "node:perf_hooks";
 import { Counter, Histogram, register } from "prom-client";
-import { performance } from 'node:perf_hooks';
 
 type Endpoint =
   | "collector"
@@ -15,7 +15,7 @@ register.removeSingleMetric("event_loop_lag_milliseconds");
 const eventLoopLag = new Histogram({
   name: "event_loop_lag_milliseconds",
   help: "Event loop lag in milliseconds",
-  buckets: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000]
+  buckets: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000],
 });
 setInterval(() => {
   const start = performance.now();
@@ -146,7 +146,7 @@ const evaluationStatusCounter = new Counter({
 
 export const getEvaluationStatusCounter = (
   evaluatorType: string,
-  status: EvaluationStatus
+  status: EvaluationStatus,
 ) => evaluationStatusCounter.labels(evaluatorType, status);
 
 // Counter for pii checks

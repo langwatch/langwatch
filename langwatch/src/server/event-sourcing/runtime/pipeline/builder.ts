@@ -1,28 +1,28 @@
 import type {
-  Event,
-  Projection,
-  EventStore,
-  EventHandlerClass,
-  ProjectionHandlerClass,
   AggregateType,
-  EventPublisher,
-  EventStoreReadContext,
   CommandHandlerClass,
-  ExtractCommandHandlerPayload,
+  Event,
+  EventHandlerClass,
+  EventPublisher,
   EventSourcedQueueProcessor,
+  EventStore,
+  EventStoreReadContext,
+  ExtractCommandHandlerPayload,
+  Projection,
+  ProjectionHandlerClass,
 } from "../../library";
-import type { DistributedLock } from "../../library/utils/distributedLock";
-import type { ProjectionDefinition } from "../../library/projection.types";
 import type {
   EventHandlerDefinition,
   EventHandlerOptions,
 } from "../../library/eventHandler.types";
-import { EventSourcingPipeline } from "../index";
-import { defaultQueueProcessorFactory } from "../queue";
-import type { RegisteredPipeline, PipelineWithCommandHandlers } from "./types";
-import type { QueueProcessorFactory } from "../queue";
+import type { ProjectionDefinition } from "../../library/projection.types";
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { DistributedLock } from "../../library/utils/distributedLock";
+import { EventSourcingPipeline } from "../index";
+import type { QueueProcessorFactory } from "../queue";
+import { defaultQueueProcessorFactory } from "../queue";
+import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./types";
 
 export interface PipelineBuilderOptions {
   eventStore: EventStore<any>;

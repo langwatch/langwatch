@@ -26,4 +26,3 @@ export function generateUniqueIdentifier({
 
   return identifier;
 }
-

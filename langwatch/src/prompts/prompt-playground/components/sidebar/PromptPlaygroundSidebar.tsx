@@ -1,7 +1,7 @@
-import { Sidebar } from "./ui/Sidebar";
-import { PublishedPromptsList } from "./PublishedPromptsList";
 import { Text } from "@chakra-ui/react";
 import { AddPromptButton } from "./AddPromptButton";
+import { PublishedPromptsList } from "./PublishedPromptsList";
+import { Sidebar } from "./ui/Sidebar";
 
 /**
  * The Prompt Playground sidebar component.

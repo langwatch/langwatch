@@ -7,28 +7,27 @@
  * need to use are documented accordingly near the end.
  */
 
+import type { inferParser } from "@trpc/server";
 import {
   initTRPC,
-  TRPCError,
   type ProcedureBuilder,
   type ProcedureParams,
   type Simplify,
+  TRPCError,
 } from "@trpc/server";
-import { captureException } from "../../utils/posthogErrorCapture";
-import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
-import type { inferParser } from "@trpc/server";
-import type { NextApiRequest, NextApiResponse } from "next";
-import { type Session } from "next-auth";
-import superjson from "superjson";
-import { ZodError } from "zod";
-
+import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { Session } from "next-auth";
+import superjson from "superjson";
+import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { type PermissionMiddleware } from "./permission";
-import { auditLog } from "../auditLog";
 import { createLogger } from "../../utils/logger";
+import { captureException } from "../../utils/posthogErrorCapture";
+import { auditLog } from "../auditLog";
+import type { PermissionMiddleware } from "./permission";
 
 const logger = createLogger("langwatch:trpc");
 

@@ -5,8 +5,8 @@ import {
   Card,
   Center,
   Field,
-  HStack,
   Heading,
+  HStack,
   Separator,
   Skeleton,
   Spacer,
@@ -122,8 +122,8 @@ export function DSPyExperiment({
                       {optimizerNames.length == 1
                         ? optimizerNames[0]!
                         : optimizerNames.length > 1
-                        ? "Multiple Optimizers"
-                        : "Waiting for the first completed step to arrive..."}
+                          ? "Multiple Optimizers"
+                          : "Waiting for the first completed step to arrive..."}
                     </Heading>
                   </Card.Header>
                   <Card.Body>
@@ -191,7 +191,7 @@ export const useDSPyExperimentState = ({
     {
       refetchInterval: 3000,
       refetchOnMount: false,
-    }
+    },
   );
 
   const router = useRouter();
@@ -225,7 +225,7 @@ export const useDSPyExperimentState = ({
         void router.push({ query });
       }
     },
-    [router, setSelectedRuns]
+    [router, setSelectedRuns],
   );
 
   const [selectedPoint, setSelectedPoint] = useState<{
@@ -264,31 +264,31 @@ export const useDSPyExperimentState = ({
         acc[run.runId] = run;
         return acc;
       },
-      {} as Record<string, DSPyRunsSummary>
+      {} as Record<string, DSPyRunsSummary>,
     );
   }, [dspyRuns.data]);
 
   const stepToDisplay =
     dspyRuns.data &&
     (selectedPoint && runsById?.[selectedPoint.runId])?.steps.find(
-      (step) => step.index === selectedPoint.index
+      (step) => step.index === selectedPoint.index,
     );
 
   const optimizerNames = Array.from(
     new Set(
       visibleRuns?.flatMap((run) =>
-        run.steps.map((step) => step.optimizer.name)
-      ) ?? []
-    )
+        run.steps.map((step) => step.optimizer.name),
+      ) ?? [],
+    ),
   );
   const labelNames = Array.from(
     new Set(
-      visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? []
-    )
+      visibleRuns?.flatMap((run) => run.steps.map((step) => step.label)) ?? [],
+    ),
   );
 
   const nonMatchingRunIds = Array.from(
-    new Set([...selectedRuns_, ...incomingRunIds])
+    new Set([...selectedRuns_, ...incomingRunIds]),
   ).filter((runId) => !dspyRuns.data?.some((run) => run.runId === runId));
   const dspyRunsPlusIncoming =
     nonMatchingRunIds.length > 0
@@ -338,7 +338,7 @@ export function DSPyExperimentRunList({
   incomingRunIds?: string[];
 }) {
   const hasAnyVersion = dspyRunsPlusIncoming?.some(
-    (run) => run.workflow_version
+    (run) => run.workflow_version,
   );
 
   return (
@@ -416,8 +416,8 @@ export function DSPyExperimentRunList({
                   selectedRuns?.includes(run.runId)
                     ? selectedRuns.filter((id) => id !== run.runId)
                     : isHoldingShift
-                    ? [...(selectedRuns ?? []), run.runId]
-                    : [run.runId]
+                      ? [...(selectedRuns ?? []), run.runId]
+                      : [run.runId],
                 );
                 setHighlightedRun(null);
               }}
@@ -503,7 +503,7 @@ export function DSPyExperimentRunList({
                           <Text>
                             {formatMoney(
                               { amount: runCost, currency: "USD" },
-                              "$0.00[0]"
+                              "$0.00[0]",
                             )}
                           </Text>
                         </>
@@ -543,7 +543,7 @@ export const RunDetails = React.memo(
       },
       {
         enabled: !!dspyStepSummary,
-      }
+      },
     );
 
     const [tabIndex, setTabIndex] = useState(0);
@@ -592,13 +592,13 @@ export const RunDetails = React.memo(
                     amount: dspyStepSummary.llm_calls_summary.total_cost,
                     currency: "USD",
                   },
-                  "$0.00[00]"
+                  "$0.00[00]",
                 )}
               />
               <MetadataTag
                 label="Step Tokens"
                 value={numeral(
-                  dspyStepSummary.llm_calls_summary.total_tokens
+                  dspyStepSummary.llm_calls_summary.total_tokens,
                 ).format("0a")}
               />
               <MetadataTag
@@ -681,14 +681,14 @@ export const RunDetails = React.memo(
                         amount: dspyStepSummary.llm_calls_summary.total_cost,
                         currency: "USD",
                       },
-                      "$0.00[00]"
+                      "$0.00[00]",
                     )}
                   </Text>
                   <Separator orientation="vertical" />
                   <Text>
                     Step Tokens:{" "}
                     {numeral(
-                      dspyStepSummary.llm_calls_summary.total_tokens
+                      dspyStepSummary.llm_calls_summary.total_tokens,
                     ).format("0a")}
                   </Text>
                   <Separator orientation="vertical" />
@@ -805,8 +805,8 @@ export const RunDetails = React.memo(
                                 <RenderInputOutput
                                   value={JSON.stringify(
                                     predictor.demos.map((demo: any) =>
-                                      demo._store ? demo._store : demo
-                                    )
+                                      demo._store ? demo._store : demo,
+                                    ),
                                   )}
                                   collapseStringsAfterLength={140}
                                   shouldCollapse={(field) => {
@@ -820,7 +820,7 @@ export const RunDetails = React.memo(
                             </Table.Cell>
                           </Table.Row>
                         );
-                      }
+                      },
                     )
                   ) : null}
                 </Table.Body>
@@ -1009,7 +1009,7 @@ export const RunDetails = React.memo(
                           <RenderInputOutput
                             value={JSON.stringify(
                               llmCall.response?.prompt ??
-                                llmCall.response?.messages
+                                llmCall.response?.messages,
                             )}
                             collapseStringsAfterLength={140}
                             collapsed={true}
@@ -1030,7 +1030,7 @@ export const RunDetails = React.memo(
                           {llmCall.cost ? (
                             formatMoney(
                               { amount: llmCall.cost, currency: "USD" },
-                              "$0.00[0000]"
+                              "$0.00[0000]",
                             )
                           ) : llmCall.response.cached ? (
                             <HStack align="start">
@@ -1059,7 +1059,7 @@ export const RunDetails = React.memo(
       prevProps.dspyStepSummary?.run_id === nextProps.dspyStepSummary?.run_id &&
       prevProps.dspyStepSummary?.index === nextProps.dspyStepSummary?.index
     );
-  }
+  },
 );
 
 function CollapsableSignature({
@@ -1091,12 +1091,12 @@ function CollapsableSignature({
                   key,
                   Object.fromEntries(
                     Object.entries(value as any).filter(
-                      ([key]) => key !== "__class__"
-                    )
+                      ([key]) => key !== "__class__",
+                    ),
                   ),
                 ];
-              })
-            )
+              }),
+            ),
           )}
           collapseStringsAfterLength={140}
           collapsed={false}
@@ -1142,7 +1142,7 @@ export function DSPyRunsScoresChart({
       });
       return acc;
     },
-    {} as Record<string, { index: string } & Record<string, number>>
+    {} as Record<string, { index: string } & Record<string, number>>,
   );
 
   const data = Object.values(stepsFlattenedByIndex).sort((a, b) => {
@@ -1184,7 +1184,7 @@ export function DSPyRunsScoresChart({
         }
         return score > best.score ? { score, index: point.index } : best;
       },
-      { score: -Infinity, index: "" }
+      { score: -Infinity, index: "" },
     );
   }, [data, firstSelectedRun]);
 
@@ -1302,7 +1302,7 @@ export function DSPyRunsScoresChart({
                 }}
                 isAnimationActive={false}
               />
-            ) : null
+            ) : null,
           )}
           {stepToDisplay &&
             (!highlightedRun || highlightedRun === stepToDisplay.run_id) && (
@@ -1357,7 +1357,7 @@ export function DSPyExperimentSummary({
         ?.map((step) => step.score)
         .reduce((acc, score) => (score > acc ? score : acc), 0);
       const bestScoreStepSummary = run?.steps?.find(
-        (step) => step.score === bestScore
+        (step) => step.score === bestScore,
       );
       const bestScoreLabel = bestScoreStepSummary?.label;
 
@@ -1373,7 +1373,7 @@ export function DSPyExperimentSummary({
     },
     {
       enabled: !!bestScoreStepSummary && !!onApply,
-    }
+    },
   );
 
   const selectedPointStep = api.experiments.getExperimentDSPyStep.useQuery(
@@ -1385,7 +1385,7 @@ export function DSPyExperimentSummary({
     },
     {
       enabled: !!selectedPoint,
-    }
+    },
   );
 
   const onApplyOptimization = (predictors: DSPyPredictor[]) => {
@@ -1397,7 +1397,7 @@ export function DSPyExperimentSummary({
             predictor.predictor.extended_signature?.instructions ??
             predictor.predictor.signature?.instructions,
           fields: Object.entries(
-            predictor.predictor.signature?.fields ?? {}
+            predictor.predictor.signature?.fields ?? {},
           ).map(([key, value]: [string, any]) => {
             const field: AppliedOptimizationField = {
               identifier: key,
@@ -1413,7 +1413,7 @@ export function DSPyExperimentSummary({
             .filter(Boolean),
         };
         return optimization;
-      }
+      },
     );
 
     if (onApply) {

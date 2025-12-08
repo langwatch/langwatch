@@ -1,7 +1,7 @@
 import { loadEnvConfig } from "@next/env";
-import { createLogger } from "./utils/logger";
 import fs from "fs";
 import path from "path";
+import { createLogger } from "./utils/logger";
 
 loadEnvConfig(process.cwd());
 

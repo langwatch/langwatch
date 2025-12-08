@@ -1,25 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventHandlerDispatcher } from "../eventHandlerDispatcher";
+import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
+import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import {
-  createMockEventStore,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
-  createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
-  createTestAggregateType,
+  createMockEventStore,
   createMockLogger,
+  createMockProcessorCheckpointStore,
+  createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { buildCheckpointKey } from "../../../utils/checkpointKey";
-import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
 import { CheckpointManager } from "../../checkpoints/checkpointManager";
-import { QueueProcessorManager } from "../../queues/queueProcessorManager";
-import { EVENT_TYPES } from "../../../domain/eventType";
 import { SequentialOrderingError } from "../../errorHandling";
+import { QueueProcessorManager } from "../../queues/queueProcessorManager";
+import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
+import { EventHandlerDispatcher } from "../eventHandlerDispatcher";
 
 describe("EventHandlerDispatcher", () => {
   const aggregateType = createTestAggregateType();

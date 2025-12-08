@@ -1,4 +1,4 @@
-import { Card, Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
+import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
@@ -48,7 +48,12 @@ function SimulationCardHeader({
         </Text>
         {status && (
           <HStack align="center" gap={2}>
-            <Badge colorPalette={status === ScenarioRunStatus.IN_PROGRESS ? "blue" : colorPallete} size="sm">
+            <Badge
+              colorPalette={
+                status === ScenarioRunStatus.IN_PROGRESS ? "blue" : colorPallete
+              }
+              size="sm"
+            >
               {status}
             </Badge>
           </HStack>

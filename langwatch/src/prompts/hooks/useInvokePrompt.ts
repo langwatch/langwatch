@@ -1,10 +1,8 @@
-import { useMutation, type MutationOptions } from "@tanstack/react-query";
+import { type MutationOptions, useMutation } from "@tanstack/react-query";
 import type { Node } from "@xyflow/react";
-
-import { invokeLLM, type PromptExecutionResult } from "../utils/invokeLLM";
-
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { createLogger } from "~/utils/logger";
+import { invokeLLM, type PromptExecutionResult } from "../utils/invokeLLM";
 
 const logger = createLogger("useInvokePrompt");
 
@@ -16,7 +14,6 @@ export interface InvokeParams {
   data: Node<LlmPromptConfigComponent>["data"];
 }
 
-
 /**
  * Hook for executing a prompt using TanStack Query
  *
@@ -24,18 +21,11 @@ export interface InvokeParams {
  * providing loading states, error handling, and cache management.
  */
 export function useInvokePrompt(
-  options?: Pick<MutationOptions, "mutationKey">
+  options?: Pick<MutationOptions, "mutationKey">,
 ) {
-  return useMutation<
-    PromptExecutionResult,
-    Error,
-    InvokeParams
-  >({
+  return useMutation<PromptExecutionResult, Error, InvokeParams>({
     ...options,
-    mutationFn: async ({
-      projectId,
-      data,
-    }: InvokeParams) => {
+    mutationFn: async ({ projectId, data }: InvokeParams) => {
       return invokeLLM({ projectId, data });
     },
     onError: (error) => {

@@ -1,4 +1,4 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 import { createLogger } from "../../../utils/logger";
 
@@ -6,7 +6,7 @@ const logger = createLogger("langwatch:auth:validate");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests

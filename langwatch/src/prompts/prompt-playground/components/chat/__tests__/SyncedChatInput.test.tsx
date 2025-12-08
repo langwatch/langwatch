@@ -26,4 +26,3 @@ describe("SyncedChatInput", () => {
     it.todo("submits when all conditions met");
   });
 });
-

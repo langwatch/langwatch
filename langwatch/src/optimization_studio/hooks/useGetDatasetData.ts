@@ -1,19 +1,19 @@
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
 import { useMemo } from "react";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { AppRouter } from "../../server/api/root";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
+import { api } from "../../utils/api";
 import type { Entry } from "../types/dsl";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   transposeColumnsFirstToRowsFirstWithId,
 } from "../utils/datasetUtils";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
-import type { AppRouter } from "../../server/api/root";
 
 export const useGetDatasetData = ({
   dataset,
@@ -43,7 +43,7 @@ export const useGetDatasetData = ({
           skipBatch: true,
         },
       },
-    }
+    },
   );
   const databaseDataset_ =
     databaseDataset.data?.dataset &&
@@ -60,7 +60,7 @@ export const useGetDatasetData = ({
             records: databaseDataset_.datasetRecords,
             columnTypes: databaseDataset_.columnTypes.slice(
               0,
-              preview ? 5 : undefined
+              preview ? 5 : undefined,
             ),
           }
         : undefined;
@@ -88,8 +88,8 @@ export const useGetDatasetData = ({
     return rows?.map((row) => {
       const row_ = Object.fromEntries(
         Object.entries(row).filter(
-          ([key]) => key === "id" || columnSet.has(key)
-        )
+          ([key]) => key === "id" || columnSet.has(key),
+        ),
       );
 
       return row_;
@@ -101,7 +101,7 @@ export const useGetDatasetData = ({
     columns: data?.columnTypes ?? [],
     query: databaseDataset,
     total: dataset?.inline?.records
-      ? Object.values(dataset?.inline.records)[0]?.length ?? 0
+      ? (Object.values(dataset?.inline.records)[0]?.length ?? 0)
       : databaseDataset.data?.total,
   };
 };

@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, it, vi } from "vitest";
-
-import { salvageValidData } from "~/utils/zodSalvage";
 import { formSchema } from "~/prompts";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { salvageValidData } from "~/utils/zodSalvage";
 
 /**
  * Tests for usePromptConfigForm's data salvage logic.

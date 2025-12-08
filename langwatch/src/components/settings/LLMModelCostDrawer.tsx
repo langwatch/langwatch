@@ -1,19 +1,13 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-} from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useDrawer } from "../CurrentDrawer";
-import { api } from "../../utils/api";
+import { Button, Field, HStack, Input, Text } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
-import { HorizontalFormControl } from "../HorizontalFormControl";
-import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
 import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
+import { api } from "../../utils/api";
+import { useDrawer } from "../CurrentDrawer";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 
 export function LLMModelCostDrawer({
   id,
@@ -27,11 +21,16 @@ export function LLMModelCostDrawer({
 
   const llmModelCosts = api.llmModelCost.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   return (
-    <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size={"xl"}
+      onOpenChange={() => closeDrawer()}
+    >
       <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
@@ -74,16 +73,17 @@ function LLMModelCostForm({
 
   const llmModelCostsQuery = api.llmModelCost.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const currentLLMModelCost = id
     ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
     : cloneModel
-    ? llmModelCosts.find(
-        (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel
-      )
-    : undefined;
+      ? llmModelCosts.find(
+          (llmModelCost) =>
+            !llmModelCost.id && llmModelCost.model === cloneModel,
+        )
+      : undefined;
 
   type LLMModelCostForm = {
     model: string;
@@ -144,7 +144,7 @@ function LLMModelCostForm({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -166,8 +166,16 @@ function LLMModelCostForm({
           invalid={!!errors.regex}
         >
           <InputGroup
-            startElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
-            endElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
+            startElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
+            endElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
           >
             <Input
               required
@@ -195,9 +203,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.inputCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.inputCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Output Cost Per Token"

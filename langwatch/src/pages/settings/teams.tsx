@@ -1,8 +1,8 @@
 import {
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Spacer,
   Table,
   Text,
@@ -14,10 +14,10 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function Teams() {
   const { organization } = useOrganizationTeamProject();

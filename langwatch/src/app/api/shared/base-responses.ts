@@ -1,13 +1,11 @@
 import { resolver } from "hono-openapi/zod";
-
-import type { RouteResponse } from "./types";
-
 import {
   badRequestSchema,
-  unauthorizedSchema,
-  errorSchema,
   conflictSchema,
+  errorSchema,
+  unauthorizedSchema,
 } from "~/app/api/shared/schemas";
+import type { RouteResponse } from "./types";
 
 export const baseResponses: Record<number, RouteResponse> = {
   401: {

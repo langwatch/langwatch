@@ -4,9 +4,9 @@ import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../components/checks/CheckConfigForm";
 import { DashboardLayout } from "../../../components/DashboardLayout";
+import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
-import { toaster } from "../../../components/ui/toaster";
 
 export default function NewTraceCheckConfig() {
   const { project } = useOrganizationTeamProject();

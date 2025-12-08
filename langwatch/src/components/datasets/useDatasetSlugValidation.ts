@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDebouncedCallback } from "use-debounce";
-import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
 const DEBOUNCE_TIME = 500;
 const MAX_WAIT_TIME = 1000;
@@ -52,7 +52,7 @@ export function useDatasetSlugValidation({
     },
     {
       enabled: !!datasetId && !!projectId,
-    }
+    },
   );
 
   const dbSlug = existingDataset?.slug;
@@ -66,27 +66,31 @@ export function useDatasetSlugValidation({
     },
     {
       enabled: false, // Manual trigger only
-    }
+    },
   );
 
   // Debounced validation check (500ms)
-  const debouncedSlugCheck = useDebouncedCallback(() => {
-    if (name && name.trim() !== "" && projectId) {
-      validateDatasetName.refetch().then((result) => {
-        if (result.data) {
-          setSlugInfo({
-            slug: result.data.slug,
-            hasConflict: !result.data.available,
-            conflictsWith: result.data.conflictsWith,
-          });
-        }
-      });
-    }
-  }, DEBOUNCE_TIME, {
-    leading: LEADING,
-    trailing: TRAILING,
-    maxWait: MAX_WAIT_TIME,
-  });
+  const debouncedSlugCheck = useDebouncedCallback(
+    () => {
+      if (name && name.trim() !== "" && projectId) {
+        validateDatasetName.refetch().then((result) => {
+          if (result.data) {
+            setSlugInfo({
+              slug: result.data.slug,
+              hasConflict: !result.data.available,
+              conflictsWith: result.data.conflictsWith,
+            });
+          }
+        });
+      }
+    },
+    DEBOUNCE_TIME,
+    {
+      leading: LEADING,
+      trailing: TRAILING,
+      maxWait: MAX_WAIT_TIME,
+    },
+  );
 
   // Trigger validation when name changes
   useEffect(() => {
@@ -104,13 +108,13 @@ export function useDatasetSlugValidation({
 
   // Computed display values
   const displaySlug = datasetId
-    ? (dbSlug && slugInfo?.slug === undefined ? dbSlug : slugInfo?.slug)
+    ? dbSlug && slugInfo?.slug === undefined
+      ? dbSlug
+      : slugInfo?.slug
     : slugInfo?.slug;
 
-  const slugWillChange = !!datasetId &&
-                         !!dbSlug &&
-                         !!slugInfo?.slug &&
-                         dbSlug !== slugInfo.slug;
+  const slugWillChange =
+    !!datasetId && !!dbSlug && !!slugInfo?.slug && dbSlug !== slugInfo.slug;
 
   return {
     /**
@@ -140,4 +144,3 @@ export function useDatasetSlugValidation({
     resetSlugInfo: () => setSlugInfo(null),
   };
 }
-

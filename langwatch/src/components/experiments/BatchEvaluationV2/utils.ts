@@ -5,13 +5,13 @@ import type { ESBatchEvaluation } from "../../../server/experiments/types";
  * Single Responsibility: derive columns used by UI and CSV builders.
  */
 export function getEvaluationColumns(
-  results: ESBatchEvaluation["evaluations"]
+  results: ESBatchEvaluation["evaluations"],
 ): {
   evaluationInputsColumns: Set<string>;
   evaluationResultsColumns: Set<string>;
 } {
   const evaluationInputsColumns = new Set(
-    results.flatMap((result) => Object.keys(result.inputs ?? {}))
+    results.flatMap((result) => Object.keys(result.inputs ?? {})),
   );
   const evaluatorResultsColumnsMap = {
     passed: false,
@@ -43,7 +43,7 @@ export function getEvaluationColumns(
   const evaluationResultsColumns = new Set(
     Object.entries(evaluatorResultsColumnsMap)
       .filter(([_key, value]) => value)
-      .map(([key]) => key)
+      .map(([key]) => key),
   );
 
   return {
@@ -51,5 +51,3 @@ export function getEvaluationColumns(
     evaluationResultsColumns,
   };
 }
-
-

@@ -1,9 +1,9 @@
 export { EventSourcedQueueProcessorBullMq as EventSourcedQueueProcessorBullmq } from "./bullmq";
-export { EventSourcedQueueProcessorMemory } from "./memory";
 export {
-  type QueueProcessorFactory,
-  DefaultQueueProcessorFactory,
   BullmqQueueProcessorFactory,
-  MemoryQueueProcessorFactory,
+  DefaultQueueProcessorFactory,
   defaultQueueProcessorFactory,
+  MemoryQueueProcessorFactory,
+  type QueueProcessorFactory,
 } from "./factory";
+export { EventSourcedQueueProcessorMemory } from "./memory";

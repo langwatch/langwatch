@@ -1,21 +1,21 @@
 import { VStack } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import { useEffect } from "react";
+import { CopilotChat } from "@copilotkit/react-ui";
 import {
   type ActionExecutionMessage,
   type ResultMessage,
   Role,
   type TextMessage,
 } from "@copilotkit/runtime-client-gql";
-import { CopilotChat } from "@copilotkit/react-ui";
-import { ToolResultMessage } from "./messages/ToolResultMessage";
-import { ToolCallMessage } from "./messages/ToolCallMessage";
-import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
+import { useEffect } from "react";
+import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
-import { Markdown } from "../Markdown";
 import { TraceMessage } from "../copilot-kit/TraceMessage";
+import { Markdown } from "../Markdown";
+import { ToolCallMessage } from "./messages/ToolCallMessage";
+import { ToolResultMessage } from "./messages/ToolResultMessage";
+import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
 
 const logger = createLogger("CustomCopilotKitChat.tsx");
 

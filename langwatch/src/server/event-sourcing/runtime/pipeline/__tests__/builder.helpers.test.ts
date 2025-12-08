@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Projection } from "../../../library/domain/types";
 import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
 import type { CommandType } from "../../../library/domain/commandType";
+import type { Projection } from "../../../library/domain/types";
 import { PipelineBuilder } from "../builder";
 import {
-  createTestCommandHandlerClass,
-  TEST_CONSTANTS,
   BASE_COMMAND_HANDLER_SCHEMA,
   createMinimalPipelineBuilder,
+  createTestCommandHandlerClass,
+  TEST_CONSTANTS,
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";

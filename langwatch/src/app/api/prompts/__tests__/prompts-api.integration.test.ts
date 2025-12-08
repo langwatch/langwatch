@@ -5,19 +5,15 @@ import type {
   Team,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
-
-import { prisma } from "~/server/db";
-
-import { app } from "../[[...route]]/app";
-
-import { createHandle } from "./helpers";
-
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "~/server/db";
+import { app } from "../[[...route]]/app";
+import { createHandle } from "./helpers";
 
 describe("Prompts API", () => {
   let mockConfig: LlmPromptConfig;
@@ -283,7 +279,7 @@ describe("Prompts API", () => {
               `/api/prompts/${config.id}/versions`,
               {
                 headers: { "X-Auth-Token": testApiKey },
-              }
+              },
             );
 
             expect(res.status).toBe(200);
@@ -309,7 +305,7 @@ describe("Prompts API", () => {
               `/api/prompts/${config.id}/versions`,
               {
                 headers: { "X-Auth-Token": testApiKey },
-              }
+              },
             );
 
             const body = await res.json();
@@ -432,7 +428,7 @@ describe("Prompts API", () => {
 
           // Verify the handle is in the correct format
           expect(realPrompt?.handle).toBe(
-            `${testProjectId}/my-custom-ref-updated`
+            `${testProjectId}/my-custom-ref-updated`,
           );
         });
 
@@ -458,7 +454,7 @@ describe("Prompts API", () => {
             {
               commitMessage: "Updated handle",
               handle: "second-ref",
-            }
+            },
           );
 
           // Should fail because the handle is already taken
@@ -552,7 +548,7 @@ describe("Prompts API", () => {
                 json_schema: { type: "json_schema" },
               },
             ],
-          }
+          },
         );
 
         const updatedPrompt = await updateRes.json();
@@ -562,11 +558,11 @@ describe("Prompts API", () => {
         expect(updatedPrompt.handle).toBe("updated-all-fields-test");
         expect(updatedPrompt.scope).toBe("ORGANIZATION");
         expect(updatedPrompt.prompt).toBe(
-          "Updated prompt text with {{new_variable}}"
+          "Updated prompt text with {{new_variable}}",
         );
         expect(updatedPrompt.messages).toHaveLength(3);
         expect(updatedPrompt.messages[0].content).toBe(
-          "Updated prompt text with {{new_variable}}"
+          "Updated prompt text with {{new_variable}}",
         );
         expect(updatedPrompt.inputs).toHaveLength(3);
         expect(updatedPrompt.inputs[2].identifier).toBe("additional_param");
@@ -593,7 +589,7 @@ describe("Prompts API", () => {
               { role: "system", content: "This is a system message" },
               { role: "user", content: "User message" },
             ],
-          }
+          },
         );
 
         expect(updateRes.status).toBe(409); // Changed from 400 to 409
@@ -619,7 +615,7 @@ describe("Prompts API", () => {
               { role: "system", content: "New system message" },
               { role: "user", content: "User message" },
             ],
-          }
+          },
         );
 
         expect(updateRes.status).toBe(200);
@@ -657,7 +653,7 @@ describe("Prompts API", () => {
           {
             commitMessage: "Updated prompt text",
             prompt: "New prompt text with {{variable}}",
-          }
+          },
         );
 
         expect(updateRes.status).toBe(200);
@@ -725,7 +721,7 @@ describe("Prompts API", () => {
           headers: {
             "X-Auth-Token": testApiKey,
           },
-        }
+        },
       );
 
       const deleteBody = await deleteRes.json();

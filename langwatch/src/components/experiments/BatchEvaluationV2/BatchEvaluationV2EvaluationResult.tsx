@@ -1,3 +1,13 @@
+import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
+import type {
+  CellClickedEvent,
+  ColDef,
+  ColGroupDef,
+  GridApi,
+  GridOptions,
+} from "@ag-grid-community/core";
+import { ModuleRegistry } from "@ag-grid-community/core";
+import { AgGridReact } from "@ag-grid-community/react";
 import { Box, Button } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -6,18 +16,7 @@ import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { useDrawer } from "../../CurrentDrawer";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
-import { HoverableBigText } from "../../HoverableBigText";
-import { ExpandedTextDialog } from "../../HoverableBigText";
-import { AgGridReact } from "@ag-grid-community/react";
-import type {
-  ColDef,
-  ColGroupDef,
-  GridApi,
-  GridOptions,
-  CellClickedEvent,
-} from "@ag-grid-community/core";
-import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
-import { ModuleRegistry } from "@ag-grid-community/core";
+import { ExpandedTextDialog, HoverableBigText } from "../../HoverableBigText";
 import { getEvaluationColumns } from "./utils";
 import "@ag-grid-community/styles/ag-grid.css";
 import "@ag-grid-community/styles/ag-theme-balham.css";
@@ -61,7 +60,7 @@ export function BatchEvaluationV2EvaluationResult({
   const [expandedText, setExpandedText] = useState<string | undefined>(void 0);
 
   const totalRows = Math.max(
-    ...Object.values(datasetByIndex).map((d) => d.index + 1)
+    ...Object.values(datasetByIndex).map((d) => d.index + 1),
   );
 
   // Row data
@@ -74,7 +73,7 @@ export function BatchEvaluationV2EvaluationResult({
           [evaluator]: results.find((r) => r.index === index),
         },
       })),
-    [totalRows, datasetByIndex, evaluator, results]
+    [totalRows, datasetByIndex, evaluator, results],
   );
 
   // Grid configuration
@@ -86,7 +85,7 @@ export function BatchEvaluationV2EvaluationResult({
       reactiveCustomComponents: true,
       ensureDomOrder: true,
     }),
-    []
+    [],
   );
 
   const defaultColDef: ColDef = useMemo(
@@ -98,7 +97,7 @@ export function BatchEvaluationV2EvaluationResult({
       wrapText: false,
       suppressMovable: true,
     }),
-    []
+    [],
   );
 
   // Column definitions builder
@@ -195,7 +194,7 @@ export function BatchEvaluationV2EvaluationResult({
       evaluatorHeaders.evaluationInputsColumns.size > 0
     ) {
       const children: ColDef[] = Array.from(
-        evaluatorHeaders.evaluationInputsColumns
+        evaluatorHeaders.evaluationInputsColumns,
       ).map((column) => ({
         colId: `eval_input_${column}`,
         headerName: titleCase(column),
@@ -213,7 +212,7 @@ export function BatchEvaluationV2EvaluationResult({
           const { datasetEntry, evaluationsForEntry } = getRowData(p);
           if (datasetEntry?.error) return datasetEntry.error;
           return stringify(
-            evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-"
+            evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-",
           );
         },
         cellClassRules: {
@@ -290,7 +289,7 @@ export function BatchEvaluationV2EvaluationResult({
       "details",
     ] as const;
     const evaluationResultsColumnsOrdered = evalResultPreferredOrder.filter(
-      (c) => evaluatorHeaders.evaluationResultsColumns.has(c)
+      (c) => evaluatorHeaders.evaluationResultsColumns.has(c),
     );
 
     evaluationResultsColumnsOrdered.forEach((column) => {
@@ -300,7 +299,7 @@ export function BatchEvaluationV2EvaluationResult({
         if (value === true) return "true";
         return !isNaN(Number(value))
           ? numeral(Number(value)).format("0.[00]")
-          : value ?? "-";
+          : (value ?? "-");
       };
 
       colDefs.push({
@@ -370,7 +369,7 @@ export function BatchEvaluationV2EvaluationResult({
 
     // Trace column
     const hasAnyTraceId = Object.values(datasetByIndex).some(
-      (d) => d.trace_id && d.trace_id !== "0"
+      (d) => d.trace_id && d.trace_id !== "0",
     );
     if (hasAnyTraceId) {
       colDefs.push({
@@ -452,21 +451,18 @@ export function BatchEvaluationV2EvaluationResult({
   }, []);
 
   // Handle cell click to show expanded text dialog
-  const handleCellClicked = useCallback(
-    (event: CellClickedEvent) => {
-      // Skip for row number and trace button
-      const colId = event.column.getColId();
-      if (colId === "rowNumber" || colId === "trace") return;
+  const handleCellClicked = useCallback((event: CellClickedEvent) => {
+    // Skip for row number and trace button
+    const colId = event.column.getColId();
+    if (colId === "rowNumber" || colId === "trace") return;
 
-      // Get the cell value
-      const value = event.value;
-      if (!value || value === "-") return;
+    // Get the cell value
+    const value = event.value;
+    if (!value || value === "-") return;
 
-      // Show the expanded text dialog
-      setExpandedText(stringify(value));
-    },
-    []
-  );
+    // Show the expanded text dialog
+    setExpandedText(stringify(value));
+  }, []);
 
   // Auto-scroll to bottom only if user is pinned to bottom
   useEffect(() => {
@@ -475,11 +471,11 @@ export function BatchEvaluationV2EvaluationResult({
     const lastIndex = totalRows - 1;
     setTimeout(
       () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
-      100
+      100,
     );
     setTimeout(
       () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
-      1000
+      1000,
     );
   }, [totalRows]);
 

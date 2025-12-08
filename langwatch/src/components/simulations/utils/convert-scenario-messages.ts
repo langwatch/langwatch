@@ -1,11 +1,11 @@
 import {
-  TextMessage,
-  Role,
-  type MessageRole,
-  type Message,
   ActionExecutionMessage,
-  ResultMessage,
   ImageMessage,
+  type Message,
+  type MessageRole,
+  ResultMessage,
+  Role,
+  TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallback";

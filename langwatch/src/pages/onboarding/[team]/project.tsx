@@ -14,11 +14,11 @@ import {
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { forwardRef, useEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { type SubmitHandler, useForm } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
 import {
-  TechStackSelector,
   type ProjectFormData,
+  TechStackSelector,
 } from "~/components/TechStack";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -60,7 +60,7 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
         </Box>
       </RadioGroup.Item>
     );
-  }
+  },
 );
 
 export default function ProjectOnboarding() {
@@ -86,11 +86,11 @@ export default function ProjectOnboarding() {
       slug: typeof teamSlug == "string" ? teamSlug : "",
       organizationId: organization?.id ?? "",
     },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
   const teams = api.team.getTeamsWithMembers.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -98,7 +98,7 @@ export default function ProjectOnboarding() {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
   const returnTo =
     typeof router.query.return_to === "string"
@@ -137,7 +137,7 @@ export default function ProjectOnboarding() {
             window.location.href = `/${data.projectSlug}/messages`;
           }
         },
-      }
+      },
     );
   };
 

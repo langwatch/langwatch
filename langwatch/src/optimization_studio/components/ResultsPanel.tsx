@@ -8,11 +8,11 @@ import {
   HStack,
   Skeleton,
   Spacer,
+  type StackProps,
   Tabs,
   Text,
   useDisclosure,
   VStack,
-  type StackProps,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import type { Node } from "@xyflow/react";
@@ -37,14 +37,14 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppliedOptimization } from "../../server/experiments/types";
 import { api } from "../../utils/api";
+import { slugify } from "../../utils/slugify";
 import { useEvaluationExecution } from "../hooks/useEvaluationExecution";
 import { useOptimizationExecution } from "../hooks/useOptimizationExecution";
+import { useRunEvalution } from "../hooks/useRunEvalution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Field, Signature, Workflow } from "../types/dsl";
 import { simpleRecordListToNodeDataset } from "../utils/datasetUtils";
 import { OptimizationProgressBar } from "./ProgressToast";
-import { slugify } from "../../utils/slugify";
-import { useRunEvalution } from "../hooks/useRunEvalution";
 
 export function ResultsPanel({
   isCollapsed,
@@ -66,7 +66,7 @@ export function ResultsPanel({
       workflowId,
       experimentId,
       evaluationState: state.evaluation,
-    })
+    }),
   );
 
   return (
@@ -160,7 +160,7 @@ export function EvaluationResults({
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
-    }
+    },
   );
 
   useEffect(() => {
@@ -171,13 +171,13 @@ export function EvaluationResults({
         () => {
           setKeepFetching(false);
         },
-        experiment.data ? 0 : 15_000
+        experiment.data ? 0 : 15_000,
       );
     }
   }, [evaluationState?.status, experiment.data]);
 
   const [selectedRunId, setSelectedRunId] = useState<string | undefined>(
-    evaluationState?.run_id
+    evaluationState?.run_id,
   );
 
   useEffect(() => {
@@ -279,7 +279,7 @@ export function OptimizationResults() {
     ({ workflow_id: workflowId, state }) => ({
       workflowId,
       optimizationState: state.optimization,
-    })
+    }),
   );
 
   const { project } = useOrganizationTeamProject();
@@ -295,7 +295,7 @@ export function OptimizationResults() {
       enabled: !!project && !!workflowId,
       refetchOnWindowFocus: false,
       refetchInterval: keepFetching ? 1 : undefined,
-    }
+    },
   );
 
   useEffect(() => {
@@ -306,7 +306,7 @@ export function OptimizationResults() {
         () => {
           setKeepFetching(false);
         },
-        experiment.data ? 0 : 15_000
+        experiment.data ? 0 : 15_000,
       );
     }
   }, [optimizationState?.status, experiment.data]);
@@ -350,7 +350,7 @@ export function LoadedOptimizationResults({
         nodes,
         setNodes,
         setOpenResultsPanelRequest,
-      })
+      }),
     );
 
   const incomingRunIds =
@@ -395,16 +395,16 @@ export function LoadedOptimizationResults({
   const optimizationStateRunId = optimizationState?.run_id;
 
   const onApplyOptimizations = (
-    appliedOptimizations: AppliedOptimization[]
+    appliedOptimizations: AppliedOptimization[],
   ) => {
     const appliedOptimizationsMap = Object.fromEntries(
       appliedOptimizations.map((optimization) => [
         optimization.id.replace(".predict", ""),
         optimization,
-      ])
+      ]),
     );
     const matchingNodes = nodes.filter(
-      (node) => appliedOptimizationsMap[node.id]
+      (node) => appliedOptimizationsMap[node.id],
     );
 
     setNodes(
@@ -419,14 +419,14 @@ export function LoadedOptimizationResults({
 
           const setNodeParameter = (
             identifier: string,
-            field: Omit<Field, "value"> & { value?: any }
+            field: Omit<Field, "value"> & { value?: any },
           ) => {
             const existingParameter = node_.data.parameters?.find(
-              (p) => p.identifier === identifier
+              (p) => p.identifier === identifier,
             );
             if (existingParameter) {
               node_.data.parameters = node_.data.parameters?.map((p) =>
-                p.identifier === identifier ? { ...p, ...field } : p
+                p.identifier === identifier ? { ...p, ...field } : p,
               );
             } else {
               node_.data.parameters = [...(node_.data.parameters ?? []), field];
@@ -438,10 +438,10 @@ export function LoadedOptimizationResults({
               Object.values(optimization.demonstrations).map((demonstration) =>
                 Object.fromEntries(
                   Object.entries(demonstration).filter(
-                    ([key]) => key !== "augmented"
-                  )
-                )
-              )
+                    ([key]) => key !== "augmented",
+                  ),
+                ),
+              ),
             );
             setNodeParameter("demonstrations", {
               identifier: "demonstrations",
@@ -457,7 +457,8 @@ export function LoadedOptimizationResults({
             });
           }
           const optimizedFieldsByIdentifier = Object.fromEntries(
-            optimization.fields?.map((field) => [field.identifier, field]) ?? []
+            optimization.fields?.map((field) => [field.identifier, field]) ??
+              [],
           );
           node_.data.inputs = node_.data.inputs?.map((input) => {
             const optimizedField =
@@ -484,7 +485,7 @@ export function LoadedOptimizationResults({
           return node_;
         }
         return node;
-      })
+      }),
     );
 
     setOpenResultsPanelRequest("closed");
@@ -535,8 +536,8 @@ export function LoadedOptimizationResults({
                     {optimizerNames.length == 1
                       ? optimizerNames[0]!
                       : optimizerNames.length > 1
-                      ? "Multiple Optimizers"
-                      : "Waiting for the first completed step to arrive..."}
+                        ? "Multiple Optimizers"
+                        : "Waiting for the first completed step to arrive..."}
                   </Heading>
                   <DSPyRunsScoresChart
                     dspyRuns={dspyRuns.data}

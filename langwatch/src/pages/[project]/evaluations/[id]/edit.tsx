@@ -1,24 +1,24 @@
-import { useRouter } from "next/router";
 import {
+  Alert,
   Button,
   Card,
   Container,
-  HStack,
   Heading,
+  HStack,
   Skeleton,
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { Alert } from "@chakra-ui/react";
-import { Menu } from "../../../../components/ui/menu";
-import { toaster } from "../../../../components/ui/toaster";
+import { useRouter } from "next/router";
+import { MoreVertical } from "react-feather";
 import CheckConfigForm, {
   type CheckConfigFormData,
 } from "../../../../components/checks/CheckConfigForm";
-import { api } from "../../../../utils/api";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { MoreVertical } from "react-feather";
+import { Menu } from "../../../../components/ui/menu";
+import { toaster } from "../../../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../utils/api";
 
 export default function EditTraceCheck() {
   const { project } = useOrganizationTeamProject();
@@ -27,7 +27,7 @@ export default function EditTraceCheck() {
   const checkId = typeof router.query.id == "string" ? router.query.id : "";
   const check = api.monitors.getById.useQuery(
     { id: checkId, projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
   const updateCheck = api.monitors.update.useMutation();
   const deleteCheck = api.monitors.delete.useMutation();
@@ -90,7 +90,7 @@ export default function EditTraceCheck() {
               },
             });
           },
-        }
+        },
       );
     }
   };

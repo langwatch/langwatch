@@ -1,28 +1,28 @@
+import { unflatten } from "flat";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
 } from "../background/workers/collector/common";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
-import {
-  type ElasticSearchEvent,
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
-  type Event,
-  type Span,
-  type SpanInputOutput,
-  type ElasticSearchEvaluation,
-  type Evaluation,
-  type RAGChunk,
+import type {
+  ElasticSearchEvaluation,
+  ElasticSearchEvent,
+  ElasticSearchInputOutput,
+  ElasticSearchSpan,
+  Evaluation,
+  Event,
+  RAGChunk,
+  Span,
+  SpanInputOutput,
 } from "./types";
-import { unflatten } from "flat";
 
 export const getRAGChunks = (
-  spans: (ElasticSearchSpan | Span)[]
+  spans: (ElasticSearchSpan | Span)[],
 ): RAGChunk[] => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
-    "inside-out"
+    "inside-out",
   ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
@@ -35,11 +35,11 @@ export const getRAGChunks = (
 };
 
 export const getRAGInfo = (
-  spans: (ElasticSearchSpan | Span)[]
+  spans: (ElasticSearchSpan | Span)[],
 ): { input: string; output: string; contexts: string[] } => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
-    "inside-out"
+    "inside-out",
   ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
@@ -61,11 +61,11 @@ export const getRAGInfo = (
 
   let input = typedValueToText(
     elasticSearchToTypedValue(lastRagSpan.input),
-    true
+    true,
   );
   let output = typedValueToText(
     elasticSearchToTypedValue(lastRagSpan.output),
-    true
+    true,
   );
 
   try {
@@ -86,7 +86,7 @@ export const getRAGInfo = (
 };
 
 export const elasticSearchToTypedValue = (
-  typed: ElasticSearchInputOutput
+  typed: ElasticSearchInputOutput,
 ): SpanInputOutput => {
   try {
     return {
@@ -103,7 +103,7 @@ export const elasticSearchToTypedValue = (
 };
 
 export const elasticSearchEvaluationsToEvaluations = (
-  elasticSearchEvaluations: ElasticSearchEvaluation[]
+  elasticSearchEvaluations: ElasticSearchEvaluation[],
 ): Evaluation[] => {
   return elasticSearchEvaluations.map((evaluation) => {
     return evaluation;
@@ -111,7 +111,7 @@ export const elasticSearchEvaluationsToEvaluations = (
 };
 
 export const elasticSearchEventsToEvents = (
-  elasticSearchEvents: ElasticSearchEvent[]
+  elasticSearchEvents: ElasticSearchEvent[],
 ): Event[] => {
   return elasticSearchEvents.map(elasticSearchEventToEvent);
 };
@@ -120,10 +120,10 @@ export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
   return {
     ...event,
     metrics: Object.fromEntries(
-      event.metrics.map((metric) => [metric.key, metric.value])
+      event.metrics.map((metric) => [metric.key, metric.value]),
     ),
     event_details: Object.fromEntries(
-      event.event_details.map((detail) => [detail.key, detail.value])
+      event.event_details.map((detail) => [detail.key, detail.value]),
     ),
   };
 };
@@ -190,7 +190,7 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
 export const setNestedProperty = (
   obj: Record<string, any>,
   path: string,
-  value: any
+  value: any,
 ): void => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const unflattened = unflatten({ [path]: value }) as Record<string, any>;
@@ -202,7 +202,10 @@ export const setNestedProperty = (
       obj[key] = unflattened[key];
     } else {
       // Deep merge if both are objects
-      if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
+      if (
+        typeof obj[key] === "object" &&
+        typeof unflattened[key] === "object"
+      ) {
         obj[key] = { ...obj[key], ...unflattened[key] };
       } else {
         obj[key] = unflattened[key];

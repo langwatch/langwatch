@@ -1,10 +1,10 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import {
-  TRACE_INDEX,
-  TRACE_COLD_INDEX,
-  esClient,
   COLD_STORAGE_AGE_DAYS,
+  esClient,
+  TRACE_COLD_INDEX,
+  TRACE_INDEX,
 } from "../../server/elasticsearch";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 const buildColdStorageMigrationQuery = (ageDays: number) => {
   const cutoffDate = new Date().getTime() - ageDays * 24 * 60 * 60 * 1000;
@@ -27,7 +27,7 @@ const buildColdStorageMigrationQuery = (ageDays: number) => {
 const pollReindexTask = async (
   client: ElasticClient,
   taskId: string,
-  expectedTotal: number
+  expectedTotal: number,
 ): Promise<number> => {
   const pollInterval = 5000; // 5 seconds
 
@@ -45,21 +45,21 @@ const pollReindexTask = async (
         if (response?.failures && response?.failures.length > 0) {
           console.error(
             "❌ Reindex task completed with failures:",
-            response?.failures
+            response?.failures,
           );
           throw new Error(
-            `Reindex task failed with ${response.failures.length} failures`
+            `Reindex task failed with ${response.failures.length} failures`,
           );
         }
         if (taskResponse.error) {
           console.error(
             "❌ Reindex task completed with error:",
-            taskResponse.error
+            taskResponse.error,
           );
           throw new Error(
             `Reindex task failed with error: ${JSON.stringify(
-              taskResponse.error
-            )}`
+              taskResponse.error,
+            )}`,
           );
         }
 
@@ -107,7 +107,7 @@ const pollReindexTask = async (
       } catch (childTaskError) {
         console.warn(
           "⚠️ Could not fetch child task progress:",
-          (childTaskError as any).message
+          (childTaskError as any).message,
         );
       }
 
@@ -118,7 +118,7 @@ const pollReindexTask = async (
             ? Math.round((totalProcessed / expectedTotal) * 100)
             : 0;
         console.log(
-          `⏳ Reindex progress: ${totalProcessed}/${expectedTotal} (${progress}%) [Created: ${totalCreated}, Updated: ${totalUpdated}]`
+          `⏳ Reindex progress: ${totalProcessed}/${expectedTotal} (${progress}%) [Created: ${totalCreated}, Updated: ${totalUpdated}]`,
         );
         if (progress === 100) {
           console.log(`✅ Reindex task completed successfully`);
@@ -130,7 +130,7 @@ const pollReindexTask = async (
         const processed = created + updated;
         const progress = total > 0 ? Math.round((processed / total) * 100) : 0;
         console.log(
-          `⏳ Reindex progress: ${processed}/${total} (${progress}%) [Created: ${created}, Updated: ${updated}]`
+          `⏳ Reindex progress: ${processed}/${total} (${progress}%) [Created: ${created}, Updated: ${updated}]`,
         );
       }
 
@@ -142,7 +142,7 @@ const pollReindexTask = async (
         const failures = task.status?.failures || [];
         console.error("❌ Reindex task failed:", failures);
         throw new Error(
-          `Reindex task failed or was cancelled. Failures: ${failures.length}`
+          `Reindex task failed or was cancelled. Failures: ${failures.length}`,
         );
       }
 
@@ -161,7 +161,7 @@ const pollReindexTask = async (
 const pollDeleteTask = async (
   client: ElasticClient,
   taskId: string,
-  expectedTotal: number
+  expectedTotal: number,
 ): Promise<number> => {
   const pollInterval = 5000; // 5 seconds
 
@@ -179,10 +179,10 @@ const pollDeleteTask = async (
         if (response.failures && response.failures.length > 0) {
           console.error(
             "❌ Delete task completed with failures:",
-            response.failures
+            response.failures,
           );
           throw new Error(
-            `Delete task failed with ${response.failures.length} failures`
+            `Delete task failed with ${response.failures.length} failures`,
           );
         }
 
@@ -206,7 +206,7 @@ const pollDeleteTask = async (
         const failures = task.status?.failures || [];
         console.error("❌ Delete task failed:", failures);
         throw new Error(
-          `Delete task failed or was cancelled. Failures: ${failures.length}`
+          `Delete task failed or was cancelled. Failures: ${failures.length}`,
         );
       }
 
@@ -224,10 +224,10 @@ const pollDeleteTask = async (
 
 const migrateTracesToColdStorage = async (
   ageDays: number,
-  organizationId?: string
+  organizationId?: string,
 ) => {
   const client = await esClient(
-    organizationId ? { organizationId } : undefined
+    organizationId ? { organizationId } : undefined,
   );
 
   console.log(`🔍 Searching for traces older than ${ageDays} days...`);
@@ -250,7 +250,7 @@ const migrateTracesToColdStorage = async (
 
   // Step 1: Reindex old traces to cold storage
   console.log(
-    `📤 Starting reindex of ${totalToMigrate} traces to cold storage...`
+    `📤 Starting reindex of ${totalToMigrate} traces to cold storage...`,
   );
   const reindexResponse = await client.reindex({
     wait_for_completion: false,
@@ -274,7 +274,7 @@ const migrateTracesToColdStorage = async (
 
   if (!taskId) {
     throw new Error(
-      `Reindex task failed to be created: ${JSON.stringify(reindexResponse)}`
+      `Reindex task failed to be created: ${JSON.stringify(reindexResponse)}`,
     );
   }
 
@@ -284,14 +284,14 @@ const migrateTracesToColdStorage = async (
 
   if (reindexed !== totalToMigrate) {
     console.warn(
-      `⚠️  Expected to reindex ${totalToMigrate} traces, but reindexed ${reindexed}`
+      `⚠️  Expected to reindex ${totalToMigrate} traces, but reindexed ${reindexed}`,
     );
   }
 
   // Step 2: Delete old traces from hot storage (only if reindexing was successful)
   if (reindexed > 0) {
     console.log(
-      `🗑️  Starting deletion of ${reindexed} old traces from hot storage...`
+      `🗑️  Starting deletion of ${reindexed} old traces from hot storage...`,
     );
     const deleteResponse = await client.deleteByQuery({
       index: TRACE_INDEX.alias,
@@ -306,7 +306,7 @@ const migrateTracesToColdStorage = async (
 
     if (!deleteTaskId) {
       throw new Error(
-        `Delete task failed to be created: ${JSON.stringify(deleteResponse)}`
+        `Delete task failed to be created: ${JSON.stringify(deleteResponse)}`,
       );
     }
 
@@ -314,15 +314,15 @@ const migrateTracesToColdStorage = async (
     const deletedCount = await pollDeleteTask(
       client,
       `${deleteTaskId}`,
-      reindexed
+      reindexed,
     );
     console.log(
-      `✅ Successfully deleted ${deletedCount} traces from hot storage`
+      `✅ Successfully deleted ${deletedCount} traces from hot storage`,
     );
 
     if (deletedCount !== reindexed) {
       console.warn(
-        `⚠️  Expected to delete ${reindexed} traces, but deleted ${deletedCount}`
+        `⚠️  Expected to delete ${reindexed} traces, but deleted ${deletedCount}`,
       );
     }
 
@@ -336,7 +336,7 @@ const verifyMigration = async (ageDays: number, organizationId?: string) => {
   console.log("🔍 Verifying migration...");
 
   const client = await esClient(
-    organizationId ? { organizationId } : undefined
+    organizationId ? { organizationId } : undefined,
   );
   const query = buildColdStorageMigrationQuery(ageDays);
 
@@ -361,9 +361,7 @@ const verifyMigration = async (ageDays: number, organizationId?: string) => {
   console.log(`  - Total traces in cold storage: ${coldCount.count}`);
 
   if (hotCount.count > 0) {
-    console.warn(
-      `⚠️  ${hotCount.count} old traces still remain in hot storage`
-    );
+    console.warn(`⚠️  ${hotCount.count} old traces still remain in hot storage`);
   } else {
     console.log(`✅ All old traces successfully migrated to cold storage`);
   }
@@ -371,13 +369,13 @@ const verifyMigration = async (ageDays: number, organizationId?: string) => {
 
 export const migrateToColdStorage = async (
   ageDays: number = COLD_STORAGE_AGE_DAYS,
-  organizationId?: string
+  organizationId?: string,
 ) => {
   console.log("🚀 Starting migration to cold storage...");
   console.log(`📅 Migrating traces older than ${ageDays} days`);
 
   const client = await esClient(
-    organizationId ? { organizationId } : undefined
+    organizationId ? { organizationId } : undefined,
   );
 
   // Check if cold storage index exists
@@ -387,10 +385,10 @@ export const migrateToColdStorage = async (
 
   if (!coldIndexExists) {
     console.log(
-      "⚠️  Cold storage index does not exist, skipping moving traces to cold storage"
+      "⚠️  Cold storage index does not exist, skipping moving traces to cold storage",
     );
     console.log(
-      `💡 Run 'setupColdStorage' task first to create the ${TRACE_COLD_INDEX.base} index`
+      `💡 Run 'setupColdStorage' task first to create the ${TRACE_COLD_INDEX.base} index`,
     );
     return;
   }
@@ -420,7 +418,7 @@ export const migrateToColdStorage = async (
 
 export default async function execute(
   ageDays: number,
-  organizationId?: string
+  organizationId?: string,
 ) {
   await migrateToColdStorage(ageDays, organizationId);
 }

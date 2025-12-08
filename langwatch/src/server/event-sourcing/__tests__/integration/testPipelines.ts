@@ -1,21 +1,21 @@
+import type { ClickHouseClient } from "@clickhouse/client";
 import { z } from "zod";
+import { createLogger } from "~/utils/logger";
+import {
+  type AggregateType,
+  createTenantId,
+  defineCommandSchema,
+  type EventType,
+  EventUtils,
+} from "../../library";
 import type { Command, CommandHandler } from "../../library/commands/command";
 import type { EventHandler } from "../../library/domain/handlers/eventHandler";
 import type { ProjectionHandler } from "../../library/domain/handlers/projectionHandler";
-import type { EventStream } from "../../library/streams/eventStream";
-import type { Projection } from "../../library/domain/types";
 import type { TenantId } from "../../library/domain/tenantId";
+import type { Projection } from "../../library/domain/types";
 import type { ProjectionStore } from "../../library/stores/projectionStore.types";
-import {
-  EventUtils,
-  createTenantId,
-  defineCommandSchema,
-  type AggregateType,
-  type EventType,
-} from "../../library";
+import type { EventStream } from "../../library/streams/eventStream";
 import { getTestClickHouseClient } from "./testContainers";
-import { type ClickHouseClient } from "@clickhouse/client";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
   "langwatch:event-sourcing:tests:integration:test-pipelines",

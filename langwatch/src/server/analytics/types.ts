@@ -2,7 +2,7 @@ import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/li
 import { z } from "zod";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
-import { filterFieldsEnum, type FilterField } from "../filters/types";
+import { type FilterField, filterFieldsEnum } from "../filters/types";
 
 export type AnalyticsMetric = {
   label: string;
@@ -21,13 +21,13 @@ export type AnalyticsMetric = {
     index: number,
     aggregation: AggregationTypes,
     key: string | undefined,
-    subkey: string | undefined
+    subkey: string | undefined,
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: (
     index: number,
     aggregations: AggregationTypes,
     key: string | undefined,
-    subkey: string | undefined
+    subkey: string | undefined,
   ) => string;
   quickwitSupport: boolean;
 };
@@ -35,7 +35,7 @@ export type AnalyticsMetric = {
 export type AnalyticsGroup = {
   label: string;
   aggregation: (
-    aggToGroup: Record<string, AggregationsAggregationContainer>
+    aggToGroup: Record<string, AggregationsAggregationContainer>,
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: () => string;
   quickwitSupport: boolean;
@@ -108,7 +108,7 @@ export const sharedFiltersInputSchema = z.object({
         z.array(z.string()),
         z.record(z.string(), z.array(z.string())),
         z.record(z.string(), z.record(z.string(), z.array(z.string()))),
-      ])
+      ]),
     )
     .default({}),
   traceIds: z.array(z.string()).optional(),

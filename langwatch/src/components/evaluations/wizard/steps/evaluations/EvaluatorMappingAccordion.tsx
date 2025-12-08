@@ -2,16 +2,16 @@ import { Field, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import { useFilterParams } from "../../../../../hooks/useFilterParams";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
+import { mergeThreadAndTraceMappings } from "../../../../../server/tracer/tracesMapping";
+import { api } from "../../../../../utils/api";
+import { ThreadMapping } from "../../../../traces/ThreadMapping";
+import { Switch } from "../../../../ui/switch";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
-import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
-import { Switch } from "../../../../ui/switch";
-import { ThreadMapping } from "../../../../traces/ThreadMapping";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../../../utils/api";
-import { useFilterParams } from "../../../../../hooks/useFilterParams";
-import { mergeThreadAndTraceMappings } from "../../../../../server/tracer/tracesMapping";
 
 export const EvaluatorMappingAccordion = ({
   selected,
@@ -59,8 +59,8 @@ export const EvaluatorMappingAccordion = ({
             getDSL().nodes.find((node) => node.type === "entry")?.data as Entry
           )?.outputs?.map((field) => field.identifier) ?? [],
         executorNode: getFirstExecutorNode(),
-      })
-    )
+      }),
+    ),
   );
 
   const evaluator = getFirstEvaluatorNode();
@@ -125,7 +125,7 @@ export const EvaluatorMappingAccordion = ({
   const { filterParams, queryOpts } = useFilterParams();
   const recentTraces = api.traces.getSampleTracesDataset.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   // Extract thread_ids from traces
@@ -145,7 +145,7 @@ export const EvaluatorMappingAccordion = ({
     {
       enabled: !!project && isThreadMapping && threadIds.length > 0,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   // Use thread traces when thread mapping is enabled, otherwise use provided traces
@@ -167,7 +167,7 @@ export const EvaluatorMappingAccordion = ({
     const merged = mergeThreadAndTraceMappings(
       traceMappings,
       threadMappings,
-      isThreadMapping
+      isThreadMapping,
     );
 
     // Only update if there's a meaningful change
@@ -211,8 +211,8 @@ export const EvaluatorMappingAccordion = ({
                 {task == "real_time" && dataSource !== "from_production"
                   ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
                   : task == "real_time"
-                  ? "What data from the real time traces will be used for evaluation?"
-                  : "What data from the dataset will be used for evaluation?"}
+                    ? "What data from the real time traces will be used for evaluation?"
+                    : "What data from the dataset will be used for evaluation?"}
               </Text>
 
               {task == "real_time" && (
@@ -276,8 +276,8 @@ export const EvaluatorMappingAccordion = ({
                           datasetFields.length > 0
                             ? ["Dataset", "Trace", "Evaluator"]
                             : task == "real_time"
-                            ? ["Trace", "Evaluator"]
-                            : ["Data", "Evaluator"]
+                              ? ["Trace", "Evaluator"]
+                              : ["Data", "Evaluator"]
                         }
                         targetFields={targetFields}
                         traceMapping={

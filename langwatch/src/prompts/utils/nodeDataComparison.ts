@@ -22,7 +22,7 @@ function hasRecords(demonstrations: NodeDataset | undefined): boolean {
  */
 function standardizeNodeData(
   nodeData: Node<LlmPromptConfigComponent>["data"],
-  includeDemonstrations: boolean
+  includeDemonstrations: boolean,
 ) {
   return JSON.parse(
     JSON.stringify({
@@ -42,7 +42,7 @@ function standardizeNodeData(
       parameters: [...nodeData.parameters]
         .filter(
           (param) =>
-            param.identifier !== "demonstrations" || includeDemonstrations
+            param.identifier !== "demonstrations" || includeDemonstrations,
         )
         .map((param) => {
           if (param.identifier === "demonstrations" && includeDemonstrations) {
@@ -64,7 +64,7 @@ function standardizeNodeData(
           };
         })
         .sort((a, b) => a.identifier.localeCompare(b.identifier)),
-    })
+    }),
   );
 }
 
@@ -79,19 +79,19 @@ function standardizeNodeData(
  */
 export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
-  nodeData2: Node<LlmPromptConfigComponent>["data"]
+  nodeData2: Node<LlmPromptConfigComponent>["data"],
 ): boolean {
   const demo1 = nodeData1.parameters.find(
-    (p) => p.identifier === "demonstrations"
+    (p) => p.identifier === "demonstrations",
   )?.value as NodeDataset | undefined;
   const demo2 = nodeData2.parameters.find(
-    (p) => p.identifier === "demonstrations"
+    (p) => p.identifier === "demonstrations",
   )?.value as NodeDataset | undefined;
 
   const includeDemonstrations = hasRecords(demo1) || hasRecords(demo2);
 
   return isEqual(
     standardizeNodeData(nodeData1, includeDemonstrations),
-    standardizeNodeData(nodeData2, includeDemonstrations)
+    standardizeNodeData(nodeData2, includeDemonstrations),
   );
 }

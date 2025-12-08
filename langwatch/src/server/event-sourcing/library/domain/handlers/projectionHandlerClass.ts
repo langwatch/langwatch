@@ -1,5 +1,5 @@
-import type { Event, Projection } from "../types";
 import type { ProjectionStore } from "../../stores/projectionStore.types";
+import type { Event, Projection } from "../types";
 import type { ProjectionHandler } from "./projectionHandler";
 
 /**

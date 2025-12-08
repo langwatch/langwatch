@@ -1,7 +1,7 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { dependencies } from "../../injection/dependencies.server";
-import { pathToRegexp, type Key } from "path-to-regexp";
 import { buffer } from "micro";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { type Key, pathToRegexp } from "path-to-regexp";
+import { dependencies } from "../../injection/dependencies.server";
 
 export const config = {
   api: {
@@ -11,16 +11,16 @@ export const config = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   const route =
     "/api/" +
     (Array.isArray(req.query.routes)
       ? req.query.routes.join("/")
-      : req.query.routes ?? "/");
+      : (req.query.routes ?? "/"));
 
   for (const [pattern, handler] of Object.entries(
-    dependencies.extraApiRoutes ?? []
+    dependencies.extraApiRoutes ?? [],
   )) {
     const keys: Key[] = [];
     const regexp = pathToRegexp(pattern, keys);
@@ -28,7 +28,7 @@ export default async function handler(
 
     if (match) {
       const params = Object.fromEntries(
-        keys.map((key, index) => [key.name, match[index + 1]])
+        keys.map((key, index) => [key.name, match[index + 1]]),
       );
       req.query = { ...req.query, ...params };
       // @ts-ignore

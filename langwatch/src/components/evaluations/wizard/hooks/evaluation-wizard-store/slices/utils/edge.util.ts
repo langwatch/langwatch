@@ -1,4 +1,4 @@
-import { type Edge, type Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import type { Component, Entry } from "~/optimization_studio/types/dsl";
 
 const createEdgeId = (source: string, target: string) =>
@@ -14,7 +14,7 @@ const createEdgeId = (source: string, target: string) =>
  * @returns
  */
 export const createDefaultEdge = (
-  edge: Partial<Edge> & Required<Pick<Edge, "source" | "target">>
+  edge: Partial<Edge> & Required<Pick<Edge, "source" | "target">>,
 ): Edge => ({
   // Defaults
   id: createEdgeId(edge.source, edge.target),
@@ -29,7 +29,7 @@ export const createDefaultEdge = (
  * Create the default edge between the executor node and the evaluator node
  */
 export const buildExecutorToEvaluatorEdge = (
-  edge: Partial<Edge> & Required<Pick<Edge, "source" | "target">>
+  edge: Partial<Edge> & Required<Pick<Edge, "source" | "target">>,
 ): Edge =>
   ({
     // Defaults
@@ -71,7 +71,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<string, string> = {
  * // Transposed result: { "input": ["question", "user_input"] }
  */
 const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
-  DATASET_INFERRED_MAPPINGS_BY_NAME
+  DATASET_INFERRED_MAPPINGS_BY_NAME,
 ).reduce(
   (acc, [key, value]) => {
     if (acc[value]) {
@@ -81,7 +81,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
     }
     return acc;
   },
-  {} as Record<string, string[]>
+  {} as Record<string, string[]>,
 );
 
 /**
@@ -92,7 +92,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
  */
 export const buildEntryToTargetEdges = (
   entryNode: Node<Entry> | undefined,
-  targetNode: Node<Component> | undefined
+  targetNode: Node<Component> | undefined,
 ): Edge[] => {
   const edges: Edge[] = [];
 
@@ -110,7 +110,7 @@ export const buildEntryToTargetEdges = (
 
     // 1. Try direct match - same name
     const directMatch = entryNode.data.outputs?.find(
-      (output) => output.identifier === inputIdentifier
+      (output) => output.identifier === inputIdentifier,
     );
 
     if (directMatch) {
@@ -140,7 +140,7 @@ export const buildEntryToTargetEdges = (
     // Check each potential field name
     for (const fieldName of potentialFields) {
       const match = entryNode.data.outputs?.find(
-        (output) => output.identifier === fieldName
+        (output) => output.identifier === fieldName,
       );
 
       if (match) {

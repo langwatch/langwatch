@@ -1,4 +1,4 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "../../../server/db";
 
 import { createLogger } from "../../../utils/logger";
@@ -7,7 +7,7 @@ const logger = createLogger("langwatch:annotations:id");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   const authToken = req.headers["x-auth-token"];
 
@@ -36,7 +36,10 @@ export default async function handler(
         .status(200)
         .json({ status: "success", message: "Annotation deleted." });
     } catch (e) {
-      logger.error({ error: e, projectId: project.id }, 'error deleting annotation');
+      logger.error(
+        { error: e, projectId: project.id },
+        "error deleting annotation",
+      );
       return res
         .status(500)
         .json({ status: "error", message: "ID not found." });
@@ -76,7 +79,10 @@ export default async function handler(
 
       return res.status(200).json({ data: patchAnnotation });
     } catch (e) {
-      logger.error({ error: e, projectId: project.id }, 'error patching annotation');
+      logger.error(
+        { error: e, projectId: project.id },
+        "error patching annotation",
+      );
       return res.status(500).json({ status: "error", message: "Not found" });
     }
   }
@@ -94,7 +100,10 @@ export default async function handler(
       }
       return res.status(200).json({ data: annotation });
     } catch (e) {
-      logger.error({ error: e, projectId: project.id }, 'error fetching annotation');
+      logger.error(
+        { error: e, projectId: project.id },
+        "error fetching annotation",
+      );
       return res
         .status(500)
         .json({ status: "error", message: "Internal server error." });

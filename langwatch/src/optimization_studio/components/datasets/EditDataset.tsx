@@ -1,3 +1,4 @@
+import { Box, Button } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   DatasetTable,
@@ -7,7 +8,6 @@ import type { DatasetColumns } from "../../../server/datasets/types";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Entry } from "../../types/dsl";
 import { inMemoryDatasetToNodeDataset } from "../../utils/datasetUtils";
-import { Box, Button } from "@chakra-ui/react";
 
 export function EditDataset({
   editingDataset,
@@ -24,7 +24,7 @@ export function EditDataset({
   setSelectedDataset: (
     dataset: Required<Entry>["dataset"],
     columnTypes: DatasetColumns,
-    close: boolean
+    close: boolean,
   ) => void;
   title?: string;
   cta?: string;
@@ -44,7 +44,7 @@ export function EditDataset({
       datasetRecords: rows ?? [],
       columnTypes: columns ?? [],
     }),
-    [columns, editingDataset, rows]
+    [columns, editingDataset, rows],
   );
 
   const [columnTypes, setColumnTypes] = useState<DatasetColumns>(columns ?? []);
@@ -66,7 +66,7 @@ export function EditDataset({
         setSelectedDataset(nodeDataset, dataset.columnTypes, false);
       }
     },
-    [setEditingDataset, setSelectedDataset]
+    [setEditingDataset, setSelectedDataset],
   );
 
   useEffect(() => {

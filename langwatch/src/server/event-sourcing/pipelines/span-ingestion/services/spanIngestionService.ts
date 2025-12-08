@@ -1,12 +1,11 @@
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
-
-import type { TraceForCollection } from "../../../../tracer/otel.traces";
-import type { DeepPartial } from "../../../../../utils/types";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
-import { SpanProcessingMapperService } from "./spanProcessingMapperService";
+import type { DeepPartial } from "../../../../../utils/types";
+import type { TraceForCollection } from "../../../../tracer/otel.traces";
 import { spanIngestionPipeline } from "../pipeline";
+import { SpanProcessingMapperService } from "./spanProcessingMapperService";
 
 export class SpanIngestionService {
   tracer = getLangWatchTracer("langwatch.span-ingestion.service");

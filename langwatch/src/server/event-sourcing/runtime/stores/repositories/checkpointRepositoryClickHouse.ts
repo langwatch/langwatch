@@ -1,9 +1,9 @@
-import { type ClickHouseClient } from "@clickhouse/client";
-import type {
-  CheckpointRepository,
-  CheckpointRecord,
-} from "./checkpointRepository.types";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
+import type {
+  CheckpointRecord,
+  CheckpointRepository,
+} from "./checkpointRepository.types";
 
 /**
  * ClickHouse implementation of CheckpointRepository.

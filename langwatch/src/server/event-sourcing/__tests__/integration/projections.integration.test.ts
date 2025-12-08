@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { createTestPipeline } from "./testHelpers";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { type AggregateType, EventUtils } from "../../library";
 import {
+  cleanupTestDataForTenant,
+  createTestPipeline,
   createTestTenantId,
   getTenantIdString,
-  waitForQueueProcessing,
-  cleanupTestDataForTenant,
   verifyCheckpoint,
+  waitForQueueProcessing,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
-import { type AggregateType, EventUtils } from "../../library";
 
 describe("Projections - Integration Tests", () => {
   let pipeline: ReturnType<typeof createTestPipeline>;

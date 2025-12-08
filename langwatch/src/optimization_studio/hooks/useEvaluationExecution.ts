@@ -1,9 +1,9 @@
-import { toaster } from "../../components/ui/toaster";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
+import { toaster } from "../../components/ui/toaster";
 import type { StudioClientEvent } from "../types/events";
-import { useWorkflowStore } from "./useWorkflowStore";
 import { usePostEvent } from "./usePostEvent";
+import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useEvaluationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -108,7 +108,7 @@ export const useEvaluationExecution = () => {
       setEvaluationState,
       getWorkflow,
       postEvent,
-    ]
+    ],
   );
 
   const stopEvaluationExecution = useCallback(
@@ -140,7 +140,7 @@ export const useEvaluationExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setEvaluationState, postEvent, getWorkflow]
+    [socketAvailable, setEvaluationState, postEvent, getWorkflow],
   );
 
   return {

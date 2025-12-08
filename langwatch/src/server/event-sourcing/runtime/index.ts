@@ -1,10 +1,10 @@
-import type { Event, Projection, AggregateType } from "../library";
+import { createLogger } from "~/utils/logger";
+import type { AggregateType, Event, Projection } from "../library";
 import { EventSourcingService } from "../library";
 import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
 } from "./pipeline";
-import { createLogger } from "~/utils/logger";
 
 const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 
@@ -70,34 +70,30 @@ export class EventSourcingPipeline<
   }
 }
 
-export {
-  EventSourcedQueueProcessorBullmq,
-  EventSourcedQueueProcessorMemory,
-  type QueueProcessorFactory,
-  DefaultQueueProcessorFactory,
-  BullmqQueueProcessorFactory,
-  MemoryQueueProcessorFactory,
-  defaultQueueProcessorFactory,
-} from "./queue";
-
-export { PipelineBuilder } from "./pipeline";
-export type {
-  EventSourcingPipelineDefinition,
-  RegisteredPipeline,
-  PipelineWithCommandHandlers,
-  PipelineBuilderOptions,
-} from "./pipeline";
-
-export { eventSourcing } from "./eventSourcing";
+export type { EventSourcingConfig } from "./config";
+export { createEventSourcingConfig } from "./config";
+export { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 export type { EventSourcing } from "./eventSourcing";
+export { eventSourcing } from "./eventSourcing";
 
 export {
   EventSourcingRuntime,
   getEventSourcingRuntime,
   resetEventSourcingRuntime,
 } from "./eventSourcingRuntime";
-
-export type { EventSourcingConfig } from "./config";
-export { createEventSourcingConfig } from "./config";
-
-export { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
+export type {
+  EventSourcingPipelineDefinition,
+  PipelineBuilderOptions,
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
+} from "./pipeline";
+export { PipelineBuilder } from "./pipeline";
+export {
+  BullmqQueueProcessorFactory,
+  DefaultQueueProcessorFactory,
+  defaultQueueProcessorFactory,
+  EventSourcedQueueProcessorBullmq,
+  EventSourcedQueueProcessorMemory,
+  MemoryQueueProcessorFactory,
+  type QueueProcessorFactory,
+} from "./queue";

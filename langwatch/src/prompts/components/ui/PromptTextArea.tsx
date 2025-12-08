@@ -1,4 +1,4 @@
-import { Box, Text, type BoxProps } from "@chakra-ui/react";
+import { Box, type BoxProps, Text } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Mention, MentionsInput } from "react-mentions";
 

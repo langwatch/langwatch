@@ -1,6 +1,6 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import type { Trace } from "../../server/tracer/types";
 import { ThumbsDown, ThumbsUp } from "react-feather";
+import type { Trace } from "../../server/tracer/types";
 
 export function EventsCounter({
   trace,
@@ -30,7 +30,7 @@ export function ThumbsUpDown({ trace }: { trace: Trace }) {
     ?.sort(
       (a, b) =>
         (b.timestamps.started_at || b.timestamps.inserted_at) -
-        (a.timestamps.started_at || a.timestamps.inserted_at)
+        (a.timestamps.started_at || a.timestamps.inserted_at),
     )
     .find((event) => event.event_type === "thumbs_up_down");
 
@@ -44,7 +44,9 @@ export function ThumbsUpDown({ trace }: { trace: Trace }) {
     <>
       <Text>·</Text>
       <HStack>
-        <Box>{vote == 1 ? <ThumbsUp size="12px" /> : <ThumbsDown size="12px" />}</Box>
+        <Box>
+          {vote == 1 ? <ThumbsUp size="12px" /> : <ThumbsDown size="12px" />}
+        </Box>
         <Text>{vote == 1 ? "Thumbs Up" : "Thumbs Down"}</Text>
       </HStack>
     </>

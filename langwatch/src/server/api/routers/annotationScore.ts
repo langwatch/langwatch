@@ -1,8 +1,7 @@
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const annotationScoreRouter = createTRPCRouter({
   upsert: protectedProcedure

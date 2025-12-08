@@ -1,9 +1,16 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
+import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
-import { EventUtils, createTenantId } from "../../../library";
-import { defineCommandSchema } from "../../../library";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "../../../library";
+import type { SpanRepository } from "../repositories/spanRepository";
+import { SpanRepositoryClickHouse } from "../repositories/spanRepositoryClickHouse";
+import { SpanRepositoryMemory } from "../repositories/spanRepositoryMemory";
 import type { StoreSpanIngestionCommandData } from "../schemas/commands";
 import {
   SPAN_INGESTION_RECORD_COMMAND_TYPE,
@@ -11,11 +18,6 @@ import {
 } from "../schemas/commands";
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
-import { createLogger } from "../../../../../utils/logger";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
-import { SpanRepositoryClickHouse } from "../repositories/spanRepositoryClickHouse";
-import { SpanRepositoryMemory } from "../repositories/spanRepositoryMemory";
-import type { SpanRepository } from "../repositories/spanRepository";
 
 /**
  * Self-contained command handler for span ingestion record commands.

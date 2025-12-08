@@ -1,29 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ProjectionUpdater } from "../projectionUpdater";
+import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
+import { buildCheckpointKey } from "../../../utils/checkpointKey";
+import { EventUtils } from "../../../utils/event.utils";
 import {
-  createMockEventStore,
-  createMockProjectionDefinition,
-  createMockEventHandler,
-  createMockProjectionStore,
   createMockDistributedLock,
-  createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
-  createTestAggregateType,
-  createTestProjection,
+  createMockEventHandler,
+  createMockEventStore,
   createMockLogger,
+  createMockProcessorCheckpointStore,
+  createMockProjectionDefinition,
+  createMockProjectionStore,
+  createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestProjection,
+  createTestTenantId,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
-import { buildCheckpointKey } from "../../../utils/checkpointKey";
-import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
 import { CheckpointManager } from "../../checkpoints/checkpointManager";
-import { QueueProcessorManager } from "../../queues/queueProcessorManager";
-import { EventUtils } from "../../../utils/event.utils";
-import { EVENT_TYPES } from "../../../domain/eventType";
 import { LockError, SequentialOrderingError } from "../../errorHandling";
+import { QueueProcessorManager } from "../../queues/queueProcessorManager";
+import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
+import { ProjectionUpdater } from "../projectionUpdater";
 
 // Mock EventUtils
 vi.mock("../../../utils/event.utils", () => ({

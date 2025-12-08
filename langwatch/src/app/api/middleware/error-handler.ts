@@ -4,8 +4,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { createLogger } from "~/utils/logger";
-import { errorSchema } from "../shared/schemas";
 import { HttpError, NotFoundError } from "../shared/errors";
+import { errorSchema } from "../shared/schemas";
 
 const logger = createLogger("langwatch:api:errors");
 
@@ -25,7 +25,7 @@ export const handleError = async (
     code?: string;
     name?: string;
   },
-  c: Context
+  c: Context,
 ) => {
   const projectId = c.get("project")?.id;
   const path = c.req.path;
@@ -41,7 +41,7 @@ export const handleError = async (
       routeParams,
       error,
     },
-    `API Error: ${error.message || String(error)}`
+    `API Error: ${error.message || String(error)}`,
   );
 
   // Check if it's a "not found" error
@@ -68,7 +68,7 @@ export const handleError = async (
         error: error.message || "An error occurred",
         message: error.message,
       }),
-      error.status
+      error.status,
     );
   }
 
@@ -81,6 +81,6 @@ export const handleError = async (
           ? error.message
           : "Internal server error",
     }),
-    500
+    500,
   );
 };

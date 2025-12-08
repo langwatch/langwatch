@@ -1,6 +1,6 @@
 import escapeStringRegexp from "escape-string-regexp";
-import * as llmModelCosts from "./llmModelCosts.json";
 import { prisma } from "../db";
+import * as llmModelCosts from "./llmModelCosts.json";
 
 const getImportedModelCosts = () => {
   type ImportedLLMModelCost =

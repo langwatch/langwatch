@@ -1,5 +1,5 @@
 import type { Organization } from "@prisma/client";
-import { type MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";
 
@@ -19,7 +19,7 @@ export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
         error: "Internal Server Error",
         message: "Trying to use organization middleware without project",
       },
-      500
+      500,
     );
   }
 
@@ -35,7 +35,7 @@ export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
         error: "Internal Server Error",
         message: "Organization not found",
       },
-      500
+      500,
     );
   }
 

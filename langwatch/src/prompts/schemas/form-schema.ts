@@ -1,14 +1,13 @@
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
-import { handleSchema, scopeSchema } from "./field-schemas";
-import { versionMetadataSchema } from "./version-metadata-schema";
 import {
   DEFAULT_MODEL,
-  MIN_MAX_TOKENS,
   FALLBACK_MAX_TOKENS,
+  MIN_MAX_TOKENS,
 } from "~/utils/constants";
+import { handleSchema, scopeSchema } from "./field-schemas";
+import { versionMetadataSchema } from "./version-metadata-schema";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 

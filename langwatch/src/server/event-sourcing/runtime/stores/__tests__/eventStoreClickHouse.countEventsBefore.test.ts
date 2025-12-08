@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import type { ClickHouseClient } from "@clickhouse/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { type AggregateType, EventUtils } from "../../../library";
+import { EVENT_TYPES } from "../../../library/domain/eventType";
+import { createTenantId } from "../../../library/domain/tenantId";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickHouse";
-import { EventUtils, type AggregateType } from "../../../library";
-import { createTenantId } from "../../../library/domain/tenantId";
-import { EVENT_TYPES } from "../../../library/domain/eventType";
-import type { ClickHouseClient } from "@clickhouse/client";
 
 describe("EventStoreClickHouse - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");

@@ -1,11 +1,11 @@
-import { StepAccordion, type StepAccordionProps } from "./StepAccordion";
-import {
-  FieldsForm,
-  FieldsDefinition,
-} from "~/optimization_studio/components/properties/BasePropertiesPanel";
-import type { Node } from "@xyflow/react";
-import type { Component, Field } from "~/optimization_studio/types/dsl";
 import { VStack } from "@chakra-ui/react";
+import type { Node } from "@xyflow/react";
+import {
+  FieldsDefinition,
+  FieldsForm,
+} from "~/optimization_studio/components/properties/BasePropertiesPanel";
+import type { Component, Field } from "~/optimization_studio/types/dsl";
+import { StepAccordion, type StepAccordionProps } from "./StepAccordion";
 
 /**
  * A compound component for execution step accordions with parameters, inputs, and outputs fields.
@@ -98,5 +98,5 @@ export const ExecutionStepAccordion = Object.assign(
     ParametersField,
     InputField,
     OutputField,
-  }
+  },
 );

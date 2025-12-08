@@ -1,9 +1,9 @@
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { z } from "zod";
 import type { Project } from "@prisma/client";
+import { z } from "zod";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
-  OrganizationRoleGroup,
   checkUserPermissionForOrganization,
+  OrganizationRoleGroup,
 } from "../permission";
 
 export const costsRouter = createTRPCRouter({
@@ -13,12 +13,12 @@ export const costsRouter = createTRPCRouter({
         organizationId: z.string(),
         startDate: z.number(),
         endDate: z.number(),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const { startDate, endDate } = input;
@@ -61,7 +61,7 @@ export const costsRouter = createTRPCRouter({
       });
       const projectsById = userProjects.reduce(
         (acc, project) => ({ ...acc, [project.id]: project }),
-        {} as Record<string, Project>
+        {} as Record<string, Project>,
       );
       const projectIds = Object.keys(projectsById);
 
@@ -127,7 +127,7 @@ export const costsRouter = createTRPCRouter({
             project: Project;
             costs: typeof aggregatedCosts;
           }
-        >
+        >,
       );
 
       return Object.values(aggregatedCostsByProject);

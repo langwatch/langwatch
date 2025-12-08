@@ -15,7 +15,7 @@ export function LlmPromptPropertiesStepAccordion() {
   const { getNodesByType } = useEvaluationWizardStore(
     useShallow(({ getNodesByType }) => ({
       getNodesByType,
-    }))
+    })),
   );
 
   const signatureNode = getNodesByType("signature")[0];

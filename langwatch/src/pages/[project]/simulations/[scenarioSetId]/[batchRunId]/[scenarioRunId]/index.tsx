@@ -1,12 +1,12 @@
-import { Box, Button, HStack, Text, VStack, Skeleton } from "@chakra-ui/react";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { ArrowLeft, Clock, Check, X } from "react-feather";
+import { ArrowLeft, Check, Clock, X } from "react-feather";
 
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import {
   CustomCopilotKitChat,
-  SimulationConsole,
   PreviousRunsList,
+  SimulationConsole,
   SimulationLayout,
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";

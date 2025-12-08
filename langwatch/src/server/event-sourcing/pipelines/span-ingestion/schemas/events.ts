@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { EventSchema } from "../../../library/domain/types";
 import type { TenantId } from "../../../library";
+import { EventSchema } from "../../../library/domain/types";
 import {
-  SPAN_INGESTION_RECORDED_EVENT_TYPE,
   SPAN_INGESTION_EVENT_TYPES,
+  SPAN_INGESTION_RECORDED_EVENT_TYPE,
 } from "./typeIdentifiers";
 
 export type { SpanIngestionEventType } from "./typeIdentifiers";
 export {
-  SPAN_INGESTION_RECORDED_EVENT_TYPE,
   SPAN_INGESTION_EVENT_TYPES,
+  SPAN_INGESTION_RECORDED_EVENT_TYPE,
 } from "./typeIdentifiers";
 
 /**

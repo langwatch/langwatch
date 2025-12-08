@@ -1,7 +1,14 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-
-import { createLogger } from "../../../../utils/logger";
+import { ExperimentType, type Project } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { type ZodError, z } from "zod";
+import { fromZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
+import {
+  BATCH_EVALUATION_INDEX,
+  batchEvaluationId,
+  esClient,
+} from "../../../../server/elasticsearch";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -10,18 +17,10 @@ import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
 } from "../../../../server/experiments/types.generated";
-import { z, type ZodError } from "zod";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { fromZodError } from "zod-validation-error";
-import { findOrCreateExperiment } from "../../experiment/init";
-import { ExperimentType, type Project } from "@prisma/client";
-import {
-  BATCH_EVALUATION_INDEX,
-  batchEvaluationId,
-  esClient,
-} from "../../../../server/elasticsearch";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
+import { createLogger } from "../../../../utils/logger";
 import { safeTruncate } from "../../../../utils/truncate";
+import { findOrCreateExperiment } from "../../experiment/init";
 
 const logger = createLogger("langwatch:evaluations:batch:log_results");
 

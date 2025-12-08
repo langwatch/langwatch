@@ -1,16 +1,16 @@
 import {
-  HStack,
-  Button,
-  type StackProps,
   Alert,
-  Text,
+  Button,
+  HStack,
   Spinner,
+  type StackProps,
+  Text,
 } from "@chakra-ui/react";
-import { useDrawer } from "../CurrentDrawer";
 import { LuListTree, LuRefreshCw } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { easyCatchToast } from "../../utils/easyCatchToast";
+import { useDrawer } from "../CurrentDrawer";
 
 // Constants
 const TRACE_QUERY_CONFIG = {

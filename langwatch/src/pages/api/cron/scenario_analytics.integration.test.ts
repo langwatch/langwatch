@@ -1,27 +1,27 @@
+import type { Project } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { createMocks } from "node-mocks-http";
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  beforeEach,
-  afterEach,
-  beforeAll,
   vi,
-  afterAll,
 } from "vitest";
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { createMocks } from "node-mocks-http";
+import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
 import { prisma } from "~/server/db";
 import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { ANALYTICS_KEYS } from "~/types";
-import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
 import { getTestProject } from "~/utils/testUtils";
-import type { Project } from "@prisma/client";
 import handler from "./scenario_analytics";
 
 // Helper function to create mock request/response
 function createMockRequestResponse(
   method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
 ) {
   const { req, res } = createMocks<NextApiRequest, NextApiResponse>({
     method,
@@ -33,7 +33,7 @@ function createMockRequestResponse(
 // Helper function to clean up scenario events for test projects
 async function cleanupScenarioEvents(
   projectIds: string[],
-  context = "test cleanup"
+  context = "test cleanup",
 ) {
   try {
     const client = await esClient({ test: true });
@@ -287,45 +287,45 @@ describe("Scenario Analytics Cron Job", () => {
 
       // Verify project1 has the expected analytics
       const project1Analytics = analytics.filter(
-        (a) => a.projectId === project1.id
+        (a) => a.projectId === project1.id,
       );
       expect(project1Analytics.length).toBe(4); // All 4 event types
 
       // Verify project2 has the expected analytics
       const project2Analytics = analytics.filter(
-        (a) => a.projectId === project2.id
+        (a) => a.projectId === project2.id,
       );
       expect(project2Analytics.length).toBe(2); // Message snapshot + total count
 
       // Verify specific counts
       const project1MessageSnapshot = project1Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
       );
       expect(project1MessageSnapshot?.numericValue).toBe(1);
 
       const project1RunStarted = project1Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_RUN_STARTED_COUNT_PER_DAY,
       );
       expect(project1RunStarted?.numericValue).toBe(1);
 
       const project1RunFinished = project1Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_RUN_FINISHED_COUNT_PER_DAY,
       );
       expect(project1RunFinished?.numericValue).toBe(1);
 
       const project1TotalEvents = project1Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
       );
       expect(project1TotalEvents?.numericValue).toBe(3);
 
       // Verify project2 specific counts
       const project2MessageSnapshot = project2Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_MESSAGE_SNAPSHOT_COUNT_PER_DAY,
       );
       expect(project2MessageSnapshot?.numericValue).toBe(1);
 
       const project2TotalEvents = project2Analytics.find(
-        (a) => a.key === ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY
+        (a) => a.key === ANALYTICS_KEYS.SCENARIO_EVENT_COUNT_PER_DAY,
       );
       expect(project2TotalEvents?.numericValue).toBe(1);
     });
@@ -386,7 +386,7 @@ describe("Scenario Analytics Cron Job", () => {
       // Create a project with no scenario events
       const timestamp = Date.now();
       const emptyProject = await getTestProject(
-        `scenario-analytics-empty-${timestamp}`
+        `scenario-analytics-empty-${timestamp}`,
       );
 
       try {
@@ -435,7 +435,7 @@ describe("Scenario Analytics Cron Job", () => {
       expect(testDateStart.getUTCMilliseconds()).toBe(0);
 
       expect(testDateEnd.getTime()).toBe(
-        testDateStart.getTime() + 24 * 60 * 60 * 1000
+        testDateStart.getTime() + 24 * 60 * 60 * 1000,
       );
     });
   });
@@ -559,24 +559,24 @@ describe("Scenario Analytics Cron Job", () => {
             key: a.key,
             numericValue: a.numericValue,
             createdAt: a.createdAt,
-          }))
+          })),
         );
 
         // In CI/CD, there might be other tests creating events in the same date range
         // Let's be more lenient and only fail if we find analytics with high counts
         // that suggest our test events were processed incorrectly
         const highCountAnalytics = analytics.filter(
-          (a) => (a.numericValue ?? 0) > 1
+          (a) => (a.numericValue ?? 0) > 1,
         );
         if (highCountAnalytics.length > 0) {
           console.log(
             "Found high count analytics that suggest test events were processed:",
-            highCountAnalytics
+            highCountAnalytics,
           );
           expect(highCountAnalytics.length).toBe(0);
         } else {
           console.log(
-            "Found low count analytics, likely from other tests - this is acceptable"
+            "Found low count analytics, likely from other tests - this is acceptable",
           );
         }
       } else {

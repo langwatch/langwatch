@@ -1,8 +1,8 @@
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { api } from "../utils/api";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { api } from "../utils/api";
 import { isNotFound } from "../utils/trpcError";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export function useTraceDetailsState(traceId: string) {
   const router = useRouter();
@@ -20,7 +20,7 @@ export function useTraceDetailsState(traceId: string) {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: true,
       refetchInterval: keepRefetching ? 1000 : undefined,
-    }
+    },
   );
 
   useEffect(() => {

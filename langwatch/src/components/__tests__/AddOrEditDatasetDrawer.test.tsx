@@ -27,4 +27,3 @@ describe("tryToConvertRowsToAppropriateType", () => {
     it.todo("treats as string URL");
   });
 });
-

@@ -1,17 +1,17 @@
 import { Field, HStack, Spacer } from "@chakra-ui/react";
 import {
   Controller,
-  useFormContext,
   type UseFieldArrayReturn,
+  useFormContext,
 } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import type { PromptConfigFormValues } from "~/prompts";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
-import { AddRemoveMessageFieldButton } from "./message-history-fields/AddRemoveMessageFieldButton";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
 } from "../../components/ui/PromptTextArea";
+import { AddRemoveMessageFieldButton } from "./message-history-fields/AddRemoveMessageFieldButton";
 
 export function PromptField({
   templateAdapter,

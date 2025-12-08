@@ -7,6 +7,6 @@ export const usePublicEnv = () => {
       staleTime: Infinity,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 };
