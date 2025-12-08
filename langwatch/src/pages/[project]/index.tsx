@@ -11,7 +11,6 @@ import {
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import {
   DocumentsCountsSummary,
@@ -21,15 +20,14 @@ import { UserMetrics } from "../../components/analytics/UserMetrics";
 import { FilterSidebar } from "../../components/filters/FilterSidebar";
 import GraphsLayout from "../../components/GraphsLayout";
 import { LLMMetrics } from "../../components/LLMMetrics";
-import { PermissionAlert } from "../../components/PermissionAlert";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
 import { dependencies as serverDependencies } from "../../injection/dependencies.server";
-import type { Permission } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 
 function ProjectRouter() {
   const router = useRouter();
@@ -69,36 +67,19 @@ function IndexContent() {
 
   const router = useRouter();
   const returnTo = router.query.return_to;
-
-  /**
-   * Validates if a returnTo URL is safe to redirect to
-   * @param url - The URL to validate
-   * @returns True if the URL is safe to redirect to
-   */
-  function isValidReturnToUrl(url: string): boolean {
-    if (url.startsWith("/")) return true; // relative path
-    if (typeof window === "undefined") return false;
-    try {
-      const target = new URL(url, window.location.origin);
-      return target.origin === window.location.origin;
-    } catch (error) {
-      captureException(error, {
-        tags: {
-          url,
-        },
-      });
-      return false;
-    }
-  }
+  const safeReturnToPath = getSafeReturnToPath(returnTo);
+  const shouldRedirect = Boolean(
+    safeReturnToPath && typeof window !== "undefined",
+  );
 
   useEffect(() => {
-    if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
-      void router.push(returnTo);
+    if (shouldRedirect && safeReturnToPath) {
+      void router.push(safeReturnToPath);
     }
-  }, [returnTo, router]);
+  }, [router, safeReturnToPath, shouldRedirect]);
 
   // Don't render anything while redirecting
-  if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
+  if (shouldRedirect) {
     return null;
   }
 

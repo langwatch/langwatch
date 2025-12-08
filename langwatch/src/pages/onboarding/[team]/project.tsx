@@ -25,6 +25,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { trackEvent } from "../../../utils/tracking";
 
 type RadioCardProps = {
@@ -100,10 +101,7 @@ export default function ProjectOnboarding() {
       refetchOnMount: false,
     },
   );
-  const returnTo =
-    typeof router.query.return_to === "string"
-      ? router.query.return_to
-      : undefined;
+  const safeReturnToPath = getSafeReturnToPath(router.query.return_to);
 
   useEffect(() => {
     if (team.data) {
@@ -127,15 +125,12 @@ export default function ProjectOnboarding() {
       },
       {
         onSuccess: (data) => {
-          if (
-            returnTo &&
-            (returnTo.startsWith("/") ||
-              returnTo.startsWith(window.location.origin))
-          ) {
-            window.location.href = returnTo;
-          } else {
-            window.location.href = `/${data.projectSlug}/messages`;
-          }
+      if (safeReturnToPath) {
+        void router.push(safeReturnToPath);
+        return;
+      }
+
+      void router.push(`/${data.projectSlug}/messages`);
         },
       },
     );
