@@ -1,5 +1,8 @@
 import { useRouter } from "next/router";
 import qs from "qs";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("useDrawer");
 
 /**
  * Drawer type registry. Add new drawer types here.
@@ -44,6 +47,15 @@ export function useDrawer() {
           typeof value === "function" || typeof value === "object",
       ),
     ) as Record<string, DrawerCallback>;
+
+    const badKeys = Object.entries(props ?? {})
+      .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
+      .map(([k]) => k);
+    if (badKeys.length > 0) {
+      logger.warn(
+        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}`,
+      );
+    }
 
     void router[replace ? "replace" : "push"](
       "?" +

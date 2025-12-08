@@ -375,7 +375,7 @@ export function CSVReaderComponent({
               Remove={Remove}
               ProgressBar={ProgressBar}
             />
-            {children ? children(acceptedFile) : null}
+            {children ? children(acceptedFile !== null) : null}
           </>
         );
       }}
