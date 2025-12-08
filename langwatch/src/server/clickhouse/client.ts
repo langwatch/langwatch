@@ -16,7 +16,10 @@ export function getClickHouseClient(): ClickHouseClient | null {
     try {
       url = new URL(env.CLICKHOUSE_URL);
     } catch (error) {
-      logger.warn({ error }, 'ClickHouse URL was not a valid URL, it will still be set, but may not work as expected.');
+      logger.warn(
+        { error },
+        "ClickHouse URL was not a valid URL, it will still be set, but may not work as expected.",
+      );
     }
 
     clickHouseClient = createClient({ url });

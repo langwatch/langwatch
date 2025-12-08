@@ -15,7 +15,7 @@ const logger = createLogger("langwatch:clickhouse:migrations");
 
 const MIGRATIONS_DIR = path.join(
   process.cwd(),
-  "src/server/clickhouse/migrations"
+  "src/server/clickhouse/migrations",
 );
 
 interface GooseOptions {
@@ -51,7 +51,10 @@ function parseConnectionUrl(connectionUrl?: string): {
   return { database, connectionString: parsed.toString() };
 }
 
-function getConfig(database: string, connectionString: string): ClickHouseConfig {
+function getConfig(
+  database: string,
+  connectionString: string,
+): ClickHouseConfig {
   return {
     database,
     connectionString,
@@ -65,7 +68,7 @@ function getConfig(database: string, connectionString: string): ClickHouseConfig
  * Security: Only passes the minimal set of environment variables needed.
  */
 function buildMigrationEnvVars(
-  config: ClickHouseConfig
+  config: ClickHouseConfig,
 ): Record<string, string | undefined> {
   const systemVars: Record<string, string | undefined> = {
     PATH: process.env.PATH,
@@ -103,12 +106,14 @@ function logConfig(config: ClickHouseConfig): void {
       database: config.database,
       replicated: config.replicated,
     },
-    "ClickHouse migration configuration"
+    "ClickHouse migration configuration",
   );
 }
 
 function executeGoose(command: string, options: GooseOptions = {}): string {
-  const { database, connectionString } = parseConnectionUrl(options.connectionUrl);
+  const { database, connectionString } = parseConnectionUrl(
+    options.connectionUrl,
+  );
   const config = getConfig(database, connectionString);
   const migrationsDir = options.migrationsDir ?? MIGRATIONS_DIR;
   const envVars = buildMigrationEnvVars(config);
@@ -130,15 +135,15 @@ function executeGoose(command: string, options: GooseOptions = {}): string {
   });
 
   if (result.error) {
-    const message = result.error.message.includes('ENOENT')
-      ? 'Goose binary not found. Install from https://github.com/pressly/goose'
+    const message = result.error.message.includes("ENOENT")
+      ? "Goose binary not found. Install from https://github.com/pressly/goose"
       : result.error.message;
     throw new Error(`Goose migration failed: ${message}`);
   }
 
   if (result.status !== 0) {
     throw new Error(
-      `Goose migration failed: ${result.stderr || "Unknown error"}`
+      `Goose migration failed: ${result.stderr || "Unknown error"}`,
     );
   }
 
@@ -178,11 +183,11 @@ export function getMigrateStatus(options: GooseOptions = {}): string {
  * Run migrations if ENABLE_CLICKHOUSE and CLICKHOUSE_URL are configured
  */
 export async function runMigrationsIfConfigured(
-  options: GooseOptions = {}
+  options: GooseOptions = {},
 ): Promise<void> {
   if (!process.env.ENABLE_CLICKHOUSE) {
     logger.info(
-      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations."
+      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",
     );
     return;
   }
@@ -191,7 +196,7 @@ export async function runMigrationsIfConfigured(
 
   if (!connectionUrl) {
     logger.info(
-      "CLICKHOUSE_URL not configured, skipping ClickHouse migrations."
+      "CLICKHOUSE_URL not configured, skipping ClickHouse migrations.",
     );
     return;
   }
