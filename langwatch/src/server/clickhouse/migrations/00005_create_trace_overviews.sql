@@ -52,7 +52,7 @@ ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}LastUpdatedAt
 PARTITION BY (TenantId, toYYYYMM(CreatedAt))
 ORDER BY (TenantId, TraceId)
 TTL toDateTime(LastUpdatedAt) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192, storage_policy = 'tiered';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

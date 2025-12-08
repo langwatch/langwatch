@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY (TenantId, AggregateType)
 ORDER BY (TenantId, CheckpointKey)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192, storage_policy = 'tiered';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
