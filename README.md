@@ -22,7 +22,7 @@
 ## Core Features
 
 - [**Observability**](https://docs.langwatch.ai/integration/overview) - Add tracing to your LLM, based on the OpenTelemetry standard, allowing LangWatch to provide real-time powers.
-- [**Evaluation**](https://docs.langwatch.ai/llm-evaluation/offline-evaluation) - Run real-time and offline evaluations against production or synthetic datasets. Compare performance across various matrixes (prompts, modules, hosting providers, and complete LLM pipelines).
+- [**Evaluation**](https://docs.langwatch.ai/llm-evaluation/offline-evaluation) - Run real-time and offline evaluations against production or synthetic datasets. Compare performance across various matrices (prompts, modules, hosting providers, and complete LLM pipelines).
 - [**Datasets**](https://docs.langwatch.ai/features/datasets) - Automatically created from traced messages, or upload, datasets which can be used across the platform for evals.
 - [**Optimization Studio**](https://docs.langwatch.ai/optimization-studio/overview) – Build and run evaluations faster with our no+lo 🧘 code studio. If you need more flexibility, you have access to the DSL that powers it too.
 - [**Prompt Management & Optimization**](https://docs.langwatch.ai/features/prompt-versioning) – Version prompts, test changes on datasets, and improve real-world performance. Auto-optimize with DSPy's MIPROv2 to generate better prompts and few-shot examples.
@@ -30,7 +30,7 @@
 
 LangWatch is framework- and LLM-agnostic, with support for (LangGraph, DSPy, Langflow, Flowise, Vercel, Mastra, Agno and others) and LLM providers (OpenAI, Azure, Bedrock, Gemini, Deepseek, Groq, MistralAI, VertexAI, LiteLLM, and others) via [OpenTelemetry](https://opentelemetry.io/).
 
-Our use of **open**, and **community-driven** **standards** enables your team to be flexible to the rapidly changing AI ecosystem without worrying about compatibility.
+Our use of **open** and **community-driven** **standards** enables your team to be flexible to the rapidly changing AI ecosystem without worrying about compatibility.
 
 ## Getting Started
 
@@ -42,7 +42,7 @@ The easiest way to get started with LangWatch.
 
 ### Local setup 💻
 
-Get up and running in your own machine using docker compose:
+Get up and running on your own machine using docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
@@ -100,10 +100,10 @@ make start
 
 ## 🚀 Quick Start
 
-Get observing in minutes. Now you have an account and have created a project inside LangWatch, lets get your messages flowing through LangWatch.
+Get observing in minutes. Now you have an account and have created a project inside LangWatch, let's get your messages flowing through LangWatch.
 
 > [!NOTE]
-> Not using Python or OpenAI? Don't worry, we have your back . [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
+> Not using Python or OpenAI? Don't worry, we have your back. [Visit our docs](https://docs.langwatch.ai/integration/overview) for full guides for other popular languages, LLM providers, and frameworks.
 
 ### Install and configure SDK
 
@@ -156,7 +156,7 @@ Our Python SDK supports the following auto-instrumentors.
 - [DSPy](https://docs.langwatch.ai/integration/python/guide#ds-py)
 - [LangChain](https://docs.langwatch.ai/integration/python/guide#lang-chain)
 
-Though OpenTelemetry, we also support all the frameworks and providers that support them, such as:
+Through OpenTelemetry, we also support all the frameworks and providers that support them, such as:
 
 - AWS Bedrock
 - Haystack
@@ -176,17 +176,16 @@ Our JavaScript SDK supports the following instrumentors:
 - [Azure](https://docs.langwatch.ai/integration/typescript/guide#azure)
 - [LangChain.js](https://docs.langwatch.ai/integration/typescript/guide#lang-chain-js)
 
+### Agent Simulation
+
+Test your agents before they hit production using [Scenarios](https://github.com/langwatch/scenario) — our lightweight simulation framework for stress testing agents against real-world situations. [Get started here](https://scenario.langwatch.ai/)
+
 ### Platforms
 
 - [LangFlow](https://docs.langwatch.ai/integration/langflow)
 - [Flowise](https://docs.langwatch.ai/integration/flowise)
 
 Are you using a platform that could benefit from a direct LangWatch integration? We'd love to hear from you, please [**fill out this very quick form.**](https://www.notion.so/1e35e165d48280468247fcbdc3349077?pvs=21)
-
-
-### Agent Simulation 
-
-Test your agents before they hit production using [Scenarios](https://github.com/langwatch/scenario) — our lightweight simulation framework for stress testing agents against real-world situations.
 
 ## 🥰 Community
 
