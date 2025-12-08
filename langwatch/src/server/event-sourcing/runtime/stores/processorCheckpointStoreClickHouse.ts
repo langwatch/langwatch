@@ -19,27 +19,7 @@ import type {
  * ClickHouse implementation of ProcessorCheckpointStore.
  * Provides distributed checkpoint storage for multi-instance deployments.
  *
- * **Table Schema:**
- * ```sql
- * CREATE TABLE IF NOT EXISTS processor_checkpoints (
- *   CheckpointKey String, -- Primary key: tenantId:pipelineName:processorName:aggregateType:aggregateId
- *   ProcessorName String,
- *   ProcessorType String,
- *   EventId String,
- *   Status String,
- *   EventTimestamp UInt64,
- *   SequenceNumber UInt64, -- Sequence number of last processed event within aggregate (1-indexed)
- *   ProcessedAt Nullable(UInt64),
- *   FailedAt Nullable(UInt64),
- *   ErrorMessage Nullable(String),
- *   TenantId String,
- *   AggregateType String,
- *   AggregateId String,
- *   UpdatedAt DateTime DEFAULT now()
- * ) ENGINE = ReplacingMergeTree(UpdatedAt)
- * PARTITION BY (TenantId, AggregateType)
- * ORDER BY (CheckpointKey);
- * Note: ReplacingMergeTree will keep the row with the highest UpdatedAt value for each CheckpointKey.
+ * Schema in /server/clickhouse/migrations/00003_create_processor_checkpoints.sql
  * ```
  */
 export class ProcessorCheckpointStoreClickHouse

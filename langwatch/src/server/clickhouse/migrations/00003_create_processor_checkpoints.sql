@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.processor_checkpoints
     EventId String CODEC(ZSTD(1)),
     Status LowCardinality(String),
     EventTimestamp DateTime64(3) CODEC(Delta(4), ZSTD(1)),
-    SequenceNumber DateTime64(3) CODEC(Delta(4), ZSTD(1)),
+    SequenceNumber Int64 CODEC(Delta(8), ZSTD(1)),
     ProcessedAt Nullable(DateTime64(3)) CODEC(Delta(4), ZSTD(1)),
     FailedAt Nullable(DateTime64(3)) CODEC(Delta(4), ZSTD(1)),
     ErrorMessage Nullable(String) CODEC(ZSTD(1)),
