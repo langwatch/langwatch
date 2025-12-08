@@ -224,7 +224,8 @@ jobs:
         with:
           version: latest
       - name: Run Biome
-        run: biome ci ./langwatch/src/
+        working-directory: langwatch
+        run: biome ci ./src/
 
   build:
     runs-on: ubuntu-latest
