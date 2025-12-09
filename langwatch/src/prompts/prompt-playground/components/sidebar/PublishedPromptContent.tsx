@@ -1,10 +1,12 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { PublishedPromptActions } from "./PublishedPromptActions";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptContentProps {
   promptId: string;
   promptHandle: string | null;
+  prompt?: VersionedPrompt | null;
 }
 
 /**
@@ -14,6 +16,7 @@ interface PublishedPromptContentProps {
 export function PublishedPromptContent({
   promptId,
   promptHandle,
+  prompt,
 }: PublishedPromptContentProps) {
   return (
     <HStack justify="space-between" width="full" className="group">
@@ -27,7 +30,11 @@ export function PublishedPromptContent({
       >
         {getDisplayHandle(promptHandle)}
       </Text>
-      <PublishedPromptActions promptId={promptId} promptHandle={promptHandle} />
+      <PublishedPromptActions
+        promptId={promptId}
+        promptHandle={promptHandle}
+        prompt={prompt}
+      />
     </HStack>
   );
 }

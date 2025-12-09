@@ -42,6 +42,9 @@ export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
     author?: { name: string } | null;
   };
+  _count?: {
+    copiedPrompts?: number;
+  } | null;
 }
 
 /**
@@ -85,6 +88,11 @@ export class LlmConfigRepository {
             },
           },
           take: 1,
+        },
+        _count: {
+          select: {
+            copiedPrompts: true,
+          },
         },
       },
     });

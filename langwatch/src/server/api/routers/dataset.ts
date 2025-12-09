@@ -7,7 +7,8 @@ import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
@@ -212,5 +213,44 @@ export const datasetRouter = createTRPCRouter({
         input.projectId,
         input.proposedName,
       );
+    }),
+  /**
+   * Copy a dataset to a target project.
+   * Handles name conflicts by appending a suffix.
+   * Copies all records with correct structure.
+   */
+  copy: protectedProcedure
+    .input(
+      z.object({
+        datasetId: z.string(),
+        sourceProjectId: z.string(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("datasets:create"))
+    .use(datasetErrorHandler)
+    .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least datasets:create permission on the source project
+      // (having create permission implies you can view/copy from that project)
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "datasets:create",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to view datasets in the source project",
+        });
+      }
+
+      const datasetService = DatasetService.create(ctx.prisma);
+      return await datasetService.copyDataset({
+        sourceDatasetId: input.datasetId,
+        sourceProjectId: input.sourceProjectId,
+        targetProjectId: input.projectId,
+      });
     }),
 });

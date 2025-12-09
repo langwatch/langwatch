@@ -7,19 +7,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { MoreVertical, Copy, Trash2, RefreshCw, ArrowUp } from "react-feather";
+import { useCallback, useState } from "react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useCallback, useState } from "react";
-import { MoreVertical } from "react-feather";
 import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
-import { Menu } from "../../../components/ui/menu";
+import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
+import { PushToCopiesDialog } from "./PushToCopiesDialog";
 import { toaster } from "../../../components/ui/toaster";
-import { Tooltip } from "../../../components/ui/tooltip";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
+import { Menu } from "../../../components/ui/menu";
+import { Tooltip } from "../../../components/ui/tooltip";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -66,8 +68,61 @@ export function WorkflowCard({
 } & React.ComponentProps<typeof WorkflowCardBase>) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
+  const syncFromSource = api.workflow.syncFromSource.useMutation();
   const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
+  const hasWorkflowsCreatePermission = hasPermission("workflows:create");
+  const hasWorkflowsUpdatePermission = hasPermission("workflows:update");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
+  const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
+    useState(false);
+
+  // Get the workflow data to check if it's a copy or has copies
+  const workflow = workflowId
+    ? query?.data?.find((w) => w.id === workflowId)
+    : undefined;
+  const isCopiedWorkflow = !!workflow?.copiedFromWorkflowId;
+  const hasCopies = (workflow?._count?.copiedWorkflows ?? 0) > 0;
+
+  // Get source project path for tooltip
+  const sourceProjectPath = workflow?.copiedFrom
+    ? `${workflow.copiedFrom.project.team.organization.name} / ${workflow.copiedFrom.project.team.name} / ${workflow.copiedFrom.project.name}`
+    : undefined;
+
+  const onSyncFromSource = useCallback(() => {
+    if (!workflowId || !project) return;
+
+    syncFromSource.mutate(
+      { workflowId, projectId: project.id },
+      {
+        onSuccess: () => {
+          void query?.refetch();
+          toaster.create({
+            title: "Workflow updated",
+            description: `Workflow "${name}" has been updated from source.`,
+            type: "success",
+            meta: {
+              closable: true,
+            },
+          });
+        },
+        onError: (error) => {
+          toaster.create({
+            title: "Error updating workflow",
+            description: error.message || "Please try again later.",
+            type: "error",
+            meta: {
+              closable: true,
+            },
+          });
+        },
+      },
+    );
+  }, [syncFromSource, workflowId, project, query, name]);
+
+  const onPushToCopies = useCallback(() => {
+    setIsPushToCopiesDialogOpen(true);
+  }, []);
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -150,6 +205,80 @@ export function WorkflowCard({
                 <MoreVertical size={24} />
               </Menu.Trigger>
               <Menu.Content className="js-inner-menu">
+                {isCopiedWorkflow && (
+                  <Tooltip
+                    content={
+                      !hasWorkflowsUpdatePermission
+                        ? "You need workflows:update permission to sync from source"
+                        : sourceProjectPath
+                        ? `Copied from: ${sourceProjectPath}`
+                        : undefined
+                    }
+                    disabled={
+                      !hasWorkflowsUpdatePermission && !sourceProjectPath
+                    }
+                    positioning={{ placement: "right" }}
+                    showArrow
+                  >
+                    <Menu.Item
+                      value="sync"
+                      onClick={
+                        hasWorkflowsUpdatePermission
+                          ? () => onSyncFromSource()
+                          : undefined
+                      }
+                      disabled={!hasWorkflowsUpdatePermission}
+                    >
+                      <RefreshCw size={16} /> Update from source
+                    </Menu.Item>
+                  </Tooltip>
+                )}
+                {hasCopies && (
+                  <Tooltip
+                    content={
+                      !hasWorkflowsUpdatePermission
+                        ? "You need workflows:update permission to push to copies"
+                        : undefined
+                    }
+                    disabled={hasWorkflowsUpdatePermission}
+                    positioning={{ placement: "right" }}
+                    showArrow
+                  >
+                    <Menu.Item
+                      value="push"
+                      onClick={
+                        hasWorkflowsUpdatePermission
+                          ? () => onPushToCopies()
+                          : undefined
+                      }
+                      disabled={!hasWorkflowsUpdatePermission}
+                    >
+                      <ArrowUp size={16} /> Push to copies
+                    </Menu.Item>
+                  </Tooltip>
+                )}
+                <Tooltip
+                  content={
+                    !hasWorkflowsCreatePermission
+                      ? "You need workflows:create permission to copy workflows"
+                      : undefined
+                  }
+                  disabled={hasWorkflowsCreatePermission}
+                  positioning={{ placement: "right" }}
+                  showArrow
+                >
+                  <Menu.Item
+                    value="copy"
+                    onClick={
+                      hasWorkflowsCreatePermission
+                        ? () => setIsCopyDialogOpen(true)
+                        : undefined
+                    }
+                    disabled={!hasWorkflowsCreatePermission}
+                  >
+                    <Copy size={16} /> Copy to another project
+                  </Menu.Item>
+                </Tooltip>
                 <Tooltip
                   content={
                     !hasWorkflowsDeletePermission
@@ -170,7 +299,7 @@ export function WorkflowCard({
                     }
                     disabled={!hasWorkflowsDeletePermission}
                   >
-                    Delete
+                    <Trash2 size={16} /> Delete
                   </Menu.Item>
                 </Tooltip>
               </Menu.Content>
@@ -193,6 +322,23 @@ export function WorkflowCard({
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={onArchiveWorkflow}
       />
+
+      {workflowId && (
+        <CopyWorkflowDialog
+          open={isCopyDialogOpen}
+          onClose={() => setIsCopyDialogOpen(false)}
+          workflowId={workflowId}
+          workflowName={name}
+        />
+      )}
+      {workflowId && (
+        <PushToCopiesDialog
+          open={isPushToCopiesDialogOpen}
+          onClose={() => setIsPushToCopiesDialogOpen(false)}
+          workflowId={workflowId}
+          workflowName={name}
+        />
+      )}
     </>
   );
 }
