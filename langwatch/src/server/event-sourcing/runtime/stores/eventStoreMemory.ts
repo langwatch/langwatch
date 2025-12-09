@@ -1,22 +1,22 @@
 import type {
-  EventStore as BaseEventStore,
-  EventStoreReadContext,
-  Event,
   AggregateType,
+  EventStore as BaseEventStore,
+  Event,
+  EventStoreReadContext,
 } from "../../library";
-import { EventUtils, createTenantId } from "../../library";
-import type {
-  EventRepository,
-  EventRecord,
-} from "./repositories/eventRepository.types";
-import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
+import { createTenantId, EventUtils } from "../../library";
 import {
   ConfigurationError,
-  ValidationError,
+  ErrorCategory,
   SecurityError,
   StoreError,
-  ErrorCategory,
+  ValidationError,
 } from "../../library/services/errorHandling";
+import type {
+  EventRecord,
+  EventRepository,
+} from "./repositories/eventRepository.types";
+import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
 
 /**
  * Simple in-memory EventStore used for tests and local development.

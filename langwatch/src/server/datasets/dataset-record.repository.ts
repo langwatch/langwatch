@@ -1,8 +1,4 @@
-import {
-  type PrismaClient,
-  type DatasetRecord,
-  type Prisma,
-} from "@prisma/client";
+import type { DatasetRecord, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Repository layer for dataset record data access.
@@ -23,7 +19,7 @@ export class DatasetRecordRepository {
     },
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<DatasetRecord[]> {
     const client = options?.tx ?? this.prisma;
     return await client.datasetRecord.findMany({
@@ -54,7 +50,7 @@ export class DatasetRecordRepository {
     }>,
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<void> {
     const client = options?.tx ?? this.prisma;
 
@@ -67,7 +63,7 @@ export class DatasetRecordRepository {
         data: {
           entry: update.entry,
         },
-      })
+      }),
     );
 
     if (options?.tx) {
@@ -77,4 +73,3 @@ export class DatasetRecordRepository {
     }
   }
 }
-

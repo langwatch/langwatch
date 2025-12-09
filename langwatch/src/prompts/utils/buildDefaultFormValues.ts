@@ -32,7 +32,7 @@ const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
  * @returns The default form values with overrides
  */
 export const buildDefaultFormValues = (
-  overrides?: DeepPartial<PromptConfigFormValues>
+  overrides?: DeepPartial<PromptConfigFormValues>,
 ): PromptConfigFormValues => {
   return merge(DEFAULT_FORM_VALUES, overrides ?? {});
 };

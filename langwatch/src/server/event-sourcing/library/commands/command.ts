@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CommandTypeSchema, type CommandType } from "../domain/commandType";
-import { TenantIdSchema, type TenantId } from "../domain/tenantId";
+import { type CommandType, CommandTypeSchema } from "../domain/commandType";
+import { type TenantId, TenantIdSchema } from "../domain/tenantId";
 import type { Event } from "../domain/types";
 
 /**

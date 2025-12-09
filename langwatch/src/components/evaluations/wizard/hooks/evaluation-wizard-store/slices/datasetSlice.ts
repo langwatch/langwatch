@@ -1,13 +1,13 @@
-import { type StateCreator } from "zustand";
+import type { AgGridReact } from "@ag-grid-community/react";
+import type { Node } from "@xyflow/react";
+import type { RefObject } from "react";
+import type { StateCreator } from "zustand";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import type { DatasetColumns } from "~/server/datasets/types";
-import { datasetColumnsToFields } from "~/optimization_studio/utils/datasetUtils";
 import { entryNode } from "~/optimization_studio/templates/blank";
 import type { Entry } from "~/optimization_studio/types/dsl";
-import type { Node } from "@xyflow/react";
+import { datasetColumnsToFields } from "~/optimization_studio/utils/datasetUtils";
+import type { DatasetColumns } from "~/server/datasets/types";
 import { buildEntryToTargetEdges } from "./utils/edge.util";
-import type { RefObject } from "react";
-import type { AgGridReact } from "@ag-grid-community/react";
 
 export interface DatasetSlice {
   /**
@@ -85,7 +85,7 @@ export const createDatasetSlice: StateCreator<
     setDatasetId: (datasetId, columnTypes) => {
       get().workflowStore.setWorkflow((current) => {
         const previousEntryNode = current.nodes.find(
-          (node) => node.type === "entry"
+          (node) => node.type === "entry",
         );
 
         // Upsert the entry node into the workflow
@@ -127,12 +127,12 @@ export const createDatasetSlice: StateCreator<
 
         // Logic to disconnect the current no longer existing edges from the entry node
         const entryFields = outputs.map(
-          (output) => `outputs.${output.identifier}`
+          (output) => `outputs.${output.identifier}`,
         );
         let newEdges = current.edges.filter(
           (edge) =>
             edge.source !== "entry" ||
-            entryFields.includes(edge.sourceHandle ?? "")
+            entryFields.includes(edge.sourceHandle ?? ""),
         );
 
         // And then connecting it again using defaults with the other existing components
@@ -141,18 +141,18 @@ export const createDatasetSlice: StateCreator<
         // Only proceed with edge creation if we have a valid entry node
         if (updatedEntryNode) {
           const newEdgesTargetHandles = newEdges.map(
-            (edge) => `${edge.target}-${edge.targetHandle}`
+            (edge) => `${edge.target}-${edge.targetHandle}`,
           );
 
           for (const node of otherNodes) {
             const otherNodeEdges = buildEntryToTargetEdges(
               updatedEntryNode,
-              node
+              node,
             ).filter(
               (edge) =>
                 !newEdgesTargetHandles.includes(
-                  `${edge.target}-${edge.targetHandle}`
-                )
+                  `${edge.target}-${edge.targetHandle}`,
+                ),
             );
             newEdges = [...newEdges, ...otherNodeEdges];
           }
@@ -171,7 +171,7 @@ export const createDatasetSlice: StateCreator<
       if (updatedDataset.datasetId && updatedDataset.columnTypes) {
         get().setDatasetId(
           updatedDataset.datasetId,
-          updatedDataset.columnTypes
+          updatedDataset.columnTypes,
         );
       }
     },
@@ -201,7 +201,7 @@ export const createDatasetSlice: StateCreator<
         const edges = current.edges.filter(
           (edge) =>
             edge.source !== "entry" ||
-            !edge.sourceHandle?.startsWith("outputs.")
+            !edge.sourceHandle?.startsWith("outputs."),
         );
 
         return {

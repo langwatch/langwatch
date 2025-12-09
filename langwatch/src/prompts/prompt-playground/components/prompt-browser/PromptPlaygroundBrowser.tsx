@@ -1,9 +1,9 @@
 import { HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { LuColumns2 } from "react-icons/lu";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
-import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
-import { LuColumns2 } from "react-icons/lu";
 import { TabIdProvider } from "./ui/TabContext";
 
 /**

@@ -1,12 +1,12 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { RoleService } from "../../role";
 import {
   checkOrganizationPermission,
   checkTeamPermission,
   hasOrganizationPermission,
 } from "../rbac";
-import { TRPCError } from "@trpc/server";
-import { RoleService } from "../../role";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const permissionSchema = z.string().regex(/^[a-z]+:[a-z]+$/);
 

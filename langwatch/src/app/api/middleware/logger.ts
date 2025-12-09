@@ -1,5 +1,5 @@
-import type { Context, Next } from "hono";
 import { context as otContext, trace } from "@opentelemetry/api";
+import type { Context, Next } from "hono";
 
 import { createLogger } from "../../../utils/logger";
 
@@ -51,7 +51,11 @@ export const loggerMiddleware = () => {
 };
 
 function getStatusCode(error: unknown): number {
-  if (error instanceof Error && 'status' in error && typeof error.status === 'number') {
+  if (
+    error instanceof Error &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
     return error.status;
   }
 

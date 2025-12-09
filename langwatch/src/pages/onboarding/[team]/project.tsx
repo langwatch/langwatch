@@ -14,14 +14,15 @@ import {
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { forwardRef, useEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { type SubmitHandler, useForm } from "react-hook-form";
 import { SetupLayout } from "~/components/SetupLayout";
 import {
-  TechStackSelector,
   type ProjectFormData,
+  TechStackSelector,
 } from "~/components/TechStack";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
+import { getSafeReturnToPath } from "~/utils/getSafeReturnToPath";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
@@ -60,7 +61,7 @@ export const RadioCard = forwardRef<HTMLInputElement, RadioCardProps>(
         </Box>
       </RadioGroup.Item>
     );
-  }
+  },
 );
 
 export default function ProjectOnboarding() {
@@ -86,11 +87,11 @@ export default function ProjectOnboarding() {
       slug: typeof teamSlug == "string" ? teamSlug : "",
       organizationId: organization?.id ?? "",
     },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
   const teams = api.team.getTeamsWithMembers.useQuery(
     { organizationId: organization?.id ?? "" },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -98,12 +99,9 @@ export default function ProjectOnboarding() {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
-  const returnTo =
-    typeof router.query.return_to === "string"
-      ? router.query.return_to
-      : undefined;
+  const safeReturnToPath = getSafeReturnToPath(router.query.return_to);
 
   useEffect(() => {
     if (team.data) {
@@ -127,17 +125,14 @@ export default function ProjectOnboarding() {
       },
       {
         onSuccess: (data) => {
-          if (
-            returnTo &&
-            (returnTo.startsWith("/") ||
-              returnTo.startsWith(window.location.origin))
-          ) {
-            window.location.href = returnTo;
-          } else {
-            window.location.href = `/${data.projectSlug}/messages`;
+          if (safeReturnToPath) {
+            void router.push(safeReturnToPath);
+            return;
           }
+
+          void router.push(`/${data.projectSlug}/messages`);
         },
-      }
+      },
     );
   };
 
@@ -192,35 +187,34 @@ export default function ProjectOnboarding() {
             <Field.Label>Project Name</Field.Label>
             <Input {...form.register("name", { required: true })} />
           </Field.Root>
-          {teams.data &&
-            teams.data.some((team) => team.projects.length > 0) && (
-              <>
+          {teams.data?.some((team) => team.projects.length > 0) && (
+            <>
+              <Field.Root>
+                <Field.Label>Team</Field.Label>
+                <NativeSelect.Root>
+                  <NativeSelect.Field
+                    {...form.register("teamId", { required: true })}
+                  >
+                    {teams.data?.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                    <option value="NEW">(+) Create new team</option>
+                  </NativeSelect.Field>
+                  <NativeSelect.Indicator />
+                </NativeSelect.Root>
+              </Field.Root>
+              {teamId == "NEW" && (
                 <Field.Root>
-                  <Field.Label>Team</Field.Label>
-                  <NativeSelect.Root>
-                    <NativeSelect.Field
-                      {...form.register("teamId", { required: true })}
-                    >
-                      {teams.data?.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                      <option value="NEW">(+) Create new team</option>
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
+                  <Field.Label>New Team Name</Field.Label>
+                  <Input
+                    {...form.register("newTeamName", { required: true })}
+                  />
                 </Field.Root>
-                {teamId == "NEW" && (
-                  <Field.Root>
-                    <Field.Label>New Team Name</Field.Label>
-                    <Input
-                      {...form.register("newTeamName", { required: true })}
-                    />
-                  </Field.Root>
-                )}
-              </>
-            )}
+              )}
+            </>
+          )}
           <TechStackSelector form={form} />
           {createProject.error && <p>Something went wrong!</p>}
           <HStack width="full">

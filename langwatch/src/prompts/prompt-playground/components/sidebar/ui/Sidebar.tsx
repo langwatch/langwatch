@@ -1,6 +1,6 @@
-import { Box, VStack, HStack, Text, type BoxProps } from "@chakra-ui/react";
-import { LuChevronDown } from "react-icons/lu";
+import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
+import { LuChevronDown } from "react-icons/lu";
 
 /**
  * Props for the SidebarRoot component

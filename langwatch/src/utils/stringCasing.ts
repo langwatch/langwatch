@@ -10,7 +10,7 @@ export const camelCaseToTitleCase = (input: string): string => {
       // Insert a space before all caps
       .replace(/([A-Z])/g, " $1")
       // Replace underscores with spaces
-      .replace(/_/g, " ")
+      .replace(/_/g, " "),
   );
 };
 
@@ -63,7 +63,7 @@ export const kebabCase = (input: string): string => {
   return input
     .replace(
       /!|@|#|\$|%|\^|&|\*|\(|\)|_|\+|`|~|:|;|,|\.|\?|\/|\\|\{|\}|\[|\]|\"|\'|\<|\>/g,
-      ""
+      "",
     )
     .replace(/([A-Z])/g, " $1")
     .trim()

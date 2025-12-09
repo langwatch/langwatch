@@ -1,20 +1,30 @@
-import { Box, Card, Grid, GridItem, Icon, Text, VStack } from "@chakra-ui/react";
-import { Telescope, Gavel, GraduationCap, HatGlasses } from "lucide-react";
-import { type ProductSelection } from "../../types/types";
-import React from "react";
+import {
+  Box,
+  Card,
+  Grid,
+  GridItem,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Gavel, GraduationCap, HatGlasses, Telescope } from "lucide-react";
+import type React from "react";
+import type { ProductSelection } from "../../types/types";
 
-type ProductOption = {
-  key: ProductSelection;
-  title: string;
-  description: string;
-  icon: typeof Telescope;
-} | {
-  key: "agent-simulations";
-  title: string;
-  description: string;
-  icon: typeof HatGlasses;
-  url: string;
-}
+type ProductOption =
+  | {
+      key: ProductSelection;
+      title: string;
+      description: string;
+      icon: typeof Telescope;
+    }
+  | {
+      key: "agent-simulations";
+      title: string;
+      description: string;
+      icon: typeof HatGlasses;
+      url: string;
+    };
 
 const productOptions: ProductOption[] = [
   {
@@ -51,7 +61,6 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
-
   return (
     <Box position="relative" minH="60vh">
       <Grid
@@ -97,10 +106,21 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                     <opt.icon strokeWidth={1.75} />
                   </Icon>
                   <VStack gap={1}>
-                    <Text textStyle="lg" fontWeight="semibold" color="fg.emphasized" textAlign="center">
+                    <Text
+                      textStyle="lg"
+                      fontWeight="semibold"
+                      color="fg.emphasized"
+                      textAlign="center"
+                    >
                       {opt.title}
                     </Text>
-                    <Text fontSize="xs" color="fg.muted" textAlign="center" alignSelf="stretch" flex={1}>
+                    <Text
+                      fontSize="xs"
+                      color="fg.muted"
+                      textAlign="center"
+                      alignSelf="stretch"
+                      flex={1}
+                    >
                       {opt.description}
                     </Text>
                   </VStack>
@@ -113,4 +133,3 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
     </Box>
   );
 };
-

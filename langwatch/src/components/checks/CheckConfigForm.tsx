@@ -22,17 +22,17 @@ import {
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import { slugify } from "~/utils/slugify";
 import { z } from "zod";
+import { slugify } from "~/utils/slugify";
 import { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   DEFAULT_MAPPINGS,
   migrateLegacyMappings,
 } from "../../server/evaluations/evaluationMappings";
-import {
-  type Evaluators,
-  type EvaluatorTypes,
+import type {
+  Evaluators,
+  EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
@@ -45,8 +45,8 @@ import {
 import type { CheckPreconditions } from "../../server/evaluations/types";
 import { checkPreconditionsSchema } from "../../server/evaluations/types.generated";
 import {
-  mappingStateSchema,
   type MappingState,
+  mappingStateSchema,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
 import { EvaluatorTracesMapping } from "../evaluations/EvaluatorTracesMapping";
@@ -57,7 +57,6 @@ import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
 import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export interface CheckConfigFormData {
   name: string;
@@ -86,7 +85,6 @@ export default function CheckConfigForm({
   const { project } = useOrganizationTeamProject();
   const isNameAvailable = api.monitors.isNameAvailable.useMutation();
   const [isNameAlreadyInUse, setIsNameAlreadyInUse] = useState(false);
-  const publicEnv = usePublicEnv();
 
   const validateNameUniqueness = async (name: string) => {
     const result = await isNameAvailable.mutateAsync({
@@ -121,7 +119,7 @@ export default function CheckConfigForm({
             ])
             .optional(),
           mappings: mappingStateSchema,
-        })
+        }),
       )({ ...data, settings: data.settings || {} }, ...args);
     },
   });
@@ -186,18 +184,18 @@ export default function CheckConfigForm({
     let defaultName = getEvaluatorDefinitions(checkType)?.name;
     defaultName = evaluatorTempNameMap[defaultName ?? ""] ?? defaultName;
     const allDefaultNames = Object.values(availableEvaluators).map(
-      (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name
+      (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name,
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
       form.setValue(
         "name",
-        checkType.includes("custom") ? "" : defaultName ?? ""
+        checkType.includes("custom") ? "" : (defaultName ?? ""),
       );
     }
 
     const setDefaultSettings = (
       defaultValues: Record<string, any>,
-      prefix: string
+      prefix: string,
     ) => {
       if (!defaultValues) return;
 
@@ -217,13 +215,13 @@ export default function CheckConfigForm({
 
     setDefaultSettings(
       getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined),
-      "settings"
+      "settings",
     );
   }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
 
   const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;
   const [accordionValue, setAccordionValue] = useState(
-    accordionIndex ? ["0"] : []
+    accordionIndex ? ["0"] : [],
   );
 
   const runOn = (
@@ -238,7 +236,7 @@ export default function CheckConfigForm({
 
   const evaluatorDefinition = useMemo(
     () => checkType && availableEvaluators?.[checkType],
-    [checkType, availableEvaluators]
+    [checkType, availableEvaluators],
   );
 
   const fields = useMemo(() => {
@@ -430,7 +428,7 @@ export default function CheckConfigForm({
                           runOn={
                             preconditions?.length === 0 &&
                             !evaluatorDefinition?.requiredFields.includes(
-                              "contexts"
+                              "contexts",
                             ) ? (
                               sample == 1 ? (
                                 runOn

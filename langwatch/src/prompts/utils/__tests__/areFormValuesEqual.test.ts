@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { areFormValuesEqual } from "../areFormValuesEqual";
 
 describe("areFormValuesEqual", () => {
@@ -52,4 +52,3 @@ describe("areFormValuesEqual", () => {
     });
   });
 });
-

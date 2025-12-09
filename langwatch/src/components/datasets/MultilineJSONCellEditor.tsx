@@ -1,16 +1,15 @@
-import React, {
-  useRef,
-  useEffect,
-  useState,
-  useCallback,
-  useMemo,
-} from "react";
 import type { CustomCellEditorProps } from "@ag-grid-community/react";
-import { Textarea, VStack, Text } from "@chakra-ui/react";
-import { Alert } from "@chakra-ui/react";
-import { Tooltip } from "../../components/ui/tooltip";
+import { Alert, Text, Textarea, VStack } from "@chakra-ui/react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { ZodError, type ZodType } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { Tooltip } from "../../components/ui/tooltip";
 import { deepStrict } from "../../utils/zod";
 
 export function MultilineJSONCellEditor({
@@ -39,7 +38,7 @@ export function MultilineJSONCellEditor({
       setLocalValue(val);
       onValueChange(val === "" ? null : val);
     },
-    [onValueChange]
+    [onValueChange],
   );
 
   useEffect(() => {

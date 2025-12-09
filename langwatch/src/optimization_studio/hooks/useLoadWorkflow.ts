@@ -11,7 +11,7 @@ export const useLoadWorkflow = () => {
   const { project } = useOrganizationTeamProject();
   const workflow = api.workflow.getById.useQuery(
     { workflowId: workflowId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!project && !!workflowId, staleTime: Infinity }
+    { enabled: !!project && !!workflowId, staleTime: Infinity },
   );
 
   return { workflow };

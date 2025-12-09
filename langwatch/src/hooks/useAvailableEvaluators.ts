@@ -1,15 +1,14 @@
+import type { JsonArray } from "@prisma/client/runtime/library";
+import type { Edge, Node } from "@xyflow/react";
 import { useMemo } from "react";
-
-import { api } from "../utils/api";
+import { getInputsOutputs } from "../optimization_studio/utils/nodeUtils";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "../server/evaluations/evaluators.generated";
-import { getInputsOutputs } from "../optimization_studio/utils/nodeUtils";
-import type { Node, Edge } from "@xyflow/react";
+import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import type { JsonArray } from "@prisma/client/runtime/library";
 
 export const useAvailableEvaluators = ():
   | Record<
@@ -22,7 +21,7 @@ export const useAvailableEvaluators = ():
   const availableCustomEvaluators =
     api.evaluations.availableCustomEvaluators.useQuery(
       { projectId: project?.id ?? "" },
-      { enabled: !!project }
+      { enabled: !!project },
     );
 
   const availableEvaluators = useMemo(() => {
@@ -37,7 +36,7 @@ export const useAvailableEvaluators = ():
             JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
               ?.edges as Edge[],
             JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-              ?.nodes as JsonArray as unknown[] as Node[]
+              ?.nodes as JsonArray as unknown[] as Node[],
           );
           const requiredFields = inputs.map((input) => input.identifier);
 
@@ -55,7 +54,7 @@ export const useAvailableEvaluators = ():
               envVars: [],
             },
           ];
-        })
+        }),
       ),
     };
   }, [availableCustomEvaluators.data]);

@@ -7,10 +7,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-
+import { Link } from "../../components/ui/link";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { titleCase } from "../../utils/stringCasing";
-import { Link } from "../../components/ui/link";
 
 export const AddModelProviderKey = ({
   runWhat,

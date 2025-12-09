@@ -16,7 +16,9 @@ describe("PromptService", () => {
   describe("transformToDbFormat", () => {
     describe("when transforming field names", () => {
       it.todo("converts maxTokens to max_tokens when defined");
-      it.todo("converts promptingTechnique to prompting_technique when defined");
+      it.todo(
+        "converts promptingTechnique to prompting_technique when defined",
+      );
       it.todo("converts responseFormat to response_format when defined");
       it.todo("omits fields when undefined");
     });
@@ -67,4 +69,3 @@ describe("PromptService", () => {
     });
   });
 });
-

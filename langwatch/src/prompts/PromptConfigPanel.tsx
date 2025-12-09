@@ -1,21 +1,17 @@
 import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
-  forwardRef,
-  useEffect,
-  useMemo,
   type Dispatch,
   type ForwardedRef,
+  forwardRef,
   type SetStateAction,
+  useEffect,
+  useMemo,
 } from "react";
 import { LuBuilding } from "react-icons/lu";
 import { useDebouncedCallback } from "use-debounce";
-
-import { useInvokePrompt } from "./hooks/useInvokePrompt";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
-
 import {
-  ExecutionInputPanel,
   type ExecuteData,
+  ExecutionInputPanel,
 } from "~/components/executable-panel/ExecutionInputPanel";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
 import {
@@ -31,6 +27,8 @@ import {
 import { api } from "~/utils/api";
 import { PanelHeader } from "./components/ui/PanelHeader";
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
+import { useInvokePrompt } from "./hooks/useInvokePrompt";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "./types";
 import { buildDefaultFormValues } from "./utils/buildDefaultFormValues";
 
@@ -57,7 +55,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     isPaneExpanded: isExpanded,
     setIsPaneExpanded: setIsExpanded,
   }: PromptConfigPanelProps,
-  ref: ForwardedRef<HTMLDivElement>
+  ref: ForwardedRef<HTMLDivElement>,
 ) {
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
@@ -86,7 +84,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
         refetchOnWindowFocus: false,
         refetchOnMount: false,
         refetchOnReconnect: false,
-      }
+      },
     );
 
   // ---- Form setup and configuration ----
@@ -97,15 +95,15 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       return prompt
         ? versionedPromptToPromptConfigFormValues(prompt)
         : // If default model is set, use the default model merged with the default values
-        typeof defaultModel === "string"
-        ? buildDefaultFormValues({
-            version: { configData: { llm: { model: defaultModel } } },
-          })
-        : // If no default model is set, use the default values
-          buildDefaultFormValues({});
+          typeof defaultModel === "string"
+          ? buildDefaultFormValues({
+              version: { configData: { llm: { model: defaultModel } } },
+            })
+          : // If no default model is set, use the default values
+            buildDefaultFormValues({});
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(prompt), defaultModel, configId]
+    [Boolean(prompt), defaultModel, configId],
   );
 
   // Setup form with the config values
@@ -166,7 +164,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     {
       leading: true,
       trailing: false,
-    }
+    },
   );
 
   // Early return if panel is closed
@@ -207,7 +205,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                         // Hack to call the edit handle dialog, as triggering from here and dealing with all the provider context shaneningans is too complicated
                         const button =
                           document.querySelector<HTMLButtonElement>(
-                            "#js-edit-prompt-handle"
+                            "#js-edit-prompt-handle",
                           );
                         if (button) {
                           button.click();

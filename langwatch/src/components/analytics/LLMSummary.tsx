@@ -1,15 +1,15 @@
 import { Card, Heading } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { analyticsMetrics } from "../../server/analytics/registry";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export const LLMSummary = () => {
   const publicEnv = usePublicEnv();
   const { hasPermission } = useOrganizationTeamProject();
 
-  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
+  const isNotQuickwit = !isQuickwit;
 
   const llmSummary: CustomGraphInput = {
     graphId: "llmSummary",

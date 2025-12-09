@@ -1,14 +1,14 @@
 import { Box } from "@chakra-ui/react";
 
-import { SimulationZoomGrid, SimulationLayout } from "~/components/simulations";
+import { SimulationLayout, SimulationZoomGrid } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../../simulations.css";
+
+import { useEffect, useMemo } from "react";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import { useEffect, useMemo } from "react";
 
 // Main layout for a single Simulation Set page
 export default function SimulationSetPage() {
@@ -25,7 +25,7 @@ export default function SimulationSetPage() {
     {
       enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   const sortedScenarioSetData = useMemo(() => {
@@ -36,7 +36,7 @@ export default function SimulationSetPage() {
 
   const scenarioRunIds = useMemo(
     () => sortedScenarioSetData?.map((scenario) => scenario.scenarioRunId),
-    [sortedScenarioSetData]
+    [sortedScenarioSetData],
   );
 
   useEffect(() => {

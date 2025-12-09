@@ -1,19 +1,14 @@
-import {
-  Box,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Table, Text, VStack } from "@chakra-ui/react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
-import { SummaryMetricValue } from "./SummaryMetric";
 import { Tooltip } from "../ui/tooltip";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const DocumentsCountsTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   if (documents.isLoading) return <Box>Loading...</Box>;
@@ -71,7 +66,7 @@ export const DocumentsCountsSummary = () => {
   const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   const count = documents.data?.totalUniqueDocuments;

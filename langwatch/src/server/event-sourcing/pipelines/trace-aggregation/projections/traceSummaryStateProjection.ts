@@ -1,14 +1,17 @@
-import type { ProjectionHandler, EventStream } from "../../../library";
-import type { Projection } from "../../../library";
+import type {
+  EventStream,
+  Projection,
+  ProjectionHandler,
+} from "../../../library";
+import { traceSummaryStateProjectionRepository } from "../repositories";
 import type { TraceAggregationEvent } from "../schemas/events";
 import { isTraceAggregationCompletedEvent } from "../schemas/events";
-import { traceAggregationStateProjectionRepository } from "../repositories";
 
 /**
- * Projection data for trace metrics.
- * Matches the trace_projections ClickHouse table schema.
+ * Summary data for trace metrics.
+ * Matches the trace_summaries ClickHouse table schema.
  */
-export interface TraceProjectionData {
+export interface TraceSummaryData {
   // Basic trace info
   TraceId: string;
   SpanCount: number;
@@ -37,27 +40,27 @@ export interface TraceProjectionData {
 }
 
 /**
- * Projection for trace metrics matching the ClickHouse schema.
+ * Summary for trace metrics matching the ClickHouse schema.
  */
-export interface TraceProjection extends Projection<TraceProjectionData> {
-  data: TraceProjectionData;
+export interface TraceSummary extends Projection<TraceSummaryData> {
+  data: TraceSummaryData;
 }
 
 /**
- * Projection handler that builds the trace projection from completed events.
+ * Projection handler that builds the trace summaries from completed events.
  * Populates all computed trace metrics from TraceAggregationCompletedEvent data.
  */
-export class TraceAggregationStateProjectionHandler
-  implements ProjectionHandler<TraceAggregationEvent, TraceProjection>
+export class TraceSummaryStateProjectionHandler
+  implements ProjectionHandler<TraceAggregationEvent, TraceSummary>
 {
-  static readonly store = traceAggregationStateProjectionRepository;
+  static readonly store = traceSummaryStateProjectionRepository;
 
   handle(
     stream: EventStream<
       TraceAggregationEvent["tenantId"],
       TraceAggregationEvent
     >,
-  ): TraceProjection {
+  ): TraceSummary {
     const events = stream.getEvents();
     const aggregateId = stream.getAggregateId();
     const tenantId = stream.getTenantId();

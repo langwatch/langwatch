@@ -1,7 +1,7 @@
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { PromptPlaygroundSidebar } from "~/prompts/prompt-playground/components/sidebar/PromptPlaygroundSidebar";
-import { PromptPlaygroundMainContent } from "~/prompts/prompt-playground/components/PromptPlaygroundMainContent";
 import { Box, HStack } from "@chakra-ui/react";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { PromptPlaygroundMainContent } from "~/prompts/prompt-playground/components/PromptPlaygroundMainContent";
+import { PromptPlaygroundSidebar } from "~/prompts/prompt-playground/components/sidebar/PromptPlaygroundSidebar";
 import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
 import { PromptPlaygroundChatProvider } from "./chat/PromptPlaygroundChatContext";
 

@@ -1,11 +1,12 @@
-import React, { createContext, useContext } from "react";
-import {
-  type OnboardingFormData,
-  type UsageStyle,
-  type CompanySize,
-  type SolutionType,
-  type DesireType,
-  type RoleType,
+import type React from "react";
+import { createContext, useContext } from "react";
+import type {
+  CompanySize,
+  DesireType,
+  OnboardingFormData,
+  RoleType,
+  SolutionType,
+  UsageStyle,
 } from "../types/types";
 
 interface OnboardingFormContextValue extends OnboardingFormData {
@@ -30,19 +31,6 @@ export function useOnboardingFormContext(): OnboardingFormContextValue {
   if (!ctx) throw new Error("OnboardingFormContext not found");
   return ctx;
 }
-
-type Handlers = {
-  setOrganizationName: (value: string) => void;
-  setAgreement: (value: boolean) => void;
-  setUsageStyle: (value: UsageStyle | undefined) => void;
-  setPhoneNumber: (value: string) => void;
-  setPhoneHasValue: (value: boolean) => void;
-  setPhoneIsValid: (value: boolean) => void;
-  setCompanySize: (value: CompanySize) => void;
-  setSolutionType: (value: SolutionType | undefined) => void;
-  setDesires: (value: DesireType[]) => void;
-  setRole: (value: RoleType | undefined) => void;
-};
 
 export const OnboardingFormProvider: React.FC<
   React.PropsWithChildren<{ value: OnboardingFormContextValue }>

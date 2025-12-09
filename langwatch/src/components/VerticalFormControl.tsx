@@ -1,4 +1,4 @@
-import { type PropsWithChildren, type ReactNode } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import type { FieldErrors } from "react-hook-form";
 
 import {

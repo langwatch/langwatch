@@ -1,32 +1,32 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Projection } from "../../../library/domain/types";
-import { PipelineBuilder } from "../builder";
-import {
-  createMockEventStore,
-  createMockQueueProcessorFactory,
-  createMockProjectionStore,
-  createMockEventHandler,
-  createMockEventReactionHandler,
-  createMockEventPublisher,
-  createTestCommandHandlerClass,
-  createTestEventHandlerClass,
-  createTestProjectionHandlerClass,
-  createTestEventForBuilder,
-  createTestProjection,
-  TEST_CONSTANTS,
-  testCommandPayloadSchema,
-  type TestCommandPayload,
-  type TestEvent,
-} from "./testHelpers";
+import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
 import { createTenantId } from "../../../library/domain/tenantId";
-import { defineCommandSchema } from "../../../library/commands/commandSchema";
+import type { Projection } from "../../../library/domain/types";
+import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
 import { ProcessorCheckpointStoreMemory } from "../../stores/processorCheckpointStoreMemory";
-import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { CheckpointRepositoryMemory } from "../../stores/repositories/checkpointRepositoryMemory";
-import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
+import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
+import { PipelineBuilder } from "../builder";
+import {
+  createMockEventHandler,
+  createMockEventPublisher,
+  createMockEventReactionHandler,
+  createMockEventStore,
+  createMockProjectionStore,
+  createMockQueueProcessorFactory,
+  createTestCommandHandlerClass,
+  createTestEventForBuilder,
+  createTestEventHandlerClass,
+  createTestProjection,
+  createTestProjectionHandlerClass,
+  TEST_CONSTANTS,
+  type TestCommandPayload,
+  type TestEvent,
+  testCommandPayloadSchema,
+} from "./testHelpers";
 
 describe("PipelineBuilder Integration Tests", () => {
   beforeEach(() => {
@@ -970,7 +970,8 @@ describe("PipelineBuilder Integration Tests", () => {
         "span_ingestion",
         aggregateId,
       );
-      const finalCheckpoint = await checkpointStore.loadCheckpoint(checkpointKey);
+      const finalCheckpoint =
+        await checkpointStore.loadCheckpoint(checkpointKey);
 
       expect(finalCheckpoint?.sequenceNumber).toBe(3);
       expect(finalCheckpoint?.status).toBe("processed");

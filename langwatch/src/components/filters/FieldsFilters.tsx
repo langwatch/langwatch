@@ -2,15 +2,15 @@ import {
   Box,
   Button,
   Field,
-  HStack,
   Heading,
+  HStack,
   Input,
   Skeleton,
   Spacer,
   Tag,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -21,8 +21,10 @@ import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-
-import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
+import { useDrawer } from "~/components/CurrentDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
@@ -34,10 +36,6 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
-
-import { useDrawer } from "~/components/CurrentDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { filterOutEmptyFilters } from "../../server/analytics/utils";
 
 export function QueryStringFieldsFilters({
   hideTriggerButton = false,

@@ -1,17 +1,17 @@
 import {
   Box,
+  Link as ChakraLink,
   Heading,
-  VStack,
   HStack,
   Text,
-  Link as ChakraLink,
+  VStack,
 } from "@chakra-ui/react";
+import type React from "react";
 import { FaGolang, FaJs, FaPython } from "react-icons/fa6";
-import { MdHttp } from "react-icons/md";
 import { LuExternalLink } from "react-icons/lu";
+import { MdHttp } from "react-icons/md";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../../utils/tracking";
-import React from "react";
 
 interface Guide {
   icon: React.ReactNode;
@@ -79,10 +79,12 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     _hover={{ textDecoration: "none", bg: "gray.50", borderColor: "gray.300" }}
     transition="all 0.2s"
     onClick={onClick}
-    aria-label={guide.label + ' (opens in a new tab)'}
+    aria-label={guide.label + " (opens in a new tab)"}
   >
     {guide.icon}
-    <Text fontWeight="medium" flex={1} textAlign="left">{guide.label}</Text>
+    <Text fontWeight="medium" flex={1} textAlign="left">
+      {guide.label}
+    </Text>
     <Box as="span" color="gray.400" ml={1} display="flex" alignItems="center">
       <LuExternalLink size={16} />
     </Box>
@@ -93,7 +95,12 @@ const ObservabilityCard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   return (
     <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
-      <HStack mb={3} gap={2} alignItems="flex-start" justifyContent="flex-start">
+      <HStack
+        mb={3}
+        gap={2}
+        alignItems="flex-start"
+        justifyContent="flex-start"
+      >
         <Heading size="md" fontWeight="bold" textAlign="left">
           Observability setup
         </Heading>
@@ -103,7 +110,12 @@ const ObservabilityCard: React.FC = () => {
           <GuideLink
             key={guide.href}
             guide={guide}
-            onClick={() => trackEvent(guide.event, { language: guide.language, project_id: project?.id })}
+            onClick={() =>
+              trackEvent(guide.event, {
+                language: guide.language,
+                project_id: project?.id,
+              })
+            }
           />
         ))}
       </VStack>

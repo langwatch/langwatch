@@ -25,24 +25,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm start:prepare:files
 
       - name: Run typecheck
         working-directory: langwatch
-        run: npm run typecheck
+        run: pnpm typecheck
 
   test-unit:
     env:
@@ -61,24 +66,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm start:prepare:files
 
       - name: Run unit tests with coverage
         working-directory: langwatch
-        run: npm run test:unit -- --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: pnpm test:unit --run --bail=1 --coverage --coverage.reporter=lcov --coverage.reporter=text
 
       - name: Upload unit test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -162,32 +172,37 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm start:prepare:files
 
       - name: Setup database
         working-directory: langwatch
-        run: npm run prisma:migrate
+        run: pnpm prisma:migrate
 
       - name: Setup Elasticsearch
         working-directory: langwatch
-        run: npm run elastic:migrate
+        run: pnpm elastic:migrate
 
       - name: Run integration tests with coverage
         working-directory: langwatch
-        run: npm run test:integration -- --coverage --coverage.reporter=lcov --coverage.reporter=text
+        run: pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text
 
       - name: Upload integration test coverage to Codecov
         uses: codecov/codecov-action@v5
@@ -197,11 +212,30 @@ jobs:
           name: integration-tests
           fail_ci_if_error: false
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: mongolyy/reviewdog-action-biome@v2
+        with:
+          reporter: github-pr-review
+          fail_level: error
+          biome_flags: "./src"
+
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -213,7 +247,7 @@ jobs:
         id: modules-cache
         with:
           path: langwatch/node_modules
-          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/package-lock.json') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
           restore-keys: ${{ runner.os }}-modules-
 
       - name: Cache Next.js
@@ -223,18 +257,18 @@ jobs:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
 
       - name: Install dependencies
         if: steps.modules-cache.outputs.cache-hit != 'true'
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: CI=true pnpm install --frozen-lockfile
 
       - name: Build
         working-directory: langwatch
-        run: npm run build
+        run: pnpm build
 
       - name: Save Next.js cache
         if: steps.next-cache.outputs.cache-hit != 'true'

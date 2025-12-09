@@ -1,0 +1,56 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "checkJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "moduleDetection": "force",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "paths": {
+      "~/*": ["./src/*"],
+      "@trpc-internal/parser": ["./node_modules/@trpc/server/dist/core/parser"],
+      "@trpc-internal/utils": [
+        "./node_modules/@trpc/server/dist/core/internals/utils"
+      ],
+      "zod/lib/helpers/errorUtil": ["./node_modules/zod/lib/helpers/errorUtil"],
+      "@langwatch-oss/*": ["./*"]
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
+  },
+  "include": [
+    "./src/**/*",
+    ".eslintrc.cjs",
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.cjs",
+    "**/*.mjs",
+    ".next/types/**/*.ts",
+    ".next-saas/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "saas-src/**/*",
+    ".next",
+    ".next-saas",
+    "**/*.snippet.*",
+    "src/**/codegen/snippets/**/*",
+  ]
+}

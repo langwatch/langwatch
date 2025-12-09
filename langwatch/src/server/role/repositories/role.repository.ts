@@ -1,7 +1,7 @@
 import {
-  type PrismaClient,
   type CustomRole,
   type Prisma,
+  type PrismaClient,
   TeamUserRole,
 } from "@prisma/client";
 

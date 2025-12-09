@@ -1,11 +1,11 @@
-import { z } from "zod";
-import {
-  scenarioRunStartedSchema,
-  scenarioRunFinishedSchema,
-  scenarioMessageSnapshotSchema,
-  scenarioEventSchema,
-  scenarioBatchSchema,
+import type { z } from "zod";
+import type {
   runDataSchema,
+  scenarioBatchSchema,
+  scenarioEventSchema,
+  scenarioMessageSnapshotSchema,
+  scenarioRunFinishedSchema,
+  scenarioRunStartedSchema,
 } from "./schemas";
 
 // Type exports

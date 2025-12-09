@@ -1,6 +1,6 @@
+import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useWorkflowStore } from "./useWorkflowStore";
-import { useEffect } from "react";
 
 export const useAskBeforeLeaving = () => {
   const { evaluationStatus, hasPendingChanges } = useWorkflowStore(
@@ -9,7 +9,7 @@ export const useAskBeforeLeaving = () => {
         evaluationStatus: state.state.evaluation?.status,
         hasPendingChanges: state.hasPendingChanges,
       };
-    })
+    }),
   );
 
   useEffect(() => {
@@ -22,8 +22,8 @@ export const useAskBeforeLeaving = () => {
       const message_ = message
         ? message
         : hasPendingChanges()
-        ? "Changes were not autosaved yet, are you sure you want to leave?"
-        : undefined;
+          ? "Changes were not autosaved yet, are you sure you want to leave?"
+          : undefined;
       if (message_) {
         event.preventDefault();
         event.returnValue = message;

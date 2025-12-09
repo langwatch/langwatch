@@ -1,6 +1,6 @@
 export const trackEvent = (
   eventName: string,
-  params: Record<string, any> | undefined
+  params: Record<string, any> | undefined,
 ) => {
   if (typeof window === "undefined") return;
 
@@ -21,7 +21,7 @@ const eventsTracked =
 
 export const trackEventOnce = (
   eventName: string,
-  params: Record<string, any>
+  params: Record<string, any>,
 ) => {
   if (typeof window === "undefined") return;
   if (eventsTracked.includes(eventName)) {

@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { transformElasticSearchTraceToTrace } from "./transformers";
+import { describe, expect, it } from "vitest";
 import type { ElasticSearchTrace } from "../tracer/types";
 import type { Protections } from "./protections";
+import { transformElasticSearchTraceToTrace } from "./transformers";
 
 describe("transformElasticSearchTraceToTrace", () => {
   it("redacts input values in output when canSeeCapturedInput is false", () => {

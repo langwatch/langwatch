@@ -1,17 +1,19 @@
+import cloneDeep from "lodash.clonedeep";
 import { useCallback } from "react";
-import { cloneDeep } from "lodash";
-import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import { formValuesToTriggerSaveVersionParams } from "~/prompts/utils/llmPromptConfigUtils";
-import { toaster } from "~/components/ui/toaster";
-import { type VersionedPrompt } from "~/server/prompt-config";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import { useFormContext } from "react-hook-form";
+import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompts";
+import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
-  useDraggableTabsBrowserStore,
-  type TabData,
-} from "../prompt-playground-store/DraggableTabsBrowserStore";
+  formValuesToTriggerSaveVersionParams,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+} from "~/prompts/utils/llmPromptConfigUtils";
+import type { VersionedPrompt } from "~/server/prompt-config";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
+import {
+  type TabData,
+  useDraggableTabsBrowserStore,
+} from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
  * Hook to handle the saving of a prompt in the prompt studio.

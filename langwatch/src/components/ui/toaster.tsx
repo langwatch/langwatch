@@ -2,11 +2,11 @@
 
 import {
   Toaster as ChakraToaster,
+  createToaster,
   Portal,
   Spinner,
   Stack,
   Toast,
-  createToaster,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
 
@@ -25,7 +25,7 @@ export const toaster = {
       meta: {
         ...args.meta,
         placement: "top-end",
-    },
+      },
     });
   },
 };

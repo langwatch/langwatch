@@ -1,10 +1,5 @@
-import React from "react";
-import {
-  HStack,
-  Stack,
-  Icon,
-  RadioCard,
-} from "@chakra-ui/react";
+import { HStack, Icon, RadioCard, Stack } from "@chakra-ui/react";
+import type React from "react";
 
 type IconListItem<T> = {
   title: string;
@@ -34,10 +29,18 @@ export const IconRadioCardGroup = <T extends string = string>({
     variant={variant}
     w="full"
     value={value}
-    onValueChange={({ value }) => onChange(value === null ? void 0 : (value as T))}
+    onValueChange={({ value }) =>
+      onChange(value === null ? void 0 : (value as T))
+    }
     colorPalette="orange"
   >
-    <Stack align="stretch" direction={{ base: "column", md: layout === "horizontal" ? "row" : "column" }}>
+    <Stack
+      align="stretch"
+      direction={{
+        base: "column",
+        md: layout === "horizontal" ? "row" : "column",
+      }}
+    >
       {items.map((item) => (
         <RadioCard.Item key={item.value} value={item.value}>
           <RadioCard.ItemHiddenInput />
@@ -48,9 +51,7 @@ export const IconRadioCardGroup = <T extends string = string>({
                   <Icon size="sm" color="fg.muted">
                     <item.icon />
                   </Icon>
-                  <RadioCard.ItemText>
-                    {item.title}
-                  </RadioCard.ItemText>
+                  <RadioCard.ItemText>{item.title}</RadioCard.ItemText>
                 </HStack>
                 <RadioCard.ItemIndicator />
               </HStack>
@@ -63,5 +64,3 @@ export const IconRadioCardGroup = <T extends string = string>({
 );
 
 export default IconRadioCardGroup;
-
-

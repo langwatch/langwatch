@@ -1,20 +1,21 @@
+import { VStack } from "@chakra-ui/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useRouter } from "next/router";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { AnalyticsBoundary } from "react-contextual-analytics";
+import { LoadingScreen } from "~/components/LoadingScreen";
+import { toaster } from "~/components/ui/toaster";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { api } from "~/utils/api";
+import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
+import { slideVariants, transition } from "../constants/onboarding-data";
+import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
-import { slideVariants, transition } from "../constants/onboarding-data";
-import { VStack } from "@chakra-ui/react";
-import { motion, AnimatePresence } from "motion/react";
-import React, { useEffect, useState } from "react";
-import { api } from "~/utils/api";
-import { toaster } from "~/components/ui/toaster";
-import { trackEventOnce } from "~/utils/tracking";
-import { useRouter } from "next/router";
-import { useRequiredSession } from "~/hooks/useRequiredSession";
-import { LoadingScreen } from "~/components/LoadingScreen";
-import { AnalyticsBoundary } from "react-contextual-analytics";
-import { OnboardingFormProvider } from "../contexts/form-context";
 
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -91,7 +92,9 @@ export const WelcomeScreen: React.FC = () => {
             label: "organization_onboarding_completed",
           });
 
-          const params = new URLSearchParams({ projectSlug: response.projectSlug });
+          const params = new URLSearchParams({
+            projectSlug: response.projectSlug,
+          });
 
           window.location.href = `/onboarding/product?${params.toString()}`;
         },
@@ -127,7 +130,8 @@ export const WelcomeScreen: React.FC = () => {
     currentVisibleIndex === flow.visibleScreens.length - 1 &&
     (flow.variant !== "self_hosted" || !isPublicEnvLoading);
 
-  const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
+  const pendingOrSuccessful =
+    initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
@@ -160,7 +164,9 @@ export const WelcomeScreen: React.FC = () => {
               >
                 <OnboardingFormProvider value={formContextValue}>
                   <fieldset disabled={pendingOrSuccessful}>
-                    {currentScreen?.component ? <currentScreen.component /> : null}
+                    {currentScreen?.component ? (
+                      <currentScreen.component />
+                    ) : null}
                   </fieldset>
                 </OnboardingFormProvider>
               </AnalyticsBoundary>

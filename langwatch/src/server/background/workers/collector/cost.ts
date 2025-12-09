@@ -1,18 +1,18 @@
-import { type Tiktoken } from "tiktoken/lite";
-// @ts-ignore
-import registry from "tiktoken/registry.json";
+import fs from "fs/promises";
+import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
+import path from "path";
+import type { Tiktoken } from "tiktoken/lite";
 // @ts-ignore
 import models from "tiktoken/model_to_encoding.json";
+// @ts-ignore
+import registry from "tiktoken/registry.json";
+import { createLogger } from "../../../../utils/logger";
+import { startSpan } from "../../../../utils/posthogErrorCapture";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
-import { startSpan } from "../../../../utils/posthogErrorCapture";
-import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
-import { createLogger } from "../../../../utils/logger";
 import { isBuildOrNoRedis } from "../../../redis";
-import fs from "fs/promises";
-import path from "path";
 
 const logger = createLogger("langwatch:workers:collector:cost");
 
@@ -32,7 +32,7 @@ const cachedModel: Record<
 const loadingModel = new Set<string>();
 
 const initTikToken = async (
-  modelName: string
+  modelName: string,
 ): Promise<{ encoder: Tiktoken } | undefined> => {
   let Tiktoken: typeof import("tiktoken/lite").Tiktoken;
   let load: typeof import("tiktoken/load").load;
@@ -42,7 +42,7 @@ const initTikToken = async (
   } catch (error) {
     logger.warn(
       { error },
-      "tiktoken could not be loaded, skipping tokenization"
+      "tiktoken could not be loaded, skipping tokenization",
     );
     return undefined;
   }
@@ -80,20 +80,29 @@ const initTikToken = async (
       // Prevent directory traversal
       const isSafeFilename = /^[a-zA-Z0-9._-]+$/.test(filename);
       if (!isSafeFilename) {
-        logger.warn({ filename }, "Unsafe filename detected; using remote fetch instead");
+        logger.warn(
+          { filename },
+          "Unsafe filename detected; using remote fetch instead",
+        );
         return fetch(url).then((r) => r.text());
       }
 
       if (process.env.TIKTOKENS_PATH) {
         const localPath = path.join(process.env.TIKTOKENS_PATH, filename);
-        logger.debug({ localPath }, "Attempting to load tiktoken model from local file");
+        logger.debug(
+          { localPath },
+          "Attempting to load tiktoken model from local file",
+        );
 
         try {
           return await fs.readFile(localPath, "utf8");
         } catch (error) {
           logger.warn(
-            { localPath, error: error instanceof Error ? error.message : String(error) },
-            "Local read failed; falling back to remote fetch"
+            {
+              localPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            "Local read failed; falling back to remote fetch",
           );
         }
       }
@@ -105,7 +114,7 @@ const initTikToken = async (
     const encoder = new Tiktoken(
       model.bpe_ranks,
       model.special_tokens,
-      model.pat_str
+      model.pat_str,
     );
 
     cachedModel[tokenizer] = { model, encoder };
@@ -117,7 +126,7 @@ const initTikToken = async (
 
 async function countTokens(
   llmModelCost: MaybeStoredLLMModelCost,
-  text: string | undefined
+  text: string | undefined,
 ): Promise<number | undefined> {
   if (!text) return 0;
 
@@ -144,21 +153,18 @@ export async function tokenizeAndEstimateCost({
   outputTokens: number;
   cost: number | undefined;
 }> {
-  return await startSpan(
-    { name: "tokenizeAndEstimateCost" },
-    async () => {
-      const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
-      const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
+  return await startSpan({ name: "tokenizeAndEstimateCost" }, async () => {
+    const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;
+    const outputTokens = (await countTokens(llmModelCost, output)) ?? 0;
 
-      const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
+    const cost = estimateCost({ llmModelCost, inputTokens, outputTokens });
 
-      return {
-        inputTokens,
-        outputTokens,
-        cost,
-      };
-    }
-  );
+    return {
+      inputTokens,
+      outputTokens,
+      cost,
+    };
+  });
 }
 
 export function estimateCost({
@@ -178,10 +184,10 @@ export function estimateCost({
 
 export const matchingLLMModelCost = (
   model: string,
-  llmModelCosts: MaybeStoredLLMModelCost[]
+  llmModelCosts: MaybeStoredLLMModelCost[],
 ): MaybeStoredLLMModelCost | undefined => {
   const llmModelCost = llmModelCosts.find((llmModelCost) =>
-    new RegExp(llmModelCost.regex).test(model)
+    new RegExp(llmModelCost.regex).test(model),
   );
   if (!llmModelCost && model.includes("/")) {
     const model_ = model.split("/")[1]!;
@@ -192,7 +198,7 @@ export const matchingLLMModelCost = (
 
 export const getMatchingLLMModelCost = async (
   projectId: string,
-  model: string
+  model: string,
 ) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
   return matchingLLMModelCost(model, llmModelCosts);
@@ -205,5 +211,7 @@ export const prewarmTiktokenModels = async () => {
 };
 
 if (isBuildOrNoRedis) {
-  prewarmTiktokenModels();
+  prewarmTiktokenModels().catch((error) => {
+    logger.error({ error }, "error prewarming tiktoken models");
+  });
 }

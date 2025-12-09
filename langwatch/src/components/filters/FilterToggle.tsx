@@ -1,12 +1,12 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter, X } from "react-feather";
-import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
-import { Tooltip } from "../ui/tooltip";
-import type { FilterField } from "../../server/filters/types";
-import { filterOutEmptyFilters } from "../../server/analytics/utils";
-import { dependencies } from "../../injection/dependencies.client";
+import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { dependencies } from "../../injection/dependencies.client";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
+import type { FilterField } from "../../server/filters/types";
+import { Tooltip } from "../ui/tooltip";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false },
@@ -29,8 +29,8 @@ export const useFilterToggle = (
                 ? undefined
                 : "true"
               : defaultShowFilters
-              ? "false"
-              : undefined,
+                ? "false"
+                : undefined,
           }).filter(([, value]) => value !== undefined),
         ),
       },
@@ -87,7 +87,9 @@ export function FilterToggleButton({
   const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
   const { project } = useOrganizationTeamProject();
 
-  const hasNegateFilters = dependencies.hasNegateFilters?.({ projectId: project?.id ?? "" });
+  const hasNegateFilters = dependencies.hasNegateFilters?.({
+    projectId: project?.id ?? "",
+  });
 
   return (
     <HStack gap={2}>
@@ -151,7 +153,8 @@ export function FilterToggleButton({
               setNegateFilters?.(!negateFiltersToggled);
             }}
           >
-            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span> Negate Filters
+            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span>{" "}
+            Negate Filters
           </Button>
         </Tooltip>
       )}

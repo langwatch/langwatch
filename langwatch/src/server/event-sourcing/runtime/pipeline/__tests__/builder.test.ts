@@ -15,26 +15,27 @@ vi.mock("langwatch", () => ({
     }),
   })),
 }));
-import {
-  createMockEventStore,
-  createMockQueueProcessorFactory,
-  createMockProjectionStore,
-  createMockEventPublisher,
-  createTestCommandHandlerClass,
-  createTestEventHandlerClass,
-  createTestProjectionHandlerClass,
-  createTestEventForBuilder,
-  createTestProjection,
-  TEST_CONSTANTS,
-  testCommandPayloadSchema,
-  type TestCommandPayload,
-  type TestEvent,
-} from "./testHelpers";
+
+import type { Command } from "../../../library/commands/command";
+import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import { COMMAND_TYPES } from "../../../library/domain/commandType";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
 import { createTenantId } from "../../../library/domain/tenantId";
-import { defineCommandSchema } from "../../../library/commands/commandSchema";
-import type { Command } from "../../../library/commands/command";
+import {
+  createMockEventPublisher,
+  createMockEventStore,
+  createMockProjectionStore,
+  createMockQueueProcessorFactory,
+  createTestCommandHandlerClass,
+  createTestEventForBuilder,
+  createTestEventHandlerClass,
+  createTestProjection,
+  createTestProjectionHandlerClass,
+  TEST_CONSTANTS,
+  type TestCommandPayload,
+  type TestEvent,
+  testCommandPayloadSchema,
+} from "./testHelpers";
 
 describe("PipelineBuilder", () => {
   beforeEach(() => {

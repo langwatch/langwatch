@@ -1,16 +1,13 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { useDisclosure } from "@chakra-ui/react";
+import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
-import { ChevronDownIcon, CheckIcon } from "lucide-react";
-import React, { useEffect, useState, createContext, useContext } from "react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 import type { Snippet, Target } from "~/prompts/types";
-
+import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";
 import { Menu } from "./ui/menu";
-
-import { uppercaseFirstLetter } from "~/utils/stringCasing";
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{

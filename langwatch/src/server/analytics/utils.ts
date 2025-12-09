@@ -2,7 +2,7 @@ import type { FilterParam } from "../../hooks/useFilterParams";
 import type { FilterField } from "../filters/types";
 
 export const filterOutEmptyFilters = (
-  filters: Partial<Record<FilterField, FilterParam | string>> | undefined
+  filters: Partial<Record<FilterField, FilterParam | string>> | undefined,
 ): Record<FilterField, FilterParam> => {
   if (!filters) {
     return {} as Record<FilterField, FilterParam>;
@@ -12,8 +12,8 @@ export const filterOutEmptyFilters = (
       typeof f === "string"
         ? !!f
         : Array.isArray(f)
-        ? f.length > 0
-        : Object.keys(f).length > 0
-    )
+          ? f.length > 0
+          : Object.keys(f).length > 0,
+    ),
   ) as Record<FilterField, FilterParam>;
 };

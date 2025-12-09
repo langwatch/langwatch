@@ -4,18 +4,18 @@ import type { EventStore } from "../library";
 import type { ProcessorCheckpointStore } from "../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../library/utils/distributedLock";
 import { RedisDistributedLock } from "../library/utils/distributedLock";
+import type { EventSourcingConfig } from "./config";
+import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
 import { DefaultQueueProcessorFactory } from "./queue";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
 import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
 import { ProcessorCheckpointStoreMemory } from "./stores/processorCheckpointStoreMemory";
-import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
-import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 import { CheckpointRepositoryClickHouse } from "./stores/repositories/checkpointRepositoryClickHouse";
 import { CheckpointRepositoryMemory } from "./stores/repositories/checkpointRepositoryMemory";
-import type { EventSourcingConfig } from "./config";
-import { createEventSourcingConfig } from "./config";
+import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
+import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 
 const logger = createLogger("langwatch:event-sourcing:runtime");
 
@@ -138,8 +138,7 @@ export class EventSourcingRuntime {
       forceClickHouseInTests,
     } = this.config;
 
-    const isProduction =
-      process.env.NODE_ENV === "production";
+    const isProduction = process.env.NODE_ENV === "production";
 
     // Create event store
     if (clickHouseEnabled && clickHouseClient) {
@@ -198,8 +197,7 @@ export class EventSourcingRuntime {
     isTestEnvironment: boolean,
     forceClickHouseInTests: boolean,
   ): ProcessorCheckpointStore | undefined {
-    const isProduction =
-      process.env.NODE_ENV === "production";
+    const isProduction = process.env.NODE_ENV === "production";
 
     // In test environment, use memory unless forced to use ClickHouse
     if (isTestEnvironment && !forceClickHouseInTests) {

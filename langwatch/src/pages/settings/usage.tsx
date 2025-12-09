@@ -2,25 +2,25 @@ import {
   Alert,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Progress,
   Spacer,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import {
   PeriodSelector,
   usePeriodSelector,
 } from "../../components/PeriodSelector";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function Usage() {
   const { organization } = useOrganizationTeamProject();

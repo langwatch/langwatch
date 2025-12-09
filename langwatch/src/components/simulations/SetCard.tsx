@@ -1,4 +1,4 @@
-import { Card, VStack, Text, HStack } from "@chakra-ui/react";
+import { Card, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
 
 export interface SetCardProps extends ScenarioSetData {

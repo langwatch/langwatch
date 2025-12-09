@@ -1,12 +1,18 @@
-import { type Provider, createAnalyticsClient, providers } from "react-contextual-analytics";
 import type { PostHog } from "posthog-js";
+import {
+  createAnalyticsClient,
+  type Provider,
+  providers,
+} from "react-contextual-analytics";
 
 interface CreateAppAnalyticsClientParams {
   isSaaS: boolean;
   posthogClient: PostHog | undefined;
 }
 
-export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams) {
+export function createAppAnalyticsClient(
+  params: CreateAppAnalyticsClientParams,
+) {
   const { isSaaS, posthogClient } = params;
   const registeredProviders = [] as Provider[];
   const isDev = process.env.NODE_ENV !== "production";
@@ -40,5 +46,3 @@ export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams)
 
   return createAnalyticsClient(registeredProviders, []);
 }
-
-

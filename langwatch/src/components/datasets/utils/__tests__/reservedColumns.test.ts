@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  isReservedColumnName,
   getSafeColumnName,
+  isReservedColumnName,
   RESERVED_COLUMN_NAMES,
 } from "../reservedColumns";
 
@@ -78,7 +78,7 @@ describe("reservedColumns utilities", () => {
       const existingNames = new Set(["other_name"]);
 
       expect(getSafeColumnName("unique_name", existingNames)).toBe(
-        "unique_name"
+        "unique_name",
       );
     });
   });

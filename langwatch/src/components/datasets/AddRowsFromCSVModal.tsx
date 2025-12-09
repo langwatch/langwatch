@@ -6,19 +6,18 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import {
-  newDatasetEntriesSchema,
-  type DatasetColumns,
-  type DatasetRecordEntry,
-} from "../../server/datasets/types";
-import { api } from "../../utils/api";
-
-import { nanoid } from "nanoid";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import {
+  type DatasetColumns,
+  type DatasetRecordEntry,
+  newDatasetEntriesSchema,
+} from "../../server/datasets/types";
+import { api } from "../../utils/api";
 import { tryToConvertRowsToAppropriateType } from "../AddOrEditDatasetDrawer";
 import { CSVReaderComponent } from "./UploadCSVModal";
 
@@ -41,7 +40,7 @@ export function AddRowsFromCSVModal({
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   const [recordEntries, setRecordEntries] = useState<DatasetRecordEntry[]>([]);
@@ -162,7 +161,7 @@ export function AddRowsFromCSVModal({
             },
           });
         },
-      }
+      },
     );
   };
 

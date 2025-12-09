@@ -1,6 +1,6 @@
+import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { ANALYTICS_KEYS } from "~/types";
 
 interface DateHistogramBucket {
@@ -72,7 +72,7 @@ export default async function execute() {
       .buckets as DateHistogramBucket[];
 
     console.log(
-      `Found ${dailyCounts.length} days with traces for project ${project.id}`
+      `Found ${dailyCounts.length} days with traces for project ${project.id}`,
     );
 
     if (dailyCounts.length === 0) {
@@ -97,14 +97,14 @@ export default async function execute() {
 
     // Create a set of dates that already have analytics
     const existingDates = new Set(
-      existingAnalytics.map((a) => a.createdAt.toISOString().split("T")[0])
+      existingAnalytics.map((a) => a.createdAt.toISOString().split("T")[0]),
     );
 
     // Prepare batch of analytics to create
     const analyticsToCreate = dailyCounts
       .filter(
         (bucket) =>
-          bucket.doc_count > 0 && !existingDates.has(bucket.key_as_string)
+          bucket.doc_count > 0 && !existingDates.has(bucket.key_as_string),
       )
       .map((bucket) => ({
         projectId: project.id,
@@ -120,7 +120,7 @@ export default async function execute() {
         skipDuplicates: true,
       });
       console.log(
-        `Created ${analyticsToCreate.length} analytics entries for project ${project.id}`
+        `Created ${analyticsToCreate.length} analytics entries for project ${project.id}`,
       );
     } else {
       console.log(`No new analytics needed for project ${project.id}`);

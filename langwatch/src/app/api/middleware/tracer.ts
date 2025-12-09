@@ -1,5 +1,11 @@
+import {
+  context as otContext,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from "@opentelemetry/api";
 import type { Context, Next } from "hono";
-import { context as otContext, propagation, trace, SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
 type TracerOptions = {
   name?: string;
@@ -7,7 +13,8 @@ type TracerOptions = {
 
 const headersGetter = {
   keys: (carrier: Headers): string[] => Array.from(carrier.keys()),
-  get: (carrier: Headers, key: string): string | string[] | undefined => carrier.get(key) ?? void 0,
+  get: (carrier: Headers, key: string): string | string[] | undefined =>
+    carrier.get(key) ?? void 0,
 };
 
 export const tracerMiddleware = (options?: TracerOptions) => {
@@ -15,7 +22,11 @@ export const tracerMiddleware = (options?: TracerOptions) => {
     const tracer = trace.getTracer("langwatch:api:hono");
 
     const incomingHeaders = c.req.raw.headers;
-    const parentCtx = propagation.extract(otContext.active(), incomingHeaders, headersGetter);
+    const parentCtx = propagation.extract(
+      otContext.active(),
+      incomingHeaders,
+      headersGetter,
+    );
 
     const method = c.req.method;
     const spanName = `${method} ${options?.name ?? c.req.path}`;
@@ -52,7 +63,7 @@ export const tracerMiddleware = (options?: TracerOptions) => {
 
             span.end();
           }
-        }
+        },
       );
     });
   };

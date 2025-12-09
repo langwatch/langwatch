@@ -1,6 +1,6 @@
 import { Card, HStack, Tabs, Text } from "@chakra-ui/react";
-import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 
 export const SatisfactionGraphs = () => {
   const publicEnv = usePublicEnv();

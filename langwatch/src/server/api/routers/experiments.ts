@@ -10,14 +10,14 @@ import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
-  wizardStateSchema,
   type WizardState,
+  wizardStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
-  workflowJsonSchema,
   type Entry,
   type Evaluator,
   type Workflow,
+  workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
@@ -487,11 +487,11 @@ export const experimentsRouter = createTRPCRouter({
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source!.run_id === bucket.key,
+            (hit) => hit._source?.run_id === bucket.key,
           );
           const versionId = steps.filter(
-            (step) => step._source!.workflow_version_id,
-          )[0]?._source!.workflow_version_id;
+            (step) => step._source?.workflow_version_id,
+          )[0]?._source?.workflow_version_id;
 
           return {
             runId: bucket.key,
@@ -887,8 +887,8 @@ const findNextDraftName = async (projectId: string) => {
     },
   });
 
-  const draftCount = experiments.filter(
-    (draft) => draft.name?.startsWith("Draft"),
+  const draftCount = experiments.filter((draft) =>
+    draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -1069,8 +1069,9 @@ const getExperimentBatchEvaluationRuns = async (
         dataset_average_duration: runAgg?.dataset_average_duration.value as
           | number
           | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost
-          .value as number | undefined,
+        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
+          | number
+          | undefined,
         evaluations_average_duration: runAgg?.evaluations_cost.average_duration
           .value as number | undefined,
         evaluations: Object.fromEntries(

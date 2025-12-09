@@ -1,7 +1,7 @@
 import type { NextApiRequest } from "next";
 import { getClientIp } from "../utils/getClientIp";
-import { prisma } from "./db";
 import { safeTruncate } from "../utils/truncate";
+import { prisma } from "./db";
 
 export const auditLog = async ({
   userId,

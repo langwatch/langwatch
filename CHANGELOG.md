@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.9.0...langwatch@v1.10.0) (2025-12-04)
+
+
+### Features
+
+* add global filters negation ([#888](https://github.com/langwatch/langwatch/issues/888)) ([a332ded](https://github.com/langwatch/langwatch/commit/a332dedc58c4a06d2912c3ec58cf44fccc3d6f29))
+* add message deletion to prompt playground chat   ([#855](https://github.com/langwatch/langwatch/issues/855)) ([2a820ee](https://github.com/langwatch/langwatch/commit/2a820ee8bd4e6cdf64c8851fdfdcd13fbfc739ed))
+* event sourcing 2, electric boogaloo ([#860](https://github.com/langwatch/langwatch/issues/860)) ([19eeecf](https://github.com/langwatch/langwatch/commit/19eeecfd9c4bec1826c087854a40f5c1f8722351))
+* improve trace message loading with retry logic and caching ([#852](https://github.com/langwatch/langwatch/issues/852)) ([4a76815](https://github.com/langwatch/langwatch/commit/4a76815c2b36a5f608f2fc4c97d4f36995db3fcc))
+
+
+### Bug Fixes
+
+* add cap and no decimal ([#851](https://github.com/langwatch/langwatch/issues/851)) ([e0efafd](https://github.com/langwatch/langwatch/commit/e0efafd540501fa77720f0e1f48fc6ff83556a20))
+* add robust FormErrorDisplay component for form validation errors ([#870](https://github.com/langwatch/langwatch/issues/870)) ([c3d50a5](https://github.com/langwatch/langwatch/commit/c3d50a5ca64326a0697068eecf2250cf547da639))
+* bump litellm and other dependencies to the latest version to fix bedrock embedding issues ([b522e89](https://github.com/langwatch/langwatch/commit/b522e89eccd91ae0de814e6bdd743bff0da52d04))
+* **hotfix:** fix api_key being set breaking bedrock for newer versions of litellm, has_key being set instead of the actual value, and allowing for empty bedrock values to use env vars instead for onprem deployments ([ade0a84](https://github.com/langwatch/langwatch/commit/ade0a84d59426f796de02f0e150c2e8e32c991f6))
+* **hotfix:** parse input and output for mastra ([cdb8766](https://github.com/langwatch/langwatch/commit/cdb876685981993ab79713f5cdb009e8dd195348))
+* **hotfix:** remove eval usage limits ([7a48498](https://github.com/langwatch/langwatch/commit/7a48498277f1f7c93dbf8db33cbe4b32eff85b11))
+* intelligent minmax for model settings so that users dont have to be surprised with a failure ([#859](https://github.com/langwatch/langwatch/issues/859)) ([0b6b498](https://github.com/langwatch/langwatch/commit/0b6b498d88d2ee71c65fe04a9189465bec6e2d8d))
+* langwatch/package.json & langwatch/package-lock.json to reduce vulnerabilities ([a9eeb12](https://github.com/langwatch/langwatch/commit/a9eeb12921f5304a193263d46d07e4aa303c293e))
+* managed llm providers ([bddfa70](https://github.com/langwatch/langwatch/commit/bddfa70036252b3c4975cad3242b0f2b9bb03017))
+* otel trace/span id parsing was not decoding base64 span/trace ids ([#861](https://github.com/langwatch/langwatch/issues/861)) ([19abbac](https://github.com/langwatch/langwatch/commit/19abbacf9b11fe48bc74330ac29ca3e7bd2bf067))
+* **prompts:** make maxTokens and temperature optional in form schema ([#913](https://github.com/langwatch/langwatch/issues/913)) ([73a2705](https://github.com/langwatch/langwatch/commit/73a2705a15d85da5b69a40b8938cc832cdeb4d40)), closes [#912](https://github.com/langwatch/langwatch/issues/912)
+* **prompts:** make prompts.get throw error instead of returning null/undefined ([#867](https://github.com/langwatch/langwatch/issues/867)) ([9705201](https://github.com/langwatch/langwatch/commit/97052015061f40fc63069c78bb1e702cbf12fa29))
+* **python-sdk:** add httpx.ReadTimeout to transient error skip list ([#910](https://github.com/langwatch/langwatch/issues/910)) ([dbdae14](https://github.com/langwatch/langwatch/commit/dbdae1465b5da364aa23097d9d91ff2072ee6d13)), closes [#909](https://github.com/langwatch/langwatch/issues/909)
+* resolve LLM config modal value reversion by adding proper format… ([#874](https://github.com/langwatch/langwatch/issues/874)) ([85daeb2](https://github.com/langwatch/langwatch/commit/85daeb250abc729c1687688e6d049cfc18c55390))
+* **secutity:** upgrade next from 15.5.4 to 15.5.7 ([#914](https://github.com/langwatch/langwatch/issues/914)) ([a9eeb12](https://github.com/langwatch/langwatch/commit/a9eeb12921f5304a193263d46d07e4aa303c293e))
+* type errors ([#872](https://github.com/langwatch/langwatch/issues/872)) ([f1f3333](https://github.com/langwatch/langwatch/commit/f1f3333a2057a0aed04bd6b4c9e50852ea4cb936))
+
+
+### Miscellaneous
+
+* add better logging for topic clustering ([587861b](https://github.com/langwatch/langwatch/commit/587861b93b91ff07a5b097d6d1013d7a962f08c0))
+* add delete confirmation workflow ([#856](https://github.com/langwatch/langwatch/issues/856)) ([a1a50f5](https://github.com/langwatch/langwatch/commit/a1a50f5679cc6fa9b64c2719bf25f32d7f460e8e))
+* event sourcing library ([#815](https://github.com/langwatch/langwatch/issues/815)) ([1e327c8](https://github.com/langwatch/langwatch/commit/1e327c88e2313d368c23ddc6e4e503532fda83ad))
+* **main:** release python-sdk 0.7.1 ([#881](https://github.com/langwatch/langwatch/issues/881)) ([df09d83](https://github.com/langwatch/langwatch/commit/df09d83b1034b87fb4ca206a0339169d75798d88))
+* **main:** release python-sdk 0.7.2 ([#911](https://github.com/langwatch/langwatch/issues/911)) ([7a1e545](https://github.com/langwatch/langwatch/commit/7a1e5451cf87a1d741a7b986edeba2b9fafe7401))
+* rework add members modal ([#812](https://github.com/langwatch/langwatch/issues/812)) ([066f197](https://github.com/langwatch/langwatch/commit/066f197220c103fae4048df2fd790a94035ce711))
+
 ## [1.9.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.8.0...langwatch@v1.9.0) (2025-11-17)
 
 

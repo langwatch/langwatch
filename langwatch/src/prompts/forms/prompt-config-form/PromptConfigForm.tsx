@@ -2,33 +2,30 @@ import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import {
   FormProvider,
+  type UseFormReturn,
   useFieldArray,
   useFormContext,
-  type UseFormReturn,
 } from "react-hook-form";
-
+import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompts";
+import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
+import {
+  formValuesToTriggerSaveVersionParams,
+  versionedPromptToPromptConfigFormValues,
+} from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
+import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "../fields/PromptField";
-import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
-
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
-
-import {
-  formValuesToTriggerSaveVersionParams,
-  versionedPromptToPromptConfigFormValues,
-} from "~/prompts/utils/llmPromptConfigUtils";
-import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import { toaster } from "~/components/ui/toaster";
 
 interface PromptConfigFormProps {
   methods: UseFormReturn<PromptConfigFormValues>;

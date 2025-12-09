@@ -1,7 +1,7 @@
+import { PIIRedactionLevel } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../../tracer/types";
 import { cleanupPIIs } from "./piiCheck";
-import { PIIRedactionLevel } from "@prisma/client";
 
 describe("PIICheck", () => {
   it.skip("detects PII on traces", async () => {
@@ -47,7 +47,7 @@ describe("PIICheck", () => {
       mainMethod: "presidio",
     });
     expect(samplePIITrace.input?.value).toEqual(
-      "hi there, my credit card number is <CREDIT_CARD>"
+      "hi there, my credit card number is <CREDIT_CARD>",
     );
   });
 
@@ -94,7 +94,7 @@ describe("PIICheck", () => {
       mainMethod: "google_dlp",
     });
     expect(samplePIITrace.input?.value).toEqual(
-      "hi there, my credit card number is [REDACTED]"
+      "hi there, my credit card number is [REDACTED]",
     );
   });
 });

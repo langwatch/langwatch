@@ -1,20 +1,20 @@
 import {
-  Box,
-  Heading,
-  VStack,
-  Text,
-  Spinner,
   Alert,
-  HStack,
+  Box,
   Code,
+  Heading,
+  HStack,
   Spacer,
+  Spinner,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { CopyInput } from "../CopyInput";
-import { trackEvent } from "../../utils/tracking";
-import { useIntegrationChecks } from "../IntegrationChecks";
+import type React from "react";
 import { LuCheckCheck } from "react-icons/lu";
-import React from "react";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { trackEvent } from "../../utils/tracking";
+import { CopyInput } from "../CopyInput";
+import { useIntegrationChecks } from "../IntegrationChecks";
 
 const getLangWatchEndpoint = () => {
   if (typeof window === "undefined") return "";

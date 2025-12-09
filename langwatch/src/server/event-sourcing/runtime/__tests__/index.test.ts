@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AggregateType, Event, Projection } from "../../library";
+import { EventSourcingService } from "../../library";
+import {
+  createMockEventHandlerDefinition,
+  createMockEventPublisher,
+  createMockEventStore,
+  createMockProjectionDefinition,
+  createMockProjectionStore,
+  createTestAggregateType,
+} from "../../library/services/__tests__/testHelpers";
 import { EventSourcingPipeline } from "../index";
 import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
 } from "../pipeline/types";
-import type { Event, Projection, AggregateType } from "../../library";
-import { EventSourcingService } from "../../library";
-import {
-  createMockEventStore,
-  createMockProjectionStore,
-  createMockEventPublisher,
-  createMockProjectionDefinition,
-  createMockEventHandlerDefinition,
-  createTestAggregateType,
-} from "../../library/services/__tests__/testHelpers";
 
 describe("EventSourcingPipeline", () => {
   let mockEventStore: ReturnType<typeof createMockEventStore<Event>>;

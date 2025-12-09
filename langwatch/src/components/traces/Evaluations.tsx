@@ -1,5 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import { type Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Link } from "../ui/link";
@@ -79,14 +79,14 @@ export const Guardrails = (trace: TraceEval) => {
 };
 
 export const EvaluationsCount = (
-  trace: TraceEval & { countGuardrails?: boolean }
+  trace: TraceEval & { countGuardrails?: boolean },
 ) => {
   const evaluations = trace.countGuardrails
     ? trace.evaluations?.filter((x) => x.is_guardrail)
     : trace.evaluations?.filter((x) => !x.is_guardrail);
   const totalErrors =
     evaluations?.filter(
-      (check) => check.status === "error" || evaluationPassed(check) === false
+      (check) => check.status === "error" || evaluationPassed(check) === false,
     ).length ?? 0;
 
   if (totalErrors > 0) {
@@ -129,7 +129,7 @@ export const EvaluationsCount = (
 export const Blocked = (trace: TraceEval) => {
   const totalBlocked = trace
     ? trace.evaluations?.filter(
-        (check) => check.is_guardrail && check.passed === false
+        (check) => check.is_guardrail && check.passed === false,
       ).length
     : 0;
 

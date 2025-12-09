@@ -1,8 +1,13 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import { captureException, withScope } from "../../../utils/posthogErrorCapture";
-import { Worker, type Job } from "bullmq";
+import { type Job, Worker } from "bullmq";
 import { nanoid } from "nanoid";
+import { getProtectionsForProject } from "~/server/api/utils";
 import type { EvaluationJob } from "~/server/background/types";
+import type { Protections } from "~/server/elasticsearch/protections";
+import {
+  getTraceById,
+  getTracesGroupedByThreadId,
+} from "~/server/elasticsearch/traces";
 import type { Trace } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
 import {
@@ -11,6 +16,11 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
+import { createLogger } from "../../../utils/logger";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
@@ -22,6 +32,10 @@ import {
 } from "../../api/routers/modelProviders";
 import { prisma } from "../../db";
 import {
+  DEFAULT_MAPPINGS,
+  migrateLegacyMappings,
+} from "../../evaluations/evaluationMappings";
+import {
   evaluationDurationHistogram,
   getEvaluationStatusCounter,
   getJobProcessingCounter,
@@ -29,29 +43,17 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import {
+  type MappingState,
+  mapTraceToDatasetEntry,
+  THREAD_MAPPINGS,
+  type TRACE_MAPPINGS,
+  tryAndConvertTo,
+} from "../../tracer/tracesMapping";
+import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
+import {
   EVALUATIONS_QUEUE_NAME,
   updateEvaluationStatusInES,
 } from "../queues/evaluationsQueue";
-
-import {
-  DEFAULT_MAPPINGS,
-  migrateLegacyMappings,
-} from "../../evaluations/evaluationMappings";
-import {
-  mapTraceToDatasetEntry,
-  tryAndConvertTo,
-  type MappingState,
-  type TRACE_MAPPINGS,
-  THREAD_MAPPINGS,
-} from "../../tracer/tracesMapping";
-import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
-import type { Protections } from "~/server/elasticsearch/protections";
-import {
-  getTraceById,
-  getTracesGroupedByThreadId,
-} from "~/server/elasticsearch/traces";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:evaluationsWorker");
 
@@ -115,11 +117,14 @@ const buildThreadData = async (
     );
   }
 
-  logger.info({
-    threadId,
-    traceId: trace.trace_id,
-    projectId,
-  }, "Fetching thread traces");
+  logger.info(
+    {
+      threadId,
+      traceId: trace.trace_id,
+      projectId,
+    },
+    "Fetching thread traces",
+  );
 
   // Fetch all traces in the thread
   const threadTraces = await getTracesGroupedByThreadId({
@@ -129,11 +134,14 @@ const buildThreadData = async (
     includeSpans: true,
   });
 
-  logger.info({
-    threadId,
-    traceCount: threadTraces.length,
-    traceIds: threadTraces.map((t) => t.trace_id),
-  }, "Thread traces fetched");
+  logger.info(
+    {
+      threadId,
+      traceCount: threadTraces.length,
+      traceIds: threadTraces.map((t) => t.trace_id),
+    },
+    "Thread traces fetched",
+  );
 
   const result: Record<string, any> = {};
 
@@ -156,14 +164,17 @@ const buildThreadData = async (
         selectedFields as (keyof typeof TRACE_MAPPINGS)[],
       );
 
-      logger.info({
-        targetField,
-        source,
-        ...(selectedFields.length > 0 && { selectedFields }),
-        ...(source === "traces" && {
-          traceCount: (result[targetField] as any[]).length,
-        }),
-      }, "Mapped thread field");
+      logger.info(
+        {
+          targetField,
+          source,
+          ...(selectedFields.length > 0 && { selectedFields }),
+          ...(source === "traces" && {
+            traceCount: (result[targetField] as any[]).length,
+          }),
+        },
+        "Mapped thread field",
+      );
     } else {
       // Regular trace mapping - use current trace
       // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
@@ -181,22 +192,28 @@ const buildThreadData = async (
           undefined,
         )[0];
         result[targetField] = mapped?.[targetField];
-        logger.info({
-          targetField,
-          source: mappingConfig.source,
-          value:
-            typeof result[targetField] === "string"
-              ? result[targetField].substring(0, 100) + "..."
-              : result[targetField],
-        }, "Mapped trace field");
+        logger.info(
+          {
+            targetField,
+            source: mappingConfig.source,
+            value:
+              typeof result[targetField] === "string"
+                ? result[targetField].substring(0, 100) + "..."
+                : result[targetField],
+          },
+          "Mapped trace field",
+        );
       }
     }
   }
 
-  logger.info({
-    threadId,
-    resultKeys: Object.keys(result),
-  }, "Thread data build complete");
+  logger.info(
+    {
+      threadId,
+      resultKeys: Object.keys(result),
+    },
+    "Thread data build complete",
+  );
 
   return result;
 };
@@ -208,8 +225,8 @@ const switchMapping = (
   const mapping = !mapping_
     ? DEFAULT_MAPPINGS
     : "mapping" in mapping_
-    ? mapping_
-    : migrateLegacyMappings(mapping_ as any);
+      ? mapping_
+      : migrateLegacyMappings(mapping_ as any);
 
   // No need to filter - switchMapping is only called when hasThreadMappings is false
   return mapTraceToDatasetEntry(
@@ -255,26 +272,35 @@ const buildDataForEvaluation = async (
   // Check if we have thread mappings
   const hasThread = hasThreadMappings(mappings);
 
-  logger.info({
-    evaluatorType,
-    traceId: trace.trace_id,
-    threadId: trace.metadata?.thread_id,
-    hasThreadMappings: hasThread,
-    mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
-  }, "Building data for evaluation");
+  logger.info(
+    {
+      evaluatorType,
+      traceId: trace.trace_id,
+      threadId: trace.metadata?.thread_id,
+      hasThreadMappings: hasThread,
+      mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
+    },
+    "Building data for evaluation",
+  );
 
   if (hasThread) {
     // Use thread-based data extraction
-    logger.info({
-      traceId: trace.trace_id,
-      threadId: trace.metadata?.thread_id,
-    }, "Using thread-based data extraction");
+    logger.info(
+      {
+        traceId: trace.trace_id,
+        threadId: trace.metadata?.thread_id,
+      },
+      "Using thread-based data extraction",
+    );
     data = await buildThreadData(projectId, trace, mappings, protections);
   } else {
     // Use regular trace-based mapping
-    logger.info({
-      traceId: trace.trace_id,
-    }, "Using regular trace-based mapping");
+    logger.info(
+      {
+        traceId: trace.trace_id,
+      },
+      "Using regular trace-based mapping",
+    );
     const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
       throw new Error("No mapped data found to run evaluator");
@@ -532,7 +558,9 @@ export const runEvaluation = async ({
       let statusText = response.statusText;
       try {
         statusText = JSON.stringify(await response.json(), undefined, 2);
-      } catch {}
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
       throw `${response.status} ${statusText}`;
     }
   }
@@ -635,7 +663,7 @@ export const startEvaluationsWorker = (
                 label: result.label,
               }
             : {}),
-          details: "details" in result ? result.details ?? "" : "",
+          details: "details" in result ? (result.details ?? "") : "",
         });
         logger.info({ jobId: job.id }, "successfully processed job");
 
@@ -681,10 +709,10 @@ export const startEvaluationsWorker = (
     logger.info("trace worker active, waiting for jobs!");
   });
 
-  traceChecksWorker.on("failed", (job, err) => {
+  traceChecksWorker.on("failed", async (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
     logger.error({ jobId: job?.id, error: err }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "traceChecks");
       scope.setExtra?.("job", job?.data);
       captureException(err);

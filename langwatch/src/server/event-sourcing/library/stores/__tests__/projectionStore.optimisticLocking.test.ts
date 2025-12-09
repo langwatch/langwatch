@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMockProjectionStore,
   createTestProjection,
-  createTestTenantId,
   createTestProjectionStoreReadContext,
+  createTestTenantId,
 } from "../../services/__tests__/testHelpers";
 
 describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {

@@ -10,7 +10,7 @@ declare global {
      * Strongly-typed entries that preserve key/value correlation for object literals
      */
     entries<T extends object>(
-      o: T
+      o: T,
     ): Array<
       { [K in Extract<keyof T, string>]-?: [K, T[K]] }[Extract<keyof T, string>]
     >;

@@ -1,18 +1,16 @@
 import {
+  Alert,
   Badge,
   Box,
   HStack,
   LinkOverlay,
   Skeleton,
   Spacer,
+  Tag,
   Text,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Alert } from "@chakra-ui/react";
-import { Tag } from "@chakra-ui/react";
-import { Tooltip } from "../ui/tooltip";
-import { Popover } from "../ui/popover";
 import type { Annotation, Project } from "@prisma/client";
 import numeral from "numeral";
 import {
@@ -25,29 +23,31 @@ import {
   XCircle,
 } from "react-feather";
 import type {
+  ElasticSearchEvaluation,
   EvaluationResult,
   Trace,
-  ElasticSearchEvaluation,
 } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
-import { pluralize } from "../../utils/pluralize";
-import { getColorForString } from "../../utils/rotatingColors";
-import { CheckPassing } from "../CheckPassing";
-import { useDrawer } from "../CurrentDrawer";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
-import { EventsCounter } from "./EventsCounter";
-import { evaluationPassed } from "../checks/EvaluationStatus";
 import { isJson } from "../../utils/isJson";
 import {
   isPythonRepr,
   parsePythonInsideJson,
 } from "../../utils/parsePythonInsideJson";
-import { Markdown } from "../Markdown";
-import { RedactedField } from "../ui/RedactedField";
+import { pluralize } from "../../utils/pluralize";
+import { getColorForString } from "../../utils/rotatingColors";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
-import { OverflownTextWithTooltip } from "../OverflownText";
 import { getExtractedInput } from "../../utils/traceExtraction";
+import { CheckPassing } from "../CheckPassing";
+import { useDrawer } from "../CurrentDrawer";
+import { evaluationPassed } from "../checks/EvaluationStatus";
+import { Markdown } from "../Markdown";
+import { OverflownTextWithTooltip } from "../OverflownText";
+import { Popover } from "../ui/popover";
+import { RedactedField } from "../ui/RedactedField";
+import { Tooltip } from "../ui/tooltip";
+import { EventsCounter } from "./EventsCounter";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -69,31 +69,31 @@ export function MessageCard({
   checksMap: Record<string, ElasticSearchEvaluation[]> | undefined;
 }) {
   const evaluations = checksMap
-    ? checksMap[trace.trace_id]?.filter((x) => !x.is_guardrail) ?? []
+    ? (checksMap[trace.trace_id]?.filter((x) => !x.is_guardrail) ?? [])
     : [];
   const guardrails = checksMap
-    ? checksMap[trace.trace_id]?.filter((x) => x.is_guardrail) ?? []
+    ? (checksMap[trace.trace_id]?.filter((x) => x.is_guardrail) ?? [])
     : [];
   const evaluationsDone = evaluations.every(
     (check) =>
       check.status == "processed" ||
       check.status == "skipped" ||
-      check.status == "error"
+      check.status == "error",
   );
   const evaluationsPasses = evaluations.filter(
     (check) =>
       evaluationPassed(check) !== false &&
-      (check.status === "processed" || check.status === "skipped")
+      (check.status === "processed" || check.status === "skipped"),
   ).length;
   const guardrailsPasses = guardrails.filter(
-    (check) => check.passed !== false
+    (check) => check.passed !== false,
   ).length;
 
   const allEvaluationsSkipped = evaluations.every(
-    (check) => check.status === "skipped"
+    (check) => check.status === "skipped",
   );
   const allGuardrailsSkipped = guardrails.every(
-    (check) => check.status === "skipped"
+    (check) => check.status === "skipped",
   );
 
   const totalEvaluations = evaluations.length;
@@ -101,10 +101,10 @@ export function MessageCard({
 
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnMount: false, refetchOnWindowFocus: false }
+    { enabled: !!project, refetchOnMount: false, refetchOnWindowFocus: false },
   );
   const topicsMap = Object.fromEntries(
-    topics.data?.map((topic) => [topic.id, topic]) ?? []
+    topics.data?.map((topic) => [topic.id, topic]) ?? [],
   );
   const traceTopic = topicsMap[trace.metadata.topic_id ?? ""];
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
@@ -148,7 +148,7 @@ export function MessageCard({
 
   const inputIsJson = isJson(stringifyIfObject(trace.input?.value) ?? "");
   const inputIsPythonRepr = isPythonRepr(
-    stringifyIfObject(trace.input?.value) ?? ""
+    stringifyIfObject(trace.input?.value) ?? "",
   );
 
   return (
@@ -401,8 +401,8 @@ export function MessageCard({
                   allGuardrailsSkipped
                     ? "yellow.600"
                     : guardrailsPasses == totalGuardrails
-                    ? "green.600"
-                    : "blue.600"
+                      ? "green.600"
+                      : "blue.600"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -435,7 +435,7 @@ export function MessageCard({
                         {pluralize(
                           totalGuardrails - guardrailsPasses,
                           "guardrail block",
-                          "guardrail blocks"
+                          "guardrail blocks",
                         )}
                       </>
                     )}
@@ -471,8 +471,8 @@ export function MessageCard({
                   !evaluationsDone || allEvaluationsSkipped
                     ? "yellow.600"
                     : evaluationsPasses == totalEvaluations
-                    ? "green.600"
-                    : "red.600"
+                      ? "green.600"
+                      : "red.600"
                 }
                 paddingY={1}
                 paddingX={2}
@@ -496,12 +496,12 @@ export function MessageCard({
                     {allEvaluationsSkipped
                       ? "Evaluations skipped"
                       : evaluationsDone && evaluationsPasses != totalEvaluations
-                      ? `${totalEvaluations - evaluationsPasses} ${
-                          totalEvaluations - evaluationsPasses == 1
-                            ? "evaluation failed"
-                            : "evaluations failed"
-                        }`
-                      : `${evaluationsPasses}/${totalEvaluations} evaluations`}
+                        ? `${totalEvaluations - evaluationsPasses} ${
+                            totalEvaluations - evaluationsPasses == 1
+                              ? "evaluation failed"
+                              : "evaluations failed"
+                          }`
+                        : `${evaluationsPasses}/${totalEvaluations} evaluations`}
                   </HStack>
                 </Tag.Label>
               </Tag.Root>
@@ -554,7 +554,7 @@ export function MessageCardJsonOutput({ value }: { value: string }) {
   const json = JSON.stringify(
     parsePythonInsideJson(isPythonRepr(value) ? value : JSON.parse(value)),
     null,
-    2
+    2,
   );
 
   return (

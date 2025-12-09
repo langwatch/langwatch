@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   InMemoryDistributedLock,
-  RedisDistributedLock,
   type LockHandle,
   type RedisClient,
+  RedisDistributedLock,
 } from "../distributedLock";
 
 describe("InMemoryDistributedLock", () => {

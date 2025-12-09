@@ -2,20 +2,20 @@ import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
+import { useDrawer } from "../../../components/CurrentDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
+import { Menu } from "../../../components/ui/menu";
+import { toaster } from "../../../components/ui/toaster";
+import { useDeleteDatasetConfirmation } from "../../../hooks/useDeleteDatasetConfirmation";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Component, Entry } from "../../types/dsl";
-import { useDrawer } from "../../../components/CurrentDrawer";
-import { Menu } from "../../../components/ui/menu";
-import { toaster } from "../../../components/ui/toaster";
-import { useDeleteDatasetConfirmation } from "../../../hooks/useDeleteDatasetConfirmation";
 
 export function DatasetSelection({
   node,

@@ -1,10 +1,10 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
-import type { ElasticSearchTrace, Span } from "../../tracer/types";
-import { processCollectorJob } from "./collectorWorker";
-import type { CollectorJob } from "../types";
 import { getTestProject } from "../../../utils/testUtils";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import type { ElasticSearchTrace, Span } from "../../tracer/types";
+import type { CollectorJob } from "../types";
+import { processCollectorJob } from "./collectorWorker";
 
 describe("Collector Worker Merging Logic Tests", () => {
   let projectId: string;
@@ -194,13 +194,12 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       expect(trace.spans).toHaveLength(2);
       expect(trace.spans?.find((s) => s.span_id === spanId1)?.name).toBe(
-        "First Call"
+        "First Call",
       );
       expect(trace.spans?.find((s) => s.span_id === spanId2)?.name).toBe(
-        "Second Call"
+        "Second Call",
       );
     });
-
 
     it("should preserve span input/output when update provides none", async () => {
       const traceId = `test-log-record-${nanoid()}`;
@@ -1048,13 +1047,14 @@ describe("Collector Worker Merging Logic Tests", () => {
       const trace = response._source as ElasticSearchTrace;
 
       // Only one span with that id should exist
-      const spansWithId = trace.spans?.filter((s) => s.span_id === spanId) ?? [];
+      const spansWithId =
+        trace.spans?.filter((s) => s.span_id === spanId) ?? [];
       expect(spansWithId.length).toBe(1);
       const s = spansWithId[0]!;
 
       // I/O must be one of the provided non-empty values (no clobber to empty)
       expect([JSON.stringify("A-input"), JSON.stringify("B-input")]).toContain(
-        s.input?.value
+        s.input?.value,
       );
       expect([
         JSON.stringify("A-output"),
@@ -1163,7 +1163,8 @@ describe("Collector Worker Merging Logic Tests", () => {
         id: traceIndexId({ traceId, projectId }),
       });
       const trace = response._source as ElasticSearchTrace;
-      const spansWithId = trace.spans?.filter((s) => s.span_id === spanId) ?? [];
+      const spansWithId =
+        trace.spans?.filter((s) => s.span_id === spanId) ?? [];
       expect(spansWithId.length).toBe(1);
       const s = spansWithId[0]!;
 

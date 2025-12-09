@@ -1,10 +1,11 @@
-import React, { useMemo } from "react";
-import { Field, HStack, VStack, IconButton } from "@chakra-ui/react";
-import type { FieldMetadata } from "../../../regions/model-providers/types";
-import type { DerivedFieldMeta } from "../../../../../hooks/useModelProviderFields";
-import { Tooltip } from "../../../../../components/ui/tooltip";
-import { InputWithPrefix } from "../shared/InputWithPrefix";
+import { Field, HStack, IconButton, VStack } from "@chakra-ui/react";
 import { Info } from "lucide-react";
+import type React from "react";
+import { useMemo } from "react";
+import { Tooltip } from "../../../../../components/ui/tooltip";
+import type { DerivedFieldMeta } from "../../../../../hooks/useModelProviderFields";
+import type { FieldMetadata } from "../../../regions/model-providers/types";
+import { InputWithPrefix } from "../shared/InputWithPrefix";
 
 interface ModelProviderCredentialFieldsProps {
   displayKeys: Record<string, unknown> | undefined;
@@ -19,7 +20,9 @@ interface ModelProviderCredentialFieldsProps {
   onOpenAiValidationClear: () => void;
 }
 
-export const ModelProviderCredentialFields: React.FC<ModelProviderCredentialFieldsProps> = ({
+export const ModelProviderCredentialFields: React.FC<
+  ModelProviderCredentialFieldsProps
+> = ({
   displayKeys,
   customKeys,
   derivedFields,
@@ -112,4 +115,4 @@ export const ModelProviderCredentialFields: React.FC<ModelProviderCredentialFiel
       )}
     </VStack>
   );
-}
+};

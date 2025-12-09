@@ -1,30 +1,28 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
-
-import { createLogger } from "../../../../../utils/logger";
-
 import { CostReferenceType, CostType } from "@prisma/client";
-import { captureException } from "~/utils/posthogErrorCapture";
 import { nanoid } from "nanoid";
-import { type z } from "zod";
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { z } from "zod";
+import { fromZodError, type ZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { updateEvaluationStatusInES } from "../../../../../server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "../../../../../server/background/workers/collector/evaluations";
 import {
-  runEvaluation,
   type DataForEvaluation,
+  runEvaluation,
 } from "../../../../../server/background/workers/evaluationsWorker";
-import {
-  type EvaluatorTypes,
-  type SingleEvaluationResult,
+import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
 } from "../../../../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import {
-  evaluationInputSchema,
   type EvaluationRESTParams,
   type EvaluationRESTResult,
+  evaluationInputSchema,
 } from "../../../../../server/evaluations/types";
+import { createLogger } from "../../../../../utils/logger";
 import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
@@ -34,7 +32,7 @@ const logger = createLogger("langwatch:evaluations:evaluate");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   return handleEvaluatorCall(req, res, false);
 }
@@ -42,7 +40,7 @@ export default async function handler(
 export async function handleEvaluatorCall(
   req: NextApiRequest,
   res: NextApiResponse,
-  as_guardrail: boolean
+  as_guardrail: boolean,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -90,7 +88,7 @@ export async function handleEvaluatorCall(
 
   const evaluatorDefinition = await getEvaluatorIncludingCustom(
     project.id,
-    checkType as EvaluatorTypes
+    checkType as EvaluatorTypes,
   );
   if (!evaluatorDefinition) {
     return res.status(404).json({
@@ -103,7 +101,10 @@ export async function handleEvaluatorCall(
   try {
     params = evaluationInputSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid evaluation params received",
+    );
 
     const validationError = fromZodError(error as ZodError);
     captureException(error, {
@@ -148,7 +149,10 @@ export async function handleEvaluatorCall(
       ...(params.settings ? params.settings : {}),
     });
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid settings received for the evaluator');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid settings received for the evaluator",
+    );
 
     const validationError = fromZodError(error as ZodError);
     captureException(error, {
@@ -167,10 +171,13 @@ export async function handleEvaluatorCall(
   try {
     data = getEvaluatorDataForParams(
       checkType,
-      params.data as Record<string, any>
+      params.data as Record<string, any>,
     );
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid evaluation data received",
+    );
     captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
@@ -215,7 +222,10 @@ export async function handleEvaluatorCall(
         body: req.body,
       },
     });
-    logger.error({ error, body: req.body, projectId: project.id }, 'error running evaluation');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "error running evaluation",
+    );
     result = {
       status: "error",
       error_type: "INTERNAL_ERROR",
@@ -251,15 +261,15 @@ export async function handleEvaluatorCall(
           ...(isGuardrail ? { passed: true } : {}), // We don't want to fail the check if the evaluator throws, becuase this is likely a bug in the evaluator
         }
       : result.status === "skipped"
-      ? {
-          status: "skipped",
-          details: result.details,
-          ...(isGuardrail ? { passed: true } : {}),
-        }
-      : {
-          ...result,
-          ...(isGuardrail ? { passed: result.passed ?? true } : {}),
-        };
+        ? {
+            status: "skipped",
+            details: result.details,
+            ...(isGuardrail ? { passed: true } : {}),
+          }
+        : {
+            ...result,
+            ...(isGuardrail ? { passed: result.passed ?? true } : {}),
+          };
 
   if (params.trace_id) {
     await updateEvaluationStatusInES({
@@ -294,7 +304,7 @@ export async function handleEvaluatorCall(
             label: result.label,
           }
         : {}),
-      details: "details" in result ? result.details ?? "" : "",
+      details: "details" in result ? (result.details ?? "") : "",
     });
   }
 

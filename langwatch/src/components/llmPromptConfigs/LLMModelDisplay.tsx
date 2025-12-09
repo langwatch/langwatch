@@ -37,8 +37,8 @@ export function LLMModelDisplay({
           modelOption?.isDisabled
             ? "(disabled)"
             : !modelOption?.label
-            ? "(deprecated)"
-            : ""
+              ? "(deprecated)"
+              : ""
         }`}
         fontSize={fontSize}
         fontFamily="mono"

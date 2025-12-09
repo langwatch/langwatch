@@ -1,8 +1,8 @@
-import { type Job, type Worker } from "bullmq";
+import type { Job, Worker } from "bullmq";
 import type {
   CollectorJob,
-  TopicClusteringJob,
   EvaluationJob,
+  TopicClusteringJob,
   TrackEventJob,
   UsageStatsJob,
 } from "~/server/background/types";
@@ -11,22 +11,22 @@ import type {
   SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
 import { createLogger } from "../../utils/logger";
-import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
+import { startCollectorWorker } from "./workers/collectorWorker";
 import {
   runEvaluationJob,
   startEvaluationsWorker,
 } from "./workers/evaluationsWorker";
+import { startTopicClusteringWorker } from "./workers/topicClusteringWorker";
 import { startTrackEventsWorker } from "./workers/trackEventsWorker";
-import { startCollectorWorker } from "./workers/collectorWorker";
 
 import "../../instrumentation.node";
-import http from "http";
-import { register } from "prom-client";
-import path from "path";
 import fs from "fs";
+import http from "http";
+import path from "path";
+import { register } from "prom-client";
 import { workerRestartsCounter } from "../metrics";
-import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { WorkersRestart } from "./errors";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 const logger = createLogger("langwatch:workers");
 
@@ -140,7 +140,9 @@ const startMetricsServer = () => {
           .catch(() => {
             res.writeHead(500).end();
           });
-      } catch (err) {
+      } catch (error) {
+        logger.error({ error }, "error getting metrics");
+
         res.writeHead(500).end();
       }
     } else {

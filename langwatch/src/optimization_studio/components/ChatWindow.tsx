@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Edge, type Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { Play, Send } from "react-feather";
 import { useForm } from "react-hook-form";
@@ -17,11 +17,11 @@ import { InputGroup } from "~/components/ui/input-group";
 import { Tooltip } from "~/components/ui/tooltip";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { usePostEvent } from "../hooks/usePostEvent";
 import { useWorkflowExecution } from "../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import { getEntryInputs } from "../utils/nodeUtils";
 import { RunningStatus } from "./ExecutionState";
-import { usePostEvent } from "../hooks/usePostEvent";
 
 interface ChatWindowProps {
   open: boolean;
@@ -120,7 +120,7 @@ const useMultipleInputs = (entryEdges: Edge[]) => {
         const key = edge.sourceHandle?.split(".")[1] ?? "";
         return { ...acc, [key]: "" };
       },
-      {} as Record<string, string>
+      {} as Record<string, string>,
     );
   });
 
@@ -290,7 +290,7 @@ export const ChatBox = ({
                       )}
                     </Box>
                   </Box>
-                ) : null
+                ) : null,
               )}
             </Flex>
           ))}
@@ -351,7 +351,7 @@ const MultipleInput = ({
           onChange={(e) =>
             handleInputChange(
               entryInputs[0]?.sourceHandle?.split(".")?.[1] ?? "",
-              e.target.value
+              e.target.value,
             )
           }
           placeholder={`Send ${entryInputs[0]?.sourceHandle?.split(".")[1]} `}
@@ -394,7 +394,7 @@ const MultipleInput = ({
               onChange={(e) =>
                 handleInputChange(
                   edge.sourceHandle?.split(".")[1] ?? "",
-                  e.target.value
+                  e.target.value,
                 )
               }
             />

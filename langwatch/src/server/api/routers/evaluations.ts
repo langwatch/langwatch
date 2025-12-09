@@ -1,14 +1,14 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission } from "../rbac";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { prisma } from "~/server/db";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { prisma } from "~/server/db";
+import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
 export const evaluationsRouter = createTRPCRouter({

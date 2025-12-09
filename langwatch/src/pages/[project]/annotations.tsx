@@ -1,9 +1,8 @@
 import { Box } from "@chakra-ui/react";
-
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { DashboardLayout } from "../../components/DashboardLayout";
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { DashboardLayout } from "../../components/DashboardLayout";
 
 function AnnotationsContent() {
   return (

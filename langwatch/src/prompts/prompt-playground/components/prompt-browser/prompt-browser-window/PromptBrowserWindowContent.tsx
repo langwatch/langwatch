@@ -1,18 +1,18 @@
-import { useEffect, useMemo } from "react";
 import { Box, VStack } from "@chakra-ui/react";
+import cloneDeep from "lodash.clonedeep";
+import debounce from "lodash.debounce";
+import { useEffect, useMemo } from "react";
+import { type DeepPartial, FormProvider } from "react-hook-form";
+import { usePromptConfigForm } from "~/prompts/hooks";
+import {
+  type TabData,
+  useDraggableTabsBrowserStore,
+} from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
+import type { PromptConfigFormValues } from "~/prompts/types";
+import { useTabId } from "../ui/TabContext";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
-import { usePromptConfigForm } from "~/prompts/hooks";
-import { FormProvider, type DeepPartial } from "react-hook-form";
-import {
-  useDraggableTabsBrowserStore,
-  type TabData,
-} from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
-import type { PromptConfigFormValues } from "~/prompts/types";
-import debounce from "lodash/debounce";
-import { cloneDeep } from "lodash";
-import { useTabId } from "../ui/TabContext";
 
 export { useTabId } from "../ui/TabContext";
 

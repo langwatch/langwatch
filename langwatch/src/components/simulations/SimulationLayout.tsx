@@ -1,8 +1,15 @@
-import { Box, Button, Flex, HStack, Text, useDisclosure } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  HStack,
+  Text,
+  useDisclosure,
+} from "@chakra-ui/react";
+import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
+import { useSimulationRouter } from "~/hooks/simulations";
 import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
-import { useSimulationRouter } from "~/hooks/simulations";
-import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
 
 // TODO: This file could be better organized.
 export const SimulationLayout = ({
@@ -70,8 +77,9 @@ const Header = ({
         </Button>
         <Flex alignItems="center" gap={1}>
           <Text fontWeight="semibold">
-            <Text fontSize={"xs"} color={"GrayText"} as="span">Scenario Set ID:</Text>
-            {" "}
+            <Text fontSize={"xs"} color={"GrayText"} as="span">
+              Scenario Set ID:
+            </Text>{" "}
             <code>{scenarioSetId ?? "unknown"}</code>
           </Text>
         </Flex>

@@ -1,16 +1,14 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db";
-import { createLogger } from "../../../utils/logger";
-
 import { ExperimentType, type Project } from "@prisma/client";
-import { captureException } from "~/utils/posthogErrorCapture";
 import crypto from "crypto";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
+import { fromZodError, type ZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
 import {
   estimateCost,
   matchingLLMModelCost,
 } from "../../../server/background/workers/collector/cost";
+import { prisma } from "../../../server/db";
 import {
   DSPY_STEPS_INDEX,
   dspyStepIndexId,
@@ -25,13 +23,14 @@ import {
   dSPyStepRESTParamsSchema,
   dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
-import { findOrCreateExperiment } from "../experiment/init";
+import { getPayloadSizeHistogram } from "../../../server/metrics";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../server/modelProviders/llmModelCost";
-import { getPayloadSizeHistogram } from "../../../server/metrics";
+import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
+import { findOrCreateExperiment } from "../experiment/init";
 
 const logger = createLogger("langwatch:dspy_log_steps");
 

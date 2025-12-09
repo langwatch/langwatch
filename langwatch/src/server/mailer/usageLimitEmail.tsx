@@ -1,12 +1,12 @@
-import React from "react";
-import { render } from "@react-email/render";
-import { Html } from "@react-email/html";
 import { Button } from "@react-email/button";
 import { Container } from "@react-email/container";
 import { Heading } from "@react-email/heading";
+import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
-import { Text } from "@react-email/text";
+import { render } from "@react-email/render";
 import { Section } from "@react-email/section";
+import { Text } from "@react-email/text";
+import React from "react";
 import { sendEmail } from "./emailSender";
 
 interface ProjectUsageData {

@@ -40,14 +40,14 @@ export function DatasetUpload({
               (col: string) => ({
                 name: col,
                 type: "string",
-              })
+              }),
             );
             const records: DatasetRecordEntry[] = data
               .slice(1)
               .map((row: string[]) => ({
                 id: nanoid(),
                 ...Object.fromEntries(
-                  row.map((col, i) => [columns[i]?.name, col])
+                  row.map((col, i) => [columns[i]?.name, col]),
                 ),
               }));
 

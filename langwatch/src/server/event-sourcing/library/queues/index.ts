@@ -1,5 +1,5 @@
 export type {
-  EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
 } from "./queue.types";

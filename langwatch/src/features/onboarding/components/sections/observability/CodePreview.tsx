@@ -1,18 +1,18 @@
-import React, { useMemo, useState } from "react";
 import {
+  ClientOnly,
   CodeBlock,
   createShikiAdapter,
+  HStack,
   Icon,
   IconButton,
-  HStack,
-  ClientOnly,
 } from "@chakra-ui/react";
+import { Eye, EyeOff, WandSparkles } from "lucide-react";
+import type React from "react";
+import { useMemo, useState } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-import { Eye, EyeOff } from "lucide-react";
-import { Tooltip } from "../../../../../components/ui/tooltip";
 import { toaster } from "../../../../../components/ui/toaster";
-import { WandSparkles } from "lucide-react";
+import { Tooltip } from "../../../../../components/ui/tooltip";
 
 interface CodePreviewProps {
   code: string;
@@ -91,7 +91,7 @@ export function CodePreview({
           closable: true,
         },
       });
-    } catch (err) {
+    } catch {
       toaster.create({
         title: "Failed to copy",
         description: "Could not copy to clipboard",

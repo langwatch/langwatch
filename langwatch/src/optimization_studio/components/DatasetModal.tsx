@@ -1,8 +1,8 @@
 import { Button, Tabs } from "@chakra-ui/react";
 import {
-  useUpdateNodeInternals,
   type Node,
   type NodeProps,
+  useUpdateNodeInternals,
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "react-feather";
@@ -50,13 +50,13 @@ export function DatasetModal({
   const initialDataset = useMemo(
     () => (node.data as Entry).dataset,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [(node.data as Entry).dataset?.id]
+    [(node.data as Entry).dataset?.id],
   );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const checkForUnsavedChanges = (
     newDataset: Entry["dataset"],
-    columnTypes: DatasetColumns
+    columnTypes: DatasetColumns,
   ) => {
     if (
       initialDataset &&
@@ -71,7 +71,7 @@ export function DatasetModal({
           name: newDataset.name,
           columnTypes: columnTypes ?? [],
           datasetRecords: transposeColumnsFirstToRowsFirstWithId(
-            newDataset.inline?.records ?? {}
+            newDataset.inline?.records ?? {},
           ),
         },
         onSuccess: (dataset_) => {
@@ -79,7 +79,7 @@ export function DatasetModal({
           setSelectedDataset(
             { id: dataset_.datasetId, name: dataset_.name },
             dataset_.columnTypes,
-            false
+            false,
           );
           onClose_();
         },
@@ -104,7 +104,7 @@ export function DatasetModal({
     (
       dataset: Required<Entry>["dataset"],
       columnTypes: DatasetColumns,
-      close: boolean
+      close: boolean,
     ) => {
       setNode({
         id: node.id,
@@ -119,7 +119,7 @@ export function DatasetModal({
         onClose();
       }
     },
-    [setNode, node.id, node.data, updateNodeInternals, onClose]
+    [setNode, node.id, node.data, updateNodeInternals, onClose],
   );
 
   return (

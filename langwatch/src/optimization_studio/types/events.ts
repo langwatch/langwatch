@@ -1,6 +1,6 @@
-import { workflowJsonSchema, type BaseComponent, type Workflow } from "./dsl";
-import { optimizerParamsSchema, OPTIMIZERS } from "./optimizers";
 import { z } from "zod";
+import { type BaseComponent, type Workflow, workflowJsonSchema } from "./dsl";
+import { OPTIMIZERS, optimizerParamsSchema } from "./optimizers";
 
 export const studioClientEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("is_alive"), payload: z.record(z.never()) }),

@@ -1,8 +1,8 @@
-import type { FrameworkKey, PlatformKey } from "../types.ts";
-import { useActiveProject } from "../../../contexts/ActiveProjectContext.tsx";
-import { parseSnippet } from "./snippets.ts";
-import { getRegistryEntry } from "./registry.tsx";
 import { usePublicEnv } from "~/hooks/usePublicEnv.ts";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext.tsx";
+import type { FrameworkKey, PlatformKey } from "../types.ts";
+import { getRegistryEntry } from "./registry.tsx";
+import { parseSnippet } from "./snippets.ts";
 
 interface CodegenResult {
   code: string;
@@ -44,7 +44,8 @@ export function useCodegen(
 
   return {
     ...base,
-    code: base.code.replaceAll("<project_name>", projectName)
+    code: base.code
+      .replaceAll("<project_name>", projectName)
       .replaceAll("<project_endpoint>", effectiveEndpoint),
   };
 }

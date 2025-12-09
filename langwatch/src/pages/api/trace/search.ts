@@ -1,12 +1,11 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "../../../server/db";
-
+import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import {
   getAllForProjectInput,
   getAllTracesForProject,
 } from "../../../server/api/routers/traces";
+import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
 import { toLLMModeTrace } from "./[id]";
 
@@ -41,7 +40,7 @@ const paramsSchema = getAllForProjectInput
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end();

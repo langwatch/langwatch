@@ -1,9 +1,9 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { type AggregateType, EventUtils } from "../../../library";
+import { EVENT_TYPES } from "../../../library/domain/eventType";
+import { createTenantId } from "../../../library/domain/tenantId";
 import { EventStoreMemory } from "../eventStoreMemory";
 import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
-import { EventUtils, type AggregateType } from "../../../library";
-import { createTenantId } from "../../../library/domain/tenantId";
-import { EVENT_TYPES } from "../../../library/domain/eventType";
 
 describe("EventStoreMemory - Event ID Deduplication", () => {
   const tenantId = createTenantId("test-tenant");

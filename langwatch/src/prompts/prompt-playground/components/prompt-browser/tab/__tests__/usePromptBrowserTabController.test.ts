@@ -14,4 +14,3 @@ describe("usePromptBrowserTabController", () => {
     });
   });
 });
-

@@ -1,7 +1,7 @@
-import React from "react";
+import type React from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { PermissionAlert } from "./PermissionAlert";
 import type { Permission } from "../server/api/rbac";
+import { PermissionAlert } from "./PermissionAlert";
 
 interface WithPermissionGuardOptions {
   permission: Permission;

@@ -8,7 +8,7 @@ import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmProm
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
-  "langwatch:optimization_studio:use-reset-form-with-latest-version"
+  "langwatch:optimization_studio:use-reset-form-with-latest-version",
 );
 
 /**

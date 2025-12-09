@@ -1,4 +1,3 @@
-import React, { useEffect, useMemo, useCallback, useRef, useId } from "react";
 import {
   Combobox,
   Field,
@@ -10,6 +9,8 @@ import {
   useTagsInput,
   VStack,
 } from "@chakra-ui/react";
+import type React from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 
 type ModelOption = { label: string; value: string };
@@ -23,7 +24,9 @@ interface ModelProviderModelSettingsProps {
   onDefaultModelChange: (model: string | null) => void;
 }
 
-export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProps> = ({
+export const ModelProviderModelSettings: React.FC<
+  ModelProviderModelSettingsProps
+> = ({
   modelProviderKey,
   customModels,
   chatModelOptions,
@@ -54,10 +57,10 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
       if (value) existing.add(value);
     });
     return Array.from(existing);
-  // We have the model provider key as a dependency because the chat model options are
-  // different for each model provider, and this forces a re-render when the provider
-  // changes.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // We have the model provider key as a dependency because the chat model options are
+    // different for each model provider, and this forces a re-render when the provider
+    // changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelProviderKey, chatModelOptions, customModelValues]);
 
   // eslint-disable-next-line @typescript-eslint/unbound-method
@@ -203,10 +206,11 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
           <NativeSelect.Indicator />
         </NativeSelect.Root>
         <Field.HelperText>
-          This model will be used for evaluations, prompt optimization, and dataset
-          generation. Change this anytime in the model provider settings.
+          This model will be used for evaluations, prompt optimization, and
+          dataset generation. Change this anytime in the model provider
+          settings.
         </Field.HelperText>
       </Field.Root>
     </VStack>
   );
-}
+};

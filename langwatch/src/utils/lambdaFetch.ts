@@ -18,7 +18,7 @@ type LambdaFetchResponse<T> = {
 export const lambdaFetch = async <T>(
   urlOrArn: string,
   path: string,
-  init?: LambdaFetchInit
+  init?: LambdaFetchInit,
 ): Promise<LambdaFetchResponse<T>> => {
   // If it's a Lambda ARN
   if (urlOrArn.startsWith("arn:aws:lambda")) {

@@ -1,17 +1,15 @@
-import { type Node, type NodeProps } from "@xyflow/react";
-import type { Ref } from "react";
-import { ComponentNode } from "./Nodes";
-
 import { Alert, Text } from "@chakra-ui/react";
-
+import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
+import type { Ref } from "react";
 import { forwardRef, useEffect } from "react";
 import { useComponentVersion } from "../../hooks/useComponentVersion";
-import { type Custom } from "../../types/dsl";
+import type { Custom } from "../../types/dsl";
+import { ComponentNode } from "./Nodes";
 
 export const CustomNode = forwardRef(function CustomNode(
   props: NodeProps<Node<Custom>>,
-  ref: Ref<HTMLDivElement>
+  ref: Ref<HTMLDivElement>,
 ) {
   return (
     <ComponentNode ref={ref} {...props}>

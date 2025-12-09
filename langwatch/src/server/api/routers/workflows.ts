@@ -1,25 +1,24 @@
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generateText, tool } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
-import { type Session } from "next-auth";
+import type { Session } from "next-auth";
 import { z } from "zod";
-
 import {
-  workflowJsonSchema,
   type Workflow,
+  workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
-import type { Unpacked } from "../../../utils/types";
-import { getVercelAIModel } from "../../modelProviders/utils";
 import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
+import type { Unpacked } from "../../../utils/types";
+import { getVercelAIModel } from "../../modelProviders/utils";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure

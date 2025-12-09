@@ -1,6 +1,6 @@
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { assert, describe, expect, it } from "vitest";
-import { z, type ZodError } from "zod";
+import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
@@ -664,7 +664,7 @@ const claudeCodeLogsRequest: DeepPartial<IExportLogsServiceRequest> = {
 describe("opentelemetry logs receiver", () => {
   it("receives a complete Spring AI chat interaction (prompt + completion)", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
-      springAICompleteChatRequest
+      springAICompleteChatRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -712,7 +712,7 @@ describe("opentelemetry logs receiver", () => {
 
   it("receives a Spring AI prompt-only request", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
-      springAIPromptOnlyRequest
+      springAIPromptOnlyRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -757,7 +757,7 @@ describe("opentelemetry logs receiver", () => {
 
   it("receives a Spring AI completion-only request", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
-      springAICompletionOnlyRequest
+      springAICompletionOnlyRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -831,7 +831,7 @@ describe("opentelemetry logs receiver", () => {
     expect(span1).toBeDefined();
     expect(span1?.name).toEqual("Chat Model Prompt Content");
     expect(span1?.input?.value).toEqual(
-      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1"
+      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1",
     );
     expect(span1?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_1");
     expect(span1?.name).toEqual("Chat Model Prompt Content");
@@ -843,7 +843,7 @@ describe("opentelemetry logs receiver", () => {
     expect(span2).toBeDefined();
     expect(span2?.name).toEqual("Chat Model Prompt Content");
     expect(span2?.input?.value).toEqual(
-      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2"
+      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2",
     );
     expect(span2?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_2");
     expect(span2?.input?.type).toEqual("text");
@@ -852,7 +852,7 @@ describe("opentelemetry logs receiver", () => {
 
   it("includes logs with unsupported scope names", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
-      unsupportedScopeRequest
+      unsupportedScopeRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -961,7 +961,7 @@ IGNORED_CONTENT`,
 
   it("handles claude code logs, getting the params", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
-      claudeCodeLogsRequest
+      claudeCodeLogsRequest,
     );
 
     expect(traces).toHaveLength(1);

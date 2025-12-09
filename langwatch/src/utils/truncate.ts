@@ -10,7 +10,7 @@ const truncateRecursive = (
   options: {
     maxStringLength: number;
     maxTotalLength: number;
-  }
+  },
 ): unknown => {
   if (typeof data === "string") {
     return truncateString(data, options.maxStringLength);
@@ -34,7 +34,7 @@ const truncateRecursive = (
 const truncateWithSizeLimit = (
   data: unknown,
   maxTotalLength: number,
-  stringLengths: number[]
+  stringLengths: number[],
 ): unknown => {
   if (JSON.stringify(data).length <= maxTotalLength) {
     return data;
@@ -56,7 +56,7 @@ const truncateWithSizeLimit = (
     const entries = Object.entries(data);
     let result: Record<string, unknown> = {};
 
-    // eslint-disable-next-line @typescript-eslint/prefer-for-of
+    // biome-ignore lint/style/useForOf: this is a fair use case for a for loop, as we need to access the index of the entries array.
     for (let i = 0; i < entries.length; i++) {
       const tempResult = {
         ...result,
@@ -87,7 +87,7 @@ const truncateWithSizeLimit = (
 export const safeTruncate = <T>(
   data: T,
   maxTotalLength = 32 * 1024, // 32KB
-  stringLengths = [24 * 1024, 16 * 1024, 8 * 1024, 4 * 1024, 2 * 1024, 1024]
+  stringLengths = [24 * 1024, 16 * 1024, 8 * 1024, 4 * 1024, 2 * 1024, 1024],
 ): T => {
   try {
     return truncateWithSizeLimit(data, maxTotalLength, stringLengths) as T;

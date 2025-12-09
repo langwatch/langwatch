@@ -2,15 +2,13 @@ import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
-
+import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
 import { MetadataTag } from "../MetadataTag";
 import { Tooltip } from "../ui/tooltip";
-
-import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 
 const SummaryItem = ({
   label,
@@ -85,7 +83,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
         (span) =>
           span.metrics?.cost !== null &&
           span.metrics?.cost !== undefined &&
-          span.metrics.cost > 0
+          span.metrics.cost > 0,
       );
     };
 
@@ -99,7 +97,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
       return (
         trace.spans?.reduce(
           (total, span) => total + (span.metrics?.cost || 0),
-          0
+          0,
         ) || 0
       );
     };
@@ -223,5 +221,5 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
         </HStack>
       </>
     );
-  }
+  },
 );

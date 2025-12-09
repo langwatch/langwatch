@@ -1,11 +1,8 @@
-import React from "react";
-import {
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Text, VStack } from "@chakra-ui/react";
+import type React from "react";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { toaster } from "../../../../../components/ui/toaster";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { CopyableInputWithPrefix } from "./CopyableInputWithPrefix";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
@@ -15,9 +12,17 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
 
-  async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
+  async function copyApiKey({
+    withBashPrefix,
+  }: {
+    withBashPrefix?: boolean;
+  }): Promise<void> {
     try {
-      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey);
+      await navigator.clipboard.writeText(
+        withBashPrefix
+          ? `LANGWATCH_API_KEY=${effectiveApiKey}`
+          : effectiveApiKey,
+      );
       toaster.create({
         title: "Copied",
         description: "API key copied to clipboard",
@@ -34,9 +39,17 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
     }
   }
 
-  async function copyEndpoint({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
+  async function copyEndpoint({
+    withBashPrefix,
+  }: {
+    withBashPrefix?: boolean;
+  }): Promise<void> {
     try {
-      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint);
+      await navigator.clipboard.writeText(
+        withBashPrefix
+          ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}`
+          : effectiveEndpoint,
+      );
       toaster.create({
         title: "Copied",
         description: "Endpoint copied to clipboard",
@@ -58,7 +71,9 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
           Your LangWatch Integration Info
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          {"You can access your API key again anytime in the project's settings "}
+          {
+            "You can access your API key again anytime in the project's settings "
+          }
           {"page."}
         </Text>
       </VStack>
@@ -70,15 +85,16 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
         onCopy={copyApiKey}
       />
 
-      {effectiveEndpoint && effectiveEndpoint !== "https://app.langwatch.ai" && (
-        <CopyableInputWithPrefix
-          prefix="LANGWATCH_ENDPOINT="
-          value={effectiveEndpoint}
-          ariaLabel="Your LangWatch Endpoint"
-          showVisibilityToggle={false}
-          onCopy={copyEndpoint}
-        />
-      )}
+      {effectiveEndpoint &&
+        effectiveEndpoint !== "https://app.langwatch.ai" && (
+          <CopyableInputWithPrefix
+            prefix="LANGWATCH_ENDPOINT="
+            value={effectiveEndpoint}
+            ariaLabel="Your LangWatch Endpoint"
+            showVisibilityToggle={false}
+            onCopy={copyEndpoint}
+          />
+        )}
     </VStack>
   );
 }

@@ -1,9 +1,9 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { useMemo, useState, useEffect } from "react";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../utils/api";
 import { toaster } from "../ui/toaster";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 
 type OrgRoleOption = {
   label: string;

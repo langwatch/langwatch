@@ -31,7 +31,9 @@ describe("DatasetService", () => {
       it.todo("throws DatasetNotFoundError if dataset missing");
       it.todo("triggers column migration when columnTypes differ");
       it.todo("preserves slug format (kebab-case)");
-      it.todo("throws DatasetConflictError if slug collides with another dataset");
+      it.todo(
+        "throws DatasetConflictError if slug collides with another dataset",
+      );
       it.todo("allows updating with same name/slug without conflict");
       it.todo("wraps all operations in transaction for atomicity");
     });
@@ -61,4 +63,3 @@ describe("DatasetService", () => {
     it.todo("removes special characters");
   });
 });
-

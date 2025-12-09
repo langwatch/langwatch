@@ -1,8 +1,8 @@
-import { Highlight, Prism } from "prism-react-renderer";
 import { Box, IconButton } from "@chakra-ui/react";
-import { monokaiTheme } from "./monokaiTheme";
 import { CopyIcon } from "lucide-react";
+import { Highlight, Prism } from "prism-react-renderer";
 import { toaster } from "../ui/toaster";
+import { monokaiTheme } from "./monokaiTheme";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 require("prismjs/components/prism-bash");

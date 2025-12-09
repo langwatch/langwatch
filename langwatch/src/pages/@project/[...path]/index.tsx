@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 import { LoadingScreen } from "../../../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { useEffect } from "react";
 
 export default function AtProjectRedirect() {
   const { project } = useOrganizationTeamProject();

@@ -1,16 +1,16 @@
 import type {
+  Projection,
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../library";
-import type { Projection } from "../../../library";
 
 /**
- * Repository interface for trace projection storage operations.
- * Stores computed trace metrics matching the trace_projections ClickHouse schema,
+ * Repository interface for trace summary storage operations.
+ * Stores computed trace metrics matching the trace_summaries ClickHouse schema,
  * including all aggregated trace data and computed metrics.
  */
-export interface TraceAggregationStateProjectionRepository<
+export interface TraceSummaryStateProjectionRepository<
   ProjectionType extends Projection = Projection,
 > extends ProjectionStore<ProjectionType> {
   /**

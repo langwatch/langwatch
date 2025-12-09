@@ -1,6 +1,6 @@
-import { Text, HStack } from "@chakra-ui/react";
-import { getDisplayHandle } from "./PublishedPromptsList";
+import { HStack, Text } from "@chakra-ui/react";
 import { PublishedPromptActions } from "./PublishedPromptActions";
+import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptContentProps {
   promptId: string;

@@ -1,23 +1,23 @@
+import { generate } from "@langwatch/ksuid";
 import { context, trace } from "@opentelemetry/api";
-import { EventStream } from "../streams/eventStream";
-import {
-  EventSchema,
-  ProjectionSchema,
-  EventMetadataBaseSchema,
-} from "../domain/types";
+import type { AggregateType } from "../domain/aggregateType";
+import type { EventType } from "../domain/eventType";
+import type { TenantId } from "../domain/tenantId";
+import { TenantIdSchema } from "../domain/tenantId";
 import type {
   Event,
   EventMetadataBase,
-  Projection,
   EventOrderingStrategy,
+  Projection,
   ProjectionMetadata,
 } from "../domain/types";
-import type { TenantId } from "../domain/tenantId";
-import { TenantIdSchema } from "../domain/tenantId";
-import type { EventType } from "../domain/eventType";
-import type { AggregateType } from "../domain/aggregateType";
-import { generate } from "@langwatch/ksuid";
+import {
+  EventMetadataBaseSchema,
+  EventSchema,
+  ProjectionSchema,
+} from "../domain/types";
 import { SecurityError } from "../services/errorHandling";
+import { EventStream } from "../streams/eventStream";
 
 /**
  * Generates a unique event ID with entropy to prevent predictability and replay attacks.

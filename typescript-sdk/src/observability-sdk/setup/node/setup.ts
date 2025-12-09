@@ -255,7 +255,7 @@ export function createAndStartNodeSdk(
         // Access the real provider from the delegate
         const realProvider = (globalProvider as any)._delegate;
 
-        if (realProvider && realProvider.constructor.name === 'NodeTracerProvider') {
+        if (realProvider?.constructor.name === 'NodeTracerProvider') {
           // Explicitly register the real provider globally
           trace.setGlobalTracerProvider(realProvider);
           logger.info('Successfully registered NodeTracerProvider globally for Next.js 15');

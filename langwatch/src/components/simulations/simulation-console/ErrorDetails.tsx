@@ -1,4 +1,4 @@
-import { Box, Text, VStack, Code } from "@chakra-ui/react";
+import { Box, Code, Text, VStack } from "@chakra-ui/react";
 
 import { CONSOLE_COLORS } from "./constants";
 

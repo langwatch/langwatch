@@ -1,11 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-
-import { checkProjectPermission } from "../rbac";
-
 import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { checkProjectPermission } from "../rbac";
 
 // Base schema for all project-related operations
 const projectSchema = z.object({
@@ -32,7 +29,7 @@ export const scenarioRouter = createTRPCRouter({
         scenarioSetId: z.string(),
         limit: z.number().min(1).max(100).default(20),
         cursor: z.string().optional(), // Cursor for pagination
-      })
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -64,7 +61,7 @@ export const scenarioRouter = createTRPCRouter({
     .input(
       projectSchema.extend({
         scenarioRunId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -100,7 +97,7 @@ export const scenarioRouter = createTRPCRouter({
     .input(
       projectSchema.extend({
         scenarioId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
@@ -118,7 +115,7 @@ export const scenarioRouter = createTRPCRouter({
       projectSchema.extend({
         scenarioSetId: z.string(),
         batchRunId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {

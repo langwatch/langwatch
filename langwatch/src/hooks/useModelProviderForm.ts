@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ZodError, z } from "zod";
+import { fromZodError } from "zod-validation-error";
 import { toaster } from "../components/ui/toaster";
 import {
   getProviderModelOptions,
-  modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
+  modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
-import { fromZodError } from "zod-validation-error";
 
 type SelectOption = { value: string; label: string };
 
@@ -60,7 +60,8 @@ export type UseModelProviderFormActions = {
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const { provider, projectId, projectDefaultModel, onSuccess, onError } = params;
+  const { provider, projectId, projectDefaultModel, onSuccess, onError } =
+    params;
 
   const updateMutation = api.modelProvider.update.useMutation();
 
@@ -449,7 +450,9 @@ export function useModelProviderForm(
         ? (keysSchema as any).safeParse(keysToValidate)
         : { success: true };
       if (!parsed.success) {
-        setErrors({ customKeysRoot: fromZodError(parsed.error as ZodError).message });
+        setErrors({
+          customKeysRoot: fromZodError(parsed.error as ZodError).message,
+        });
         setIsSaving(false);
         return;
       }

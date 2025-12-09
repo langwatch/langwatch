@@ -1,13 +1,13 @@
-import { captureException } from "~/utils/posthogErrorCapture";
 import { nanoid } from "nanoid";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
-import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
-import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
-import { type TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
-import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
-import { createLogger } from "../../utils/logger";
 import { fromZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
+import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/types";
+import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
+import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
+import { createLogger } from "../../utils/logger";
 
 const thumbsUpDownSchema = z.object({
   trace_id: z.string(),
@@ -51,14 +51,14 @@ export const predefinedEventsSchemas = z.union([
 ]);
 
 const predefinedEventTypes = predefinedEventsSchemas.options.map(
-  (schema) => schema.shape.event_type.value
+  (schema) => schema.shape.event_type.value,
 );
 
 const logger = createLogger("langwatch:track_event");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -84,7 +84,7 @@ export default async function handler(
   } catch (error) {
     logger.error(
       { error, body: req.body, projectId: project.id },
-      "invalid event received"
+      "invalid event received",
     );
     captureException(error);
     const validationError = fromZodError(error as ZodError);
@@ -97,7 +97,7 @@ export default async function handler(
     } catch (error) {
       logger.error(
         { error, body: req.body, projectId: project.id },
-        "invalid event received"
+        "invalid event received",
       );
       captureException(error);
       const validationError = fromZodError(error as ZodError);
@@ -122,7 +122,7 @@ export default async function handler(
       jobId: `track_event_${eventId}`,
       // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
       delay: process.env.VITEST_MODE ? 0 : 5000,
-    }
+    },
   );
 
   return res.status(200).json({ message: "Event tracked" });

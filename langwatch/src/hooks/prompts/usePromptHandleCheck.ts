@@ -1,8 +1,6 @@
-import { type PromptScope } from "@prisma/client";
-
-import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
-
+import type { PromptScope } from "@prisma/client";
 import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 
 export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();

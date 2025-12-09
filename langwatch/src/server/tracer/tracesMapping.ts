@@ -1,11 +1,15 @@
 import type { Annotation, AnnotationScore, User } from "@prisma/client";
-import { getRAGChunks, getRAGInfo } from "./utils";
 import { z } from "zod";
-import type { DatasetSpan, Evaluation, Span } from "./types";
-import type { Trace as BaseTrace } from "./types";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
+import type {
+  Trace as BaseTrace,
+  DatasetSpan,
+  Evaluation,
+  Span,
+} from "./types";
 import { reservedTraceMetadataSchema } from "./types.generated";
+import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file
 // This assumes the Annotation type comes from Prisma
@@ -37,7 +41,7 @@ export const TRACE_MAPPINGS = {
     mapping: (trace: TraceWithAnnotations) => {
       try {
         return getRAGInfo(trace.spans ?? []).contexts ?? [];
-      } catch (e) {
+      } catch {
         return [];
       }
     },
@@ -616,7 +620,7 @@ export function mergeThreadAndTraceMappings(
 const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
     return z.array(datasetSpanSchema).parse(spans);
-  } catch (e) {
+  } catch {
     return spans as any;
   }
 };
@@ -728,7 +732,7 @@ export const tryAndConvertTo = <T extends keyof StringTypeToType>(
         return parsed as unknown as StringTypeToType[T];
       }
       throw new Error("Failed to parse to a valid type, falling back");
-    } catch (e) {
+    } catch {
       if (type === "string[]") {
         return [
           tryAndConvertTo(value, "string"),

@@ -1,7 +1,7 @@
-import { z } from "zod";
 import { SpanKind } from "@opentelemetry/api";
+import type { Cluster, Redis } from "ioredis";
 import { getLangWatchTracer } from "langwatch";
-import type { Redis, Cluster } from "ioredis";
+import { z } from "zod";
 import { createLogger } from "~/utils/logger";
 import { ConfigurationError } from "../services/errorHandling";
 

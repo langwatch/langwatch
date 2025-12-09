@@ -1,27 +1,14 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  OrganizationRoleGroup,
-  checkUserPermissionForOrganization,
-} from "../permission";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
+import { prisma } from "../../db";
 import { UsageLimitService } from "../../notifications/usage-limit.service";
-
-export const getProjectIdsForOrganization = async (
-  organizationId: string,
-): Promise<string[]> => {
-  return (
-    await prisma.project.findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: { id: true },
-    })
-  ).map((project) => project.id);
-};
+import { TraceUsageService } from "../../traces/trace-usage.service";
+import { getCurrentMonthStart } from "../../utils/dateUtils";
+import {
+  checkUserPermissionForOrganization,
+  OrganizationRoleGroup,
+} from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
@@ -34,12 +21,11 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const projectIds = await getProjectIdsForOrganization(organizationId);
-
-      const projectsCount = projectIds.length;
+      const traceUsageService = TraceUsageService.create();
+      const projectsCount = await getOrganizationProjectsCount(organizationId);
       const currentMonthMessagesCount =
-        await getCurrentMonthMessagesCount(projectIds);
-      const currentMonthCost = await getCurrentMonthCostForProjects(projectIds);
+        await traceUsageService.getCurrentMonthCount({ organizationId });
+      const currentMonthCost = await getCurrentMonthCost(organizationId);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,
         ctx.session.user,
@@ -83,79 +69,12 @@ export const limitsRouter = createTRPCRouter({
     }),
 });
 
-const getCurrentMonth = () => {
-  return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-};
-
 export const getOrganizationProjectsCount = async (organizationId: string) => {
   return await prisma.project.count({
     where: {
       team: { organizationId },
     },
   });
-};
-
-type CacheEntry = {
-  count: number;
-  lastUpdated: number;
-};
-
-const FIVE_MINUTES = 5 * 60 * 1000;
-const messageCountCache = new Map<string, CacheEntry>();
-
-export const getCurrentMonthMessagesCount = async (
-  projectIds: string[],
-  organizationId?: string,
-) => {
-  const cacheKey = organizationId
-    ? `org:${organizationId}`
-    : `projects:${projectIds.sort().join(",")}`;
-
-  const now = Date.now();
-  const cachedResult = messageCountCache.get(cacheKey);
-
-  // Return cached result if valid
-  if (cachedResult && now - cachedResult.lastUpdated < FIVE_MINUTES) {
-    return cachedResult.count;
-  }
-
-  let projectIdsToUse = projectIds;
-  if (organizationId) {
-    projectIdsToUse = await getProjectIdsForOrganization(organizationId);
-  }
-
-  const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
-  const messagesCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              terms: {
-                project_id: projectIds,
-              },
-            },
-            {
-              range: {
-                "timestamps.inserted_at": {
-                  gte: getCurrentMonth().getTime(),
-                },
-              },
-            },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
-
-  // Store result in cache
-  messageCountCache.set(cacheKey, {
-    count: messagesCount.count,
-    lastUpdated: now,
-  });
-
-  return messagesCount.count;
 };
 
 export const getCurrentMonthCost = async (organizationId: string) => {
@@ -180,7 +99,7 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
             in: projectIds,
           },
           createdAt: {
-            gte: getCurrentMonth(),
+            gte: getCurrentMonthStart(),
           },
         },
         _sum: {

@@ -1,11 +1,11 @@
-import { useState, useRef, useEffect } from "react";
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
+import { useEffect, useRef, useState } from "react";
+import { useIsTabActive } from "../../hooks/useIsTabActive";
 import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
 import { ChatTextArea } from "./ui/ChatTextArea";
-import { useIsTabActive } from "../../hooks/useIsTabActive";
 
 /**
  * Custom chat input with sync across tabs functionality.

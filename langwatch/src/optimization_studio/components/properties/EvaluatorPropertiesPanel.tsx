@@ -1,21 +1,21 @@
+import { VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import type { Evaluator, Field } from "../../types/dsl";
-import { BasePropertiesPanel } from "./BasePropertiesPanel";
-import { z } from "zod";
+import { useCallback, useEffect } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import { useDebouncedCallback } from "use-debounce";
+import { z } from "zod";
 import DynamicZodForm from "../../../components/checks/DynamicZodForm";
+import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../../server/evaluations/evaluators.zod.generated";
-import { VStack } from "@chakra-ui/react";
-import { useCallback, useEffect } from "react";
 import { getEvaluatorDefaultSettings } from "../../../server/evaluations/getEvaluator";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { useDebouncedCallback } from "use-debounce";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
+import type { Evaluator, Field } from "../../types/dsl";
+import { BasePropertiesPanel } from "./BasePropertiesPanel";
 
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const { project } = useOrganizationTeamProject();
@@ -25,7 +25,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     (node.data.parameters ?? []).map(({ identifier, value }) => [
       identifier,
       value,
-    ])
+    ]),
   );
   const form = useForm({
     defaultValues: {
@@ -56,7 +56,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
 
     const setDefaultSettings = (
       defaultValues: Record<string, any>,
-      prefix: string
+      prefix: string,
     ) => {
       if (!defaultValues) return;
 
@@ -76,7 +76,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
 
     setDefaultSettings(
       getEvaluatorDefaultSettings(evaluatorDefinition, project),
-      "settings"
+      "settings",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [evaluator]);
@@ -92,12 +92,12 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
                 identifier,
                 type: "str",
                 value: value,
-              }) as Field
+              }) as Field,
           ),
         },
       });
     },
-    [node.id, setNode]
+    [node.id, setNode],
   );
 
   const handleSubmit_ = useCallback(() => {

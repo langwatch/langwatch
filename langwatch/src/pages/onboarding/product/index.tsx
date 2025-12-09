@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Provider } from "~/components/ui/provider";
 import ProductScreen from "~/features/onboarding/screens/ProductScreen";
 

@@ -1,19 +1,19 @@
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
-import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
-import type { TenantId } from "../../library/domain/tenantId";
-import type { AggregateType } from "../../library/domain/aggregateType";
+import { createLogger } from "~/utils/logger";
 import { EventUtils } from "../../library";
+import type { AggregateType } from "../../library/domain/aggregateType";
+import type { TenantId } from "../../library/domain/tenantId";
+import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
+import { ConfigurationError } from "../../library/services/errorHandling";
+import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import {
-  parseCheckpointKey,
   buildCheckpointKey,
+  parseCheckpointKey,
 } from "../../library/utils/checkpointKey";
 import type {
-  CheckpointRepository,
   CheckpointRecord,
+  CheckpointRepository,
 } from "./repositories/checkpointRepository.types";
 import { CheckpointRepositoryMemory } from "./repositories/checkpointRepositoryMemory";
-import { createLogger } from "~/utils/logger";
-import { ConfigurationError } from "../../library/services/errorHandling";
 
 /**
  * In-memory implementation of ProcessorCheckpointStore.

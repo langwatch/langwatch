@@ -1,13 +1,16 @@
-import { useCallback } from "react";
-import { useShallow } from "zustand/react/shallow";
 import { RadioCard } from "@chakra-ui/react";
+import { useUpdateNodeInternals } from "@xyflow/react";
+import { useCallback } from "react";
 import {
   LuCode,
-  LuTerminal,
   LuGlobe,
-  LuWorkflow,
   LuMessageSquareCode,
+  LuTerminal,
+  LuWorkflow,
 } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
+import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
+import { useOrganizationTeamProject } from "../../../../../../hooks/useOrganizationTeamProject";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { StepRadio } from "../../../components/StepButton";
 import {
@@ -15,9 +18,6 @@ import {
   type OfflineExecutionMethod,
   useEvaluationWizardStore,
 } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useAnimatedFocusElementById } from "../../../../../../hooks/useAnimatedFocusElementById";
-import { useUpdateNodeInternals } from "@xyflow/react";
-import { useOrganizationTeamProject } from "../../../../../../hooks/useOrganizationTeamProject";
 
 export const EXECUTION_METHOD_SELECTOR_STEP_ACCORDION_VALUE =
   "execution-method-selector";
@@ -36,8 +36,8 @@ export function ExecutionMethodSelectionStepAccordion({
           executionMethod: wizardState.executionMethod,
           setWizardState,
           upsertExecutorNodeByType,
-        })
-      )
+        }),
+      ),
     );
 
   const focusElementById = useAnimatedFocusElementById();
@@ -50,7 +50,7 @@ export function ExecutionMethodSelectionStepAccordion({
       focusElementById("js-next-step-button");
       onSelect(value);
     },
-    [setWizardState, focusElementById, onSelect]
+    [setWizardState, focusElementById, onSelect],
   );
 
   const buildBaseRadioParams = useCallback(
@@ -61,7 +61,7 @@ export function ExecutionMethodSelectionStepAccordion({
         onClick: () => handleOptionClick(value),
       };
     },
-    [handleOptionClick]
+    [handleOptionClick],
   );
 
   return (
@@ -81,7 +81,10 @@ export function ExecutionMethodSelectionStepAccordion({
           description="Run a prompt via any LLM model to evaluate"
           icon={<LuMessageSquareCode />}
           onClick={() => {
-            const nodeId = upsertExecutorNodeByType({ type: "signature", project });
+            const nodeId = upsertExecutorNodeByType({
+              type: "signature",
+              project,
+            });
             updateNodeInternals(nodeId);
             handleOptionClick("offline_prompt");
           }}

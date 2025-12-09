@@ -9,10 +9,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Edit, MessageCircle, ThumbsDown, ThumbsUp } from "react-feather";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
 import { AnnotationComment } from "./annotations/AnnotationComment";
 
@@ -32,7 +32,7 @@ export const Annotations = ({
       projectId: project?.id ?? "",
       traceId: traceId,
     },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const scoreOptions = api.annotationScore.getAll.useQuery(
@@ -41,7 +41,7 @@ export const Annotations = ({
     },
     {
       enabled: !!project?.id && !isPublicRoute,
-    }
+    },
   );
 
   return (
@@ -152,7 +152,7 @@ export const Annotations = ({
                         )
                           return null;
                         const name = scoreOptions.data?.find(
-                          (option) => option.id === key
+                          (option) => option.id === key,
                         )?.name;
                         if (!name || !scoreOption.value) return null;
                         return (
@@ -176,7 +176,7 @@ export const Annotations = ({
                                             typeof scoreOption.reason ===
                                             "object"
                                               ? JSON.stringify(
-                                                  scoreOption.reason
+                                                  scoreOption.reason,
                                                 )
                                               : scoreOption.reason
                                           }
@@ -190,7 +190,7 @@ export const Annotations = ({
                             </Text>
                           )
                         );
-                      }
+                      },
                     )}
                 </HStack>
               </VStack>

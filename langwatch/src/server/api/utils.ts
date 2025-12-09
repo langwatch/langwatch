@@ -1,11 +1,11 @@
 import {
+  type PrismaClient,
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
-  type PrismaClient,
 } from "@prisma/client";
-import { hasProjectPermission, isDemoProject } from "./rbac";
-import type { Protections } from "../elasticsearch/protections";
 import type { Session } from "next-auth";
+import type { Protections } from "../elasticsearch/protections";
+import { hasProjectPermission, isDemoProject } from "./rbac";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>,
@@ -13,7 +13,7 @@ export const extractCheckKeys = (
   const keys: string[] = [];
 
   const recurse = (obj: Record<string, any>) => {
-    for (const key in obj) {
+    for (const key of Object.keys(obj)) {
       if (key.startsWith("check_") || key.startsWith("eval_")) {
         keys.push(key);
       }

@@ -2,8 +2,8 @@ import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generat
 import type {
   CustomMetadata,
   ElasticSearchTrace,
-  ReservedTraceMetadata,
   RESTEvaluation,
+  ReservedTraceMetadata,
   Span,
   TrackEventRESTParamsValidator,
 } from "../tracer/types";

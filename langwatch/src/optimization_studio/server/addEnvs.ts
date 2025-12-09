@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -6,11 +7,10 @@ import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
-import crypto from "crypto";
 
 export const addEnvs = async (
   event: StudioClientEvent,
-  projectId: string
+  projectId: string,
 ): Promise<StudioClientEvent> => {
   if (!("workflow" in event.payload)) {
     return event;
@@ -72,11 +72,11 @@ export const addEnvs = async (
               };
             }
             return p;
-          }) ?? []
+          }) ?? [],
         );
 
         return { ...node, data: { ...node.data, parameters } };
-      })
+      }),
     ),
   };
 
@@ -118,7 +118,7 @@ const addLiteLLMParams = async ({
   }
   if (!modelProvider.enabled) {
     throw new Error(
-      `${provider} model provider is disabled, go to settings to enable it`
+      `${provider} model provider is disabled, go to settings to enable it`,
     );
   }
   if (customKeysOnly && !modelProvider.customKeys) {

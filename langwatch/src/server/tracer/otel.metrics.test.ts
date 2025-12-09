@@ -1,6 +1,6 @@
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { assert, describe, expect, it } from "vitest";
-import { z, type ZodError } from "zod";
+import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryMetricsRequestToTracesForCollection } from "./otel.metrics";
@@ -384,7 +384,7 @@ const multipleDifferentTracesRequest: DeepPartial<IExportMetricsServiceRequest> 
 describe("opentelemetry metrics receiver", () => {
   it("receives time_to_first_token metric and maps to span timestamps", async () => {
     const traces = await openTelemetryMetricsRequestToTracesForCollection(
-      timeToFirstTokenMetricsRequest
+      timeToFirstTokenMetricsRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -410,7 +410,7 @@ describe("opentelemetry metrics receiver", () => {
     expect(trace?.spans[0]?.type).toEqual("llm");
     expect(trace?.spans[0]?.timestamps?.first_token_at).toEqual(1759757017682);
     expect(
-      trace?.spans[0]?.params?.metrics?.gen_ai?.server?.time_to_first_token
+      trace?.spans[0]?.params?.metrics?.gen_ai?.server?.time_to_first_token,
     ).toEqual({
       model: "gpt-5",
       request: {
@@ -424,7 +424,7 @@ describe("opentelemetry metrics receiver", () => {
 
   it("handles multiple exemplars in the same trace", async () => {
     const traces = await openTelemetryMetricsRequestToTracesForCollection(
-      multipleExemplarsRequest
+      multipleExemplarsRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -447,14 +447,14 @@ describe("opentelemetry metrics receiver", () => {
 
     // "c3BhbjExMTExMTExMTE=" -> "span1111111111" -> hex: 7370616e31313131313131313131
     const span1 = trace.spans.find(
-      (s) => s.span_id === "7370616e31313131313131313131"
+      (s) => s.span_id === "7370616e31313131313131313131",
     );
     expect(span1).toBeDefined();
     expect(span1?.timestamps?.first_token_at).toEqual(1759757017682); // Rounded from 1759757017681.929
 
     // "c3BhbjIyMjIyMjIyMjI=" -> "span2222222222" -> hex: 7370616e32323232323232323232
     const span2 = trace.spans.find(
-      (s) => s.span_id === "7370616e32323232323232323232"
+      (s) => s.span_id === "7370616e32323232323232323232",
     );
     expect(span2).toBeDefined();
     expect(span2?.timestamps?.first_token_at).toEqual(1759757020000);
@@ -462,7 +462,7 @@ describe("opentelemetry metrics receiver", () => {
 
   it("handles multiple traces from different exemplars", async () => {
     const traces = await openTelemetryMetricsRequestToTracesForCollection(
-      multipleDifferentTracesRequest
+      multipleDifferentTracesRequest,
     );
 
     expect(traces).toHaveLength(2);
@@ -480,14 +480,14 @@ describe("opentelemetry metrics receiver", () => {
 
     // "dHJhY2VhYWFhYWFhYWE=" -> "traceaaaaaaaaa" -> hex: 7472616365616161616161616161
     const trace1 = traces.find(
-      (t) => t.traceId === "7472616365616161616161616161"
+      (t) => t.traceId === "7472616365616161616161616161",
     );
     expect(trace1).toBeDefined();
     expect(trace1?.spans).toHaveLength(1);
 
     // "dHJhY2ViYmJiYmJiYmI=" -> "tracebbbbbbbbb" -> hex: 7472616365626262626262626262
     const trace2 = traces.find(
-      (t) => t.traceId === "7472616365626262626262626262"
+      (t) => t.traceId === "7472616365626262626262626262",
     );
     expect(trace2).toBeDefined();
     expect(trace2?.spans).toHaveLength(1);
@@ -496,7 +496,7 @@ describe("opentelemetry metrics receiver", () => {
   it("handles gauge metrics with exemplars", async () => {
     const traces =
       await openTelemetryMetricsRequestToTracesForCollection(
-        gaugeMetricsRequest
+        gaugeMetricsRequest,
       );
 
     expect(traces).toHaveLength(1);
@@ -522,7 +522,7 @@ describe("opentelemetry metrics receiver", () => {
     const metrics = span?.params?.metrics;
     expect(metrics?.gen_ai?.server?.active_requests).toBeDefined();
     expect(metrics?.gen_ai?.server?.active_requests?.endpoint).toEqual(
-      "/api/chat"
+      "/api/chat",
     );
     expect(metrics?.gen_ai?.server?.active_requests?.value).toEqual(5);
     expect(metrics?.gen_ai?.server?.active_requests?.unit).toEqual("count");
@@ -561,7 +561,7 @@ describe("opentelemetry metrics receiver", () => {
   it("handles empty metrics request", async () => {
     const traces =
       await openTelemetryMetricsRequestToTracesForCollection(
-        emptyMetricsRequest
+        emptyMetricsRequest,
       );
 
     expect(traces).toHaveLength(0);
@@ -570,7 +570,7 @@ describe("opentelemetry metrics receiver", () => {
   it("handles metrics without exemplars", async () => {
     const traces =
       await openTelemetryMetricsRequestToTracesForCollection(
-        noExemplarsRequest
+        noExemplarsRequest,
       );
 
     expect(traces).toHaveLength(0);
@@ -605,7 +605,7 @@ describe("opentelemetry metrics receiver", () => {
           console.log("trace", JSON.stringify(trace, undefined, 2));
           console.log("validationError", validationError);
           assert.fail(
-            `Schema validation failed for trace ${trace.traceId}: ${validationError.message}`
+            `Schema validation failed for trace ${trace.traceId}: ${validationError.message}`,
           );
         }
       }

@@ -1,18 +1,18 @@
 import {
+  type ComponentProps,
   createContext,
   useCallback,
   useContext,
   useState,
-  type ComponentProps,
 } from "react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
-  SaveVersionDialog,
   type SaveDialogFormValues,
+  SaveVersionDialog,
 } from "../forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
 import { usePrompts } from "../hooks/usePrompts";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigContextType } from "./types";
 
 /**
@@ -21,30 +21,30 @@ import type { PromptConfigContextType } from "./types";
 const createDefaultContextValue = (): PromptConfigContextType => ({
   triggerCreatePrompt: () => {
     throw new Error(
-      "triggerCreatePrompt must be called within PromptConfigProvider"
+      "triggerCreatePrompt must be called within PromptConfigProvider",
     );
   },
   triggerSaveVersion: () => {
     throw new Error(
-      "triggerSaveVersion must be called within PromptConfigProvider"
+      "triggerSaveVersion must be called within PromptConfigProvider",
     );
   },
   triggerChangeHandle: () => {
     throw new Error(
-      "triggerChangeHandle must be called within PromptConfigProvider"
+      "triggerChangeHandle must be called within PromptConfigProvider",
     );
   },
 });
 
 const PromptConfigContext = createContext<PromptConfigContextType>(
-  createDefaultContextValue()
+  createDefaultContextValue(),
 );
 
 export const usePromptConfigContext = () => {
   const context = useContext(PromptConfigContext);
   if (!context) {
     throw new Error(
-      "usePromptConfigContext must be used within a PromptConfigProvider"
+      "usePromptConfigContext must be used within a PromptConfigProvider",
     );
   }
   return context;
@@ -101,7 +101,7 @@ export function PromptConfigProvider({
           onSubmit,
         });
       },
-      [updatePrompt, projectId]
+      [updatePrompt, projectId],
     );
 
   const triggerCreatePrompt: PromptConfigContextType["triggerCreatePrompt"] =
@@ -132,7 +132,7 @@ export function PromptConfigProvider({
           onSubmit,
         });
       },
-      [createPrompt, projectId]
+      [createPrompt, projectId],
     );
 
   const triggerChangeHandle: PromptConfigContextType["triggerChangeHandle"] =
@@ -173,7 +173,7 @@ export function PromptConfigProvider({
           }
         })();
       },
-      [updateHandle, getPromptById, projectId]
+      [updateHandle, getPromptById, projectId],
     );
 
   return (

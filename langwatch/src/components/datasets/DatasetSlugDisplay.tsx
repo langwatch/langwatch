@@ -1,16 +1,16 @@
-import { useCallback } from "react";
 import {
-  Field,
-  Text,
-  VStack,
   Box,
   type BoxProps,
+  Field,
   HStack,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import type { SlugValidationResult } from "./useDatasetSlugValidation";
+import { useCallback } from "react";
+import { CopyButton } from "../CopyButton";
 import { SlugChangeWarningAlert } from "./SlugChangeWarningAlert";
 import { SlugConflictAlert } from "./SlugConflictAlert";
-import { CopyButton } from "../CopyButton";
+import type { SlugValidationResult } from "./useDatasetSlugValidation";
 
 /**
  * Props for DatasetSlugDisplay.

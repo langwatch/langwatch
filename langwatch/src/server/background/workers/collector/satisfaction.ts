@@ -1,11 +1,11 @@
+import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 import { getProjectEmbeddingsModel } from "~/server/embeddings";
 import { env } from "../../../../env.mjs";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../../elasticsearch";
-import type { Trace } from "../../../tracer/types";
-import { prepareLitellmParams } from "~/server/api/routers/modelProviders";
 import { OPENAI_EMBEDDING_DIMENSION } from "../../../../utils/constants";
 import { lambdaFetch } from "../../../../utils/lambdaFetch";
 import { createLogger } from "../../../../utils/logger";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../../elasticsearch";
+import type { Trace } from "../../../tracer/types";
 
 const logger = createLogger("langwatch:workers:collector:satisfaction");
 
@@ -33,7 +33,7 @@ export const scoreSatisfactionFromInput = async ({
   if (!input?.value) {
     logger.warn(
       { traceId },
-      "trace ID input is empty, skipping satisfaction score"
+      "trace ID input is empty, skipping satisfaction score",
     );
     return;
   }
@@ -58,12 +58,12 @@ export const scoreSatisfactionFromInput = async ({
           dimensions: OPENAI_EMBEDDING_DIMENSION,
         },
       }),
-    }
+    },
   );
 
   if (!response.ok) {
     throw new Error(
-      `Score satisfaction check API returned an error: ${await response.text()}`
+      `Score satisfaction check API returned an error: ${await response.text()}`,
     );
   }
 

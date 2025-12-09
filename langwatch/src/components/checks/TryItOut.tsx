@@ -2,8 +2,8 @@ import {
   Alert,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Input,
   Skeleton,
   Spacer,
@@ -15,35 +15,35 @@ import {
 import numeral from "numeral";
 import { useEffect, useState } from "react";
 import { Pause, Play, RefreshCw, Search } from "react-feather";
-import { type UseFormReturn } from "react-hook-form";
+import type { UseFormReturn } from "react-hook-form";
 import { useDebounceValue } from "usehooks-ts";
 import { useColorRawValue } from "../../components/ui/color-mode";
+import { toaster } from "../../components/ui/toaster";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import {
-  type Evaluators,
-  type SingleEvaluationResult,
+import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
+import type {
+  Evaluators,
+  SingleEvaluationResult,
 } from "../../server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "../../server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { evaluatePreconditions } from "../../server/evaluations/preconditions";
 import type { CheckPreconditions } from "../../server/evaluations/types";
-import { type ElasticSearchSpan } from "../../server/tracer/types";
-import { transformElasticSearchSpanToSpan } from "../../server/elasticsearch/transformers";
+import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
 import { useDrawer } from "../CurrentDrawer";
-import { HoverableBigText } from "../HoverableBigText";
-import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
+import { HoverableBigText } from "../HoverableBigText";
+import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
+import { InputGroup } from "../ui/input-group";
+import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { evaluationStatusColor } from "./EvaluationStatus";
-import { toaster } from "../../components/ui/toaster";
-import { InputGroup } from "../ui/input-group";
-import { RedactedField } from "../ui/RedactedField";
 
 export function TryItOut({
   form,
@@ -87,7 +87,7 @@ export function TryItOut({
       enabled: !!filterParams.projectId && !!fetchingParams,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function TryItOut({
 
   const allPassing =
     tracesPassingPreconditionsOnLoad.data?.every(
-      (trace) => trace.passesPreconditions
+      (trace) => trace.passesPreconditions,
     ) ?? false;
 
   const tracesLivePassesPreconditions =
@@ -114,14 +114,14 @@ export function TryItOut({
                 canSeeCapturedOutput: false,
                 canSeeCosts: false,
               },
-              new Set()
-            )(span as ElasticSearchSpan)
+              new Set(),
+            )(span as ElasticSearchSpan),
           ),
-          preconditions
-        )
+          preconditions,
+        ),
     ) ?? [];
   const firstPassingPrecondition = tracesLivePassesPreconditions.findIndex(
-    (pass) => pass
+    (pass) => pass,
   );
 
   const [runningResults, setRunningResults] = useState<
@@ -155,8 +155,8 @@ export function TryItOut({
         (passes, index) =>
           passes &&
           !processedTraceIds.includes(
-            tracesPassingPreconditionsOnLoad.data?.[index]?.trace_id ?? ""
-          )
+            tracesPassingPreconditionsOnLoad.data?.[index]?.trace_id ?? "",
+          ),
       );
 
       const nextTraceId =
@@ -224,7 +224,7 @@ export function TryItOut({
 
           moveToNext();
         },
-      }
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [runningState.state, (runningState as any).nextTraceId]);
@@ -232,8 +232,10 @@ export function TryItOut({
   const totalCost = Object.values(runningResults).reduce(
     (acc, result) =>
       acc +
-      (result.status === "processed" ? (result.cost as Money)?.amount ?? 0 : 0),
-    0
+      (result.status === "processed"
+        ? ((result.cost as Money)?.amount ?? 0)
+        : 0),
+    0,
   );
 
   const hasAnyLabels = evaluatorDefinition?.result.label;
@@ -351,8 +353,8 @@ export function TryItOut({
                 {runningState.state === "running"
                   ? "Running..."
                   : runningState.state === "paused"
-                  ? "Paused"
-                  : "Run on samples"}
+                    ? "Paused"
+                    : "Run on samples"}
               </Button>
             </HStack>
           </Card.Header>
@@ -443,14 +445,14 @@ export function TryItOut({
                             }
                           >
                             {new Date(
-                              trace.timestamps.started_at
+                              trace.timestamps.started_at,
                             ).toLocaleDateString(undefined, {
                               month: "numeric",
                               day: "numeric",
                             }) +
                               ", " +
                               new Date(
-                                trace.timestamps.started_at
+                                trace.timestamps.started_at,
                               ).toLocaleTimeString(undefined, {
                                 hour: "numeric",
                                 minute: "numeric",
@@ -467,7 +469,7 @@ export function TryItOut({
                             <Tooltip
                               content={
                                 livePassesPreconditions
-                                  ? trace.input?.value ?? ""
+                                  ? (trace.input?.value ?? "")
                                   : undefined
                               }
                             >
@@ -561,7 +563,7 @@ export function TryItOut({
                               ) : evaluatorDefinition?.result.score ? (
                                 <Table.Cell maxWidth="120" color={color}>
                                   {numeral(runningResult.score).format(
-                                    "0.[00]"
+                                    "0.[00]",
                                   )}
                                 </Table.Cell>
                               ) : null}
@@ -570,7 +572,7 @@ export function TryItOut({
                                 <Table.Cell maxWidth="120" color={color}>
                                   {"score" in runningResult
                                     ? numeral(runningResult.score).format(
-                                        "0.[00]"
+                                        "0.[00]",
                                       )
                                     : "-"}
                                 </Table.Cell>
@@ -590,7 +592,7 @@ export function TryItOut({
                                 <Table.Cell maxWidth="120" color={color}>
                                   {"score" in runningResult
                                     ? numeral(runningResult.score).format(
-                                        "0.[00]"
+                                        "0.[00]",
                                       )
                                     : "-"}
                                 </Table.Cell>
@@ -622,11 +624,11 @@ export function TryItOut({
                                     (runningResult.cost as Money) ?? {
                                       amount: 0,
                                       currency: "USD",
-                                    }
+                                    },
                                   )
                                 : runningResult.status === "loading"
-                                ? ""
-                                : "-")}
+                                  ? ""
+                                  : "-")}
                           </Table.Cell>
                         </Table.Row>
                       </Tooltip>
@@ -658,7 +660,7 @@ export function TryItOut({
                     </Table.Cell>
                     <Table.Cell>
                       {Object.values(runningResults).filter(
-                        (result) => result.status !== "loading"
+                        (result) => result.status !== "loading",
                       ).length > 0
                         ? formatMoney({
                             amount: totalCost,
@@ -666,7 +668,8 @@ export function TryItOut({
                               (
                                 Object.values(runningResults).filter(
                                   (result) =>
-                                    result.status === "processed" && result.cost
+                                    result.status === "processed" &&
+                                    result.cost,
                                 )[0] as any
                               )?.cost.currency ?? "USD",
                           })

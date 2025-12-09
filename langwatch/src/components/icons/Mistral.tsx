@@ -1,10 +1,6 @@
 export function Mistral() {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 32 32"
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 32 32">
       <g clipPath="url(#clip0_3970_2078)">
         <path fill="#000" d="M29.09 0h-5.817v6.393h5.818V0z"></path>
         <path fill="#F7D046" d="M32 0h-5.818v6.393H32V0z"></path>

@@ -1,7 +1,6 @@
 import { Container } from "@chakra-ui/react";
-
-import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
+import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 
 export default function Annotations() {
   return (

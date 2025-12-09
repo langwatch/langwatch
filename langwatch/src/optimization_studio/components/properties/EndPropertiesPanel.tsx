@@ -1,5 +1,5 @@
 import { Alert, Text } from "@chakra-ui/react";
-import { type Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import { useState } from "react";
 import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { End, Field } from "../../types/dsl";
@@ -30,7 +30,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
     }),
 
     // Add equality function to ensure proper updates
-    (prev, next) => prev.node === next.node
+    (prev, next) => prev.node === next.node,
   );
 
   const [isEvaluator] = useState(() => node.data.behave_as === "evaluator");
@@ -46,7 +46,7 @@ export function EndPropertiesPanel({ node: initialNode }: { node: Node<End> }) {
         !node.data.inputs?.some(
           (input) =>
             (input.identifier === "score" && input.type === "float") ||
-            (input.identifier === "passed" && input.type === "bool")
+            (input.identifier === "passed" && input.type === "bool"),
         ) && (
           <Alert.Root>
             <Alert.Indicator />

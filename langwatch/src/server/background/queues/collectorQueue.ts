@@ -1,11 +1,11 @@
+import type { ConnectionOptions } from "bullmq";
 import type {
-  CollectorJob,
   CollectorCheckAndAdjustJob,
+  CollectorJob,
 } from "~/server/background/types";
 import { connection } from "../../redis";
-import { QueueWithFallback } from "./queueWithFallback";
 import { processCollectorJob } from "../workers/collectorWorker";
-import type { ConnectionOptions } from "bullmq";
+import { QueueWithFallback } from "./queueWithFallback";
 
 export const COLLECTOR_QUEUE = "{collector}";
 

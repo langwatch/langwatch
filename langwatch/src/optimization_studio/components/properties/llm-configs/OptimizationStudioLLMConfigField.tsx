@@ -77,7 +77,8 @@ export function OptimizationStudioLLMConfigField({
   const { modelProviders } = useOrganizationTeamProject();
   const hasCustomKeys = Object.values(modelProviders ?? {}).some(
     (modelProvider) =>
-      model.split("/")[0] === modelProvider.provider && modelProvider.customKeys,
+      model.split("/")[0] === modelProvider.provider &&
+      modelProvider.customKeys,
   );
   const requiresCustomKey = hasCodeNodes && !hasCustomKeys;
 

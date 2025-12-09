@@ -40,5 +40,5 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(
         )}
       </ChakraSwitch.Root>
     );
-  }
+  },
 );

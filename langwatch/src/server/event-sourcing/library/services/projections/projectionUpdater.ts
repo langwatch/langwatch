@@ -1,28 +1,30 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event, EventOrderingStrategy } from "../../domain/types";
-import type { EventStream } from "../../streams/eventStream";
+import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { TenantId } from "../../domain/tenantId";
-import type { EventStore } from "../../stores/eventStore.types";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { Event, EventOrderingStrategy } from "../../domain/types";
 import type { ProjectionDefinition } from "../../projection.types";
-import type { UpdateProjectionOptions } from "../eventSourcingService.types";
-import { EventUtils } from "../../utils/event.utils";
+import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type {
+  EventStore,
+  EventStoreReadContext,
+} from "../../stores/eventStore.types";
+import type { EventStream } from "../../streams/eventStream";
 import type { DistributedLock } from "../../utils/distributedLock";
-import { createLogger } from "~/utils/logger";
-import { type EventProcessorValidator } from "../validation/eventProcessorValidator";
-import { type CheckpointManager } from "../checkpoints/checkpointManager";
-import { type QueueProcessorManager } from "../queues/queueProcessorManager";
+import { EventUtils } from "../../utils/event.utils";
+import type { CheckpointManager } from "../checkpoints/checkpointManager";
 import {
-  handleError,
-  categorizeError,
   ConfigurationError,
+  categorizeError,
+  handleError,
+  isSequentialOrderingError,
   LockError,
   ValidationError,
-  isSequentialOrderingError,
 } from "../errorHandling";
+import type { UpdateProjectionOptions } from "../eventSourcingService.types";
+import type { QueueProcessorManager } from "../queues/queueProcessorManager";
+import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
 
 /**
  * Manages projection updates for event sourcing.

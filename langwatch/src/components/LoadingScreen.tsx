@@ -1,8 +1,7 @@
 import { Box } from "@chakra-ui/react";
-import { motion, AnimatePresence } from "motion/react";
-
-import { FullLogo } from "./icons/FullLogo";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { FullLogo } from "./icons/FullLogo";
 
 let logoVisibleOnce = false;
 

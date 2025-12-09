@@ -1,10 +1,10 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "~/server/db";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { unshareItem } from "~/server/api/routers/share";
+import { prisma } from "~/server/db";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end();

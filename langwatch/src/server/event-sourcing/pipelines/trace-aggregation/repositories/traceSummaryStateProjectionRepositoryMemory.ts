@@ -1,36 +1,35 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
+import { createLogger } from "../../../../../utils/logger";
 import type {
+  Projection,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
 } from "../../../library";
-import type { Projection } from "../../../library";
 import { EventUtils } from "../../../library";
 import {
-  ValidationError,
   SecurityError,
+  ValidationError,
 } from "../../../library/services/errorHandling";
-import { createLogger } from "../../../../../utils/logger";
-import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
+import type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
 
 /**
- * In-memory projection repository for trace projections.
- * Stores trace metrics matching the trace_projections ClickHouse schema.
+ * In-memory projection repository for trace summaries.
+ * Stores trace metrics matching the trace_summaries ClickHouse schema.
  *
  * **WARNING: NOT THREAD-SAFE**
  * This implementation is NOT safe for concurrent access.
  * Use only for single-threaded environments or with proper synchronization.
  */
-export class TraceAggregationStateProjectionRepositoryMemory<
+export class TraceSummaryStateProjectionRepositoryMemory<
   ProjectionType extends Projection = Projection,
-> implements TraceAggregationStateProjectionRepository<ProjectionType>
+> implements TraceSummaryStateProjectionRepository<ProjectionType>
 {
   tracer = getLangWatchTracer(
-    "langwatch.trace-aggregation-state-projection-repository.memory",
+    "langwatch.trace-summary-state-projection-repository.memory",
   );
   logger = createLogger(
-    "langwatch:trace-aggregation-state-projection-repository:memory",
+    "langwatch:trace-summary-state-projection-repository:memory",
   );
   // Partition by tenant + traceId
   private readonly projectionsByKey = new Map<string, ProjectionType>();
@@ -40,7 +39,7 @@ export class TraceAggregationStateProjectionRepositoryMemory<
     context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
     return await this.tracer.withActiveSpan(
-      "TraceAggregationStateProjectionRepositoryMemory.getProjection",
+      `${this.constructor.name}.getProjection`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -52,7 +51,7 @@ export class TraceAggregationStateProjectionRepositoryMemory<
         // Validate tenant context
         EventUtils.validateTenantId(
           context,
-          "TraceAggregationStateProjectionRepositoryMemory.getProjection",
+          `${this.constructor.name}.getProjection`,
         );
 
         const key = `${context.tenantId}:${aggregateId}`;
@@ -72,7 +71,7 @@ export class TraceAggregationStateProjectionRepositoryMemory<
     context: ProjectionStoreWriteContext,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
-      "TraceAggregationStateProjectionRepositoryMemory.storeProjection",
+      `${this.constructor.name}.storeProjection`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -84,7 +83,7 @@ export class TraceAggregationStateProjectionRepositoryMemory<
         // Validate tenant context
         EventUtils.validateTenantId(
           context,
-          "TraceAggregationStateProjectionRepositoryMemory.storeProjection",
+          `${this.constructor.name}.storeProjection`,
         );
 
         // Validate projection

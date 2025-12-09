@@ -1,6 +1,6 @@
-import { IconButton, HStack } from "@chakra-ui/react";
-import { LuTrash2 } from "react-icons/lu";
+import { HStack, IconButton } from "@chakra-ui/react";
 import { useState } from "react";
+import { LuTrash2 } from "react-icons/lu";
 
 interface DeletableMessageProps {
   messageId: string;

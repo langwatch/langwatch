@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TeamUserRole } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { hasProjectPermission, type Permission } from "../rbac";
 
 // Helper function to test permission hierarchy logic

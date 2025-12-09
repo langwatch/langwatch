@@ -1,39 +1,37 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator, resolver } from "hono-openapi/zod";
+import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
-import {
-  organizationMiddleware,
-  type AuthMiddlewareVariables,
-  type OrganizationMiddlewareVariables,
-} from "../../middleware";
-import {
-  promptServiceMiddleware,
-  type PromptServiceMiddlewareVariables,
-} from "../../middleware/prompt-service";
-import { baseResponses, conflictResponses } from "../../shared/base-responses";
-
-import {
-  apiResponsePromptWithVersionDataSchema,
-  createPromptInputSchema,
-  updatePromptInputSchema,
-  type ApiResponsePrompt,
-} from "./schemas";
-import { buildStandardSuccessResponse } from "./utils";
-import { handlePossibleConflictError } from "./utils";
-import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
-
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   commitMessageSchema,
   versionSchema,
 } from "~/prompts/schemas/field-schemas";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
+import {
+  type AuthMiddlewareVariables,
+  type OrganizationMiddlewareVariables,
+  organizationMiddleware,
+} from "../../middleware";
+import {
+  type PromptServiceMiddlewareVariables,
+  promptServiceMiddleware,
+} from "../../middleware/prompt-service";
+import { baseResponses, conflictResponses } from "../../shared/base-responses";
+import {
+  type ApiResponsePrompt,
+  apiResponsePromptWithVersionDataSchema,
+  createPromptInputSchema,
+  updatePromptInputSchema,
+} from "./schemas";
+import {
+  buildStandardSuccessResponse,
+  handlePossibleConflictError,
+} from "./utils";
+import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
 const logger = createLogger("langwatch:api:prompts");
 

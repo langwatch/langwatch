@@ -1,31 +1,32 @@
-import { type ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-
-import type {
-  ProjectionStoreReadContext,
-  ProjectionStoreWriteContext,
-} from "../../../library";
-import type { Projection } from "../../../library";
-import { EventUtils, createTenantId } from "../../../library";
-import { createLogger } from "../../../../../utils/logger";
-import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
-import type { TraceProjectionData } from "../projections/traceAggregationStateProjection";
-import type { TraceProjection } from "../projections/traceAggregationStateProjection";
 import {
   ErrorCategory,
   SecurityError,
   StoreError,
   ValidationError,
 } from "~/server/event-sourcing/library/services/errorHandling";
+import { createLogger } from "../../../../../utils/logger";
+import type {
+  Projection,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext,
+} from "../../../library";
+import { createTenantId, EventUtils } from "../../../library";
+import type {
+  TraceSummary,
+  TraceSummaryData,
+} from "../projections/traceSummaryStateProjection";
+import type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
 
-const TABLE_NAME = "trace_projections" as const;
+const TABLE_NAME = "trace_summaries" as const;
 
 /**
- * ClickHouse record matching the trace_projections table schema.
+ * ClickHouse record matching the trace_summaries table schema.
  * Version is stored as DateTime64(9) in ClickHouse (nanoseconds since epoch).
  */
-interface ClickHouseProjectionRecord {
+interface ClickHouseSummaryRecord {
   Id: string;
   TenantId: string;
   TraceId: string;
@@ -69,19 +70,19 @@ function dateTime64ToTimestamp(dateTime64: string): number {
 }
 
 /**
- * ClickHouse projection repository for trace projections.
- * Stores trace metrics in ClickHouse matching the trace_projections table schema.
+ * ClickHouse projection repository for trace summaries.
+ * Stores trace metrics in ClickHouse matching the trace_summaries table schema.
  * Uses ReplacingMergeTree with Version to keep the latest projection per trace.
  */
-export class TraceAggregationStateProjectionRepositoryClickHouse<
+export class TraceSummaryStateProjectionRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
-> implements TraceAggregationStateProjectionRepository<ProjectionType>
+> implements TraceSummaryStateProjectionRepository<ProjectionType>
 {
   tracer = getLangWatchTracer(
-    "langwatch.trace-aggregation-state-projection-repository.clickhouse",
+    "langwatch.trace-summary-state-projection-repository.clickhouse",
   );
   logger = createLogger(
-    "langwatch:trace-aggregation-state-projection-repository:clickhouse",
+    "langwatch:trace-summary-state-projection-repository:clickhouse",
   );
 
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
@@ -90,8 +91,8 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
    * Maps a ClickHouse record to projection data.
    */
   private mapClickHouseRecordToProjectionData(
-    record: ClickHouseProjectionRecord,
-  ): TraceProjectionData {
+    record: ClickHouseSummaryRecord,
+  ): TraceSummaryData {
     return {
       TraceId: record.TraceId,
       SpanCount: record.SpanCount,
@@ -120,12 +121,12 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
    * Maps projection data to a ClickHouse record.
    */
   private mapProjectionDataToClickHouseRecord(
-    data: TraceProjectionData,
+    data: TraceSummaryData,
     tenantId: string,
     traceId: string,
     projectionId: string,
     projectionVersion: number,
-  ): ClickHouseProjectionRecord {
+  ): ClickHouseSummaryRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
@@ -216,7 +217,7 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
             format: "JSONEachRow",
           });
 
-          const rows = await result.json<ClickHouseProjectionRecord>();
+          const rows = await result.json<ClickHouseSummaryRecord>();
           const row = rows[0];
           if (!row) {
             return null;
@@ -224,7 +225,7 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
 
           const projectionData = this.mapClickHouseRecordToProjectionData(row);
 
-          const projection: TraceProjection = {
+          const projection: TraceSummary = {
             id: row.Id,
             aggregateId: traceId,
             tenantId: createTenantId(context.tenantId),
@@ -299,7 +300,7 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
         try {
           const traceId = String(projection.aggregateId);
           const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-            projection.data as TraceProjectionData,
+            projection.data as TraceSummaryData,
             String(context.tenantId),
             traceId,
             projection.id,

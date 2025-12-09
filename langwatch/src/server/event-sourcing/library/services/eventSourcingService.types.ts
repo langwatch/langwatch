@@ -1,13 +1,13 @@
-import type { Event, EventOrderingStrategy, Projection } from "../domain/types";
-import type { EventStore } from "../stores/eventStore.types";
+import type { createLogger } from "../../../../utils/logger";
 import type { AggregateType } from "../domain/aggregateType";
-import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
-import { type createLogger } from "../../../../utils/logger";
-import type { DistributedLock } from "../utils/distributedLock";
-import type { ProjectionDefinitions } from "../projection.types";
+import type { Event, EventOrderingStrategy, Projection } from "../domain/types";
 import type { EventHandlerDefinitions } from "../eventHandler.types";
+import type { ProjectionDefinitions } from "../projection.types";
 import type { EventPublisher } from "../publishing/eventPublisher.types";
 import type { EventSourcedQueueProcessor } from "../queues";
+import type { EventStore } from "../stores/eventStore.types";
+import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
+import type { DistributedLock } from "../utils/distributedLock";
 
 /**
  * Default time-to-live for distributed locks used during projection updates.

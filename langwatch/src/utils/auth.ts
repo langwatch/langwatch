@@ -2,7 +2,7 @@ import type { GetServerSidePropsContext, NextApiRequest } from "next";
 import type { NextRequest } from "next/server";
 
 export const getNextAuthSessionToken = (
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
 ) => {
   if (typeof req.cookies.get === "function") {
     return (

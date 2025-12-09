@@ -1,8 +1,8 @@
-import { IncomingWebhook } from "@slack/webhook";
-import { captureException } from "../../utils/posthogErrorCapture";
-import { env } from "../../env.mjs";
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
-import { type Trace } from "~/server/tracer/types";
+import { IncomingWebhook } from "@slack/webhook";
+import type { Trace } from "~/server/tracer/types";
+import { env } from "../../env.mjs";
+import { captureException } from "../../utils/posthogErrorCapture";
 
 interface TriggerData {
   traceId: string;

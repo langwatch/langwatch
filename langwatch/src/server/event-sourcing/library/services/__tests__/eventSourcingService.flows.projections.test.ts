@@ -1,24 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourcingService } from "../eventSourcingService";
-import type { Event } from "../../domain/types";
-import {
-  createMockEventStore,
-  createMockProjectionStore,
-  createMockProjectionDefinition,
-  createMockEventHandler,
-  createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
-  createTestAggregateType,
-  createTestProjection,
-  TEST_CONSTANTS,
-  setupTestEnvironment,
-  cleanupTestEnvironment,
-  createTestContext,
-} from "./testHelpers";
 import { EVENT_TYPES } from "../../domain/eventType";
+import type { Event } from "../../domain/types";
 import { buildCheckpointKey } from "../../utils/checkpointKey";
+import { EventSourcingService } from "../eventSourcingService";
+import {
+  cleanupTestEnvironment,
+  createMockEventHandler,
+  createMockEventStore,
+  createMockProcessorCheckpointStore,
+  createMockProjectionDefinition,
+  createMockProjectionStore,
+  createTestAggregateType,
+  createTestContext,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestProjection,
+  createTestTenantId,
+  setupTestEnvironment,
+  TEST_CONSTANTS,
+} from "./testHelpers";
 
 describe("EventSourcingService - Projection Flows", () => {
   const { aggregateType, tenantId, context } = createTestContext();

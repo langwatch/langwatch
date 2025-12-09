@@ -1,13 +1,13 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
-import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
+import { signOut } from "next-auth/react";
 import { useEffect } from "react";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
-import { captureException } from "~/utils/posthogErrorCapture";
 
 export default function Accept() {
   const router = useRouter();
@@ -52,7 +52,7 @@ export default function Accept() {
             });
           });
         },
-      }
+      },
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1,20 +1,14 @@
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTestProject } from "../../../utils/testUtils";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import type {
   ElasticSearchSpan,
   ElasticSearchTrace,
   Span,
 } from "../../tracer/types";
-import { processCollectorJob } from "./collectorWorker";
 import type { CollectorJob } from "../types";
-import { getTestProject } from "../../../utils/testUtils";
+import { processCollectorJob } from "./collectorWorker";
 
 describe("Collector Worker Integration Tests", () => {
   let projectId: string;
@@ -151,10 +145,10 @@ describe("Collector Worker Integration Tests", () => {
 
       // The unchanged span should still exist
       expect(unchangedSpan?.timestamps.started_at).toBe(
-        originalStartedAt + 1000
+        originalStartedAt + 1000,
       );
       expect(unchangedSpan?.timestamps.finished_at).toBe(
-        originalFinishedAt + 1000
+        originalFinishedAt + 1000,
       );
     });
 
@@ -274,15 +268,15 @@ describe("Collector Worker Integration Tests", () => {
       // Should preserve the provided started_at and finished_at
       if (span) {
         expect(span.timestamps.started_at).toBe(
-          normalJob.spans[0]!.timestamps.started_at
+          normalJob.spans[0]!.timestamps.started_at,
         );
         expect(span.timestamps.finished_at).toBe(
-          normalJob.spans[0]!.timestamps.finished_at
+          normalJob.spans[0]!.timestamps.finished_at,
         );
         // inserted_at and updated_at should be set to current time (cast to any for ES-specific fields)
         const esSpan = span as ElasticSearchSpan;
         expect(esSpan.timestamps.inserted_at).toBeGreaterThanOrEqual(
-          beforeTime
+          beforeTime,
         );
         expect(esSpan.timestamps.inserted_at).toBeLessThanOrEqual(afterTime);
         expect(esSpan.timestamps.updated_at).toBeGreaterThanOrEqual(beforeTime);
@@ -378,13 +372,13 @@ describe("Collector Worker Integration Tests", () => {
       // Verify all spans are present
       expect(trace.spans).toHaveLength(3);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost,
       ).toBe(0.0001);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost,
       ).toBe(0.0002);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId3)?.metrics
+        trace.spans?.find((s) => s.span_id === spanId3)?.metrics,
       ).toBeUndefined();
     });
 
@@ -488,10 +482,10 @@ describe("Collector Worker Integration Tests", () => {
       // Verify both spans are present with their individual costs
       expect(trace.spans).toHaveLength(2);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost,
       ).toBe(0.0001);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost,
       ).toBe(0.0002);
     });
 
@@ -569,10 +563,10 @@ describe("Collector Worker Integration Tests", () => {
       // Verify both spans are present
       expect(trace.spans).toHaveLength(2);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics?.cost,
       ).toBe(0.0001);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost,
       ).toBeUndefined();
     });
 
@@ -644,10 +638,10 @@ describe("Collector Worker Integration Tests", () => {
       // Verify both spans are present
       expect(trace.spans).toHaveLength(2);
       expect(
-        trace.spans?.find((s) => s.span_id === spanId1)?.metrics
+        trace.spans?.find((s) => s.span_id === spanId1)?.metrics,
       ).toBeUndefined();
       expect(
-        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost
+        trace.spans?.find((s) => s.span_id === spanId2)?.metrics?.cost,
       ).toBeUndefined();
     });
 

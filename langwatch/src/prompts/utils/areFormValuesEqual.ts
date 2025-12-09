@@ -1,6 +1,6 @@
-import { isEqual } from "lodash";
-import type { PromptConfigFormValues } from "~/prompts";
+import isEqual from "lodash.isequal";
 import type { DeepPartial } from "react-hook-form";
+import type { PromptConfigFormValues } from "~/prompts";
 
 /**
  * Compare two form values for deep equality after JSON normalization.
@@ -17,4 +17,3 @@ export function areFormValuesEqual(
   // Use JSON.stringify to normalize the objects for comparison (ie Dates, etc)
   return isEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 }
-

@@ -1,11 +1,11 @@
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 
-import {
-  type Code,
-  type Evaluator,
-  type Field,
-  type PromptingTechnique,
-  type Signature,
+import type {
+  Code,
+  Evaluator,
+  Field,
+  PromptingTechnique,
+  Signature,
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
 
@@ -26,7 +26,7 @@ const signature: Signature = {
         model: "openai/gpt-4o",
         temperature: 0,
         max_tokens: 2048,
-      }
+      },
     },
     {
       identifier: "prompting_technique",
@@ -109,24 +109,6 @@ const promptingTechniques: PromptingTechnique[] = [
   },
 ];
 
-const retrieverInputsAndOutputs: {
-  inputs: Field[];
-  outputs: Field[];
-} = {
-  inputs: [
-    {
-      identifier: "query",
-      type: "str",
-    },
-  ],
-  outputs: [
-    {
-      identifier: "contexts",
-      type: "list[str]",
-    },
-  ],
-};
-
 const ALLOWED_EVALUATORS = [
   "langevals/exact_match",
   "langevals/llm_answer_match",
@@ -161,9 +143,9 @@ const evaluators: Evaluator[] = [
         .filter(([cls, _evaluator]) => ALLOWED_EVALUATORS.includes(cls))
         .sort(
           ([clsA, _evaluatorA], [clsB, _evaluatorB]) =>
-            ALLOWED_EVALUATORS.indexOf(clsA) - ALLOWED_EVALUATORS.indexOf(clsB)
-        )
-    ) as typeof AVAILABLE_EVALUATORS
+            ALLOWED_EVALUATORS.indexOf(clsA) - ALLOWED_EVALUATORS.indexOf(clsB),
+        ),
+    ) as typeof AVAILABLE_EVALUATORS,
   ),
 ];
 

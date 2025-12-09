@@ -15,7 +15,7 @@ def get_webapp_dir():
     return Path(__file__).parent.parent / "langwatch"
 
 
-def npm_install():
+def pnpm_install():
     webapp_dir = get_webapp_dir()
     if not (webapp_dir / ".env").exists():
         shutil.copy(webapp_dir / ".env.example", webapp_dir / ".env")
@@ -23,15 +23,15 @@ def npm_install():
         print(
             "Setting up LangWatch for first time use, this is a one-time only operation..."
         )
-        print("[1/2] 📦 Installing npm dependencies...")
-        subprocess.run(["npm", "install"], cwd=webapp_dir, check=True)
+        print("[1/2] 📦 Installing pnpm dependencies...")
+        subprocess.run(["pnpm", "install"], cwd=webapp_dir, check=True)
         print("[2/2] 📦 Installing quickwit...")
-        subprocess.run(["npm", "run", "setup:quickwit"], cwd=webapp_dir, check=True)
+        subprocess.run(["pnpm", "run", "setup:quickwit"], cwd=webapp_dir, check=True)
 
 
 def start_dev_server():
     webapp_dir = get_webapp_dir()
-    subprocess.run(["npm", "start"], cwd=webapp_dir)
+    subprocess.run(["pnpm", "start"], cwd=webapp_dir)
 
 
 def main():
@@ -39,7 +39,7 @@ def main():
         print_help()
 
     try:
-        npm_install()
+        pnpm_install()
         start_dev_server()
     except subprocess.CalledProcessError as e:
         print(f"Error: Failed to start server: {str(e)}", file=sys.stderr)

@@ -1,12 +1,12 @@
-import { type Edge, type Node } from "@xyflow/react";
-import { type StateCreator } from "zustand";
+import type { Edge, Node } from "@xyflow/react";
+import type { StateCreator } from "zustand";
+import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type {
   Component,
   Field,
 } from "../../../../../../optimization_studio/types/dsl";
-import { calculateNextPosition, updateNodeParameter } from "./utils/node.util";
-import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type { NodeWithOptionalPosition } from "../../../../../../types";
+import { calculateNextPosition, updateNodeParameter } from "./utils/node.util";
 
 type NodeTypes = "signature" | "code" | "evaluator" | "entry";
 
@@ -22,7 +22,7 @@ export interface BaseNodeSlice {
    * @returns A new node with position
    */
   createNewNode: <T extends Component>(
-    node: NodeWithOptionalPosition<T>
+    node: NodeWithOptionalPosition<T>,
   ) => Node<T>;
 
   /**
@@ -31,7 +31,7 @@ export interface BaseNodeSlice {
    */
   addNodeToWorkflow: <T extends Component>(
     node: Node<T>,
-    newEdges?: Edge[]
+    newEdges?: Edge[],
   ) => string;
 
   /**
@@ -41,7 +41,7 @@ export interface BaseNodeSlice {
    */
   updateNode: <T extends Component>(
     nodeId: string,
-    updater: (node: Node<T>) => Node<T>
+    updater: (node: Node<T>) => Node<T>,
   ) => void;
 
   // Setters
@@ -54,7 +54,7 @@ export interface BaseNodeSlice {
       identifier: string;
       type: Field["type"];
       value?: unknown;
-    }
+    },
   ) => void;
   /**
    * Replace node with a new node
@@ -83,7 +83,7 @@ export const createBaseNodeSlice: StateCreator<
 
     getNodesByType: <T extends Component>(type: NodeTypes) => {
       return getWorkflow().nodes.filter(
-        (node) => node.type === type
+        (node) => node.type === type,
       ) as Node<T>[];
     },
 
@@ -103,7 +103,7 @@ export const createBaseNodeSlice: StateCreator<
 
     addNodeToWorkflow: <T extends Component>(
       node: Node<T>,
-      newEdges?: Edge[]
+      newEdges?: Edge[],
     ): string => {
       get().workflowStore.setWorkflow((current) => {
         return {
@@ -118,13 +118,13 @@ export const createBaseNodeSlice: StateCreator<
 
     updateNode: <T extends Component>(
       nodeId: string,
-      updater: (node: Node<T>) => Node<T>
+      updater: (node: Node<T>) => Node<T>,
     ) => {
       get().workflowStore.setWorkflow((current) => {
         return {
           ...current,
           nodes: current.nodes.map((node) =>
-            node.id === nodeId ? updater(node as Node<T>) : node
+            node.id === nodeId ? updater(node as Node<T>) : node,
           ),
         };
       });
@@ -136,10 +136,10 @@ export const createBaseNodeSlice: StateCreator<
         identifier: string;
         type: Field["type"];
         value?: unknown;
-      }
+      },
     ) => {
       return get().updateNode(nodeId, (node) =>
-        updateNodeParameter(node, parameter)
+        updateNodeParameter(node, parameter),
       );
     },
 
