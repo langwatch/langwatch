@@ -1,13 +1,15 @@
-import { type ClickHouseClient } from "@clickhouse/client";
-import type {
-  CheckpointRepository,
-  CheckpointRecord,
-} from "./checkpointRepository.types";
+import type { ClickHouseClient } from "@clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
+import type {
+  CheckpointRecord,
+  CheckpointRepository,
+} from "./checkpointRepository.types";
 
 /**
  * ClickHouse implementation of CheckpointRepository.
  * Handles raw data access to ClickHouse without business logic.
+ *
+ * Schema in /server/clickhouse/migrations/00003_create_processor_checkpoints.sql
  */
 export class CheckpointRepositoryClickHouse implements CheckpointRepository {
   private readonly logger = createLogger(

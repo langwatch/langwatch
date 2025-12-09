@@ -20,13 +20,13 @@ import { prisma } from "../db";
 import { esClient, TRACE_INDEX } from "../elasticsearch";
 import {
   analyticsPipelines,
-  pipelineAggregationsToElasticSearch,
   type FlattenAnalyticsGroupsEnum,
+  pipelineAggregationsToElasticSearch,
   type SeriesInputType,
 } from "./registry";
 import {
-  percentileAggregationTypes,
   type PercentileAggregationTypes,
+  percentileAggregationTypes,
 } from "./types";
 import { filterOutEmptyFilters } from "./utils";
 
@@ -66,7 +66,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   const { previousPeriodStartDate, startDate, endDate } =
     currentVsPreviousDates(
       input,
-      typeof input.timeScale === "number" ? input.timeScale : undefined
+      typeof input.timeScale === "number" ? input.timeScale : undefined,
     );
 
   // Calculate total time span in minutes
@@ -94,7 +94,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
           filters,
           asPercent,
         }: SeriesInputType,
-        index: number
+        index: number,
       ) => {
         const metric_ = getMetric(metric);
 
@@ -115,7 +115,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
           index,
           aggregation,
           key,
-          subkey
+          subkey,
         );
 
         let aggregationQuery: Record<string, AggregationsAggregationContainer> =
@@ -135,7 +135,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             index,
             metric,
             aggregation,
-            pipeline
+            pipeline,
           );
 
           pipelineBucketsMetricPath =
@@ -185,7 +185,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
               index,
               aggregation,
               key,
-              subkey
+              subkey,
             );
             const percentageWrapperKey = pipelinePath_
               ? `${pipelinePath_}__percent`
@@ -213,8 +213,8 @@ export const timeseries = async (input: TimeseriesInputType) => {
         }
 
         return Object.entries(aggregationQuery);
-      }
-    )
+      },
+    ),
   );
 
   let groupLabelsMapping: Record<string, string> | undefined;
@@ -223,7 +223,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
     aggs = group.aggregation(aggs);
     if (labelsMapping[input.groupBy]) {
       groupLabelsMapping = await labelsMapping[input.groupBy]?.(
-        input.projectId
+        input.projectId,
       );
     }
   }
@@ -288,7 +288,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   })) as any;
 
   const parseAggregations = (
-    buckets: any
+    buckets: any,
   ): ({ date: string } & Record<string, number>)[] => {
     return buckets.map((day_bucket: any) => {
       let aggregationResult: Record<string, any> = {
@@ -320,7 +320,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
                   extractResultForBucket(
                     input.series,
                     pathsAfterBuckets,
-                    group_bucket
+                    group_bucket,
                   ),
                 ];
               })
@@ -331,12 +331,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
                     extractResultForBucket(
                       input.series,
                       pathsAfterBuckets,
-                      group_bucket
+                      group_bucket,
                     ),
                   ];
-                }
+                },
               )
-          ).filter(([key, _]) => key !== undefined)
+          ).filter(([key, _]) => key !== undefined),
         );
 
         aggregationResult = {
@@ -357,7 +357,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   if (input.timeScale === "full") {
     const [previous, current] =
       result.aggregations?.previous_vs_current.buckets.filter(
-        (bucket: any) => bucket.key === "previous" || bucket.key === "current"
+        (bucket: any) => bucket.key === "previous" || bucket.key === "current",
       );
 
     return {
@@ -368,18 +368,18 @@ export const timeseries = async (input: TimeseriesInputType) => {
 
   const currentPeriod = parseAggregations(
     result.aggregations.previous_vs_current.buckets.find(
-      (bucket: any) => bucket.key === "current"
-    ).traces_per_day.buckets
+      (bucket: any) => bucket.key === "current",
+    ).traces_per_day.buckets,
   );
 
   let previousPeriod = parseAggregations(
     result.aggregations.previous_vs_current.buckets.find(
-      (bucket: any) => bucket.key === "previous"
-    ).traces_per_day.buckets
+      (bucket: any) => bucket.key === "previous",
+    ).traces_per_day.buckets,
   );
   // Correction for when a single day is selected and we end up querying for 2 days for previous period and dates don't align
   previousPeriod = previousPeriod.slice(
-    Math.max(0, previousPeriod.length - currentPeriod.length)
+    Math.max(0, previousPeriod.length - currentPeriod.length),
   );
 
   return {
@@ -391,14 +391,14 @@ export const timeseries = async (input: TimeseriesInputType) => {
 const extractResultForBucket = (
   seriesList: SeriesInputType[],
   pathsAfterBuckets: string | undefined,
-  bucket: any
+  bucket: any,
 ) => {
   return Object.fromEntries(
     seriesList.flatMap((series, index) => {
       return Object.entries(
-        extractResult(series, index, pathsAfterBuckets, bucket)
+        extractResult(series, index, pathsAfterBuckets, bucket),
       );
-    })
+    }),
   );
 };
 
@@ -414,7 +414,7 @@ const extractResult = (
   }: SeriesInputType,
   index: number,
   pathsAfterBuckets: string | undefined,
-  result: any
+  result: any,
 ) => {
   let current = result;
   if (pathsAfterBuckets) {
@@ -430,7 +430,7 @@ const extractResult = (
     index,
     aggregation,
     key,
-    subkey
+    subkey,
   );
   let paths = extractionPath.split(">");
   if (pipeline) {
@@ -439,7 +439,7 @@ const extractResult = (
       index,
       metric,
       aggregation,
-      pipeline
+      pipeline,
     );
     if (asPercent) {
       return {
@@ -473,7 +473,7 @@ const extractResult = (
         key && hasKeySupport
           ? `${index}/${metric}/${aggregation.replace(
               "terms",
-              "cardinality"
+              "cardinality",
             )}/${key}`
           : `${index}/${metric}/${aggregation.replace("terms", "cardinality")}`;
       return { [seriesName]: 0 };
@@ -495,7 +495,7 @@ const extractResult = (
     key && hasKeySupport
       ? `${index}/${metric}/${aggregation.replace(
           "terms",
-          "cardinality"
+          "cardinality",
         )}/${key}`
       : `${index}/${metric}/${aggregation.replace("terms", "cardinality")}`;
 
@@ -508,7 +508,7 @@ const pipelinePath = (
   index: number,
   metric: SeriesInputType["metric"],
   aggregation: SeriesInputType["aggregation"],
-  pipeline: Required<SeriesInputType>["pipeline"]
+  pipeline: Required<SeriesInputType>["pipeline"],
 ) =>
   `${index}/${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;
 
@@ -516,5 +516,5 @@ const esSafePipelinePath = (
   index: number,
   metric: SeriesInputType["metric"],
   aggregation: SeriesInputType["aggregation"],
-  pipeline: Required<SeriesInputType>["pipeline"]
+  pipeline: Required<SeriesInputType>["pipeline"],
 ) => pipelinePath(index, metric, aggregation, pipeline).replace(/\./g, "__");

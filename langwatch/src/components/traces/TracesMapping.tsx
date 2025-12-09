@@ -8,23 +8,22 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-
+import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
-import { Select as MultiSelect } from "chakra-react-select";
+import type { Trace } from "~/server/tracer/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
   type MappingState,
+  mapTraceToDatasetEntry,
   TRACE_EXPANSIONS,
   TRACE_MAPPINGS,
-  mapTraceToDatasetEntry,
 } from "../../server/tracer/tracesMapping";
 import { api } from "../../utils/api";
-import { Switch } from "../ui/switch";
-import type { Workflow } from "../../optimization_studio/types/dsl";
 import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import type { Trace } from "~/server/tracer/types";
+import { Switch } from "../ui/switch";
 
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
@@ -267,11 +266,10 @@ export const TracesMapping = ({
       ]),
     );
     const targetEdgesWithDefaults = [
-      ...dsl.targetEdges.filter(
-        (edge) =>
-          dsl.sourceOptions[edge.source]?.fields.includes(
-            edge.sourceHandle?.split(".")[1] ?? "",
-          ),
+      ...dsl.targetEdges.filter((edge) =>
+        dsl.sourceOptions[edge.source]?.fields.includes(
+          edge.sourceHandle?.split(".")[1] ?? "",
+        ),
       ),
       ...(targetFields
         .map((targetField) => {

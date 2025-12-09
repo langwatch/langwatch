@@ -1,22 +1,22 @@
-import React from "react";
+import { Box, type BoxProps, HStack, type StackProps } from "@chakra-ui/react";
 import {
+  closestCenter,
   DndContext,
   type DragEndEvent,
   DragOverlay,
   PointerSensor,
-  closestCenter,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import {
+  horizontalListSortingStrategy,
   SortableContext,
   useSortable,
-  horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BrowserLikeTabs } from "./BrowserLikeTabs";
-import { Box, HStack, type StackProps, type BoxProps } from "@chakra-ui/react";
+import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
+import { BrowserLikeTabs } from "./BrowserLikeTabs";
 import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks

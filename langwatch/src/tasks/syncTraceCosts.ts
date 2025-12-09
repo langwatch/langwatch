@@ -1,4 +1,4 @@
-import { TRACE_INDEX, esClient, traceIndexId } from "../server/elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../server/elasticsearch";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:tasks:syncTraceCosts");
@@ -70,7 +70,7 @@ export default async function execute() {
 
     logger.info(
       { totalHits: searchResponse.hits.total, batchSize },
-      "Starting scroll through traces with span costs"
+      "Starting scroll through traces with span costs",
     );
 
     // Process all traces using scroll API
@@ -177,7 +177,7 @@ export default async function execute() {
               consecutiveFailures++;
               logger.error(
                 { bulkError, consecutiveFailures },
-                "Failed to execute bulk update"
+                "Failed to execute bulk update",
               );
             }
 
@@ -185,7 +185,7 @@ export default async function execute() {
             if (consecutiveFailures >= maxConsecutiveFailures) {
               logger.error(
                 { consecutiveFailures },
-                "Too many consecutive failures, stopping processing"
+                "Too many consecutive failures, stopping processing",
               );
               break;
             }
@@ -204,13 +204,13 @@ export default async function execute() {
                 totalSkippedCount,
                 consecutiveFailures,
               },
-              "Progress update"
+              "Progress update",
             );
           }
         } catch (error) {
           logger.error(
             { error, traceId, projectId },
-            "Failed to process trace"
+            "Failed to process trace",
           );
           totalSkippedCount++;
         }
@@ -269,6 +269,6 @@ export default async function execute() {
       totalSkippedCount,
       consecutiveFailures,
     },
-    "Finished syncing all trace costs"
+    "Finished syncing all trace costs",
   );
 }

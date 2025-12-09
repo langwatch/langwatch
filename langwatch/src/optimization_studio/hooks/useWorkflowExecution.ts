@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import type { StudioClientEvent } from "../types/events";
-import { useWorkflowStore } from "./useWorkflowStore";
 import { toaster } from "../../components/ui/toaster";
-import { usePostEvent } from "./usePostEvent";
 import { generateOtelTraceId } from "../../utils/trace";
+import type { StudioClientEvent } from "../types/events";
+import { usePostEvent } from "./usePostEvent";
+import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useWorkflowExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -17,7 +17,7 @@ export const useWorkflowExecution = () => {
     (state) => ({
       getWorkflow: state.getWorkflow,
       setWorkflowExecutionState: state.setWorkflowExecutionState,
-    })
+    }),
   );
 
   const socketAvailable = useCallback(() => {
@@ -98,7 +98,7 @@ export const useWorkflowExecution = () => {
         setTriggerTimeout({ trace_id, timeout_on_status: "waiting" });
       }, 20_000);
     },
-    [socketAvailable, getWorkflow, postEvent, setWorkflowExecutionState]
+    [socketAvailable, getWorkflow, postEvent, setWorkflowExecutionState],
   );
 
   const stopWorkflowExecution = useCallback(
@@ -130,7 +130,7 @@ export const useWorkflowExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setWorkflowExecutionState, postEvent, getWorkflow]
+    [socketAvailable, setWorkflowExecutionState, postEvent, getWorkflow],
   );
 
   return {

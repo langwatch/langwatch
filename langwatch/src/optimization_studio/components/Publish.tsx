@@ -3,52 +3,51 @@ import {
   Box,
   Button,
   HStack,
+  type MenuItemProps,
+  Separator,
   Skeleton,
   Spacer,
   Spinner,
   Text,
   useDisclosure,
   VStack,
-  type MenuItemProps,
 } from "@chakra-ui/react";
+import type { Dataset, DatasetRecord, Project } from "@prisma/client";
+import type { Edge } from "@xyflow/react";
 import { useRouter } from "next/router";
 import { useCallback, useState } from "react";
 import {
   ArrowUp,
   ArrowUpCircle,
+  ChevronDown,
   Code,
   Lock,
   Play,
   Share2,
   XCircle,
 } from "react-feather";
-import { RenderCode } from "~/components/code/RenderCode";
-import { SmallLabel } from "../../components/SmallLabel";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
-import { useWorkflowStore } from "../hooks/useWorkflowStore";
-import type { Workflow } from "../types/dsl";
-import { AddModelProviderKey } from "./AddModelProviderKey";
-import { useVersionState, VersionToBeUsed } from "./History";
-
-import { Separator } from "@chakra-ui/react";
-import type { Dataset, DatasetRecord, Project } from "@prisma/client";
-import { type Edge } from "@xyflow/react";
-import { ChevronDown } from "react-feather";
 import { useForm } from "react-hook-form";
+import { RenderCode } from "~/components/code/RenderCode";
 import { langwatchEndpoint } from "../../components/code/langwatchEndpointEnv";
+import { SmallLabel } from "../../components/SmallLabel";
 import { Dialog } from "../../components/ui/dialog";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { useModelProviderKeys } from "../hooks/useModelProviderKeys";
+import { useWorkflowStore } from "../hooks/useWorkflowStore";
+import type { Workflow } from "../types/dsl";
 import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "../utils/datasetUtils";
 import { getEntryInputs } from "../utils/nodeUtils";
+import { AddModelProviderKey } from "./AddModelProviderKey";
+import { useVersionState, VersionToBeUsed } from "./History";
 
 // Type with dataset property
 interface NodeDataWithDataset {
@@ -181,7 +180,7 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
 
 const exportWorkflow = async (
   publishedWorkflow: Workflow,
-  datasetData?: Dataset & { datasetRecords: DatasetRecord[] }
+  datasetData?: Dataset & { datasetRecords: DatasetRecord[] },
 ) => {
   const dsl = { ...publishedWorkflow };
   try {
@@ -210,7 +209,7 @@ const exportWorkflow = async (
     document.body.appendChild(link);
     link.click();
     link.remove();
-  } catch (error) {
+  } catch {
     toaster.create({
       title: "Error exporting workflow",
       description: "An error occurred while exporting the workflow.",
@@ -234,7 +233,7 @@ function PublishMenu({
       workflowId,
       workflow_type,
       getWorkflow,
-    })
+    }),
   );
 
   const { canSaveNewVersion, versionToBeEvaluated } = useVersionState({
@@ -251,7 +250,7 @@ function PublishMenu({
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   const workflow = publishedWorkflow.data
@@ -269,7 +268,7 @@ function PublishMenu({
     },
     {
       enabled: !!datasetId && !!project?.id,
-    }
+    },
   );
 
   const disableAsComponentMutation =
@@ -331,10 +330,10 @@ function PublishMenu({
     { organizationId: organization?.id ?? "" },
     {
       enabled: !!organization,
-    }
+    },
   );
 
-  const planAllowsToPublish = usage.data && usage.data?.activePlan.canPublish;
+  const planAllowsToPublish = usage.data?.activePlan.canPublish;
   const publishDisabledLabel = !publishedWorkflow.data?.version
     ? "Publish a version to enable this option"
     : undefined;
@@ -342,7 +341,7 @@ function PublishMenu({
   const SubscriptionMenuItem = (
     props: MenuItemProps & {
       tooltip?: string;
-    }
+    },
   ) => {
     if (!planAllowsToPublish) {
       return (
@@ -375,8 +374,8 @@ function PublishMenu({
     );
   };
 
-  const handleExportWorkflow = () => {
-    exportWorkflow(workflow, datasetRecords.data ?? undefined);
+  const handleExportWorkflow = async () => {
+    await exportWorkflow(workflow, datasetRecords.data ?? undefined);
   };
 
   return (
@@ -448,7 +447,7 @@ function PublishMenu({
         <Code size={16} /> View API Reference
       </SubscriptionMenuItem>
       <SubscriptionMenuItem
-        onClick={handleExportWorkflow}
+        onClick={() => void handleExportWorkflow()}
         value="export-workflow"
       >
         <Share2 size={16} /> Export Workflow
@@ -476,7 +475,7 @@ function PublishModalContent({
       workflowId,
       getWorkflow,
       workflow_type,
-    })
+    }),
   );
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
@@ -515,7 +514,7 @@ function PublishModalContent({
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   const onSubmit = useCallback(
@@ -595,7 +594,7 @@ function PublishModalContent({
               },
             });
           },
-        }
+        },
       );
     },
     [
@@ -611,7 +610,7 @@ function PublishModalContent({
       workflow_type,
       toggleSaveAsComponent,
       toggleSaveAsEvaluator,
-    ]
+    ],
   );
 
   const openApiModal = () => {
@@ -751,7 +750,7 @@ export const ApiModalContent = () => {
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   if (!publishedWorkflow.data) {
@@ -760,7 +759,7 @@ export const ApiModalContent = () => {
 
   const entryInputs = getEntryInputs(
     (publishedWorkflow.data?.dsl as unknown as Workflow)?.edges,
-    (publishedWorkflow.data?.dsl as unknown as Workflow)?.nodes
+    (publishedWorkflow.data?.dsl as unknown as Workflow)?.nodes,
   );
 
   const message = JSON.stringify(
@@ -770,10 +769,10 @@ export const ApiModalContent = () => {
         if (sourceHandle) obj[sourceHandle] = "";
         return obj;
       },
-      {} as Record<string, string>
+      {} as Record<string, string>,
     ),
     null,
-    2
+    2,
   );
   return (
     <Dialog.Content>

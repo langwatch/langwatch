@@ -1,9 +1,8 @@
 /* eslint-disable @typescript-eslint/no-empty-function */
 import { describe, expect, it, vi } from "vitest";
-
-import { salvageValidData } from "~/utils/zodSalvage";
 import { formSchema } from "~/prompts";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { salvageValidData } from "~/utils/zodSalvage";
 
 /**
  * Tests for usePromptConfigForm's data salvage logic.
@@ -39,7 +38,9 @@ describe("usePromptConfigForm", () => {
     it("salvages valid parts and uses defaults for invalid parts", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
 
       const defaults = buildDefaultFormValues();
       const corruptedValues = {

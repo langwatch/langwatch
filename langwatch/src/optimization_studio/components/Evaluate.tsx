@@ -2,28 +2,27 @@ import {
   Button,
   createListCollection,
   HStack,
+  Input,
   Skeleton,
   Spacer,
   Text,
   useDisclosure,
   VStack,
-  Input,
 } from "@chakra-ui/react";
-import { Dialog } from "../../components/ui/dialog";
-import { Select } from "../../components/ui/select";
-import { Tooltip } from "../../components/ui/tooltip";
-
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckSquare } from "react-feather";
 import {
   Controller,
-  useForm,
   type ControllerRenderProps,
   type UseFormReturn,
+  useForm,
 } from "react-hook-form";
 import { SmallLabel } from "../../components/SmallLabel";
+import { Dialog } from "../../components/ui/dialog";
+import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
@@ -117,7 +116,7 @@ export function EvaluateModalContent({
       evaluationState: state.evaluation,
       deselectAllNodes: deselectAllNodes,
       setOpenResultsPanelRequest: setOpenResultsPanelRequest,
-    })
+    }),
   );
 
   const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } =
@@ -125,9 +124,9 @@ export function EvaluateModalContent({
       workflow: getWorkflow(),
     });
 
-  const entryNode = getWorkflow().nodes.find(
-    (node) => node.type === "entry"
-  ) as Node<Entry> | undefined;
+  const entryNode = getWorkflow().nodes.find((node) => node.type === "entry") as
+    | Node<Entry>
+    | undefined;
 
   const { total } = useGetDatasetData({
     dataset: entryNode?.data.dataset,
@@ -141,7 +140,7 @@ export function EvaluateModalContent({
     if (!evaluateOn) {
       form.setValue(
         "evaluateOn",
-        total && total > 50 ? splitOptions[1]! : splitOptions[0]!
+        total && total > 50 ? splitOptions[1]! : splitOptions[0]!,
       );
     }
   }, [form, total, evaluateOn]);
@@ -156,7 +155,7 @@ export function EvaluateModalContent({
     {
       trainSize,
       testSize,
-    }
+    },
   );
   const splitOptions: DatasetSplitOption[] = [
     {
@@ -253,7 +252,7 @@ export function EvaluateModalContent({
 
       if (estimatedTotal >= 5000) {
         alert(
-          "A maximum of 5000 entries can be evaluated at a time. Please contact support if you need to evaluate more."
+          "A maximum of 5000 entries can be evaluated at a time. Please contact support if you need to evaluate more.",
         );
         return;
       }
@@ -311,7 +310,7 @@ export function EvaluateModalContent({
       versionToBeEvaluated.id,
       versions,
       workflowId,
-    ]
+    ],
   );
 
   const isRunning = evaluationState?.status === "running";
@@ -343,10 +342,10 @@ export function EvaluateModalContent({
   const isDisabled = hasProvidersWithoutCustomKeys
     ? "Set up your API keys to run evaluations"
     : !estimatedTotal || estimatedTotal < 1
-    ? "You need at least 1 dataset entry to run evaluations"
-    : needsACommitMessage
-    ? "You need to provide a version description"
-    : false;
+      ? "You need at least 1 dataset entry to run evaluations"
+      : needsACommitMessage
+        ? "You need to provide a version description"
+        : false;
 
   return (
     <Dialog.Content
@@ -446,7 +445,7 @@ const DatasetSplitSelect = ({
         onChange={undefined}
         onValueChange={(change) => {
           const selectedOption = options.find(
-            (option) => option.value === change.value[0]
+            (option) => option.value === change.value[0],
           );
           field.onChange({
             target: {

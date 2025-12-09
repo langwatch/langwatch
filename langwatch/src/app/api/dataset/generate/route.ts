@@ -1,10 +1,4 @@
-import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
-
-import { type NextRequest, NextResponse } from "next/server";
-import { prisma } from "../../../../server/db";
-import { getServerSession } from "next-auth";
-import { authOptions } from "../../../../server/auth";
-import { getVercelAIModel } from "../../../../server/modelProviders/utils";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import {
   convertToModelMessages,
   smoothStream,
@@ -12,10 +6,14 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
-import { type OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
-import { tools } from "./tools";
-
+import { type NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { backendHasTeamProjectPermission } from "../../../../server/api/permission";
+import { authOptions } from "../../../../server/auth";
+import { prisma } from "../../../../server/db";
+import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger";
+import { tools } from "./tools";
 
 const logger = createLogger("langwatch:api:dataset:generate");
 
@@ -30,7 +28,7 @@ export async function POST(req: NextRequest) {
   if (!session) {
     return NextResponse.json(
       { error: "You must be logged in to access this endpoint." },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -39,19 +37,19 @@ export async function POST(req: NextRequest) {
   if (!projectId) {
     return NextResponse.json(
       { error: "Missing projectId header" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   const hasPermission = await backendHasTeamProjectPermission(
     { prisma, session },
     { projectId },
-    "DATASETS_MANAGE"
+    "DATASETS_MANAGE",
   );
   if (!hasPermission) {
     return NextResponse.json(
       { error: "You do not have permission to access this endpoint." },
-      { status: 403 }
+      { status: 403 },
     );
   }
 

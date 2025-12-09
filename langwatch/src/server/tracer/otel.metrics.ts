@@ -1,13 +1,17 @@
-import type { DeepPartial } from "~/utils/types";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
+import type { DeepPartial } from "~/utils/types";
 import {
   otelAttributesToNestedAttributes,
   type TraceForCollection,
 } from "./otel.traces";
-import { decodeBase64OpenTelemetryId, convertFromUnixNano, setNestedProperty } from "./utils";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import {
+  convertFromUnixNano,
+  decodeBase64OpenTelemetryId,
+  setNestedProperty,
+} from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.metrics");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.metrics");
@@ -20,7 +24,7 @@ const GENAI_METRICS = {
 } as const;
 
 export const openTelemetryMetricsRequestToTracesForCollection = async (
-  otelMetrics: DeepPartial<IExportMetricsServiceRequest>
+  otelMetrics: DeepPartial<IExportMetricsServiceRequest>,
 ): Promise<TraceForCollection[]> => {
   console.log("otelMetrics", JSON.stringify(otelMetrics, undefined, 2));
   return await tracer.withActiveSpan(
@@ -35,7 +39,7 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
 
         span.setAttribute(
           "resourceMetrics.count",
-          otelMetrics.resourceMetrics.length
+          otelMetrics.resourceMetrics.length,
         );
 
         const traceMap: Record<string, TraceForCollection> = {};
@@ -67,12 +71,14 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       continue;
                     }
 
-                    const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
+                    const traceId = decodeBase64OpenTelemetryId(
+                      exemplar.traceId,
+                    );
                     const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
 
                     if (!traceId || !spanId) {
                       logger.info(
-                        "received metric exemplar with no span or trace id, rejecting"
+                        "received metric exemplar with no span or trace id, rejecting",
                       );
                       continue;
                     }
@@ -90,11 +96,11 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                     }
 
                     let existingSpan = trace.spans.find(
-                      (span) => span.span_id === spanId
+                      (span) => span.span_id === spanId,
                     );
 
                     const exemplarTime = convertFromUnixNano(
-                      exemplar.timeUnixNano
+                      exemplar.timeUnixNano,
                     );
 
                     if (!existingSpan) {
@@ -115,7 +121,7 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                     // Map specific GenAI metrics to span fields
                     if (metric.name === GENAI_METRICS.TIME_TO_FIRST_TOKEN) {
                       const firstTokenMs = convertSecondsToMilliseconds(
-                        exemplar.asDouble ?? exemplar.asInt
+                        exemplar.asDouble ?? exemplar.asInt,
                       );
 
                       if (firstTokenMs !== null) {
@@ -142,12 +148,12 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                         metricName,
                         {
                           ...otelAttributesToNestedAttributes(
-                            dataPoint.attributes
+                            dataPoint.attributes,
                           ),
                           value: exemplar.asDouble ?? exemplar.asInt,
                           unit: metric.unit,
                           timestamp: exemplarTime,
-                        }
+                        },
                       );
                     }
                   }
@@ -166,7 +172,9 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       continue;
                     }
 
-                    const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
+                    const traceId = decodeBase64OpenTelemetryId(
+                      exemplar.traceId,
+                    );
                     const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
 
                     if (!traceId || !spanId) {
@@ -186,11 +194,11 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                     }
 
                     const exemplarTime = convertFromUnixNano(
-                      exemplar.timeUnixNano
+                      exemplar.timeUnixNano,
                     );
 
                     let existingSpan = trace.spans.find(
-                      (span) => span.span_id === spanId
+                      (span) => span.span_id === spanId,
                     );
 
                     if (!existingSpan) {
@@ -222,12 +230,14 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       metricName,
                       {
                         ...(dataPoint.attributes
-                          ? otelAttributesToNestedAttributes(dataPoint.attributes)
+                          ? otelAttributesToNestedAttributes(
+                              dataPoint.attributes,
+                            )
                           : {}),
                         value: exemplar.asDouble ?? exemplar.asInt,
                         unit: metric.unit,
                         timestamp: exemplarTime,
-                      }
+                      },
                     );
                   }
                 }
@@ -245,7 +255,9 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       continue;
                     }
 
-                    const traceId = decodeBase64OpenTelemetryId(exemplar.traceId);
+                    const traceId = decodeBase64OpenTelemetryId(
+                      exemplar.traceId,
+                    );
                     const spanId = decodeBase64OpenTelemetryId(exemplar.spanId);
 
                     if (!traceId || !spanId) {
@@ -265,11 +277,11 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                     }
 
                     const exemplarTime = convertFromUnixNano(
-                      exemplar.timeUnixNano
+                      exemplar.timeUnixNano,
                     );
 
                     let existingSpan = trace.spans.find(
-                      (span) => span.span_id === spanId
+                      (span) => span.span_id === spanId,
                     );
 
                     if (!existingSpan) {
@@ -301,12 +313,14 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       metricName,
                       {
                         ...(dataPoint.attributes
-                          ? otelAttributesToNestedAttributes(dataPoint.attributes)
+                          ? otelAttributesToNestedAttributes(
+                              dataPoint.attributes,
+                            )
                           : {}),
                         value: exemplar.asDouble ?? exemplar.asInt,
                         unit: metric.unit,
                         timestamp: exemplarTime,
-                      }
+                      },
                     );
                   }
                 }
@@ -324,11 +338,11 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
         throw error;
       }
-    }
+    },
   );
 };
 

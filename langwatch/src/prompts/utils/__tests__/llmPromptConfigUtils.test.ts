@@ -41,7 +41,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("migrates legacy format to object with model field", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [
           {
@@ -128,7 +130,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifier", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [{ identifier: "", type: "str" }],
@@ -147,7 +151,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifier", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [{ type: "str" }],
@@ -166,7 +172,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifiers for each", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [
@@ -195,7 +203,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifier", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [],
@@ -216,7 +226,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifier", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [],
@@ -237,7 +249,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     it("generates unique identifiers for each", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
-        .mockImplementation(() => {});
+        .mockImplementation(() => {
+          /* this is just a mock implementation for a spy */
+        });
       const nodeData = {
         parameters: [],
         inputs: [],

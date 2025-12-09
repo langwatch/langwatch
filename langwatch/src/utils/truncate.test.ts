@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { safeTruncate } from "./truncate";
 
 describe("safeTruncate", () => {
@@ -73,7 +73,7 @@ describe("safeTruncate", () => {
     expect(JSON.stringify(result).length).toBeLessThanOrEqual(32 * 1024);
     expect(result["..."]).toBe("[truncated]");
     expect(Object.keys(result).length).toBeLessThan(
-      Object.keys(input).length + 1
+      Object.keys(input).length + 1,
     );
   });
 

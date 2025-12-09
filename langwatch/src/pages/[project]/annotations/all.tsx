@@ -1,17 +1,16 @@
-import { Button, Container, HStack, Heading, Spacer } from "@chakra-ui/react";
-import Parse from "papaparse";
-
+import { Button, Container, Heading, HStack, Spacer } from "@chakra-ui/react";
 import type { Annotation, User } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
+import Parse from "papaparse";
 import { Download } from "react-feather";
+import AnnotationsLayout from "~/components/AnnotationsLayout";
 import {
   AnnotationsTable,
   type AnnotationWithUser,
 } from "~/components/annotations/AnnotationsTable";
-import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { PeriodSelector, usePeriodSelector } from "~/components/PeriodSelector";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -36,7 +35,7 @@ export default function Annotations() {
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
-    queryOpts
+    queryOpts,
   );
 
   const {
@@ -56,21 +55,21 @@ export default function Annotations() {
   if (hasAnyFilters) {
     const traceIds =
       traceGroups.data?.groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       ) ?? [];
 
     annotations = api.annotation.getByTraceIds.useQuery(
       { projectId: project?.id ?? "", traceIds },
       {
         enabled: project?.id !== undefined,
-      }
+      },
     );
   } else {
     annotations = api.annotation.getAll.useQuery(
       { projectId: project?.id ?? "", startDate, endDate },
       {
         enabled: !!project,
-      }
+      },
     );
   }
 
@@ -84,7 +83,7 @@ export default function Annotations() {
     {
       enabled: !!project?.id,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   type GroupedAnnotation = {
@@ -101,7 +100,7 @@ export default function Annotations() {
             traceId: item.traceId,
             annotations: [],
             trace: traces.data?.find(
-              (trace) => trace.trace_id === item.traceId
+              (trace) => trace.trace_id === item.traceId,
             ),
           };
         }
@@ -119,7 +118,7 @@ export default function Annotations() {
 
         return acc;
       },
-      {}
+      {},
     );
 
     return Object.values(grouped);
@@ -143,7 +142,7 @@ export default function Annotations() {
     const csv =
       annotations?.data?.map((annotation) => {
         const trace = traces.data?.find(
-          (trace) => trace.trace_id === annotation.traceId
+          (trace) => trace.trace_id === annotation.traceId,
         );
 
         return [

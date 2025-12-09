@@ -1,14 +1,14 @@
 import { Button, Field, NativeSelect } from "@chakra-ui/react";
-import { type Dataset } from "@prisma/client";
-import {
-  type UseFormRegister,
-  type UseFormSetValue,
-  type FieldErrors,
-  type Path,
-  type PathValue,
+import type { Dataset } from "@prisma/client";
+import type { ReactNode } from "react";
+import type {
+  FieldErrors,
+  Path,
+  PathValue,
+  UseFormRegister,
+  UseFormSetValue,
 } from "react-hook-form";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import type { ReactNode } from "react";
 
 interface DatasetSelectorProps<T extends { datasetId: string }> {
   datasets: Dataset[] | undefined;

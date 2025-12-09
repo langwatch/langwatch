@@ -1,9 +1,9 @@
 import { Text } from "@chakra-ui/react";
-import { api } from "../../utils/api";
-import { useRouter } from "next/router";
 import ErrorPage from "next/error";
+import { useRouter } from "next/router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { TraceDetails } from "../../components/traces/TraceDetails";
+import { api } from "../../utils/api";
 
 export default function SharePage() {
   const router = useRouter();

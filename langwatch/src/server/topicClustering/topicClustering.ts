@@ -6,21 +6,12 @@ import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
 import { env } from "../../env.mjs";
-import { createLogger } from "../../utils/logger";
-import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
-import { prisma } from "../db";
-import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
-import { getProjectEmbeddingsModel } from "../embeddings";
-import type { ElasticSearchTrace, Trace } from "../tracer/types";
 import {
-  type BatchClusteringParams,
-  type IncrementalClusteringParams,
-  type TopicClusteringResponse,
-  type TopicClusteringSubtopic,
-  type TopicClusteringTopic,
-  type TopicClusteringTrace,
-  type TopicClusteringTraceTopicMap,
-} from "./types";
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+  OPENAI_EMBEDDING_DIMENSION,
+} from "../../utils/constants";
+import { createLogger } from "../../utils/logger";
+import { getExtractedInput } from "../../utils/traceExtraction";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
@@ -29,20 +20,28 @@ import {
   getProjectModelProviders,
   prepareLitellmParams,
 } from "../api/routers/modelProviders";
+import { scheduleTopicClusteringNextPage } from "../background/queues/topicClusteringQueue";
+import { prisma } from "../db";
+import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
+import { getProjectEmbeddingsModel } from "../embeddings";
 import { getPayloadSizeHistogram } from "../metrics";
-import {
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-  OPENAI_EMBEDDING_DIMENSION,
-} from "../../utils/constants";
-
-import { getExtractedInput } from "../../utils/traceExtraction";
+import type { ElasticSearchTrace, Trace } from "../tracer/types";
+import type {
+  BatchClusteringParams,
+  IncrementalClusteringParams,
+  TopicClusteringResponse,
+  TopicClusteringSubtopic,
+  TopicClusteringTopic,
+  TopicClusteringTrace,
+  TopicClusteringTraceTopicMap,
+} from "./types";
 
 const logger = createLogger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
   projectId: string,
   searchAfter?: [number, string],
-  scheduleNextPage = true
+  scheduleNextPage = true,
 ): Promise<void> => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -52,13 +51,13 @@ export const clusterTopicsForProject = async (
     throw new Error("Project not found");
   }
   const maxMonthlyUsage = await maxMonthlyUsageLimit(
-    project.team.organizationId
+    project.team.organizationId,
   );
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
   if (getCurrentCost >= maxMonthlyUsage) {
     logger.info(
       { projectId },
-      "skipping clustering for project as monthly limit has been reached"
+      "skipping clustering for project as monthly limit has been reached",
     );
   }
 
@@ -131,7 +130,7 @@ export const clusterTopicsForProject = async (
       tracesWithInput: tracesWithInputCount.count,
       recentTraces: recentTracesCount.count,
     },
-    "Debug: Project trace counts"
+    "Debug: Project trace counts",
   );
 
   const assignedTracesCount = await client.count({
@@ -180,8 +179,8 @@ export const clusterTopicsForProject = async (
     assignedTracesCount.count < 100
       ? 7
       : assignedTracesCount.count < 500
-      ? 3
-      : 2;
+        ? 3
+        : 2;
   if (
     !isIncrementalProcessing &&
     lastTopicCreatedAt >
@@ -189,7 +188,7 @@ export const clusterTopicsForProject = async (
   ) {
     logger.info(
       { projectId },
-      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`
+      `skipping clustering for project as last topic from batch processing was created less than ${daysFrequency} days ago`,
     );
     return;
   }
@@ -254,7 +253,7 @@ export const clusterTopicsForProject = async (
       assignedTracesCount: assignedTracesCount.count,
       searchAfter,
     },
-    "Starting trace search for topic clustering"
+    "Starting trace search for topic clustering",
   );
 
   const result = await client.search<Trace>({
@@ -289,7 +288,7 @@ export const clusterTopicsForProject = async (
       totalHits: result.hits.total,
       returnedHits: result.hits.hits.length,
     },
-    "Elasticsearch search results"
+    "Elasticsearch search results",
   );
 
   const rawTraces = result.hits.hits.map((hit) => hit._source!);
@@ -322,13 +321,13 @@ export const clusterTopicsForProject = async (
       minimumTraces,
       isIncrementalProcessing,
     },
-    "Final trace count for clustering"
+    "Final trace count for clustering",
   );
 
   if (traces.length < minimumTraces) {
     logger.info(
       { projectId },
-      `less than ${minimumTraces} traces found for project, skipping topic clustering`
+      `less than ${minimumTraces} traces found for project, skipping topic clustering`,
     );
     return;
   }
@@ -347,14 +346,14 @@ export const clusterTopicsForProject = async (
     if (lastTraceSort) {
       logger.info(
         { projectId, lastTraceSort },
-        "scheduling the next page for clustering"
+        "scheduling the next page for clustering",
       );
       if (scheduleNextPage) {
         await scheduleTopicClusteringNextPage(projectId, lastTraceSort);
       } else {
         logger.info(
           { projectId, lastTraceSort },
-          "skipping scheduling next page for project"
+          "skipping scheduling next page for project",
         );
       }
     }
@@ -380,7 +379,7 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
   if (!modelProvider.enabled) {
     logger.info(
       { provider },
-      "topic cluste ring model provider is not enabled, skipping topic clustering"
+      "topic cluste ring model provider is not enabled, skipping topic clustering",
     );
     return;
   }
@@ -390,11 +389,11 @@ const getProjectTopicClusteringModelProvider = async (project: Project) => {
 
 export const batchClusterTraces = async (
   project: Project,
-  traces: TopicClusteringTrace[]
+  traces: TopicClusteringTrace[],
 ) => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
-    "batch clustering topics"
+    "batch clustering topics",
   );
 
   const topicModel = await getProjectTopicClusteringModelProvider(project);
@@ -424,11 +423,11 @@ export const batchClusterTraces = async (
 
 export const incrementalClustering = async (
   project: Project,
-  traces: TopicClusteringTrace[]
+  traces: TopicClusteringTrace[],
 ) => {
   logger.info(
     { tracesLength: traces.length, projectId: project.id },
-    "incremental topic clustering"
+    "incremental topic clustering",
   );
 
   const topics: TopicClusteringTopic[] = (
@@ -492,7 +491,7 @@ export const incrementalClustering = async (
 export const storeResults = async (
   projectId: string,
   clusteringResult: TopicClusteringResponse | undefined,
-  isIncremental: boolean
+  isIncremental: boolean,
 ) => {
   const {
     topics,
@@ -513,7 +512,7 @@ export const storeResults = async (
       tracesToAssignLength: Object.keys(tracesToAssign).length,
       projectId,
     },
-    "found new topics, subtopics and traces to assign for project"
+    "found new topics, subtopics and traces to assign for project",
   );
 
   if (!isIncremental) {
@@ -600,12 +599,12 @@ export const storeResults = async (
 
 export const fetchTopicsBatchClustering = async (
   projectId: string,
-  params: BatchClusteringParams
+  params: BatchClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
     logger.warn(
       { projectId },
-      "Topic clustering service URL not set, skipping topic clustering"
+      "Topic clustering service URL not set, skipping topic clustering",
     );
     return;
   }
@@ -615,12 +614,12 @@ export const fetchTopicsBatchClustering = async (
 
   logger.info(
     { sizeMb: size / 125000, projectId },
-    "uploading traces data for project"
+    "uploading traces data for project",
   );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering`,
-    { method: "POST", json: params }
+    { method: "POST", json: params },
   );
 
   if (!response.ok) {
@@ -630,9 +629,11 @@ export const fetchTopicsBatchClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch {
+      /* this is just a safe json parse fallback */
+    }
     throw new Error(
-      `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
+      `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`,
     );
   }
 
@@ -643,12 +644,12 @@ export const fetchTopicsBatchClustering = async (
 
 export const fetchTopicsIncrementalClustering = async (
   projectId: string,
-  params: IncrementalClusteringParams
+  params: IncrementalClusteringParams,
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
     logger.warn(
       { projectId },
-      "Topic clustering service URL not set, skipping topic clustering"
+      "Topic clustering service URL not set, skipping topic clustering",
     );
     return;
   }
@@ -658,12 +659,12 @@ export const fetchTopicsIncrementalClustering = async (
 
   logger.info(
     { sizeMb: size / 125000, projectId },
-    "uploading traces data for project"
+    "uploading traces data for project",
   );
 
   const response = await fetchHTTP2(
     `${env.TOPIC_CLUSTERING_SERVICE}/topics/incremental_clustering`,
-    { method: "POST", json: params }
+    { method: "POST", json: params },
   );
 
   if (!response.ok) {
@@ -673,9 +674,12 @@ export const fetchTopicsIncrementalClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch {}
+    } catch {
+      /* this is just a safe json parse fallback */
+    }
+
     throw new Error(
-      `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`
+      `Failed to fetch topics incremental clustering: ${response.statusText}\n\n${body}`,
     );
   }
 

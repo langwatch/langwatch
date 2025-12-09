@@ -88,7 +88,7 @@ describe("Prompt tracing", () => {
     beforeEach(async () => {
       // Test template compilation
       const prompt = await langwatch.prompts.get("prompt_123");
-      prompt!.compile({
+      prompt.compile({
         name: "Alice",
         topic: "weather",
       });

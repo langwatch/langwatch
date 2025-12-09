@@ -1,6 +1,7 @@
 import { loadEnvConfig } from "@next/env";
-import { createLogger } from "./utils/logger";
 import { WorkersRestart } from "./server/background/errors";
+import { createLogger } from "./utils/logger";
+
 loadEnvConfig(process.cwd());
 
 const logger = createLogger("langwatch:workers");
@@ -34,6 +35,6 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason, promise) => {
   logger.fatal(
     { reason: reason instanceof Error ? reason : { value: reason }, promise },
-    "unhandled rejection detected"
+    "unhandled rejection detected",
   );
 });

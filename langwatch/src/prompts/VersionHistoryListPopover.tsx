@@ -1,25 +1,25 @@
 import {
+  Avatar,
   Box,
+  type BoxProps,
   Button,
   HStack,
   Separator,
   Tag,
   Text,
-  VStack,
-  type BoxProps,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
-import { Avatar } from "@chakra-ui/react";
 import { useCallback } from "react";
-import { api } from "~/utils/api";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { usePrompts } from "./hooks";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
+import { usePrompts } from "./hooks";
 
 const logger = createLogger("VersionHistoryListPopover");
 

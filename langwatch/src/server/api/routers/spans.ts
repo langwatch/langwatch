@@ -1,14 +1,13 @@
 import { PublicShareResourceTypes } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
+import { TRACE_INDEX } from "~/server/elasticsearch";
+import { getTraceById, searchTraces } from "~/server/elasticsearch/traces";
+import type { ChatMessage, LLMSpan } from "~/server/tracer/types";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { getTraceById, searchTraces } from "~/server/elasticsearch/traces";
-import { TRPCError } from "@trpc/server";
-import { TRACE_INDEX } from "~/server/elasticsearch";
-import type { ChatMessage } from "~/server/tracer/types";
-import { type LLMSpan } from "~/server/tracer/types";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: publicProcedure

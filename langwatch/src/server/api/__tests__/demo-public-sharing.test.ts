@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { TeamUserRole } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  hasProjectPermission,
-  isDemoProject,
   checkPermissionOrPubliclyShared,
   checkProjectPermission,
+  hasProjectPermission,
+  isDemoProject,
   type Permission,
 } from "../rbac";
 

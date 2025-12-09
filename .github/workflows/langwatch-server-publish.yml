@@ -25,11 +25,16 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.24.0
+
       - name: Install dependencies
         run: |
           cd langwatch
-          npm install
-          npm run build
+          pnpm install
+          pnpm build
           cd ..
           uv pip install build
 

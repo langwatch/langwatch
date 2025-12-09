@@ -1,15 +1,14 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission } from "../rbac";
-
 import { prisma } from "../../db";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const integrationsChecksRouter = createTRPCRouter({
   getCheckStatus: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("project:update"))
     .query(async ({ input }) => {

@@ -16,4 +16,3 @@ export class DatasetConflictError extends Error {
     this.name = "DatasetConflictError";
   }
 }
-

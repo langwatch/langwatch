@@ -7,7 +7,7 @@ import {
   esClient,
   TRACE_INDEX,
 } from "../server/elasticsearch";
-import { type ElasticSearchEvaluation } from "../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../server/tracer/types";
 // import {
 //   scheduleTraceCheck,
 //   traceChecksQueue,
@@ -58,7 +58,7 @@ export default async function execute(evaluatorId: string, projectId: string) {
   //eslint-disable-next-line
   const hits = traceChecks.hits.hits;
 
-  throw "This task is currently broken, fix it when needed";
+  throw `This task is currently broken, fix it when needed. skipping ${hits.length} hit checks`;
   // for (const hit of hits) {
   //   const traceCheck = hit._source;
   //   if (!traceCheck) continue;

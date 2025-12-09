@@ -12,13 +12,13 @@ export const useModelProviderKeys = ({
   const { modelProviders } = useOrganizationTeamProject();
 
   const modelProvidersWithoutCustomKeys = Object.values(
-    modelProviders ?? {}
+    modelProviders ?? {},
   ).filter((modelProvider) => !modelProvider.customKeys);
 
   const defaultModelProvider = workflow.default_llm.model.split("/")[0];
 
-  const nodesWithLLMParameter = workflow.nodes.filter(
-    (node) => node.data.parameters?.find((p) => p.type === "llm")
+  const nodesWithLLMParameter = workflow.nodes.filter((node) =>
+    node.data.parameters?.find((p) => p.type === "llm"),
   );
 
   const getModelProviders = (nodes: Component[]) => {
@@ -30,15 +30,15 @@ export const useModelProviderKeys = ({
               .map(
                 (p) =>
                   (p.value as LLMConfig | undefined)?.model.split("/")[0] ??
-                  defaultModelProvider
+                  defaultModelProvider,
               )
-          : []
+          : [],
       )
       .filter((provider): provider is string => provider !== undefined);
   };
 
   const nodeProviders = new Set(
-    getModelProviders(nodesWithLLMParameter as Component[])
+    getModelProviders(nodesWithLLMParameter as Component[]),
   );
 
   for (const llm of extra_llms ?? []) {
@@ -52,7 +52,7 @@ export const useModelProviderKeys = ({
 
   const nodeProvidersWithoutCustomKeys = uniqueNodeProviders.filter(
     (provider) =>
-      modelProvidersWithoutCustomKeys.some((p) => p.provider === provider)
+      modelProvidersWithoutCustomKeys.some((p) => p.provider === provider),
   );
 
   const hasProvidersWithoutCustomKeys =

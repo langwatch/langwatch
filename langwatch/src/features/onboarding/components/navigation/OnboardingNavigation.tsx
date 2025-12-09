@@ -1,10 +1,6 @@
-import React from "react";
-import {
-  HStack,
-  Button,
-  Icon,
-} from "@chakra-ui/react";
+import { Button, HStack, Icon } from "@chakra-ui/react";
 import { SkipForward } from "lucide-react";
+import React from "react";
 import { useAnalytics } from "react-contextual-analytics";
 
 interface OnboardingNavigationProps<T extends number = number> {

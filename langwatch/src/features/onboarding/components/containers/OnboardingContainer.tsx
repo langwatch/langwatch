@@ -2,18 +2,18 @@ import {
   Box,
   Center,
   Container,
-  VStack,
-  Text,
   HStack,
   IconButton,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import { FullLogo } from "~/components/icons/FullLogo";
+import { ArrowLeft, LogOut } from "lucide-react";
 import { motion } from "motion/react";
-import SpookyScarySkeleton from "../SpookyScarySkeleton";
 import { signOut } from "next-auth/react";
-import { LogOut, ArrowLeft } from "lucide-react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useAnalytics } from "react-contextual-analytics";
+import { FullLogo } from "~/components/icons/FullLogo";
+import { Tooltip } from "~/components/ui/tooltip";
+import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
 const MotionCenter = motion(Center);
 const MotionContainer = motion(Container);
@@ -41,9 +41,16 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   onBack?: () => void;
 }
 
-export const OnboardingContainer: React.FC<
-  OnboardingContainerProps
-> = ({ children, title, subTitle, loading, compressedHeader, widthVariant = "narrow", showBackButton, onBack }) => {
+export const OnboardingContainer: React.FC<OnboardingContainerProps> = ({
+  children,
+  title,
+  subTitle,
+  loading,
+  compressedHeader,
+  widthVariant = "narrow",
+  showBackButton,
+  onBack,
+}) => {
   const { emit } = useAnalytics();
   const isFullWidth = widthVariant === "full";
   const containerWidthProps = isFullWidth

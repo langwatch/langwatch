@@ -1,13 +1,13 @@
+import type { AlertType } from "@prisma/client";
 import { Column, Link, Row, Section } from "@react-email/components";
 import { Container } from "@react-email/container";
 import { Heading } from "@react-email/heading";
 import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
-import { sendEmail } from "./emailSender";
 
 import { env } from "../../env.mjs";
-import type { AlertType } from "@prisma/client";
+import { sendEmail } from "./emailSender";
 
 interface TriggerData {
   traceId: string;
@@ -54,7 +54,7 @@ export const sendTriggerEmail = async ({
         {triggerMessage && <p>{triggerMessage}</p>}
         <TriggerTable triggerData={triggerData} projectSlug={projectSlug} />
       </Container>
-    </Html>
+    </Html>,
   );
 
   await sendEmail({

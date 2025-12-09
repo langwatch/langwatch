@@ -1,36 +1,37 @@
-import React, { useMemo } from "react";
 import {
-  VStack,
-  Field,
-  Input,
-  Icon,
   /* eslint-disable no-restricted-imports */
   Checkbox,
+  Field,
+  Icon,
+  Input,
+  VStack,
   /* eslint-enable no-restricted-imports */
 } from "@chakra-ui/react";
-import { useAnalytics } from "react-contextual-analytics";
 import { ExternalLink } from "lucide-react";
-import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
+import type React from "react";
+import { useMemo } from "react";
+import { useAnalytics } from "react-contextual-analytics";
+import { Link } from "~/components/ui/link";
 import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
+import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
+import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
 import {
-  usageStyleItems,
   desireItems,
   roleItems,
+  usageStyleItems,
 } from "../constants/onboarding-data";
+import { useOnboardingFormContext } from "../contexts/form-context";
 import {
+  type CompanySize,
+  type DesireType,
+  type OnboardingFlowConfig,
   type OnboardingFormData,
   type OnboardingScreen,
-  type UsageStyle,
-  type CompanySize,
-  type SolutionType,
-  type DesireType,
-  type RoleType,
   OnboardingScreenIndex,
-  type OnboardingFlowConfig,
+  type RoleType,
+  type SolutionType,
+  type UsageStyle,
 } from "../types/types";
-import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
-import { Link } from "~/components/ui/link";
-import { useOnboardingFormContext } from "../contexts/form-context";
 
 // Module-scope screen components and their props
 const OrganizationScreen: React.FC = () => {

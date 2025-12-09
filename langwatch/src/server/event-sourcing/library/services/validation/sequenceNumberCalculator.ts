@@ -1,8 +1,10 @@
-import type { Event } from "../../domain/types";
-import type { EventStore } from "../../stores/eventStore.types";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import type { AggregateType } from "../../domain/aggregateType";
 import { createLogger } from "~/utils/logger";
+import type { AggregateType } from "../../domain/aggregateType";
+import type { Event } from "../../domain/types";
+import type {
+  EventStore,
+  EventStoreReadContext,
+} from "../../stores/eventStore.types";
 
 /**
  * Calculates sequence numbers for events within their aggregates.

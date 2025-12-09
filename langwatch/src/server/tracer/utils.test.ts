@@ -50,7 +50,7 @@ describe("utils test", () => {
 
     expect(input).toBe("Hi I am looking for a chatbot");
     expect(output).toBe(
-      "Yes, we offer a custom ChatGPT bot for your website. It's easy to set up and requires no training or maintenance. You can automate customer support, resolve repetitive questions, and even escalate to a human agent if needed."
+      "Yes, we offer a custom ChatGPT bot for your website. It's easy to set up and requires no training or maintenance. You can automate customer support, resolve repetitive questions, and even escalate to a human agent if needed.",
     );
     expect(contexts).toEqual(["Foo", "Bar", "Baz"]);
   });

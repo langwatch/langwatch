@@ -2,16 +2,16 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
-import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
-import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
+import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
+import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
 type DrawerProps = {
   open: string;
@@ -58,12 +58,12 @@ export function CurrentDrawer() {
             qs.stringify(
               Object.fromEntries(
                 Object.entries(router.query).filter(
-                  ([key]) => !key.startsWith("drawer.")
-                )
-              )
+                  ([key]) => !key.startsWith("drawer."),
+                ),
+              ),
             ),
           undefined,
-          { shallow: true }
+          { shallow: true },
         );
       }}
     >
@@ -78,13 +78,13 @@ export function useDrawer() {
   const openDrawer = <T extends keyof typeof drawers>(
     drawer: T,
     props?: Parameters<(typeof drawers)[T]>[0],
-    { replace }: { replace?: boolean } = {}
+    { replace }: { replace?: boolean } = {},
   ) => {
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
         ([_key, value]) =>
-          typeof value === "function" || typeof value === "object"
-      )
+          typeof value === "function" || typeof value === "object",
+      ),
     );
 
     void router[replace ? "replace" : "push"](
@@ -96,8 +96,8 @@ export function useDrawer() {
                 ([key, value]) =>
                   !key.startsWith("drawer.") &&
                   typeof value !== "function" &&
-                  typeof value !== "object"
-              )
+                  typeof value !== "object",
+              ),
             ),
             drawer: {
               open: drawer,
@@ -109,10 +109,10 @@ export function useDrawer() {
             arrayFormat: "comma",
             // @ts-ignore of course it exists
             allowEmptyArrays: true,
-          }
+          },
         ),
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
   };
 
@@ -122,18 +122,18 @@ export function useDrawer() {
         qs.stringify(
           Object.fromEntries(
             Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer.") && key !== "span" // remove span key as well left by trace details
-            )
+              ([key]) => !key.startsWith("drawer.") && key !== "span", // remove span key as well left by trace details
+            ),
           ),
           {
             allowDots: true,
             arrayFormat: "comma",
             // @ts-ignore of course it exists
             allowEmptyArrays: true,
-          }
+          },
         ),
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
   };
 

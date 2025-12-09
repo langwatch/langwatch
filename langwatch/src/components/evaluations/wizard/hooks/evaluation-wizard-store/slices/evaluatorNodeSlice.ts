@@ -1,21 +1,21 @@
-import { type Edge, type Node } from "@xyflow/react";
-import { type StateCreator } from "zustand";
+import type { Edge, Node } from "@xyflow/react";
+import type { StateCreator } from "zustand";
+import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type {
+  Entry,
   Evaluator,
   Workflow,
-  Entry,
 } from "~/optimization_studio/types/dsl";
-import type { BaseNodeSlice } from "./baseNodeSlice";
-import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { buildEvaluatorFromType } from "~/optimization_studio/utils/registryUtils";
 import { nameToId } from "~/optimization_studio/utils/nodeUtils";
+import { buildEvaluatorFromType } from "~/optimization_studio/utils/registryUtils";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import type { useAvailableEvaluators } from "../../../../../../hooks/useAvailableEvaluators";
+import type { BaseNodeSlice } from "./baseNodeSlice";
+import type { ExecutorSlice } from "./executorSlice";
 import {
   buildEntryToTargetEdges,
   buildExecutorToEvaluatorEdge,
 } from "./utils/edge.util";
-import type { ExecutorSlice } from "./executorSlice";
-import type { useAvailableEvaluators } from "../../../../../../hooks/useAvailableEvaluators";
 
 const createEvaluatorData = (): Omit<Node<Evaluator>, "position"> => ({
   id: "evaluator_node",
@@ -39,7 +39,7 @@ export interface EvaluatorNodeSlice {
     availableEvaluators: Exclude<
       ReturnType<typeof useAvailableEvaluators>,
       undefined
-    >
+    >,
   ) => void;
   getFirstEvaluatorNode: () => Node<Evaluator> | undefined;
   setFirstEvaluatorEdges: (edges: Workflow["edges"]) => void;
@@ -86,12 +86,12 @@ export const createEvaluatorNodeSlice: StateCreator<
       availableEvaluators: Exclude<
         ReturnType<typeof useAvailableEvaluators>,
         undefined
-      >
+      >,
     ) {
       get().workflowStore.setWorkflow((current) => {
         // Find existing evaluator node if any
         const firstEvaluatorIndex = current.nodes.findIndex(
-          (node) => node.type === "evaluator"
+          (node) => node.type === "evaluator",
         );
         const previousEvaluator =
           firstEvaluatorIndex !== -1
@@ -101,7 +101,7 @@ export const createEvaluatorNodeSlice: StateCreator<
         // Get base evaluator properties from the evaluator type
         const initialEvaluator = buildEvaluatorFromType(
           evaluator.evaluator,
-          availableEvaluators
+          availableEvaluators,
         );
         const id = nameToId(initialEvaluator.name ?? initialEvaluator.cls);
 
@@ -139,7 +139,7 @@ export const createEvaluatorNodeSlice: StateCreator<
               evaluator.parameters ??
               (hasEvaluatorChanged
                 ? []
-                : baseEvaluatorNode.data.parameters ?? []),
+                : (baseEvaluatorNode.data.parameters ?? [])),
           },
         };
 
@@ -162,7 +162,7 @@ export const createEvaluatorNodeSlice: StateCreator<
             (e) =>
               !(
                 e.target === edge.target && e.targetHandle === edge.targetHandle
-              )
+              ),
           );
           newEdges.push(edge);
         }
@@ -182,14 +182,14 @@ export const createEvaluatorNodeSlice: StateCreator<
           ...current,
           // Replace the existing evaluator node
           nodes: current.nodes.map((node, index) =>
-            index === firstEvaluatorIndex ? evaluatorNode : node
+            index === firstEvaluatorIndex ? evaluatorNode : node,
           ),
           // Remove old edges targeting the old and current evaluator and add new connections
           edges: [
             ...current.edges.filter(
               (edge) =>
                 edge.target !== previousEvaluator?.id &&
-                edge.target !== evaluatorNode.id
+                edge.target !== evaluatorNode.id,
             ),
             ...newEdges,
           ],
@@ -225,7 +225,7 @@ export const createEvaluatorNodeSlice: StateCreator<
           ...current,
           edges: [
             ...current.edges.filter(
-              (edge) => edge.target !== firstEvaluator.id
+              (edge) => edge.target !== firstEvaluator.id,
             ),
             ...edges.map((edge) => ({
               ...edge,

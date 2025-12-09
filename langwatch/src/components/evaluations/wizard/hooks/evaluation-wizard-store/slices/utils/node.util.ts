@@ -1,4 +1,4 @@
-import { type Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import type { Component, Field } from "~/optimization_studio/types/dsl";
 
 export const calculateNextPosition = (position: Node<Component>["position"]) =>
@@ -19,18 +19,18 @@ export function updateNodeParameter(
     identifier: string;
     type: Field["type"];
     value?: any;
-  }
+  },
 ): Node<Component> {
   const parameters = node.data.parameters ?? [];
   const paramIndex = parameters.findIndex(
-    (p) => p.identifier === parameter.identifier
+    (p) => p.identifier === parameter.identifier,
   );
 
   const updatedParameters =
     paramIndex === -1
       ? [...parameters, parameter]
       : parameters.map((param, index) =>
-          index === paramIndex ? { ...param, ...parameter } : param
+          index === paramIndex ? { ...param, ...parameter } : param,
         );
 
   return {

@@ -1,16 +1,14 @@
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { env } from "~/env.mjs";
+import { dependencies } from "~/injection/dependencies.server";
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { type Prisma } from "@prisma/client";
-import { ANALYTICS_KEYS } from "~/types";
 import { UsageLimitService } from "~/server/notifications/usage-limit.service";
-import {
-  getCurrentMonthMessagesCount,
-  getProjectIdsForOrganization,
-} from "~/server/api/routers/limits";
-import { dependencies } from "~/injection/dependencies.server";
+import { OrganizationRepository } from "~/server/repositories/organization.repository";
+import { TraceUsageService } from "~/server/traces/trace-usage.service";
+import { ANALYTICS_KEYS } from "~/types";
 import { captureException } from "~/utils/posthogErrorCapture";
-import { env } from "~/env.mjs";
 
 export default async function handler(
   req: NextApiRequest,
@@ -181,9 +179,12 @@ export default async function handler(
         },
       });
 
+      const traceUsageService = TraceUsageService.create();
+      const organizationRepository = new OrganizationRepository(prisma);
+
       for (const org of organizations) {
         try {
-          const projectIds = await getProjectIdsForOrganization(org.id);
+          const projectIds = await organizationRepository.getProjectIds(org.id);
           if (projectIds.length === 0) {
             console.log(
               `[Trace Analytics] Organization ${org.id} has no projects, skipping`,
@@ -191,7 +192,9 @@ export default async function handler(
             continue;
           }
           const currentMonthMessagesCount =
-            await getCurrentMonthMessagesCount(projectIds);
+            await traceUsageService.getCurrentMonthCount({
+              organizationId: org.id,
+            });
           const activePlan =
             await dependencies.subscriptionHandler.getActivePlan(org.id);
 

@@ -2,19 +2,19 @@ import {
   Box,
   Button,
   Center,
+  Field,
   HStack,
   Input,
   NativeSelect,
   Spacer,
+  type StackProps,
   Text,
   useDisclosure,
   VStack,
-  type StackProps,
 } from "@chakra-ui/react";
-import { Field } from "@chakra-ui/react";
-import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useCallback, useEffect, useState } from "react";
-import { useDebouncedCallback } from "use-debounce";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import type React from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ChevronDown,
   Columns,
@@ -25,6 +25,7 @@ import {
   X,
 } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
+import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
 import { RenderCode } from "../../../components/code/RenderCode";
@@ -40,8 +41,8 @@ import type {
   Workflow,
 } from "../../types/dsl";
 import { nameToId } from "../../utils/nodeUtils";
-import { CodeEditorModal } from "../code/CodeEditorModal";
 import { ComponentIcon } from "../ColorfulBlockIcons";
+import { CodeEditorModal } from "../code/CodeEditorModal";
 import {
   ComponentExecutionButton,
   getNodeDisplayName,

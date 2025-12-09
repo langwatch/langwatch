@@ -1,7 +1,7 @@
 import type { NextApiRequest } from "next";
 
 export function getClientIp(
-  req: NextApiRequest | undefined
+  req: NextApiRequest | undefined,
 ): string | undefined {
   if (!req) {
     return undefined;
@@ -56,7 +56,7 @@ export function getClientIp(
   }
 
   // Fallback to request socket
-  if (req.socket && req.socket.remoteAddress) {
+  if (req.socket?.remoteAddress) {
     const ip = cleanIp(req.socket.remoteAddress);
     if (ip) return ip;
   }

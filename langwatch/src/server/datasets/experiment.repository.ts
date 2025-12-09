@@ -1,4 +1,4 @@
-import { type PrismaClient, type Experiment, type Prisma } from "@prisma/client";
+import type { Experiment, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Repository layer for experiment data access.
@@ -17,7 +17,7 @@ export class ExperimentRepository {
     },
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<Experiment | null> {
     const client = options?.tx ?? this.prisma;
     return await client.experiment.findFirst({
@@ -28,4 +28,3 @@ export class ExperimentRepository {
     });
   }
 }
-

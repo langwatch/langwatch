@@ -1,13 +1,13 @@
-import { type PrismaClient, type Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { slugify } from "~/utils/slugify";
-import type { DatasetColumns, DatasetRecordEntry } from "./types";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
+import { slugify } from "~/utils/slugify";
 import { createManyDatasetRecords } from "../api/routers/datasetRecord";
 import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
+import { DatasetConflictError, DatasetNotFoundError } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
-import { DatasetNotFoundError, DatasetConflictError } from "./errors";
+import type { DatasetColumns, DatasetRecordEntry } from "./types";
 
 /**
  * Service input types for business operations
@@ -45,7 +45,7 @@ export class DatasetService {
     private readonly prisma: PrismaClient,
     private readonly repository: DatasetRepository,
     private readonly recordRepository: DatasetRecordRepository,
-    private readonly experimentRepository: ExperimentRepository
+    private readonly experimentRepository: ExperimentRepository,
   ) {}
 
   /**
@@ -55,7 +55,12 @@ export class DatasetService {
     const repository = new DatasetRepository(prisma);
     const recordRepository = new DatasetRecordRepository(prisma);
     const experimentRepository = new ExperimentRepository(prisma);
-    return new DatasetService(prisma, repository, recordRepository, experimentRepository);
+    return new DatasetService(
+      prisma,
+      repository,
+      recordRepository,
+      experimentRepository,
+    );
   }
 
   /**
@@ -70,10 +75,18 @@ export class DatasetService {
    * @throws {DatasetConflictError} if creating with duplicate slug
    */
   async upsertDataset(params: UpsertDatasetParams) {
-    const { projectId, name, experimentId, columnTypes, datasetId, datasetRecords } = params;
+    const {
+      projectId,
+      name,
+      experimentId,
+      columnTypes,
+      datasetId,
+      datasetRecords,
+    } = params;
 
     // Resolve the dataset name
-    const resolvedName = name ?? await this.resolveExperimentName(projectId, experimentId);
+    const resolvedName =
+      name ?? (await this.resolveExperimentName(projectId, experimentId));
 
     if (datasetId) {
       return await this.updateExistingDataset({
@@ -114,7 +127,7 @@ export class DatasetService {
           id: datasetId,
           projectId,
         },
-        { tx }
+        { tx },
       );
 
       if (!existingDataset) {
@@ -130,7 +143,7 @@ export class DatasetService {
           projectId,
           excludeId: datasetId,
         },
-        { tx }
+        { tx },
       );
 
       if (conflictingDataset) {
@@ -149,7 +162,7 @@ export class DatasetService {
             oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
             newColumnTypes: columnTypes,
           },
-          { tx }
+          { tx },
         );
       }
 
@@ -164,7 +177,7 @@ export class DatasetService {
             columnTypes,
           },
         },
-        { tx }
+        { tx },
       );
     });
   }
@@ -229,7 +242,7 @@ export class DatasetService {
     },
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<void> {
     const { datasetId, projectId, oldColumnTypes, newColumnTypes } = params;
 
@@ -238,18 +251,18 @@ export class DatasetService {
         datasetId,
         projectId,
       },
-      options
+      options,
     );
 
     const updatedEntries = tryToMapPreviousColumnsToNewColumns(
       datasetRecords.map((record) => record.entry as DatasetRecordEntry),
       oldColumnTypes,
-      newColumnTypes
+      newColumnTypes,
     );
 
     if (updatedEntries.length !== datasetRecords.length) {
       throw new Error(
-        `Column migration failed: expected ${datasetRecords.length} records but got ${updatedEntries.length}`
+        `Column migration failed: expected ${datasetRecords.length} records but got ${updatedEntries.length}`,
       );
     }
 
@@ -259,7 +272,7 @@ export class DatasetService {
         id: record.id,
         entry: updatedEntries[index]!,
       })),
-      options
+      options,
     );
   }
 
@@ -267,7 +280,7 @@ export class DatasetService {
    * Validates a dataset name by computing its slug and checking availability.
    */
   async validateDatasetName(
-    params: ValidateDatasetNameParams
+    params: ValidateDatasetNameParams,
   ): Promise<ValidateDatasetNameResult> {
     const { projectId, proposedName, excludeDatasetId } = params;
 
@@ -292,7 +305,7 @@ export class DatasetService {
    */
   async findNextAvailableName(
     projectId: string,
-    proposedName: string
+    proposedName: string,
   ): Promise<string> {
     const datasets = await this.repository.findAllSlugs({ projectId });
     const slugSet = new Set(datasets.map((d) => d.slug));
@@ -329,7 +342,7 @@ export class DatasetService {
    */
   private async resolveExperimentName(
     projectId: string,
-    experimentId?: string
+    experimentId?: string,
   ): Promise<string> {
     if (!experimentId) {
       return "Draft Dataset";
@@ -351,7 +364,7 @@ export class DatasetService {
    */
   private async findNextAvailableNameInternal(
     projectId: string,
-    baseName: string
+    baseName: string,
   ): Promise<string> {
     const datasets = await this.repository.findAllSlugs({ projectId });
     const slugSet = new Set(datasets.map((d) => d.slug));
@@ -417,4 +430,3 @@ export class DatasetService {
     return newDataset;
   }
 }
-

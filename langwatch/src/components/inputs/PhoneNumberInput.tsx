@@ -1,12 +1,13 @@
 import { Box, Group, Input, NativeSelect } from "@chakra-ui/react";
-import React, { useEffect, useMemo, useState } from "react";
 import {
   AsYouType,
-  getCountryCallingCode,
-  parsePhoneNumberFromString,
-  isValidPhoneNumber,
   type CountryCode,
+  getCountryCallingCode,
+  isValidPhoneNumber,
+  parsePhoneNumberFromString,
 } from "libphonenumber-js";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   countryCodeToFlagEmoji,
   countryCodeToName,
@@ -56,7 +57,7 @@ export function PhoneNumberInput(
 
     return allowedCountries.includes(defaultCountry)
       ? defaultCountry
-      : allowedCountries[0] ?? defaultCountry;
+      : (allowedCountries[0] ?? defaultCountry);
   }, [value, defaultCountry, allowedCountries]);
 
   const [country, setCountry] = useState<CountryCode>(initialCountry);
@@ -146,7 +147,9 @@ export function PhoneNumberInput(
           cancelled = true;
         };
       }
-    } catch { /* fallthrough */ }
+    } catch {
+      /* fallthrough */
+    }
 
     // 2) Try to detect with locale detection
     try {
@@ -155,7 +158,9 @@ export function PhoneNumberInput(
         const loc = new Intl.Locale(lang);
         if (loc.region) return choose(loc.region);
       }
-    } catch { /* fallthrough */ }
+    } catch {
+      /* fallthrough */
+    }
 
     return () => {
       cancelled = true;
@@ -191,7 +196,8 @@ export function PhoneNumberInput(
               const renderOption = (code: CountryCode) => {
                 const calling = getCountryCallingCode(code);
                 const flag = countryCodeToFlagEmoji(code);
-                const countryName = countryCodeToName[code as keyof typeof countryCodeToName];
+                const countryName =
+                  countryCodeToName[code as keyof typeof countryCodeToName];
                 return (
                   <option key={code} value={code}>
                     {`${countryName} ${flag} (+${calling})`}

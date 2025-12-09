@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createLogger } from "../../../../utils/logger";
-import { errorSchema } from "../../shared/schemas";
 import { HttpError, InternalServerError } from "../../shared/errors";
+import { errorSchema } from "../../shared/schemas";
 
 const logger = createLogger("langwatch:api:dataset:errors");
 
@@ -18,7 +18,7 @@ export const handleDatasetError = async (
   const method = c.req.method;
   const routeParams = c.req.param();
   const status =
-    error instanceof HttpError ? error.status : error.status ?? 500;
+    error instanceof HttpError ? error.status : (error.status ?? 500);
 
   // Log the error with context (including status code)
   logger.error(

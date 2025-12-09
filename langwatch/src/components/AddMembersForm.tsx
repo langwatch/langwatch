@@ -10,16 +10,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { Mail, Plus, Trash2 } from "lucide-react";
 import {
   Controller,
+  type SubmitHandler,
+  type UseFormSetValue,
   useFieldArray,
   useForm,
   useWatch,
-  type UseFormSetValue,
-  type SubmitHandler,
 } from "react-hook-form";
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { api } from "~/utils/api";
 
 type Option = { label: string; value: string; description?: string };

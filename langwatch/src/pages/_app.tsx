@@ -1,9 +1,3 @@
-import { type Session } from "next-auth";
-import { SessionProvider } from "next-auth/react";
-import { type AppType } from "next/app";
-
-import { api } from "~/utils/api";
-
 import {
   ChakraProvider,
   createSystem,
@@ -11,6 +5,10 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
+import type { AppType } from "next/app";
+import type { Session } from "next-auth";
+import { SessionProvider } from "next-auth/react";
+import { api } from "~/utils/api";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
@@ -18,16 +16,15 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
+import { PostHogProvider } from "posthog-js/react";
 import { useEffect, useState } from "react";
+import { AnalyticsProvider } from "react-contextual-analytics";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
-import { dependencies } from "../injection/dependencies.client";
-
-import { PostHogProvider } from "posthog-js/react";
 import { usePostHog } from "../hooks/usePostHog";
-import { AnalyticsProvider } from "react-contextual-analytics";
-import { createAppAnalyticsClient } from "~/utils/analyticsClient";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { dependencies } from "../injection/dependencies.client";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -537,7 +534,7 @@ const LangWatch: AppType<{
       .filter(
         ([key]) =>
           key.startsWith("NEXT_PUBLIC_FEATURE_") &&
-          typeof router.query[key] === "string"
+          typeof router.query[key] === "string",
       )
       .map(([key, value]) => ({ key, value: value as string }));
     setPreviousFeatureFlagQueryParams(featureFlagQueryParams);

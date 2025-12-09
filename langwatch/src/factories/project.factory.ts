@@ -1,6 +1,6 @@
 import {
-  type Project,
   PIIRedactionLevel,
+  type Project,
   ProjectSensitiveDataVisibilityLevel,
 } from "@prisma/client";
 import { Factory } from "fishery";

@@ -1,8 +1,8 @@
 "use client";
 
-import { captureException } from "~/utils/posthogErrorCapture";
 import NextError from "next/error";
 import { useEffect } from "react";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 export default function GlobalError({
   error,

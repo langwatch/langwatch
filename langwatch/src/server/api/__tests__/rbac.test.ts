@@ -1,19 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  teamRoleHasPermission,
-  organizationRoleHasPermission,
-  getTeamRolePermissions,
-  getOrganizationRolePermissions,
-  canView,
-  canManage,
-  canCreate,
-  canUpdate,
-  canDelete,
-  isDemoProject,
-  Resources,
   Actions,
+  canCreate,
+  canDelete,
+  canManage,
+  canUpdate,
+  canView,
+  getOrganizationRolePermissions,
+  getTeamRolePermissions,
+  isDemoProject,
+  organizationRoleHasPermission,
   type Permission,
+  Resources,
+  teamRoleHasPermission,
 } from "../rbac";
 
 // Helper function to test permission hierarchy logic

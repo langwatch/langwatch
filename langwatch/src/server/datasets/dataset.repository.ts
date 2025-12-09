@@ -1,8 +1,4 @@
-import {
-  type PrismaClient,
-  type Dataset,
-  type Prisma,
-} from "@prisma/client";
+import type { Dataset, Prisma, PrismaClient } from "@prisma/client";
 
 /**
  * Input types derived from Prisma for type safety
@@ -38,7 +34,7 @@ export class DatasetRepository {
     },
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<Dataset | null> {
     const client = options?.tx ?? this.prisma;
     return await client.dataset.findFirst({
@@ -60,7 +56,7 @@ export class DatasetRepository {
     },
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<Dataset | null> {
     const client = options?.tx ?? this.prisma;
     return await client.dataset.findFirst({
@@ -77,7 +73,7 @@ export class DatasetRepository {
    */
   async create(input: CreateDatasetInput): Promise<Dataset> {
     return await this.prisma.dataset.create({
-      data: input
+      data: input,
     });
   }
 
@@ -93,7 +89,7 @@ export class DatasetRepository {
     input: UpdateDatasetInput,
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<Dataset> {
     const client = options?.tx ?? this.prisma;
 
@@ -107,7 +103,7 @@ export class DatasetRepository {
 
     if (!result) {
       throw new Error(
-        `Dataset ${input.id} not found in project ${input.projectId}`
+        `Dataset ${input.id} not found in project ${input.projectId}`,
       );
     }
 
@@ -123,9 +119,7 @@ export class DatasetRepository {
   /**
    * Gets project with organization info for S3 configuration check.
    */
-  async getProjectWithOrgS3Settings(input: {
-    projectId: string;
-  }): Promise<{
+  async getProjectWithOrgS3Settings(input: { projectId: string }): Promise<{
     canUseS3: boolean;
   }> {
     const project = await this.prisma.project.findUnique({
@@ -141,11 +135,12 @@ export class DatasetRepository {
   /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
-  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
+  async findAllSlugs(input: {
+    projectId: string;
+  }): Promise<Array<{ slug: string }>> {
     return await this.prisma.dataset.findMany({
       where: { projectId: input.projectId },
       select: { slug: true },
     });
   }
 }
-

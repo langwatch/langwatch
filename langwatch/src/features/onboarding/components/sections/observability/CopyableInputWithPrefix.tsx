@@ -1,13 +1,14 @@
-import React, { useState } from "react";
 import {
   HStack,
   IconButton,
   Input,
-  Text,
   /* eslint-disable-next-line no-restricted-imports */
   InputGroup,
+  Text,
 } from "@chakra-ui/react";
-import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
+import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 
 interface CopyableInputWithPrefixProps {
@@ -38,9 +39,21 @@ export function CopyableInputWithPrefix({
         boxShadow: "sm",
         borderRadius: "sm",
       }}
-      startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", borderColor: "border", borderWidth: "1px", borderEndWidth: 0 }}
+      startAddonProps={{
+        bg: "bg.muted/60",
+        color: "fg.muted",
+        borderColor: "border",
+        borderWidth: "1px",
+        borderEndWidth: 0,
+      }}
       startAddon={<Text fontSize="xs">{prefix}</Text>}
-      endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", borderColor: "border", borderWidth: "1px", borderStartWidth: 0 }}
+      endAddonProps={{
+        bg: "bg.muted/40",
+        color: "fg.muted",
+        borderColor: "border",
+        borderWidth: "1px",
+        borderStartWidth: 0,
+      }}
       endAddon={
         <HStack gap="1">
           {showVisibilityToggle && (
@@ -53,7 +66,11 @@ export function CopyableInputWithPrefix({
               {isVisible ? <EyeOff /> : <Eye />}
             </IconButton>
           )}
-          <Tooltip content={`Copy ${ariaLabel.toLowerCase()}`} openDelay={0} showArrow>
+          <Tooltip
+            content={`Copy ${ariaLabel.toLowerCase()}`}
+            openDelay={0}
+            showArrow
+          >
             <IconButton
               size="2xs"
               variant="ghost"
@@ -63,7 +80,11 @@ export function CopyableInputWithPrefix({
               <Clipboard />
             </IconButton>
           </Tooltip>
-          <Tooltip content={`Copy ${ariaLabel.toLowerCase()} with environment variable prefix`} openDelay={0} showArrow>
+          <Tooltip
+            content={`Copy ${ariaLabel.toLowerCase()} with environment variable prefix`}
+            openDelay={0}
+            showArrow
+          >
             <IconButton
               size="2xs"
               variant="ghost"
@@ -95,4 +116,3 @@ export function CopyableInputWithPrefix({
     </InputGroup>
   );
 }
-

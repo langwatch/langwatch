@@ -3,41 +3,40 @@ import {
   Button,
   Card,
   Flex,
-  HStack,
   Heading,
+  HStack,
   LinkBox,
   Spacer,
   Spinner,
   Table,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
-import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
+import { useEffect, useMemo, useState } from "react";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
-import { CopyInput } from "../../components/CopyInput";
-import { AddMembersForm } from "../../components/AddMembersForm";
+import type { SubmitHandler } from "react-hook-form";
+import { captureException } from "~/utils/posthogErrorCapture";
 import type { MembersForm } from "../../components/AddMembersForm";
-
-import { useState, useMemo, useEffect } from "react";
-import { type SubmitHandler } from "react-hook-form";
+import { AddMembersForm } from "../../components/AddMembersForm";
+import { CopyInput } from "../../components/CopyInput";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
+import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
 } from "../../server/api/routers/organization";
-import { type PlanInfo } from "../../server/subscriptionHandler";
+import type { PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 const selectOptions = [
   {
@@ -387,7 +386,6 @@ function MembersList({
                 {sortedMembers.map((member) => {
                   const roleLabel =
                     roleLabelMap.get(member.role) ?? member.role;
-                  const isDeleteDisabled = member.user.id === user?.id;
 
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
@@ -426,8 +424,8 @@ function MembersList({
                                   !hasOrganizationManagePermission
                                     ? "You need organization:manage permission to remove members"
                                     : organization.members.length === 1
-                                    ? "Cannot remove the last member"
-                                    : undefined
+                                      ? "Cannot remove the last member"
+                                      : undefined
                                 }
                                 disabled={
                                   hasOrganizationManagePermission &&

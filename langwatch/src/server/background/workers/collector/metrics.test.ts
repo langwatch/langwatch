@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Span } from "../../../tracer/types";
 import {
+  addGuardrailCosts,
   addLLMTokensCount,
   computeTraceMetrics,
-  addGuardrailCosts,
 } from "./metrics";
 
 // Mock the LLM model costs
@@ -295,7 +295,7 @@ describe("Trace metrics", () => {
       expect(span).toBeTruthy();
       expect(span!.metrics).toBeTruthy();
       expect(span!.metrics!.cost).toEqual(
-        (gpt4oMiniInputCost * 200) / 1000 + (gpt4oMiniOutputCost * 100) / 1000
+        (gpt4oMiniInputCost * 200) / 1000 + (gpt4oMiniOutputCost * 100) / 1000,
       );
     });
 

@@ -1,7 +1,7 @@
 import {
   OrganizationUserRole,
-  TeamUserRole,
   type PrismaClient,
+  TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";

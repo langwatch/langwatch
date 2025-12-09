@@ -1,20 +1,20 @@
 import {
-  LambdaClient,
-  InvokeWithResponseStreamCommand,
-  CreateFunctionCommand,
-  GetFunctionCommand,
-  UpdateFunctionCodeCommand,
-} from "@aws-sdk/client-lambda";
-import {
   CloudWatchLogsClient,
-  PutRetentionPolicyCommand,
   CreateLogGroupCommand,
+  PutRetentionPolicyCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
-import type { StudioClientEvent } from "../types/events";
-import { captureException } from "../../utils/posthogErrorCapture";
+import {
+  CreateFunctionCommand,
+  GetFunctionCommand,
+  InvokeWithResponseStreamCommand,
+  LambdaClient,
+  UpdateFunctionCodeCommand,
+} from "@aws-sdk/client-lambda";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger";
+import { captureException } from "../../utils/posthogErrorCapture";
+import type { StudioClientEvent } from "../types/events";
 
 const logger = createLogger("langwatch:langwatch-nlp-lambda");
 
@@ -383,7 +383,9 @@ export const invokeLambda = async (
               if (payloadText.includes('{"statusCode":')) {
                 try {
                   statusCode = parseInt(JSON.parse(payloadText).statusCode);
-                } catch {}
+                } catch {
+                  /* this is just a safe json parse fallback */
+                }
               }
               controller.enqueue(chunk.PayloadChunk.Payload);
             }
@@ -401,7 +403,10 @@ export const invokeLambda = async (
           if (statusCode < 200 || statusCode >= 300) {
             try {
               errorMessage = JSON.parse(errorMessage.trim());
-            } catch {}
+            } catch {
+              /* this is just a safe json parse fallback */
+            }
+
             if (statusCode === 422) {
               console.error(
                 "Optimization Studio validation failed, please contact support",
@@ -442,7 +447,10 @@ export const invokeLambda = async (
       let body = await response.text();
       try {
         body = JSON.parse(body);
-      } catch {}
+      } catch {
+        /* this is just a safe json parse fallback */
+      }
+
       if (response.status === 422) {
         console.error(
           "Optimization Studio validation failed, please contact support",

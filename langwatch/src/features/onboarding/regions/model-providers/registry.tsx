@@ -1,5 +1,5 @@
+import { iconWithLabel, singleIcon, themedIcon } from "../shared/types";
 import type { ModelProviderKey, ModelProviderSpec } from "./types";
-import { themedIcon, singleIcon, iconWithLabel } from "../shared/types";
 
 export type ModelProviderRegistry = ModelProviderSpec[];
 
@@ -12,7 +12,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
-      "OpenAI"
+      "OpenAI",
     ),
     externalDocsUrl: "https://platform.openai.com/docs/overview",
     fieldMetadata: {
@@ -22,7 +22,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       OPENAI_BASE_URL: {
         label: "OpenAI Base URL",
-        description: "Optional: Custom API endpoint for OpenAI-compatible services (e.g., Azure OpenAI proxy)",
+        description:
+          "Optional: Custom API endpoint for OpenAI-compatible services (e.g., Azure OpenAI proxy)",
       },
     },
   },
@@ -34,7 +35,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
       "/images/external-icons/anthropic-darktheme.svg",
-      "Anthropic"
+      "Anthropic",
     ),
     externalDocsUrl: "https://docs.anthropic.com/",
     fieldMetadata: {
@@ -44,7 +45,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       ANTHROPIC_BASE_URL: {
         label: "Anthropic Base URL",
-        description: "Optional: Custom API endpoint for Anthropic-compatible services",
+        description:
+          "Optional: Custom API endpoint for Anthropic-compatible services",
       },
     },
   },
@@ -58,7 +60,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
-        description: "Your Google AI Studio API key from aistudio.google.com/apikey",
+        description:
+          "Your Google AI Studio API key from aistudio.google.com/apikey",
       },
     },
   },
@@ -76,11 +79,13 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       AZURE_OPENAI_ENDPOINT: {
         label: "Endpoint",
-        description: "Your Azure OpenAI resource endpoint URL (e.g., https://your-resource.openai.azure.com)",
+        description:
+          "Your Azure OpenAI resource endpoint URL (e.g., https://your-resource.openai.azure.com)",
       },
       AZURE_API_GATEWAY_BASE_URL: {
         label: "Base URL",
-        description: "Optional: Base URL for Azure API Management gateway if routing through APIM",
+        description:
+          "Optional: Base URL for Azure API Management gateway if routing through APIM",
       },
       AZURE_API_GATEWAY_VERSION: {
         label: "Version",
@@ -109,7 +114,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       AWS_REGION_NAME: {
         label: "Region",
-        description: "The AWS region where Bedrock is available (e.g., us-east-1, us-west-2)",
+        description:
+          "The AWS region where Bedrock is available (e.g., us-east-1, us-west-2)",
       },
     },
   },
@@ -148,7 +154,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
       "/images/external-icons/grok-darktheme.svg",
-      "Grok"
+      "Grok",
     ),
     externalDocsUrl: "https://x.ai/",
     fieldMetadata: {
@@ -167,7 +173,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     fieldMetadata: {
       GOOGLE_APPLICATION_CREDENTIALS: {
         label: "Google Service Account JSON",
-        description: "Paste the contents of your Google Cloud service account JSON file. Create one in GCP Console > IAM & Admin > Service Accounts with Vertex AI permissions.",
+        description:
+          "Paste the contents of your Google Cloud service account JSON file. Create one in GCP Console > IAM & Admin > Service Accounts with Vertex AI permissions.",
       },
       VERTEXAI_PROJECT: {
         label: "Vertex Project ID",
@@ -175,7 +182,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       },
       VERTEXAI_LOCATION: {
         label: "Vertex Location",
-        description: "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
+        description:
+          "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
       },
     },
   },
@@ -202,21 +210,25 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "Custom, OpenAI-compatible",
     icon: iconWithLabel(
       singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
-      "Custom"
+      "Custom",
     ),
     fieldMetadata: {
       CUSTOM_API_KEY: {
         label: "API Key",
-        description: "Optional: API key for your custom OpenAI-compatible endpoint",
+        description:
+          "Optional: API key for your custom OpenAI-compatible endpoint",
       },
       CUSTOM_BASE_URL: {
         label: "Base URL",
-        description: "Your custom API endpoint URL (e.g., LiteLLM proxy, vLLM server, or any /chat/completions compatible service)",
+        description:
+          "Your custom API endpoint URL (e.g., LiteLLM proxy, vLLM server, or any /chat/completions compatible service)",
       },
     },
   },
 ];
 
-export function getModelProvider(key: ModelProviderKey): ModelProviderSpec | undefined {
+export function getModelProvider(
+  key: ModelProviderKey,
+): ModelProviderSpec | undefined {
   return modelProviderRegistry.find((provider) => provider.key === key);
 }

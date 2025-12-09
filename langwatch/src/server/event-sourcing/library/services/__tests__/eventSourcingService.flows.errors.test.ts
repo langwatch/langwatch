@@ -1,21 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourcingService } from "../eventSourcingService";
 import type { Event } from "../../domain/types";
+import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventStore,
-  createMockEventPublisher,
-  createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
-  createMockProjectionDefinition,
-  createMockEventHandler,
-  createMockProjectionStore,
   createMockDistributedLock,
+  createMockEventHandler,
+  createMockEventHandlerDefinition,
+  createMockEventPublisher,
+  createMockEventReactionHandler,
+  createMockEventStore,
   createMockProcessorCheckpointStore,
-  createTestEvent,
-  createTestTenantId,
-  createTestEventStoreReadContext,
+  createMockProjectionDefinition,
+  createMockProjectionStore,
   createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
   createTestProjection,
+  createTestTenantId,
   TEST_CONSTANTS,
 } from "./testHelpers";
 

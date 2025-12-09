@@ -1,21 +1,22 @@
-import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import crypto from "crypto";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import { dependencies } from "../../injection/dependencies.server";
-import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
+import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../server/background/workers/collectorWorker";
 import { prisma } from "../../server/db"; // Adjust the import based on your setup
-import {
-  type CollectorRESTParamsValidator,
-  type CustomMetadata,
-  type ReservedTraceMetadata,
-  type Span,
+import type {
+  CollectorRESTParamsValidator,
+  CustomMetadata,
+  ReservedTraceMetadata,
+  Span,
 } from "../../server/tracer/types";
 import {
   collectorRESTParamsValidatorSchema,
@@ -25,9 +26,8 @@ import {
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
+import { TraceUsageService } from "../../server/traces/trace-usage.service";
 import { createLogger } from "../../utils/logger";
-import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
-import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 
 const logger = createLogger("langwatch.collector");
 
@@ -41,7 +41,7 @@ export const config = {
 
 async function handleCollectorRequest(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -56,7 +56,7 @@ async function handleCollectorRequest(
 
   if (!authToken) {
     logger.error(
-      "collector request is not authenticated, no auth token provided"
+      "collector request is not authenticated, no auth token provided",
     );
 
     return res.status(401).json({
@@ -90,54 +90,51 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-      [project.id],
-      project.team.organizationId
-    );
+    const traceUsageService = TraceUsageService.create();
+    const limitResult = await traceUsageService.checkLimit({
+      teamId: project.teamId,
+    });
 
-    const activePlan = await dependencies.subscriptionHandler.getActivePlan(
-      project.team.organizationId
-    );
-
-    if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+    if (limitResult.exceeded) {
       if (dependencies.planLimits) {
         try {
+          const activePlan =
+            await dependencies.subscriptionHandler.getActivePlan(
+              project.team.organizationId,
+            );
           await dependencies.planLimits(
             project.team.organizationId,
-            activePlan.name ?? "free"
+            activePlan.name ?? "free",
           );
         } catch (error) {
           logger.error(
             { error, projectId: project.id },
-            "Error sending plan limit notification"
+            "Error sending plan limit notification",
           );
         }
       }
       logger.info(
         {
           projectId: project.id,
-          currentMonthMessagesCount,
-          activePlanName: activePlan.name,
-          maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
+          currentMonthMessagesCount: limitResult.count,
+          activePlanName: limitResult.planName,
+          maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
         },
-        "Project has reached plan limit"
+        "Project has reached plan limit",
       );
 
       return res.status(429).json({
-        message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+        message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
       });
     }
   } catch (error) {
     logger.error(
       { error, projectId: project.id },
-      "Error getting current month messages count"
+      "Error checking trace limit",
     );
-    captureException(
-      new Error("Error getting current month messages count"),
-      {
-        extra: { projectId: project.id, zodError: error },
-      }
-    );
+    captureException(new Error("Error checking trace limit"), {
+      extra: { projectId: project.id, error },
+    });
   }
 
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
@@ -163,10 +160,10 @@ async function handleCollectorRequest(
       typeof req.body.metadata.labels === "string"
         ? [req.body.metadata.labels]
         : Array.isArray(req.body.metadata.labels)
-        ? req.body.metadata.labels
-        : Object.entries(req.body.metadata.labels).map(
-            ([key, value]) => `${key}: ${value as string}`
-          );
+          ? req.body.metadata.labels
+          : Object.entries(req.body.metadata.labels).map(
+              ([key, value]) => `${key}: ${value as string}`,
+            );
   }
 
   for (const evaluation of req.body.evaluations ?? []) {
@@ -179,7 +176,7 @@ async function handleCollectorRequest(
     ) {
       logger.error(
         { projectId: project.id, evaluationId: evaluation.id },
-        "evaluation has no passed, score or label"
+        "evaluation has no passed, score or label",
       );
 
       return res.status(400).json({
@@ -200,7 +197,7 @@ async function handleCollectorRequest(
     ) {
       logger.error(
         { projectId: project.id, evaluationId: evaluation.id },
-        "evaluation timestamps not in milliseconds"
+        "evaluation timestamps not in milliseconds",
       );
 
       return res.status(400).json({
@@ -222,7 +219,7 @@ async function handleCollectorRequest(
 
     logger.error(
       { error, body: req.body, validationError },
-      "invalid trace received"
+      "invalid trace received",
     );
 
     return res.status(400).json({ error: validationError.message });
@@ -237,7 +234,7 @@ async function handleCollectorRequest(
         spans: req.body.spans,
         traceId: nullableTraceId,
       },
-      "invalid spans field, expecting array"
+      "invalid spans field, expecting array",
     );
 
     return res
@@ -252,7 +249,7 @@ async function handleCollectorRequest(
         spansCount: req.body.spans?.length,
         traceId: nullableTraceId,
       },
-      "[429] Too many spans"
+      "[429] Too many spans",
     );
     return res.status(429).json({
       message: "Too many spans, maximum of 200 per trace",
@@ -265,13 +262,13 @@ async function handleCollectorRequest(
     if (params.metadata) {
       reservedTraceMetadata = Object.fromEntries(
         Object.entries(
-          reservedTraceMetadataSchema.parse(params.metadata)
-        ).filter(([_key, value]) => value !== null && value !== undefined)
+          reservedTraceMetadataSchema.parse(params.metadata),
+        ).filter(([_key, value]) => value !== null && value !== undefined),
       );
       const remainingMetadata = Object.fromEntries(
         Object.entries(params.metadata).filter(
-          ([key]) => !(key in reservedTraceMetadataSchema.shape)
-        )
+          ([key]) => !(key in reservedTraceMetadataSchema.shape),
+        ),
       );
       customMetadata = customMetadataSchema.parse(remainingMetadata);
     }
@@ -287,14 +284,14 @@ async function handleCollectorRequest(
 
     logger.error(
       { projectId: project.id, metadata: params.metadata, zodError: error },
-      "invalid metadata received"
+      "invalid metadata received",
     );
 
     return res.status(400).json({ error: validationError.message });
   }
 
   const spanFields = spanSchema.options.flatMap((option) =>
-    Object.keys(option.shape)
+    Object.keys(option.shape),
   );
   const spans = ((req.body as Record<string, any>).spans ?? []) as Span[];
   spans.forEach((span) => {
@@ -365,7 +362,7 @@ async function handleCollectorRequest(
         spanCount: spans.length,
         spanIds: spans.map((span) => span.span_id),
       },
-      "trace id not defined"
+      "trace id not defined",
     );
 
     return res.status(400).json({ message: "Trace ID not defined" });
@@ -378,12 +375,12 @@ async function handleCollectorRequest(
   });
 
   const traceIds = Array.from(
-    new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
+    new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id)),
   );
   if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
     logger.error(
       { projectId: project.id, traceId, traceIds },
-      "trace ids are not the same"
+      "trace ids are not the same",
     );
 
     return res
@@ -398,8 +395,8 @@ async function handleCollectorRequest(
       if (validMetrics.success) {
         const extrataneousMetrics = Object.fromEntries(
           Object.entries(span.metrics).filter(
-            ([key]) => !(key in validMetrics.data)
-          )
+            ([key]) => !(key in validMetrics.data),
+          ),
         );
         span.params = {
           ...span.params,
@@ -419,7 +416,7 @@ async function handleCollectorRequest(
 
       logger.error(
         { error, span, projectId: project.id, index, validationError },
-        "invalid span received"
+        "invalid span received",
       );
 
       return res
@@ -437,7 +434,7 @@ async function handleCollectorRequest(
     ) {
       logger.error(
         { traceId, projectId: project.id },
-        "timestamps not in milliseconds for span"
+        "timestamps not in milliseconds for span",
       );
       return res.status(400).json({
         error:
@@ -454,7 +451,7 @@ async function handleCollectorRequest(
   if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
     logger.info(
       { traceId, projectId: project.id, paramsMD5 },
-      "trace already indexed"
+      "trace already indexed",
     );
 
     return res.status(200).json({ message: "No changes" });
@@ -463,7 +460,7 @@ async function handleCollectorRequest(
   if (existingTrace?.version && existingTrace.version > 256) {
     logger.error(
       { traceId, projectId: project.id, version: existingTrace.version },
-      "over 256 updates were sent for this trace already, no more updates will be accepted"
+      "over 256 updates were sent for this trace already, no more updates will be accepted",
     );
 
     return res.status(400).json({
@@ -492,11 +489,13 @@ async function handleCollectorRequest(
       paramsMD5,
       collectedAt: Date.now(),
     },
-    forceSync
+    forceSync,
   );
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
 
 // Export the handler wrapped with logging middleware
-export default withPagesRouterTracer("langwatch.collector")(withPagesRouterLogger(handleCollectorRequest));
+export default withPagesRouterTracer("langwatch.collector")(
+  withPagesRouterLogger(handleCollectorRequest),
+);

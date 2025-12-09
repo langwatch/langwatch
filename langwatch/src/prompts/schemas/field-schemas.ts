@@ -1,9 +1,7 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
-
-import { SchemaVersion } from "~/server/prompt-config/enums";
-
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
+import { SchemaVersion } from "~/server/prompt-config/enums";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "~/types";
 
 /**

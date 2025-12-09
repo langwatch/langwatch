@@ -10,32 +10,34 @@ import {
 } from "@chakra-ui/react";
 
 import { useRouter } from "next/router";
+import { useState } from "react";
 import {
+  Edit,
   MoreVertical,
   Play,
-  Upload,
   Table as TableIcon,
-  Edit,
   Trash2,
   Copy,
+  Upload,
 } from "react-feather";
+import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import type { DatasetColumns } from "../../server/datasets/types";
 import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
-import { useState } from "react";
-import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
-import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { DatasetColumns } from "../../server/datasets/types";
+import { api } from "../../utils/api";
 import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "../../server/api/root";
 
 function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
@@ -51,6 +53,8 @@ function DatasetsPage() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  type Dataset = inferRouterOutputs<AppRouter>["dataset"]["getAll"][number];
 
   const datasetDelete = api.dataset.deleteById.useMutation();
   const [editDataset, setEditDataset] = useState<
@@ -227,7 +231,7 @@ function DatasetsPage() {
                       </Table.Row>
                     ))
                   : datasets.data
-                  ? datasets.data?.map((dataset) => (
+                  ? datasets.data.map((dataset: Dataset) => (
                       <Table.Row
                         cursor="pointer"
                         onClick={() => goToDataset(dataset.id)}

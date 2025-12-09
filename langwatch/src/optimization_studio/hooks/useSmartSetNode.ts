@@ -16,6 +16,6 @@ export function useSmartSetNode() {
       setNode(node);
       updateNodeInternals(node.id);
     },
-    [setNode, updateNodeInternals]
+    [setNode, updateNodeInternals],
   );
 }

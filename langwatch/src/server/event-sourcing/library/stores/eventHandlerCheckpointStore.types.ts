@@ -1,6 +1,6 @@
-import type { Event, ProcessorCheckpoint } from "../domain/types";
-import type { TenantId } from "../domain/tenantId";
 import type { AggregateType } from "../domain/aggregateType";
+import type { TenantId } from "../domain/tenantId";
+import type { Event, ProcessorCheckpoint } from "../domain/types";
 
 /**
  * Store interface for managing processor checkpoints (event handlers and projections).

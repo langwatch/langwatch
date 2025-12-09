@@ -10,10 +10,10 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   loading: () => <div style={{ padding: "0 16px" }}>Loading editor...</div>,
 });
 
-import monokaiTheme from "./Monokai.json";
-import { useCallback, useEffect, useState } from "react";
 import { registerCompletion } from "monacopilot";
+import { useCallback, useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import monokaiTheme from "./Monokai.json";
 
 export function CodeEditorModal({
   code,
@@ -103,7 +103,7 @@ export function CodeEditorModal({
 }
 
 const onKeyDown = {
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: this is a fair use case for a function expression as a third party client may need to access the fn property of the object.
   fn: () => {},
 };
 

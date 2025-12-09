@@ -8,10 +8,10 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useForm } from "react-hook-form";
 import { useEffect } from "react";
-import { Dialog } from "../ui/dialog";
+import { useForm } from "react-hook-form";
 import type { Permission } from "../../server/api/rbac";
+import { Dialog } from "../ui/dialog";
 import { PermissionSelector } from "./PermissionSelector";
 
 type RoleFormData = {

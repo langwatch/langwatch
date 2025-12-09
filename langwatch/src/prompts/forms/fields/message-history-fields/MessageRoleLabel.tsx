@@ -16,8 +16,8 @@ export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
     role === "system"
       ? "System prompt"
       : role === "user"
-      ? "user"
-      : "assistant";
+        ? "user"
+        : "assistant";
   return (
     <PropertySectionTitle padding={0} {...props}>
       {label}

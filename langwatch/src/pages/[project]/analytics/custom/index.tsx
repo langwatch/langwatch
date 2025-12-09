@@ -5,32 +5,32 @@ import {
   Card,
   Center,
   Container,
+  createListCollection,
   Field,
   Grid,
-  HStack,
   Heading,
+  HStack,
   Input,
   NativeSelect,
   Spacer,
   Text,
   Textarea,
-  VStack,
-  createListCollection,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 
 import {
-  Select as MultiSelect,
   chakraComponents,
+  Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
 import { useRouter } from "next/router";
 import {
-  useEffect,
-  useState,
-  useRef,
   type Dispatch,
   type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 import {
   AlignLeft,
@@ -47,14 +47,15 @@ import {
 } from "react-feather";
 import {
   Controller,
-  useFieldArray,
-  useForm,
   type ControllerRenderProps,
   type FieldArrayWithId,
   type FieldValues,
   type Path,
   type UseFieldArrayReturn,
+  useFieldArray,
+  useForm,
 } from "react-hook-form";
+import { LuChartArea } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
@@ -62,13 +63,13 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useFilterParams, type FilterParam } from "~/hooks/useFilterParams";
-import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
+import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
-  summaryGraphTypes,
   type CustomGraphInput,
+  summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
+import { useDrawer } from "../../../../components/CurrentDrawer";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
@@ -86,12 +87,12 @@ import {
   analyticsGroups,
   analyticsMetrics,
   analyticsPipelines,
+  type FlattenAnalyticsGroupsEnum,
+  type FlattenAnalyticsMetricsEnum,
   getGroup,
   getMetric,
   metricAggregations,
   pipelineAggregations,
-  type FlattenAnalyticsGroupsEnum,
-  type FlattenAnalyticsMetricsEnum,
 } from "../../../../server/analytics/registry";
 import type {
   AggregationTypes,
@@ -99,18 +100,17 @@ import type {
   PipelineFields,
   SharedFiltersInput,
 } from "../../../../server/analytics/types";
+import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import type { FilterField } from "../../../../server/filters/types";
 import { api } from "../../../../utils/api";
 import {
-  rotatingColors,
   type RotatingColorSet,
+  rotatingColors,
 } from "../../../../utils/rotatingColors";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { LuChartArea } from "react-icons/lu";
-import { useDrawer } from "../../../../components/CurrentDrawer";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -610,7 +610,7 @@ function CustomGraphForm({
   const addGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    if (graphJson && graphJson.hasOwnProperty("height")) {
+    if (graphJson?.hasOwnProperty("height")) {
       graphJson.height = 300;
     }
 
@@ -1042,14 +1042,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? metricAggregations[aggregation] ?? aggregation
+      ? (metricAggregations[aggregation] ?? aggregation)
       : undefined;
     const pipeline_ = pipelineField
-      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
+      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
+        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(

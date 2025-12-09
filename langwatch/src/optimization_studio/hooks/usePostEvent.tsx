@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { type WorkflowStore, useWorkflowStore } from "./useWorkflowStore";
-import type { StudioClientEvent, StudioServerEvent } from "../types/events";
-import { createLogger } from "../../utils/logger";
-import { toaster } from "../../components/ui/toaster";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { createLogger } from "../../utils/logger";
 import type { BaseComponent } from "../types/dsl";
+import type { StudioClientEvent, StudioServerEvent } from "../types/events";
+import { useWorkflowStore, type WorkflowStore } from "./useWorkflowStore";
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
@@ -21,7 +21,7 @@ export const PostEventProvider = ({
     useShallow((state) => ({
       setSocketStatus: state.setSocketStatus,
       socketStatus: state.socketStatus,
-    }))
+    })),
   );
   const { postEvent } = usePostEvent();
 
@@ -43,7 +43,7 @@ export const PostEventProvider = ({
 
     const interval = setInterval(
       isAlive,
-      socketStatus === "connecting-python" ? 5_000 : 30_000
+      socketStatus === "connecting-python" ? 5_000 : 30_000,
     );
 
     // Make the first call
@@ -63,13 +63,14 @@ export const PostEventProvider = ({
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
   const workflowStore = useWorkflowStore();
-  const { socketStatus, setEvaluationState, setComponentExecutionState } = useWorkflowStore(
-    useShallow((state) => ({
-      socketStatus: state.socketStatus,
-      setEvaluationState: state.setEvaluationState,
-      setComponentExecutionState: state.setComponentExecutionState,
-    }))
-  );
+  const { socketStatus, setEvaluationState, setComponentExecutionState } =
+    useWorkflowStore(
+      useShallow((state) => ({
+        socketStatus: state.socketStatus,
+        setEvaluationState: state.setEvaluationState,
+        setComponentExecutionState: state.setComponentExecutionState,
+      })),
+    );
 
   const handleServerMessage = useHandleServerMessage({
     workflowStore,
@@ -153,7 +154,7 @@ export const usePostEvent = () => {
           setIsLoading(false);
         });
     },
-    [handleServerMessage, project, setEvaluationState]
+    [handleServerMessage, project, setEvaluationState],
   );
 
   return { postEvent, isLoading, socketStatus };
@@ -227,16 +228,16 @@ export const useHandleServerMessage = ({
           break;
         case "component_state_change":
           const currentComponentState = getWorkflow().nodes.find(
-            (node) => node.id === message.payload.component_id
+            (node) => node.id === message.payload.component_id,
           )?.data.execution_state;
           setComponentExecutionState(
             message.payload.component_id,
-            message.payload.execution_state
+            message.payload.execution_state,
           );
 
           if (message.payload.execution_state?.status === "error") {
             checkIfUnreachableErrorMessage(
-              message.payload.execution_state.error
+              message.payload.execution_state.error,
             );
             alertOnComponent({
               componentId: message.payload.component_id,
@@ -326,6 +327,6 @@ export const useHandleServerMessage = ({
       setSocketStatus,
       setWorkflowExecutionState,
       stopWorkflowIfRunning,
-    ]
+    ],
   );
 };

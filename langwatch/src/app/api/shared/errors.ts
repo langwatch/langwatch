@@ -20,7 +20,7 @@ export abstract class HttpError extends Error {
  */
 export class BadRequestError extends HttpError {
   readonly status = 400;
-  constructor(message: string = "Bad request") {
+  constructor(message = "Bad request") {
     super(message);
   }
 }
@@ -30,7 +30,7 @@ export class BadRequestError extends HttpError {
  */
 export class UnauthorizedError extends HttpError {
   readonly status = 401;
-  constructor(message: string = "Unauthorized") {
+  constructor(message = "Unauthorized") {
     super(message);
   }
 }
@@ -40,7 +40,7 @@ export class UnauthorizedError extends HttpError {
  */
 export class NotFoundError extends HttpError {
   readonly status = 404;
-  constructor(message: string = "Not found") {
+  constructor(message = "Not found") {
     super(message);
   }
 }
@@ -50,7 +50,7 @@ export class NotFoundError extends HttpError {
  */
 export class UnprocessableEntityError extends HttpError {
   readonly status = 422;
-  constructor(message: string = "Unprocessable entity") {
+  constructor(message = "Unprocessable entity") {
     super(message);
   }
 }
@@ -60,9 +60,7 @@ export class UnprocessableEntityError extends HttpError {
  */
 export class InternalServerError extends HttpError {
   readonly status = 500;
-  constructor(message: string = "Internal server error") {
+  constructor(message = "Internal server error") {
     super(message);
   }
 }
-
-

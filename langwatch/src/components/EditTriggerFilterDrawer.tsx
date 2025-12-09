@@ -41,12 +41,12 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             }
             return acc;
           },
-          {} as Record<FilterField, string[] | Record<string, string[]>>
+          {} as Record<FilterField, string[] | Record<string, string[]>>,
         );
 
         setFilters(filtersToSet);
       },
-    }
+    },
   );
 
   const { closeDrawer } = useDrawer();
@@ -75,8 +75,8 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
           Object.entries(filterParams.filters).filter(([_, value]) =>
             Array.isArray(value)
               ? value.length > 0
-              : Object.keys(value as Record<string, string[]>).length > 0
-          )
+              : Object.keys(value as Record<string, string[]>).length > 0,
+          ),
         ),
       },
       {
@@ -107,7 +107,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             },
           });
         },
-      }
+      },
     );
   };
 

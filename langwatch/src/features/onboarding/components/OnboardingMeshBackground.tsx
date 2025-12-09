@@ -1,6 +1,6 @@
-import React from "react";
 import { Box } from "@chakra-ui/react";
 import { motion } from "motion/react";
+import type React from "react";
 
 const MotionBox = motion(Box);
 
@@ -46,7 +46,10 @@ const blobConfigs = [
   },
 ] as const;
 
-export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: number }> = ({ opacity = 0.28, blurPx = 70 }) => (
+export const OnboardingMeshBackground: React.FC<{
+  opacity?: number;
+  blurPx?: number;
+}> = ({ opacity = 0.28, blurPx = 70 }) => (
   <Box
     position="absolute"
     inset={0}

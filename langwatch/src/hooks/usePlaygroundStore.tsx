@@ -1,8 +1,8 @@
-import { create } from "zustand";
-import { temporal } from "zundo";
 import type { UIMessage } from "ai";
 import isDeepEqual from "fast-deep-equal";
 import { nanoid } from "nanoid";
+import { temporal } from "zundo";
+import { create } from "zustand";
 import { modelSelectorOptions } from "../components/ModelSelector";
 
 interface PlaygroundStore {
@@ -74,16 +74,16 @@ const store = (
       | PlaygroundStore
       | Partial<PlaygroundStore>
       | ((
-          state: PlaygroundStore
+          state: PlaygroundStore,
         ) => PlaygroundStore | Partial<PlaygroundStore>),
-    replace?: boolean | undefined
-  ) => void
+    replace?: boolean | undefined,
+  ) => void,
 ): PlaygroundStore => {
   const setCurrentTab = (
     fn: (
       current: PlaygroundTabState,
-      state: PlaygroundStore
-    ) => Partial<PlaygroundTabState>
+      state: PlaygroundStore,
+    ) => Partial<PlaygroundTabState>,
   ): void => {
     set((state) => ({
       tabs: state.tabs.map((tab, index) => {
@@ -97,7 +97,7 @@ const store = (
 
   const setChatWindow = (
     windowId: string,
-    fn: (current: ChatWindowState) => Partial<ChatWindowState>
+    fn: (current: ChatWindowState) => Partial<ChatWindowState>,
   ): void => {
     setCurrentTab((tab) => ({
       chatWindows: tab.chatWindows.map((chatWindow) => {
@@ -159,7 +159,7 @@ const store = (
       setCurrentTab((tab, _state) => {
         const currentChatWindowIndex = Math.max(
           tab.chatWindows.findIndex((chatWindow) => chatWindow.id === windowId),
-          0
+          0,
         );
         return {
           chatWindows: [
@@ -181,14 +181,14 @@ const store = (
     removeChatWindow: (windowId) => {
       setCurrentTab((tab) => ({
         chatWindows: tab.chatWindows.filter(
-          (chatWindow) => chatWindow.id !== windowId
+          (chatWindow) => chatWindow.id !== windowId,
         ),
       }));
     },
     reorderChatWindows: (idsOrder) => {
       setCurrentTab((tab) => ({
         chatWindows: idsOrder.map(
-          (id) => tab.chatWindows.find((chatWindow) => chatWindow.id === id)!
+          (id) => tab.chatWindows.find((chatWindow) => chatWindow.id === id)!,
         ),
       }));
     },
@@ -339,5 +339,5 @@ export const usePlaygroundStore = create<PlaygroundStore>()(
       return state_;
     },
     equality: (pastState, currentState) => isDeepEqual(pastState, currentState),
-  })
+  }),
 );

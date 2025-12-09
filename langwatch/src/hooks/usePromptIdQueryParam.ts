@@ -27,7 +27,7 @@ export const usePromptIdQueryParam = () => {
       }
       void router.push({ query }, undefined, { shallow: true });
     },
-    [router]
+    [router],
   );
 
   // Helper to clear selection

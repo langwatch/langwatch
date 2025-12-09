@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { RAGChunk, RAGSpan, Span } from "../../../tracer/types";
 import {
   flattenSpanTree,
@@ -6,7 +7,6 @@ import {
   organizeSpansIntoTree,
   type SpanWithChildren,
 } from "./common";
-import crypto from "crypto";
 
 export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
   const inputOutputMap: Record<
@@ -35,7 +35,7 @@ export const addInputAndOutputForRAGs = (spans: Span[]): Span[] => {
       }
 
       const flatChildren = fillInputOutputMap(
-        flattenSpanTree(span.children, "inside-out")
+        flattenSpanTree(span.children, "inside-out"),
       );
       const input = getFirstInputAsText(flatChildren);
       const output = getLastOutputAsText(flatChildren);
@@ -85,13 +85,13 @@ export const extractChunkTextualContent = (object: any): string => {
 };
 
 export const maybeAddIdsToContextList = (
-  contexts: (RAGChunk["content"] | null)[]
+  contexts: (RAGChunk["content"] | null)[],
 ): RAGChunk[] => {
   const everyWithoutId =
     Array.isArray(contexts) &&
     contexts.every(
       (context) =>
-        !context || typeof context !== "object" || !("document_id" in context)
+        !context || typeof context !== "object" || !("document_id" in context),
     );
   if (!everyWithoutId) return contexts as RAGChunk[];
 

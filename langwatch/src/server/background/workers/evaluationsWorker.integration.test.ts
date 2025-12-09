@@ -9,6 +9,11 @@ import {
   it,
   vi,
 } from "vitest";
+import type { EvaluationJob } from "~/server/background/types";
+import type {
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "~/server/evaluations/evaluators.generated";
 import { esClient, TRACE_INDEX } from "../../elasticsearch";
 import type { ElasticSearchTrace } from "../../tracer/types";
 import {
@@ -16,11 +21,6 @@ import {
   updateEvaluationStatusInES,
 } from "../queues/evaluationsQueue";
 import * as traceChecksWorker from "../worker";
-import type { EvaluationJob } from "~/server/background/types";
-import type {
-  EvaluatorTypes,
-  SingleEvaluationResult,
-} from "~/server/evaluations/evaluators.generated";
 
 const mocks = vi.hoisted(() => {
   return {
@@ -35,7 +35,7 @@ const mocks = vi.hoisted(() => {
 const getTraceCheck = async (
   traceId: string,
   checkId: string,
-  projectId: string
+  projectId: string,
 ) => {
   const client = await esClient({ test: true });
   return await client.search<ElasticSearchTrace>({
@@ -153,7 +153,7 @@ describe("Check Queue Integration Tests", () => {
 
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("scheduled");
 
@@ -189,11 +189,10 @@ describe("Check Queue Integration Tests", () => {
     await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
-    await new Promise<void>(
-      (resolve) =>
-        worker?.on("completed", (args) => {
-          if (args.data.trace.trace_id === trace_id_success) resolve();
-        })
+    await new Promise<void>((resolve) =>
+      worker?.on("completed", (args) => {
+        if (args.data.trace.trace_id === trace_id_success) resolve();
+      }),
     );
 
     // Query ES to verify the status is "processed"
@@ -214,7 +213,7 @@ describe("Check Queue Integration Tests", () => {
     expect(response.hits.hits).toHaveLength(1);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("processed");
     expect(evaluation?.score).toBe(1);
@@ -237,11 +236,10 @@ describe("Check Queue Integration Tests", () => {
     await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
-    await new Promise<void>(
-      (resolve) =>
-        worker?.on("completed", (args) => {
-          if (args.data.trace.trace_id === trace_id_failed) resolve();
-        })
+    await new Promise<void>((resolve) =>
+      worker?.on("completed", (args) => {
+        if (args.data.trace.trace_id === trace_id_failed) resolve();
+      }),
     );
 
     // Query ES to verify the status is "processed"
@@ -262,7 +260,7 @@ describe("Check Queue Integration Tests", () => {
     expect(response.hits.hits).toHaveLength(1);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("processed");
     expect(evaluation?.score).toBe(1);
@@ -301,7 +299,7 @@ describe("Check Queue Integration Tests", () => {
     expect(response.hits.hits).toHaveLength(1);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("error");
     expect(mocks.runEvaluation).toHaveBeenCalled();
@@ -322,11 +320,10 @@ describe("Check Queue Integration Tests", () => {
     await scheduleEvaluation({ check, trace, delay: 0 });
 
     // Wait for the job to be completed
-    await new Promise<void>(
-      (resolve) =>
-        worker?.on("completed", (args) => {
-          if (args.data.trace.trace_id === trace_id_success) resolve();
-        })
+    await new Promise<void>((resolve) =>
+      worker?.on("completed", (args) => {
+        if (args.data.trace.trace_id === trace_id_success) resolve();
+      }),
     );
 
     // Query ES to verify the status is "processed"
@@ -346,7 +343,7 @@ describe("Check Queue Integration Tests", () => {
 
     let traceDoc = response.hits.hits[0]?._source;
     let evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("processed");
     expect(evaluation?.score).toBe(1);
@@ -371,16 +368,15 @@ describe("Check Queue Integration Tests", () => {
 
     traceDoc = response.hits.hits[0]?._source;
     evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("scheduled");
 
     // Wait for the job to be completed
-    await new Promise<void>(
-      (resolve) =>
-        worker?.on("completed", (args) => {
-          if (args.data.trace.trace_id === trace_id_success) resolve();
-        })
+    await new Promise<void>((resolve) =>
+      worker?.on("completed", (args) => {
+        if (args.data.trace.trace_id === trace_id_success) resolve();
+      }),
     );
 
     // Query ES to verify the status is "processed"
@@ -399,7 +395,7 @@ describe("Check Queue Integration Tests", () => {
 
     traceDoc = response.hits.hits[0]?._source;
     evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation?.status).toBe("processed");
     expect(evaluation?.score).toBe(1);
@@ -445,12 +441,12 @@ describe("updateCheckStatusInES", () => {
     const response = await getTraceCheck(
       traceId,
       check.evaluator_id,
-      projectId
+      projectId,
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),
@@ -489,12 +485,12 @@ describe("updateCheckStatusInES", () => {
     const response = await getTraceCheck(
       traceId,
       check.evaluator_id,
-      projectId
+      projectId,
     );
     expect((response.hits.total as any).value).toBeGreaterThan(0);
     const traceDoc = response.hits.hits[0]?._source;
     const evaluation = traceDoc?.evaluations?.find(
-      (e) => e.evaluator_id === check.evaluator_id
+      (e) => e.evaluator_id === check.evaluator_id,
     );
     expect(evaluation).toMatchObject({
       evaluation_id: expect.any(String),

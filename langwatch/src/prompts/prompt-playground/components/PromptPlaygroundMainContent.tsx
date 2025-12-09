@@ -1,8 +1,8 @@
 import { HStack } from "@chakra-ui/react";
-import { PromptPlaygroundBrowser } from "./prompt-browser/PromptPlaygroundBrowser";
-import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
-import { MainContentEmptyState } from "./sidebar/ui/MainContentEmptyState";
 import { useLoadSpanIntoPromptPlayground } from "../hooks/useLoadSpanIntoPromptPlayground";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
+import { PromptPlaygroundBrowser } from "./prompt-browser/PromptPlaygroundBrowser";
+import { MainContentEmptyState } from "./sidebar/ui/MainContentEmptyState";
 
 /**
  * PromptPlaygroundMainContent
@@ -25,7 +25,7 @@ export function PromptPlaygroundMainContent() {
 
   return (
     <HStack width="full" height="full" gap={0} overflowX="scroll" bg="white">
-            <PromptPlaygroundBrowser />
+      <PromptPlaygroundBrowser />
     </HStack>
   );
 }

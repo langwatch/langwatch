@@ -1,13 +1,13 @@
 import { VStack } from "@chakra-ui/react";
-import { type Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 
 import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { BasePropertiesPanel } from "../../BasePropertiesPanel";
 import type {
   LlmPromptConfigComponent,
   Signature,
 } from "../../../../types/dsl";
+import { BasePropertiesPanel } from "../../BasePropertiesPanel";
 
 import { SignaturePropertiesPanelForm } from "./SignaturePropertiesPanelForm";
 

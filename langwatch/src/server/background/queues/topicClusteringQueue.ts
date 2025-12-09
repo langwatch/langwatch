@@ -1,10 +1,10 @@
-import { connection } from "../../redis";
-import type { TopicClusteringJob } from "~/server/background/types";
-import crypto from "crypto";
-import { prisma } from "../../db";
-import { QueueWithFallback } from "./queueWithFallback";
-import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
 import type { ConnectionOptions } from "bullmq";
+import crypto from "crypto";
+import type { TopicClusteringJob } from "~/server/background/types";
+import { prisma } from "../../db";
+import { connection } from "../../redis";
+import { runTopicClusteringJob } from "../workers/topicClusteringWorker";
+import { QueueWithFallback } from "./queueWithFallback";
 
 export const TOPIC_CLUSTERING_QUEUE_NAME = "{topic_clustering}";
 
@@ -60,7 +60,7 @@ export const scheduleTopicClustering = async () => {
 
 export const scheduleTopicClusteringNextPage = async (
   projectId: string,
-  searchAfter: [number, string]
+  searchAfter: [number, string],
 ) => {
   const yyyymmdd = new Date().toISOString().split("T")[0];
 
@@ -69,16 +69,16 @@ export const scheduleTopicClusteringNextPage = async (
     { project_id: projectId, search_after: searchAfter },
     {
       jobId: `topic_clustering_${projectId}_${yyyymmdd}_${searchAfter.join(
-        "_"
+        "_",
       )}`,
       delay: 1000,
-    }
+    },
   );
 };
 
 export const scheduleTopicClusteringForProject = async (
   projectId: string,
-  isManualTrigger = false
+  isManualTrigger = false,
 ) => {
   const timestamp = Date.now();
   const jobIdSuffix = isManualTrigger
@@ -91,6 +91,6 @@ export const scheduleTopicClusteringForProject = async (
     {
       jobId: `topic_clustering_${projectId}_${jobIdSuffix}`,
       delay: 0, // Run immediately for manual triggers
-    }
+    },
   );
 };

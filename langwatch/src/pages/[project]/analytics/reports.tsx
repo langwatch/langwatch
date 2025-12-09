@@ -11,6 +11,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useRouter } from "next/router";
+import { useMemo } from "react";
 import {
   BarChart2,
   Edit,
@@ -23,22 +25,19 @@ import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import { useFilterToggle } from "~/components/filters/FilterToggle";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import type { FilterField } from "~/server/filters/types";
-import { api } from "~/utils/api";
-import { Link } from "../../../components/ui/link";
-
-import { useRouter } from "next/router";
-import { useMemo } from "react";
-import GraphsLayout from "~/components/GraphsLayout";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import { useFilterToggle } from "~/components/filters/FilterToggle";
+import GraphsLayout from "~/components/GraphsLayout";
 import { FilterDisplay } from "~/components/triggers/FilterDisplay";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { FilterField } from "~/server/filters/types";
+import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { Link } from "../../../components/ui/link";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 interface GraphCardProps {
   graph: {

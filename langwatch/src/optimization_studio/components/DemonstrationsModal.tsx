@@ -1,4 +1,4 @@
-import { type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import { useCallback, useEffect, useState } from "react";
 import { Dialog } from "../../components/ui/dialog";
 import type { DatasetColumns } from "../../server/datasets/types";
@@ -28,7 +28,7 @@ export function DemonstrationsModal({
     ]);
 
     let demonstrations = (node.data as Signature).parameters?.find(
-      (p) => p.identifier === "demonstrations"
+      (p) => p.identifier === "demonstrations",
     )?.value as NodeDataset | undefined;
     if (
       !demonstrations?.inline ||
@@ -37,7 +37,7 @@ export function DemonstrationsModal({
       demonstrations = {
         inline: {
           records: Object.fromEntries(
-            columns.map((column) => [column.name, []])
+            columns.map((column) => [column.name, []]),
           ),
           columnTypes: columns,
         },
@@ -72,7 +72,7 @@ export function DemonstrationsModal({
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [node.data, node.id, setNodeParameter, onClose]
+    [node.data, node.id, setNodeParameter, onClose],
   );
 
   return (

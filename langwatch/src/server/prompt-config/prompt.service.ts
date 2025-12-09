@@ -1,11 +1,16 @@
-import {
-  type Prisma,
-  type PrismaClient,
-  type PromptScope,
-  type LlmPromptConfigVersion,
+import type {
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
+  PromptScope,
 } from "@prisma/client";
-import { type z } from "zod";
-
+import type { z } from "zod";
+import type {
+  inputsSchema,
+  messageSchema,
+  outputsSchema,
+  promptingTechniqueSchema,
+} from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import { PromptVersionService } from "./prompt-version.service";
@@ -20,13 +25,6 @@ import {
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
-
-import {
-  type inputsSchema,
-  type messageSchema,
-  type outputsSchema,
-  type promptingTechniqueSchema,
-} from "~/prompts/schemas/field-schemas";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<

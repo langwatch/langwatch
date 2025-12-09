@@ -3,7 +3,7 @@ import rerunChecks from "../../tasks/rerunChecks";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   try {
     const checkId = req.query.checkId as string;

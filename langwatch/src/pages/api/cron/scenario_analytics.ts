@@ -1,9 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { prisma } from "~/server/db";
 import { esClient } from "~/server/elasticsearch";
-import { type Prisma } from "@prisma/client";
-import { ANALYTICS_KEYS } from "~/types";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
+import { ANALYTICS_KEYS } from "~/types";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:cron:scenario-analytics");
@@ -94,7 +94,7 @@ function createAnalyticsEntriesForProject(
   project: { id: string },
   msearchResult: any,
   baseIndex: number,
-  yesterday: Date
+  yesterday: Date,
 ): Prisma.AnalyticsCreateManyInput[] {
   const analytics: Prisma.AnalyticsCreateManyInput[] = [];
 
@@ -153,7 +153,7 @@ function createAnalyticsEntriesForProject(
 function processElasticsearchResults(
   projects: { id: string }[],
   msearchResult: any,
-  yesterday: Date
+  yesterday: Date,
 ): Prisma.AnalyticsCreateManyInput[] {
   const analyticsToCreate: Prisma.AnalyticsCreateManyInput[] = [];
 
@@ -166,7 +166,7 @@ function processElasticsearchResults(
       project,
       msearchResult,
       baseIndex,
-      yesterday
+      yesterday,
     );
     analyticsToCreate.push(...projectAnalytics);
   }
@@ -180,7 +180,7 @@ function processElasticsearchResults(
 async function filterExistingAnalytics(
   analyticsToCreate: Prisma.AnalyticsCreateManyInput[],
   yesterday: Date,
-  yesterdayEnd: Date
+  yesterdayEnd: Date,
 ): Promise<Prisma.AnalyticsCreateManyInput[]> {
   // If no analytics to create, return empty array
   if (analyticsToCreate.length === 0) {
@@ -209,8 +209,8 @@ async function filterExistingAnalytics(
     (entry) =>
       !existingEntries.some(
         (existing) =>
-          existing.projectId === entry.projectId && existing.key === entry.key
-      )
+          existing.projectId === entry.projectId && existing.key === entry.key,
+      ),
   );
 }
 
@@ -219,7 +219,7 @@ async function filterExistingAnalytics(
  */
 async function saveAnalyticsAndLog(
   newAnalyticsToCreate: Prisma.AnalyticsCreateManyInput[],
-  yesterday: Date
+  yesterday: Date,
 ): Promise<void> {
   if (newAnalyticsToCreate.length > 0) {
     await prisma.analytics.createMany({
@@ -232,20 +232,20 @@ async function saveAnalyticsAndLog(
         acc[entry.key] = (acc[entry.key] ?? 0) + 1;
         return acc;
       },
-      {} as Record<string, number>
+      {} as Record<string, number>,
     );
 
     logger.info(
       { analyticsByType },
       `[Scenario Analytics] Created ${
         newAnalyticsToCreate.length
-      } entries for ${yesterday.toISOString().split("T")[0]}`
+      } entries for ${yesterday.toISOString().split("T")[0]}`,
     );
   } else {
     logger.info(
       `[Scenario Analytics] All entries exist for ${
         yesterday.toISOString().split("T")[0]
-      }`
+      }`,
     );
   }
 }
@@ -270,7 +270,7 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
         format: "yyyy-MM-dd",
         timeZone: "UTC",
       },
-    })
+    }),
   );
 
   // Execute multi-search to get counts for all projects and event types
@@ -282,14 +282,14 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
   const analyticsToCreate = processElasticsearchResults(
     projects,
     msearchResult,
-    dateRange.yesterdayStart
+    dateRange.yesterdayStart,
   );
 
   if (analyticsToCreate.length > 0) {
     const newAnalyticsToCreate = await filterExistingAnalytics(
       analyticsToCreate,
       dateRange.yesterdayStart,
-      dateRange.yesterdayEnd
+      dateRange.yesterdayEnd,
     );
 
     await saveAnalyticsAndLog(newAnalyticsToCreate, dateRange.yesterdayStart);
@@ -297,7 +297,7 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
     logger.info(
       `[Scenario Analytics] No scenario events found for ${
         dateRange.yesterdayStart.toISOString().split("T")[0]
-      }`
+      }`,
     );
   }
 
@@ -309,7 +309,7 @@ async function processScenarioAnalytics(): Promise<AnalyticsResult> {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (!validateRequest(req)) {
     return res.status(req.method !== "GET" ? 405 : 401).end();

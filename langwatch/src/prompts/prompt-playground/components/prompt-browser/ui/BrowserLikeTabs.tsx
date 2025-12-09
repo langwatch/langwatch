@@ -1,4 +1,4 @@
-import { HStack, Tabs, VStack, type StackProps } from "@chakra-ui/react";
+import { HStack, type StackProps, Tabs, VStack } from "@chakra-ui/react";
 
 /**
  * Props for BrowserLikeTabsRoot component

@@ -2,7 +2,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
 import { PHASE_PRODUCTION_BUILD } from "next/constants";
-import { getClickHouseClient } from "~/utils/clickhouse";
+import { getClickHouseClient } from "~/server/clickhouse/client";
 import { connection } from "../../redis";
 
 export interface EventSourcingConfig {

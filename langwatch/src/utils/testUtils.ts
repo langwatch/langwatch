@@ -1,14 +1,14 @@
 import {
   OrganizationUserRole,
   PIIRedactionLevel,
+  type Project,
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
-  type Project,
 } from "@prisma/client";
-import { prisma } from "../server/db";
 import { nanoid } from "nanoid";
-import { createMocks, type RequestMethod } from "node-mocks-http";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { createMocks, type RequestMethod } from "node-mocks-http";
+import { prisma } from "../server/db";
 
 export async function getTestUser() {
   // Ensure a user exists
@@ -174,7 +174,7 @@ export async function getTestProject(namespace: string): Promise<Project> {
 export const waitForResult = async <T>(
   queryFn: () => Promise<T | null>,
   maxRetries = 10,
-  retryDelay = 1000
+  retryDelay = 1000,
 ): Promise<T> => {
   let lastError: Error | null = null;
   for (let i = 0; i < maxRetries; i++) {
@@ -187,7 +187,7 @@ export const waitForResult = async <T>(
     await new Promise((resolve) => setTimeout(resolve, retryDelay));
   }
   throw new Error(
-    `Result not found after multiple retries. Last error: ${lastError?.message}`
+    `Result not found after multiple retries. Last error: ${lastError?.message}`,
   );
 };
 

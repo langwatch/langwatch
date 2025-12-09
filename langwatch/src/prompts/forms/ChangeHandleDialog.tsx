@@ -1,30 +1,27 @@
 import {
   Button,
+  Select as ChakraSelect,
   createListCollection,
   Field,
+  HStack,
   Input,
   Spacer,
+  Text,
   useSelectContext,
   VStack,
-  Text,
-  HStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PromptScope } from "@prisma/client";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { LuBuilding, LuLock } from "react-icons/lu";
-
-import { Select } from "../../components/ui/select";
-import { Select as ChakraSelect } from "@chakra-ui/react";
-import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
-
-import {
-  createChangeHandleFormSchema,
-  type ChangeHandleFormValues,
-} from "./schemas/change-handle-form.schema";
-
 import { Dialog } from "~/components/ui/dialog";
+import { Select } from "../../components/ui/select";
+import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
+import {
+  type ChangeHandleFormValues,
+  createChangeHandleFormSchema,
+} from "./schemas/change-handle-form.schema";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;
@@ -59,7 +56,7 @@ export function ChangeHandleDialog({
       scope: scope,
     },
     resolver: zodResolver(
-      createChangeHandleFormSchema({ checkHandleUniqueness })
+      createChangeHandleFormSchema({ checkHandleUniqueness }),
     ),
   });
 
@@ -84,7 +81,7 @@ export function ChangeHandleDialog({
       });
       reset();
     },
-    [onSubmit, reset]
+    [onSubmit, reset],
   );
 
   const handleHandler = register("handle", {

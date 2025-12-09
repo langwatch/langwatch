@@ -1,12 +1,12 @@
 import { TRPCError } from "@trpc/server";
-import { DatasetNotFoundError, DatasetConflictError } from "./errors";
+import { DatasetConflictError, DatasetNotFoundError } from "./errors";
 
 /**
  * Middleware function that catches domain errors and maps them to tRPC errors.
  * Can be used as a wrapper function or as tRPC middleware.
  */
 export async function withDatasetErrorHandling<T>(
-  operation: () => Promise<T>
+  operation: () => Promise<T>,
 ): Promise<T> {
   try {
     return await operation();
@@ -41,5 +41,3 @@ export const datasetErrorHandler = async <T>({
 }): Promise<T> => {
   return await withDatasetErrorHandling(next);
 };
-
-

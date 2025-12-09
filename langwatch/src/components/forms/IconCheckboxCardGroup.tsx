@@ -1,11 +1,5 @@
-import React from "react";
-import {
-  HStack,
-  VStack,
-  Icon,
-  CheckboxCard,
-  Text,
-} from "@chakra-ui/react";
+import { CheckboxCard, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import type React from "react";
 import { CheckboxGroup } from "../ui/checkbox";
 
 type IconListItem<T> = {
@@ -38,7 +32,9 @@ export const IconCheckboxCardGroup = <T extends string = string>({
     }}
   >
     {label && (
-      <Text textStyle={size} fontWeight="medium">{label}</Text>
+      <Text textStyle={size} fontWeight="medium">
+        {label}
+      </Text>
     )}
     <VStack gap="2" w="full">
       {items.map((item) => (
@@ -57,9 +53,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
                   <Icon size="sm" color="fg.muted">
                     <item.icon />
                   </Icon>
-                  <CheckboxCard.Label>
-                    {item.title}
-                  </CheckboxCard.Label>
+                  <CheckboxCard.Label>{item.title}</CheckboxCard.Label>
                 </HStack>
               </CheckboxCard.Content>
               <CheckboxCard.Indicator />
@@ -72,5 +66,3 @@ export const IconCheckboxCardGroup = <T extends string = string>({
 );
 
 export default IconCheckboxCardGroup;
-
-

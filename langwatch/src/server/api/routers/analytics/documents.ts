@@ -1,13 +1,13 @@
-import { TRACE_INDEX, esClient } from "../../../elasticsearch";
-import { checkProjectPermission } from "../../rbac";
-import { protectedProcedure } from "../../trpc";
-import { generateTracesPivotQueryConditions } from "./common";
-import { sharedFiltersInputSchema } from "../../../analytics/types";
 import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
+import { sharedFiltersInputSchema } from "../../../analytics/types";
+import { esClient, TRACE_INDEX } from "../../../elasticsearch";
 import type { ElasticSearchTrace } from "../../../tracer/types";
+import { checkProjectPermission } from "../../rbac";
+import { protectedProcedure } from "../../trpc";
+import { generateTracesPivotQueryConditions } from "./common";
 
 export const topUsedDocuments = protectedProcedure
   .input(sharedFiltersInputSchema)
@@ -66,7 +66,7 @@ export const topUsedDocuments = protectedProcedure
           count: bucket.doc_count,
           traceId:
             bucket.back_to_root.top_content.hits.hits[0]._source.trace_id,
-        })
+        }),
       ) as { documentId: string; count: number; traceId: string }[];
 
     const totalUniqueDocuments = result.aggregations?.nested
@@ -87,7 +87,7 @@ export const topUsedDocuments = protectedProcedure
                   query: {
                     terms: {
                       "spans.contexts.document_id": topDocuments.map(
-                        (d) => d.documentId
+                        (d) => d.documentId,
                       ),
                     },
                   },

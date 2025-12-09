@@ -1,19 +1,19 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { Project } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
-import handler from "./log_steps";
 import { prisma } from "../../../server/db";
 import {
-  esClient,
   DSPY_STEPS_INDEX,
   dspyStepIndexId,
+  esClient,
 } from "../../../server/elasticsearch";
-import {
-  type DSPyStep,
-  type DSPyStepRESTParams,
+import type {
+  DSPyStep,
+  DSPyStepRESTParams,
 } from "../../../server/experiments/types";
 import { getTestProject } from "../../../utils/testUtils";
-import type { Project } from "@prisma/client";
+import handler from "./log_steps";
 
 const sampleDSPyStep: DSPyStepRESTParams = {
   experiment_slug: "sample-experiment",
@@ -197,7 +197,7 @@ describe("Log Steps API Endpoint", () => {
     expect(indexedStep._source?.examples).toHaveLength(2);
 
     expect(indexedStep._source?.llm_calls[0]?.model).toEqual(
-      "gpt-3.5-turbo-0125"
+      "gpt-3.5-turbo-0125",
     );
     expect(indexedStep._source?.llm_calls[0]?.cost).toBeGreaterThan(0);
   });

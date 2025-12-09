@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TeamUserRole } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { RoleService } from "../../role";
 import {
-  RoleNotFoundError,
   RoleDuplicateNameError,
   RoleInUseError,
+  RoleNotFoundError,
   TeamNotFoundError,
   UserNotTeamMemberError,
 } from "../../role/errors";

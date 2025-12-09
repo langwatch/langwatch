@@ -1,6 +1,7 @@
 import {
   Avatar,
   Box,
+  type BoxProps,
   Button,
   Field,
   HStack,
@@ -10,15 +11,18 @@ import {
   Text,
   useDisclosure,
   VStack,
-  type BoxProps,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
-import { useForm, type UseFormReturn } from "react-hook-form";
+import { type UseFormReturn, useForm } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
 
 import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 import { HistoryIcon } from "../../components/icons/History";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../components/ModelSelector";
 import { SmallLabel } from "../../components/SmallLabel";
 import { InputGroup } from "../../components/ui/input-group";
 import { Popover } from "../../components/ui/popover";
@@ -26,14 +30,10 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { DEFAULT_MODEL } from "../../utils/constants";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
-import {
-  allModelOptions,
-  useModelSelectionOptions,
-} from "../../components/ModelSelector";
-import { DEFAULT_MODEL } from "../../utils/constants";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -69,7 +69,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
         getWorkflow,
         setWorkflow,
         setPreviousWorkflow,
-      })
+      }),
     );
   const form = useForm<{ version: string; commitMessage: string }>({
     defaultValues: {
@@ -129,7 +129,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             meta: { closable: true },
           });
         },
-      }
+      },
     );
   };
 
@@ -166,7 +166,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       setWorkflow,
       setPreviousWorkflow,
       onClose,
-    ]
+    ],
   );
 
   return (
@@ -325,7 +325,7 @@ export const useVersionState = ({
       version,
       getWorkflow,
       previousWorkflow,
-    })
+    }),
   );
 
   const versions = api.workflow.getVersions.useQuery(
@@ -334,16 +334,16 @@ export const useVersionState = ({
       workflowId: workflowId ?? "",
       returnDSL: "previousVersion",
     },
-    { enabled: !!project?.id && !!workflowId }
+    { enabled: !!project?.id && !!workflowId },
   );
   const currentVersion = versions.data?.find(
-    (version) => version.isCurrentVersion
+    (version) => version.isCurrentVersion,
   );
   const previousVersion = versions.data?.find(
-    (version) => version.isPreviousVersion
+    (version) => version.isPreviousVersion,
   );
   const latestVersion = versions.data?.find(
-    (version) => version.isLatestVersion
+    (version) => version.isLatestVersion,
   );
   const hasChanges = previousWorkflow
     ? hasDSLChanged(getWorkflow(), previousWorkflow, false)
@@ -365,16 +365,16 @@ export const useVersionState = ({
     return canSaveNewVersion
       ? { id: "", version: nextVersion, commitMessage: "" }
       : currentVersion?.autoSaved
-      ? {
-          id: currentVersion?.parent?.id,
-          version: currentVersion?.parent?.version,
-          commitMessage: currentVersion?.parent?.commitMessage,
-        }
-      : {
-          id: currentVersion?.id,
-          version: currentVersion?.version,
-          commitMessage: currentVersion?.commitMessage,
-        };
+        ? {
+            id: currentVersion?.parent?.id,
+            version: currentVersion?.parent?.version,
+            commitMessage: currentVersion?.parent?.commitMessage,
+          }
+        : {
+            id: currentVersion?.id,
+            version: currentVersion?.version,
+            commitMessage: currentVersion?.commitMessage,
+          };
   }, [
     canSaveNewVersion,
     currentVersion?.autoSaved,
@@ -428,7 +428,7 @@ export function NewVersionFields({
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,
-    "chat"
+    "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -463,10 +463,10 @@ export function NewVersionFields({
               meta: { closable: true },
             });
           },
-        }
+        },
       );
     },
-    [form, generateCommitMessage, project?.id, isDefaultModelDisabled]
+    [form, generateCommitMessage, project?.id, isDefaultModelDisabled],
   );
 
   const debouncedGenerateCommitMessage = useDebounceCallback(
@@ -474,7 +474,7 @@ export function NewVersionFields({
       generateCommitMessageCallback(prevDsl, newDsl);
     },
     500,
-    { leading: true, trailing: false }
+    { leading: true, trailing: false },
   );
 
   useEffect(() => {

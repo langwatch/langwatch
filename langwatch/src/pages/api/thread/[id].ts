@@ -1,12 +1,11 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { prisma } from "~/server/db";
-
+import type { NextApiRequest, NextApiResponse } from "next";
 import { getProtectionsForProject } from "~/server/api/utils";
+import { prisma } from "~/server/db";
 import { getTracesGroupedByThreadId } from "~/server/elasticsearch/traces";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "GET") {
     return res.status(405).end();
@@ -28,7 +27,9 @@ export default async function handler(
   }
 
   const threadId = req.query.id as string;
-  const protections = await getProtectionsForProject(prisma, { projectId: project?.id });
+  const protections = await getProtectionsForProject(prisma, {
+    projectId: project?.id,
+  });
   const traces = await getTracesGroupedByThreadId({
     connConfig: { projectId: project?.id },
     threadId,

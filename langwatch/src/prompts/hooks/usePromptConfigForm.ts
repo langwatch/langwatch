@@ -1,18 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
-import { useForm, type DeepPartial } from "react-hook-form";
-
+import { type DeepPartial, useForm } from "react-hook-form";
+import { useModelLimits } from "~/hooks/useModelLimits";
 import {
   formSchema,
-  refinedFormSchemaWithModelLimits,
   type PromptConfigFormValues,
+  refinedFormSchemaWithModelLimits,
 } from "~/prompts";
 import { salvageValidData } from "~/utils/zodSalvage";
-import { useModelLimits } from "~/hooks/useModelLimits";
-
-import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
+import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 
 interface UsePromptConfigFormProps {
   configId?: string;
@@ -72,8 +70,9 @@ export const usePromptConfigForm = ({
   }, [dynamicSchema, methods]);
   const messages = methods.watch("version.configData.messages");
   // Messages should always be defined, but we're being defensive here.
-  const systemMessage = messages?.find(({ role }) => role === "system")
-    ?.content;
+  const systemMessage = messages?.find(
+    ({ role }) => role === "system",
+  )?.content;
 
   /**
    * In the case that we're using system messages,

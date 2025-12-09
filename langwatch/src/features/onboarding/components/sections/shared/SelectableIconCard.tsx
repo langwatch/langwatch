@@ -1,5 +1,13 @@
-import React from "react";
-import { Box, Card, Icon, Text, type IconProps, type CardRootProps, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Card,
+  type CardRootProps,
+  Icon,
+  type IconProps,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 import type { IconData } from "../../../regions/shared/types";
@@ -17,7 +25,15 @@ interface SelectableIconCardProps {
 export function SelectableIconCard(
   props: SelectableIconCardProps,
 ): React.ReactElement {
-  const { label, size = "md", icon, iconSize, selected, onClick, ariaLabel } = props;
+  const {
+    label,
+    size = "md",
+    icon,
+    iconSize,
+    selected,
+    onClick,
+    ariaLabel,
+  } = props;
 
   // Extract the actual icon from IconWithLabel if needed
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
@@ -36,7 +52,8 @@ export function SelectableIconCard(
     "border.inverted/60",
   );
 
-  const iconSrc = actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
+  const iconSrc =
+    actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
   const iconAlt = actualIcon?.alt;
 
   return (

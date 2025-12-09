@@ -1,23 +1,33 @@
-import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
+import { useEffect, useRef, useState } from "react";
 import { OnboardingFlowDirection } from "../types/types";
 
-export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfig extends {
-  visibleScreens: TScreenIndex[];
-  first: TScreenIndex;
-  last: TScreenIndex;
-}>(
+export function useGenericOnboardingFlow<
+  TScreenIndex extends number,
+  TFlowConfig extends {
+    visibleScreens: TScreenIndex[];
+    first: TScreenIndex;
+    last: TScreenIndex;
+  },
+>(
   flowConfig: TFlowConfig,
   canProceedFn: (currentScreen: TScreenIndex) => boolean,
   options?: {
     queryParamName?: string;
-    screenIdMap?: { indexToId: Map<TScreenIndex, string>; idToIndex: Map<string, TScreenIndex> };
+    screenIdMap?: {
+      indexToId: Map<TScreenIndex, string>;
+      idToIndex: Map<string, TScreenIndex>;
+    };
     firstScreenId?: string;
-  }
+  },
 ) {
   const router = useRouter();
-  const [currentScreenIndex, setCurrentScreenIndex] = useState<TScreenIndex>(flowConfig.first);
-  const [direction, setDirection] = useState<OnboardingFlowDirection>(OnboardingFlowDirection.FORWARD);
+  const [currentScreenIndex, setCurrentScreenIndex] = useState<TScreenIndex>(
+    flowConfig.first,
+  );
+  const [direction, setDirection] = useState<OnboardingFlowDirection>(
+    OnboardingFlowDirection.FORWARD,
+  );
   const isUpdatingUrl = useRef(false);
 
   const useUrlSync = options?.screenIdMap !== undefined;
@@ -42,13 +52,24 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
 
     if (typeof stepFromQuery === "string") {
       const screenIndex = screenIdMap.idToIndex.get(stepFromQuery);
-      if (screenIndex !== void 0 && flowConfig.visibleScreens.includes(screenIndex)) {
+      if (
+        screenIndex !== void 0 &&
+        flowConfig.visibleScreens.includes(screenIndex)
+      ) {
         if (currentScreenIndex !== screenIndex) {
           setCurrentScreenIndex(screenIndex);
         }
       }
     }
-  }, [router.query, queryParamName, flowConfig.visibleScreens, flowConfig.first, screenIdMap, useUrlSync, currentScreenIndex]);
+  }, [
+    router.query,
+    queryParamName,
+    flowConfig.visibleScreens,
+    flowConfig.first,
+    screenIdMap,
+    useUrlSync,
+    currentScreenIndex,
+  ]);
 
   // Update URL when screen changes (only if screenIdMap provided)
   const updateUrlForScreen = (screenIndex: TScreenIndex) => {
@@ -68,19 +89,21 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
       currentQuery[queryParamName] = screenId;
     }
 
-    void router.push(
-      {
-        pathname: router.pathname,
-        query: currentQuery,
-      },
-      void 0,
-      { shallow: true }
-    ).then(() => {
-      // Clear the flag after navigation completes
-      setTimeout(() => {
-        isUpdatingUrl.current = false;
-      }, 100);
-    });
+    void router
+      .push(
+        {
+          pathname: router.pathname,
+          query: currentQuery,
+        },
+        void 0,
+        { shallow: true },
+      )
+      .then(() => {
+        // Clear the flag after navigation completes
+        setTimeout(() => {
+          isUpdatingUrl.current = false;
+        }, 100);
+      });
   };
 
   const navigateTo = (newDirection: OnboardingFlowDirection) => {
@@ -114,7 +137,9 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
     const pos = visible.indexOf(currentScreenIndex);
     if (pos === -1) {
       setDirection(OnboardingFlowDirection.FORWARD);
-      const firstScreen = visible[Math.max(0, visible.indexOf(flowConfig.first))] ?? flowConfig.first;
+      const firstScreen =
+        visible[Math.max(0, visible.indexOf(flowConfig.first))] ??
+        flowConfig.first;
       setCurrentScreenIndex(firstScreen);
       updateUrlForScreen(firstScreen);
       return;
@@ -129,7 +154,9 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
     const pos = visible.indexOf(currentScreenIndex);
     if (pos === -1) {
       setDirection(OnboardingFlowDirection.BACKWARD);
-      const firstScreen = visible[Math.max(0, visible.indexOf(flowConfig.first))] ?? flowConfig.first;
+      const firstScreen =
+        visible[Math.max(0, visible.indexOf(flowConfig.first))] ??
+        flowConfig.first;
       setCurrentScreenIndex(firstScreen);
       updateUrlForScreen(firstScreen);
       return;

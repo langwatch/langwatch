@@ -1,6 +1,5 @@
 import { Button, Heading, HStack, type StackProps } from "@chakra-ui/react";
-import { X } from "lucide-react";
-import { Columns } from "lucide-react";
+import { Columns, X } from "lucide-react";
 
 // Component for the panel header
 interface PanelHeaderProps extends Omit<StackProps, "title"> {

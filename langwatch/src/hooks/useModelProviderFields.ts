@@ -20,7 +20,7 @@ function extractObjectShape(schema: any): Record<string, any> {
     return schema.shape as Record<string, any>;
   }
   if ("_def" in schema && schema._def && "schema" in schema._def) {
-    const inner = (schema )._def.schema;
+    const inner = schema._def.schema;
     if (inner && "shape" in inner) return inner.shape as Record<string, any>;
   }
   return {};
@@ -61,10 +61,11 @@ export function useModelProviderFields(
   providerKey: ServerModelProviderKey | (string & {}),
 ): UseModelProviderFieldsResult {
   return useMemo(() => {
-    const provider =
-      serverModelProviders[
-        providerKey as keyof typeof serverModelProviders
-      ] as (typeof serverModelProviders)[keyof typeof serverModelProviders] | undefined;
+    const provider = serverModelProviders[
+      providerKey as keyof typeof serverModelProviders
+    ] as
+      | (typeof serverModelProviders)[keyof typeof serverModelProviders]
+      | undefined;
 
     const shape = extractObjectShape(provider?.keysSchema);
     const orderedFieldKeys = Object.keys(shape ?? {});

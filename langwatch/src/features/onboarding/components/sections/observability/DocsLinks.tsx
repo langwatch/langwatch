@@ -1,5 +1,5 @@
-import React from "react";
-import { HStack, Text, Icon } from "@chakra-ui/react";
+import { HStack, Icon, Text } from "@chakra-ui/react";
+import type React from "react";
 import { BookOpen, ExternalLink } from "react-feather";
 import { Link } from "../../../../../components/ui/link";
 
@@ -11,7 +11,10 @@ interface DocsLinksProps {
   label: string;
 }
 
-export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement | null {
+export function DocsLinks({
+  docs,
+  label,
+}: DocsLinksProps): React.ReactElement | null {
   if (!docs || (!docs.internal && !docs.external)) return null;
 
   return (
@@ -33,9 +36,7 @@ export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement |
           </HStack>
         </Link>
       )}
-      {docs.internal && docs.external ? (
-        <Text aria-hidden>•</Text>
-      ) : null}
+      {docs.internal && docs.external ? <Text aria-hidden>•</Text> : null}
       {docs.external && (
         <Link href={docs.external} isExternal>
           <HStack gap={1} _hover={{ color: "fg" }} transition="color 0.2s">
@@ -49,4 +50,3 @@ export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement |
     </HStack>
   );
 }
-

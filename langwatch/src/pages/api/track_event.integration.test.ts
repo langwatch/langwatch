@@ -2,16 +2,16 @@ import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
 import debug from "debug";
 import { nanoid } from "nanoid";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { TrackEventJob } from "~/server/background/types";
 import { startTrackEventsWorker } from "~/server/background/workers/trackEventsWorker";
 import { prisma } from "~/server/db";
-import { TRACE_INDEX, esClient, traceIndexId } from "~/server/elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "~/server/elasticsearch";
 import type { ElasticSearchTrace, Trace } from "~/server/tracer/types";
 import { getTestProject, waitForResult } from "~/utils/testUtils";
 import handler from "./track_event";
-import type { NextApiRequest, NextApiResponse } from "next";
 
 describe.skip("/api/track_event", () => {
   let worker: Worker<TrackEventJob, void, string> | undefined;
@@ -111,11 +111,10 @@ describe.skip("/api/track_event", () => {
     console.log("Waiting for job");
 
     // Wait for the job to be completed
-    await new Promise<void>(
-      (resolve) =>
-        worker?.on("completed", (args) => {
-          if (args.data.event.event_id.includes(eventId)) resolve();
-        })
+    await new Promise<void>((resolve) =>
+      worker?.on("completed", (args) => {
+        if (args.data.event.event_id.includes(eventId)) resolve();
+      }),
     );
 
     console.log("Event processed");
@@ -191,7 +190,7 @@ describe.skip("/api/track_event", () => {
     expect(res.statusCode).toBe(401);
     expect(res._getJSONData()).toHaveProperty(
       "message",
-      "X-Auth-Token header is required."
+      "X-Auth-Token header is required.",
     );
   });
 });

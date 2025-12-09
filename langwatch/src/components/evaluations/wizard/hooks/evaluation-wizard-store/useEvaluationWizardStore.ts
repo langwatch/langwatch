@@ -6,8 +6,8 @@ import { create } from "zustand";
 import {
   initialState as initialWorkflowStore,
   type WorkflowStore,
-  store as workflowStore,
   type State as WorkflowStoreState,
+  store as workflowStore,
 } from "../../../../../optimization_studio/hooks/useWorkflowStore";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
@@ -107,7 +107,7 @@ export const wizardStateSchema = z.object({
         z.object({
           source: z.enum(["", "thread_id", "traces"]),
           selectedFields: z.array(z.string()).optional(),
-        })
+        }),
       ),
     })
     .optional(),
@@ -132,15 +132,15 @@ export type EvaluationWizardStore = State & {
   setWizardState: (
     state:
       | Partial<State["wizardState"]>
-      | ((state: State["wizardState"]) => Partial<State["wizardState"]>)
+      | ((state: State["wizardState"]) => Partial<State["wizardState"]>),
   ) => void;
   getWizardState: () => State["wizardState"];
   setDSL: (
     dsl:
       | Partial<Workflow & { workflowId?: string }>
       | ((
-          state: Workflow & { workflowId?: string }
-        ) => Partial<Workflow & { workflowId?: string }>)
+          state: Workflow & { workflowId?: string },
+        ) => Partial<Workflow & { workflowId?: string }>),
   ) => void;
   getDSL: () => Workflow & { workflowId?: string };
   setIsAutosaving: (isAutosaving: boolean) => void;
@@ -167,11 +167,11 @@ const store = (
       | EvaluationWizardStore
       | Partial<EvaluationWizardStore>
       | ((
-          state: EvaluationWizardStore
+          state: EvaluationWizardStore,
         ) => EvaluationWizardStore | Partial<EvaluationWizardStore>),
-    replace?: boolean | undefined
+    replace?: boolean | undefined,
   ) => void,
-  get: () => EvaluationWizardStore
+  get: () => EvaluationWizardStore,
 ): EvaluationWizardStore => {
   const store: EvaluationWizardStore = {
     ...initialState,
@@ -191,7 +191,7 @@ const store = (
     setWizardState(state) {
       const applyChanges = (
         current: EvaluationWizardStore,
-        next: Partial<State["wizardState"]>
+        next: Partial<State["wizardState"]>,
       ) => {
         return {
           ...current,
@@ -267,18 +267,18 @@ const createWorkflowStore = (
       | EvaluationWizardStore
       | Partial<EvaluationWizardStore>
       | ((
-          state: EvaluationWizardStore
+          state: EvaluationWizardStore,
         ) => EvaluationWizardStore | Partial<EvaluationWizardStore>),
-    replace?: boolean | undefined
+    replace?: boolean | undefined,
   ) => void,
-  get: () => EvaluationWizardStore
+  get: () => EvaluationWizardStore,
 ) => {
   return workflowStore(
     (
       partial:
         | WorkflowStore
         | Partial<WorkflowStore>
-        | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>)
+        | ((state: WorkflowStore) => WorkflowStore | Partial<WorkflowStore>),
     ) =>
       set((current) => ({
         ...current,
@@ -287,7 +287,7 @@ const createWorkflowStore = (
             ? { ...current.workflowStore, ...partial(current.workflowStore) }
             : { ...current.workflowStore, ...partial },
       })),
-    () => get().workflowStore
+    () => get().workflowStore,
   );
 };
 

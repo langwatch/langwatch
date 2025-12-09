@@ -1,7 +1,7 @@
-import { TRACE_INDEX, esClient, traceIndexId } from "../server/elasticsearch";
-import { prisma } from "../server/db";
-import { createLogger } from "../utils/logger";
 import type { Annotation } from "@prisma/client";
+import { prisma } from "../server/db";
+import { esClient, TRACE_INDEX, traceIndexId } from "../server/elasticsearch";
+import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:tasks:syncAnnotations");
 
@@ -31,7 +31,7 @@ export default async function execute() {
       acc[annotation.projectId]![annotation.traceId]!.push(annotation);
       return acc;
     },
-    {}
+    {},
   );
 
   let totalProcessedCount = 0;
@@ -39,11 +39,14 @@ export default async function execute() {
 
   // Process each project
   for (const [projectId, projectAnnotations] of Object.entries(
-    annotationsByProjectAndTrace as Record<string, Record<string, Annotation[]>>
+    annotationsByProjectAndTrace as Record<
+      string,
+      Record<string, Annotation[]>
+    >,
   )) {
     logger.info(
       { projectId, traceCount: Object.keys(projectAnnotations).length },
-      "Processing project"
+      "Processing project",
     );
 
     const client = await esClient({ projectId });
@@ -51,7 +54,7 @@ export default async function execute() {
 
     // Update each trace in Elasticsearch
     for (const [traceId, traceAnnotations] of Object.entries(
-      projectAnnotations as Record<string, Annotation[]>
+      projectAnnotations as Record<string, Annotation[]>,
     )) {
       try {
         await client.update({
@@ -99,13 +102,13 @@ export default async function execute() {
         if (processedCount % 100 === 0) {
           logger.info(
             { projectId, processedCount },
-            "Processed annotations for project"
+            "Processed annotations for project",
           );
         }
       } catch (error) {
         logger.error(
           { error, projectId, traceId },
-          "Failed to update annotations in Elasticsearch"
+          "Failed to update annotations in Elasticsearch",
         );
       }
     }
@@ -119,6 +122,6 @@ export default async function execute() {
       totalProjects,
       totalAnnotations: annotations.length,
     },
-    "Finished syncing all annotations"
+    "Finished syncing all annotations",
   );
 }

@@ -5,7 +5,7 @@ import { OverflownTextWithTooltip } from "../../../OverflownText";
 
 interface DatasetRadioCardProps {
   dataset: Dataset & { _count: { datasetRecords: number } };
-  handleDatasetSelect: (datasetId: string) => void;
+  handleDatasetSelect?: (datasetId: string) => void;
 }
 
 export function DatasetRadioCard({
@@ -17,7 +17,7 @@ export function DatasetRadioCard({
       value={dataset.id}
       width="full"
       minWidth={0}
-      onClick={() => handleDatasetSelect(dataset.id)}
+      onClick={() => handleDatasetSelect?.(dataset.id)}
       _active={{ background: "blue.50" }}
     >
       <RadioCard.ItemHiddenInput />

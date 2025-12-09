@@ -1,5 +1,5 @@
-import type { Event, Projection } from "../types";
 import type { EventStream } from "../../streams/eventStream";
+import type { Event, Projection } from "../types";
 
 /**
  * Result type for projection handler execution.

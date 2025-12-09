@@ -1,10 +1,10 @@
 import { Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { TeamUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
-import { Controller, useForm, type SubmitHandler } from "react-hook-form";
+import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+import { toaster } from "../../components/ui/toaster";
 import type { TeamMemberWithUser } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { toaster } from "../../components/ui/toaster";
 
 export type RoleOption = {
   label: string;
@@ -55,7 +55,7 @@ export const TeamUserRoleField = ({
   };
 }) => {
   const defaultRole: RoleOption =
-    customRole ?? member.role === TeamUserRole.CUSTOM
+    (customRole ?? member.role === TeamUserRole.CUSTOM)
       ? ({
           label: customRole?.name ?? "Custom Role",
           value: `custom:${customRole?.id ?? ""}`,

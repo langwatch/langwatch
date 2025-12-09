@@ -1,19 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { EventSourcingService } from "../eventSourcingService";
+import { EVENT_TYPES } from "../../domain/eventType";
 import type { Event } from "../../domain/types";
+import { buildCheckpointKey } from "../../utils/checkpointKey";
+import { EventSourcingService } from "../eventSourcingService";
 import {
-  createMockEventStore,
+  cleanupTestEnvironment,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
+  createMockEventStore,
   createMockProcessorCheckpointStore,
-  createTestEvent,
-  TEST_CONSTANTS,
-  setupTestEnvironment,
-  cleanupTestEnvironment,
   createTestContext,
+  createTestEvent,
+  setupTestEnvironment,
+  TEST_CONSTANTS,
 } from "./testHelpers";
-import { EVENT_TYPES } from "../../domain/eventType";
-import { buildCheckpointKey } from "../../utils/checkpointKey";
 
 describe("EventSourcingService - Handler Flows", () => {
   const { aggregateType, tenantId, context } = createTestContext();

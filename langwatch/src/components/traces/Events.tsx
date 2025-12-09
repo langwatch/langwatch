@@ -1,8 +1,15 @@
-import { Box, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Heading,
+  HStack,
+  Spacer,
+  Table,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { Link } from "../ui/link";
-import { Table } from "@chakra-ui/react";
 import { Tooltip } from "../ui/tooltip";
 
 export function Events({ traceId }: { traceId: string }) {
@@ -85,7 +92,7 @@ export function Events({ traceId }: { traceId: string }) {
                       <Table.Cell>{key}</Table.Cell>
                       <Table.Cell>{value}</Table.Cell>
                     </Table.Row>
-                  )
+                  ),
                 )}
               </Table.Body>
             </Table.Root>

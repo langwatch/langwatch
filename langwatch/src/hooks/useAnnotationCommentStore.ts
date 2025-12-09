@@ -10,7 +10,7 @@ interface AnnotationCommentState {
   setCommentState: (
     state: Partial<
       Omit<AnnotationCommentState, "setCommentState" | "resetComment">
-    >
+    >,
   ) => void;
   resetComment: () => void;
   setConversationHasSomeComments: (hasComments: boolean) => void;
@@ -36,5 +36,5 @@ export const useAnnotationCommentStore = create<AnnotationCommentState>(
     setConversationHasSomeComments: (hasComments) =>
       set({ conversationHasSomeComments: hasComments }),
     setExpectedOutput: (expectedOutput: string) => set({ expectedOutput }),
-  })
+  }),
 );

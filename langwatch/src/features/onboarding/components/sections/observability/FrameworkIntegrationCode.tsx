@@ -1,9 +1,13 @@
-import React, { useMemo } from "react";
-import type { FrameworkKey, PlatformKey } from "../../../regions/observability/types";
+import type React from "react";
+import { useMemo } from "react";
 import { useCodegen } from "../../../regions/observability/codegen";
-import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
-import { CodePreview } from "./CodePreview";
 import { generateLLMIntegrationPrompt } from "../../../regions/observability/codegen/llm-integration";
+import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
+import type {
+  FrameworkKey,
+  PlatformKey,
+} from "../../../regions/observability/types";
+import { CodePreview } from "./CodePreview";
 
 export function FrameworkIntegrationCode({
   platform,
@@ -32,7 +36,11 @@ export function FrameworkIntegrationCode({
   }, [platform, framework, codegenResult]);
 
   if (!codegenResult) {
-    console.error("No snippets found for platform and framework", platform, framework);
+    console.error(
+      "No snippets found for platform and framework",
+      platform,
+      framework,
+    );
 
     return null;
   }

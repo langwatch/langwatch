@@ -1,6 +1,6 @@
-import { Link } from "../../components/ui/link";
-import { Card, Heading, Text, VStack, HStack } from "@chakra-ui/react";
+import { Card, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
 import { dependencies } from "../../injection/dependencies.client";
 
 export default function Subscription() {
@@ -33,9 +33,9 @@ export default function Subscription() {
               align="start"
             >
               <Text>
-                This is the self-hosted version of LangWatch and all
-                the costs and maintenance are managed by yourself. If you want
-                to use the cloud version, please visit{" "}
+                This is the self-hosted version of LangWatch and all the costs
+                and maintenance are managed by yourself. If you want to use the
+                cloud version, please visit{" "}
                 <Link href="https://langwatch.ai" isExternal>
                   langwatch.ai
                 </Link>

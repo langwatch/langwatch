@@ -1,45 +1,45 @@
 import {
+  Alert,
+  Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
+  HStack,
   Input,
   Spacer,
   Spinner,
   Text,
-  createListCollection,
-  Alert,
-  Badge,
+  VStack,
 } from "@chakra-ui/react";
 import {
   PIIRedactionLevel,
-  ProjectSensitiveDataVisibilityLevel,
   type Project,
+  ProjectSensitiveDataVisibilityLevel,
 } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { Lock } from "react-feather";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
+import { Tooltip } from "~/components/ui/tooltip";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import {
   ProjectTechStackIcon,
   TechStackSelector,
 } from "../components/TechStack";
+import { Dialog } from "../components/ui/dialog";
+import { Select } from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
+import { toaster } from "../components/ui/toaster";
+import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
-import { usePublicEnv } from "../hooks/usePublicEnv";
-import { HStack, VStack } from "@chakra-ui/react";
-import { toaster } from "../components/ui/toaster";
-import { Select } from "../components/ui/select";
-import { Tooltip } from "~/components/ui/tooltip";
-import { Switch } from "../components/ui/switch";
-import { Dialog } from "../components/ui/dialog";
-import { Lock } from "react-feather";
-
-import { withPermissionGuard } from "../components/WithPermissionGuard";
 
 type OrganizationFormData = {
   name: string;

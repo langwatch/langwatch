@@ -1,16 +1,17 @@
-import React, { useState } from "react";
 import {
   HStack,
   IconButton,
   Input,
-  Text,
-  type InputProps,
   /* eslint-disable-next-line no-restricted-imports */
   InputGroup,
+  type InputProps,
+  Text,
 } from "@chakra-ui/react";
-import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
-import { Tooltip } from "../../../../../components/ui/tooltip";
+import { Clipboard, ClipboardPlus, Eye, EyeOff } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
 import { useColorModeValue } from "~/components/ui/color-mode";
+import { Tooltip } from "../../../../../components/ui/tooltip";
 
 interface InputWithPrefixProps {
   value: string;
@@ -47,7 +48,10 @@ export function InputWithPrefix({
   invalid = false,
 }: InputWithPrefixProps): React.ReactElement {
   const [isVisible, setIsVisible] = useState(false);
-  const focusBoxShadow = useColorModeValue<InputProps["boxShadow"]>("sm", "2xl");
+  const focusBoxShadow = useColorModeValue<InputProps["boxShadow"]>(
+    "sm",
+    "2xl",
+  );
   const borderColor = invalid ? "border.error" : "border";
 
   function toggleVisibility(): void {
@@ -55,7 +59,8 @@ export function InputWithPrefix({
   }
 
   const hasEndAddon = showVisibilityToggle || onCopyPlain || onCopyWithPrefix;
-  const inputType = type ?? (showVisibilityToggle && !isVisible ? "password" : "text");
+  const inputType =
+    type ?? (showVisibilityToggle && !isVisible ? "password" : "text");
 
   return (
     <InputGroup
@@ -167,4 +172,3 @@ export function InputWithPrefix({
     </InputGroup>
   );
 }
-

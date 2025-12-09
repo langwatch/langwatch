@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { TenantId as ConcreteTenantId } from "../domain/tenantId";
+import type { Event, EventOrderingStrategy } from "../domain/types";
 
 /**
  * Zod schema for event stream metadata.

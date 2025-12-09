@@ -252,7 +252,7 @@ export class ScenarioEventService {
     if (truncated) {
       throw new Error(
         `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
-          "Refine filters or use the paginated API."
+          "Refine filters or use the paginated API.",
       );
     }
 
@@ -398,7 +398,7 @@ export class ScenarioEventService {
           runStartedEvent?.timestamp && runFinishedEvent?.timestamp
             ? Math.max(
                 0,
-                runFinishedEvent.timestamp - runStartedEvent.timestamp
+                runFinishedEvent.timestamp - runStartedEvent.timestamp,
               )
             : 0,
       });

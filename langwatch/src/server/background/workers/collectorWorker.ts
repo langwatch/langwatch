@@ -1,24 +1,29 @@
 import type { Project } from "@prisma/client";
+import { Worker } from "bullmq";
+import type {
+  CollectorCheckAndAdjustJob,
+  CollectorJob,
+} from "~/server/background/types";
+import {
+  getTraceById,
+  searchTraces,
+  searchTracesWithInternals,
+} from "~/server/elasticsearch/traces";
+import { env } from "../../../env.mjs";
+import { createLogger } from "../../../utils/logger";
 import {
   captureException,
   getCurrentScope,
   startSpan,
   withScope,
 } from "../../../utils/posthogErrorCapture";
-import { Worker } from "bullmq";
-import type {
-  CollectorCheckAndAdjustJob,
-  CollectorJob,
-} from "~/server/background/types";
-import { env } from "../../../env.mjs";
-import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
 import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
 } from "../../api/utils";
 import { prisma } from "../../db";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
   collectorIndexDelayHistogram,
   getJobProcessingCounter,
@@ -27,17 +32,18 @@ import {
   traceSpanCountHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
-import {
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
-  type ElasticSearchTrace,
-  type ErrorCapture,
-  type Evaluation,
-  type Span,
-  type SpanInputOutput,
+import type {
+  ElasticSearchInputOutput,
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  ErrorCapture,
+  Evaluation,
+  Span,
+  SpanInputOutput,
 } from "../../tracer/types";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
+import { prewarmTiktokenModels } from "./collector/cost";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
   addGuardrailCosts,
@@ -47,12 +53,6 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import {
-  searchTraces,
-  getTraceById,
-  searchTracesWithInternals,
-} from "~/server/elasticsearch/traces";
-import { prewarmTiktokenModels } from "./collector/cost";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 
@@ -270,7 +270,7 @@ const processCollectorJob_ = async (
   if (!project) {
     logger.warn(
       { projectId, traceId },
-      "Project not found or archived, skipping collector job"
+      "Project not found or archived, skipping collector job",
     );
     return;
   }
@@ -301,7 +301,7 @@ const processCollectorJob_ = async (
         // If ignore_timestamps_on_write is set, we'll preserve existing timestamps in the ES update script
         // For now, set the required fields but they may be overridden during update
         inserted_at: span.timestamps.ignore_timestamps_on_write
-          ? existingTrace?.inserted_at ?? currentTime
+          ? (existingTrace?.inserted_at ?? currentTime)
           : currentTime,
         updated_at: currentTime,
       },
@@ -412,8 +412,8 @@ const processCollectorJob_ = async (
                 ...existingSpans.map((span) => span.timestamps.started_at),
               )
             : Math.min(...allSpans.map((span) => span.timestamps.started_at))
-          : Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
-            Date.now(),
+          : (Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
+            Date.now()),
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
@@ -906,7 +906,7 @@ export const startCollectorWorker = () => {
     logger.debug("collector worker active, waiting for jobs!");
   });
 
-  collectorWorker.on("failed", (job, err) => {
+  collectorWorker.on("failed", async (job, err) => {
     if (
       job?.data &&
       "action" in job.data &&
@@ -917,7 +917,7 @@ export const startCollectorWorker = () => {
       getJobProcessingCounter("collector", "failed").inc();
     }
     logger.debug({ jobId: job?.id, error: err.message }, "job failed");
-    withScope((scope) => {
+    await withScope((scope) => {
       scope.setTag?.("worker", "collector");
       scope.setExtra?.("job", job?.data);
       captureException(err);
@@ -974,10 +974,10 @@ const markProjectFirstMessage = async (
           metadata.custom?.platform === "optimization_studio"
             ? "other"
             : metadata.sdk_language === "python"
-            ? "python"
-            : metadata.sdk_language === "typescript"
-            ? "typescript"
-            : "other",
+              ? "python"
+              : metadata.sdk_language === "typescript"
+                ? "typescript"
+                : "other",
       },
     });
   }

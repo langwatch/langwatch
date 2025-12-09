@@ -1,17 +1,17 @@
+import { createLogger } from "~/utils/logger";
+import type { QueueProcessorFactory } from "../../../runtime/queue";
+import type { Command, CommandHandler } from "../../commands/command";
+import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
+import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
-import type { AggregateType } from "../../domain/aggregateType";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
+import type { CommandSchemaType, CommandType } from "../../index";
+import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
-import type { CommandHandler, Command } from "../../commands/command";
-import type { CommandType, CommandSchemaType } from "../../index";
-import { createCommand, createTenantId, EventUtils } from "../../index";
-import type { QueueProcessorFactory } from "../../../runtime/queue";
-import { createLogger } from "~/utils/logger";
-import { ValidationError, ConfigurationError } from "../errorHandling";
+import { ConfigurationError, ValidationError } from "../errorHandling";
 
 /**
  * Configuration extracted from a command handler class, merged with options.

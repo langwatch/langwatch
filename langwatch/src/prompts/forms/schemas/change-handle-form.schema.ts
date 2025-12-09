@@ -46,7 +46,7 @@ export const createChangeHandleFormSchema = (params: {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: `⚠ Prompt "${String(
-          data.handle
+          data.handle,
         )}" already exists on the ${data.scope.toLowerCase()}.`,
         path: ["handle"],
       });

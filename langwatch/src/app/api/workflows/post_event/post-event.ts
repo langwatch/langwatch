@@ -1,10 +1,10 @@
+import { captureException } from "~/utils/posthogErrorCapture";
+import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
+import { invokeLambda } from "../../../../optimization_studio/server/lambda";
 import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
-import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
-import { captureException } from "~/utils/posthogErrorCapture";
-import { invokeLambda } from "../../../../optimization_studio/server/lambda";
 import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:post_event");

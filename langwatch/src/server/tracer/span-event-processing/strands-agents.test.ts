@@ -1,127 +1,289 @@
-import { describe, it, expect } from "vitest";
-import { extractStrandsAgentsInputOutput, isStrandsAgentsInstrumentation, extractStrandsAgentsMetadata } from "./strands-agents";
+import type { IEvent, ISpan } from "@opentelemetry/otlp-transformer";
+import { describe, expect, it } from "vitest";
 import type { DeepPartial } from "~/utils/types";
-import type { ISpan, IEvent } from "@opentelemetry/otlp-transformer";
+import {
+  extractStrandsAgentsInputOutput,
+  extractStrandsAgentsMetadata,
+  isStrandsAgentsInstrumentation,
+} from "./strands-agents";
 
 describe("isStrandsAgentsInstrumentation", () => {
   it("returns true for scope.name === 'strands-agents'", () => {
-    expect(
-      isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})
-    ).toBe(true);
+    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(
+      true,
+    );
   });
   it("returns true for scope.attributes['gen_ai.system'] === 'strands-agents'", () => {
     expect(
-      isStrandsAgentsInstrumentation({ attributes: [{ key: "gen_ai.system", value: { stringValue: "strands-agents" } }] }, {})
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [
+            { key: "gen_ai.system", value: { stringValue: "strands-agents" } },
+          ],
+        },
+        {},
+      ),
     ).toBe(true);
   });
   it("returns true for scope.attributes['system.name'] === 'strands-agents'", () => {
     expect(
-      isStrandsAgentsInstrumentation({ attributes: [{ key: "system.name", value: { stringValue: "strands-agents" } }] }, {})
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [
+            { key: "system.name", value: { stringValue: "strands-agents" } },
+          ],
+        },
+        {},
+      ),
     ).toBe(true);
   });
   it("returns true for span.attributes['gen_ai.agent.name'] === 'Strands Agents'", () => {
     expect(
-      isStrandsAgentsInstrumentation({}, { attributes: [{ key: "gen_ai.agent.name", value: { stringValue: "Strands Agents" } }] })
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            {
+              key: "gen_ai.agent.name",
+              value: { stringValue: "Strands Agents" },
+            },
+          ],
+        },
+      ),
     ).toBe(true);
   });
   it("returns true for span.attributes['service.name'] === 'strands-agents'", () => {
     expect(
-      isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "strands-agents" } }] })
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            { key: "service.name", value: { stringValue: "strands-agents" } },
+          ],
+        },
+      ),
     ).toBe(true);
   });
   it("returns true for span.name.includes('Agents')", () => {
     expect(
-      isStrandsAgentsInstrumentation({}, { name: "invoke_agent Strands Agents" })
+      isStrandsAgentsInstrumentation(
+        {},
+        { name: "invoke_agent Strands Agents" },
+      ),
     ).toBe(true);
   });
   it("returns true for scope.name === 'opentelemetry.instrumentation.strands'", () => {
     expect(
-      isStrandsAgentsInstrumentation({ name: "opentelemetry.instrumentation.strands" }, {})
+      isStrandsAgentsInstrumentation(
+        { name: "opentelemetry.instrumentation.strands" },
+        {},
+      ),
     ).toBe(true);
   });
   it("returns false for wrong service name", () => {
     expect(
-      isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "other-service" } }] })
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            { key: "service.name", value: { stringValue: "other-service" } },
+          ],
+        },
+      ),
     ).toBe(false);
   });
   it("returns false for null scope and span", () => {
-    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(false);
+    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(
+      false,
+    );
   });
   it("returns false for undefined scope and span", () => {
-    expect(isStrandsAgentsInstrumentation(undefined as any, undefined as any)).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(undefined as any, undefined as any),
+    ).toBe(false);
   });
   it("returns false when no relevant attributes present", () => {
-    expect(
-      isStrandsAgentsInstrumentation({}, {})
-    ).toBe(false);
+    expect(isStrandsAgentsInstrumentation({}, {})).toBe(false);
   });
   it("returns false when service.name is not a string", () => {
     expect(
-      isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { intValue: 42 } }] })
+      isStrandsAgentsInstrumentation(
+        {},
+        { attributes: [{ key: "service.name", value: { intValue: 42 } }] },
+      ),
     ).toBe(false);
   });
 });
 
 describe("isStrandsAgentsInstrumentation (extensive attribute checks)", () => {
   it("returns true for scope.name === 'strands-agents' (exact match)", () => {
-    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(true);
+    expect(isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})).toBe(
+      true,
+    );
   });
   it("returns false for scope.name !== 'strands-agents'", () => {
     expect(isStrandsAgentsInstrumentation({ name: "other" }, {})).toBe(false);
   });
 
   it("returns true for scope.attributes['gen_ai.system'] === 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "gen_ai.system", value: { stringValue: "strands-agents" } }] }, {})).toBe(true);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [
+            { key: "gen_ai.system", value: { stringValue: "strands-agents" } },
+          ],
+        },
+        {},
+      ),
+    ).toBe(true);
   });
   it("returns false for scope.attributes['gen_ai.system'] !== 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "gen_ai.system", value: { stringValue: "other" } }] }, {})).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [
+            { key: "gen_ai.system", value: { stringValue: "other" } },
+          ],
+        },
+        {},
+      ),
+    ).toBe(false);
   });
   it("returns false for scope.attributes['gen_ai.system'] with wrong value type", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "gen_ai.system", value: { intValue: 42 } }] }, {})).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        { attributes: [{ key: "gen_ai.system", value: { intValue: 42 } }] },
+        {},
+      ),
+    ).toBe(false);
   });
 
   it("returns true for scope.attributes['system.name'] === 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "system.name", value: { stringValue: "strands-agents" } }] }, {})).toBe(true);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [
+            { key: "system.name", value: { stringValue: "strands-agents" } },
+          ],
+        },
+        {},
+      ),
+    ).toBe(true);
   });
   it("returns false for scope.attributes['system.name'] !== 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "system.name", value: { stringValue: "other" } }] }, {})).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {
+          attributes: [{ key: "system.name", value: { stringValue: "other" } }],
+        },
+        {},
+      ),
+    ).toBe(false);
   });
   it("returns false for scope.attributes['system.name'] with wrong value type", () => {
-    expect(isStrandsAgentsInstrumentation({ attributes: [{ key: "system.name", value: { intValue: 42 } }] }, {})).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        { attributes: [{ key: "system.name", value: { intValue: 42 } }] },
+        {},
+      ),
+    ).toBe(false);
   });
 
   it("returns true for span.attributes['gen_ai.agent.name'] === 'Strands Agents'", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "gen_ai.agent.name", value: { stringValue: "Strands Agents" } }] })).toBe(true);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            {
+              key: "gen_ai.agent.name",
+              value: { stringValue: "Strands Agents" },
+            },
+          ],
+        },
+      ),
+    ).toBe(true);
   });
   it("returns false for span.attributes['gen_ai.agent.name'] !== 'Strands Agents'", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "gen_ai.agent.name", value: { stringValue: "Other Agent" } }] })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            { key: "gen_ai.agent.name", value: { stringValue: "Other Agent" } },
+          ],
+        },
+      ),
+    ).toBe(false);
   });
   it("returns false for span.attributes['gen_ai.agent.name'] with wrong value type", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "gen_ai.agent.name", value: { intValue: 42 } }] })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        { attributes: [{ key: "gen_ai.agent.name", value: { intValue: 42 } }] },
+      ),
+    ).toBe(false);
   });
 
   it("returns true for span.attributes['service.name'] === 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "strands-agents" } }] })).toBe(true);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            { key: "service.name", value: { stringValue: "strands-agents" } },
+          ],
+        },
+      ),
+    ).toBe(true);
   });
   it("returns false for span.attributes['service.name'] !== 'strands-agents'", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "other-service" } }] })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        {
+          attributes: [
+            { key: "service.name", value: { stringValue: "other-service" } },
+          ],
+        },
+      ),
+    ).toBe(false);
   });
   it("returns false for span.attributes['service.name'] with wrong value type", () => {
-    expect(isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { intValue: 42 } }] })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        {},
+        { attributes: [{ key: "service.name", value: { intValue: 42 } }] },
+      ),
+    ).toBe(false);
   });
 
   it("returns false if none of the attributes match", () => {
-    expect(isStrandsAgentsInstrumentation({ name: "not-strands" }, { attributes: [{ key: "foo", value: { stringValue: "bar" } }] })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        { name: "not-strands" },
+        { attributes: [{ key: "foo", value: { stringValue: "bar" } }] },
+      ),
+    ).toBe(false);
   });
 
   it("returns false for missing attributes arrays", () => {
     expect(isStrandsAgentsInstrumentation({}, {})).toBe(false);
-    expect(isStrandsAgentsInstrumentation({ attributes: undefined }, { attributes: undefined })).toBe(false);
+    expect(
+      isStrandsAgentsInstrumentation(
+        { attributes: undefined },
+        { attributes: undefined },
+      ),
+    ).toBe(false);
   });
 
   it("returns false for null or undefined scope/span", () => {
-    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(false);
-    expect(isStrandsAgentsInstrumentation(undefined as any, undefined as any)).toBe(false);
+    expect(isStrandsAgentsInstrumentation(null as any, null as any)).toBe(
+      false,
+    );
+    expect(
+      isStrandsAgentsInstrumentation(undefined as any, undefined as any),
+    ).toBe(false);
   });
 });
 
@@ -438,7 +600,10 @@ describe("extractStrandsAgentsMetadata", () => {
   it("extracts bytes attributes", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { key: "data.hash", value: { bytesValue: new Uint8Array([1, 2, 3, 4]) } },
+        {
+          key: "data.hash",
+          value: { bytesValue: new Uint8Array([1, 2, 3, 4]) },
+        },
       ],
     };
     const result = extractStrandsAgentsMetadata(span);
@@ -503,28 +668,28 @@ describe("extractStrandsAgentsMetadata", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
         { key: "simple.attr", value: { stringValue: "simple" } },
-        { 
-          key: "complex.attr", 
-          value: { 
-            kvlistValue: { 
+        {
+          key: "complex.attr",
+          value: {
+            kvlistValue: {
               values: [
                 { key: "nested.key", value: { stringValue: "nested value" } },
                 { key: "nested.number", value: { intValue: 42 } },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
-        { 
-          key: "array.attr", 
-          value: { 
-            arrayValue: { 
+        {
+          key: "array.attr",
+          value: {
+            arrayValue: {
               values: [
                 { stringValue: "item1" },
                 { intValue: 123 },
                 { boolValue: true },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
       ],
     };
@@ -532,9 +697,9 @@ describe("extractStrandsAgentsMetadata", () => {
     expect(result).toEqual({
       "simple.attr": "simple",
       "complex.attr": {
-        "nested": {
-          "key": "nested value",
-          "number": 42,
+        nested: {
+          key: "nested value",
+          number: 42,
         },
       },
       "array.attr": ["item1", 123, true],
@@ -573,13 +738,13 @@ describe("extractStrandsAgentsMetadata", () => {
   it("handles attributes with multiple value types set (should use first defined)", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { 
-          key: "mixed.attr", 
-          value: { 
+        {
+          key: "mixed.attr",
+          value: {
             stringValue: "string value",
             intValue: 42,
-            boolValue: true 
-          } 
+            boolValue: true,
+          },
         },
       ],
     };
@@ -665,40 +830,43 @@ describe("extractStrandsAgentsMetadata", () => {
   it("handles deeply nested kvlistValue structures", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { 
-          key: "deeply.nested", 
-          value: { 
-            kvlistValue: { 
+        {
+          key: "deeply.nested",
+          value: {
+            kvlistValue: {
               values: [
-                { 
-                  key: "level1", 
-                  value: { 
-                    kvlistValue: { 
+                {
+                  key: "level1",
+                  value: {
+                    kvlistValue: {
                       values: [
-                        { key: "level2.key", value: { stringValue: "deep value" } },
+                        {
+                          key: "level2.key",
+                          value: { stringValue: "deep value" },
+                        },
                         { key: "level2.number", value: { intValue: 999 } },
-                      ] 
-                    } 
-                  } 
+                      ],
+                    },
+                  },
                 },
                 { key: "top.level", value: { stringValue: "top value" } },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
       ],
     };
     const result = extractStrandsAgentsMetadata(span);
     expect(result).toEqual({
       "deeply.nested": {
-        "level1": {
-          "level2": {
-            "key": "deep value",
-            "number": 999,
+        level1: {
+          level2: {
+            key: "deep value",
+            number: 999,
           },
         },
-        "top": {
-          "level": "top value",
+        top: {
+          level: "top value",
         },
       },
     });
@@ -707,31 +875,32 @@ describe("extractStrandsAgentsMetadata", () => {
   it("handles mixed complex types in arrays", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { 
-          key: "mixed.array", 
-          value: { 
-            arrayValue: { 
+        {
+          key: "mixed.array",
+          value: {
+            arrayValue: {
               values: [
                 { stringValue: "string item" },
                 { intValue: 456 },
                 { boolValue: false },
-                { 
-                  kvlistValue: { 
+                {
+                  kvlistValue: {
                     values: [
-                      { key: "nested.key", value: { stringValue: "nested in array" } },
-                    ] 
-                  } 
+                      {
+                        key: "nested.key",
+                        value: { stringValue: "nested in array" },
+                      },
+                    ],
+                  },
                 },
-                { 
-                  arrayValue: { 
-                    values: [
-                      { stringValue: "nested array item" },
-                    ] 
-                  } 
+                {
+                  arrayValue: {
+                    values: [{ stringValue: "nested array item" }],
+                  },
                 },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
       ],
     };
@@ -742,8 +911,8 @@ describe("extractStrandsAgentsMetadata", () => {
         456,
         false,
         {
-          "nested": {
-            "key": "nested in array",
+          nested: {
+            key: "nested in array",
           },
         },
         ["nested array item"],
@@ -770,15 +939,32 @@ describe("extractStrandsAgentsMetadata", () => {
   it("handles complex types with filtering (scope/gen_ai)", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { key: "valid.complex", value: { kvlistValue: { values: [{ key: "nested", value: { stringValue: "valid" } }] } } },
-        { key: "scope.should.filter", value: { kvlistValue: { values: [{ key: "nested", value: { stringValue: "filtered" } }] } } },
-        { key: "gen_ai.should.filter", value: { arrayValue: { values: [{ stringValue: "filtered" }] } } },
+        {
+          key: "valid.complex",
+          value: {
+            kvlistValue: {
+              values: [{ key: "nested", value: { stringValue: "valid" } }],
+            },
+          },
+        },
+        {
+          key: "scope.should.filter",
+          value: {
+            kvlistValue: {
+              values: [{ key: "nested", value: { stringValue: "filtered" } }],
+            },
+          },
+        },
+        {
+          key: "gen_ai.should.filter",
+          value: { arrayValue: { values: [{ stringValue: "filtered" }] } },
+        },
       ],
     };
     const result = extractStrandsAgentsMetadata(span);
     expect(result).toEqual({
       "valid.complex": {
-        "nested": "valid",
+        nested: "valid",
       },
     });
   });
@@ -786,44 +972,44 @@ describe("extractStrandsAgentsMetadata", () => {
   it("handles JSON parsing in string values within complex types", () => {
     const span: DeepPartial<ISpan> = {
       attributes: [
-        { 
-          key: "json.in.kvlist", 
-          value: { 
-            kvlistValue: { 
+        {
+          key: "json.in.kvlist",
+          value: {
+            kvlistValue: {
               values: [
-                { key: "json.string", value: { stringValue: '{"key": "value", "number": 42}' } },
+                {
+                  key: "json.string",
+                  value: { stringValue: '{"key": "value", "number": 42}' },
+                },
                 { key: "plain.string", value: { stringValue: "plain text" } },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
-        { 
-          key: "json.in.array", 
-          value: { 
-            arrayValue: { 
+        {
+          key: "json.in.array",
+          value: {
+            arrayValue: {
               values: [
                 { stringValue: '{"nested": {"deep": "value"}}' },
                 { stringValue: "not json" },
-              ] 
-            } 
-          } 
+              ],
+            },
+          },
         },
       ],
     };
     const result = extractStrandsAgentsMetadata(span);
     expect(result).toEqual({
       "json.in.kvlist": {
-        "json": {
-          "string": { key: "value", number: 42 },
+        json: {
+          string: { key: "value", number: 42 },
         },
-        "plain": {
-          "string": "plain text",
+        plain: {
+          string: "plain text",
         },
       },
-      "json.in.array": [
-        { nested: { deep: "value" } },
-        "not json",
-      ],
+      "json.in.array": [{ nested: { deep: "value" } }, "not json"],
     });
   });
 });

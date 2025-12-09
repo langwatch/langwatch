@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SpanKind } from "@opentelemetry/api";
-import type { EventSourcedQueueDefinition } from "../../../library/queues";
 import type { SemConvAttributes } from "langwatch/observability";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { EventSourcedQueueDefinition } from "../../../library/queues";
 
 const mockLogger = {
   info: vi.fn(),

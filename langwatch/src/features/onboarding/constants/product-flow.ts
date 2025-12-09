@@ -1,4 +1,4 @@
-import { ProductScreenIndex, type ProductFlowConfig } from "../types/types";
+import { type ProductFlowConfig, ProductScreenIndex } from "../types/types";
 
 export const PRODUCT_FLOW_CONFIG: ProductFlowConfig = {
   variant: "product",
@@ -7,4 +7,3 @@ export const PRODUCT_FLOW_CONFIG: ProductFlowConfig = {
   last: ProductScreenIndex.SELECTION,
   total: 1,
 };
-

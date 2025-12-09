@@ -1,15 +1,15 @@
+import type { Dataset, DatasetRecord } from "@prisma/client";
 import { nanoid } from "nanoid";
+import type { InMemoryDataset } from "../../components/datasets/DatasetTable";
 import type {
   DatasetColumns,
   DatasetColumnType,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import type { Field, NodeDataset } from "../types/dsl";
-import type { InMemoryDataset } from "../../components/datasets/DatasetTable";
-import type { Dataset, DatasetRecord } from "@prisma/client";
 
 export function transposeColumnsFirstToRowsFirstWithId(
-  data: Record<string, string[]>
+  data: Record<string, string[]>,
 ): DatasetRecordEntry[] {
   return Object.entries(data).reduce((acc, [column, values]) => {
     values.forEach((value, index) => {
@@ -22,7 +22,7 @@ export function transposeColumnsFirstToRowsFirstWithId(
 }
 
 export function transpostRowsFirstToColumnsFirstWithoutId(
-  data: DatasetRecordEntry[]
+  data: DatasetRecordEntry[],
 ): Record<string, string[]> {
   return data.reduce(
     (acc, row) => {
@@ -34,7 +34,7 @@ export function transpostRowsFirstToColumnsFirstWithoutId(
       });
       return acc;
     },
-    {} as Record<string, string[]>
+    {} as Record<string, string[]>,
   );
 }
 
@@ -89,7 +89,7 @@ export function datasetColumnsToFields(columns: DatasetColumns): Field[] {
 }
 
 export function inMemoryDatasetToNodeDataset(
-  dataset: InMemoryDataset
+  dataset: InMemoryDataset,
 ): NodeDataset {
   return dataset.datasetId
     ? {
@@ -100,7 +100,7 @@ export function inMemoryDatasetToNodeDataset(
         name: dataset.name,
         inline: {
           records: transpostRowsFirstToColumnsFirstWithoutId(
-            dataset.datasetRecords
+            dataset.datasetRecords,
           ),
           columnTypes: dataset.columnTypes,
         },
@@ -108,10 +108,10 @@ export function inMemoryDatasetToNodeDataset(
 }
 
 export const simpleRecordListToNodeDataset = (
-  records: Record<string, any>[]
+  records: Record<string, any>[],
 ): NodeDataset => {
   const columnsFirst = transpostRowsFirstToColumnsFirstWithoutId(
-    records as DatasetRecordEntry[]
+    records as DatasetRecordEntry[],
   );
   return {
     inline: {
@@ -125,7 +125,7 @@ export const simpleRecordListToNodeDataset = (
 };
 
 export const datasetDatabaseRecordsToInMemoryDataset = (
-  dataset: Dataset & { datasetRecords: DatasetRecord[] }
+  dataset: Dataset & { datasetRecords: DatasetRecord[] },
 ): InMemoryDataset => {
   const columns = (dataset.columnTypes ?? []) as DatasetColumns;
   const datasetRecords = dataset.datasetRecords.map((record) => {
@@ -148,7 +148,7 @@ export const datasetDatabaseRecordsToInMemoryDataset = (
 
 export const trainTestSplit = (
   list: any[],
-  { trainSize, testSize }: { trainSize: number; testSize: number }
+  { trainSize, testSize }: { trainSize: number; testSize: number },
 ) => {
   const total = list.length;
   const isPercentage = trainSize < 1 || testSize < 1;
@@ -164,14 +164,14 @@ export const trainTestSplit = (
 export const tryToMapPreviousColumnsToNewColumns = (
   datasetRecords: DatasetRecordEntry[],
   previousColumns: DatasetColumns,
-  newColumns: DatasetColumns
+  newColumns: DatasetColumns,
 ): DatasetRecordEntry[] => {
   const columnNameMap: Record<string, string | undefined> = {};
 
   // First pass: exact name matches
   previousColumns.forEach((prevCol) => {
     const matchingNewCol = newColumns.find(
-      (newCol) => newCol.name === prevCol.name
+      (newCol) => newCol.name === prevCol.name,
     );
     if (matchingNewCol) {
       columnNameMap[prevCol.name] = matchingNewCol.name;
@@ -181,10 +181,10 @@ export const tryToMapPreviousColumnsToNewColumns = (
   // Second pass: map by position for unmapped columns
   // This preserves data when column names are changed
   const unmappedPrevColumns = previousColumns.filter(
-    (col) => !(col.name in columnNameMap)
+    (col) => !(col.name in columnNameMap),
   );
   const unmappedNewColumns = newColumns.filter(
-    (col) => !Object.values(columnNameMap).includes(col.name)
+    (col) => !Object.values(columnNameMap).includes(col.name),
   );
 
   // Map remaining columns by position

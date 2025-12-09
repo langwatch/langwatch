@@ -32,7 +32,7 @@ export abstract class SubscriptionHandler {
       id: string;
       email?: string | null;
       name?: string | null;
-    }
+    },
   ): Promise<PlanInfo> {
     return {
       type: "OPEN_SOURCE",

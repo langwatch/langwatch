@@ -339,9 +339,13 @@ describe("generateMermaidSyntax", () => {
     const result = generateMermaidSyntax(mockSpans);
 
     // Should process interactions in chronological order
-    const lines = result.split('\n').filter(line => line.includes('->>'));
-    expect(lines.some(line => line.includes('Agent1->>Agent2: handover'))).toBe(true); // Earlier interaction first
-    expect(lines.some(line => line.includes('Agent1->>gpt_4: LLM call'))).toBe(true); // Later interaction second
+    const lines = result.split("\n").filter((line) => line.includes("->>"));
+    expect(
+      lines.some((line) => line.includes("Agent1->>Agent2: handover")),
+    ).toBe(true); // Earlier interaction first
+    expect(
+      lines.some((line) => line.includes("Agent1->>gpt_4: LLM call")),
+    ).toBe(true); // Later interaction second
   });
 
   it("should handle tool calls and subsequent agent calls correctly", () => {
@@ -496,14 +500,16 @@ describe("generateMermaidSyntax", () => {
     console.log("Stacked activations test result:", result);
 
     // Should show multiple activations on the same participant
-    const lines = result.split('\n').filter(line => line.includes('->>') || line.includes('-->>'));
+    const lines = result
+      .split("\n")
+      .filter((line) => line.includes("->>") || line.includes("-->>"));
 
     // Should have two LLM calls to gpt_4
-    const llmCalls = lines.filter(line => line.includes('MainAgent->>gpt_4'));
+    const llmCalls = lines.filter((line) => line.includes("MainAgent->>gpt_4"));
     expect(llmCalls.length).toBe(2);
 
     // Should have corresponding returns
-    const returns = lines.filter(line => line.includes('gpt_4-->>MainAgent'));
+    const returns = lines.filter((line) => line.includes("gpt_4-->>MainAgent"));
     expect(returns.length).toBe(2);
   });
 
@@ -551,9 +557,17 @@ describe("generateMermaidSyntax", () => {
     expect(filteredResult.includes("generic_span")).toBe(false); // span should be excluded
 
     // Test with tool, agent, and llm types (needed for tool self-calls to work)
-    const toolIncludedResult = generateMermaidSyntax(mockSpans, ["tool", "agent", "llm"]);
-    expect(toolIncludedResult.includes("TestAgent->>gpt_4: LLM call")).toBe(true);
-    expect(toolIncludedResult.includes("gpt_4->>gpt_4: tool: search_tool")).toBe(true);
+    const toolIncludedResult = generateMermaidSyntax(mockSpans, [
+      "tool",
+      "agent",
+      "llm",
+    ]);
+    expect(toolIncludedResult.includes("TestAgent->>gpt_4: LLM call")).toBe(
+      true,
+    );
+    expect(
+      toolIncludedResult.includes("gpt_4->>gpt_4: tool: search_tool"),
+    ).toBe(true);
 
     // Test with only agent type (no llm or tool)
     const agentOnlyResult = generateMermaidSyntax(mockSpans, ["agent"]);
@@ -613,7 +627,11 @@ describe("generateMermaidSyntax", () => {
     expect(result).toBe(expectedBridged);
 
     // With all types included, should show the full chain
-    const fullResult = generateMermaidSyntax(mockSpans, ["agent", "span", "llm"]);
+    const fullResult = generateMermaidSyntax(mockSpans, [
+      "agent",
+      "span",
+      "llm",
+    ]);
 
     const expectedFull = `sequenceDiagram
     actor AgentA as AgentA

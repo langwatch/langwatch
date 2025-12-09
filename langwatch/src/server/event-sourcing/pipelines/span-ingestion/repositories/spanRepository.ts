@@ -1,6 +1,6 @@
 import type {
-  StoreSpanIngestionCommandData,
   SpanData,
+  StoreSpanIngestionCommandData,
 } from "../schemas/commands";
 
 /**

@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import {
-  type OnboardingFormData,
-  type OnboardingFlowState,
-  type UsageStyle,
-  type CompanySize,
-  type SolutionType,
-  type DesireType,
-  type RoleType,
-  OnboardingScreenIndex,
-} from "../types/types";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
+import {
+  type CompanySize,
+  type DesireType,
+  type OnboardingFlowState,
+  type OnboardingFormData,
+  OnboardingScreenIndex,
+  type RoleType,
+  type SolutionType,
+  type UsageStyle,
+} from "../types/types";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow";
 
 export const useOnboardingFlow = () => {
@@ -64,10 +64,8 @@ export const useOnboardingFlow = () => {
   };
 
   // Use generic flow hook for navigation
-  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(
-    flow,
-    canProceed
-  );
+  const { currentScreenIndex, direction, navigation } =
+    useGenericOnboardingFlow(flow, canProceed);
 
   const getFormData = (): OnboardingFormData => ({
     organizationName,

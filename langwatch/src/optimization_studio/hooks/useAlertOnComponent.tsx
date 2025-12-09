@@ -65,6 +65,6 @@ export const useAlertOnComponent = () => {
       propertiesExpanded,
       setSelectedNode,
       setPropertiesExpanded,
-    ]
+    ],
   );
 };

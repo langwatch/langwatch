@@ -1,8 +1,8 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { prisma } from "~/server/db";
-import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
 import { getModelLimits } from "../../../utils/modelLimits";
+import { getLLMModelCosts } from "../../modelProviders/llmModelCost";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -94,7 +94,7 @@ const isValidRegex = (pattern: string): boolean => {
   try {
     new RegExp(pattern);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };

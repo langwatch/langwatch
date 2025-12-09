@@ -1,13 +1,16 @@
 import crypto from "crypto";
 import { env } from "../env.mjs";
+import { createLogger } from "./logger";
 
 const ENCRYPTION_ALGORITHM = "aes-256-gcm";
+
+const logger = createLogger("langwatch.utils.encryption");
 
 function getEncryptionKey(): Uint8Array {
   const CREDENTIALS_SECRET = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
   if (!CREDENTIALS_SECRET) {
     throw new Error(
-      "CREDENTIALS_SECRET is not set in the environment variables"
+      "CREDENTIALS_SECRET is not set in the environment variables",
     );
   }
 
@@ -26,7 +29,7 @@ export function encrypt(text: string): string {
   const cipher = crypto.createCipheriv(
     ENCRYPTION_ALGORITHM,
     key,
-    new Uint8Array(iv)
+    new Uint8Array(iv),
   );
 
   let encrypted = cipher.update(text, "utf8", "hex");
@@ -51,7 +54,7 @@ export function decrypt(encryptedString: string): string {
     const decipher = crypto.createDecipheriv(
       ENCRYPTION_ALGORITHM,
       key,
-      new Uint8Array(iv)
+      new Uint8Array(iv),
     );
     decipher.setAuthTag(new Uint8Array(authTag));
 
@@ -60,8 +63,10 @@ export function decrypt(encryptedString: string): string {
 
     return decrypted;
   } catch (error) {
+    logger.error(error, "decryption failure");
+
     throw new Error(
-      "Failed to decrypt: Data may be corrupted or tampered with"
+      "Failed to decrypt: Data may be corrupted or tampered with",
     );
   }
 }

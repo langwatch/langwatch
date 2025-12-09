@@ -24,7 +24,7 @@ export function isReservedColumnName(columnName: string): boolean {
  */
 export function getSafeColumnName(
   columnName: string,
-  existingNames: Set<string>
+  existingNames: Set<string>,
 ): string {
   // If the name is not reserved and doesn't exist, return as-is
   if (!isReservedColumnName(columnName) && !existingNames.has(columnName)) {

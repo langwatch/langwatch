@@ -9,8 +9,8 @@
  * **Security:** All components must not contain `:` to prevent key injection vulnerabilities.
  */
 
-import { createTenantId, type TenantId } from "../domain/tenantId";
 import { createLogger } from "~/utils/logger";
+import { createTenantId, type TenantId } from "../domain/tenantId";
 import { CheckpointError } from "../services/errorHandling";
 
 const logger = createLogger("langwatch:event-sourcing:checkpointKey");

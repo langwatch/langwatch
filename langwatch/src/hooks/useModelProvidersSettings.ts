@@ -1,6 +1,8 @@
 import { api } from "../utils/api";
 
-export function useModelProvidersSettings(params: { projectId: string | undefined }) {
+export function useModelProvidersSettings(params: {
+  projectId: string | undefined;
+}) {
   const projectId = params.projectId ?? "";
 
   const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(

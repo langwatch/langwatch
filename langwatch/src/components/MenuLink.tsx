@@ -1,7 +1,7 @@
-import type { PropsWithChildren } from "react";
-import { Link, HStack, Spacer, Text } from "@chakra-ui/react";
-import { usePathname } from "next/navigation";
+import { HStack, Link, Spacer, Text } from "@chakra-ui/react";
 import NextLink from "next/link";
+import { usePathname } from "next/navigation";
+import type { PropsWithChildren } from "react";
 
 export const MenuLink = ({
   paddingX = 4,

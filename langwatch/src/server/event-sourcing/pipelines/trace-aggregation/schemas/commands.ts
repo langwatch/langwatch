@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-export type { TraceAggregationCommandType } from "./typeIdentifiers";
+export type { TraceAggregationSummaryCommandType } from "./typeIdentifiers";
 export {
-  TRACE_AGGREGATION_TRIGGER_COMMAND_TYPE,
   TRACE_AGGREGATION_COMMAND_TYPES,
+  TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE,
 } from "./typeIdentifiers";
 
 /**

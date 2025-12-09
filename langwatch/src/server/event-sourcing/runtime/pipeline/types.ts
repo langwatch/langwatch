@@ -1,20 +1,20 @@
-import type { Event, Projection } from "../../library/domain/types";
 import type { AggregateType } from "../../library/domain/aggregateType";
-import type { EventStore } from "../../library/stores/eventStore.types";
-import type { EventSourcingService } from "../../library/services/eventSourcingService";
-import type { ProjectionDefinitions } from "../../library/projection.types";
+import type { Event, Projection } from "../../library/domain/types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
+import type { ProjectionDefinitions } from "../../library/projection.types";
 import type { EventPublisher } from "../../library/publishing/eventPublisher.types";
-import type { DistributedLock } from "../../library/utils/distributedLock";
-import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type {
-  EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
 } from "../../library/queues";
+import type { EventSourcingService } from "../../library/services/eventSourcingService";
+import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
+import type { EventStore } from "../../library/stores/eventStore.types";
+import type { DistributedLock } from "../../library/utils/distributedLock";
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
+  _ProjectionType extends Projection = Projection,
 > {
   /**
    * Logical name for this pipeline, used for logging/metrics.

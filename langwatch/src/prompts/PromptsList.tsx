@@ -17,19 +17,18 @@ import {
   ArrowUp,
 } from "react-feather";
 import { useState, useCallback } from "react";
-
-import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
+import { LuBuilding } from "react-icons/lu";
 import { CopyPromptDialog } from "./components/CopyPromptDialog";
 import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
-import { LuBuilding } from "react-icons/lu";
+import { formatTimeAgo } from "../utils/formatTimeAgo";
+import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 

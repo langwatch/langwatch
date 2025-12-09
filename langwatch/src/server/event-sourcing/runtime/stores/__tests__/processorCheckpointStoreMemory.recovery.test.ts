@@ -1,10 +1,10 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { type AggregateType, EventUtils } from "../../../library";
+import { EVENT_TYPES } from "../../../library/domain/eventType";
+import { createTenantId } from "../../../library/domain/tenantId";
+import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 import { ProcessorCheckpointStoreMemory } from "../processorCheckpointStoreMemory";
 import { CheckpointRepositoryMemory } from "../repositories/checkpointRepositoryMemory";
-import { EventUtils, type AggregateType } from "../../../library";
-import { createTenantId } from "../../../library/domain/tenantId";
-import { EVENT_TYPES } from "../../../library/domain/eventType";
-import { buildCheckpointKey } from "../../../library/utils/checkpointKey";
 
 describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
   const pipelineName = "test-pipeline";
@@ -510,7 +510,6 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
 
     it("handles non-existent checkpoints gracefully", async () => {
       const processorName = "test-handler";
-      const processorType = "handler" as const;
       const nonExistentAggregateId = "non-existent-aggregate-id";
 
       // Try to clear non-existent checkpoint - should not throw

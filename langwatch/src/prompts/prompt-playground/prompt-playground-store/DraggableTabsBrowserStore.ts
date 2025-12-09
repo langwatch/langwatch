@@ -1,14 +1,14 @@
 "use client";
-import { create } from "zustand";
-import { immer } from "zustand/middleware/immer";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { cloneDeep } from "lodash";
-import { createLogger } from "~/utils/logger";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { z } from "zod";
-import { type PromptConfigFormValues } from "~/prompts/types";
+import cloneDeep from "lodash.clonedeep";
 import type { DeepPartial } from "react-hook-form";
+import { z } from "zod";
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { PromptConfigFormValues } from "~/prompts/types";
 import { chatMessageSchema } from "~/server/tracer/types.generated";
+import { createLogger } from "~/utils/logger";
 import { createTabId, createWindowId } from "./utils/id-generators";
 
 const logger = createLogger("DraggableTabsBrowserStore");

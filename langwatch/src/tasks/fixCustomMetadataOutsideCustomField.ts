@@ -1,5 +1,5 @@
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
-import { type ElasticSearchTrace } from "../server/tracer/types";
+import { esClient, TRACE_INDEX } from "../server/elasticsearch";
+import type { ElasticSearchTrace } from "../server/tracer/types";
 import { reservedTraceMetadataSchema } from "../server/tracer/types.generated";
 
 const migrateIndex = async () => {
@@ -465,7 +465,7 @@ const migrateIndex = async () => {
     process.stdout.write(
       `\nFetched ${results.length} more hits from ${
         (response as any).hits.total.value
-      } total\n`
+      } total\n`,
     );
 
     for (let i = 0; i < results.length; i++) {
@@ -482,8 +482,8 @@ const migrateIndex = async () => {
           ([key, _]) =>
             key !== "all_keys" &&
             key !== "custom" &&
-            !(key in validatedReservedMetadata)
-        )
+            !(key in validatedReservedMetadata),
+        ),
       );
       const newMetadata = {
         ...validatedReservedMetadata,
@@ -492,7 +492,7 @@ const migrateIndex = async () => {
           ...extrataneousMetadata,
         },
         all_keys: Array.from(
-          new Set([...allKeys, ...Object.keys(extrataneousMetadata)])
+          new Set([...allKeys, ...Object.keys(extrataneousMetadata)]),
         ),
       };
 

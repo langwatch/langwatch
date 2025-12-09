@@ -1,29 +1,30 @@
-import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { VStack, HStack, Button, Text, Field, Spinner } from "@chakra-ui/react";
+import { Button, Field, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import type React from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Switch } from "../../../../../components/ui/switch";
+import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
+import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
+import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import {
+  type MaybeStoredModelProvider,
+  modelProviders as modelProvidersRegistry,
+} from "../../../../../server/modelProviders/registry";
+import { createLogger } from "../../../../../utils/logger";
+import {
+  parseZodFieldErrors,
+  type ZodErrorStructure,
+} from "../../../../../utils/zod";
 import {
   getModelProvider,
   modelProviderRegistry,
 } from "../../../regions/model-providers/registry";
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
-import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
-import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { DocsLinks } from "../observability/DocsLinks";
-import {
-  modelProviders as modelProvidersRegistry,
-  type MaybeStoredModelProvider,
-} from "../../../../../server/modelProviders/registry";
-import {
-  parseZodFieldErrors,
-  type ZodErrorStructure,
-} from "../../../../../utils/zod";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
 import { ModelProviderModelSettings } from "./ModelProviderModelSettings";
-import { createLogger } from "../../../../../utils/logger";
 
 const logger = createLogger("ModelProviderSetup");
 
@@ -95,7 +96,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
 
     return fallbackProviderMeta?.backendModelProviderKey ?? "openai";
-  }, [fallbackProviderMeta?.backendModelProviderKey, meta?.backendModelProviderKey]);
+  }, [
+    fallbackProviderMeta?.backendModelProviderKey,
+    meta?.backendModelProviderKey,
+  ]);
   const { providers, isLoading } = useModelProvidersSettings({
     projectId,
   });
@@ -134,7 +138,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     },
   });
 
-  const { fields: derivedFields } = useModelProviderFields(backendModelProviderKey);
+  const { fields: derivedFields } = useModelProviderFields(
+    backendModelProviderKey,
+  );
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -227,7 +233,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     void actions
       .setEnabled(true)
       .then(() => actions.submit())
-      .catch(err => logger.error(err, "failed to submit model provider settings"));
+      .catch((err) =>
+        logger.error(err, "failed to submit model provider settings"),
+      );
   }, [
     validateOpenAi,
     actions,
@@ -287,7 +295,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             onOpenAiValidationClear={handleOpenAiValidationClear}
           />
 
-          {(backendModelProviderKey === "azure" || backendModelProviderKey === "custom") && (
+          {(backendModelProviderKey === "azure" ||
+            backendModelProviderKey === "custom") && (
             <ModelProviderExtraHeaders
               headers={state.extraHeaders}
               onHeaderKeyChange={actions.setExtraHeaderKey}
@@ -306,10 +315,13 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             onDefaultModelChange={actions.setDefaultModel}
           />
 
-          <DocsLinks docs={{
-            external: meta.externalDocsUrl,
-            internal: variantToDocsMapping[variant],
-          }} label={meta.label} />
+          <DocsLinks
+            docs={{
+              external: meta.externalDocsUrl,
+              internal: variantToDocsMapping[variant],
+            }}
+            label={meta.label}
+          />
 
           <HStack justify="end">
             <Button

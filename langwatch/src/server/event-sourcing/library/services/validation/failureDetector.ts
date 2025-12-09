@@ -1,6 +1,6 @@
+import type { createLogger } from "~/utils/logger";
 import type { Event } from "../../domain/types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
-import type { createLogger } from "~/utils/logger";
 
 /**
  * Detects failed events for an aggregate to prevent cascading failures.

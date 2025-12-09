@@ -1,23 +1,23 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event } from "../../domain/types";
-import type { AggregateType } from "../../domain/aggregateType";
-import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
-import type { EventHandlerDefinition } from "../../eventHandler.types";
 import { createLogger } from "~/utils/logger";
-import { type EventProcessorValidator } from "../validation/eventProcessorValidator";
-import { type CheckpointManager } from "../checkpoints/checkpointManager";
-import { type QueueProcessorManager } from "../queues/queueProcessorManager";
+import type { AggregateType } from "../../domain/aggregateType";
+import type { Event } from "../../domain/types";
+import type { EventHandlerDefinition } from "../../eventHandler.types";
+import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { EventStoreReadContext } from "../../stores/eventStore.types";
+import { buildCheckpointKey } from "../../utils/checkpointKey";
+import type { DistributedLock } from "../../utils/distributedLock";
+import type { CheckpointManager } from "../checkpoints/checkpointManager";
 import {
   ErrorCategory,
   handleError,
   isSequentialOrderingError,
-  SequentialOrderingError,
   LockError,
+  SequentialOrderingError,
 } from "../errorHandling";
-import { buildCheckpointKey } from "../../utils/checkpointKey";
-import type { DistributedLock } from "../../utils/distributedLock";
+import type { QueueProcessorManager } from "../queues/queueProcessorManager";
+import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
 
 /**
  * Dispatches events to registered event handlers.

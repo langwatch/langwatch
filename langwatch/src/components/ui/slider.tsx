@@ -2,12 +2,12 @@ import {
   Slider as ChakraSlider,
   For,
   HStack,
-  SliderHiddenInput,
-  SliderThumb,
-  SliderRange,
-  SliderTrack,
   SliderControl,
+  SliderHiddenInput,
+  SliderRange,
   SliderRoot,
+  SliderThumb,
+  SliderTrack,
 } from "@chakra-ui/react";
 import * as React from "react";
 
@@ -49,7 +49,7 @@ export const SimpleSlider = React.forwardRef<HTMLDivElement, SliderProps>(
         </ChakraSlider.Control>
       </ChakraSlider.Root>
     );
-  }
+  },
 );
 
 function SliderThumbs(props: { value?: number[] }) {
@@ -88,7 +88,7 @@ const SliderMarks = React.forwardRef<HTMLDivElement, SliderMarksProps>(
         })}
       </ChakraSlider.MarkerGroup>
     );
-  }
+  },
 );
 
 export const Slider = {

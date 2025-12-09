@@ -12,10 +12,9 @@ import { Select as MultiSelect } from "chakra-react-select";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import type { Trace } from "~/server/tracer/types";
+import type { Workflow } from "../../optimization_studio/types/dsl";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import { TRACE_MAPPINGS } from "../../server/tracer/tracesMapping";
-
-import type { Workflow } from "../../optimization_studio/types/dsl";
 
 /**
  * Thread mappings - simplified set of options for thread-based data
@@ -69,7 +68,7 @@ const groupTracesByThreadId = (traces: Trace[]): ThreadData[] => {
       acc[threadId].push(trace);
       return acc;
     },
-    {} as Record<string, Trace[]>
+    {} as Record<string, Trace[]>,
   );
 
   return Object.entries(groupedTraces).map(([thread_id, traces]) => ({
@@ -84,7 +83,7 @@ const groupTracesByThreadId = (traces: Trace[]): ThreadData[] => {
  */
 const mapThreadToDatasetEntry = (
   thread: ThreadData,
-  mapping: ThreadMapping
+  mapping: ThreadMapping,
 ): Record<string, string | number> => {
   return Object.fromEntries(
     Object.entries(mapping).map(([column, { source, selectedFields }]) => {
@@ -103,7 +102,7 @@ const mapThreadToDatasetEntry = (
                 trace as any,
                 "",
                 "",
-                {}
+                {},
               );
             }
           }
@@ -118,7 +117,7 @@ const mapThreadToDatasetEntry = (
           ? JSON.stringify(value)
           : value,
       ];
-    })
+    }),
   );
 };
 
@@ -166,7 +165,7 @@ export const ThreadMapping = ({
         return newMappingState;
       });
     },
-    [setThreadMapping]
+    [setThreadMapping],
   );
 
   const mapping = threadMappingState.mapping;
@@ -189,7 +188,7 @@ export const ThreadMapping = ({
             selectedFields: ["input", "output"],
           };
           return [name, existingMapping ?? defaultMapping];
-        }) ?? []
+        }) ?? [],
       ),
     };
 
@@ -276,7 +275,7 @@ export const ThreadMapping = ({
 
                             dsl.setTargetEdges?.([
                               ...(dsl.targetEdges?.filter(
-                                (edge) => edge.targetHandle !== targetHandle
+                                (edge) => edge.targetHandle !== targetHandle,
                               ) ?? []),
                               {
                                 id: `${Date.now()}-${index}`,
@@ -314,7 +313,7 @@ export const ThreadMapping = ({
                                   {options}
                                 </optgroup>
                               );
-                            }
+                            },
                           )}
                         </NativeSelect.Field>
                         <NativeSelect.Indicator />
@@ -417,7 +416,7 @@ export const ThreadMapping = ({
                 </GridItem>
               </React.Fragment>
             );
-          }
+          },
         )}
       </Grid>
     </VStack>

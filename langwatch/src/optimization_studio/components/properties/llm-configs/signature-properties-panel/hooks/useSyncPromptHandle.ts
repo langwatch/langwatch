@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,7 +26,7 @@ export function useSyncPromptHandle(nodeData?: { configId?: string | null }) {
     },
     {
       enabled: !!configId && !!project?.id && !isDirty,
-    }
+    },
   );
 
   const isLoading = isLoadingLatestPrompt || isFetchingLatestPrompt;
@@ -45,7 +45,7 @@ export function useSyncPromptHandle(nodeData?: { configId?: string | null }) {
         shouldValidate: false,
       });
     },
-    [formProps]
+    [formProps],
   );
 
   useEffect(() => {

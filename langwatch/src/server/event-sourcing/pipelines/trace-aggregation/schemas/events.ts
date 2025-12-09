@@ -1,14 +1,11 @@
 import { z } from "zod";
-import { EventSchema } from "../../../library/domain/types";
 import type { TenantId } from "../../../library";
-import {
-  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
-  TRACE_AGGREGATION_EVENT_TYPES,
-} from "./typeIdentifiers";
+import { EventSchema } from "../../../library/domain/types";
+import { TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE } from "./typeIdentifiers";
 
 export type { TraceAggregationEventType } from "./typeIdentifiers";
 export {
-  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
+  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
   TRACE_AGGREGATION_EVENT_TYPES,
 } from "./typeIdentifiers";
 
@@ -36,10 +33,10 @@ export const traceAggregationEventMetadataSchema =
   }>;
 
 /**
- * Zod schema for TraceAggregationCompletedEventData.
- * Contains all computed trace metrics matching the trace_projections ClickHouse schema.
+ * Zod schema for TraceAggregationSummaryCompletedEventData.
+ * Contains all computed trace metrics matching the trace_summaries ClickHouse schema.
  */
-export const traceAggregationCompletedEventDataSchema = z.object({
+export const traceAggregationSummaryCompletedEventDataSchema = z.object({
   traceId: z.string(),
   spanIds: z.array(z.string()),
   totalSpans: z.number(),
@@ -91,19 +88,19 @@ export const traceAggregationCompletedEventDataSchema = z.object({
 }>;
 
 /**
- * Zod schema for TraceAggregationCompletedEvent.
+ * Zod schema for TraceAggregationSummaryCompletedEvent.
  */
-export const traceAggregationCompletedEventSchema = EventSchema.extend({
-  type: z.literal(TRACE_AGGREGATION_COMPLETED_EVENT_TYPE),
-  data: traceAggregationCompletedEventDataSchema,
+export const traceAggregationSummaryCompletedEventSchema = EventSchema.extend({
+  type: z.literal(TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE),
+  data: traceAggregationSummaryCompletedEventDataSchema,
   metadata: traceAggregationEventMetadataSchema,
 }) satisfies z.ZodType<{
   id: string;
   aggregateId: string;
   tenantId: string;
   timestamp: number;
-  type: typeof TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
-  data: z.infer<typeof traceAggregationCompletedEventDataSchema>;
+  type: typeof TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE;
+  data: z.infer<typeof traceAggregationSummaryCompletedEventDataSchema>;
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
 
@@ -115,10 +112,10 @@ export type TraceAggregationEventMetadata = z.infer<
   typeof traceAggregationEventMetadataSchema
 >;
 export type TraceAggregationCompletedEventData = z.infer<
-  typeof traceAggregationCompletedEventDataSchema
+  typeof traceAggregationSummaryCompletedEventDataSchema
 >;
-export type TraceAggregationCompletedEvent = Omit<
-  z.infer<typeof traceAggregationCompletedEventSchema>,
+export type TraceAggregationSummaryCompletedEvent = Omit<
+  z.infer<typeof traceAggregationSummaryCompletedEventSchema>,
   "tenantId"
 > & {
   tenantId: TenantId;
@@ -127,13 +124,13 @@ export type TraceAggregationCompletedEvent = Omit<
 /**
  * Union of all trace aggregation event types.
  */
-export type TraceAggregationEvent = TraceAggregationCompletedEvent;
+export type TraceAggregationEvent = TraceAggregationSummaryCompletedEvent;
 
 /**
  * Type guard function for trace aggregation completed event.
  */
 export function isTraceAggregationCompletedEvent(
   event: TraceAggregationEvent,
-): event is TraceAggregationCompletedEvent {
-  return event.type === TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
+): event is TraceAggregationSummaryCompletedEvent {
+  return event.type === TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE;
 }

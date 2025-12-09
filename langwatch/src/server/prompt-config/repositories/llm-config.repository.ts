@@ -1,27 +1,24 @@
-import {
-  type PrismaClient,
-  type LlmPromptConfig,
-  type LlmPromptConfigVersion,
-  type Prisma,
+import type {
+  LlmPromptConfig,
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "../../../utils/logger";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
-
 import {
-  parseLlmConfigVersion,
-  type LatestConfigVersionSchema,
   getSchemaValidator,
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
+  parseLlmConfigVersion,
 } from "./llm-config-version-schema";
 import {
-  LlmConfigVersionsRepository,
   type CreateLlmConfigVersionParams,
+  LlmConfigVersionsRepository,
 } from "./llm-config-versions.repository";
-
-import { DEFAULT_MODEL } from "~/utils/constants";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
@@ -372,9 +369,10 @@ export class LlmConfigRepository {
 
     const isProjectMatch = config.projectId === projectId;
     if (!isProjectMatch) {
-      throw new Error(`Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${projectId}`);
+      throw new Error(
+        `Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${projectId}`,
+      );
     }
-
 
     // This will error if the projectId !== config.projectId
     await this.prisma.llmPromptConfig.delete({

@@ -1,17 +1,15 @@
-import { type Edge, type Node } from "@xyflow/react";
-import { type StateCreator } from "zustand";
-
-import type { BaseNodeSlice } from "./baseNodeSlice";
-import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
-import { buildEntryToTargetEdges } from "./utils/edge.util";
-import { calculateNextPosition } from "./utils/node.util";
-
+import type { Edge, Node } from "@xyflow/react";
+import type { StateCreator } from "zustand";
 import type { WorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
 import type {
   Entry,
   LLMConfig,
   Signature,
 } from "~/optimization_studio/types/dsl";
+import type { BaseNodeSlice } from "./baseNodeSlice";
+import { LlmSignatureNodeFactory } from "./factories/llm-signature-node.factory";
+import { buildEntryToTargetEdges } from "./utils/edge.util";
+import { calculateNextPosition } from "./utils/node.util";
 
 export interface LlmSignatureNodeSlice {
   createNewLlmSignatureNode: ({
@@ -26,7 +24,7 @@ export interface LlmSignatureNodeSlice {
   }) => string;
   updateSignatureNodeLLMConfigValue: (
     nodeId: string,
-    llmConfig: LLMConfig
+    llmConfig: LLMConfig,
   ) => void;
 }
 
@@ -50,7 +48,7 @@ export const createLlmSignatureNodeSlice: StateCreator<
         {
           position,
         },
-        project
+        project,
       );
 
       return get().createNewNode(newNode);
@@ -69,7 +67,7 @@ export const createLlmSignatureNodeSlice: StateCreator<
 
     updateSignatureNodeLLMConfigValue: (
       nodeId: string,
-      llmConfig: LLMConfig
+      llmConfig: LLMConfig,
     ) => {
       get().setNodeParameter(nodeId, {
         identifier: "llm",

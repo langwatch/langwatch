@@ -1,15 +1,15 @@
+import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import type { Component } from "../../types/dsl";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { useShallow } from "zustand/react/shallow";
 import { ExecutionOutputPanel } from "~/components/executable-panel/ExecutionOutputPanel";
-import { Box } from "@chakra-ui/react";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { Component } from "../../types/dsl";
 
 export const OutputPanel = ({ node }: { node: Node<Component> }) => {
   const { enableTracing } = useWorkflowStore(
     useShallow((state) => ({
       enableTracing: state.enable_tracing,
-    }))
+    })),
   );
 
   return (
