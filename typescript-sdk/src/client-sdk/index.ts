@@ -1,4 +1,5 @@
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
+export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
