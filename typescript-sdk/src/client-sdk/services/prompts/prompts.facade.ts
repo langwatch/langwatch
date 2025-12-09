@@ -31,7 +31,7 @@ interface PromptsFacadeDependencies {
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
-export class PromptsFacade {
+export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">{
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
   private readonly cache = new Map<string, CacheEntry>();
@@ -164,28 +164,14 @@ export class PromptsFacade {
     return new Prompt(serverPrompt);
   }
 
-  /**
-   * Deletes a prompt by handle or ID.
-   * @param handleOrId The prompt's handle or unique identifier.
-   * @throws {PromptsError} If the API call fails.
-   */
-  async delete(handleOrId: string): Promise<{ success: boolean }> {
-    return this.promptsApiService.delete(handleOrId);
+  get delete() {
+    return this.promptsApiService.delete.bind(this.promptsApiService);
   }
 
   /**
-   * Syncs a prompt with the server.
-   * @param params The sync parameters.
-   * @returns The sync result.
-   * @throws {PromptsError} If the API call fails.
+   * Delegated method to the prompts API service.
    */
-  async sync(params: {
-    name: string;
-    configData: any;
-    localVersion?: number;
-    commitMessage?: string;
-  }): Promise<SyncResult> {
-    const syncResult = await this.promptsApiService.sync(params);
-    return syncResult;
+  get sync() {
+    return this.promptsApiService.sync.bind(this.promptsApiService);
   }
 }

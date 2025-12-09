@@ -2,7 +2,6 @@ import * as fs from "fs";
 import * as path from "path";
 import { CliRunner } from "../cli/helpers/cli-runner";
 import { expect } from "vitest";
-import { expectCliResultSuccess } from "../cli/helpers/expectations";
 
 const TMP_BASE_DIR = path.join(__dirname, "tmp");
 
@@ -22,7 +21,7 @@ export const teardownCliRunner = (params: { testDir: string, originalCwd: string
 }
 
 export const createLocalPromptFile = (params: { handle: string, cli: CliRunner, testDir: string }) => {
-  const { handle, cli, testDir } = params;
+  const { handle, cli = setupCliRunner().cli, testDir } = params;
   const initResult = cli.run(`prompt init`);
   expect(initResult.success).toBe(true);
   const createResult = cli.run(`prompt create ${handle}`);

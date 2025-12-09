@@ -271,6 +271,7 @@ export class PromptsApiService {
 
   /**
    * Sync a prompt with local content, handling conflicts and version management
+   * You probably don't need to use this method directly.
    */
   async sync(params: {
     name: string;
