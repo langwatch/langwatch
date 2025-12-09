@@ -1471,9 +1471,51 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         );
       },
     },
+    "metadata.prompt_version_ids": {
+      name: "Prompt Version ID",
+      urlKey: "prompt_version_id",
+      query: (values: string[]) => ({
+        terms: { "metadata.prompt_version_ids": values },
+      }),
+      listMatch: {
+        aggregation: (query: string | undefined) => ({
+          unique_values: {
+            filter: query
+              ? {
+                  prefix: {
+                    "metadata.prompt_version_ids": {
+                      value: query,
+                      case_insensitive: true,
+                    },
+                  },
+                }
+              : {
+                  match_all: {},
+                },
+            aggs: {
+              child: {
+                terms: {
+                  field: "metadata.prompt_version_ids",
+                  size: 10_000,
+                  order: { _key: "asc" },
+                },
+              },
+            },
+          },
+        }),
+        extract: (result: Record<string, any>) => {
+          return (
+            result.unique_values?.child?.buckets?.map((bucket: any) => ({
+              field: bucket.key,
+              label: bucket.key,
+              count: bucket.doc_count,
+            })) ?? []
+          );
+        },
+      },
+    },
   },
 };
-
 const metadataKey = (key: string | undefined) => {
   const reservedKeys = Object.keys(reservedTraceMetadataSchema.shape);
   if (key && reservedKeys.includes(key)) {

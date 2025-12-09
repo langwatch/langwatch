@@ -86,7 +86,7 @@ export function MessagesTable({
   const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
 
-  const { filterParams, queryOpts } = useFilterParams();
+  const { filterParams, queryOpts, setFilters } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
 
   const { showFilters } = useFilterToggle();
@@ -466,6 +466,82 @@ export function MessagesTable({
         </Table.Cell>
       ),
       value: (trace: Trace) => trace.metadata?.labels?.join(", ") ?? "",
+    },
+    "metadata.prompts": {
+      name: "Prompts",
+      sortable: true,
+      render: (trace, index) => (
+        <Table.Cell key={index}>
+          <HStack gap={1}>
+            {trace.metadata.prompt_ids?.map((promptId) => (
+              <Badge
+                key={`prompt-${promptId}`}
+                size="sm"
+                paddingX={2}
+                background={
+                  getColorForString("colors", `prompt-${promptId}`).background
+                }
+                color={getColorForString("colors", `prompt-${promptId}`).color}
+                fontSize="12px"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentPromptIds =
+                    (filterParams.filters["metadata.prompt_ids"] as string[]) ??
+                    [];
+                  const newPromptIds = currentPromptIds.includes(promptId)
+                    ? currentPromptIds.filter((id) => id !== promptId)
+                    : [...currentPromptIds, promptId];
+                  setFilters({
+                    ...filterParams.filters,
+                    "metadata.prompt_ids":
+                      newPromptIds.length > 0 ? newPromptIds : [],
+                  });
+                }}
+              >
+                {promptId}
+              </Badge>
+            ))}
+            {trace.metadata.prompt_version_ids?.map((versionId) => (
+              <Badge
+                key={`version-${versionId}`}
+                size="sm"
+                paddingX={2}
+                background={
+                  getColorForString("colors", `version-${versionId}`).background
+                }
+                color={
+                  getColorForString("colors", `version-${versionId}`).color
+                }
+                fontSize="12px"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentVersionIds =
+                    (filterParams.filters[
+                      "metadata.prompt_version_ids"
+                    ] as string[]) ?? [];
+                  const newVersionIds = currentVersionIds.includes(versionId)
+                    ? currentVersionIds.filter((id) => id !== versionId)
+                    : [...currentVersionIds, versionId];
+                  setFilters({
+                    ...filterParams.filters,
+                    "metadata.prompt_version_ids":
+                      newVersionIds.length > 0 ? newVersionIds : [],
+                  });
+                }}
+              >
+                v:{versionId.slice(0, 8)}
+              </Badge>
+            ))}
+          </HStack>
+        </Table.Cell>
+      ),
+      value: (trace: Trace) =>
+        [
+          ...(trace.metadata?.prompt_ids ?? []),
+          ...(trace.metadata?.prompt_version_ids ?? []),
+        ].join(", "),
     },
     "metrics.first_token_ms": {
       name: "First Token",
