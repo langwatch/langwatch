@@ -1,8 +1,26 @@
 import { PromptsApiService, type SyncResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody } from "./types";
+import type { CreatePromptBody, UpdatePromptBody, PromptData } from "./types";
+import { FetchPolicy } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
+
+/**
+ * Options for fetching a prompt.
+ */
+export interface GetPromptOptions {
+  /** Specific version to fetch */
+  version?: string;
+  /** Fetch policy to use */
+  fetchPolicy?: FetchPolicy;
+  /** Cache TTL in minutes (only used with CACHE_TTL policy) */
+  cacheTtlMinutes?: number;
+}
+
+interface CacheEntry {
+  data: PromptData;
+  timestamp: number;
+}
 
 interface PromptsFacadeDependencies {
   promptsApiService: PromptsApiService;
@@ -13,9 +31,10 @@ interface PromptsFacadeDependencies {
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
-export class PromptsFacade {
+export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">{
   private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
+  private readonly cache = new Map<string, CacheEntry>();
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
@@ -42,7 +61,29 @@ export class PromptsFacade {
    */
   async get(
     handleOrId: string,
-    options?: { version?: string },
+    options?: GetPromptOptions,
+  ): Promise<Prompt> {
+    const fetchPolicy = options?.fetchPolicy ?? FetchPolicy.MATERIALIZED_FIRST;
+
+    switch (fetchPolicy) {
+      case FetchPolicy.MATERIALIZED_ONLY:
+        return this.getMaterializedOnly(handleOrId);
+
+      case FetchPolicy.ALWAYS_FETCH:
+        return this.getAlwaysFetch(handleOrId, options);
+
+      case FetchPolicy.CACHE_TTL:
+        return this.getCacheTtl(handleOrId, options);
+
+      case FetchPolicy.MATERIALIZED_FIRST:
+      default:
+        return this.getMaterializedFirst(handleOrId, options);
+    }
+  }
+
+  private async getMaterializedFirst(
+    handleOrId: string,
+    options?: GetPromptOptions,
   ): Promise<Prompt> {
     const localPrompt = await this.localPromptsService.get(handleOrId);
     if (localPrompt) {
@@ -50,6 +91,63 @@ export class PromptsFacade {
     }
     const serverPrompt = await this.promptsApiService.get(handleOrId, options);
     return new Prompt(serverPrompt);
+  }
+
+  private async getAlwaysFetch(
+    handleOrId: string,
+    options?: GetPromptOptions,
+  ): Promise<Prompt> {
+    try {
+      const serverPrompt = await this.promptsApiService.get(handleOrId, options);
+      return new Prompt(serverPrompt);
+    } catch {
+      const localPrompt = await this.localPromptsService.get(handleOrId);
+      if (localPrompt) {
+        return new Prompt(localPrompt);
+      }
+      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+    }
+  }
+
+  private async getMaterializedOnly(handleOrId: string): Promise<Prompt> {
+    const localPrompt = await this.localPromptsService.get(handleOrId);
+    if (localPrompt) {
+      return new Prompt(localPrompt);
+    }
+    throw new Error(`Prompt "${handleOrId}" not found in materialized files`);
+  }
+
+  /**
+   * Builds a cache key that includes both handle and version to prevent collisions.
+   */
+  private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
+    return `${handleOrId}::version:${options?.version ?? ''}`;
+  }
+
+  private async getCacheTtl(
+    handleOrId: string,
+    options?: GetPromptOptions,
+  ): Promise<Prompt> {
+    const cacheKey = this.buildCacheKey(handleOrId, options);
+    const ttlMs = (options?.cacheTtlMinutes ?? 5) * 60 * 1000;
+    const cached = this.cache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < ttlMs) {
+      return new Prompt(cached.data);
+    }
+
+    try {
+      const serverPrompt = await this.promptsApiService.get(handleOrId, options);
+      this.cache.set(cacheKey, { data: serverPrompt, timestamp: now });
+      return new Prompt(serverPrompt);
+    } catch {
+      const localPrompt = await this.localPromptsService.get(handleOrId);
+      if (localPrompt) {
+        return new Prompt(localPrompt);
+      }
+      throw new Error(`Prompt "${handleOrId}" not found locally or on server`);
+    }
   }
 
   /**
@@ -74,28 +172,14 @@ export class PromptsFacade {
     return new Prompt(serverPrompt);
   }
 
-  /**
-   * Deletes a prompt by handle or ID.
-   * @param handleOrId The prompt's handle or unique identifier.
-   * @throws {PromptsError} If the API call fails.
-   */
-  async delete(handleOrId: string): Promise<{ success: boolean }> {
-    return this.promptsApiService.delete(handleOrId);
+  get delete() {
+    return this.promptsApiService.delete.bind(this.promptsApiService);
   }
 
   /**
-   * Syncs a prompt with the server.
-   * @param params The sync parameters.
-   * @returns The sync result.
-   * @throws {PromptsError} If the API call fails.
+   * Delegated method to the prompts API service.
    */
-  async sync(params: {
-    name: string;
-    configData: any;
-    localVersion?: number;
-    commitMessage?: string;
-  }): Promise<SyncResult> {
-    const syncResult = await this.promptsApiService.sync(params);
-    return syncResult;
+  get sync() {
+    return this.promptsApiService.sync.bind(this.promptsApiService);
   }
 }

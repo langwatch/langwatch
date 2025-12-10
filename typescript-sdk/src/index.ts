@@ -11,7 +11,7 @@ export {
   type SpanProcessingExcludeRule,
 } from "./observability-sdk/processors";
 export { LangWatchExporter } from "./observability-sdk/exporters";
-export { LangWatch } from "./client-sdk";
+export { LangWatch, FetchPolicy, type GetPromptOptions } from "./client-sdk";
 
 export const logger = {
   ConsoleLogger,
