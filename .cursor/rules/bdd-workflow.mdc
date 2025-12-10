@@ -1,94 +1,31 @@
 ---
-description: Standards for BDD, Feature Files, and Testing Philosophy
+description: BDD workflow for feature development
 globs: "**/*.feature"
 alwaysApply: false
 ---
 
-# BDD & Testing Protocol
+# BDD Workflow
 
-## Core Philosophy
-1.  **Behavior First (Outside-In):** We define *what* the system does before *how* it does it.
-2.  **The Feature File is the Boss:** Code behavior must match the `.feature` file. If they diverge, the code is wrong.
-3.  **No Ghost Code:** Every line of logic exists solely to make a test pass.
-4.  **Zero-Boilerplate Testing:** We test *logic*, not type systems or framework mechanics.
+When invoked with a feature request:
 
-## Test Scope Hierarchy
+## 1. Challenge & Clarify
+- Question ambiguity, missing edge cases, unstated requirements.
+- Don't assume—ask before proceeding.
 
-All tests describe **behavior**. The difference is the **boundary** being tested.
+## 2. Propose Spec
+- See `TESTING.md` in the relevant project for the test hierarchy and decision tree for how to approach the test strategy and coverage.
+- Draft a `.feature` file in the `specs/` directory with tags: `@e2e`, `@integration`, `@unit`.
+- Scenarios must be user/domain focused.
+- Present for approval. **Do NOT write code yet.**
 
-| Scope       | What it tests                          | Mocking strategy           | Speed   |
-|-------------|----------------------------------------|----------------------------|---------|
-| **Unit**    | Single function/class in isolation     | Mock all collaborators     | Fast    |
-| **Integration** | Multiple units working together    | Mock external boundaries (API, DB) | Medium |
-| **E2E**     | Full system from user's perspective    | No mocks (or only third-party) | Slow |
+## 3. Implement (after approval)
+- RED → GREEN → REFACTOR
+- Write all tests first
+- Failing tests → implement code → verify: `typecheck + lint + tests pass`.
+- Refactor if needed.
 
-### When to use each
-- **E2E:** User stories, critical paths, acceptance criteria.
-- **Integration:** Service facades, orchestration logic, data flow between modules.
-- **Unit:** Pure logic, algorithms, edge cases, error handling branches.
+## References
+- see `TESTING.md` in the relevant project.
 
-### Feature File Scope
-A single `.feature` file can span multiple test scopes. Use **tags** to indicate:
-\`\`\`gherkin
-@e2e
-Scenario: User deploys a prompt version
-  ...
-
-@integration
-Scenario: Facade falls back to local when API fails
-  ...
-
-@unit
-Scenario: Cache expires after TTL
-  ...
-\`\`\`
-
-## The Workflow (Strict Order)
-
-### Phase 1: Inception (User Rant -> Spec)
-- **Input:** User provides a raw request, a rant, a bug report, or a pasted issue.
-- **AI Action:** Analyze the input and draft a Gherkin \`.feature\` file.
-- **Challenge (optional):** If the problem is unclear, challenge the user for details before writing the spec.
-- **Output:** A markdown block with the proposed \`.feature\` content.
-- **Constraint:** DO NOT write code yet. Ask for approval on the Spec.
-
-### Phase 2: The Contract (Review)
-- User reviews the \`.feature\` file.
-- User approves or requests changes.
-- Once saved to \`specs/*.feature\`, this is the **Immutable Contract**.
-
-### Phase 3: The Translation (Spec -> Test Skeleton)
-- **AI Action:** Translate the \`.feature\` file into a test file using the project's test framework.
-- **Use pending/todo tests initially:** Map every Gherkin scenario to a pending test first to verify coverage.
-- **Mapping Rules:**
-    - \`Feature\` -> Top-level test suite/group
-    - \`Scenario\` -> Nested test suite/group
-    - \`Given/And\` -> Setup (before hooks, fixtures)
-    - \`When\` -> The Act (function/method call)
-    - \`Then\` -> The Assert (expectations)
-
-### Phase 4: Implementation (Red -> Green -> Refactor)
-- **AI Action:** Implement the test logic (mocks/expectations).
-- **AI Action:** Implement the source code to pass the test.
-- **AI Action:** Run the typecheck + lint + tests to ensure they pass.
-- **AI Action:** Refactor the code to improve readability and maintainability.
-- **AI Action:** Loop Phase 4 until green.
-
-## What We Do NOT Test (The "Ignored" List)
-Do not write Gherkin or Tests for:
-1.  **Type Definitions:** Static type systems handle this.
-2.  **Simple Pass-throughs:** If a function just calls another function with no logic/transformation, skip it.
-3.  **Third-Party Library Logic:** Trust that libraries work. Mock them; don't test them.
-4.  **Constants/Config:** Unless they change runtime behavior dynamically.
-5.  **UI Styling:** Unless it's a visual regression test (handled separately).
-
-## Gherkin Style Guide
-- **Strictly User/Domain Focused.**
-- BAD: \`Given I have a variable x set to 5\`
-- GOOD: \`Given the user has 5 remaining credits\`
-- Use **Scenario Outlines** for data-driven tests (testing multiple inputs).
-
-## File Structure
-- Store feature files in a top-level \`specs/\` directory within each project.
-- Organize specs by domain (e.g., \`specs/prompts/retrieval.feature\`).
-- The \`specs/\` folder mirrors the conceptual domain, NOT the source file structure.
+## Do NOT Test
+- Type definitions, simple pass-throughs, third-party internals, static config.
