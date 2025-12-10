@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 import contextlib
 import multiprocessing
 import os
+import ssl
 from typing import Dict, List, Optional, Union
 from dotenv import load_dotenv
 from tempfile import mkdtemp
@@ -29,19 +30,56 @@ import litellm.proxy.proxy_server as litellm_proxy_server
 
 from litellm.router import Router
 
-def configure_litellm_ssl():
+
+def create_ssl_context():
     """
-    Configure httpx to respect environment variables (proxy and SSL certificates).
+    Create an SSLContext configured to respect environment variables for custom CA certificates.
+    Supports SSL_CERT_FILE, REQUESTS_CA_BUNDLE, and AWS_CA_BUNDLE.
+    """
+    ssl_context = ssl.create_default_context()
+    
+    # Check for custom CA bundle in environment variables
+    ca_bundle = None
+    for env_var in ["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"]:
+        if env_var in os.environ:
+            ca_bundle = os.environ[env_var]
+            break
+    
+    if ca_bundle and os.path.isfile(ca_bundle):
+        ssl_context.load_verify_locations(cafile=ca_bundle)
+    
+    return ssl_context
+
+
+async def configure_litellm_aiohttp():
+    """
+    Configure aiohttp ClientSession to respect environment variables (proxy and SSL certificates).
     Required for corporate environments with SSL intercepting proxy or 
     applications that communicate using self-signed certificates.
+    
+    litellm's proxy server uses aiohttp internally, and this configures it to use
+    custom SSL contexts and respect proxy environment variables.
     """
-    if any(key in os.environ for key in ["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"]):
-        import httpx
-        import litellm
-        litellm.client_session = httpx.Client(trust_env=True)
-        litellm.aclient_session = httpx.AsyncClient(trust_env=True)
-
-configure_litellm_ssl()
+    import aiohttp
+    import litellm
+    
+    ssl_context = create_ssl_context()
+    
+    # Create connector that respects environment proxy and SSL settings
+    # Use custom SSL context if CA bundle is configured, otherwise use None (default SSL verification)
+    # For HTTP connections, aiohttp ignores the ssl parameter
+    has_custom_ca = any(key in os.environ for key in ["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"])
+    connector = aiohttp.TCPConnector(
+        ssl=ssl_context if has_custom_ca else None
+    )
+    
+    # Create session with the configured connector and trust_env for proxy support
+    session = aiohttp.ClientSession(connector=connector, trust_env=True)
+    
+    # Store session reference for litellm to use
+    litellm._aiohttp_session = session
+    
+    return session
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 if "DATABASE_URL" in os.environ:
@@ -51,6 +89,9 @@ if "DATABASE_URL" in os.environ:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Configure aiohttp session for litellm with SSL and proxy support
+    aiohttp_session = await configure_litellm_aiohttp()
+    
     lifespans = [
         litellm_proxy_server.proxy_startup_event,
         studio_lifespan,
@@ -58,9 +99,13 @@ async def lifespan(app: FastAPI):
 
     exit_stack = contextlib.AsyncExitStack()
     async with exit_stack:
-        for lifespan in lifespans:
-            await exit_stack.enter_async_context(lifespan(app))
+        for lifespan_context in lifespans:
+            await exit_stack.enter_async_context(lifespan_context(app))
         yield
+    
+    # Cleanup aiohttp session
+    if aiohttp_session and not aiohttp_session.closed:
+        await aiohttp_session.close()
 
 
 # Config
