@@ -286,7 +286,7 @@ export class PipelineBuilderWithNameAndType<
    * ```typescript
    * pipeline
    *   .withEventHandler("span-storage", SpanClickHouseHandler, {
-   *     eventTypes: ["lw.obs.span_ingestion.recorded"],
+   *     eventTypes: ["lw.obs.trace.span_received"],
    *   })
    *   .withEventHandler("trace-aggregator", TraceHandler)
    * ```

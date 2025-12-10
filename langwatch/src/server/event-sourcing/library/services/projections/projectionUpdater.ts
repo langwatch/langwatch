@@ -402,18 +402,17 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           const isOrderingError = isSequentialOrderingError(error);
 
           if (isLockError || isOrderingError) {
-            this.logger.warn(
+            this.logger.debug(
               {
                 projectionName,
                 eventId: event.id,
                 aggregateId: String(event.aggregateId),
                 tenantId: event.tenantId,
-                error: errorMessage,
                 errorType: isLockError ? "lock" : "ordering",
               },
               isLockError
-                ? "Projection processing blocked by distributed lock; retrying without marking failure"
-                : "Projection processing blocked by sequential ordering; retrying without marking failure",
+                ? "Projection processing blocked by lock, will retry (expected behavior)"
+                : "Projection processing blocked by ordering, will retry (expected behavior)",
             );
           } else {
             await this.checkpointManager.saveCheckpointSafely(

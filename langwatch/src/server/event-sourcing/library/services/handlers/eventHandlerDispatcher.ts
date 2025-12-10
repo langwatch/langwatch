@@ -571,23 +571,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               {
                 handlerName,
                 eventId: event.id,
-                sequenceNumber,
-                previousSequenceNumber,
-              },
-              "Throwing ordering error",
-            );
-
-            this.logger.warn(
-              {
-                handlerName,
-                eventId: event.id,
                 aggregateId: String(event.aggregateId),
                 sequenceNumber,
                 previousSequenceNumber,
                 tenantId: event.tenantId,
               },
-              "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
+              "Previous event not yet processed, deferring (expected behavior)",
             );
+
             throw new SequentialOrderingError(
               previousSequenceNumber,
               sequenceNumber,

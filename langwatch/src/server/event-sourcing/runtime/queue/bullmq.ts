@@ -20,6 +20,7 @@ import type {
 import {
   ConfigurationError,
   extractPreviousSequenceNumber,
+  isLockError,
   isSequentialOrderingError,
   QueueError,
 } from "../../library/services/errorHandling";
@@ -43,16 +44,20 @@ const JOB_RETRY_CONFIG = {
 /**
  * Configuration for progressive delay calculation when handling ordering errors.
  * Higher sequence numbers wait longer, giving earlier events priority.
+ *
+ * These delays should be short since we're just polling for the previous event's
+ * checkpoint to appear. Actual event processing is typically fast (10-100ms),
+ * so we use short polling intervals to minimize latency when events arrive together.
  */
 const PROGRESSIVE_DELAY_CONFIG = {
   /** Base delay before any sequence-based adjustment */
-  baseDelayMs: 1000,
+  baseDelayMs: 100,
   /** Additional delay per sequence number position */
-  perSequenceDelayMs: 200,
+  perSequenceDelayMs: 50,
   /** Additional delay per retry attempt */
-  perAttemptDelayMs: 200,
+  perAttemptDelayMs: 50,
   /** Maximum delay cap to prevent excessive waits */
-  maxDelayMs: 20000,
+  maxDelayMs: 5000,
 } as const;
 
 /**
@@ -71,16 +76,6 @@ const SHUTDOWN_CONFIG = {
   timeoutMs: 30000,
 } as const;
 
-/**
- * Context for handling ordering errors, containing all necessary information
- * for progressive delay calculation and job re-queuing.
- */
-interface OrderingErrorContext<Payload> {
-  job: Job<Payload>;
-  error: unknown;
-  previousSequence: number | null;
-  progressiveDelayMs: number;
-}
 
 export class EventSourcedQueueProcessorBullMq<Payload>
   implements EventSourcedQueueProcessor<Payload>
@@ -171,6 +166,21 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     });
 
     this.worker.on("failed", (job, error) => {
+      // Don't log ordering/lock errors at ERROR level - they're expected behavior
+      if (isSequentialOrderingError(error) || isLockError(error)) {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job?.id,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          isSequentialOrderingError(error)
+            ? "Job delayed due to ordering (previous event not yet processed)"
+            : "Job failed due to lock contention, will retry",
+        );
+        return;
+      }
+
       this.logger.error(
         {
           queueName: this.queueName,
@@ -213,51 +223,46 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         "Queue job processed successfully",
       );
     } catch (error) {
-      // Detect ordering errors for better logging and potential future smart retry logic
+      // Detect expected errors - ordering and lock contention are normal when events arrive close together
       const isOrderingError = isSequentialOrderingError(error);
-      const previousSequence = isOrderingError
-        ? extractPreviousSequenceNumber(error)
-        : null;
+      const isLockContention = isLockError(error);
 
+      // For ordering errors, re-queue with progressive delay
+      if (isOrderingError) {
+        const previousSequence = extractPreviousSequenceNumber(error);
+        const progressiveDelayMs = this.calculateProgressiveDelay(
+          previousSequence,
+          job.attemptsMade,
+        );
+
+        await this.requeueWithDelay(job, progressiveDelayMs, previousSequence);
+        return;
+      }
+
+      // For lock contention, log at DEBUG and let BullMQ handle retry
+      if (isLockContention) {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job.id,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Lock contention detected, will retry (expected behavior)",
+        );
+        throw error;
+      }
+
+      // Non-expected errors are actual failures
       this.logger.error(
         {
           queueName: this.queueName,
           jobId: job.id,
           error: error instanceof Error ? error.message : String(error),
           errorStack: error instanceof Error ? error.stack : void 0,
-          isOrderingError,
-          ...(previousSequence !== null
-            ? { previousSequenceNumber: previousSequence }
-            : {}),
         },
-        isOrderingError
-          ? "Queue job failed due to ordering violation - previous event not yet processed"
-          : "Queue job processing failed",
+        "Queue job processing failed",
       );
 
-      // For ordering errors, we should NOT retry immediately because:
-      // 1. The event is already stored in the database
-      // 2. The sequence number calculation will include it, causing sequence numbers to grow
-      // 3. The previous event needs to be processed first, which will happen naturally
-      // Instead, we move the job to delayed state to retry later when the previous event is processed
-      // IMPORTANT: We use progressive delays to prevent jobs from hitting retry limits when many
-      // events arrive simultaneously. Ordering errors should wait indefinitely until their turn.
-      if (isOrderingError) {
-        const progressiveDelayMs = this.calculateProgressiveDelay(
-          previousSequence,
-          job.attemptsMade,
-        );
-
-        await this.handleOrderingError({
-          job,
-          error,
-          previousSequence,
-          progressiveDelayMs,
-        });
-        return;
-      }
-
-      // For non-ordering errors, throw to trigger normal retry logic
       throw error;
     }
   }
@@ -290,148 +295,47 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   }
 
   /**
-   * Handles ordering errors by attempting to move the job to delayed state.
-   * Falls back to re-queuing if moveToDelayed fails.
+   * Re-queues a job with a progressive delay for ordering errors.
+   * This is expected behavior when events arrive close together.
    */
-  private async handleOrderingError(
-    context: OrderingErrorContext<Payload>,
-  ): Promise<void> {
-    const { job, error, previousSequence, progressiveDelayMs } = context;
-    const delayedTimestamp = Date.now() + progressiveDelayMs;
-
-    type JobWithOptionalLock = Job<Payload> & {
-      takeLock?: () => Promise<boolean>;
-    };
-    const jobWithOptionalLock = job as JobWithOptionalLock;
-    const hasTakeLock = typeof jobWithOptionalLock.takeLock === "function";
-
-    if (!hasTakeLock) {
-      await this.requeueWithFallbackDelay(
-        job,
-        progressiveDelayMs,
-        previousSequence,
-        "Ordering error: BullMQ job missing takeLock; re-enqueued with fallback delay",
-        { supportsManualDelay: false },
-      );
-      return;
-    }
-
-    try {
-      const hasLock = await jobWithOptionalLock.takeLock!();
-      if (!hasLock) {
-        this.logger.warn(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            attemptsMade: job.attemptsMade,
-            previousSequenceNumber: previousSequence,
-          },
-          "Ordering error: unable to reacquire job lock before delaying, falling back to BullMQ retry",
-        );
-        throw error;
-      }
-
-      await job.moveToDelayed(delayedTimestamp);
-
-      this.logger.debug(
-        {
-          queueName: this.queueName,
-          jobId: job.id,
-          delayMs: progressiveDelayMs,
-          attemptsMade: job.attemptsMade,
-          previousSequenceNumber: previousSequence,
-          supportsManualDelay: hasTakeLock,
-        },
-        "Ordering error: moved job to delayed state with progressive delay",
-      );
-
-      // Don't throw - job is moved to delayed state
-      // Note: moveToDelayed doesn't increment attemptsMade, so ordering errors
-      // won't consume retry attempts. The job will retry indefinitely until
-      // the previous event is processed.
-    } catch (moveError) {
-      // If moveToDelayed fails, handle gracefully
-      const moveErrorMessage =
-        moveError instanceof Error ? moveError.message : String(moveError);
-
-      if (moveErrorMessage.includes("Missing lock")) {
-        await this.requeueWithFallbackDelay(
-          job,
-          progressiveDelayMs,
-          previousSequence,
-          "Ordering error: BullMQ lock missing while delaying, re-enqueued job with fallback delay",
-          {
-            supportsManualDelay: hasTakeLock,
-            moveError: moveErrorMessage,
-          },
-        );
-      } else {
-        this.logger.warn(
-          {
-            queueName: this.queueName,
-            jobId: job.id,
-            moveError: moveErrorMessage,
-            supportsManualDelay: hasTakeLock,
-          },
-          "Failed to move ordering error job to delayed state, will retry normally",
-        );
-        // Fall through to throw original error so BullMQ manages retry/backoff.
-        throw error;
-      }
-    }
-  }
-
-  /**
-   * Re-queues a job with a fallback delay when moveToDelayed is not available.
-   * Uses default job options when the original job's options are not available.
-   */
-  private async requeueWithFallbackDelay(
+  private async requeueWithDelay(
     job: Job<Payload>,
     progressiveDelayMs: number,
     previousSequence: number | null,
-    logMessage: string,
-    extraContext?: Record<string, unknown>,
   ): Promise<void> {
-    const fallbackJobId = `${job.id}:retry:${Date.now()}`;
-    this.logger.warn(
+    const requeueJobId = `${job.id}:retry:${Date.now()}`;
+
+    this.logger.debug(
       {
         queueName: this.queueName,
         jobId: job.id,
-        requeueJobId: fallbackJobId,
+        requeueJobId,
         delayMs: progressiveDelayMs,
         attemptsMade: job.attemptsMade,
         previousSequenceNumber: previousSequence,
-        ...extraContext,
       },
-      logMessage,
+      "Re-queuing job with delay due to ordering (previous event not yet processed)",
     );
-
-    // Use job.opts with fallback defaults in case options are not set
-    const defaultJobOptions = {
-      attempts: JOB_RETRY_CONFIG.maxAttempts,
-      backoff: {
-        type: "fixed" as const,
-        delay: JOB_RETRY_CONFIG.backoffDelayMs,
-      },
-      removeOnComplete: {
-        age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
-        count: JOB_RETRY_CONFIG.removeOnCompleteCount,
-      },
-      removeOnFail: { age: JOB_RETRY_CONFIG.removeOnFailAgeSec },
-    };
 
     await this.queue.add(
       // @ts-expect-error - jobName typing
       this.jobName,
       job.data,
       {
-        jobId: fallbackJobId,
+        jobId: requeueJobId,
         delay: progressiveDelayMs,
-        attempts: job.opts?.attempts ?? defaultJobOptions.attempts,
-        backoff: job.opts?.backoff ?? defaultJobOptions.backoff,
-        removeOnComplete:
-          job.opts?.removeOnComplete ?? defaultJobOptions.removeOnComplete,
-        removeOnFail: job.opts?.removeOnFail ?? defaultJobOptions.removeOnFail,
+        attempts: job.opts?.attempts ?? JOB_RETRY_CONFIG.maxAttempts,
+        backoff: job.opts?.backoff ?? {
+          type: "fixed" as const,
+          delay: JOB_RETRY_CONFIG.backoffDelayMs,
+        },
+        removeOnComplete: job.opts?.removeOnComplete ?? {
+          age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
+          count: JOB_RETRY_CONFIG.removeOnCompleteCount,
+        },
+        removeOnFail: job.opts?.removeOnFail ?? {
+          age: JOB_RETRY_CONFIG.removeOnFailAgeSec,
+        },
       },
     );
   }

@@ -405,12 +405,17 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
     });
 
     // Clean up test_event_handler_log table (created in testPipelines.ts)
-    await clickHouseClient.exec({
-      query: `
-        ALTER TABLE "test_langwatch".test_event_handler_log DELETE WHERE TenantId = {tenantId:String}
-      `,
-      query_params: { tenantId },
-    });
+    // Use try/catch since the table may not exist if no events were processed
+    try {
+      await clickHouseClient.exec({
+        query: `
+          ALTER TABLE "test_langwatch".test_event_handler_log DELETE WHERE TenantId = {tenantId:String}
+        `,
+        query_params: { tenantId },
+      });
+    } catch {
+      // Table doesn't exist - this is fine
+    }
   } else {
     // Clean up all test data using TRUNCATE (synchronous and faster)
     await clickHouseClient.exec({
