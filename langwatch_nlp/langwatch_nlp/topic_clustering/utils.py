@@ -46,9 +46,19 @@ def normalize_embedding_dimensions(
 def _generate_single_embedding(
     text: str,
     embeddings_litellm_params: dict[str, str],
-    dimensions: int
+    dimensions: int,
+    use_shared_session: bool = True
 ) -> Optional[list[float]]:
-    """Generate embedding for a single text item with proper error handling."""
+    """Generate embedding for a single text item with proper error handling.
+    
+    Args:
+        text: Text to embed
+        embeddings_litellm_params: LiteLLM embedding parameters
+        dimensions: Target embedding dimension
+        use_shared_session: Whether to use the shared aiohttp session.
+                          Set to False in threaded contexts where the session
+                          cannot be safely shared across threads.
+    """
     try:
         text_to_embed = text if text else "<empty>"
         
@@ -58,10 +68,12 @@ def _generate_single_embedding(
             "input": text_to_embed,
         }
         
-        # Add shared aiohttp session if available
-        shared_session = _get_litellm_shared_session()
-        if shared_session:
-            embedding_params["aiohttp_session"] = shared_session
+        # Add shared aiohttp session only in main async context (not in threads)
+        # aiohttp.ClientSession is NOT thread-safe and should not be shared across threads
+        if use_shared_session:
+            shared_session = _get_litellm_shared_session()
+            if shared_session:
+                embedding_params["shared_session"] = shared_session
         
         response = litellm.embedding(**embedding_params)
         return normalize_embedding_dimensions(
@@ -78,7 +90,11 @@ def generate_embeddings_threaded(
     embeddings_litellm_params: dict[str, str],
     max_workers: int = 8
 ) -> list[Optional[list[float]]]:
-    """Generate embeddings in parallel using ThreadPoolExecutor."""
+    """Generate embeddings in parallel using ThreadPoolExecutor.
+    
+    NOTE: Does NOT use the shared aiohttp session because aiohttp.ClientSession
+    is not thread-safe. Each thread will use litellm's default HTTP client.
+    """
     dimensions = int(embeddings_litellm_params.get("dimensions", 1536))
     params_copy = embeddings_litellm_params.copy()
     if "dimensions" in params_copy:
@@ -98,9 +114,9 @@ def generate_embeddings_threaded(
         futures = []
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all tasks
+            # Submit all tasks with use_shared_session=False to avoid thread-safety issues
             for text in chunk:
-                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions))
+                futures.append(executor.submit(_generate_single_embedding, text, params_copy, dimensions, False))
 
             # Process results as they complete
             for future in futures:
@@ -152,6 +168,7 @@ def generate_embeddings(
             }
             
             # Add shared aiohttp session if available
+            # Safe here because this is called from async context, not from threads
             shared_session = _get_litellm_shared_session()
             if shared_session:
                 embedding_params["shared_session"] = shared_session
