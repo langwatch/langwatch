@@ -165,18 +165,57 @@ class ClientReadableValueError(ValueError):
         return self.args[0]
 
 
+# Minimum max_tokens required by DSPy for reasoning models
+REASONING_MODEL_MIN_MAX_TOKENS = 16000
+
+
+def is_reasoning_model(model: str | None) -> bool:
+    """
+    Detects if a model is an OpenAI reasoning model (o1, o3, gpt-5).
+
+    Reasoning models require temperature=1.0 and max_tokens >= 16000.
+    """
+    import re
+
+    if not model:
+        return False
+    return bool(re.search(r"o1|o3|gpt-5", model, re.IGNORECASE))
+
+
 def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
+    """
+    Converts an LLMConfig to a DSPy LM instance.
+
+    For reasoning models (o1, o3, gpt-5), auto-corrects:
+    - temperature to 1.0 (required by DSPy/OpenAI)
+    - max_tokens to at least 16000 (required by DSPy/OpenAI)
+    """
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
     }
-    if "azure/" in (llm_params["model"] or "") and "api_version" not in llm_params and "use_azure_gateway" not in llm_params:
+    if (
+        "azure/" in (llm_params["model"] or "")
+        and "api_version" not in llm_params
+        and "use_azure_gateway" not in llm_params
+    ):
         llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
     llm_params["drop_params"] = True
     llm_params["model_type"] = "chat"
 
+    # Auto-correct for reasoning models
+    if is_reasoning_model(llm_config.model):
+        temperature = 1.0
+        max_tokens = max(
+            llm_config.max_tokens or REASONING_MODEL_MIN_MAX_TOKENS,
+            REASONING_MODEL_MIN_MAX_TOKENS,
+        )
+    else:
+        temperature = llm_config.temperature or 0
+        max_tokens = llm_config.max_tokens or 2048
+
     lm = dspy.LM(
-        max_tokens=llm_config.max_tokens or 2048,
-        temperature=llm_config.temperature or 0,
+        max_tokens=max_tokens,
+        temperature=temperature,
         **llm_params,
     )
     return lm
