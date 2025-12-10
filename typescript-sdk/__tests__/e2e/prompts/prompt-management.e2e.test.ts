@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
-import type { LangWatch, FetchPolicy as FetchPolicyType } from "../../../dist/index.js";
+import type { LangWatch } from "../../../dist/index.js";
 import { server } from "../setup/msw-setup";
 import { handles, http } from "./handlers.js";
 import { type CliRunner } from "../cli/helpers/cli-runner.js";
@@ -112,59 +112,5 @@ describe("Prompt management", () => {
       });
     });
 
-    describe("FetchPolicy", () => {
-      let FetchPolicy: typeof FetchPolicyType;
-
-      beforeAll(async () => {
-        const sdk = await getLangwatchSDK();
-        FetchPolicy = sdk.FetchPolicy;
-      });
-
-      describe("ALWAYS_FETCH", () => {
-        const handle = "always-fetch-prompt";
-
-        beforeAll(() => {
-          createLocalPromptFile({ handle, cli, testDir });
-        });
-
-        it("falls back to local when API fails", async () => {
-          server.use(
-            http.get("/api/prompts/{id}", ({ response }) => {
-              return response(500).json({ error: "Server error" });
-            })
-          );
-
-          const prompt = await langwatch.prompts.get(handle, {
-            fetchPolicy: FetchPolicy.ALWAYS_FETCH,
-          });
-
-          expect(prompt?.handle).toBe(handle);
-        });
-      });
-
-      describe("MATERIALIZED_ONLY", () => {
-        const existingHandle = "materialized-only-prompt";
-
-        beforeAll(() => {
-          createLocalPromptFile({ handle: existingHandle, cli, testDir });
-        });
-
-        it("returns local prompt without calling API", async () => {
-          const prompt = await langwatch.prompts.get(existingHandle, {
-            fetchPolicy: FetchPolicy.MATERIALIZED_ONLY,
-          });
-
-          expect(prompt?.handle).toBe(existingHandle);
-        });
-
-        it("throws when local file not found", async () => {
-          await expect(
-            langwatch.prompts.get("non-existent-prompt", {
-              fetchPolicy: FetchPolicy.MATERIALIZED_ONLY,
-            })
-          ).rejects.toThrow();
-        });
-      });
-    });
   });
 });

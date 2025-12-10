@@ -12,7 +12,7 @@ import { FetchPolicy } from "../types";
 
 /**
  * Tests for PromptsFacade.get
- * @see specs/prompts/retrieval.feature
+ * @see specs/prompts/fetch-policy.feature
  */
 describe("Prompt Retrieval", () => {
   const testHandle = "test-prompt";
