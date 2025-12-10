@@ -1,8 +1,7 @@
-export { SpanStorageProjectionHandler } from "./spanStorageProjection";
 export type {
   SpanStorageData,
   SpanStorageProjection,
 } from "./spanStorageProjection";
-
+export { SpanStorageProjectionHandler } from "./spanStorageProjection";
+export type { TraceSummary, TraceSummaryData } from "./traceSummaryProjection";
 export { TraceSummaryProjectionHandler } from "./traceSummaryProjection";
-export type { TraceSummaryData, TraceSummary } from "./traceSummaryProjection";

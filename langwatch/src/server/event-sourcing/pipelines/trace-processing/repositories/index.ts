@@ -7,9 +7,9 @@ export { TraceSummaryRepositoryClickHouse } from "./traceSummaryRepositoryClickH
 export { TraceSummaryRepositoryMemory } from "./traceSummaryRepositoryMemory";
 
 import { getClickHouseClient } from "~/server/clickhouse/client";
+import type { TraceSummaryRepository } from "./traceSummaryRepository";
 import { TraceSummaryRepositoryClickHouse } from "./traceSummaryRepositoryClickHouse";
 import { TraceSummaryRepositoryMemory } from "./traceSummaryRepositoryMemory";
-import type { TraceSummaryRepository } from "./traceSummaryRepository";
 
 const clickHouseClient = getClickHouseClient();
 

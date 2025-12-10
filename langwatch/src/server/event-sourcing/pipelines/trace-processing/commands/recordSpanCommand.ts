@@ -1,5 +1,5 @@
-import { SpanKind } from "@opentelemetry/api";
 import { generate } from "@langwatch/ksuid";
+import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
