@@ -145,10 +145,18 @@ def generate_embeddings(
     for batch_idx, i in enumerate(batches):
         batch = [t if t else "<empty>" for t in texts[i : i + batch_size]]
         try:
-            response = litellm.embedding(
+            # Prepare embedding parameters with optional shared aiohttp session
+            embedding_params = {
                 **embeddings_litellm_params,  # type: ignore
-                input=batch if batch_size > 1 else batch[0],
-            )
+                "input": batch if batch_size > 1 else batch[0],
+            }
+            
+            # Add shared aiohttp session if available
+            shared_session = _get_litellm_shared_session()
+            if shared_session:
+                embedding_params["aiohttp_session"] = shared_session
+            
+            response = litellm.embedding(**embedding_params)
             embeddings += [
                 normalize_embedding_dimensions(
                     item["embedding"],
