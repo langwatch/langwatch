@@ -10,7 +10,9 @@ import type { SpanRepository, StoreSpanData } from "./spanRepository";
  * Useful for testing and development.
  */
 export class SpanRepositoryMemory implements SpanRepository {
-  tracer = getLangWatchTracer("langwatch.trace-processing.span-repository-memory");
+  tracer = getLangWatchTracer(
+    "langwatch.trace-processing.span-repository-memory",
+  );
   logger = createLogger("langwatch:trace-processing:span-repository-memory");
   private readonly spans = new Map<string, SpanData>();
 
@@ -118,4 +120,3 @@ export class SpanRepositoryMemory implements SpanRepository {
     );
   }
 }
-

@@ -475,4 +475,3 @@ interface ClickHouseSpan {
   "Links.Attributes": ClickHouseAttributes[];
   CollectedAt?: number;
 }
-

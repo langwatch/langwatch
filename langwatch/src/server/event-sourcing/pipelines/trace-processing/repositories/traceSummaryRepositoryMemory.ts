@@ -35,4 +35,3 @@ export class TraceSummaryRepositoryMemory<
     this.projections.set(key, projection);
   }
 }
-

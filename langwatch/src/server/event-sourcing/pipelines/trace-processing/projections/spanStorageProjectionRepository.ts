@@ -43,4 +43,3 @@ class SpanStorageProjectionRepositoryMemory
  */
 export const spanStorageProjectionRepository =
   new SpanStorageProjectionRepositoryMemory();
-

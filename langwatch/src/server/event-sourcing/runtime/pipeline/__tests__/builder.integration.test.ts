@@ -264,11 +264,7 @@ describe("PipelineBuilder Integration Tests", () => {
 
       await pipeline.service.storeEvents([event], context);
 
-      expect(storeEventsSpy).toHaveBeenCalledWith(
-        [event],
-        context,
-        "trace",
-      );
+      expect(storeEventsSpy).toHaveBeenCalledWith([event], context, "trace");
     });
   });
 
@@ -1010,11 +1006,7 @@ describe("PipelineBuilder Integration Tests", () => {
       event2.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP + 1000;
 
       // Store events
-      await eventStore.storeEvents(
-        [event1, event2],
-        { tenantId },
-        "trace",
-      );
+      await eventStore.storeEvents([event1, event2], { tenantId }, "trace");
 
       // Process event1 - should succeed
       await pipeline.service.storeEvents([event1], { tenantId });

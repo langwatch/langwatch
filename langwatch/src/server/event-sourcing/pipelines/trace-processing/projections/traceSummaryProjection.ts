@@ -66,10 +66,7 @@ export class TraceSummaryProjectionHandler
   );
 
   handle(
-    stream: EventStream<
-      TraceProcessingEvent["tenantId"],
-      TraceProcessingEvent
-    >,
+    stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>,
   ): TraceSummary {
     const events = stream.getEvents();
     const aggregateId = stream.getAggregateId();
@@ -83,7 +80,7 @@ export class TraceSummaryProjectionHandler
     for (const event of events) {
       if (isSpanReceivedEvent(event)) {
         spans.push(event.data.spanData);
-        
+
         if (createdAt === null) {
           createdAt = event.timestamp;
         }
@@ -175,4 +172,3 @@ export class TraceSummaryProjectionHandler
     };
   }
 }
-

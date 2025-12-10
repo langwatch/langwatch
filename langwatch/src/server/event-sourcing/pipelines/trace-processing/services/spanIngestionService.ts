@@ -90,4 +90,3 @@ export class SpanIngestionService {
 }
 
 export const spanIngestionService = new SpanIngestionService();
-

@@ -76,7 +76,6 @@ const SHUTDOWN_CONFIG = {
   timeoutMs: 30000,
 } as const;
 
-
 export class EventSourcedQueueProcessorBullMq<Payload>
   implements EventSourcedQueueProcessor<Payload>
 {

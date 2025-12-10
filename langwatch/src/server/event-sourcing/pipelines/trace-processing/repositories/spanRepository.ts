@@ -44,4 +44,3 @@ export interface SpanRepository {
    */
   getSpansByTraceId(tenantId: string, traceId: string): Promise<SpanData[]>;
 }
-

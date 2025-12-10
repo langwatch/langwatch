@@ -41,4 +41,3 @@ export const traceProcessingPipeline = eventSourcing
   .withProjection("traceSummary", TraceSummaryProjectionHandler)
   .withCommand("recordSpan", RecordSpanCommand)
   .build();
-

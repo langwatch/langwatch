@@ -65,10 +65,7 @@ export class SpanStorageProjectionHandler
   }
 
   handle(
-    stream: EventStream<
-      TraceProcessingEvent["tenantId"],
-      TraceProcessingEvent
-    >,
+    stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>,
   ): SpanStorageProjection {
     const events = stream.getEvents();
     const aggregateId = stream.getAggregateId();
@@ -85,11 +82,7 @@ export class SpanStorageProjectionHandler
         // Write span to ClickHouse (fire-and-forget, idempotent)
         // Note: We don't await here since projections should be synchronous
         // The actual write happens asynchronously
-        void this.writeSpanAsync(
-          String(tenantId),
-          spanData,
-          collectedAtUnixMs,
-        );
+        void this.writeSpanAsync(String(tenantId), spanData, collectedAtUnixMs);
 
         storedSpanIds.push(spanData.spanId);
         lastUpdatedAt = event.timestamp;
@@ -163,4 +156,3 @@ export class SpanStorageProjectionHandler
     }
   }
 }
-

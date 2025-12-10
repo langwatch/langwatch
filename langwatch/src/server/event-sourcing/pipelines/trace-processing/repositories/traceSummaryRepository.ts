@@ -30,4 +30,3 @@ export interface TraceSummaryRepository<
     context: ProjectionStoreWriteContext,
   ): Promise<void>;
 }
-

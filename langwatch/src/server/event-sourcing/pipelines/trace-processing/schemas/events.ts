@@ -97,4 +97,3 @@ export function isSpanReceivedEvent(
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent = SpanReceivedEvent;
-

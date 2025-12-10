@@ -16,4 +16,3 @@ const clickHouseClient = getClickHouseClient();
 export const traceSummaryRepository: TraceSummaryRepository = clickHouseClient
   ? new TraceSummaryRepositoryClickHouse(clickHouseClient)
   : new TraceSummaryRepositoryMemory();
-

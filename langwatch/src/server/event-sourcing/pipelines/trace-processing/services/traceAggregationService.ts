@@ -194,7 +194,10 @@ export class TraceAggregationService {
                 (firstMessage.parts &&
                   Array.isArray(firstMessage.parts) &&
                   firstMessage.parts
-                    .map((p: { content?: string; text?: string }) => p.content || p.text || "")
+                    .map(
+                      (p: { content?: string; text?: string }) =>
+                        p.content || p.text || "",
+                    )
                     .join(" ")) ||
                 JSON.stringify(firstMessage);
               ComputedInput =
@@ -226,7 +229,10 @@ export class TraceAggregationService {
                 (firstMessage.parts &&
                   Array.isArray(firstMessage.parts) &&
                   firstMessage.parts
-                    .map((p: { content?: string; text?: string }) => p.content || p.text || "")
+                    .map(
+                      (p: { content?: string; text?: string }) =>
+                        p.content || p.text || "",
+                    )
                     .join(" ")) ||
                 JSON.stringify(firstMessage);
               ComputedOutput =
@@ -439,4 +445,3 @@ export class TraceAggregationService {
 }
 
 export const traceAggregationService = new TraceAggregationService();
-

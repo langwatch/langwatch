@@ -3,7 +3,11 @@ import { generate } from "@langwatch/ksuid";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
-import { createTenantId, defineCommandSchema, EventUtils } from "../../../library";
+import {
+  createTenantId,
+  defineCommandSchema,
+  EventUtils,
+} from "../../../library";
 import type { RecordSpanCommandData } from "../schemas/commands";
 import {
   RECORD_SPAN_COMMAND_TYPE,
@@ -15,10 +19,10 @@ import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/events";
 /**
  * Command handler for recording spans in the trace processing pipeline.
  * Maps incoming span data and emits a SpanReceivedEvent with full span data.
- * 
+ *
  * Storage to ClickHouse is handled by the SpanStorageProjection, not this command.
  * This ensures events contain all data needed for replay.
- * 
+ *
  * @example
  * ```typescript
  * await traceProcessingPipeline.commands.recordSpan.send({
@@ -29,8 +33,7 @@ import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/events";
  * ```
  */
 export class RecordSpanCommand
-  implements
-    CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
+  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
 {
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
@@ -85,21 +88,20 @@ export class RecordSpanCommand
         // Emit event with full span data
         // SpanStorageProjection will handle writing to ClickHouse
         // TraceSummaryProjection will handle aggregation
-        const spanReceivedEvent =
-          EventUtils.createEvent<SpanReceivedEvent>(
-            "trace",
-            traceId,
-            tenantId,
-            SPAN_RECEIVED_EVENT_TYPE,
-            {
-              spanData: completeSpanData,
-              collectedAtUnixMs,
-            },
-            {
-              spanId,
-              collectedAtUnixMs,
-            },
-          );
+        const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
+          "trace",
+          traceId,
+          tenantId,
+          SPAN_RECEIVED_EVENT_TYPE,
+          {
+            spanData: completeSpanData,
+            collectedAtUnixMs,
+          },
+          {
+            spanId,
+            collectedAtUnixMs,
+          },
+        );
 
         this.logger.debug(
           {
@@ -133,4 +135,3 @@ export class RecordSpanCommand
     return `${payload.tenantId}:${payload.spanData.traceId}:${payload.spanData.spanId}`;
   }
 }
-

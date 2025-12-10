@@ -162,4 +162,3 @@ export type SpanData = z.infer<typeof spanDataSchema>;
  * Type inferred from the recordSpanCommandDataSchema Zod schema.
  */
 export type RecordSpanCommandData = z.infer<typeof recordSpanCommandDataSchema>;
-
