@@ -16,7 +16,7 @@ import {
   createLocalPromptFile,
   setupCliRunner,
   teardownCliRunner,
-} from "./helpers";
+} from "./cli-helpers";
 
 describe("Prompt management", () => {
   let langwatch: LangWatch;

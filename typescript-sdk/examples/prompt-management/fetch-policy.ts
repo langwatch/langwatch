@@ -5,6 +5,8 @@
  * and file management.
  */
 
+import type { CliRunner } from "../../__tests__/e2e/cli/helpers/cli-runner";
+
 /**
  * Demonstrates the default (materialized-first) fetch policy.
  * Assumes the prompt already exists (locally and/or remotely).
