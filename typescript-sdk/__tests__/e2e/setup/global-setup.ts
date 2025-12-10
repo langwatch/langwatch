@@ -72,7 +72,10 @@ const main = async () => {
   await waitForTcp(dbUrl.hostname, Number(dbUrl.port) || 5432);
 };
 
-main().catch((err) => {
-  console.error("[e2e global-setup] failed:", err);
-  process.exit(1);
-});
+/**
+ * Vitest globalSetup entry point.
+ * This function is awaited before any tests run.
+ */
+export default async function setup(): Promise<void> {
+  await main();
+}
