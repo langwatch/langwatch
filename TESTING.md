@@ -2,11 +2,19 @@
 
 ## Hierarchy
 
-| Level | Purpose | Mocking | File Pattern | Location |
-|-------|---------|---------|--------------|----------|
-| **E2E** | Happy paths via real examples | None | `*.e2e.test.ts` | `__tests__/e2e/` |
-| **Integration** | Edge cases, error handling | MSW (external boundaries) | `*.integration.test.ts` | Colocated `__tests__/` |
-| **Unit** | Pure logic, branches | Everything | `*.unit.test.ts` | Colocated `__tests__/` |
+| Level | Purpose | Mocking |
+|-------|---------|---------|
+| **E2E** | Happy paths via real examples | None |
+| **Integration** | Edge cases, error handling | External boundaries only |
+| **Unit** | Pure logic, branches | Everything |
+
+### Language-Specific Patterns
+
+| Language | E2E | Integration | Unit | Location |
+|----------|-----|-------------|------|----------|
+| TypeScript | `*.e2e.test.ts` | `*.integration.test.ts` | `*.unit.test.ts` | `__tests__/` |
+| Python | `test_*_e2e.py` | `test_*_integration.py` | `test_*.py` | `tests/` |
+| Go | `*_e2e_test.go` | `*_integration_test.go` | `*_test.go` | same package |
 
 ## Workflow
 
@@ -22,7 +30,7 @@ Is this a happy path demonstrating SDK usage?
   → E2E (wrap an example)
 
 Does it test orchestration between internal modules or external API behavior?
-  → Integration (use MSW)
+  → Integration (mock external boundaries)
 
 Is it pure logic or a single class in isolation?
   → Unit (mock collaborators)
