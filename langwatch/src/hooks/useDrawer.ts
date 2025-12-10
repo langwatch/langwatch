@@ -17,7 +17,7 @@ export function useDrawer() {
         ([_key, value]) =>
           typeof value === "function" || typeof value === "object",
       ),
-    );
+    ) as Record<string, (...args: any[]) => void>;
 
     void router[replace ? "replace" : "push"](
       "?" +

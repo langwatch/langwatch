@@ -43,7 +43,7 @@ export function DatasetSelection({
             variant="outline"
             onClick={() => {
               openDrawer("uploadCSV", {
-                onSuccess: ({ datasetId, name }) => {
+                onSuccess: ({ datasetId, name }: { datasetId: string; name: string }) => {
                   setIsEditing({
                     id: datasetId,
                     name,
@@ -51,7 +51,7 @@ export function DatasetSelection({
                 },
                 onCreateFromScratch: () => {
                   openDrawer("addOrEditDataset", {
-                    onSuccess: ({ datasetId, name }) => {
+                    onSuccess: ({ datasetId, name }: { datasetId: string; name: string }) => {
                       setIsEditing({
                         id: datasetId,
                         name,
