@@ -4,8 +4,7 @@ alwaysApply: true
 
 ALWAYS apply the best practices: 
 
-- SOLID
-- DRY
+- SOLID (SRP is the MOST IMPORTANT principle in software development)
 - YAGNI
 - KISS
 - CLEAN CODE

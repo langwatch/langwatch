@@ -5,4 +5,4 @@ Proceedure:
 - If the changes DO NOT follow best practices: SOLID, DRY, YAGNI, KISS, and CLEAN CODE principles
 - Refactor
 - Repeat the process until the changes follow best practices
-- Then commit the changes
+- Make sure there are no type errors, lint errors, or failing tests (for the changes you've made)
