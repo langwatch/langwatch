@@ -100,7 +100,7 @@ def generate_topic_names(
     # Add shared aiohttp session if available
     shared_session = _get_litellm_shared_session()
     if shared_session:
-        completion_params["aiohttp_session"] = shared_session
+        completion_params["shared_session"] = shared_session
 
     try:
         response = litellm.completion(**completion_params)
@@ -322,7 +322,7 @@ def improve_name_between_two_topics(
     # Add shared aiohttp session if available
     shared_session = _get_litellm_shared_session()
     if shared_session:
-        completion_params["aiohttp_session"] = shared_session
+        completion_params["shared_session"] = shared_session
 
     try:
         response = litellm.completion(**completion_params)

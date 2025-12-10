@@ -154,7 +154,7 @@ def generate_embeddings(
             # Add shared aiohttp session if available
             shared_session = _get_litellm_shared_session()
             if shared_session:
-                embedding_params["aiohttp_session"] = shared_session
+                embedding_params["shared_session"] = shared_session
             
             response = litellm.embedding(**embedding_params)
             embeddings += [
