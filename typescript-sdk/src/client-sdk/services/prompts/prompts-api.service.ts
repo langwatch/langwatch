@@ -6,21 +6,7 @@ import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
-
-/**
- * Custom error class for Prompts API operations.
- * Provides context about the failed operation and the original error.
- */
-export class PromptsError extends Error {
-  constructor(
-    message: string,
-    public readonly operation: string,
-    public readonly originalError?: any,
-  ) {
-    super(message);
-    this.name = "PromptsError";
-  }
-}
+import { PromptsApiError } from "./errors";
 
 export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
 
@@ -67,10 +53,10 @@ export class PromptsApiService {
   }
 
   /**
-   * Handles API errors by throwing a PromptsError with operation context.
+   * Handles API errors by throwing a PromptsApiError with operation context.
    * @param operation Description of the operation being performed.
    * @param error The error object returned from the API client.
-   * @throws {PromptsError}
+   * @throws {PromptsApiError}
    */
   private handleApiError(operation: string, error: any): never {
     const errorMessage =
@@ -83,7 +69,7 @@ export class PromptsApiService {
             JSON.stringify(error.error, Object.getOwnPropertyNames(error.error))
         : error?.message ?? "Unknown error occurred";
 
-    throw new PromptsError(
+    throw new PromptsApiError(
       `Failed to ${operation}: ${errorMessage}`,
       operation,
       error,
@@ -93,7 +79,7 @@ export class PromptsApiService {
   /**
    * Fetches all prompts from the API.
    * @returns Array of raw PromptResponse data.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async getAll(): Promise<PromptResponse[]> {
     const { data, error } =
@@ -106,7 +92,7 @@ export class PromptsApiService {
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
    * @returns Raw PromptResponse data.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   get = async (id: string, options?: { version?: string }): Promise<PromptResponse> => {
     const { data, error } = await this.apiClient.GET(
@@ -130,17 +116,19 @@ export class PromptsApiService {
    * Validates if a prompt exists.
    * @param id The prompt's unique identifier.
    * @returns True if prompt exists, false otherwise.
-   * @throws {PromptsError} If the API call fails (not 404).
+   * @throws {PromptsApiError} If the API call fails (not 404).
    */
   async exists(id: string): Promise<boolean> {
     try {
       await this.get(id);
       return true;
     } catch (error) {
-      if (
-        error instanceof PromptsError &&
-        error.originalError?.statusCode === 404
-      ) {
+      const originalError = error instanceof PromptsApiError ? error.originalError : null;
+      const statusCode = originalError != null && typeof originalError === "object" && "statusCode" in originalError
+        ? (originalError as { statusCode: unknown }).statusCode
+        : null;
+
+      if (statusCode === 404) {
         return false;
       }
 
@@ -152,7 +140,7 @@ export class PromptsApiService {
    * Creates a new prompt.
    * @param params The prompt creation payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the created prompt.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<PromptResponse> {
     const { data, error } = await this.apiClient.POST(
@@ -170,7 +158,7 @@ export class PromptsApiService {
    * @param id The prompt's unique identifier.
    * @param params The update payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the updated prompt.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async update(id: string, params: UpdatePromptBody): Promise<PromptResponse> {
     const { error, data: updatedPrompt } =
@@ -185,7 +173,7 @@ export class PromptsApiService {
   /**
    * Deletes a prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async delete(id: string): Promise<{ success: boolean }> {
     const { data, error } = await this.apiClient.DELETE(
@@ -203,7 +191,7 @@ export class PromptsApiService {
    * Fetches all versions for a given prompt.
    * @param id The prompt's unique identifier.
    * @returns Array of raw PromptResponse data for each version.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async getVersions(id: string): Promise<PromptResponse[]> {
     const { data, error } = await this.apiClient.GET(
@@ -223,7 +211,7 @@ export class PromptsApiService {
    * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
    * @returns Object with created flag and raw PromptResponse data.
-   * @throws {PromptsError} If the API call fails.
+   * @throws {PromptsApiError} If the API call fails.
    */
   async upsert(
     handle: string,
@@ -306,7 +294,7 @@ export class PromptsApiService {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown error occurred";
-      throw new PromptsError(message, "sync", error);
+      throw new PromptsApiError(message, "sync", error);
     }
   }
 }
