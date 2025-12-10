@@ -1,3 +1,4 @@
+import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -13,13 +14,29 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         filterParams: z.any().optional(),
+        alert: z
+          .object({
+            enabled: z.boolean(),
+            threshold: z.number(),
+            operator: z.enum(["gt", "lt", "gte", "lte", "eq"]),
+            timePeriod: z.number(),
+            type: z.nativeEnum(AlertType),
+            action: z.nativeEnum(TriggerAction),
+            actionParams: z
+              .object({
+                members: z.array(z.string()).optional(),
+                slackWebhook: z.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .use(checkProjectPermission("analytics:create"))
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
-      return ctx.prisma.customGraph.create({
+      const customGraph = await ctx.prisma.customGraph.create({
         data: {
           id: nanoid(),
           name: input.name,
@@ -28,6 +45,31 @@ export const graphsRouter = createTRPCRouter({
           filters: input.filterParams?.filters ?? {},
         },
       });
+
+      // Create trigger if alert is enabled
+      if (input.alert?.enabled) {
+        await ctx.prisma.trigger.create({
+          data: {
+            id: nanoid(),
+            name: `Alert: ${input.name}`,
+            projectId: input.projectId,
+            action: input.alert.action,
+            actionParams: {
+              ...input.alert.actionParams,
+              threshold: input.alert.threshold,
+              operator: input.alert.operator,
+              timePeriod: input.alert.timePeriod,
+            },
+            filters: JSON.stringify({}),
+            alertType: input.alert.type,
+            active: true,
+            lastRunAt: new Date().getTime(),
+            customGraphId: customGraph.id,
+          },
+        });
+      }
+
+      return customGraph;
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -36,12 +78,20 @@ export const graphsRouter = createTRPCRouter({
       const { projectId } = input;
       const prisma = ctx.prisma;
 
-      const datasets = await prisma.customGraph.findMany({
+      const graphs = await prisma.customGraph.findMany({
         where: { projectId },
         orderBy: { createdAt: "desc" },
+        include: {
+          trigger: {
+            where: {
+              active: true,
+              deleted: false,
+            },
+          },
+        },
       });
 
-      return datasets;
+      return graphs;
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
@@ -106,9 +156,35 @@ export const graphsRouter = createTRPCRouter({
             : undefined;
       }
 
+      // Find associated trigger for custom graph alert using direct relation
+      const trigger = await prisma.trigger.findUnique({
+        where: {
+          customGraphId: id,
+        },
+      });
+
+      let alertData = undefined;
+      if (trigger && trigger.active && !trigger.deleted) {
+        const actionParams = trigger.actionParams as any;
+        alertData = {
+          enabled: true,
+          threshold: actionParams.threshold,
+          operator: actionParams.operator,
+          timePeriod: actionParams.timePeriod,
+          type: trigger.alertType,
+          action: trigger.action,
+          actionParams: {
+            members: actionParams.members,
+            slackWebhook: actionParams.slackWebhook,
+          },
+          triggerId: trigger.id,
+        };
+      }
+
       return {
         ...graph,
         filters: validatedFilters,
+        alert: alertData,
       };
     }),
   updateById: protectedProcedure
@@ -119,13 +195,30 @@ export const graphsRouter = createTRPCRouter({
         graph: z.string(),
         graphId: z.string(),
         filterParams: z.any().optional(),
+        alert: z
+          .object({
+            enabled: z.boolean(),
+            threshold: z.number(),
+            operator: z.enum(["gt", "lt", "gte", "lte", "eq"]),
+            timePeriod: z.number(),
+            type: z.nativeEnum(AlertType),
+            action: z.nativeEnum(TriggerAction),
+            actionParams: z
+              .object({
+                members: z.array(z.string()).optional(),
+                slackWebhook: z.string().optional(),
+              })
+              .optional(),
+            triggerId: z.string().optional(),
+          })
+          .optional(),
       }),
     )
     .use(checkProjectPermission("analytics:update"))
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 
-      return prisma.customGraph.update({
+      const customGraph = await prisma.customGraph.update({
         where: { id: input.graphId, projectId: input.projectId },
         data: {
           name: input.name,
@@ -133,5 +226,61 @@ export const graphsRouter = createTRPCRouter({
           filters: input.filterParams?.filters ?? {},
         },
       });
+
+      // Handle trigger update/create/delete
+      const existingTrigger = await prisma.trigger.findUnique({
+        where: { customGraphId: input.graphId },
+      });
+
+      if (input.alert?.enabled) {
+        if (existingTrigger) {
+          // Update existing trigger
+          await prisma.trigger.update({
+            where: { id: existingTrigger.id, projectId: input.projectId },
+            data: {
+              name: `Alert: ${input.name}`,
+              action: input.alert.action,
+              actionParams: {
+                ...input.alert.actionParams,
+                threshold: input.alert.threshold,
+                operator: input.alert.operator,
+                timePeriod: input.alert.timePeriod,
+              },
+              alertType: input.alert.type,
+              active: true,
+              deleted: false,
+            },
+          });
+        } else {
+          // Create new trigger
+          await prisma.trigger.create({
+            data: {
+              id: nanoid(),
+              name: `Alert: ${input.name}`,
+              projectId: input.projectId,
+              action: input.alert.action,
+              actionParams: {
+                ...input.alert.actionParams,
+                threshold: input.alert.threshold,
+                operator: input.alert.operator,
+                timePeriod: input.alert.timePeriod,
+              },
+              filters: JSON.stringify({}),
+              alertType: input.alert.type,
+              active: true,
+              lastRunAt: new Date().getTime(),
+              customGraphId: input.graphId,
+            },
+          });
+        }
+      } else if (existingTrigger) {
+        // Disable trigger if alert is disabled
+        await prisma.trigger.update({
+          where: { id: existingTrigger.id, projectId: input.projectId },
+          data: { active: false, deleted: true },
+        });
+      }
+
+      return customGraph;
     }),
 });

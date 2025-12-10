@@ -15,6 +15,7 @@ import { useRouter } from "next/router";
 import { useMemo } from "react";
 import {
   BarChart2,
+  Bell,
   Edit,
   Filter,
   MoreVertical,
@@ -45,6 +46,11 @@ interface GraphCardProps {
     name: string;
     graph: unknown;
     filters: unknown;
+    trigger?: {
+      id: string;
+      active: boolean;
+      alertType: string | null;
+    } | null;
   };
   projectSlug: string;
   onDelete: () => void;
@@ -87,6 +93,27 @@ function GraphCard({
               {graph.name}
             </Text>
             <Spacer />
+            {graph.trigger && graph.trigger.active && (
+              <Tooltip
+                content={`Alert enabled (${graph.trigger.alertType ?? "INFO"})`}
+                positioning={{ placement: "top" }}
+                showArrow
+              >
+                <Box padding={1}>
+                  <Bell
+                    width={16}
+                    style={{ minWidth: 16 }}
+                    color={
+                      graph.trigger.alertType === "CRITICAL"
+                        ? "#E53E3E"
+                        : graph.trigger.alertType === "WARNING"
+                          ? "#D69E2E"
+                          : "#3182CE"
+                    }
+                  />
+                </Box>
+              </Tooltip>
+            )}
             {hasFilters && (
               <Tooltip
                 content={

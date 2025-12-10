@@ -1,5 +1,6 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
+import { timeseries } from "~/server/analytics/timeseries";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
@@ -75,8 +76,15 @@ export default async function handler(
   const results = [];
 
   for (const trigger of triggers) {
-    const traces = await getTracesForAlert(trigger, projects);
-    results.push(traces);
+    // Check if this is a custom graph alert (has customGraphId)
+    if (trigger.customGraphId) {
+      const result = await getCustomGraphAlert(trigger, projects);
+      results.push(result);
+    } else {
+      // Existing trace-based trigger logic
+      const traces = await getTracesForAlert(trigger, projects);
+      results.push(traces);
+    }
   }
 
   return res.status(200).json(results);
@@ -372,4 +380,222 @@ const createQueueItems = async (
       }),
     ),
   );
+};
+
+const getCustomGraphAlert = async (trigger: Trigger, projects: Project[]) => {
+  const {
+    id: triggerId,
+    projectId,
+    action,
+    actionParams,
+    name,
+    customGraphId,
+  } = trigger;
+
+  if (!customGraphId) {
+    return {
+      triggerId,
+      status: "error",
+      message: "No customGraphId found",
+    };
+  }
+
+  const params = actionParams as any;
+  const { threshold, operator, timePeriod } = params;
+
+  try {
+    // Fetch the custom graph
+    const customGraph = await prisma.customGraph.findUnique({
+      where: { id: customGraphId },
+    });
+
+    if (!customGraph) {
+      return {
+        triggerId,
+        status: "error",
+        message: "Graph not found",
+      };
+    }
+
+    // Calculate time window
+    const endDate = new Date();
+    const startDate = new Date(endDate.getTime() - timePeriod * 60 * 1000);
+
+    // Parse graph configuration
+    const graphData = customGraph.graph as any;
+    const series = graphData.series?.[0]; // Only one series allowed
+
+    if (!series) {
+      return {
+        triggerId,
+        status: "error",
+        message: "No series found in graph",
+      };
+    }
+
+    // Build timeseries input
+    const timeseriesInput = {
+      projectId,
+      startDate: startDate.getTime(),
+      endDate: endDate.getTime(),
+      filters: (customGraph.filters as any) ?? {},
+      series: [
+        {
+          name: series.name,
+          metric: series.metric,
+          aggregation: series.aggregation,
+          key: series.key,
+          subkey: series.subkey,
+          pipeline: series.pipeline,
+          filters: series.filters,
+          asPercent: series.asPercent,
+        },
+      ],
+      groupBy: graphData.groupBy,
+      timeScale: graphData.timeScale ?? 60,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+
+    // Get analytics data
+    const timeseriesResult = await timeseries(timeseriesInput);
+
+    // Calculate current value (sum or average of the last period)
+    let currentValue = 0;
+    if (timeseriesResult && timeseriesResult.length > 0) {
+      const values = timeseriesResult
+        .map((entry: any) => {
+          const seriesName = series.name;
+          return entry[seriesName] ?? 0;
+        })
+        .filter((v: any) => typeof v === "number");
+
+      if (values.length > 0) {
+        // Use sum for count/cardinality, average for others
+        if (series.aggregation === "count" || series.aggregation === "cardinality") {
+          currentValue = values.reduce((a: number, b: number) => a + b, 0);
+        } else {
+          currentValue = values.reduce((a: number, b: number) => a + b, 0) / values.length;
+        }
+      }
+    }
+
+    // Check threshold condition
+    const conditionMet = checkThreshold(currentValue, threshold, operator);
+
+    if (conditionMet) {
+      const project = projects.find((p) => p.id === projectId);
+
+      // Create trigger data for notification
+      const triggerData: TriggerData[] = [
+        {
+          input: `Graph: ${customGraph.name}`,
+          output: `Current value: ${currentValue.toFixed(2)} (threshold: ${operator} ${threshold})`,
+          traceId: `graph-${customGraphId}`,
+          projectId,
+          fullTrace: {} as Trace,
+        },
+      ];
+
+      let triggerInfo;
+
+      if (action === TriggerAction.SEND_EMAIL) {
+        try {
+          triggerInfo = {
+            triggerEmails: (params as any)?.members ?? [],
+            triggerData,
+            triggerName: name,
+            projectSlug: project!.slug,
+            triggerType: trigger.alertType ?? null,
+            triggerMessage: trigger.message ?? `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(2)} ${operator} ${threshold}`,
+          };
+
+          await sendTriggerEmail(triggerInfo);
+        } catch (error) {
+          captureException(error, {
+            extra: {
+              triggerId,
+              projectId,
+              action: TriggerAction.SEND_EMAIL,
+            },
+          });
+        }
+      } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
+        try {
+          triggerInfo = {
+            triggerWebhook: (params as any)?.slackWebhook ?? "",
+            triggerData,
+            triggerName: name,
+            projectSlug: project!.slug,
+            triggerType: trigger.alertType ?? null,
+            triggerMessage: trigger.message ?? `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(2)} ${operator} ${threshold}`,
+          };
+
+          await sendSlackWebhook(triggerInfo);
+        } catch (error) {
+          captureException(error, {
+            extra: {
+              triggerId,
+              projectId,
+              action: TriggerAction.SEND_SLACK_MESSAGE,
+            },
+          });
+        }
+      }
+
+      await updateAlert(triggerId, Date.now(), projectId);
+
+      return {
+        triggerId,
+        status: "triggered",
+        value: currentValue,
+        threshold,
+        operator,
+      };
+    }
+
+    await updateAlert(triggerId, Date.now(), projectId);
+
+    return {
+      triggerId,
+      status: "not_triggered",
+      value: currentValue,
+      threshold,
+      operator,
+    };
+  } catch (error) {
+    captureException(error, {
+      extra: {
+        triggerId,
+        projectId,
+        type: "customGraphAlert",
+      },
+    });
+
+    return {
+      triggerId,
+      status: "error",
+      message: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+};
+
+const checkThreshold = (
+  value: number,
+  threshold: number,
+  operator: string,
+): boolean => {
+  switch (operator) {
+    case "gt":
+      return value > threshold;
+    case "lt":
+      return value < threshold;
+    case "gte":
+      return value >= threshold;
+    case "lte":
+      return value <= threshold;
+    case "eq":
+      return Math.abs(value - threshold) < 0.0001; // Floating point comparison
+    default:
+      return false;
+  }
 };

@@ -36,6 +36,7 @@ import {
   AlignLeft,
   BarChart2,
   Check,
+  CheckSquare,
   ChevronDown,
   GitBranch,
   Info,
@@ -60,6 +61,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
+import { Popover } from "~/components/ui/popover";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -143,6 +145,19 @@ export interface CustomGraphFormData {
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
+  alert?: {
+    enabled: boolean;
+    threshold: number;
+    operator: "gt" | "lt" | "gte" | "lte" | "eq";
+    timePeriod: number;
+    type: "CRITICAL" | "WARNING" | "INFO";
+    action: "SEND_EMAIL" | "SEND_SLACK_MESSAGE";
+    actionParams?: {
+      members?: string[];
+      slackWebhook?: string;
+    };
+    triggerId?: string;
+  };
 }
 
 export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
@@ -253,11 +268,13 @@ export default function AnalyticsCustomGraph({
   graph,
   name,
   filters,
+  alert,
 }: {
   customId?: string;
   graph?: CustomGraphInput;
   name?: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  alert?: CustomGraphFormData["alert"];
 }) {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
@@ -266,6 +283,9 @@ export default function AnalyticsCustomGraph({
   let initialFormData: CustomGraphFormData | undefined;
   if (customId && graph) {
     initialFormData = customGraphInputToFormData(graph);
+    if (alert) {
+      initialFormData.alert = alert;
+    }
   }
 
   const form = useForm<CustomGraphFormData>({
@@ -279,7 +299,7 @@ export default function AnalyticsCustomGraph({
       setFilters(filters);
       hasSetFilters.current = true;
     }
-  }, [customId, filters]);
+  }, [customId, filters, setFilters]);
 
   useEffect(() => {
     if (name) {
@@ -563,6 +583,86 @@ const customAPIinput = (
   };
 };
 
+function AlertEmailSelector({
+  form,
+  teamMembers,
+}: {
+  form: ReturnType<typeof useForm<CustomGraphFormData>>;
+  teamMembers: Array<{ user: { id: string; email: string | null } }>;
+}) {
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(
+    form.watch("alert.actionParams.members") ?? [],
+  );
+  const emailPopover = useDisclosure();
+
+  useEffect(() => {
+    form.setValue("alert.actionParams.members", selectedMembers);
+  }, [selectedMembers, form]);
+
+  return (
+    <Popover.Root
+      open={emailPopover.open}
+      onOpenChange={({ open }) => emailPopover.setOpen(open)}
+      positioning={{ placement: "bottom-start" }}
+    >
+      <Popover.Trigger asChild>
+        <Button variant="outline" width="full" justifyContent="space-between">
+          <Text>
+            {selectedMembers.length > 0
+              ? `${selectedMembers.length} recipient${
+                  selectedMembers.length > 1 ? "s" : ""
+                }`
+              : "Select recipients"}
+          </Text>
+          <ChevronDown width={16} />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content>
+        <Popover.Body>
+          <VStack
+            width="full"
+            align="start"
+            gap={2}
+            maxHeight="300px"
+            overflowY="auto"
+          >
+            {teamMembers.map((member) => {
+              const email = member.user.email ?? "";
+              if (!email) return null;
+              return (
+                <HStack
+                  key={member.user.id}
+                  width="full"
+                  cursor="pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (selectedMembers.includes(email)) {
+                      setSelectedMembers(
+                        selectedMembers.filter((m) => m !== email),
+                      );
+                    } else {
+                      setSelectedMembers([...selectedMembers, email]);
+                    }
+                  }}
+                  padding={2}
+                  borderRadius="md"
+                  _hover={{ backgroundColor: "gray.100" }}
+                >
+                  <CheckSquare
+                    width={18}
+                    color={selectedMembers.includes(email) ? "green" : "gray"}
+                  />
+                  <Text>{email}</Text>
+                </HStack>
+              );
+            })}
+          </VStack>
+        </Popover.Body>
+      </Popover.Content>
+    </Popover.Root>
+  );
+}
+
 function CustomGraphForm({
   form,
   seriesFields,
@@ -603,9 +703,19 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project, hasPermission, team, organization } =
+    useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
+
+  const teamSlug = team?.slug;
+  const teamWithMembers = api.team.getTeamWithMembers.useQuery(
+    {
+      slug: teamSlug ?? "",
+      organizationId: organization?.id ?? "",
+    },
+    { enabled: typeof teamSlug === "string" && !!organization?.id },
+  );
 
   const addGraph = () => {
     const graphName = form.getValues("title");
@@ -614,12 +724,14 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
+    const formData = form.getValues();
     addNewGraph.mutate(
       {
         projectId: project?.id ?? "",
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
+        alert: formData.alert?.enabled ? formData.alert : undefined,
       },
       {
         onSuccess: () => {
@@ -633,6 +745,7 @@ function CustomGraphForm({
   const updateGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
+    const formData = form.getValues();
     updateGraphById.mutate(
       {
         projectId: project?.id ?? "",
@@ -640,6 +753,7 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
+        alert: formData.alert,
       },
       {
         onSuccess: () => {
@@ -789,6 +903,132 @@ function CustomGraphForm({
               </Switch>
             )}
           />
+        </Field.Root>
+      )}
+      {form.watch("series").length === 1 && (
+        <Field.Root>
+          <VStack align="start" gap={3} width="full">
+            <HStack width="full" justify="space-between">
+              <Field.Label fontSize="16px">Alert</Field.Label>
+              <Controller
+                control={form.control}
+                name="alert.enabled"
+                defaultValue={false}
+                render={({ field: { onChange, value } }) => (
+                  <Switch onChange={onChange} checked={value ?? false}>
+                    Enable alert
+                  </Switch>
+                )}
+              />
+            </HStack>
+
+            {form.watch("alert.enabled") && (
+              <VStack
+                width="full"
+                gap={3}
+                padding={3}
+                backgroundColor="gray.50"
+                borderRadius="md"
+              >
+                <HStack width="full" gap={2}>
+                  <Field.Root flex="1">
+                    <Field.Label>When value is</Field.Label>
+                    <NativeSelect.Root>
+                      <NativeSelect.Field
+                        {...form.control.register("alert.operator")}
+                      >
+                        <option value="gt">Greater than</option>
+                        <option value="lt">Less than</option>
+                        <option value="gte">Greater than or equal</option>
+                        <option value="lte">Less than or equal</option>
+                        <option value="eq">Equal to</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+
+                  <Field.Root flex="1">
+                    <Field.Label>Threshold</Field.Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      {...form.control.register("alert.threshold", {
+                        valueAsNumber: true,
+                      })}
+                      placeholder="0"
+                    />
+                  </Field.Root>
+                </HStack>
+
+                <Field.Root>
+                  <Field.Label>Check over last</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...form.control.register("alert.timePeriod", {
+                        valueAsNumber: true,
+                      })}
+                    >
+                      <option value={5}>5 minutes</option>
+                      <option value={15}>15 minutes</option>
+                      <option value={30}>30 minutes</option>
+                      <option value={60}>1 hour</option>
+                      <option value={1440}>1 day</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Alert Type</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...form.control.register("alert.type")}
+                    >
+                      <option value="INFO">Info</option>
+                      <option value="WARNING">Warning</option>
+                      <option value="CRITICAL">Critical</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Notification Method</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...form.control.register("alert.action")}
+                    >
+                      <option value="SEND_EMAIL">Email</option>
+                      <option value="SEND_SLACK_MESSAGE">Slack</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+
+                {form.watch("alert.action") === "SEND_EMAIL" && (
+                  <Field.Root width="full">
+                    <Field.Label>Email Recipients</Field.Label>
+                    <AlertEmailSelector
+                      form={form}
+                      teamMembers={teamWithMembers.data?.members ?? []}
+                    />
+                  </Field.Root>
+                )}
+
+                {form.watch("alert.action") === "SEND_SLACK_MESSAGE" && (
+                  <Field.Root width="full">
+                    <Field.Label>Slack Webhook URL</Field.Label>
+                    <Input
+                      {...form.control.register(
+                        "alert.actionParams.slackWebhook",
+                      )}
+                      placeholder="https://hooks.slack.com/..."
+                    />
+                  </Field.Root>
+                )}
+              </VStack>
+            )}
+          </VStack>
         </Field.Root>
       )}
       <HStack width="full" gap={2}>
@@ -1042,14 +1282,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? (metricAggregations[aggregation] ?? aggregation)
+      ? metricAggregations[aggregation] ?? aggregation
       : undefined;
     const pipeline_ = pipelineField
-      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
+      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
+        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(

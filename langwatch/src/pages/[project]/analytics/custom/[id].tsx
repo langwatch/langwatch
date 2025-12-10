@@ -24,6 +24,7 @@ export default function EditCustomAnalyticsPage() {
       graph={graph as CustomGraphInput}
       name={name ?? ""}
       filters={graphData.data?.filters}
+      alert={graphData.data?.alert}
     />
   ) : null;
 }

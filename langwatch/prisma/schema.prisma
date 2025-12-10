@@ -385,6 +385,7 @@ model CustomGraph {
     filters   Json?
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
+    trigger   Trigger?
 
     @@unique([id])
     @@index([projectId])
@@ -445,6 +446,8 @@ model Trigger {
     deleted      Boolean       @default(false)
     alertType    AlertType?
     TriggerSent  TriggerSent[]
+    customGraphId String?      @unique
+    customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
     @@index([projectId])
 }
