@@ -1,0 +1,32 @@
+---
+description: BDD workflow for feature development
+globs: "**/*.feature"
+alwaysApply: false
+---
+
+# BDD Workflow
+
+When invoked with a feature request:
+
+## 1. Challenge & Clarify
+- Question ambiguity, missing edge cases, unstated requirements.
+- Don't assume—ask before proceeding.
+
+## 2. Propose Spec
+- See `TESTING.md` in the relevant project for the test hierarchy and decision tree for how to approach the test strategy and coverage.
+- Draft a `.feature` file in the `specs/` directory with tags: `@e2e`, `@integration`, `@unit`.
+- Scenarios must be user/domain focused.
+- **One invariant per scenario**: Extend with `And`/`But` only for natural consequences; create new scenarios for orthogonal invariants.
+- Present for approval. **Do NOT write code yet.**
+
+## 3. Implement (after approval)
+- RED → GREEN → REFACTOR
+- Write all tests first
+- Failing tests → implement code → verify: `typecheck + lint + tests pass`.
+- Refactor if needed.
+
+## References
+- see `TESTING.md` in the relevant project.
+
+## Do NOT Test
+- Type definitions, simple pass-throughs, third-party internals, static config.

@@ -44,3 +44,19 @@ export type PromptResponse = NonNullable<
 
 // Extract the PromptScope type from the API client
 export type PromptScope = paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
+
+/**
+ * Fetch policy for prompt retrieval.
+ * Controls how prompts are fetched and cached.
+ */
+export enum FetchPolicy {
+  /** Use local file if available, otherwise fetch from API (default) */
+  MATERIALIZED_FIRST = "MATERIALIZED_FIRST",
+  /** Always try API first, fall back to materialized */
+  ALWAYS_FETCH = "ALWAYS_FETCH",
+  /** Fetch every X minutes, use materialized between fetches */
+  CACHE_TTL = "CACHE_TTL",
+  /** Never fetch, use materialized files only */
+  MATERIALIZED_ONLY = "MATERIALIZED_ONLY",
+}
+
