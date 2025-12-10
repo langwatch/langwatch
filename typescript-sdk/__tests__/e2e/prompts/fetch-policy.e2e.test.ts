@@ -11,6 +11,13 @@ import { type LangWatch } from "../../../dist";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import { CliRunner } from "../cli/helpers/cli-runner";
 
+/**
+ * NOTE: This test leaves prompts in the test DB
+ * Since the test DB is ephemeral, this is not a problem
+ * and not work the overhead of code/CI time to clean up,
+ * but it is something to be aware of.
+ */
+
 describe("Prompt fetch policies (real API)", () => {
   let langwatch: LangWatch;
   let originalCwd: string;

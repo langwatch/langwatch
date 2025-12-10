@@ -35,7 +35,7 @@ export const runAlwaysFetchPolicy = async (handle: string) => {
  * Demonstrates MATERIALIZED_ONLY with a local prompt file present.
  * Requires the Langwatch CLI for local prompt management.
  */
-export const runMaterializedOnlyPolicy = async (handle: string, cli?: CliRunner) => {
+export const runMaterializedOnlyPolicy = async (handle: string, cli: CliRunner) => {
   const { LangWatch, FetchPolicy } = await import("../../dist");
 
   // Add the prompt to the local filesystem from the

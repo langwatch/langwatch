@@ -17,7 +17,7 @@
 
 ## Decision Tree
 
-```
+```text
 Is this a happy path demonstrating SDK usage?
   → E2E (wrap an example)
 
