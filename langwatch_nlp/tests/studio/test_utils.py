@@ -24,59 +24,37 @@ class TestReasoningModelConfig:
             mock.return_value = MagicMock()
             yield mock
 
-    # Auto-correct temperature for reasoning models
+    # Reasoning models: temperature must be 1.0 (required by DSPy)
 
-    def test_autocorrect_temperature_for_gpt5_with_invalid_value(self, mock_dspy_lm):
-        """Given temperature=0.5 for gpt-5, should auto-correct to 1.0."""
+    def test_sets_temperature_1_for_gpt5(self, mock_dspy_lm):
+        """Given gpt-5, temperature should be set to 1.0 (required by DSPy)."""
         config = LLMConfig(model="openai/gpt-5", temperature=0.5, max_tokens=16000)
 
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 1.0
-            or call_kwargs[1].get("temperature") == 1.0
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0
 
-    def test_autocorrect_temperature_for_gpt5_with_undefined_value(self, mock_dspy_lm):
-        """Given temperature=None for gpt-5, should auto-correct to 1.0."""
-        config = LLMConfig(model="openai/gpt-5", temperature=None, max_tokens=16000)
-
-        node_llm_config_to_dspy_lm(config)
-
-        mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 1.0
-            or call_kwargs[1].get("temperature") == 1.0
-        )
-
-    def test_autocorrect_temperature_for_o1_model(self, mock_dspy_lm):
-        """Given temperature=0 for o1, should auto-correct to 1.0."""
+    def test_sets_temperature_1_for_o1(self, mock_dspy_lm):
+        """Given o1, temperature should be set to 1.0 (required by DSPy)."""
         config = LLMConfig(model="openai/o1", temperature=0, max_tokens=16000)
 
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 1.0
-            or call_kwargs[1].get("temperature") == 1.0
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0
 
-    def test_autocorrect_temperature_for_o3_model(self, mock_dspy_lm):
-        """Given temperature=0.7 for o3, should auto-correct to 1.0."""
+    def test_sets_temperature_1_for_o3(self, mock_dspy_lm):
+        """Given o3, temperature should be set to 1.0 (required by DSPy)."""
         config = LLMConfig(model="openai/o3", temperature=0.7, max_tokens=16000)
 
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 1.0
-            or call_kwargs[1].get("temperature") == 1.0
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0
 
     # Auto-correct max_tokens for reasoning models
 
@@ -89,11 +67,8 @@ class TestReasoningModelConfig:
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("max_tokens") == 16000
-            or call_kwargs[1].get("max_tokens") == 16000
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 16000
 
     def test_autocorrect_max_tokens_for_reasoning_model_with_undefined_value(
         self, mock_dspy_lm
@@ -104,30 +79,21 @@ class TestReasoningModelConfig:
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("max_tokens") == 16000
-            or call_kwargs[1].get("max_tokens") == 16000
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("max_tokens") == 16000
 
-    # Preserve valid config for reasoning models
+    # Preserve valid max_tokens for reasoning models
 
-    def test_preserve_valid_config_for_reasoning_model(self, mock_dspy_lm):
-        """Given valid temperature=1.0 and max_tokens=32000 for gpt-5, should preserve."""
-        config = LLMConfig(model="openai/gpt-5", temperature=1.0, max_tokens=32000)
+    def test_preserve_high_max_tokens_for_reasoning_model(self, mock_dspy_lm):
+        """Given max_tokens=32000 for gpt-5, should preserve (above minimum)."""
+        config = LLMConfig(model="openai/gpt-5", temperature=0.5, max_tokens=32000)
 
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 1.0
-            or call_kwargs[1].get("temperature") == 1.0
-        )
-        assert (
-            call_kwargs.kwargs.get("max_tokens") == 32000
-            or call_kwargs[1].get("max_tokens") == 32000
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0
+        assert call_kwargs.get("max_tokens") == 32000
 
     # Non-reasoning models unchanged
 
@@ -138,15 +104,9 @@ class TestReasoningModelConfig:
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 0.5
-            or call_kwargs[1].get("temperature") == 0.5
-        )
-        assert (
-            call_kwargs.kwargs.get("max_tokens") == 2048
-            or call_kwargs[1].get("max_tokens") == 2048
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 0.5
+        assert call_kwargs.get("max_tokens") == 2048
 
     def test_non_reasoning_model_with_undefined_values_uses_defaults(
         self, mock_dspy_lm
@@ -157,12 +117,38 @@ class TestReasoningModelConfig:
         node_llm_config_to_dspy_lm(config)
 
         mock_dspy_lm.assert_called_once()
-        call_kwargs = mock_dspy_lm.call_args
-        assert (
-            call_kwargs.kwargs.get("temperature") == 0
-            or call_kwargs[1].get("temperature") == 0
-        )
-        assert (
-            call_kwargs.kwargs.get("max_tokens") == 2048
-            or call_kwargs[1].get("max_tokens") == 2048
-        )
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 0
+        assert call_kwargs.get("max_tokens") == 2048
+
+    # False positive prevention - models containing o1/o3 substrings
+
+    def test_model_containing_o3_substring_not_treated_as_reasoning(self, mock_dspy_lm):
+        """Given 'demo3' model, should NOT be treated as reasoning model."""
+        config = LLMConfig(model="openai/demo3", temperature=0.5, max_tokens=2048)
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 0.5
+
+    def test_model_containing_o1_substring_not_treated_as_reasoning(self, mock_dspy_lm):
+        """Given 'pro1' model, should NOT be treated as reasoning model."""
+        config = LLMConfig(model="openai/pro1", temperature=0.5, max_tokens=2048)
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 0.5
+
+    def test_o1_mini_variant_treated_as_reasoning(self, mock_dspy_lm):
+        """Given 'o1-mini' model, should be treated as reasoning model."""
+        config = LLMConfig(model="openai/o1-mini", temperature=0.5, max_tokens=2048)
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("temperature") == 1.0

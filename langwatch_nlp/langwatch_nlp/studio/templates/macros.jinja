@@ -1,21 +1,12 @@
-{% macro node_llm_config_to_dspy_lm(llm_config) %}
+{% macro node_llm_config_to_dspy_lm(llm_config, corrected_params) %}
 {% set llm_params = llm_config.litellm_params or {"model": llm_config.model} %}
 {% if "azure/" in (llm_params["model"] or "") and "api_version" not in llm_params and "use_azure_gateway" not in llm_params %}
 {% set _ = llm_params.update({"api_version": os.environ["AZURE_API_VERSION"]}) %}
 {% endif %}
 {% set _ = llm_params.update({"drop_params": True, "model_type": "chat"}) %}
-{% set model_lower = (llm_config.model or "")|lower %}
-{% set is_reasoning_model = "o1" in model_lower or "o3" in model_lower or "gpt-5" in model_lower %}
-{% if is_reasoning_model %}
-{% set temperature = 1.0 %}
-{% set max_tokens = [llm_config.max_tokens or 16000, 16000]|max %}
-{% else %}
-{% set temperature = llm_config.temperature or 0 %}
-{% set max_tokens = llm_config.max_tokens or 2048 %}
-{% endif %}
 dspy.LM(
-            max_tokens={{ max_tokens }},
-            temperature={{ temperature }},
+            max_tokens={{ corrected_params["max_tokens"] }},
+            temperature={{ corrected_params["temperature"] }},
             {% for key, value in llm_params.items() %}
             {{ key }}={{ value.__repr__() }},
             {% endfor %}
