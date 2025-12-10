@@ -16,7 +16,7 @@ import { EvaluationExecutionMode, type Monitor } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";

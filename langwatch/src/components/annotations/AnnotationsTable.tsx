@@ -21,7 +21,7 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,

@@ -5,7 +5,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
-import { useDrawer } from "../../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { Menu } from "../../../components/ui/menu";
@@ -43,7 +43,7 @@ export function DatasetSelection({
             variant="outline"
             onClick={() => {
               openDrawer("uploadCSV", {
-                onSuccess: ({ datasetId, name }) => {
+                onSuccess: ({ datasetId, name }: { datasetId: string; name: string }) => {
                   setIsEditing({
                     id: datasetId,
                     name,
@@ -51,7 +51,7 @@ export function DatasetSelection({
                 },
                 onCreateFromScratch: () => {
                   openDrawer("addOrEditDataset", {
-                    onSuccess: ({ datasetId, name }) => {
+                    onSuccess: ({ datasetId, name }: { datasetId: string; name: string }) => {
                       setIsEditing({
                         id: datasetId,
                         name,
