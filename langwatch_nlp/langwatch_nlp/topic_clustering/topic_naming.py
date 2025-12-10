@@ -25,6 +25,15 @@ logger = get_logger("topic_clustering.naming")
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 
 
+def _get_litellm_shared_session():
+    """Get the configured aiohttp session from the main module for use with litellm."""
+    try:
+        from langwatch_nlp.main import get_litellm_aiohttp_session
+        return get_litellm_aiohttp_session()
+    except (ImportError, AttributeError):
+        return None
+
+
 @retry(wait=wait_exponential(min=12, max=60), stop=stop_after_attempt(4), reraise=True)
 def generate_topic_names(
     litellm_params: dict[str, str],
@@ -51,42 +60,50 @@ def generate_topic_names(
         else ""
     )
 
-    try:
-        response = litellm.completion(
-            temperature=0.0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
-                        based on a list of examples. Provide a single, descriptive name for each topic. \
-                        Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
-                        Topic names should not be similar to each other, as the data is already organized, \
-                        the disambiguation between two similar topics should be clear from the name alone.\
-                            {existing_message}',
-                },
-                {"role": "user", "content": f"{topic_examples_str}"},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "topicNames",
-                        "parameters": {
-                            "type": "object",
-                            "properties": dict(
-                                [
-                                    (f"topic_{index}", {"type": "string"})
-                                    for index in range(len(topic_examples))
-                                ]
-                            ),
-                        },
-                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+    # Prepare completion parameters with optional shared aiohttp session
+    completion_params = {
+        "temperature": 0.0,
+        "messages": [
+            {
+                "role": "system",
+                "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
+                    based on a list of examples. Provide a single, descriptive name for each topic. \
+                    Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
+                    Topic names should not be similar to each other, as the data is already organized, \
+                    the disambiguation between two similar topics should be clear from the name alone.\
+                        {existing_message}',
+            },
+            {"role": "user", "content": f"{topic_examples_str}"},
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "topicNames",
+                    "parameters": {
+                        "type": "object",
+                        "properties": dict(
+                            [
+                                (f"topic_{index}", {"type": "string"})
+                                for index in range(len(topic_examples))
+                            ]
+                        ),
                     },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": "topicNames"}},
-            **litellm_params,  # type: ignore
-        )
+                    "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+                },
+            }
+        ],
+        "tool_choice": {"type": "function", "function": {"name": "topicNames"}},
+        **litellm_params,  # type: ignore
+    }
+    
+    # Add shared aiohttp session if available
+    shared_session = _get_litellm_shared_session()
+    if shared_session:
+        completion_params["aiohttp_session"] = shared_session
+
+    try:
+        response = litellm.completion(**completion_params)
     except Exception as e:
         raise ValueError(
             f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
@@ -268,39 +285,47 @@ def improve_name_between_two_topics(
         + "\n".join(topic_b_examples)
     )
 
-    try:
-        response = litellm.completion(
-            temperature=0.0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"You are a highly knowledgeable assistant tasked with taxonomy for naming topics, \
-                    right now we have two topics with very similar names, and we need to disambiguate between them, \
-                    to have a better name that really contrasts what one topic is about versus the other. \
-                    Please look at the topics A and B and come up with a new, concise but constrasting name for each, \
-                    based on their examples.",
-                },
-                {"role": "user", "content": f"{topic_examples_str}"},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "topicNames",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "topic_a": {"type": "string"},
-                                "topic_b": {"type": "string"},
-                            },
+    # Prepare completion parameters with optional shared aiohttp session
+    completion_params = {
+        "temperature": 0.0,
+        "messages": [
+            {
+                "role": "system",
+                "content": f"You are a highly knowledgeable assistant tasked with taxonomy for naming topics, \
+                right now we have two topics with very similar names, and we need to disambiguate between them, \
+                to have a better name that really contrasts what one topic is about versus the other. \
+                Please look at the topics A and B and come up with a new, concise but constrasting name for each, \
+                based on their examples.",
+            },
+            {"role": "user", "content": f"{topic_examples_str}"},
+        ],
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": "topicNames",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "topic_a": {"type": "string"},
+                            "topic_b": {"type": "string"},
                         },
-                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
                     },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": "topicNames"}},
-            **litellm_params,  # type: ignore
-        )
+                    "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+                },
+            }
+        ],
+        "tool_choice": {"type": "function", "function": {"name": "topicNames"}},
+        **litellm_params,  # type: ignore
+    }
+    
+    # Add shared aiohttp session if available
+    shared_session = _get_litellm_shared_session()
+    if shared_session:
+        completion_params["aiohttp_session"] = shared_session
+
+    try:
+        response = litellm.completion(**completion_params)
     except Exception as e:
         raise ValueError(
             f"Failed to improve names between {topic_a_name} and {topic_b_name}: {e}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"

@@ -51,17 +51,24 @@ def create_ssl_context():
     return ssl_context
 
 
-async def configure_litellm_aiohttp():
+# Global aiohttp session for litellm to use
+_aiohttp_session: Optional[object] = None
+
+
+async def create_litellm_aiohttp_session():
     """
-    Configure aiohttp ClientSession to respect environment variables (proxy and SSL certificates).
+    Create and configure an aiohttp ClientSession for litellm to use.
+    
+    This session respects:
+    - Custom SSL certificates from environment variables (SSL_CERT_FILE, REQUESTS_CA_BUNDLE, AWS_CA_BUNDLE)
+    - HTTP/HTTPS proxy settings from environment variables (HTTP_PROXY, HTTPS_PROXY, etc.)
+    
     Required for corporate environments with SSL intercepting proxy or 
     applications that communicate using self-signed certificates.
     
-    litellm's proxy server uses aiohttp internally, and this configures it to use
-    custom SSL contexts and respect proxy environment variables.
+    Returns the configured aiohttp.ClientSession instance.
     """
     import aiohttp
-    import litellm
     
     ssl_context = create_ssl_context()
     
@@ -74,12 +81,20 @@ async def configure_litellm_aiohttp():
     )
     
     # Create session with the configured connector and trust_env for proxy support
+    # The session will be reused across all litellm calls
     session = aiohttp.ClientSession(connector=connector, trust_env=True)
     
-    # Store session reference for litellm to use
-    litellm._aiohttp_session = session
-    
     return session
+
+
+def get_litellm_aiohttp_session():
+    """
+    Get the global aiohttp session for use in litellm calls.
+    
+    Returns the configured aiohttp.ClientSession, or None if not yet initialized.
+    This should be called after the application lifespan has started.
+    """
+    return _aiohttp_session
 
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 if "DATABASE_URL" in os.environ:
@@ -89,8 +104,10 @@ if "DATABASE_URL" in os.environ:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Configure aiohttp session for litellm with SSL and proxy support
-    aiohttp_session = await configure_litellm_aiohttp()
+    global _aiohttp_session
+    
+    # Create and configure aiohttp session for litellm with SSL and proxy support
+    _aiohttp_session = await create_litellm_aiohttp_session()
     
     lifespans = [
         litellm_proxy_server.proxy_startup_event,
@@ -104,8 +121,8 @@ async def lifespan(app: FastAPI):
         yield
     
     # Cleanup aiohttp session
-    if aiohttp_session and not aiohttp_session.closed:
-        await aiohttp_session.close()
+    if _aiohttp_session and not _aiohttp_session.closed:
+        await _aiohttp_session.close()
 
 
 # Config

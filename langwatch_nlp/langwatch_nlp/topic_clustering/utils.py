@@ -10,6 +10,15 @@ from langwatch_nlp.logger import get_logger
 logger = get_logger("topic_clustering.utils")
 
 
+def _get_litellm_shared_session():
+    """Get the configured aiohttp session from the main module for use with litellm."""
+    try:
+        from langwatch_nlp.main import get_litellm_aiohttp_session
+        return get_litellm_aiohttp_session()
+    except (ImportError, AttributeError):
+        return None
+
+
 def calculate_centroid_and_distance(samples) -> tuple[np.ndarray, float]:
     centroid = np.mean([np.array(item["embeddings"]) for item in samples], axis=0)
     distances = cdist(
@@ -42,10 +51,19 @@ def _generate_single_embedding(
     """Generate embedding for a single text item with proper error handling."""
     try:
         text_to_embed = text if text else "<empty>"
-        response = litellm.embedding(
+        
+        # Prepare embedding parameters with optional shared aiohttp session
+        embedding_params = {
             **embeddings_litellm_params,  # type: ignore
-            input=text_to_embed,
-        )
+            "input": text_to_embed,
+        }
+        
+        # Add shared aiohttp session if available
+        shared_session = _get_litellm_shared_session()
+        if shared_session:
+            embedding_params["aiohttp_session"] = shared_session
+        
+        response = litellm.embedding(**embedding_params)
         return normalize_embedding_dimensions(
             response.data[0]["embedding"],
             target_dim=dimensions,
