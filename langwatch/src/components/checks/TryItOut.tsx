@@ -34,7 +34,7 @@ import type { ElasticSearchSpan } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { formatMoney } from "../../utils/formatMoney";
 import type { Money } from "../../utils/types";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { HoverableBigText } from "../HoverableBigText";

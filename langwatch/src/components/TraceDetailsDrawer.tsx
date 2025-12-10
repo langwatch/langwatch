@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { useDrawer } from "./CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {

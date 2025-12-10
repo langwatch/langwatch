@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
-import { useDrawer } from "./CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "./ui/drawer";
 
 export const AddOrEditAnnotationScoreDrawer = ({

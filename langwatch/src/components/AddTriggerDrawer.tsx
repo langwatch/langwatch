@@ -14,7 +14,7 @@ import { useEffect, useState } from "react";
 import { CheckSquare } from "react-feather";
 import { useForm } from "react-hook-form";
 import { useLocalStorage } from "usehooks-ts";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { AddParticipants } from "~/components/traces/AddParticipants";
 
 import { useFilterParams } from "~/hooks/useFilterParams";

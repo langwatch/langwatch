@@ -38,7 +38,7 @@ import type {
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Menu } from "../ui/menu";
 
 import { toaster } from "../ui/toaster";
