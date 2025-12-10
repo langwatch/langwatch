@@ -1,6 +1,6 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
 import type { FilterField } from "~/server/filters/types";
 import { FieldsFilters } from "./filters/FieldsFilters";

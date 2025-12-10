@@ -10,7 +10,7 @@ import { LuListTree, LuRefreshCw } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { easyCatchToast } from "../../utils/easyCatchToast";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 
 // Constants
 const TRACE_QUERY_CONFIG = {

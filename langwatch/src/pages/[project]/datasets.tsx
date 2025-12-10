@@ -25,7 +25,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
 import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
-import { useDrawer } from "../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { Link } from "../../components/ui/link";

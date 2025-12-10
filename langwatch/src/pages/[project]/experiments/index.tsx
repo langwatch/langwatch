@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import router from "next/router";
 import { Play } from "react-feather";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { Link } from "~/components/ui/link";

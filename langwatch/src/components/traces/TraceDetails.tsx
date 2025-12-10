@@ -19,7 +19,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Conversation } from "../messages/Conversation";
 import { Drawer } from "../ui/drawer";
 import { Link } from "../ui/link";
