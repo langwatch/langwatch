@@ -171,26 +171,25 @@ REASONING_MODEL_MIN_MAX_TOKENS = 16000
 
 def is_reasoning_model(model: str | None) -> bool:
     """
-    Detects if a model is an OpenAI reasoning model (o1, o3, gpt-5).
+    Detects if a model is an OpenAI reasoning model (o1, o3, o4, o5, gpt-5).
 
-    Matches whole tokens only to avoid false positives like "demo3" or "pro1".
-    Pattern expects model names like "openai/o1", "o1-mini", "gpt-5", etc.
+    Uses the same detection logic as DSPy: extracts model family from path
+    and matches against known reasoning model patterns.
 
-    Reasoning models do not accept temperature/top_p and require max_tokens >= 16000.
+    Reasoning models require temperature=1.0 and max_tokens >= 16000 for DSPy.
     """
     if not model:
         return False
-    # Match o1/o3/gpt-5 as whole tokens: after start or delimiter, before end or delimiter
-    return bool(
-        re.search(r"(?:^|[/\-_])(o1|o3|gpt-5)(?:$|[/\-_])", model, re.IGNORECASE)
-    )
+    # Match DSPy's approach: extract model family and match pattern
+    model_family = model.split("/")[-1].lower() if "/" in model else model.lower()
+    return bool(re.match(r"^(?:o[1345]|gpt-5)(?:-(?:mini|nano))?", model_family))
 
 
 def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     """
     Returns corrected temperature and max_tokens for an LLMConfig.
 
-    For reasoning models (o1, o3, gpt-5):
+    For reasoning models (o1, o3, o4, o5, gpt-5):
     - temperature: 1.0 (required by DSPy, which handles the API call internally)
     - max_tokens: at least 16000
 
@@ -216,7 +215,7 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     """
     Converts an LLMConfig to a DSPy LM instance.
 
-    For reasoning models (o1, o3, gpt-5):
+    For reasoning models (o1, o3, o4, o5, gpt-5):
     - temperature: 1.0 (required by DSPy, which handles the API call internally)
     - max_tokens: at least 16000
 
