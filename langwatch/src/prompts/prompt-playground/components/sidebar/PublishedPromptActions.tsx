@@ -216,9 +216,7 @@ export function PublishedPromptActions({
                 cursor={canDelete ? "pointer" : "not-allowed"}
               >
                 <LuTrash2 size={16} />
-                <Text as="span" ml={2}>
-                  Delete prompt
-                </Text>
+                <Text as="span">Delete prompt</Text>
               </Menu.Item>
             </Tooltip>
           </Menu.Content>
