@@ -69,3 +69,11 @@ Feature: Prompt Fetch Policy
     And the API returns 404
     When I retrieve the prompt
     Then the system throws a "not found" error
+
+  # Unit: Pure logic / isolated class behavior
+
+  @unit
+  Scenario: CACHE_TTL caches versions independently
+    Given "my-prompt" version "1" was cached
+    When I request "my-prompt" version "2"
+    Then it's a cache miss

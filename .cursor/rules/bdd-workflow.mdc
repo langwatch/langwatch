@@ -16,6 +16,7 @@ When invoked with a feature request:
 - See `TESTING.md` in the relevant project for the test hierarchy and decision tree for how to approach the test strategy and coverage.
 - Draft a `.feature` file in the `specs/` directory with tags: `@e2e`, `@integration`, `@unit`.
 - Scenarios must be user/domain focused.
+- **One invariant per scenario**: Extend with `And`/`But` only for natural consequences; create new scenarios for orthogonal invariants.
 - Present for approval. **Do NOT write code yet.**
 
 ## 3. Implement (after approval)

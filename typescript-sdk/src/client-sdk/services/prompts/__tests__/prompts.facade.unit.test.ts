@@ -243,4 +243,43 @@ describe("Prompt Retrieval", () => {
       expect(result).toEqual(new Prompt(mockLocalPrompt));
     });
   });
+
+  describe("Scenario: Cache TTL - Version Isolation", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("caches versions independently (different versions do not collide)", async () => {
+      // Given "my-prompt" version "1" was cached
+      const v1Prompt = promptResponseFactory.build({ handle: testHandle, version: 1 });
+      const v2Prompt = promptResponseFactory.build({ handle: testHandle, version: 2 });
+      promptsApiService.get.mockResolvedValueOnce(v1Prompt);
+      promptsApiService.get.mockResolvedValueOnce(v2Prompt);
+
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        version: "1",
+      });
+
+      // When I request "my-prompt" version "2"
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        version: "2",
+      });
+
+      // Then it's a cache miss (API called twice)
+      expect(promptsApiService.get).toHaveBeenCalledTimes(2);
+      expect(promptsApiService.get).toHaveBeenNthCalledWith(1, testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        version: "1",
+      });
+      expect(promptsApiService.get).toHaveBeenNthCalledWith(2, testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        version: "2",
+      });
+    });
+  });
 });

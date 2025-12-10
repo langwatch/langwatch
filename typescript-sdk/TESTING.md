@@ -31,6 +31,15 @@ Is it a regression from production?
   → Add test at the LOWEST sufficient level (unit > integration > e2e)
 ```
 
+## Scenario Design
+
+Each scenario should test **one invariant**. When deciding whether to extend an existing scenario or create a new one:
+
+- **Extend** (add `And`/`But`): The new assertion is a natural consequence of the same behavior
+- **New scenario**: The assertion tests a distinct invariant that could fail independently
+
+Example: "Cache returns stale data" and "Cache key includes version" are orthogonal invariants — separate scenarios. If one fails, you immediately know which contract broke.
+
 ## What We Don't Test
 
 - Type definitions

@@ -117,12 +117,20 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
     throw new Error(`Prompt "${handleOrId}" not found in materialized files`);
   }
 
+  /**
+   * Builds a cache key that includes both handle and version to prevent collisions.
+   */
+  private buildCacheKey(handleOrId: string, options?: GetPromptOptions): string {
+    return `${handleOrId}::version:${options?.version ?? ''}`;
+  }
+
   private async getCacheTtl(
     handleOrId: string,
     options?: GetPromptOptions,
   ): Promise<Prompt> {
+    const cacheKey = this.buildCacheKey(handleOrId, options);
     const ttlMs = (options?.cacheTtlMinutes ?? 5) * 60 * 1000;
-    const cached = this.cache.get(handleOrId);
+    const cached = this.cache.get(cacheKey);
     const now = Date.now();
 
     if (cached && now - cached.timestamp < ttlMs) {
@@ -131,7 +139,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
 
     try {
       const serverPrompt = await this.promptsApiService.get(handleOrId, options);
-      this.cache.set(handleOrId, { data: serverPrompt, timestamp: now });
+      this.cache.set(cacheKey, { data: serverPrompt, timestamp: now });
       return new Prompt(serverPrompt);
     } catch {
       const localPrompt = await this.localPromptsService.get(handleOrId);
