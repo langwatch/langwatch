@@ -29,6 +29,20 @@ import litellm.proxy.proxy_server as litellm_proxy_server
 
 from litellm.router import Router
 
+def configure_litellm_ssl():
+    """
+    Configure httpx to respect environment variables (proxy and SSL certificates).
+    Required for corporate environments with SSL intercepting proxy or 
+    applications that communicate using self-signed certificates.
+    """
+    if any(key in os.environ for key in ["SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"]):
+        import httpx
+        import litellm
+        litellm.client_session = httpx.Client(trust_env=True)
+        litellm.aclient_session = httpx.AsyncClient(trust_env=True)
+
+configure_litellm_ssl()
+
 os.environ["AZURE_API_VERSION"] = "2024-02-01"
 if "DATABASE_URL" in os.environ:
     # we need to delete this otherwise if this is present the proxy server tries to set up a db
