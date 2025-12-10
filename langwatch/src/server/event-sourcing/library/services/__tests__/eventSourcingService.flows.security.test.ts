@@ -295,7 +295,7 @@ describe("EventSourcingService - Security Flows", () => {
   describe("aggregate type scoping", () => {
     it("correct aggregateType is used for all operations", async () => {
       const eventStore = createMockEventStore<Event>();
-      const customAggregateType = "trace_aggregation" as const;
+      const customAggregateType = "trace" as const;
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: customAggregateType,
@@ -322,8 +322,8 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("aggregateType prevents cross-type contamination", async () => {
       const eventStore = createMockEventStore<Event>();
-      const aggregateType1 = "span_ingestion" as const satisfies AggregateType;
-      const aggregateType2 = "trace_aggregation" as const as AggregateType;
+      const aggregateType1 = "trace" as const satisfies AggregateType;
+      const aggregateType2 = "test_aggregate" as const as AggregateType;
 
       const service1 = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,

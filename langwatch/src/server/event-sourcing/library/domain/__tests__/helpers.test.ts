@@ -8,7 +8,7 @@ import type { Event, Projection } from "../types";
 function createValidEvent(
   id = "event-1",
   aggregateId = "agg-1",
-  aggregateType: AggregateType = "span_ingestion",
+  aggregateType: AggregateType = "trace",
   tenantId: TenantId = createTenantId("tenant-1"),
   timestamp = 1000000,
   type: (typeof EVENT_TYPES)[number] = EVENT_TYPES[0]!,
@@ -60,7 +60,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -73,7 +73,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -86,7 +86,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -99,7 +99,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -112,7 +112,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,

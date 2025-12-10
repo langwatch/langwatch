@@ -5,11 +5,11 @@ import { COMMAND_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
  * Command type identifiers follow the taxonomy system defined in ./taxonomy.ts.
  * Format: `<provenance>.<domain>.<aggregate-type>.<command-name>`
  *
- * Example: "lw.obs.span_ingestion.record"
+ * Example: "lw.obs.trace.record_span"
  * - `lw`: Provenance (LangWatch)
  * - `obs`: Domain (Observability)
- * - `span_ingestion`: Aggregate type
- * - `record`: Command name
+ * - `trace`: Aggregate type
+ * - `record_span`: Command name
  */
 
 /**

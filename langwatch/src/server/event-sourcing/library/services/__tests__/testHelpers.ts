@@ -251,7 +251,7 @@ export function createTestTenantId(value = "test-tenant"): TenantId {
  * Creates a test AggregateType.
  */
 export function createTestAggregateType(): AggregateType {
-  return "span_ingestion";
+  return "trace";
 }
 
 /**
@@ -264,7 +264,7 @@ export const TEST_CONSTANTS = {
   PROJECTION_NAME: "test-projection",
   PIPELINE_NAME: "test-pipeline",
   HANDLER_NAME: "test-handler",
-  AGGREGATE_TYPE: "span_ingestion" as const satisfies AggregateType,
+  AGGREGATE_TYPE: "trace" as const satisfies AggregateType,
   EVENT_TYPE_1: EVENT_TYPES[0],
   EVENT_TYPE_2: EVENT_TYPES[1] ?? EVENT_TYPES[0],
 } as const;

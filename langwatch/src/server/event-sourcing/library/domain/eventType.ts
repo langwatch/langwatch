@@ -5,11 +5,11 @@ import { EVENT_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
  * Event type identifiers follow the taxonomy system defined in ./taxonomy.ts.
  * Format: `<provenance>.<domain>.<aggregate-type>.<event-name>`
  *
- * Example: "lw.obs.span_ingestion.recorded"
+ * Example: "lw.obs.trace.span_received"
  * - `lw`: Provenance (LangWatch)
  * - `obs`: Domain (Observability)
- * - `span_ingestion`: Aggregate type
- * - `recorded`: Event name
+ * - `trace`: Aggregate type
+ * - `span_received`: Event name
  */
 
 /**

@@ -36,7 +36,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("customDispatcher", HandlerClass)
         .build();
 
@@ -68,7 +68,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -108,7 +108,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -145,7 +145,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -172,7 +172,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -197,7 +197,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -235,7 +235,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -275,7 +275,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -302,7 +302,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -327,7 +327,7 @@ describe("Pipeline Builder Helper Functions", () => {
         queueProcessorFactory: factory,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 

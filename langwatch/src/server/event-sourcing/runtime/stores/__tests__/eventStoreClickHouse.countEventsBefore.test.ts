@@ -9,7 +9,7 @@ import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickH
 describe("EventStoreClickHouse - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
 
   let mockClickHouseClient: ClickHouseClient;
   let store: EventStoreClickHouse;

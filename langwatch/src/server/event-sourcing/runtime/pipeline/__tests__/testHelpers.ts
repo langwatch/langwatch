@@ -333,7 +333,7 @@ export const TEST_CONSTANTS = {
 export function createTestEventForBuilder(
   aggregateId: string,
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
-  aggregateType: AggregateType = "span_ingestion",
+  aggregateType: AggregateType = "trace",
 ): TestEvent {
   return createTestEvent(aggregateId, aggregateType, tenantId) as TestEvent;
 }
@@ -386,7 +386,7 @@ export function createMinimalPipelineBuilder() {
       queueProcessorFactory: factory,
     })
       .withName("test-pipeline")
-      .withAggregateType("span_ingestion")
+      .withAggregateType("trace")
       .withCommand("testCommand", HandlerClass)
       .build();
   };

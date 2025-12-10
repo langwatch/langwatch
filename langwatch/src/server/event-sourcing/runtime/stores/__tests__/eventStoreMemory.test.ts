@@ -8,7 +8,7 @@ import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 describe("EventStoreMemory - Event ID Deduplication", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
   const eventType = EVENT_TYPES[0];
 
   let store: EventStoreMemory;
