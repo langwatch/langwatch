@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { RenderInputOutput } from "~/components/traces/RenderInputOutput";
 import { SpanDuration } from "~/components/traces/SpanDetails";
 import { RedactedField } from "~/components/ui/RedactedField";

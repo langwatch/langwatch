@@ -38,7 +38,7 @@ import type {
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Menu } from "../ui/menu";
 
 import { toaster } from "../ui/toaster";
@@ -374,8 +374,8 @@ export function DatasetTable({
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setParentRowData((rows) =>
-        rows?.filter((row) => !recordIds.includes(row.id)),
+      setParentRowData(
+        (rows) => rows?.filter((row) => !recordIds.includes(row.id)),
       );
 
       const grid = parentGridRef ?? gridRef;
@@ -500,8 +500,8 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                        ? ""
-                        : DEFAULT_DATASET_NAME
+                      ? ""
+                      : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
@@ -525,8 +525,8 @@ export function DatasetTable({
           {savingStatus === "saving"
             ? "Saving..."
             : savingStatus === "saved"
-              ? "Saved"
-              : ""}
+            ? "Saved"
+            : ""}
         </Text>
         <Spacer />
         {!hideButtons && (
@@ -537,14 +537,14 @@ export function DatasetTable({
                 minWidth="fit-content"
                 onClick={() =>
                   openDrawer("uploadCSV", {
-                    onSuccess: ({ datasetId: datasetId_ }) => {
-                      setDatasetId(datasetId_);
+                    onSuccess: (data: { datasetId: string }) => {
+                      setDatasetId(data.datasetId);
                       void databaseDataset.refetch();
                     },
                     onCreateFromScratch: () => {
                       openDrawer("addOrEditDataset", {
-                        onSuccess: ({ datasetId: datasetId_ }) => {
-                          setDatasetId(datasetId_);
+                        onSuccess: (data: { datasetId: string }) => {
+                          setDatasetId(data.datasetId);
                           void databaseDataset.refetch();
                         },
                       });

@@ -44,7 +44,7 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { Delayed } from "../Delayed";
 import { FilterSidebar } from "../filters/FilterSidebar";

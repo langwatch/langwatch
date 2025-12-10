@@ -15,7 +15,7 @@ import type {
   DatasetRecordEntry,
 } from "../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { useDrawer } from "./CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
 import { Drawer } from "./ui/drawer";
