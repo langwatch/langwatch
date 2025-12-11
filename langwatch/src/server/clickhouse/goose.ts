@@ -116,6 +116,10 @@ function buildMigrationEnvVars(
     CLICKHOUSE_ENGINE_REPLACING_PREFIX: config.replicated
       ? `ReplicatedReplacingMergeTree(${zkPath}, `
       : "ReplacingMergeTree(",
+
+    CLICKHOUSE_ENGINE_AGGREGATING: config.replicated
+      ? `ReplicatedAggregatingMergeTree(${zkPath})`
+      : "AggregatingMergeTree()",
   };
 
   return { ...systemVars, ...clickhouseVars };
