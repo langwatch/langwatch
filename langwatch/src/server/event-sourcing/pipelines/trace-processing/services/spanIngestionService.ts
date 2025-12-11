@@ -4,11 +4,16 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import type { DeepPartial } from "../../../../../utils/types";
 import type { TraceForCollection } from "../../../../tracer/otel.traces";
+import { spanStoragePipeline } from "../../span-storage/pipeline";
 import { traceProcessingPipeline } from "../pipeline";
 import { SpanProcessingMapperService } from "./spanProcessingMapperService";
 
 /**
- * Service for ingesting spans into the trace processing pipeline.
+ * Service for ingesting spans into both span storage and trace processing pipelines.
+ *
+ * This service sends spans to two pipelines:
+ * 1. span-storage pipeline - stores individual spans (span-level aggregates)
+ * 2. trace-processing pipeline - computes trace summaries (trace-level aggregates)
  *
  * @example
  * ```typescript
@@ -26,7 +31,7 @@ export class SpanIngestionService {
 
   /**
    * Ingests a span collection into the LangWatch platform by mapping its spans to
-   * commands and sending them through the trace processing pipeline.
+   * commands and sending them through both pipelines.
    *
    * @param tenantId - The tenant ID.
    * @param traceForCollection - The trace for collection.
@@ -67,15 +72,24 @@ export class SpanIngestionService {
         }
 
         for (const record of records) {
-          const command = {
-            tenantId,
-            spanData: this.mapperService.mapReadableSpanToSpanData(
-              record.readableSpan,
-            ),
-            collectedAtUnixMs: Date.now(),
-          };
+          const spanData = this.mapperService.mapReadableSpanToSpanData(
+            record.readableSpan,
+          );
+          const collectedAtUnixMs = Date.now();
 
-          await traceProcessingPipeline.commands.recordSpan.send(command);
+          // Send to span-storage pipeline (span-level aggregate for individual span storage)
+          await spanStoragePipeline.commands.storeSpan.send({
+            tenantId,
+            spanData,
+            collectedAtUnixMs,
+          });
+
+          // Send to trace-processing pipeline (trace-level aggregate for trace summaries)
+          await traceProcessingPipeline.commands.recordSpan.send({
+            tenantId,
+            spanData,
+            collectedAtUnixMs,
+          });
         }
 
         span.setAttributes({

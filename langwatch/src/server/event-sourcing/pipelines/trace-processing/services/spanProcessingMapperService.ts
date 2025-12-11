@@ -23,6 +23,7 @@ import type { DeepPartial } from "../../../../../utils/types";
 import type { TraceForCollection } from "../../../../tracer/otel.traces";
 import type { RAGSpan, Span } from "../../../../tracer/types";
 import type { SpanData } from "../schemas/commands";
+import { filterUndefinedAttributes } from "../utils/attributeUtils";
 import {
   convertSpanKind,
   convertSpanTypeToGenAiOperationName,
@@ -139,33 +140,6 @@ export class SpanProcessingMapperService {
     );
   }
 
-  /**
-   * Filters out undefined values from Attributes to match the expected type.
-   */
-  private filterUndefinedAttributes(
-    attrs: Attributes | undefined,
-  ): Record<
-    string,
-    string | number | boolean | string[] | number[] | boolean[]
-  > {
-    if (!attrs) return {};
-    const result: Record<
-      string,
-      string | number | boolean | string[] | number[] | boolean[]
-    > = {};
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value !== undefined) {
-        result[key] = value as
-          | string
-          | number
-          | boolean
-          | string[]
-          | number[]
-          | boolean[];
-      }
-    }
-    return result;
-  }
 
   /**
    * Converts a ReadableSpan to a JSON-serializable DTO for command payloads.
@@ -205,13 +179,13 @@ export class SpanProcessingMapperService {
       endTimeUnixMs,
 
       // Attributes (already a plain object/record)
-      attributes: this.filterUndefinedAttributes(span.attributes),
+      attributes: filterUndefinedAttributes(span.attributes),
 
       // Events - convert TimedEvent[] to serializable format
       events: span.events.map((event) => ({
         name: event.name,
         timeUnixMs: event.time[0] * 1000 + event.time[1] / 1_000_000,
-        attributes: this.filterUndefinedAttributes(event.attributes),
+        attributes: filterUndefinedAttributes(event.attributes),
       })),
 
       // Links - convert Link[] to serializable format
@@ -220,7 +194,7 @@ export class SpanProcessingMapperService {
         spanId: link.context.spanId,
         traceState: link.context.traceState?.serialize() ?? null,
         attributes: link.attributes
-          ? this.filterUndefinedAttributes(link.attributes)
+          ? filterUndefinedAttributes(link.attributes)
           : undefined,
       })),
 
@@ -231,7 +205,7 @@ export class SpanProcessingMapperService {
       },
 
       // Resource data - filter undefined attributes
-      resourceAttributes: this.filterUndefinedAttributes(
+      resourceAttributes: filterUndefinedAttributes(
         span.resource.attributes,
       ),
 

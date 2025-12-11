@@ -1,3 +1,4 @@
+export { BaseMemoryProjectionStore } from "./baseMemoryRepository";
 export type { SpanRepository, StoreSpanData } from "./spanRepository";
 export { SpanRepositoryClickHouse } from "./spanRepositoryClickHouse";
 export { SpanRepositoryMemory } from "./spanRepositoryMemory";

@@ -8,48 +8,44 @@ import {
   defineCommandSchema,
   EventUtils,
 } from "../../../library";
-import type { RecordSpanCommandData } from "../schemas/commands";
+import type { StoreSpanCommandData } from "../schemas/commands";
 import {
-  RECORD_SPAN_COMMAND_TYPE,
-  recordSpanCommandDataSchema,
+  STORE_SPAN_COMMAND_TYPE,
+  storeSpanCommandDataSchema,
 } from "../schemas/commands";
-import type { SpanReceivedEvent } from "../schemas/events";
-import { SPAN_RECEIVED_EVENT_TYPE } from "../schemas/events";
+import type { SpanStoredEvent } from "../schemas/events";
+import { SPAN_STORED_EVENT_TYPE } from "../schemas/events";
 
 /**
- * Command handler for recording spans in the trace processing pipeline.
- * Maps incoming span data and emits a SpanReceivedEvent with full span data.
- *
- * This pipeline computes trace summaries. Individual span storage is handled
- * by the separate span-storage pipeline.
- * This ensures events contain all data needed for replay.
+ * Command handler for storing spans in the span storage pipeline.
+ * Maps incoming span data and emits a SpanStoredEvent.
  *
  * @example
  * ```typescript
- * await traceProcessingPipeline.commands.recordSpan.send({
+ * await spanStoragePipeline.commands.storeSpan.send({
  *   tenantId: "tenant_123",
  *   spanData: { ... },
  *   collectedAtUnixMs: Date.now(),
  * });
  * ```
  */
-export class RecordSpanCommand
-  implements CommandHandler<Command<RecordSpanCommandData>, SpanReceivedEvent>
+export class StoreSpanCommand
+  implements CommandHandler<Command<StoreSpanCommandData>, SpanStoredEvent>
 {
   static readonly schema = defineCommandSchema(
-    RECORD_SPAN_COMMAND_TYPE,
-    recordSpanCommandDataSchema,
-    "Command to record a span in the trace processing pipeline",
+    STORE_SPAN_COMMAND_TYPE,
+    storeSpanCommandDataSchema,
+    "Command to store a span in the span storage pipeline",
   );
 
-  tracer = getLangWatchTracer("langwatch.trace-processing.record-span");
-  logger = createLogger("langwatch:trace-processing:record-span");
+  tracer = getLangWatchTracer("langwatch.span-storage.store-span");
+  logger = createLogger("langwatch:span-storage:store-span");
 
   async handle(
-    command: Command<RecordSpanCommandData>,
-  ): Promise<SpanReceivedEvent[]> {
+    command: Command<StoreSpanCommandData>,
+  ): Promise<SpanStoredEvent[]> {
     return await this.tracer.withActiveSpan(
-      "RecordSpanCommand.handle",
+      "StoreSpanCommand.handle",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -76,10 +72,10 @@ export class RecordSpanCommand
             collectedAtUnixMs,
             spanRecordId,
           },
-          "Handling record span command",
+          "Handling store span command",
         );
 
-        // Create complete span data with id and tenantId for event storage
+        // Create complete span data with id and tenantId
         const completeSpanData = {
           ...spanData,
           id: spanRecordId,
@@ -87,18 +83,18 @@ export class RecordSpanCommand
         };
 
         // Emit event with full span data
-        // TraceSummaryProjection will handle aggregation into trace summaries
-        const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
-          "trace",
-          traceId,
+        // Aggregate ID is spanId for span-level aggregates
+        const spanStoredEvent = EventUtils.createEvent<SpanStoredEvent>(
+          "span",
+          spanId, // aggregateId is spanId, not traceId
           tenantId,
-          SPAN_RECEIVED_EVENT_TYPE,
+          SPAN_STORED_EVENT_TYPE,
           {
             spanData: completeSpanData,
             collectedAtUnixMs,
           },
           {
-            spanId,
+            traceId,
             collectedAtUnixMs,
           },
         );
@@ -108,22 +104,23 @@ export class RecordSpanCommand
             tenantId,
             traceId,
             spanId,
-            eventId: spanReceivedEvent.id,
+            eventId: spanStoredEvent.id,
           },
-          "Emitting SpanReceivedEvent",
+          "Emitting SpanStoredEvent",
         );
 
-        return [spanReceivedEvent];
+        return [spanStoredEvent];
       },
     );
   }
 
-  static getAggregateId(payload: RecordSpanCommandData): string {
-    return payload.spanData.traceId;
+  static getAggregateId(payload: StoreSpanCommandData): string {
+    // Span-level aggregate: aggregateId is spanId
+    return payload.spanData.spanId;
   }
 
   static getSpanAttributes(
-    payload: RecordSpanCommandData,
+    payload: StoreSpanCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.trace.id": payload.spanData.traceId,
@@ -131,7 +128,8 @@ export class RecordSpanCommand
     };
   }
 
-  static makeJobId(payload: RecordSpanCommandData): string {
-    return `${payload.tenantId}:${payload.spanData.traceId}:${payload.spanData.spanId}`;
+  static makeJobId(payload: StoreSpanCommandData): string {
+    return `${payload.tenantId}:${payload.spanData.spanId}`;
   }
 }
+

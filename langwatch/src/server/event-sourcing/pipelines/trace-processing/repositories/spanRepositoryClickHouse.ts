@@ -4,6 +4,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import type { SpanData } from "../schemas/commands";
+import { filterUndefinedAttributes } from "../utils/attributeUtils";
 import type { SpanRepository, StoreSpanData } from "./spanRepository";
 
 /**
@@ -341,30 +342,6 @@ export class SpanRepositoryClickHouse implements SpanRepository {
     }
   }
 
-  private filterUndefinedAttributes(
-    attrs: ClickHouseAttributes | undefined,
-  ): Record<
-    string,
-    string | number | boolean | string[] | number[] | boolean[]
-  > {
-    if (!attrs) return {};
-    const result: Record<
-      string,
-      string | number | boolean | string[] | number[] | boolean[]
-    > = {};
-    for (const [key, value] of Object.entries(attrs)) {
-      if (value !== undefined) {
-        result[key] = value as
-          | string
-          | number
-          | boolean
-          | string[]
-          | number[]
-          | boolean[];
-      }
-    }
-    return result;
-  }
 
   private transformClickHouseSpanToSpanData(
     clickHouseSpan: ClickHouseSpan,
@@ -375,7 +352,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       (timestamp, index) => ({
         name: clickHouseSpan["Events.Name"][index] ?? "",
         timeUnixMs: timestamp,
-        attributes: this.filterUndefinedAttributes(
+        attributes: filterUndefinedAttributes(
           clickHouseSpan["Events.Attributes"][index],
         ),
       }),
@@ -387,7 +364,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       spanId: clickHouseSpan["Links.SpanId"][index] ?? "",
       traceState: clickHouseSpan["Links.TraceState"][index] ?? null,
       attributes: clickHouseSpan["Links.Attributes"][index]
-        ? this.filterUndefinedAttributes(
+        ? filterUndefinedAttributes(
             clickHouseSpan["Links.Attributes"][index],
           )
         : undefined,
@@ -411,7 +388,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       kind: this.mapSpanKindFromString(clickHouseSpan.SpanKind),
       startTimeUnixMs,
       endTimeUnixMs,
-      attributes: this.filterUndefinedAttributes(clickHouseSpan.SpanAttributes),
+      attributes: filterUndefinedAttributes(clickHouseSpan.SpanAttributes),
       events,
       links,
       status: {
@@ -419,7 +396,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
         message: clickHouseSpan.StatusMessage,
       },
       resourceAttributes: clickHouseSpan.ResourceAttributes
-        ? this.filterUndefinedAttributes(clickHouseSpan.ResourceAttributes)
+        ? filterUndefinedAttributes(clickHouseSpan.ResourceAttributes)
         : undefined,
       instrumentationScope: {
         name: clickHouseSpan.ScopeName,
