@@ -174,11 +174,11 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
         .withName("test-pipeline")
-        .withAggregateType("trace_aggregation");
+        .withAggregateType("test_aggregate");
 
       const pipeline = builder.build();
 
-      expect(pipeline.aggregateType).toBe("trace_aggregation");
+      expect(pipeline.aggregateType).toBe("test_aggregate");
     });
 
     it("creates RegisteredPipeline with service property that is EventSourcingService instance", () => {
