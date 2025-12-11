@@ -8,6 +8,10 @@ import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/typeIdentifiers";
+import {
+  SPAN_STORAGE_COMMAND_TYPES,
+  SPAN_STORAGE_EVENT_TYPES,
+} from "../pipelines/span-storage/schemas/typeIdentifiers";
 
 /**
  * Test event type identifiers for integration tests.
@@ -20,6 +24,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  */
 export const EVENT_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_EVENT_TYPES,
+  ...SPAN_STORAGE_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -28,6 +33,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
   ...TRACE_PROCESSING_COMMAND_TYPES,
+  ...SPAN_STORAGE_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -41,5 +47,6 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
   "trace",
+  "span",
   TEST_AGGREGATE_TYPE,
 ] as const;
