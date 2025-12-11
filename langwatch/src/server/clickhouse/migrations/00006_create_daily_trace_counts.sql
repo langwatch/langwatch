@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.daily_trace_counts
     TraceCount AggregateFunction(uniq, String),
     LastUpdatedAt DateTime64(9) CODEC(Delta(8), ZSTD(1))
 )
-ENGINE = AggregatingMergeTree()
+ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING}
 PARTITION BY toYYYYMM(DateUtc)
 ORDER BY (TenantId, DateUtc)
 SETTINGS index_granularity = 8192;
