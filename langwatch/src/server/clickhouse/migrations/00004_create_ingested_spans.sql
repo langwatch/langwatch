@@ -57,7 +57,7 @@ ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}Timestamp)
 PARTITION BY (TenantId, toYYYYMM(Timestamp))
 ORDER BY (TenantId, TraceId, SpanId)
 TTL toDateTime(Timestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
-SETTINGS index_granularity = 8192, storage_policy = 'tiered';
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

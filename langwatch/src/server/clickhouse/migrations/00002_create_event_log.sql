@@ -36,7 +36,7 @@ ENGINE = ${CLICKHOUSE_ENGINE_MERGETREE:-MergeTree()}
 PARTITION BY (TenantId, toYYYYMM(EventTimestamp))
 ORDER BY (TenantId, AggregateType, AggregateId, EventTimestamp, EventId)
 TTL toDateTime(EventTimestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
-SETTINGS index_granularity = 8192, storage_policy = 'tiered';
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
