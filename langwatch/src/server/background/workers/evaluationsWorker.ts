@@ -353,7 +353,7 @@ export const runEvaluationForTrace = async ({
     throw "trace not found";
   }
 
-  if (trace.error) {
+  if (trace.error && !trace.input && !trace.output) {
     return {
       status: "skipped",
       details: "Cannot evaluate trace with errors",

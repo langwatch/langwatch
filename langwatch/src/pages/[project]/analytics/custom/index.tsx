@@ -71,7 +71,7 @@ import {
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
-import { useDrawer } from "../../../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
@@ -1454,7 +1454,11 @@ function SeriesField({
                     openDrawer("seriesFilters", {
                       filters:
                         field.value ?? ({} as Record<FilterField, FilterParam>),
-                      onChange: ({ filters }) => {
+                      onChange: ({
+                        filters,
+                      }: {
+                        filters: Record<FilterField, FilterParam>;
+                      }) => {
                         form.setValue(`series.${index}.filters`, filters);
                       },
                     })

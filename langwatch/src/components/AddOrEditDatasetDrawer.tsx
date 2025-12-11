@@ -24,7 +24,7 @@ import type {
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
-import { useDrawer } from "./CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "./datasets/DatasetPreview";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";

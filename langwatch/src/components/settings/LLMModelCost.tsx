@@ -15,7 +15,7 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { useDrawer } from "../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 
 export function LLMModelCost(props: { projectId?: string }) {
   const { openDrawer } = useDrawer();
