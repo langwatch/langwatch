@@ -865,7 +865,7 @@ export const processCollectorCheckAndAdjustJob = async (
   if (
     // Does not re-schedule trace checks for too old traces being resynced
     (!existingTrace?.timestamps?.inserted_at ||
-      existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000) &&
+      existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
     // Does not schedule evaluations for traces that are not from the studio in development
     (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
       customMetadata?.platform !== "optimization_studio" ||
