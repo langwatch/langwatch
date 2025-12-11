@@ -63,16 +63,12 @@ export class ScenarioEventService {
       return null;
     }
 
-    // Get latest message snapshot event using dedicated repository method
+    // Get latest message snapshot event using dedicated repository method (optional)
     const latestMessageEvent =
       await this.eventRepository.getLatestMessageSnapshotEventByScenarioRunId({
         projectId,
         scenarioRunId,
       });
-
-    if (!latestMessageEvent) {
-      return null;
-    }
 
     // Get latest run finished event using dedicated repository method
     const latestRunFinishedEvent =
@@ -82,13 +78,13 @@ export class ScenarioEventService {
       });
 
     return {
-      scenarioId: latestMessageEvent.scenarioId,
-      batchRunId: latestMessageEvent.batchRunId,
-      scenarioRunId: latestMessageEvent.scenarioRunId,
+      scenarioId: runStartedEvent.scenarioId,
+      batchRunId: runStartedEvent.batchRunId,
+      scenarioRunId: runStartedEvent.scenarioRunId,
       status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
       results: latestRunFinishedEvent?.results ?? null,
-      messages: latestMessageEvent.messages ?? [],
-      timestamp: latestMessageEvent.timestamp ?? 0,
+      messages: latestMessageEvent?.messages ?? [],
+      timestamp: latestMessageEvent?.timestamp ?? runStartedEvent.timestamp,
       name: runStartedEvent?.metadata?.name ?? null,
       description: runStartedEvent?.metadata?.description ?? null,
       durationInMs:
@@ -380,18 +376,18 @@ export class ScenarioEventService {
       const runFinishedEvent = runFinishedEvents.get(scenarioRunId);
 
       // Skip if we don't have the required events
-      if (!runStartedEvent || !messageEvent) {
+      if (!runStartedEvent) {
         continue;
       }
 
       runs.push({
-        scenarioId: messageEvent.scenarioId,
-        batchRunId: messageEvent.batchRunId,
-        scenarioRunId: messageEvent.scenarioRunId,
+        scenarioId: runStartedEvent.scenarioId,
+        batchRunId: runStartedEvent.batchRunId,
+        scenarioRunId: runStartedEvent.scenarioRunId,
         status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
         results: runFinishedEvent?.results ?? null,
-        messages: messageEvent.messages ?? [],
-        timestamp: messageEvent.timestamp ?? 0,
+        messages: messageEvent?.messages ?? [],
+        timestamp: messageEvent?.timestamp ?? 0,
         name: runStartedEvent?.metadata?.name ?? null,
         description: runStartedEvent?.metadata?.description ?? null,
         durationInMs:
