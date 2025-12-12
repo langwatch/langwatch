@@ -59,11 +59,11 @@ async def main(message: cl.Message):
                             "span_id": f"span_{nanoid.generate()}",
                             "input": {
                                 "type": "text",
-                                "value": message.content,
+                                "value": "" if index == 0 else message.content,
                             },
                             "output": {
                                 "type": "text",
-                                "value": f"{full_response} (span {index})",
+                                "value": "" if index == 0 else f"{full_response} (span {index})",
                             },
                             "timestamps": {
                                 "started_at": int(time.time() * 1000),
@@ -79,10 +79,11 @@ async def main(message: cl.Message):
             )
 
     threads = []
-    for i in range(10):
+    for i in range(2):
         thread = threading.Thread(target=send_span, args=(i,))
         threads.append(thread)
         thread.start()
+        time.sleep(30)
 
     # Wait for all threads to complete
     for thread in threads:
