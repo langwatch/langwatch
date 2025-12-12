@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
     from .prompts.prompt_facade import PromptsFacade
+    from .prompts.types import FetchPolicy
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
@@ -67,6 +68,12 @@ def __getattr__(name: str):
         svc = PromptsFacade.from_global()
         globals()[name] = svc  # Cache for subsequent access
         return svc
+    elif name == "FetchPolicy":
+        # Lazy import FetchPolicy to avoid loading prompts module
+        from .prompts.types.fetch_policy import FetchPolicy as _FetchPolicy
+
+        globals()[name] = _FetchPolicy
+        return _FetchPolicy
 
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
@@ -153,5 +160,5 @@ __all__ = [
     "evaluations",
     "langchain",
     "dspy",
-    "prompts",
+    "FetchPolicy",
 ]
