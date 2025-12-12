@@ -64,6 +64,11 @@ packages = ["src/langwatch"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
+markers = [
+    "e2e: End-to-end tests that require external services",
+    "integration: Integration tests",
+    "unit: Unit tests (default)",
+]
 
 [dependency-groups]
 dev = ["black>=25.1.0"]
