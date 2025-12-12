@@ -63,7 +63,7 @@ class {{ class_name }}(LLMNode):
 
         {# Configure LLM #}
         {% if llm_config %}
-        lm = {{ node_llm_config_to_dspy_lm(llm_config) }}
+        lm = {{ node_llm_config_to_dspy_lm(llm_config, corrected_llm_params) }}
         {% endif %}
 
         {# Process demonstrations if available #}

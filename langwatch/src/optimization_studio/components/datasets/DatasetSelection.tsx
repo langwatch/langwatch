@@ -6,7 +6,7 @@ import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
 import type { AddDatasetDrawerProps } from "../../../components/AddOrEditDatasetDrawer";
-import { useDrawer } from "../../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
 import { Menu } from "../../../components/ui/menu";

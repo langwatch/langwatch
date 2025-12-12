@@ -3,7 +3,7 @@ import { Bug, TextCursorInput } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { Edit, Italic, Search } from "react-feather";
-import { useDrawer } from "../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { Trace } from "../../server/tracer/types";

@@ -1,6 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "../../../../../utils/clickhouse";
+import { getClickHouseClient } from "~/server/clickhouse/client";
 import { createLogger } from "../../../../../utils/logger";
 import type { Command, CommandHandler } from "../../../library";
 import {

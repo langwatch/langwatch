@@ -64,7 +64,7 @@ class WorkflowModule(LangWatchWorkflowModule):
     {% endif %}
         config = {}
         {% if workflow.default_llm %}
-        config["lm"] = {{ node_llm_config_to_dspy_lm(workflow.default_llm) }}
+        config["lm"] = {{ node_llm_config_to_dspy_lm(workflow.default_llm, corrected_default_llm_params) }}
         {% endif %}
         {% if workflow.template_adapter == "default" %}
         config["adapter"] = TemplateAdapter()

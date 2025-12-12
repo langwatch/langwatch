@@ -24,7 +24,7 @@ export class TraceAggregationService {
   /**
    * Aggregates spans into trace metadata.
    * Computes total spans, duration, service names, root span ID, start/end times,
-   * and all computed metrics matching the trace_projections ClickHouse schema.
+   * and all computed metrics matching the trace_summaries ClickHouse schema.
    *
    * Extracts data from spans using OpenTelemetry GenAI semantic conventions:
    * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens for token counts

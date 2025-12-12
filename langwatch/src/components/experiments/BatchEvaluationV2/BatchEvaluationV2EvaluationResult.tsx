@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
-import { useDrawer } from "../../CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
 import { ExpandedTextDialog, HoverableBigText } from "../../HoverableBigText";
 import { getEvaluationColumns } from "./utils";

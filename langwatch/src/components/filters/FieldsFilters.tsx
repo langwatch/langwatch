@@ -21,7 +21,7 @@ import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";

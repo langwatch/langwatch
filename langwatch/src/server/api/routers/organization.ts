@@ -7,6 +7,7 @@ import {
   type Team,
   type TeamUser,
   TeamUserRole,
+  type Prisma,
   type User,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
@@ -1285,5 +1286,183 @@ export const organizationRouter = createTRPCRouter({
 
         return { success: true };
       });
+    }),
+
+  getAuditLogs: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        projectId: z.string().optional(),
+        userId: z.string().optional(), // For searching by user
+        pageOffset: z.number().min(0).default(0),
+        pageSize: z.number().min(1).max(10000).default(25), // Increased max for exports
+        action: z.string().optional(), // For filtering by action type
+        startDate: z.number().optional(), // Start date timestamp (milliseconds)
+        endDate: z.number().optional(), // End date timestamp (milliseconds)
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      // Get all user IDs that belong to this organization
+      // This helps us filter logs with null organizationId to only show logs from org members
+      const orgUserIds = await ctx.prisma.organizationUser.findMany({
+        where: {
+          organizationId: input.organizationId,
+        },
+        select: {
+          userId: true,
+        },
+      });
+      const orgUserIdsList = orgUserIds.map((ou) => ou.userId);
+
+      // Build base conditions for organizationId
+      const orgIdConditions: Prisma.AuditLogWhereInput[] = [
+        { organizationId: input.organizationId },
+      ];
+
+      // Only include null organizationId logs if:
+      // 1. The user list is not empty
+      // 2. The log has a projectId (so we can determine it belongs to this org via the project)
+      // We exclude logs where both organizationId and projectId are null
+      if (orgUserIdsList.length > 0) {
+        orgIdConditions.push({
+          organizationId: null,
+          userId: {
+            in: orgUserIdsList,
+          },
+          projectId: {
+            not: null,
+          },
+        });
+      }
+
+      // Build the where clause
+      const where: Prisma.AuditLogWhereInput = {};
+
+      // Build AND conditions
+      const andConditions: Prisma.AuditLogWhereInput[] = [
+        {
+          OR: orgIdConditions,
+        },
+      ];
+
+      // Add userId filter if provided
+      if (input.userId) {
+        andConditions.push({ userId: input.userId });
+      }
+
+      // Add action filter if provided
+      if (input.action) {
+        andConditions.push({
+          action: {
+            contains: input.action,
+            mode: "insensitive" as const,
+          },
+        });
+      }
+
+      // Add projectId filter if provided
+      if (input.projectId) {
+        // When project is selected, show logs for that project OR organization-level (null projectId)
+        andConditions.push({
+          OR: [{ projectId: input.projectId }, { projectId: null }],
+        });
+      }
+
+      // Add date range filter if provided
+      if (input.startDate !== undefined || input.endDate !== undefined) {
+        const dateFilter: {
+          gte?: Date;
+          lte?: Date;
+        } = {};
+        if (input.startDate !== undefined) {
+          dateFilter.gte = new Date(input.startDate);
+        }
+        if (input.endDate !== undefined) {
+          dateFilter.lte = new Date(input.endDate);
+        }
+        andConditions.push({
+          createdAt: dateFilter,
+        });
+      }
+
+      // If we have multiple conditions, use AND; otherwise use the single condition
+      if (andConditions.length > 1) {
+        where.AND = andConditions;
+      } else {
+        Object.assign(where, andConditions[0]);
+      }
+
+      // Get total count for pagination
+      const totalCount = await ctx.prisma.auditLog.count({
+        where,
+      });
+
+      // Get paginated audit logs
+      const auditLogs = await ctx.prisma.auditLog.findMany({
+        where,
+        take: input.pageSize,
+        skip: input.pageOffset,
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      // Get unique user IDs from audit logs
+      const userIds = [...new Set(auditLogs.map((log) => log.userId))];
+
+      // Get unique project IDs from audit logs
+      const projectIds = [
+        ...new Set(
+          auditLogs
+            .map((log) => log.projectId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+
+      // Fetch users in a single query
+      const users = await ctx.prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      });
+
+      // Fetch projects in a single query
+      const projects = await ctx.prisma.project.findMany({
+        where: {
+          id: {
+            in: projectIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      // Create maps for O(1) lookup
+      const userMap = new Map(users.map((user) => [user.id, user]));
+      const projectMap = new Map(
+        projects.map((project) => [project.id, project]),
+      );
+
+      // Enrich audit logs with user and project data
+      const enrichedAuditLogs = auditLogs.map((log) => ({
+        ...log,
+        user: userMap.get(log.userId) ?? null,
+        project: log.projectId ? projectMap.get(log.projectId) ?? null : null,
+      }));
+
+      return {
+        auditLogs: enrichedAuditLogs,
+        totalCount,
+      };
     }),
 });

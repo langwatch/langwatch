@@ -26,7 +26,7 @@ import {
   AddOrEditDatasetDrawer,
   type AddDatasetDrawerProps,
 } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "../../hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { toaster } from "../ui/toaster";
 import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";

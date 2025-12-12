@@ -6,7 +6,7 @@ import {
 } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "react-feather";
-import { useDrawer } from "../../components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Dialog } from "../../components/ui/dialog";
 import type { DatasetColumns } from "../../server/datasets/types";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
