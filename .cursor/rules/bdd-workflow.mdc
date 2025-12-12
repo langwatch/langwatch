@@ -20,9 +20,9 @@ When invoked with a feature request:
 - **One invariant per scenario**: Extend with `And`/`But` only for natural consequences; create new scenarios for orthogonal invariants.
 - Present for approval. **Do NOT write code yet.**
 
-## 3. Implement (after approval)
+## 3. Outside-In TDD and Implementation (after approval)
+- Outside-In TDD: Write failing tests
 - RED → GREEN → REFACTOR
-- Write all tests first
 - Failing tests → implement code → verify: `typecheck + lint + tests pass`.
 - Refactor if needed.
 

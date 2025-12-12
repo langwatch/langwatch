@@ -99,4 +99,7 @@ examples = [
     "strands-agents[otel]>=1.14.0,<2.0.0",
     "unstructured[pdf]>=0.18.3",
 ]
-tests = ["pytest-asyncio>=0.21.2"]
+tests = [
+    "factory-boy>=3.3.3",
+    "pytest-asyncio>=0.21.2",
+]

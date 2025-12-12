@@ -24,6 +24,7 @@ import subprocess
 
 from dotenv import load_dotenv
 import langwatch
+from langwatch import FetchPolicy
 
 
 def run_cli(command: list, cwd: Path):
@@ -116,7 +117,7 @@ def demo_materialized_only(work_dir: Path, prompt_name: str):
 
     start_time = time.time()
     prompt = langwatch.prompts.get(
-        prompt_name, fetch_policy=langwatch.FetchPolicy.MATERIALIZED_ONLY
+        prompt_name, fetch_policy=FetchPolicy.MATERIALIZED_ONLY
     )
     end_time = time.time()
 
