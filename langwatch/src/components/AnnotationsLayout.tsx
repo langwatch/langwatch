@@ -7,7 +7,7 @@ import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-	import { useDrawer } from "~/hooks/useDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({

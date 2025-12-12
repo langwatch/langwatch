@@ -282,7 +282,7 @@ export function CSVReaderComponent({
     acceptedFile: File;
   }) => void | Promise<void>;
   onUploadRemoved?: () => void;
-  children?: (acceptedFile: boolean) => React.ReactNode;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
@@ -375,7 +375,7 @@ export function CSVReaderComponent({
               Remove={Remove}
               ProgressBar={ProgressBar}
             />
-            {children ? children(acceptedFile !== null) : null}
+            {children ? children(acceptedFile !== null) : null} {/* Pass boolean indicating if file is accepted to render prop */}
           </>
         );
       }}

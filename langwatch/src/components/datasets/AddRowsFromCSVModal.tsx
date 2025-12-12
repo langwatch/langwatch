@@ -172,8 +172,8 @@ export function AddRowsFromCSVModal({
     }));
   }, [columnTypes]);
 
-  const renderMapping = (acceptedFile: boolean) => {
-    if (!acceptedFile) return;
+  const renderMapping = (hasAcceptedFile: boolean) => {
+    if (!hasAcceptedFile) return;
 
     return selectMappings.map((option, index) => {
       return (
