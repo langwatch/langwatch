@@ -80,6 +80,7 @@ Specialized functionality examples:
 
 | Example | Feature | Description |
 |---------|---------|-------------|
+| [`fetch_policies_example.py`](fetch_policies_example.py) | Fetch policies | Prompt retrieval strategies |
 | [`distributed_tracing.py`](distributed_tracing.py) | Distributed tracing | Multi-service tracing |
 | [`dataset_kitchen_sink.py`](dataset_kitchen_sink.py) | Dataset operations | Full dataset workflow |
 | [`offline_evaluation.ipynb`](offline_evaluation.ipynb) | Offline analysis | Jupyter notebook evaluation |
@@ -148,7 +149,7 @@ examples/
 
 - **Beginner**: `generic_bot.py`, `generic_bot_sync_function.py`
 - **Intermediate**: Framework integrations, basic RAG
-- **Advanced**: Multi-threading, distributed tracing, custom evaluations
+- **Advanced**: Multi-threading, distributed tracing, custom evaluations, fetch policies
 - **Integration**: Web frameworks, cloud providers, specialized tools
 
 ## 📝 Contributing
