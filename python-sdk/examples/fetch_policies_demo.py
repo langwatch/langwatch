@@ -21,6 +21,7 @@ import time
 from pathlib import Path
 import tempfile
 import subprocess
+import contextlib
 
 from dotenv import load_dotenv
 import langwatch
@@ -31,6 +32,17 @@ from examples.test_utils.run_cli import run_cli
 load_dotenv()
 
 CLI_EXECUTABLE = ["npx", "langwatch@latest"]
+
+
+@contextlib.contextmanager
+def working_directory(path):
+    """Temporarily change the working directory."""
+    original_cwd = Path.cwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(original_cwd)
 
 
 def setup_local_prompt(work_dir: Path, prompt_name: str) -> str:
@@ -61,16 +73,16 @@ def demo_materialized_first(work_dir: Path, prompt_name: str):
     print("   Local first → API fallback")
     print("=" * 60)
 
-    os.chdir(work_dir)
-    langwatch.setup(debug=True)
+    with working_directory(work_dir):
+        langwatch.setup(debug=True)
 
-    start_time = time.time()
-    prompt = langwatch.prompts.get(prompt_name)  # Uses default MATERIALIZED_FIRST
-    end_time = time.time()
+        start_time = time.time()
+        prompt = langwatch.prompts.get(prompt_name)  # Uses default MATERIALIZED_FIRST
+        end_time = time.time()
 
-    print(f"   Time taken: {end_time - start_time:.3f} seconds")
-    print(f"   Model: {prompt.model}")
-    print("   ✅ Success - loaded from local (no API call needed)")
+        print(f"   Time taken: {end_time - start_time:.3f} seconds")
+        print(f"   Model: {prompt.model}")
+        print("   ✅ Success - loaded from local (no API call needed)")
 
 
 def demo_always_fetch(work_dir: Path, prompt_name: str):
@@ -80,10 +92,9 @@ def demo_always_fetch(work_dir: Path, prompt_name: str):
     print("   API first → local fallback")
     print("=" * 60)
 
-    os.chdir(work_dir)
-
-    print("   (Note: This would normally call API, but we can't demo that easily)")
-    print("   ✅ Policy exists and is implemented")
+    with working_directory(work_dir):
+        print("   (Note: This would normally call API, but we can't demo that easily)")
+        print("   ✅ Policy exists and is implemented")
 
 
 def demo_materialized_only(work_dir: Path, prompt_name: str):
@@ -93,17 +104,16 @@ def demo_materialized_only(work_dir: Path, prompt_name: str):
     print("   Local only → no API calls")
     print("=" * 60)
 
-    os.chdir(work_dir)
+    with working_directory(work_dir):
+        start_time = time.time()
+        prompt = langwatch.prompts.get(
+            prompt_name, fetch_policy=FetchPolicy.MATERIALIZED_ONLY
+        )
+        end_time = time.time()
 
-    start_time = time.time()
-    prompt = langwatch.prompts.get(
-        prompt_name, fetch_policy=FetchPolicy.MATERIALIZED_ONLY
-    )
-    end_time = time.time()
-
-    print(f"   Time taken: {end_time - start_time:.3f} seconds")
-    print(f"   Model: {prompt.model}")
-    print("   ✅ Success - loaded from local (guaranteed no API call)")
+        print(f"   Time taken: {end_time - start_time:.3f} seconds")
+        print(f"   Model: {prompt.model}")
+        print("   ✅ Success - loaded from local (guaranteed no API call)")
 
 
 def demo_cache_ttl(work_dir: Path, prompt_name: str):
@@ -113,10 +123,9 @@ def demo_cache_ttl(work_dir: Path, prompt_name: str):
     print("   Cache with TTL → local fallback")
     print("=" * 60)
 
-    os.chdir(work_dir)
-
-    print("   (Note: This would normally demonstrate caching, but needs API)")
-    print("   ✅ Policy exists and is implemented")
+    with working_directory(work_dir):
+        print("   (Note: This would normally demonstrate caching, but needs API)")
+        print("   ✅ Policy exists and is implemented")
 
 
 def main():
