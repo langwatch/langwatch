@@ -29,10 +29,10 @@ describe("buildMetadataFilterParams", () => {
       expect(result).toEqual({ customer_id: "cust-1" });
     });
 
-    it("returns the mapped urlKey param for labels", () => {
+    it("returns the mapped urlKey param for labels with all values", () => {
       const result = buildMetadataFilterParams("labels", "foo, bar", ["foo", "bar"]);
 
-      expect(result).toEqual({ labels: "foo" });
+      expect(result).toEqual({ labels: "foo,bar" });
     });
 
     it("returns prompt_id urlKey for prompt_ids key", () => {
@@ -42,10 +42,10 @@ describe("buildMetadataFilterParams", () => {
     });
 
     describe("when originalValue is an array", () => {
-      it("uses first array element as filter value", () => {
+      it("passes all array elements for OR filtering", () => {
         const result = buildMetadataFilterParams("labels", "a, b, c", ["a", "b", "c"]);
 
-        expect(result).toEqual({ labels: "a" });
+        expect(result).toEqual({ labels: "a,b,c" });
       });
     });
 

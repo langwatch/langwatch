@@ -30,7 +30,7 @@ export function buildMetadataFilterParams(
   if (urlKey) {
     const filterValue =
       Array.isArray(originalValue) && originalValue.length > 0
-        ? String(originalValue[0])
+        ? originalValue.join(",")
         : value;
     return { [urlKey]: filterValue };
   }
