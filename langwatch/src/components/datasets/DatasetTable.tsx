@@ -37,7 +37,10 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
-import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
+import {
+  AddOrEditDatasetDrawer,
+  type AddDatasetDrawerProps,
+} from "../AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Menu } from "../ui/menu";
 
@@ -535,22 +538,23 @@ export function DatasetTable({
               <Button
                 colorPalette="gray"
                 minWidth="fit-content"
-                onClick={() =>
+                onClick={() => {
+                  const handleSuccess: AddDatasetDrawerProps["onSuccess"] = ({
+                    datasetId: datasetId_,
+                  }) => {
+                    setDatasetId(datasetId_);
+                    void databaseDataset.refetch();
+                  };
+
                   openDrawer("uploadCSV", {
-                    onSuccess: (data: { datasetId: string }) => {
-                      setDatasetId(data.datasetId);
-                      void databaseDataset.refetch();
-                    },
+                    onSuccess: handleSuccess,
                     onCreateFromScratch: () => {
                       openDrawer("addOrEditDataset", {
-                        onSuccess: (data: { datasetId: string }) => {
-                          setDatasetId(data.datasetId);
-                          void databaseDataset.refetch();
-                        },
+                        onSuccess: handleSuccess,
                       });
                     },
-                  })
-                }
+                  });
+                }}
               >
                 <Upload height={17} width={17} strokeWidth={2.5} />
                 Upload or Create Dataset

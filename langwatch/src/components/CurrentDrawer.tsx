@@ -14,6 +14,9 @@ import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
+// Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
+export { useDrawer } from "../hooks/useDrawer";
+
 type DrawerProps = {
   open: string;
 } & Record<string, any>;
@@ -66,10 +69,7 @@ export function CurrentDrawer() {
         );
       }}
     >
-      <CurrentDrawer {...queryDrawer} {...complexProps} />
+      <CurrentDrawer {...queryDrawer} {...getComplexProps()} />
     </ErrorBoundary>
   ) : null;
 }
-
-// Re-export useDrawer from the hooks directory
-export { useDrawer } from "../hooks/useDrawer";
