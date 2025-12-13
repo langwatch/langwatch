@@ -8,12 +8,12 @@
 -- ============================================================================
 
 -- ============================================================================
--- Table: ingested_spans
+-- Table: stored_spans
 -- ============================================================================
 -- OpenTelemetry span storage for distributed tracing.
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.ingested_spans
+CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_spans
 (
     Id String CODEC(ZSTD(1)),
     TraceId String CODEC(ZSTD(1)),
@@ -54,10 +54,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.ingested_spans
     INDEX idx_tenant_trace_span (TenantId, TraceId, SpanId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}Timestamp)
-PARTITION BY (TenantId, toYYYYMM(Timestamp))
+PARTITION BY toYearWeek(Timestamp)
 ORDER BY (TenantId, TraceId, SpanId)
-TTL toDateTime(Timestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
-SETTINGS index_granularity = 8192, storage_policy = 'tiered';
+TTL toDateTime(Timestamp) + INTERVAL ${TIERED_STORED_SPANS_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF
@@ -66,7 +66,7 @@ SETTINGS index_granularity = 8192, storage_policy = 'tiered';
 -- +goose ENVSUB ON
 -- +goose StatementBegin
 
-DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.ingested_spans SYNC;
+DROP TABLE IF EXISTS ${CLICKHOUSE_DATABASE}.stored_spans SYNC;
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

@@ -33,6 +33,21 @@ export interface EventRepository {
   ): Promise<EventRecord[]>;
 
   /**
+   * Retrieves event records up to and including a specific event.
+   * Returns raw records without validation or transformation.
+   * Events are filtered where:
+   * - timestamp < upToTimestamp, OR
+   * - timestamp = upToTimestamp AND eventId <= upToEventId
+   */
+  getEventRecordsUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+  ): Promise<EventRecord[]>;
+
+  /**
    * Counts event records that come before a given event.
    * Returns raw count without validation.
    */
