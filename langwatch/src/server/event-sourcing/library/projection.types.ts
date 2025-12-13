@@ -7,6 +7,46 @@ import type { Event, Projection } from "./domain/types";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**
+ * Configuration options for projection processing behavior.
+ */
+export interface ProjectionOptions {
+  /**
+   * Disable ordering guarantee and debounce delay in milliseconds. When set, events for
+   * the same aggregate will be debounced - later events replace earlier queued jobs.
+   *
+   * This also disable ordering validation for the projection, which if you're debouncing
+   * you don't want.
+   *
+   * This is useful for bursty projections where many events arrive rapidly
+   * for the same aggregate, where the ordering of the events is not critical to the
+   * building of the projection.
+   *
+   * Default: undefined (no debouncing, ordering validation is enabled)
+   *
+   * @example
+   * ```typescript
+   * // Debounce trace summary updates by 1 second
+   * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
+   *   disableOrderingGuaranteeAndDebounceMs: 1000,
+   * })
+   * ```
+   */
+  disableOrderingGuaranteeAndDebounceMs?: number;
+
+  /**
+   * Maximum batch size for processing. When set, events are accumulated
+   * before processing. Only used when debouncing is enabled.
+   *
+   * This limits the number of events that can be accumulated during the
+   * debounce period. If more events arrive, they will still be processed
+   * but may require multiple batches.
+   *
+   * Default: undefined (no batching limit)
+   */
+  maxBatchSize?: number;
+}
+
+/**
  * Definition of a projection that can be computed from events.
  * Each projection has a unique name, a store, and a handler.
  */
@@ -27,12 +67,35 @@ export interface ProjectionDefinition<
    * Handler that processes events to build this projection.
    */
   handler: ProjectionHandler<EventType, ProjectionType>;
+  /**
+   * Optional configuration for projection processing behavior.
+   */
+  options?: ProjectionOptions;
 }
 
 /**
- * Map of projection names to their definitions.
+ * Type that maps projection names to their projection types.
+ * Used for type-safe projection retrieval.
  */
-export type ProjectionDefinitions<EventType extends Event = Event> = Record<
-  string,
-  ProjectionDefinition<EventType, any>
->;
+export type ProjectionTypeMap = Record<string, Projection>;
+
+/**
+ * Map of projection names to their definitions.
+ * When a ProjectionTypeMap is provided, preserves type information for each projection.
+ */
+export type ProjectionDefinitions<
+  EventType extends Event = Event,
+  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
+> = {
+  [K in keyof ProjectionTypes]: ProjectionDefinition<
+    EventType,
+    ProjectionTypes[K]
+  >;
+};
+
+/**
+ * Extracts the projection type from a ProjectionDefinition.
+ * Used for type inference in getProjectionByName methods.
+ */
+export type ProjectionTypeFromDefinition<T> =
+  T extends ProjectionDefinition<any, infer P> ? P : never;

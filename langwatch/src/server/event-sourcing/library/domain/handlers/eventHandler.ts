@@ -39,4 +39,14 @@ export interface EventHandler<EventType extends Event = Event> {
    * @returns Array of event type strings, or undefined to handle all events
    */
   getEventTypes?(): readonly EventType["type"][] | undefined;
+
+  /**
+   * Optional: Returns display data for debugging tools like deja-view.
+   * This method is only called by debugging tools and does not affect
+   * normal handler execution.
+   *
+   * @param event - The event to get display data for
+   * @returns Display data (e.g., enriched span data) or undefined
+   */
+  getDisplayData?(event: EventType): unknown | Promise<unknown>;
 }

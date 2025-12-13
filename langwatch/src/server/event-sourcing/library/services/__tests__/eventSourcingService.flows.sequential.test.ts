@@ -19,6 +19,7 @@ import {
   createTestProjection,
   setupTestEnvironment,
   TEST_CONSTANTS,
+  createMockDistributedLock,
 } from "./testHelpers";
 
 describe("EventSourcingService - Sequential Ordering Flows", () => {
@@ -49,6 +50,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       // Create events with timestamps that will result in sequence numbers 1, 2, 3
@@ -136,6 +138,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       // Create events with different timestamps
@@ -211,6 +214,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -261,6 +265,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       // Create multiple events with different timestamps
@@ -340,6 +345,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       // Create events with same timestamp but different IDs (sorted by ID)
@@ -433,6 +439,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -524,6 +531,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -582,6 +590,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
@@ -668,6 +677,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -726,6 +736,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore2,
+        distributedLock: createMockDistributedLock(),
       });
 
       // Store same events
@@ -772,6 +783,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           ),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -851,6 +863,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
@@ -941,6 +954,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -986,6 +1000,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1041,6 +1056,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1108,6 +1124,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler2: createMockEventHandlerDefinition("handler2", handler2),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -1180,6 +1197,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const aggregateId1 = "aggregate-1";
@@ -1271,6 +1289,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(

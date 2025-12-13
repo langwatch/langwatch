@@ -2,14 +2,14 @@ import { z } from "zod";
 import { EVENT_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
 
 /**
- * Event type identifiers follow the taxonomy system defined in ./taxonomy.ts.
+ * Event type identifiers follow a taxonomy system.
  * Format: `<provenance>.<domain>.<aggregate-type>.<event-name>`
  *
- * Example: "lw.obs.span_ingestion.recorded"
+ * Example: "lw.obs.trace.span_received"
  * - `lw`: Provenance (LangWatch)
  * - `obs`: Domain (Observability)
- * - `span_ingestion`: Aggregate type
- * - `recorded`: Event name
+ * - `trace`: Aggregate type
+ * - `span_received`: Event name
  */
 
 /**
@@ -27,7 +27,7 @@ export const EventTypeSchema = z.enum(EVENT_TYPES);
 /**
  * Strongly-typed event type identifiers.
  *
- * Event types follow the taxonomy system (see ./taxonomy.ts):
+ * Event types follow a taxonomy system:
  * `<provenance>.<domain>.<aggregate-type>.<event-name>`
  *
  * This type is inferred from the zod schema, which is built from type arrays
