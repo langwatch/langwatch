@@ -141,7 +141,7 @@ export function FilterToggleButton({
           )}
         </HStack>
       </Button>
-      {hasNegateFilters && (
+      {hasNegateFilters && setNegateFilters && (
         <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
           <Button
             variant="plain"
@@ -150,7 +150,7 @@ export function FilterToggleButton({
             backgroundColor={negateFiltersToggled ? "gray.200" : undefined}
             onClick={(e) => {
               e.stopPropagation();
-              setNegateFilters?.(!negateFiltersToggled);
+              setNegateFilters(!negateFiltersToggled);
             }}
           >
             <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span>{" "}
