@@ -761,7 +761,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
 
       await expect(
         service.updateProjectionByName(
-          "nonexistent",
+          "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),

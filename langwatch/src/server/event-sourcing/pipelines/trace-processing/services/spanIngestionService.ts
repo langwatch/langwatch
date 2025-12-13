@@ -46,7 +46,7 @@ export class SpanIngestionService {
     traceForCollection: TraceForCollection,
     traceRequest: DeepPartial<IExportTraceServiceRequest>,
   ): Promise<void> {
-    return await this.tracer.withActiveSpan(
+    return await this.tracer.startActiveSpan(
       "SpanIngestionService.ingestSpanCollection",
       {
         kind: ApiSpanKind.PRODUCER,

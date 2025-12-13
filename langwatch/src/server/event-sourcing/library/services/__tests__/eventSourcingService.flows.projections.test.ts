@@ -224,7 +224,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       await expect(
         service.updateProjectionByName(
-          "nonexistent",
+          "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),
@@ -396,7 +396,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       await expect(
         service.getProjectionByName(
-          "nonexistent",
+          "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),
@@ -505,7 +505,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       await expect(
         service.hasProjectionByName(
-          "nonexistent",
+          "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),
