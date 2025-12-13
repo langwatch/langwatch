@@ -78,7 +78,7 @@ export const PushToCopiesDialog = ({
 
       toaster.create({
         title: "Workflow pushed",
-        description: `Latest version of "${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected copied workflow(s).`,
+        description: `Latest version of "${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated workflow(s).`,
         type: "success",
         meta: {
           closable: true,
@@ -102,22 +102,22 @@ export const PushToCopiesDialog = ({
       <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Push to Copies</Dialog.Title>
+          <Dialog.Title>Push to Replicas</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
             <Text fontSize="sm" color="gray.600">
-              Select which copies to push the latest version to:
+              Select which replicas to push the latest version to:
             </Text>
             {isLoading ? (
-              <Text>Loading copies...</Text>
+              <Text>Loading replicas...</Text>
             ) : error ? (
               <Text color="red.500">
-                Error loading copies: {error.message}
+                Error loading replicas: {error.message}
               </Text>
             ) : availableCopies.length === 0 ? (
               <Text color="gray.500">
-                No copies found. This may be because you don't have workflows:update permission on the copy projects, or the copies have been archived.
+                No replicas found. This may be because you don't have workflows:update permission on the replica projects, or the replicas have been archived.
               </Text>
             ) : (
               <VStack gap={2} align={"start"} width="full">
@@ -153,7 +153,7 @@ export const PushToCopiesDialog = ({
             loading={pushToCopies.isLoading}
             disabled={selectedCopyIds.size === 0 || isLoading}
           >
-            Push to {selectedCopyIds.size} copy{selectedCopyIds.size !== 1 ? "ies" : ""}
+            Push to {selectedCopyIds.size} replica{selectedCopyIds.size !== 1 ? "s" : ""}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

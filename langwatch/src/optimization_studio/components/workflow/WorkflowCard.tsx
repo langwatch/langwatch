@@ -237,7 +237,7 @@ export function WorkflowCard({
                   <Tooltip
                     content={
                       !hasWorkflowsUpdatePermission
-                        ? "You need workflows:update permission to push to copies"
+                        ? "You need workflows:update permission to push to replicas"
                         : undefined
                     }
                     disabled={hasWorkflowsUpdatePermission}
@@ -253,14 +253,14 @@ export function WorkflowCard({
                       }
                       disabled={!hasWorkflowsUpdatePermission}
                     >
-                      <ArrowUp size={16} /> Push to copies
+                      <ArrowUp size={16} /> Push to replicas
                     </Menu.Item>
                   </Tooltip>
                 )}
                 <Tooltip
                   content={
                     !hasWorkflowsCreatePermission
-                      ? "You need workflows:create permission to copy workflows"
+                      ? "You need workflows:create permission to replicate workflows"
                       : undefined
                   }
                   disabled={hasWorkflowsCreatePermission}
@@ -276,7 +276,7 @@ export function WorkflowCard({
                     }
                     disabled={!hasWorkflowsCreatePermission}
                   >
-                    <Copy size={16} /> Copy to another project
+                    <Copy size={16} /> Replicate to another project
                   </Menu.Item>
                 </Tooltip>
                 <Tooltip

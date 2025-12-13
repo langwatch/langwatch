@@ -91,15 +91,15 @@ export const CopyDatasetDialog = ({
       });
 
       toaster.create({
-        title: "Dataset copied",
-        description: `Dataset "${datasetName}" copied successfully.`,
+        title: "Dataset replicated",
+        description: `Dataset "${datasetName}" replicated successfully.`,
         type: "success",
       });
 
       onClose();
     } catch (error) {
       toaster.create({
-        title: "Error copying dataset",
+        title: "Error replicating dataset",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
@@ -111,7 +111,7 @@ export const CopyDatasetDialog = ({
       <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Copy Dataset</Dialog.Title>
+          <Dialog.Title>Replicate Dataset</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
@@ -148,7 +148,7 @@ export const CopyDatasetDialog = ({
             loading={copyDataset.isLoading}
             disabled={!selectedProjectId.length}
           >
-            Copy
+            Replicate
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

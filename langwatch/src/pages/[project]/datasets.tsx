@@ -273,7 +273,7 @@ function DatasetsPage() {
                               <Tooltip
                                 content={
                                   !hasDatasetsCreatePermission
-                                    ? "You need datasets:create permission to copy datasets"
+                                    ? "You need datasets:create permission to replicate datasets"
                                     : undefined
                                 }
                                 disabled={hasDatasetsCreatePermission}
@@ -293,7 +293,7 @@ function DatasetsPage() {
                                   }}
                                   disabled={!hasDatasetsCreatePermission}
                                 >
-                                  <Copy size={16} /> Copy to another project
+                                  <Copy size={16} /> Replicate to another project
                                 </Menu.Item>
                               </Tooltip>
                               <Tooltip

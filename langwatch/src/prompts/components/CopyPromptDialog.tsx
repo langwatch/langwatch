@@ -93,15 +93,15 @@ export const CopyPromptDialog = ({
       });
 
       toaster.create({
-        title: "Prompt copied",
-        description: `Prompt "${promptName}" copied successfully.`,
+        title: "Prompt replicated",
+        description: `Prompt "${promptName}" replicated successfully.`,
         type: "success",
       });
 
       onClose();
     } catch (error) {
       toaster.create({
-        title: "Error copying prompt",
+        title: "Error replicating prompt",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
@@ -113,7 +113,7 @@ export const CopyPromptDialog = ({
       <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Copy Prompt</Dialog.Title>
+          <Dialog.Title>Replicate Prompt</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
@@ -180,7 +180,7 @@ export const CopyPromptDialog = ({
                 ?.hasCreatePermission
             }
           >
-            Copy
+            Replicate
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

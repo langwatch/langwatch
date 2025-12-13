@@ -160,7 +160,7 @@ export function PublishedPromptActions({
               <Tooltip
                 content={
                   !hasPromptsUpdatePermission
-                    ? "You need prompts:update permission to push to copies"
+                    ? "You need prompts:update permission to push to replicas"
                     : undefined
                 }
                 disabled={hasPromptsUpdatePermission}
@@ -176,14 +176,14 @@ export function PublishedPromptActions({
                   }
                   disabled={!hasPromptsUpdatePermission}
                 >
-                  <ArrowUp size={16} /> Push to copies
+                  <ArrowUp size={16} /> Push to replicas
                 </Menu.Item>
               </Tooltip>
             )}
             <Tooltip
               content={
                 !hasPromptsCreatePermission
-                  ? "You need prompts:create permission to copy prompts"
+                  ? "You need prompts:create permission to replicate prompts"
                   : undefined
               }
               disabled={hasPromptsCreatePermission}
@@ -199,7 +199,7 @@ export function PublishedPromptActions({
                 }
                 disabled={!hasPromptsCreatePermission}
               >
-                <Copy size={16} /> Copy to another project
+                <Copy size={16} /> Replicate to another project
               </Menu.Item>
             </Tooltip>
             <Tooltip
