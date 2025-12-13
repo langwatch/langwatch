@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { slugify } from "~/utils/slugify";
@@ -8,7 +9,6 @@ import {
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
-import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**

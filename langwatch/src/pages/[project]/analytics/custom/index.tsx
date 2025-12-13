@@ -63,13 +63,13 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
-import { useDrawer } from "~/hooks/useDrawer";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
@@ -1042,14 +1042,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? metricAggregations[aggregation] ?? aggregation
+      ? (metricAggregations[aggregation] ?? aggregation)
       : undefined;
     const pipeline_ = pipelineField
-      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
+      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
+        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(

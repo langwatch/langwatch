@@ -1,7 +1,7 @@
 import { Button, Text, VStack } from "@chakra-ui/react";
-import { useState, useEffect } from "react";
-import { Dialog } from "../../components/ui/dialog";
+import { useEffect, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -112,7 +112,9 @@ export const PushToCopiesDialog = ({
             {isLoading ? (
               <Text>Loading replicas...</Text>
             ) : error ? (
-              <Text color="red.500">Error loading replicas: {error.message}</Text>
+              <Text color="red.500">
+                Error loading replicas: {error.message}
+              </Text>
             ) : availableCopies.length === 0 ? (
               <Text color="gray.500">No replicas found.</Text>
             ) : (

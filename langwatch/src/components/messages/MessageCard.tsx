@@ -22,6 +22,7 @@ import {
   Shield,
   XCircle,
 } from "react-feather";
+import { useDrawer } from "~/hooks/useDrawer";
 import type {
   ElasticSearchEvaluation,
   EvaluationResult,
@@ -40,7 +41,6 @@ import { getColorForString } from "../../utils/rotatingColors";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { CheckPassing } from "../CheckPassing";
-import { useDrawer } from "~/hooks/useDrawer";
 import { evaluationPassed } from "../checks/EvaluationStatus";
 import { Markdown } from "../Markdown";
 import { OverflownTextWithTooltip } from "../OverflownText";

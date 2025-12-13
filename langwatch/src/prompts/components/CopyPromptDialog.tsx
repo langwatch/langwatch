@@ -11,12 +11,11 @@ import { Select } from "../../components/ui/select";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import { api } from "../../utils/api";
-
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../server/api/rbac";
+import { api } from "../../utils/api";
 
 export const CopyPromptDialog = ({
   open,
@@ -187,5 +186,3 @@ export const CopyPromptDialog = ({
     </Dialog.Root>
   );
 };
-
-

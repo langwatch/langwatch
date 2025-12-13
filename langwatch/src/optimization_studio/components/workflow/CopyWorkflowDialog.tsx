@@ -6,19 +6,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import { Checkbox } from "../../../components/ui/checkbox";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
-import { api } from "../../../utils/api";
 
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../../server/api/rbac";
-
-import { Checkbox } from "../../../components/ui/checkbox";
+import { api } from "../../../utils/api";
 
 export const CopyWorkflowDialog = ({
   open,

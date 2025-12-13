@@ -1,5 +1,5 @@
 export {
-  TraceSummaryStateProjectionHandler,
   type TraceSummary,
   type TraceSummaryData,
+  TraceSummaryStateProjectionHandler,
 } from "./traceSummaryStateProjection";

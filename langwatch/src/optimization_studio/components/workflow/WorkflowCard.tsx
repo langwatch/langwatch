@@ -7,21 +7,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { MoreVertical, Copy, Trash2, RefreshCw, ArrowUp } from "react-feather";
-import { useCallback, useState } from "react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
+import { useCallback, useState } from "react";
+import { ArrowUp, Copy, MoreVertical, RefreshCw, Trash2 } from "react-feather";
 import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
-import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
-import { PushToCopiesDialog } from "./PushToCopiesDialog";
+import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
-import type { AppRouter } from "../../../server/api/root";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
-import { Menu } from "../../../components/ui/menu";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
+import { PushToCopiesDialog } from "./PushToCopiesDialog";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -211,8 +211,8 @@ export function WorkflowCard({
                       !hasWorkflowsUpdatePermission
                         ? "You need workflows:update permission to sync from source"
                         : sourceProjectPath
-                        ? `Copied from: ${sourceProjectPath}`
-                        : undefined
+                          ? `Copied from: ${sourceProjectPath}`
+                          : undefined
                     }
                     disabled={
                       !hasWorkflowsUpdatePermission && !sourceProjectPath

@@ -8,29 +8,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
+import { useCallback, useState } from "react";
 import {
+  ArrowUp,
+  Copy,
   Edit,
   MoreVertical,
-  Trash2,
-  Copy,
   RefreshCw,
-  ArrowUp,
+  Trash2,
 } from "react-feather";
-import { useState, useCallback } from "react";
 import { LuBuilding } from "react-icons/lu";
-import { CopyPromptDialog } from "./components/CopyPromptDialog";
-import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
-
 import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
+import { CopyPromptDialog } from "./components/CopyPromptDialog";
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
-import { api } from "~/utils/api";
-import { toaster } from "~/components/ui/toaster";
+import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
 
 /**
  * Flat interface for prompt list items

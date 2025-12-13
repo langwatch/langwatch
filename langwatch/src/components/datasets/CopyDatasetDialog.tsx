@@ -1,21 +1,15 @@
-import {
-  Button,
-  createListCollection,
-  Field,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { useState } from "react";
-import { Dialog } from "../ui/dialog";
-import { Select } from "../ui/select";
-import { toaster } from "../ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import { api } from "../../utils/api";
-
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../server/api/rbac";
+import { api } from "../../utils/api";
+import { Dialog } from "../ui/dialog";
+import { Select } from "../ui/select";
+import { toaster } from "../ui/toaster";
 
 export const CopyDatasetDialog = ({
   open,
@@ -40,7 +34,7 @@ export const CopyDatasetDialog = ({
       org.teams.flatMap((team) => {
         // Find the current user's membership in this team
         const teamMember = team.members.find(
-          (member) => member.userId === currentUserId
+          (member) => member.userId === currentUserId,
         );
         if (!teamMember) return [];
 
@@ -51,18 +45,18 @@ export const CopyDatasetDialog = ({
           if (permissions.length > 0) {
             hasCreatePermission = hasPermissionWithHierarchy(
               permissions,
-              "datasets:create"
+              "datasets:create",
             );
           } else {
             hasCreatePermission = teamRoleHasPermission(
               teamMember.role,
-              "datasets:create"
+              "datasets:create",
             );
           }
         } else {
           hasCreatePermission = teamRoleHasPermission(
             teamMember.role,
-            "datasets:create"
+            "datasets:create",
           );
         }
 
@@ -72,7 +66,7 @@ export const CopyDatasetDialog = ({
           label: `${org.name} / ${team.name} / ${project.name}`,
           value: project.id,
         }));
-      })
+      }),
     ) ?? [];
 
   const projectCollection = createListCollection({
@@ -155,4 +149,3 @@ export const CopyDatasetDialog = ({
     </Dialog.Root>
   );
 };
-

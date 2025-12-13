@@ -14,8 +14,8 @@ import {
 import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
-import { useDrawer } from "~/hooks/useDrawer";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
 import SettingsLayout from "../../components/SettingsLayout";
