@@ -919,18 +919,36 @@ function SeriesFieldItem({
   const seriesLength = form.watch(`series`).length;
   const groupBy = form.watch("groupBy");
 
+  // Track the previous groupBy to only auto-set colors when user actually changes it
+  const prevGroupByRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    // Only auto-set colors when groupBy actually changes (not on initial load)
+    const prevGroupBy = prevGroupByRef.current;
+    prevGroupByRef.current = groupBy;
+
+    // Skip if this is the initial value being set (prevGroupBy was undefined)
+    if (prevGroupBy === undefined) {
+      return;
+    }
+
+    // Skip if groupBy didn't actually change
+    if (prevGroupBy === groupBy) {
+      return;
+    }
+
     if (seriesLength === 1 && groupBy) {
       form.setValue(
         `series.${index}.colorSet`,
         groupBy.startsWith("sentiment") ||
-          groupBy.startsWith("evaluations") ||
+          groupBy === "evaluations.evaluation_passed" ||
+          groupBy === "evaluations.evaluation_processing_state" ||
           groupBy.includes("has_error")
           ? "positiveNegativeNeutral"
           : "colors",
       );
     }
-  }, [form, groupBy, index, seriesLength, customId]);
+  }, [form, groupBy, index, seriesLength]);
 
   return (
     <Accordion.Item
