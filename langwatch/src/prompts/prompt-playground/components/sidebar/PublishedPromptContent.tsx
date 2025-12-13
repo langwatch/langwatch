@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { PublishedPromptActions } from "./PublishedPromptActions";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { PublishedPromptActions } from "./PublishedPromptActions";
 import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptContentProps {
