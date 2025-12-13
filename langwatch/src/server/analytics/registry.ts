@@ -1065,81 +1065,117 @@ export const analyticsGroups = {
   evaluations: {
     evaluation_passed: {
       label: "Evaluation Passed",
-      aggregation: (aggToGroup) => ({
+      requiresKey: {
+        filter: "evaluations.evaluator_id",
+        optional: true,
+      },
+      aggregation: (aggToGroup, key) => ({
         check_state_group: {
           nested: {
             path: "evaluations",
           },
           aggs: {
-            child: {
-              terms: {
-                field: "evaluations.passed",
-                size: 50,
-              },
+            filter_by_evaluator: {
+              filter: key
+                ? { term: { "evaluations.evaluator_id": key } }
+                : { match_all: {} },
               aggs: {
-                back_to_root: {
-                  reverse_nested: {},
-                  aggs: aggToGroup,
+                child: {
+                  terms: {
+                    field: "evaluations.passed",
+                    size: 50,
+                  },
+                  aggs: {
+                    back_to_root: {
+                      reverse_nested: {},
+                      aggs: aggToGroup,
+                    },
+                  },
                 },
               },
             },
           },
         },
       }),
-      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      extractionPath: () =>
+        "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
       quickwitSupport: false,
     },
     evaluation_label: {
       label: "Evaluation Label",
-      aggregation: (aggToGroup) => ({
+      requiresKey: {
+        filter: "evaluations.evaluator_id",
+        optional: true,
+      },
+      aggregation: (aggToGroup, key) => ({
         check_state_group: {
           nested: {
             path: "evaluations",
           },
           aggs: {
-            child: {
-              terms: {
-                field: "evaluations.label",
-                size: 50,
-              },
+            filter_by_evaluator: {
+              filter: key
+                ? { term: { "evaluations.evaluator_id": key } }
+                : { match_all: {} },
               aggs: {
-                back_to_root: {
-                  reverse_nested: {},
-                  aggs: aggToGroup,
+                child: {
+                  terms: {
+                    field: "evaluations.label",
+                    size: 50,
+                  },
+                  aggs: {
+                    back_to_root: {
+                      reverse_nested: {},
+                      aggs: aggToGroup,
+                    },
+                  },
                 },
               },
             },
           },
         },
       }),
-      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      extractionPath: () =>
+        "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
       quickwitSupport: false,
     },
     evaluation_processing_state: {
       label: "Evaluation Processing State",
-      aggregation: (aggToGroup) => ({
+      requiresKey: {
+        filter: "evaluations.evaluator_id",
+        optional: true,
+      },
+      aggregation: (aggToGroup, key) => ({
         check_state_group: {
           nested: {
             path: "evaluations",
           },
           aggs: {
-            child: {
-              terms: {
-                field: "evaluations.status",
-                size: 50,
-                missing: "unknown",
-              },
+            filter_by_evaluator: {
+              filter: key
+                ? { term: { "evaluations.evaluator_id": key } }
+                : { match_all: {} },
               aggs: {
-                back_to_root: {
-                  reverse_nested: {},
-                  aggs: aggToGroup,
+                child: {
+                  terms: {
+                    field: "evaluations.status",
+                    size: 50,
+                    missing: "unknown",
+                  },
+                  aggs: {
+                    back_to_root: {
+                      reverse_nested: {},
+                      aggs: aggToGroup,
+                    },
+                  },
                 },
               },
             },
           },
         },
       }),
-      extractionPath: () => "check_state_group>child>buckets>back_to_root",
+      extractionPath: () =>
+        "check_state_group>filter_by_evaluator>child>buckets>back_to_root",
       quickwitSupport: false,
     },
   },
@@ -1230,6 +1266,7 @@ export const timeseriesSeriesInput = z.object({
   query: z.optional(z.string()),
   series: z.array(seriesInput),
   groupBy: z.optional(z.enum(flattenAnalyticsGroupsEnum)),
+  groupByKey: z.optional(z.string()),
   timeScale: z.optional(z.union([z.literal("full"), z.number().int()])),
   timeZone: z.string(),
 });

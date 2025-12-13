@@ -34,8 +34,13 @@ export type AnalyticsMetric = {
 
 export type AnalyticsGroup = {
   label: string;
+  requiresKey?: {
+    filter: FilterField;
+    optional?: boolean;
+  };
   aggregation: (
     aggToGroup: Record<string, AggregationsAggregationContainer>,
+    key?: string,
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: () => string;
   quickwitSupport: boolean;
