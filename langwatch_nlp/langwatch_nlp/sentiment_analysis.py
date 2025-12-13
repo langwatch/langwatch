@@ -18,6 +18,15 @@ from langwatch_nlp.topic_clustering.utils import (
 embeddings: dict[str, dict[str, list[list[float]]]] = {}
 
 
+def _get_litellm_shared_session():
+    """Get the configured aiohttp session from the main module for use with litellm."""
+    try:
+        from langwatch_nlp.main import get_litellm_aiohttp_session
+        return get_litellm_aiohttp_session()
+    except (ImportError, AttributeError):
+        return None
+
+
 def load_embeddings(embeddings_litellm_params: dict[str, str]):
     global embeddings
     key = embeddings_litellm_params["model"]
@@ -55,11 +64,20 @@ def get_embedding(text: str, embeddings_litellm_params: dict[str, str]) -> list[
     if "dimensions" in embeddings_litellm_params:
         # TODO: target_dim is throwing errors for text-embedding-3-small because litellm drop_params is also not working for some reason
         del embeddings_litellm_params["dimensions"]
-    response = litellm.embedding(
-        input=text,
-        drop_params=True,
+    
+    # Prepare embedding parameters with optional shared aiohttp session
+    embedding_params = {
+        "input": text,
+        "drop_params": True,
         **embeddings_litellm_params,  # type: ignore
-    )
+    }
+    
+    # Add shared aiohttp session if available
+    shared_session = _get_litellm_shared_session()
+    if shared_session:
+        embedding_params["shared_session"] = shared_session
+    
+    response = litellm.embedding(**embedding_params)
 
     data = response.data
     if data is None:
