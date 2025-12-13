@@ -8,6 +8,9 @@ organized by their purpose and scope.
 # Core prompt data structure
 from .prompt_data import PromptData
 
+# Fetch policy
+from .fetch_policy import FetchPolicy
+
 # Standardized data structures
 from .structures import (
     MessageDict,
@@ -24,4 +27,5 @@ __all__ = [
     "InputDict",
     "OutputDict",
     "ResponseFormatDict",
+    "FetchPolicy",
 ]

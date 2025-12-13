@@ -46,6 +46,8 @@ example:
 		uv run python $$args; \
 	elif [[ $$args =~ "streamlit" ]]; then \
 		uv run streamlit run $$args; \
+	elif [[ $$args =~ "fetch_policies" ]]; then \
+		PYTHONPATH=$$PYTHONPATH:. uv run python $$args; \
 	else \
 		uv run chainlit run -w --port 9000 $$args; \
 	fi

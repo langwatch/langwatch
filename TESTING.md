@@ -2,6 +2,8 @@
 
 ## Hierarchy
 
+Avoid overlap. integration tests should not test the same thing as e2e tests, and unit tests should not test the same thing as integration tests.
+
 | Level | Purpose | Mocking |
 |-------|---------|---------|
 | **E2E** | Happy paths via real examples | None |
