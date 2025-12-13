@@ -33,10 +33,10 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log
     INDEX idx_tenant_aggregate_event_id (TenantId, AggregateType, AggregateId, EventId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_MERGETREE:-MergeTree()}
-PARTITION BY (TenantId, toYYYYMM(EventTimestamp))
+PARTITION BY (AggregateType, toYearWeek(EventTimestamp))
 ORDER BY (TenantId, AggregateType, AggregateId, EventTimestamp, EventId)
-TTL toDateTime(EventTimestamp) + INTERVAL ${TIERED_HOT_DAYS:-7} DAY TO VOLUME 'cold'
-SETTINGS index_granularity = 8192, storage_policy = 'tiered';
+TTL toDateTime(EventTimestamp) + INTERVAL ${TIERED_EVENT_LOG_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
+SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

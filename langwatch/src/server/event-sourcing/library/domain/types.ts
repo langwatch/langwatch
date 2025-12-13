@@ -1,7 +1,7 @@
 /**
  * Core types for the event sourcing library.
  *
- * Event and command types follow the taxonomy system defined in ./taxonomy.ts:
+ * Event and command types follow a taxonomy system:
  * `<provenance>.<domain>.<aggregate-type>.<specific-identifier>`
  *
  * Example: `lw.obs.span_ingestion.recorded`
@@ -42,7 +42,7 @@ export type EventMetadataBase = z.infer<typeof EventMetadataBaseSchema>;
  * For LangWatch Observability events, this would be: `lw.obs.<aggregate-type>.<event-name>`
  */
 export const EventSchema = z.object({
-  /** Unique identifier for the event */
+  /** Unique identifier for the event. The general format is {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid} */
   id: z.string(),
   /** Unique identifier for the aggregate this event belongs to */
   aggregateId: z.string(),
@@ -71,7 +71,7 @@ type EventBase = z.infer<typeof EventSchema>;
  * Events represent facts that have occurred in the system. They are immutable and
  * stored in the event store. Events are processed by handlers to build projections.
  *
- * Event types follow the taxonomy system defined in ./taxonomy.ts.
+ * Event types follow a taxonomy system.
  * For LangWatch Observability, event types are of the form: `lw.obs.<aggregate-type>.<event-name>`
  */
 export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
@@ -271,3 +271,22 @@ export const ProcessorCheckpointSchema = z.object({
  * The unique key is `tenantId:pipelineName:processorName:aggregateType:aggregateId`.
  */
 export type ProcessorCheckpoint = z.infer<typeof ProcessorCheckpointSchema>;
+
+/**
+ * Defines a parent relationship between aggregates.
+ *
+ * When defined on a pipeline, indicates that aggregates of this type have a parent
+ * aggregate of another type. The inverse (children) relationship is automatically inferred.
+ *
+ * @example
+ * ```typescript
+ * // Span has a parent Trace
+ * .withParentLink("trace", (e) => e.data.spanData.traceId)
+ * ```
+ */
+export interface ParentLink<TEvent extends Event = Event> {
+  /** The aggregate type of the parent */
+  targetAggregateType: z.infer<typeof AggregateTypeSchema>;
+  /** Function to extract the parent aggregate ID from an event */
+  extractParentId: (event: TEvent) => string | null;
+}

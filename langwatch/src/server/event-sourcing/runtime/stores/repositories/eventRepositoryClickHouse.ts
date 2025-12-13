@@ -111,6 +111,83 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 
+  async getEventRecordsUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+  ): Promise<EventRecord[]> {
+    try {
+      const result = await this.clickHouseClient.query({
+        query: `
+          SELECT
+            EventId,
+            EventTimestamp,
+            EventType,
+            EventPayload,
+            ProcessingTraceparent
+          FROM event_log
+          WHERE TenantId = {tenantId:String}
+            AND AggregateType = {aggregateType:String}
+            AND AggregateId = {aggregateId:String}
+            AND (
+              toUnixTimestamp64Milli(EventTimestamp) < {upToTimestamp:UInt64}
+              OR (
+                toUnixTimestamp64Milli(EventTimestamp) = {upToTimestamp:UInt64}
+                AND EventId <= {upToEventId:String}
+              )
+            )
+          ORDER BY EventTimestamp ASC, EventId ASC
+        `,
+        query_params: {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          upToTimestamp,
+          upToEventId,
+        },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<{
+        EventId: string;
+        EventTimestamp: number;
+        EventType: string;
+        EventPayload: unknown;
+        ProcessingTraceparent: string;
+      }>();
+
+      // Normalize payload so numeric fields stay numeric regardless of how
+      // ClickHouse serializes the JSON column.
+      return rows.map((row) => ({
+        TenantId: tenantId,
+        AggregateType: aggregateType,
+        AggregateId: String(aggregateId),
+        EventId: row.EventId,
+        EventTimestamp: row.EventTimestamp,
+        EventType: row.EventType,
+        EventPayload: normalizePayloadValue(row.EventPayload),
+        ProcessingTraceparent: row.ProcessingTraceparent || "",
+      }));
+    } catch (error) {
+      this.logger.error(
+        {
+          tenantId,
+          aggregateType,
+          aggregateId: String(aggregateId),
+          upToTimestamp,
+          upToEventId,
+          error: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : void 0,
+          errorName: error instanceof Error ? error.name : void 0,
+        },
+        "Failed to get event records up to event from ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async countEventRecords(
     tenantId: string,
     aggregateType: string,

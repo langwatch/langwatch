@@ -25,6 +25,43 @@ export class EventRepositoryMemory implements EventRepository {
     return records.map((record) => ({ ...record }));
   }
 
+  async getEventRecordsUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
+  ): Promise<EventRecord[]> {
+    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
+    const records = this.eventsByKey.get(key) ?? [];
+
+    // Filter events up to and including the specified event
+    // Events where: timestamp < upToTimestamp OR (timestamp = upToTimestamp AND eventId <= upToEventId)
+    const filteredRecords = records.filter((record) => {
+      if (record.EventTimestamp < upToTimestamp) {
+        return true;
+      }
+      if (
+        record.EventTimestamp === upToTimestamp &&
+        record.EventId <= upToEventId
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    // Sort by timestamp then eventId to ensure consistent ordering
+    const sortedRecords = [...filteredRecords].sort((a, b) => {
+      if (a.EventTimestamp !== b.EventTimestamp) {
+        return a.EventTimestamp - b.EventTimestamp;
+      }
+      return a.EventId.localeCompare(b.EventId);
+    });
+
+    // Return a copy to prevent mutation
+    return sortedRecords.map((record) => ({ ...record }));
+  }
+
   async countEventRecords(
     tenantId: string,
     aggregateType: string,

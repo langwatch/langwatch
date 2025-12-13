@@ -64,6 +64,7 @@ export type {
   Event,
   EventMetadataBase,
   EventOrderingStrategy,
+  ParentLink,
   ProcessorCheckpoint,
   Projection,
   ProjectionEnvelope,

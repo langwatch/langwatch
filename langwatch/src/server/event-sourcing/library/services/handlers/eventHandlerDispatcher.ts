@@ -10,6 +10,7 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import type { DistributedLock } from "../../utils/distributedLock";
 import type { CheckpointManager } from "../checkpoints/checkpointManager";
 import {
+  ConfigurationError,
   ErrorCategory,
   handleError,
   isSequentialOrderingError,
@@ -39,7 +40,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
   private readonly validator: EventProcessorValidator<EventType>;
   private readonly checkpointManager: CheckpointManager<EventType>;
   private readonly queueManager: QueueProcessorManager<EventType>;
-  private readonly distributedLock?: DistributedLock;
+  private readonly distributedLock: DistributedLock;
   private readonly handlerLockTtlMs: number;
 
   constructor({
@@ -58,7 +59,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     validator: EventProcessorValidator<EventType>;
     checkpointManager: CheckpointManager<EventType>;
     queueManager: QueueProcessorManager<EventType>;
-    distributedLock?: DistributedLock;
+    distributedLock: DistributedLock;
     handlerLockTtlMs?: number;
   }) {
     this.aggregateType = aggregateType;
@@ -67,6 +68,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     this.validator = validator;
     this.checkpointManager = checkpointManager;
     this.queueManager = queueManager;
+
+    // Validate that distributed lock is provided (required for correctness)
+    if (!distributedLock) {
+      throw new ConfigurationError(
+        "EventHandlerDispatcher",
+        "distributedLock is required. Concurrent event processing for the same aggregate requires a distributed lock to prevent race conditions and ensure correct failure handling. Please provide a DistributedLock implementation (e.g., Redis-based lock).",
+        {
+          aggregateType,
+        },
+      );
+    }
     this.distributedLock = distributedLock;
     this.handlerLockTtlMs = handlerLockTtlMs;
   }
@@ -571,23 +583,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               {
                 handlerName,
                 eventId: event.id,
-                sequenceNumber,
-                previousSequenceNumber,
-              },
-              "Throwing ordering error",
-            );
-
-            this.logger.warn(
-              {
-                handlerName,
-                eventId: event.id,
                 aggregateId: String(event.aggregateId),
                 sequenceNumber,
                 previousSequenceNumber,
                 tenantId: event.tenantId,
               },
-              "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
+              "Previous event not yet processed, deferring (expected behavior)",
             );
+
             throw new SequentialOrderingError(
               previousSequenceNumber,
               sequenceNumber,
@@ -607,14 +610,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           this.handlerLockTtlMs,
         );
 
-        // Acquire distributed lock if configured (only after confirming previous event is processed)
+        // Acquire distributed lock (only after confirming previous event is processed)
         // Lock key format: handler:${tenantId}:${aggregateType}:${aggregateId}:${handlerName}
-        const lockKey = `handler:${event.tenantId}:${this.aggregateType}:${String(event.aggregateId)}:${handlerName}`;
-        const lockHandle = this.distributedLock
-          ? await this.distributedLock.acquire(lockKey, lockTtlMs)
-          : null;
+        const lockKey = `handler:${event.tenantId}:${
+          this.aggregateType
+        }:${String(event.aggregateId)}:${handlerName}`;
+        const lockHandle = await this.distributedLock.acquire(
+          lockKey,
+          lockTtlMs,
+        );
 
-        if (this.distributedLock && !lockHandle) {
+        if (!lockHandle) {
           throw new LockError(
             lockKey,
             "handleEvent",
@@ -821,22 +827,20 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           throw error;
         } finally {
           // Always release lock, even on errors
-          if (lockHandle) {
-            try {
-              await this.distributedLock!.release(lockHandle);
-            } catch (error) {
-              // Handler execution already completed; lock release failure is non-critical
-              this.logger.error(
-                {
-                  handlerName,
-                  eventId: event.id,
-                  aggregateId: String(event.aggregateId),
-                  tenantId: event.tenantId,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-                "Failed to release distributed lock after handler execution",
-              );
-            }
+          try {
+            await this.distributedLock.release(lockHandle);
+          } catch (error) {
+            // Handler execution already completed; lock release failure is non-critical
+            this.logger.error(
+              {
+                handlerName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to release distributed lock after handler execution",
+            );
           }
         }
       },

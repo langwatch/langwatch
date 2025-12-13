@@ -6,6 +6,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
+import { isSequentialOrderingError } from "../../library/services/errorHandling";
 
 interface QueuedJob<Payload> {
   payload: Payload;
@@ -189,14 +190,27 @@ export class EventSourcedQueueProcessorMemory<Payload>
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
-      this.logger.error(
-        {
-          queueName: this.queueName,
-          jobId: job.jobId,
-          error: errorMessage,
-        },
-        "Event-sourced queue job failed",
-      );
+
+      // Ordering errors are expected behavior, log at DEBUG
+      if (isSequentialOrderingError(error)) {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job.jobId,
+            error: errorMessage,
+          },
+          "Job deferred due to ordering (previous event not yet processed)",
+        );
+      } else {
+        this.logger.error(
+          {
+            queueName: this.queueName,
+            jobId: job.jobId,
+            error: errorMessage,
+          },
+          "Event-sourced queue job failed",
+        );
+      }
       job.reject(error instanceof Error ? error : new Error(errorMessage));
     }
   }
