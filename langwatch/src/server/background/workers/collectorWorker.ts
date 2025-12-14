@@ -863,16 +863,27 @@ export const processCollectorCheckAndAdjustJob = async (
     !Array.isArray(customMetadata);
 
   if (
-    // Does not re-schedule trace checks for too old traces being resynced
-    (!existingTrace?.timestamps?.inserted_at ||
-      existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
-    // Does not schedule evaluations for traces that are not from the studio in development
-    (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
-      customMetadata?.platform !== "optimization_studio" ||
-      customMetadata?.environment !== "development")
+    existingTrace?.timestamps?.inserted_at &&
+    existingTrace.timestamps.inserted_at < Date.now() - 60 * 60 * 1000
   ) {
-    await scheduleEvaluations(trace, spans);
+    logger.debug({ traceId }, "trace is too old, skipping evaluations");
+    return;
   }
+
+  const isLangWatchInternal =
+    isCustomMetadataObject &&
+    customMetadata?.["service.name"]?.toString().startsWith("langwatch-") &&
+    customMetadata?.["service.name"]?.toString() !==
+      "langwatch-workflow-runtime";
+  if (isLangWatchInternal) {
+    logger.debug(
+      { traceId },
+      "trace is LangWatch internal, skipping evaluations",
+    );
+    return;
+  }
+
+  await scheduleEvaluations(trace, spans);
 
   try {
     await scoreSatisfactionFromInput({

@@ -31,11 +31,7 @@ async def execute_component(event: ExecuteComponentPayload):
         with optional_langwatch_trace(
             do_not_trace=do_not_trace,
             trace_id=event.trace_id,
-            skip_root_span=True,
-            metadata={
-                "platform": "optimization_studio",
-                "environment": "development",
-            },
+            name=event.workflow.name,
         ) as trace:
             if trace:
                 trace.autotrack_dspy()

@@ -46,9 +46,6 @@ async def execute_flow(
     trace_id = event.trace_id
     until_node_id = event.until_node_id
     inputs = event.inputs
-    manual_execution_mode = (
-        True if event.manual_execution_mode is None else event.manual_execution_mode
-    )
 
     do_not_trace = not workflow.enable_tracing or (
         inputs[0].get("do_not_trace", event.do_not_trace)
@@ -64,11 +61,7 @@ async def execute_flow(
     with optional_langwatch_trace(
         do_not_trace=do_not_trace,
         trace_id=event.trace_id,
-        skip_root_span=True,
-        metadata={
-            "platform": "optimization_studio",
-            "environment": "development" if manual_execution_mode else "production",
-        },
+        name=event.workflow.name,
     ) as trace:
         if not do_not_trace and trace:
             trace.autotrack_dspy()
