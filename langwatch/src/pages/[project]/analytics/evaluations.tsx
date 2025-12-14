@@ -32,7 +32,10 @@ const creatChecks = (checks: any) => {
     let checksSummary = {};
     const traceCheck = getEvaluatorDefinitions(check.checkType);
 
+    const isCategoryEvaluator = check.checkType === "langevals/llm_category";
+
     if (traceCheck?.isGuardrail) {
+      // Boolean/guardrail evaluators: show pass/fail distribution
       checksSummary = {
         graphId: "custom",
         graphType: "donnut",
@@ -46,6 +49,7 @@ const creatChecks = (checks: any) => {
           },
         ],
         groupBy: "evaluations.evaluation_passed",
+        groupByKey: check.id,
         includePrevious: false,
         timeScale: ONE_DAY,
         height: 300,
@@ -68,11 +72,50 @@ const creatChecks = (checks: any) => {
           },
         ],
         groupBy: "evaluations.evaluation_passed",
+        groupByKey: check.id,
         includePrevious: false,
         timeScale: ONE_DAY,
         height: 300,
       };
+    } else if (isCategoryEvaluator) {
+      // Category evaluators: show category distribution
+      checksSummary = {
+        graphId: "custom",
+        graphType: "donnut",
+        series: [
+          {
+            name: "Traces count",
+            colorSet: "colors",
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+          },
+        ],
+        groupBy: "evaluations.evaluation_label",
+        groupByKey: check.id,
+        includePrevious: false,
+        timeScale: ONE_DAY,
+        height: 400,
+      };
+
+      checksAverage = {
+        graphId: "custom",
+        graphType: "horizontal_bar",
+        series: [
+          {
+            name: "",
+            colorSet: "colors",
+            metric: "metadata.trace_id",
+            aggregation: "cardinality",
+          },
+        ],
+        groupBy: "evaluations.evaluation_label",
+        groupByKey: check.id,
+        includePrevious: false,
+        timeScale: "full",
+        height: 400,
+      };
     } else {
+      // Score-based evaluators: show average score
       checksSummary = {
         graphId: "custom",
         graphType: "summary",
@@ -115,7 +158,7 @@ const creatChecks = (checks: any) => {
             <Card.Header>
               <HStack gap={2}>
                 <BarChart2 color="orange" />
-                <Heading size="sm">{traceCheck?.name}</Heading>
+                <Heading size="sm">{check.name}</Heading>
               </HStack>
               {!check.enabled && (
                 <Text color="gray" fontSize="sm">
@@ -133,8 +176,8 @@ const creatChecks = (checks: any) => {
             <Card.Header>
               <HStack gap={2}>
                 <BarChart2 color="orange" />
-                <Heading size="sm">{traceCheck?.name}</Heading>
-                <Text fontWeight={300}>- {check.name}</Text>
+                <Heading size="sm">{check.name}</Heading>
+                <Text fontWeight={300}>- {traceCheck?.name}</Text>
               </HStack>
               {!check.enabled && (
                 <Text color="gray" fontSize="sm">
