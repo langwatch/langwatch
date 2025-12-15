@@ -17,7 +17,7 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .prompt import Prompt
-from .. import FetchPolicy
+from .types import FetchPolicy
 from .prompt_api_service import PromptApiService
 from .local_loader import LocalPromptLoader
 from .types import MessageDict, InputDict, OutputDict

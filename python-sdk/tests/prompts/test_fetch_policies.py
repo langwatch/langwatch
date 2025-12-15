@@ -83,37 +83,63 @@ def test_materialized_only_throws_when_local_file_not_found(
 
 @pytest.mark.integration
 def test_cache_ttl_returns_cached_version_before_expiration(
-    cli_prompt_setup: Path, clean_langwatch
+    empty_dir: Path, clean_langwatch
 ):
     """
-    GIVEN a prompt was fetched and cached
+    GIVEN a prompt was fetched from API and cached
     AND the cache has not expired
-    WHEN I retrieve the prompt with CACHE_TTL policy
+    WHEN I retrieve the prompt again with CACHE_TTL policy
     THEN the system returns the cached version
-    AND the system does NOT call the API
+    AND the system does NOT call the API on the second request
     """
     original_cwd = Path.cwd()
     try:
-        os.chdir(cli_prompt_setup)
+        os.chdir(empty_dir)
 
-        # First call should cache the result
+        # Mock API response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "id": "my-prompt",
+            "handle": "my-prompt",
+            "scope": "PROJECT",
+            "name": "Test Prompt",
+            "updatedAt": "2023-01-01T00:00:00Z",
+            "projectId": "project_1",
+            "organizationId": "org_1",
+            "versionId": "version_123",
+            "version": 1,
+            "createdAt": "2023-01-01T00:00:00Z",
+            "prompt": "Hello {{ name }}!",
+            "messages": [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "{{input}}"},
+            ],
+            "inputs": [],
+            "outputs": [],
+            "model": "openai/gpt-4",
+        }
+
         with patch("httpx.Client.request") as mock_request:
-            mock_request.side_effect = httpx.ConnectError("Connection blocked for test")
+            mock_request.return_value = mock_response
 
+            # First call should fetch from API and cache the result
             result1 = langwatch.prompts.get(
                 "my-prompt", fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=5
             )
             assert result1 is not None
+            assert result1.model == "openai/gpt-4"
+            assert mock_request.call_count == 1
 
             # Second call within TTL should use cache (no API call)
             result2 = langwatch.prompts.get(
                 "my-prompt", fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=5
             )
             assert result2 is not None
+            assert result2.model == "openai/gpt-4"
 
-            # Both calls should attempt API first, then fall back to local
-            # Since API fails on both calls, there should be 2 API attempts
-            assert mock_request.call_count == 2
+            # Only one API call should have been made (first call)
+            assert mock_request.call_count == 1
 
     finally:
         os.chdir(original_cwd)
