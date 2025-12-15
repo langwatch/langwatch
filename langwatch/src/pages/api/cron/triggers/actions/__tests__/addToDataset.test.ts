@@ -47,7 +47,9 @@ describe("handleAddToDataset", () => {
         },
       };
 
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
+        mockTrigger as any,
+      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "value1", field2: "value2" },
       ]);
@@ -103,7 +105,9 @@ describe("handleAddToDataset", () => {
         },
       };
 
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
+        mockTrigger as any,
+      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "test\u0000value", field2: "clean\u0000\u0000data" },
       ]);
@@ -152,9 +156,11 @@ describe("handleAddToDataset", () => {
         },
       };
 
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
+        mockTrigger as any,
+      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
-        { number: 42, boolean: true, object: { nested: "value" } },
+        { number: 42, boolean: "true", object: '{"nested":"value"}' },
       ]);
 
       const context: TriggerContext = {
@@ -179,8 +185,8 @@ describe("handleAddToDataset", () => {
           datasetRecords: expect.arrayContaining([
             expect.objectContaining({
               number: 42,
-              boolean: true,
-              object: { nested: "value" },
+              boolean: "true",
+              object: '{"nested":"value"}',
             }),
           ]),
         }),
@@ -200,7 +206,9 @@ describe("handleAddToDataset", () => {
         },
       };
 
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
+        mockTrigger as any,
+      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([{}]);
       vi.mocked(createManyDatasetRecords).mockRejectedValue(error);
 
@@ -231,4 +239,3 @@ describe("handleAddToDataset", () => {
     });
   });
 });
-
