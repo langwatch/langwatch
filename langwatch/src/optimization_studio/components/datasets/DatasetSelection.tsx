@@ -5,6 +5,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
+import type { AddDatasetDrawerProps } from "../../../components/AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
@@ -42,33 +43,18 @@ export function DatasetSelection({
             size="sm"
             variant="outline"
             onClick={() => {
+              const handleSuccess: AddDatasetDrawerProps["onSuccess"] = ({
+                datasetId,
+                name,
+              }) => {
+                setIsEditing({ id: datasetId, name });
+              };
+
               openDrawer("uploadCSV", {
-                onSuccess: ({
-                  datasetId,
-                  name,
-                }: {
-                  datasetId: string;
-                  name: string;
-                }) => {
-                  setIsEditing({
-                    id: datasetId,
-                    name,
-                  });
-                },
+                onSuccess: handleSuccess,
                 onCreateFromScratch: () => {
                   openDrawer("addOrEditDataset", {
-                    onSuccess: ({
-                      datasetId,
-                      name,
-                    }: {
-                      datasetId: string;
-                      name: string;
-                    }) => {
-                      setIsEditing({
-                        id: datasetId,
-                        name,
-                      });
-                    },
+                    onSuccess: handleSuccess,
                   });
                 },
               });

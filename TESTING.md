@@ -20,10 +20,10 @@ Avoid overlap. integration tests should not test the same thing as e2e tests, an
 
 ## Workflow
 
-1. **Spec first**: Write a `.feature` file in `specs/`. Use tags: `@e2e`, `@integration`, `@unit`.
+1. **Spec first**: Write a `.feature` file in `specs/`. Use tags: `@e2e`, `@integration`, `@unit` only.
 2. **Challenge**: LLM/reviewer challenges missing edge cases before implementation.
 3. **Examples drive E2E**: Working examples in `examples/` are wrapped by e2e tests.
-4. **Implement**: Red → Green → Refactor.
+4. **Implement**: Outside-in test driven (TDD). Red → Green → Refactor.
 
 ## Decision Tree
 

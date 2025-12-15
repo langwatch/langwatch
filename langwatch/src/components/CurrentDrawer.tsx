@@ -14,6 +14,9 @@ import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 
+// Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
+export { useDrawer } from "../hooks/useDrawer";
+
 type DrawerProps = {
   open: string;
 } & Record<string, any>;
@@ -35,7 +38,6 @@ const drawers = {
 export function CurrentDrawer() {
   const router = useRouter();
   const complexProps = getComplexProps();
-
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
     allowDots: true,
@@ -70,6 +72,3 @@ export function CurrentDrawer() {
     </ErrorBoundary>
   ) : null;
 }
-
-// Re-export useDrawer from the hooks directory
-export { useDrawer } from "../hooks/useDrawer";

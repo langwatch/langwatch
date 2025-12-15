@@ -77,7 +77,7 @@ export function DatasetModal({
         onSuccess: (dataset_: {
           datasetId: string;
           name: string;
-          columnTypes: any;
+          columnTypes: DatasetColumns;
         }) => {
           setEditingDataset({ id: dataset_.datasetId, name: dataset_.name });
           setSelectedDataset(
