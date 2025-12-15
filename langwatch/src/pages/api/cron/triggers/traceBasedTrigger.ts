@@ -117,7 +117,8 @@ export const processTraceBasedTrigger = async (
     }
 
     await addTriggersSent(triggerId, triggerData);
-    const updatedAt = getLatestUpdatedAt(traces);
+    const updatedAt = getLatestUpdatedAt(traces) ?? Date.now();
+
     void updateAlert(triggerId, updatedAt, project.id);
 
     return {

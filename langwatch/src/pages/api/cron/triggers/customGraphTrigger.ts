@@ -263,10 +263,12 @@ const calculateCurrentValue = (
       .filter((v): v is number => typeof v === "number");
 
     if (values.length > 0) {
-      // Use sum for cardinality/terms, average for others
+      // Use sum for cardinality/terms/count, average for others
+      const aggregation = series.aggregation as string;
       if (
-        series.aggregation === "cardinality" ||
-        series.aggregation === "terms"
+        aggregation === "cardinality" ||
+        aggregation === "terms" ||
+        aggregation === "count"
       ) {
         currentValue = values.reduce((a: number, b: number) => a + b, 0);
       } else {
