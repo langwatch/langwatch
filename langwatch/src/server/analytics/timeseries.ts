@@ -220,7 +220,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
   let groupLabelsMapping: Record<string, string> | undefined;
   if (input.groupBy) {
     const group = getGroup(input.groupBy);
-    aggs = group.aggregation(aggs);
+    aggs = group.aggregation(aggs, input.groupByKey);
     if (labelsMapping[input.groupBy]) {
       groupLabelsMapping = await labelsMapping[input.groupBy]?.(
         input.projectId,

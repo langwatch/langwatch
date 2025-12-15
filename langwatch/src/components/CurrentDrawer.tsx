@@ -38,7 +38,6 @@ const drawers = {
 export function CurrentDrawer() {
   const router = useRouter();
   const complexProps = getComplexProps();
-
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
     allowDots: true,
@@ -69,7 +68,7 @@ export function CurrentDrawer() {
         );
       }}
     >
-      <CurrentDrawer {...queryDrawer} {...getComplexProps()} />
+      <CurrentDrawer {...queryDrawer} {...complexProps} />
     </ErrorBoundary>
   ) : null;
 }

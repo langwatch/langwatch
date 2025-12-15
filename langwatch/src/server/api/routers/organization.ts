@@ -3,11 +3,11 @@ import {
   type Organization,
   type OrganizationUser,
   OrganizationUserRole,
+  type Prisma,
   type Project,
   type Team,
   type TeamUser,
   TeamUserRole,
-  type Prisma,
   type User,
 } from "@prisma/client";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
@@ -1457,7 +1457,7 @@ export const organizationRouter = createTRPCRouter({
       const enrichedAuditLogs = auditLogs.map((log) => ({
         ...log,
         user: userMap.get(log.userId) ?? null,
-        project: log.projectId ? projectMap.get(log.projectId) ?? null : null,
+        project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
       }));
 
       return {

@@ -13,6 +13,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -24,7 +25,6 @@ import type {
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
-import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "./datasets/DatasetPreview";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";

@@ -377,8 +377,8 @@ export function DatasetTable({
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setParentRowData(
-        (rows) => rows?.filter((row) => !recordIds.includes(row.id)),
+      setParentRowData((rows) =>
+        rows?.filter((row) => !recordIds.includes(row.id)),
       );
 
       const grid = parentGridRef ?? gridRef;
@@ -503,8 +503,8 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                      ? ""
-                      : DEFAULT_DATASET_NAME
+                        ? ""
+                        : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
@@ -528,8 +528,8 @@ export function DatasetTable({
           {savingStatus === "saving"
             ? "Saving..."
             : savingStatus === "saved"
-            ? "Saved"
-            : ""}
+              ? "Saved"
+              : ""}
         </Text>
         <Spacer />
         {!hideButtons && (

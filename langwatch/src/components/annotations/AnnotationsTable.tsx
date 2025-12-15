@@ -15,13 +15,13 @@ import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { Trace } from "~/server/tracer/types";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
-import { useDrawer } from "~/hooks/useDrawer";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,

@@ -2,9 +2,9 @@ export type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateP
 export { TraceSummaryStateProjectionRepositoryClickHouse } from "./traceSummaryStateProjectionRepositoryClickHouse";
 
 import { getClickHouseClient } from "~/server/clickhouse/client";
+import type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
 import { TraceSummaryStateProjectionRepositoryClickHouse } from "./traceSummaryStateProjectionRepositoryClickHouse";
 import { TraceSummaryStateProjectionRepositoryMemory } from "./traceSummaryStateProjectionRepositoryMemory";
-import type { TraceSummaryStateProjectionRepository } from "./traceSummaryStateProjectionRepository";
 
 const clickHouseClient = getClickHouseClient();
 

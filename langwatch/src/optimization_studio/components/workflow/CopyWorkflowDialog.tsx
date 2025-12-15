@@ -6,19 +6,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useState } from "react";
+import { Checkbox } from "../../../components/ui/checkbox";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
-import { api } from "../../../utils/api";
 
 import {
   hasPermissionWithHierarchy,
   teamRoleHasPermission,
 } from "../../../server/api/rbac";
-
-import { Checkbox } from "../../../components/ui/checkbox";
+import { api } from "../../../utils/api";
 
 export const CopyWorkflowDialog = ({
   open,
@@ -104,15 +103,15 @@ export const CopyWorkflowDialog = ({
       await utils.workflow.getAll.invalidate();
 
       toaster.create({
-        title: "Workflow copied",
-        description: `Workflow "${workflowName}" copied successfully to ${targetProjectPath}.`,
+        title: "Workflow replicated",
+        description: `Workflow "${workflowName}" replicated successfully to ${targetProjectPath}.`,
         type: "success",
       });
 
       onClose();
     } catch (error) {
       toaster.create({
-        title: "Error copying workflow",
+        title: "Error replicating workflow",
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
@@ -124,7 +123,7 @@ export const CopyWorkflowDialog = ({
       <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Copy Workflow</Dialog.Title>
+          <Dialog.Title>Replicate Workflow</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
@@ -177,7 +176,7 @@ export const CopyWorkflowDialog = ({
               checked={copyDatasets}
               onCheckedChange={(e) => setCopyDatasets(!!e.checked)}
             >
-              Copy associated dataset
+              Replicate associated dataset
             </Checkbox>
           </VStack>
         </Dialog.Body>
@@ -197,7 +196,7 @@ export const CopyWorkflowDialog = ({
                 ?.hasCreatePermission
             }
           >
-            Copy
+            Replicate
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
