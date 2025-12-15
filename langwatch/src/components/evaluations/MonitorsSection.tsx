@@ -12,6 +12,7 @@ import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
+import { Copy } from "react-feather";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,
@@ -23,11 +24,13 @@ import {
   LuTrash,
 } from "react-icons/lu";
 import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { api } from "../../utils/api";
 import { CustomGraph } from "../analytics/CustomGraph";
+import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
 
@@ -41,6 +44,11 @@ type MonitorsSectionProps = {
 
 export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [copyDialogState, setCopyDialogState] = useState<{
+    open: boolean;
+    experimentId: string;
+    evaluationName: string;
+  } | null>(null);
 
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
@@ -168,6 +176,42 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           <LuPencil size={16} />
                           Edit
                         </Menu.Item>
+                        {monitor.experimentId && (
+                          <Tooltip
+                            content={
+                              !hasPermission("evaluations:manage")
+                                ? "You need evaluations:manage permission to replicate evaluations"
+                                : undefined
+                            }
+                            disabled={hasPermission("evaluations:manage")}
+                            positioning={{ placement: "right" }}
+                            showArrow
+                          >
+                            <Menu.Item
+                              value="copy"
+                              onClick={() => {
+                                if (!project || !monitor.experimentId) return;
+
+                                if (hasPermission("evaluations:manage")) {
+                                  const experiment = experiments.data?.find(
+                                    (e) => e.id === monitor.experimentId,
+                                  );
+                                  if (experiment) {
+                                    setCopyDialogState({
+                                      open: true,
+                                      experimentId: experiment.id,
+                                      evaluationName:
+                                        experiment.name ?? experiment.slug,
+                                    });
+                                  }
+                                }
+                              }}
+                              disabled={!hasPermission("evaluations:manage")}
+                            >
+                              <Copy size={16} /> Replicate to another project
+                            </Menu.Item>
+                          </Tooltip>
+                        )}
                         <Menu.Item
                           value="toggle"
                           onClick={() => {
@@ -279,6 +323,14 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
           </>
         )}
       </Card.Body>
+      {copyDialogState && (
+        <CopyEvaluationDialog
+          open={copyDialogState.open}
+          onClose={() => setCopyDialogState(null)}
+          experimentId={copyDialogState.experimentId}
+          evaluationName={copyDialogState.evaluationName}
+        />
+      )}
     </Card.Root>
   );
 };

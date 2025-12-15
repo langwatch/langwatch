@@ -33,7 +33,7 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { saveOrCommitWorkflowVersion } from "./workflows";
 
@@ -787,6 +787,176 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  copy: protectedProcedure
+    .input(
+      z.object({
+        experimentId: z.string(),
+        projectId: z.string(),
+        sourceProjectId: z.string(),
+        copyDatasets: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission("evaluations:manage"))
+    .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least evaluations:manage permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "evaluations:manage",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to manage evaluations in the source project",
+        });
+      }
+
+      const experiment = await ctx.prisma.experiment.findUnique({
+        where: {
+          id: input.experimentId,
+          projectId: input.sourceProjectId,
+        },
+        include: {
+          workflow: {
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment workflow not found",
+        });
+      }
+
+      // Deep clone DSL to ensure mutability
+      const dsl = JSON.parse(
+        JSON.stringify(experiment.workflow.latestVersion.dsl),
+      ) as Workflow;
+      const datasetIdMap = new Map<string, { id: string; name: string }>();
+
+      if (input.copyDatasets) {
+        const { DatasetService } = await import("../../datasets/dataset.service");
+        const datasetService = DatasetService.create(ctx.prisma);
+
+        // Type guard for dataset reference
+        const isDatasetRef = (
+          value: unknown,
+        ): value is { id?: string; name?: string } => {
+          if (!value || typeof value !== "object") return false;
+          const obj = value as Record<string, unknown>;
+          return (
+            (obj.id === undefined || typeof obj.id === "string") &&
+            (obj.name === undefined || typeof obj.name === "string")
+          );
+        };
+
+        // Helper to process dataset reference
+        const processDatasetRef = async (datasetRef: {
+          id?: string;
+          name?: string;
+        }) => {
+          if (!datasetRef.id) return;
+
+          if (datasetIdMap.has(datasetRef.id)) {
+            const newDataset = datasetIdMap.get(datasetRef.id)!;
+            datasetRef.id = newDataset.id;
+            datasetRef.name = newDataset.name;
+            return;
+          }
+
+          // Create new dataset in target project using service
+          const newDataset = await datasetService.copyDataset({
+            sourceDatasetId: datasetRef.id,
+            sourceProjectId: input.sourceProjectId,
+            targetProjectId: input.projectId,
+          });
+
+          datasetIdMap.set(datasetRef.id, {
+            id: newDataset.id,
+            name: newDataset.name,
+          });
+
+          datasetRef.id = newDataset.id;
+          datasetRef.name = newDataset.name;
+        };
+
+        // Traverse nodes to find datasets
+        for (const node of dsl.nodes) {
+          // Check Entry node dataset
+          if (node.data && "dataset" in node.data && node.data.dataset) {
+            await processDatasetRef(node.data.dataset);
+          }
+
+          // Check parameters for Demonstrations
+          if (node.data && "parameters" in node.data && node.data.parameters) {
+            for (const param of node.data.parameters) {
+              if (param.type === "dataset" && isDatasetRef(param.value)) {
+                await processDatasetRef(param.value);
+              }
+            }
+          }
+        }
+      }
+
+      // Create new workflow
+      const newWorkflow = await ctx.prisma.workflow.create({
+        data: {
+          id: `workflow_${nanoid()}`,
+          projectId: input.projectId,
+          name: experiment.workflow.name,
+          icon: experiment.workflow.icon,
+          description: experiment.workflow.description,
+          copiedFromWorkflowId: experiment.workflowId,
+        },
+      });
+
+      // Save workflow version
+      await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId: newWorkflow.id,
+          dsl: {
+            ...dsl,
+            workflow_id: newWorkflow.id,
+            version: "1",
+          },
+        },
+        autoSaved: false,
+        commitMessage: `Copied from ${experiment.workflow.name}`,
+      });
+
+      // Create new experiment
+      const experimentName = experiment.name ?? experiment.slug;
+      const newSlug = slugify(experimentName);
+      const newExperiment = await ctx.prisma.experiment.create({
+        data: {
+          id: `experiment_${nanoid()}`,
+          name: experimentName,
+          slug: newSlug,
+          projectId: input.projectId,
+          type: experiment.type,
+          workflowId: newWorkflow.id,
+          wizardState: experiment.wizardState as JsonValue,
+        },
+      });
+
+      return { experiment: newExperiment, workflow: newWorkflow };
     }),
 
   /**
