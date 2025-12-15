@@ -64,6 +64,11 @@ packages = ["src/langwatch"]
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
+markers = [
+    "e2e: End-to-end tests that require external services",
+    "integration: Integration tests",
+    "unit: Unit tests (default)",
+]
 
 [dependency-groups]
 dev = ["black>=25.1.0"]
@@ -99,4 +104,8 @@ examples = [
     "strands-agents[otel]>=1.14.0,<2.0.0",
     "unstructured[pdf]>=0.18.3",
 ]
-tests = ["pytest-asyncio>=0.21.2"]
+tests = [
+    "factory-boy>=3.3.3",
+    "pytest-asyncio>=0.21.2",
+    "python-dotenv==1.0.1"
+]

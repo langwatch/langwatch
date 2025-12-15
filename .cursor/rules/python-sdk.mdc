@@ -1,0 +1,6 @@
+---
+globs: */python-sdk/**
+alwaysApply: false
+---
+
+See: python-sdk/AGENTS.md
