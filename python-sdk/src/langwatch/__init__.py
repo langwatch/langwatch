@@ -8,27 +8,8 @@ from .login import login
 from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
-from enum import Enum
+from .prompts.types import FetchPolicy
 
-
-class FetchPolicy(Enum):
-    """
-    Fetch policy for prompt retrieval.
-
-    Controls how prompts are fetched and cached.
-    """
-
-    # Use local file if available, otherwise fetch from API (default)
-    MATERIALIZED_FIRST = "MATERIALIZED_FIRST"
-
-    # Always try API first, fall back to materialized
-    ALWAYS_FETCH = "ALWAYS_FETCH"
-
-    # Fetch every X minutes, use materialized between fetches
-    CACHE_TTL = "CACHE_TTL"
-
-    # Never fetch, use materialized files only
-    MATERIALIZED_ONLY = "MATERIALIZED_ONLY"
 
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
@@ -41,7 +22,6 @@ if TYPE_CHECKING:
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
     from .prompts.prompt_facade import PromptsFacade
-    from .prompts.types import FetchPolicy
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct

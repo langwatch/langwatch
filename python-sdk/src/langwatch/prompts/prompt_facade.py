@@ -8,7 +8,7 @@ or when API is unavailable.
 
 Follows the facade pattern to coordinate between LocalPromptLoader and PromptApiService.
 """
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 import time
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -21,6 +21,9 @@ from .. import FetchPolicy
 from .prompt_api_service import PromptApiService
 from .local_loader import LocalPromptLoader
 from .types import MessageDict, InputDict, OutputDict
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 class PromptsFacade:
@@ -36,7 +39,7 @@ class PromptsFacade:
         """Initialize the prompt service facade with dependencies."""
         self._api_service = PromptApiService(rest_api_client)
         self._local_loader = LocalPromptLoader()
-        self._cache: Dict[str, Dict[str, any]] = {}
+        self._cache: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
     def from_global(cls) -> "PromptsFacade":
@@ -137,6 +140,16 @@ class PromptsFacade:
             self._cache[cache_key] = {"data": api_data, "timestamp": now}
             return Prompt(api_data)
         except Exception:
+            logger.warning(
+                f"Failed to fetch prompt '{prompt_id}' from API, falling back to local",
+                exc_info=True,
+                stack_info=True,
+                extra={
+                    "prompt_id": prompt_id,
+                    "version_number": version_number,
+                    "cache_ttl_minutes": cache_ttl_minutes,
+                },
+            )
             # Fall back to local if API fails
             local_data = self._local_loader.load_prompt(prompt_id)
             if local_data is not None:

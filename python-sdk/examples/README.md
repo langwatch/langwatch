@@ -129,7 +129,7 @@ pytest tests/test_examples.py -k "generic_bot"
 
 ## 📁 Directory Structure
 
-```
+```text
 examples/
 ├── README.md              # This file
 ├── *.py                   # Individual examples

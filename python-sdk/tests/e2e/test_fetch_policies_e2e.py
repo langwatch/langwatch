@@ -9,20 +9,24 @@ Prerequisites:
 - Node.js/npx must be available for CLI operations
 """
 
-import os
-import time
-import tempfile
 import contextlib
+import logging
+import os
 import subprocess
+import tempfile
+import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from uuid import uuid4
 
-import pytest
 import httpx
+import pytest
 
 import langwatch
 from langwatch import FetchPolicy
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -62,15 +66,15 @@ def setup_local_prompt(work_dir: Path, prompt_name: str) -> str:
     print(f"\n🔧 Setting up local prompt: {prompt_name}")
 
     # CLI init
-    run_cli(CLI_EXECUTABLE + ["prompt", "init"], work_dir)
+    run_cli([*CLI_EXECUTABLE, "prompt", "init"], work_dir)
 
     # CLI create
-    run_cli(CLI_EXECUTABLE + ["prompt", "create", prompt_name], work_dir)
+    run_cli([*CLI_EXECUTABLE, "prompt", "create", prompt_name], work_dir)
 
     # CLI add to local project
     prompt_file_path = f"prompts/{prompt_name}.prompt.yaml"
     run_cli(
-        CLI_EXECUTABLE + ["prompt", "add", prompt_name, prompt_file_path],
+        [*CLI_EXECUTABLE, "prompt", "add", prompt_name, prompt_file_path],
         work_dir,
     )
 
@@ -96,7 +100,7 @@ def run_cli(command, cwd=None):
     """Run a CLI command and return the result."""
     try:
         result = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, check=True
+            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=30
         )
         return result.stdout
     except subprocess.CalledProcessError as e:
@@ -142,13 +146,6 @@ def http_request_counter():
 
 
 @pytest.mark.e2e
-@pytest.mark.skipif(
-    not os.getenv("LANGWATCH_API_KEY"),
-    reason="LANGWATCH_API_KEY environment variable required for e2e tests",
-)
-@pytest.mark.skipif(
-    not os.getenv("RUN_E2E_TESTS"), reason="Set RUN_E2E_TESTS=1 to run end-to-end tests"
-)
 class TestFetchPoliciesE2E:
     """
     End-to-end tests for fetch policies.
@@ -158,7 +155,6 @@ class TestFetchPoliciesE2E:
 
     To run these tests:
         export LANGWATCH_API_KEY="your-api-key"
-        export RUN_E2E_TESTS=1
         pytest tests/test_fetch_policies_e2e.py -v
     """
 
@@ -167,16 +163,44 @@ class TestFetchPoliciesE2E:
         """Set up LangWatch for each test."""
         langwatch.setup(api_key=api_key)
 
-    def test_materialized_first_returns_created_prompt_via_api(self, temp_workspace):
+    def test_materialized_first_prefers_local_with_zero_api_calls(self, temp_workspace):
         """
-        Test MATERIALIZED_FIRST policy (default) returns created prompt.
+        Test MATERIALIZED_FIRST policy prefers local prompt without API calls.
 
-        GIVEN a prompt exists on the server
+        GIVEN a prompt exists locally via CLI setup
         WHEN we retrieve it with default policy (MATERIALIZED_FIRST)
-        THEN the system returns the server version (makes API call)
+        THEN the system returns the local version without API calls
         """
         # Create a unique prompt handle
-        handle = f"e2e-materialized-first-{int(time.time())}"
+        handle = f"e2e-materialized-first-local-{uuid4().hex}"
+
+        # Set up local prompt using CLI
+        setup_local_prompt(temp_workspace, handle)
+
+        # Run the example with HTTP request counting
+        with http_request_counter() as calls:
+            prompt = run_materialized_first(temp_workspace, handle)
+
+        # Verify the prompt was returned correctly
+        assert prompt is not None
+        assert prompt.handle == handle
+        assert prompt.model == "openai/gpt-4"  # From CLI fixture
+
+        # Should NOT have made any API calls (local-first behavior)
+        assert calls["count"] == 0
+
+    def test_materialized_first_falls_back_to_api_when_local_missing(
+        self, temp_workspace
+    ):
+        """
+        Test MATERIALIZED_FIRST policy falls back to API when local missing.
+
+        GIVEN a prompt exists on the server but NOT locally
+        WHEN we retrieve it with default policy (MATERIALIZED_FIRST)
+        THEN the system falls back to API and returns the server version
+        """
+        # Create a unique prompt handle
+        handle = f"e2e-materialized-first-api-{uuid4().hex}"
         prompt_content = "Hello from MATERIALIZED_FIRST policy test"
 
         # Create prompt on server
@@ -203,8 +227,8 @@ class TestFetchPoliciesE2E:
             # Clean up
             try:
                 langwatch.prompts.delete(created_prompt.id)
-            except Exception:
-                pass  # Ignore cleanup failures in tests
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created_prompt.id, e)
 
     def test_always_fetch_returns_server_prompt_and_hits_api(self, temp_workspace):
         """
@@ -215,7 +239,7 @@ class TestFetchPoliciesE2E:
         THEN the system calls the API and returns the server version
         """
         # Create a unique prompt handle
-        handle = f"e2e-always-fetch-{int(time.time())}"
+        handle = f"e2e-always-fetch-{uuid4().hex}"
         prompt_content = "Hello from ALWAYS_FETCH policy test"
 
         # Create prompt on server
@@ -242,8 +266,8 @@ class TestFetchPoliciesE2E:
             # Clean up
             try:
                 langwatch.prompts.delete(created_prompt.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created_prompt.id, e)
 
     def test_materialized_only_returns_local_prompt_without_api_call(
         self, temp_workspace
@@ -256,7 +280,7 @@ class TestFetchPoliciesE2E:
         THEN the system returns the local version without API calls
         """
         # Create a unique prompt handle
-        handle = f"e2e-materialized-only-{int(time.time())}"
+        handle = f"e2e-materialized-only-{uuid4().hex}"
 
         # Set up local prompt using CLI
         setup_local_prompt(temp_workspace, handle)
@@ -282,7 +306,7 @@ class TestFetchPoliciesE2E:
         THEN the first call caches and second call refreshes after expiry
         """
         # Create a unique prompt handle
-        handle = f"e2e-cache-ttl-{int(time.time())}"
+        handle = f"e2e-cache-ttl-{uuid4().hex}"
         prompt_content = "Hello from CACHE_TTL policy test"
 
         # Create prompt on server
@@ -322,5 +346,5 @@ class TestFetchPoliciesE2E:
             # Clean up
             try:
                 langwatch.prompts.delete(created_prompt.id)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Failed to delete prompt %s: %s", created_prompt.id, e)
