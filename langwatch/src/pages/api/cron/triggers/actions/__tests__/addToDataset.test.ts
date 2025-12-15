@@ -8,11 +8,7 @@ vi.mock("~/server/api/routers/datasetRecord", () => ({
 }));
 
 vi.mock("~/server/db", () => ({
-  prisma: {
-    trigger: {
-      findUnique: vi.fn(),
-    },
-  },
+  prisma: {},
 }));
 
 vi.mock("~/server/tracer/tracesMapping", () => ({
@@ -24,7 +20,6 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
 }));
 
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
-import { prisma } from "~/server/db";
 import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -35,27 +30,22 @@ describe("handleAddToDataset", () => {
 
   describe("when adding traces to dataset", () => {
     it("fetches trigger, maps traces, and creates dataset records", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          datasetId: "dataset-1",
-          datasetMapping: {
-            mapping: { field1: { source: "input", key: "value", subkey: "" } },
-            expansions: ["input", "output"],
-          },
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
-        mockTrigger as any,
-      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "value1", field2: "value2" },
       ]);
 
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {
+            datasetId: "dataset-1",
+            datasetMapping: {
+              mapping: { field1: { source: "input", key: "value", subkey: "" } },
+              expansions: ["input", "output"],
+            },
+          },
+        } as any,
         projects: [],
         triggerData: [
           {
@@ -70,10 +60,6 @@ describe("handleAddToDataset", () => {
       };
 
       await handleAddToDataset(context);
-
-      expect(prisma.trigger.findUnique).toHaveBeenCalledWith({
-        where: { id: "trigger-1", projectId: "project-1" },
-      });
 
       expect(mapTraceToDatasetEntry).toHaveBeenCalled();
 
@@ -93,27 +79,22 @@ describe("handleAddToDataset", () => {
 
   describe("when entry contains string with null bytes", () => {
     it("removes null bytes from the string", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          datasetId: "dataset-1",
-          datasetMapping: {
-            mapping: {},
-            expansions: [],
-          },
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
-        mockTrigger as any,
-      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "test\u0000value", field2: "clean\u0000\u0000data" },
       ]);
 
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {
+            datasetId: "dataset-1",
+            datasetMapping: {
+              mapping: {},
+              expansions: [],
+            },
+          },
+        } as any,
         projects: [],
         triggerData: [
           {
@@ -144,27 +125,22 @@ describe("handleAddToDataset", () => {
 
   describe("when entry contains non-string values", () => {
     it("preserves the value unchanged", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          datasetId: "dataset-1",
-          datasetMapping: {
-            mapping: {},
-            expansions: [],
-          },
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
-        mockTrigger as any,
-      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { number: 42, boolean: "true", object: '{"nested":"value"}' },
       ]);
 
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {
+            datasetId: "dataset-1",
+            datasetMapping: {
+              mapping: {},
+              expansions: [],
+            },
+          },
+        } as any,
         projects: [],
         triggerData: [
           {
@@ -197,23 +173,18 @@ describe("handleAddToDataset", () => {
   describe("when createManyDatasetRecords throws an error", () => {
     it("captures the exception with full context", async () => {
       const error = new Error("Dataset creation failed");
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          datasetId: "dataset-1",
-          datasetMapping: { mapping: {}, expansions: [] },
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(
-        mockTrigger as any,
-      );
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([{}]);
       vi.mocked(createManyDatasetRecords).mockRejectedValue(error);
 
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {
+            datasetId: "dataset-1",
+            datasetMapping: { mapping: {}, expansions: [] },
+          },
+        } as any,
         projects: [],
         triggerData: [
           {

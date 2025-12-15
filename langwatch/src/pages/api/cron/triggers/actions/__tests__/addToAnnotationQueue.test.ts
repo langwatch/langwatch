@@ -8,11 +8,7 @@ vi.mock("~/server/api/routers/annotation", () => ({
 }));
 
 vi.mock("~/server/db", () => ({
-  prisma: {
-    trigger: {
-      findUnique: vi.fn(),
-    },
-  },
+  prisma: {} as any,
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -30,24 +26,17 @@ describe("handleAddToAnnotationQueue", () => {
 
   describe("when adding traces to annotation queue", () => {
     it("fetches full trigger and creates queue items with annotators", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          annotators: [
-            { id: "user-1", name: "User 1" },
-            { id: "user-2", name: "User 2" },
-          ],
-          createdByUserId: "creator-1",
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
-
       const context: TriggerContext = {
         trigger: {
           id: "trigger-1",
           projectId: "project-1",
+          actionParams: {
+            annotators: [
+              { id: "user-1", name: "User 1" },
+              { id: "user-2", name: "User 2" },
+            ],
+            createdByUserId: "creator-1",
+          },
         } as any,
         projects: [],
         triggerData: [
@@ -71,10 +60,6 @@ describe("handleAddToAnnotationQueue", () => {
 
       await handleAddToAnnotationQueue(context);
 
-      expect(prisma.trigger.findUnique).toHaveBeenCalledWith({
-        where: { id: "trigger-1", projectId: "project-1" },
-      });
-
       expect(createOrUpdateQueueItems).toHaveBeenCalledTimes(2);
       expect(createOrUpdateQueueItems).toHaveBeenCalledWith({
         traceIds: ["trace-1"],
@@ -95,16 +80,12 @@ describe("handleAddToAnnotationQueue", () => {
 
   describe("when action params has no annotators", () => {
     it("creates queue items with empty annotators list", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {},
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
-
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {},
+        } as any,
         projects: [],
         triggerData: [
           {
@@ -130,18 +111,14 @@ describe("handleAddToAnnotationQueue", () => {
 
   describe("when action params has no createdByUserId", () => {
     it("creates queue items with empty string for userId", async () => {
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: {
-          annotators: [{ id: "user-1", name: "User 1" }],
-        },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
-
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: {
+            annotators: [{ id: "user-1", name: "User 1" }],
+          },
+        } as any,
         projects: [],
         triggerData: [
           {
@@ -168,17 +145,14 @@ describe("handleAddToAnnotationQueue", () => {
   describe("when createOrUpdateQueueItems throws an error", () => {
     it("captures the exception with full context", async () => {
       const error = new Error("Queue creation failed");
-      const mockTrigger = {
-        id: "trigger-1",
-        projectId: "project-1",
-        actionParams: { annotators: [] },
-      };
-
-      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
       vi.mocked(createOrUpdateQueueItems).mockRejectedValue(error);
 
       const context: TriggerContext = {
-        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        trigger: {
+          id: "trigger-1",
+          projectId: "project-1",
+          actionParams: { annotators: [] },
+        } as any,
         projects: [],
         triggerData: [
           {

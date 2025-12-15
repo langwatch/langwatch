@@ -238,7 +238,7 @@ describe("processCustomGraphTrigger", () => {
         id: "graph-1",
         name: "Test Graph",
         graph: {
-          series: [{ name: "metric1", aggregation: "count" }],
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
         },
         filters: {},
       } as any);
@@ -272,6 +272,7 @@ describe("processCustomGraphTrigger", () => {
           series: [
             {
               name: "metric1",
+              metric: "count",
               aggregation: "avg",
             },
           ],
@@ -306,7 +307,7 @@ describe("processCustomGraphTrigger", () => {
         id: "graph-1",
         name: "Test Graph",
         graph: {
-          series: [{ name: "metric1", aggregation: "count" }],
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
         },
         filters: {},
       } as any);
@@ -337,7 +338,7 @@ describe("processCustomGraphTrigger", () => {
         id: "graph-1",
         name: "Test Graph",
         graph: {
-          series: [{ name: "metric1", aggregation: "count" }],
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
         },
         filters: {},
       } as any);
