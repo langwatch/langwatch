@@ -120,6 +120,7 @@ export const MenuTrigger = React.forwardRef<
 export const Menu = {
   Root: MenuRoot,
   Trigger: MenuTrigger,
+  TriggerItem: MenuTriggerItem,
   Content: MenuContent,
   Item: MenuItem,
   ItemText: MenuItemText,

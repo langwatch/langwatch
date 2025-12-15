@@ -12,6 +12,7 @@ import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
 import { experimentsRouter } from "./routers/experiments";
 import { graphsRouter } from "./routers/graphs";
+import { dashboardsRouter } from "./routers/dashboards";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
@@ -54,6 +55,7 @@ export const appRouter = createTRPCRouter({
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboards: dashboardsRouter,
   evaluations: evaluationsRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
