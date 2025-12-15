@@ -2962,6 +2962,7 @@ examples = [
 tests = [
     { name = "factory-boy" },
     { name = "pytest-asyncio" },
+    { name = "python-dotenv" },
 ]
 
 [package.metadata]
@@ -3032,6 +3033,7 @@ examples = [
 tests = [
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "pytest-asyncio", specifier = ">=0.21.2" },
+    { name = "python-dotenv", specifier = "==1.0.1" },
 ]
 
 [[package]]

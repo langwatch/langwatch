@@ -23,7 +23,7 @@ import httpx
 import pytest
 
 import langwatch
-from langwatch import FetchPolicy
+from langwatch.prompts.types import FetchPolicy
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)

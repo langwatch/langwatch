@@ -1,6 +1,6 @@
 .PHONY: test test-tracing install example
 
-test: test-tracing
+test: test-tracing install
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
 
 # Run tracing tests in isolation to avoid global OpenTelemetry state conflicts

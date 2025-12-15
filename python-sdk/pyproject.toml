@@ -107,4 +107,5 @@ examples = [
 tests = [
     "factory-boy>=3.3.3",
     "pytest-asyncio>=0.21.2",
+    "python-dotenv==1.0.1"
 ]
