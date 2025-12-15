@@ -23,6 +23,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 import langwatch
+from examples.test_utils.run_cli import run_cli
 
 load_dotenv()
 
