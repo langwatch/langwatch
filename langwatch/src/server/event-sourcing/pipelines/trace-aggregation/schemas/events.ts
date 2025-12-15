@@ -5,8 +5,8 @@ import { TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE } from "./typeIdentifier
 
 export type { TraceAggregationEventType } from "./typeIdentifiers";
 export {
-  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
   TRACE_AGGREGATION_EVENT_TYPES,
+  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
 } from "./typeIdentifiers";
 
 /**

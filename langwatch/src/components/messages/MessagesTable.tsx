@@ -33,6 +33,7 @@ import {
 } from "react-feather";
 import { LuChevronsUpDown } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
@@ -44,7 +45,6 @@ import { useFilterParams } from "../../hooks/useFilterParams";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
 import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { Delayed } from "../Delayed";
 import { FilterSidebar } from "../filters/FilterSidebar";

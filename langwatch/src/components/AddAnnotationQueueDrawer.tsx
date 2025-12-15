@@ -14,13 +14,13 @@ import { chakraComponents, Select as MultiSelect } from "chakra-react-select";
 import { useState } from "react";
 import { Plus } from "react-feather";
 import { useForm } from "react-hook-form";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
-import { useDrawer } from "~/hooks/useDrawer";
 import { FullWidthFormControl } from "./FullWidthFormControl";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 

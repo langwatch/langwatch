@@ -14,6 +14,7 @@ import {
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
@@ -23,7 +24,6 @@ import type {
   DatasetRecordEntry,
 } from "../../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
 import { toaster } from "../ui/toaster";
 import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";

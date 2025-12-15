@@ -1,12 +1,7 @@
-import {
-  Button,
-  Field,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { useState, useEffect } from "react";
-import { Dialog } from "../../../components/ui/dialog";
+import { Button, Field, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { Checkbox } from "../../../components/ui/checkbox";
+import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
@@ -25,9 +20,15 @@ export const PushToCopiesDialog = ({
   const { project } = useOrganizationTeamProject();
   const pushToCopies = api.workflow.pushToCopies.useMutation();
   const utils = api.useContext();
-  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(new Set());
+  const [selectedCopyIds, setSelectedCopyIds] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const { data: copies, isLoading, error } = api.workflow.getCopies.useQuery(
+  const {
+    data: copies,
+    isLoading,
+    error,
+  } = api.workflow.getCopies.useQuery(
     {
       projectId: project?.id ?? "",
       workflowId: workflowId,
@@ -78,7 +79,7 @@ export const PushToCopiesDialog = ({
 
       toaster.create({
         title: "Workflow pushed",
-        description: `Latest version of "${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected copied workflow(s).`,
+        description: `Latest version of "${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated workflow(s).`,
         type: "success",
         meta: {
           closable: true,
@@ -90,8 +91,7 @@ export const PushToCopiesDialog = ({
     } catch (error) {
       toaster.create({
         title: "Error pushing workflow",
-        description:
-          error instanceof Error ? error.message : "Unknown error",
+        description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
     }
@@ -102,22 +102,24 @@ export const PushToCopiesDialog = ({
       <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
-          <Dialog.Title>Push to Copies</Dialog.Title>
+          <Dialog.Title>Push to Replicas</Dialog.Title>
         </Dialog.Header>
         <Dialog.Body>
           <VStack gap={4} align={"start"}>
             <Text fontSize="sm" color="gray.600">
-              Select which copies to push the latest version to:
+              Select which replicas to push the latest version to:
             </Text>
             {isLoading ? (
-              <Text>Loading copies...</Text>
+              <Text>Loading replicas...</Text>
             ) : error ? (
               <Text color="red.500">
-                Error loading copies: {error.message}
+                Error loading replicas: {error.message}
               </Text>
             ) : availableCopies.length === 0 ? (
               <Text color="gray.500">
-                No copies found. This may be because you don't have workflows:update permission on the copy projects, or the copies have been archived.
+                No replicas found. This may be because you don't have
+                workflows:update permission on the replica projects, or the
+                replicas have been archived.
               </Text>
             ) : (
               <VStack gap={2} align={"start"} width="full">
@@ -128,9 +130,7 @@ export const PushToCopiesDialog = ({
                     onChange={() => handleToggleCopy(copy.id)}
                   >
                     <VStack align={"start"} gap={0}>
-                      <Text fontWeight="medium">
-                        {copy.name}
-                      </Text>
+                      <Text fontWeight="medium">{copy.name}</Text>
                       <Text fontSize="sm" color="gray.500">
                         {copy.fullPath}
                       </Text>
@@ -153,11 +153,11 @@ export const PushToCopiesDialog = ({
             loading={pushToCopies.isLoading}
             disabled={selectedCopyIds.size === 0 || isLoading}
           >
-            Push to {selectedCopyIds.size} copy{selectedCopyIds.size !== 1 ? "ies" : ""}
+            Push to {selectedCopyIds.size} replica
+            {selectedCopyIds.size !== 1 ? "s" : ""}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
   );
 };
-

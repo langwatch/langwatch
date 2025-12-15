@@ -1,8 +1,8 @@
 import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "react-feather";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
-import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "../ui/tooltip";
 import { SummaryMetricValue } from "./SummaryMetric";
 

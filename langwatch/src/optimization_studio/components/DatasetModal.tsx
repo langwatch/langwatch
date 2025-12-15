@@ -74,7 +74,11 @@ export function DatasetModal({
             newDataset.inline?.records ?? {},
           ),
         },
-        onSuccess: (dataset_: { datasetId: string; name: string; columnTypes: any }) => {
+        onSuccess: (dataset_: {
+          datasetId: string;
+          name: string;
+          columnTypes: any;
+        }) => {
           setEditingDataset({ id: dataset_.datasetId, name: dataset_.name });
           setSelectedDataset(
             { id: dataset_.datasetId, name: dataset_.name },

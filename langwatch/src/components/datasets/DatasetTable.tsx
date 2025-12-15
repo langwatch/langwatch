@@ -30,6 +30,7 @@ import {
   Plus,
   Upload,
 } from "react-feather";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 import type {
@@ -38,7 +39,6 @@ import type {
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
 import { Menu } from "../ui/menu";
 
 import { toaster } from "../ui/toaster";
@@ -374,8 +374,8 @@ export function DatasetTable({
   const onDelete = useCallback(() => {
     if (confirm("Are you sure?")) {
       const recordIds = Array.from(selectedEntryIds);
-      setParentRowData(
-        (rows) => rows?.filter((row) => !recordIds.includes(row.id)),
+      setParentRowData((rows) =>
+        rows?.filter((row) => !recordIds.includes(row.id)),
       );
 
       const grid = parentGridRef ?? gridRef;
@@ -500,8 +500,8 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                      ? ""
-                      : DEFAULT_DATASET_NAME
+                        ? ""
+                        : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
@@ -525,8 +525,8 @@ export function DatasetTable({
           {savingStatus === "saving"
             ? "Saving..."
             : savingStatus === "saved"
-            ? "Saved"
-            : ""}
+              ? "Saved"
+              : ""}
         </Text>
         <Spacer />
         {!hideButtons && (

@@ -63,13 +63,13 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
 import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
   type CustomGraphInput,
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
-import { useDrawer } from "~/hooks/useDrawer";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
@@ -140,6 +140,7 @@ export interface CustomGraphFormData {
     asPercent?: boolean;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum | "";
+  groupByKey?: string;
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -159,6 +160,7 @@ export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
     filters?: Record<FilterField, FilterParam>;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum;
+  groupByKey?: string;
   timeScale: number | "full";
 };
 
@@ -470,6 +472,7 @@ const customGraphInputToFormData = (
       asPercent: series.asPercent,
     })),
     groupBy: graphInput.groupBy ?? "",
+    groupByKey: graphInput.groupByKey,
     includePrevious: graphInput.includePrevious ?? true,
     timeScale: graphInput.timeScale ?? 1,
     connected: graphInput.connected,
@@ -514,6 +517,7 @@ const customGraphFormToCustomGraphInput = (
       };
     }),
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
+    groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
@@ -559,6 +563,7 @@ const customAPIinput = (
       };
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
+    groupByKey: formData.groupByKey,
     timeScale: formData.timeScale,
   };
 };
@@ -758,24 +763,57 @@ function CustomGraphForm({
       </Field.Root>
       <Field.Root>
         <Field.Label>Group by</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field {...groupByField}>
-            <option value="">No grouping</option>
-            {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
-              <optgroup
-                key={groupParent}
-                label={camelCaseToTitleCase(groupParent)}
-              >
-                {Object.entries(metrics).map(([groupKey, group]) => (
-                  <option key={groupKey} value={`${groupParent}.${groupKey}`}>
-                    {group.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
+        <Grid
+          width="full"
+          gap={3}
+          templateColumns={
+            groupBy && getGroup(groupBy).requiresKey
+              ? "repeat(2, 1fr)"
+              : "1fr"
+          }
+        >
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              {...groupByField}
+              onChange={(e) => {
+                // Clear groupByKey when groupBy changes
+                form.setValue("groupByKey", undefined);
+                void groupByField.onChange(e);
+              }}
+            >
+              <option value="">No grouping</option>
+              {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
+                <optgroup
+                  key={groupParent}
+                  label={camelCaseToTitleCase(groupParent)}
+                >
+                  {Object.entries(metrics).map(([groupKey, group]) => (
+                    <option key={groupKey} value={`${groupParent}.${groupKey}`}>
+                      {group.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          {groupBy && getGroup(groupBy).requiresKey && (
+            <Controller
+              control={form.control}
+              name="groupByKey"
+              render={({ field }) => (
+                <FilterSelectField
+                  field={field}
+                  filter={getGroup(groupBy).requiresKey!.filter}
+                  emptyOption={
+                    getGroup(groupBy).requiresKey!.optional ? "all" : undefined
+                  }
+                  currentSelected={field.value}
+                />
+              )}
+            />
+          )}
+        </Grid>
       </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <Field.Root>
@@ -881,18 +919,36 @@ function SeriesFieldItem({
   const seriesLength = form.watch(`series`).length;
   const groupBy = form.watch("groupBy");
 
+  // Track the previous groupBy to only auto-set colors when user actually changes it
+  const prevGroupByRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    // Only auto-set colors when groupBy actually changes (not on initial load)
+    const prevGroupBy = prevGroupByRef.current;
+    prevGroupByRef.current = groupBy;
+
+    // Skip if this is the initial value being set (prevGroupBy was undefined)
+    if (prevGroupBy === undefined) {
+      return;
+    }
+
+    // Skip if groupBy didn't actually change
+    if (prevGroupBy === groupBy) {
+      return;
+    }
+
     if (seriesLength === 1 && groupBy) {
       form.setValue(
         `series.${index}.colorSet`,
         groupBy.startsWith("sentiment") ||
-          groupBy.startsWith("evaluations") ||
+          groupBy === "evaluations.evaluation_passed" ||
+          groupBy === "evaluations.evaluation_processing_state" ||
           groupBy.includes("has_error")
           ? "positiveNegativeNeutral"
           : "colors",
       );
     }
-  }, [form, groupBy, index, seriesLength, customId]);
+  }, [form, groupBy, index, seriesLength]);
 
   return (
     <Accordion.Item
@@ -1042,14 +1098,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? metricAggregations[aggregation] ?? aggregation
+      ? (metricAggregations[aggregation] ?? aggregation)
       : undefined;
     const pipeline_ = pipelineField
-      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
+      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
+        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(

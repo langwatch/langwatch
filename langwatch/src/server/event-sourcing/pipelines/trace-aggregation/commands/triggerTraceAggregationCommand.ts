@@ -15,14 +15,14 @@ import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepo
 import type { TriggerTraceAggregationCommandData } from "../schemas/commands";
 import { triggerTraceAggregationCommandDataSchema } from "../schemas/commands";
 import {
+  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
+  type TraceAggregationEvent,
   type TraceAggregationSummaryCompletedEvent,
   traceAggregationSummaryCompletedEventDataSchema,
-  type TraceAggregationEvent,
-  TRACE_AGGREGATION_SUMMARY_COMPLETED_EVENT_TYPE,
 } from "../schemas/events";
+import { TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE } from "../schemas/typeIdentifiers";
 import type { TraceAggregationService } from "../services/traceAggregationService";
 import { traceAggregationService as defaultTraceAggregationService } from "../services/traceAggregationService";
-import { TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE } from "../schemas/typeIdentifiers";
 
 /**
  * Command handler for triggering trace aggregation.
