@@ -1,7 +1,10 @@
 .PHONY: test test-tracing install example
 
-test: test-tracing install
-	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+test-unit:
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration and not e2e" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+
+test-e2e:
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "e2e"
 
 # Run tracing tests in isolation to avoid global OpenTelemetry state conflicts
 test-tracing:
@@ -13,6 +16,11 @@ test-tracing:
 	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_context.py
 	@echo "Running telemetry tracing tests..."
 	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
+
+test: install
+	$(MAKE) test-unit
+	$(MAKE) test-tracing
+	$(MAKE) test-e2e
 
 # Test bot/chatbot examples (excludes CLI examples)
 # Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
