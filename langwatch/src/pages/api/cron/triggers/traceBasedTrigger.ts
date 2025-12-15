@@ -1,6 +1,7 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { prisma } from "~/server/db";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { handleAddToAnnotationQueue } from "./actions/addToAnnotationQueue";
 import { handleAddToDataset } from "./actions/addToDataset";
 import { handleSendEmail } from "./actions/sendEmail";
@@ -26,7 +27,27 @@ export const processTraceBasedTrigger = async (
     name,
   } = trigger;
 
-  const parsedFilters = JSON.parse(filters as string);
+  let parsedFilters: Record<string, unknown>;
+  try {
+    parsedFilters = JSON.parse(filters as string);
+  } catch (error) {
+    captureException(error, {
+      extra: {
+        triggerId,
+        projectId,
+        triggerName: name,
+        rawFilters: filters as string,
+        type: "traceBasedTrigger",
+        errorType: "JSONParseError",
+      },
+    });
+
+    return {
+      triggerId,
+      status: "error",
+      message: "Failed to parse trigger filters JSON",
+    };
+  }
 
   const input = {
     projectId,

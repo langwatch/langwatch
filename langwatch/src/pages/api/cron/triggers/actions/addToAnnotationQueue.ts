@@ -8,11 +8,12 @@ export const handleAddToAnnotationQueue = async (context: TriggerContext) => {
   const { trigger, triggerData } = context;
 
   try {
-    const fullTrigger = await prisma.trigger.findUnique({
-      where: { id: trigger.id, projectId: trigger.projectId },
-    });
+    const actionParams = trigger.actionParams as unknown as ActionParams;
 
-    const actionParams = fullTrigger?.actionParams as unknown as ActionParams;
+    if (!actionParams) {
+      throw new Error("ActionParams is missing from trigger");
+    }
+
     const { annotators, createdByUserId } = actionParams;
 
     await createQueueItems(triggerData, annotators ?? [], createdByUserId);

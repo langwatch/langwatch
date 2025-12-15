@@ -1,7 +1,6 @@
 import { TriggerAction } from "@prisma/client";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import { prisma } from "~/server/db";
 import {
   mapTraceToDatasetEntry,
   type TraceMapping,
@@ -13,11 +12,12 @@ export const handleAddToDataset = async (context: TriggerContext) => {
   const { trigger, triggerData } = context;
 
   try {
-    const fullTrigger = await prisma.trigger.findUnique({
-      where: { id: trigger.id, projectId: trigger.projectId },
-    });
+    const actionParams = trigger.actionParams as unknown as ActionParams;
 
-    const actionParams = fullTrigger?.actionParams as unknown as ActionParams;
+    if (!actionParams) {
+      throw new Error("ActionParams is missing from trigger");
+    }
+
     const { datasetId, datasetMapping } = actionParams;
 
     const { mapping, expansions: expansionsArray } = datasetMapping;
@@ -69,4 +69,3 @@ export const handleAddToDataset = async (context: TriggerContext) => {
     });
   }
 };
-

@@ -1,4 +1,5 @@
 import { prisma } from "~/server/db";
+import type { Trace } from "~/server/tracer/types";
 import type { TraceGroups, TriggerData } from "./types";
 
 export const updateAlert = async (
@@ -48,10 +49,12 @@ export const triggerSentForMany = async (
   return triggerSent;
 };
 
-export const getLatestUpdatedAt = (traces: TraceGroups) => {
+export const getLatestUpdatedAt = (traces: TraceGroups): number | undefined => {
   const updatedTimes = traces.groups
-    .flatMap((group: any) =>
-      group.map((item: any) => item.timestamps.updated_at),
+    .flatMap((group: Trace[]) =>
+      group
+        .map((item: Trace) => item.timestamps?.updated_at)
+        .filter((timestamp): timestamp is number => timestamp !== undefined),
     )
     .sort((a: number, b: number) => b - a);
 

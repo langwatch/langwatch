@@ -1,10 +1,97 @@
-import { AlertType, TriggerAction } from "@prisma/client";
+import { AlertType, TriggerAction, Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { type FilterField, filterFieldsEnum } from "../../filters/types";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+// TypeScript interface for actionParams
+interface AlertActionParams {
+  members?: string[];
+  slackWebhook?: string;
+}
+
+// Base alert schema with all optional fields
+const alertSchemaBase = z.object({
+  enabled: z.boolean(),
+  threshold: z.number().optional(),
+  operator: z.enum(["gt", "lt", "gte", "lte", "eq"]).optional(),
+  timePeriod: z.number().optional(),
+  type: z.nativeEnum(AlertType).optional(),
+  action: z.nativeEnum(TriggerAction).optional(),
+  actionParams: z
+    .object({
+      members: z.array(z.string()).optional(),
+      slackWebhook: z.string().optional(),
+    })
+    .optional(),
+});
+
+// Reusable validation function for alert schema
+const alertSchemaRefinement = (
+  data: z.infer<typeof alertSchemaBase>,
+  ctx: z.RefinementCtx,
+) => {
+  if (data.enabled) {
+    if (data.threshold === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "threshold is required when enabled is true",
+        path: ["threshold"],
+      });
+    }
+    if (data.operator === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "operator is required when enabled is true",
+        path: ["operator"],
+      });
+    }
+    if (data.timePeriod === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "timePeriod is required when enabled is true",
+        path: ["timePeriod"],
+      });
+    }
+  }
+};
+
+// Reusable alert schema with conditional validation
+const alertSchema = alertSchemaBase.superRefine(alertSchemaRefinement);
+
+// Helper function to build trigger data for graph alerts
+const buildGraphAlertTriggerData = (
+  id: string,
+  name: string,
+  projectId: string,
+  action: TriggerAction,
+  actionParams: AlertActionParams & {
+    threshold: number;
+    operator: string;
+    timePeriod: number;
+  },
+  alertType: AlertType,
+  customGraphId: string,
+) => {
+  return {
+    id,
+    name: `Alert: ${name}`,
+    projectId,
+    action,
+    actionParams: {
+      ...actionParams,
+      threshold: actionParams.threshold,
+      operator: actionParams.operator,
+      timePeriod: actionParams.timePeriod,
+    },
+    filters: {},
+    alertType,
+    active: true,
+    customGraphId,
+  };
+};
 
 export const graphsRouter = createTRPCRouter({
   create: protectedProcedure
@@ -14,22 +101,7 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         filterParams: z.any().optional(),
-        alert: z
-          .object({
-            enabled: z.boolean(),
-            threshold: z.number(),
-            operator: z.enum(["gt", "lt", "gte", "lte", "eq"]),
-            timePeriod: z.number(),
-            type: z.nativeEnum(AlertType),
-            action: z.nativeEnum(TriggerAction),
-            actionParams: z
-              .object({
-                members: z.array(z.string()).optional(),
-                slackWebhook: z.string().optional(),
-              })
-              .optional(),
-          })
-          .optional(),
+        alert: alertSchema.optional(),
       }),
     )
     .use(checkProjectPermission("analytics:create"))
@@ -47,25 +119,24 @@ export const graphsRouter = createTRPCRouter({
       });
 
       // Create trigger if alert is enabled
-      if (input.alert?.enabled) {
-        await ctx.prisma.trigger.create({
-          data: {
-            id: nanoid(),
-            name: `Alert: ${input.name}`,
-            projectId: input.projectId,
-            action: input.alert.action,
-            actionParams: {
-              ...input.alert.actionParams,
-              threshold: input.alert.threshold,
-              operator: input.alert.operator,
-              timePeriod: input.alert.timePeriod,
-            },
-            filters: JSON.stringify({}),
-            alertType: input.alert.type,
-            active: true,
-            lastRunAt: new Date().getTime(),
-            customGraphId: customGraph.id,
+      if (input.alert?.enabled && input.alert.action && input.alert.type) {
+        const triggerData = buildGraphAlertTriggerData(
+          nanoid(),
+          input.name,
+          input.projectId,
+          input.alert.action,
+          {
+            ...input.alert.actionParams,
+            threshold: input.alert.threshold!,
+            operator: input.alert.operator!,
+            timePeriod: input.alert.timePeriod!,
           },
+          input.alert.type,
+          customGraph.id,
+        );
+
+        await ctx.prisma.trigger.create({
+          data: triggerData,
         });
       }
 
@@ -166,7 +237,12 @@ export const graphsRouter = createTRPCRouter({
 
       let alertData = undefined;
       if (trigger && trigger.active && !trigger.deleted) {
-        const actionParams = trigger.actionParams as any;
+        const actionParams =
+          trigger.actionParams as unknown as AlertActionParams & {
+            threshold: number;
+            operator: string;
+            timePeriod: number;
+          };
         alertData = {
           enabled: true,
           threshold: actionParams.threshold,
@@ -196,22 +272,11 @@ export const graphsRouter = createTRPCRouter({
         graph: z.string(),
         graphId: z.string(),
         filterParams: z.any().optional(),
-        alert: z
-          .object({
-            enabled: z.boolean(),
-            threshold: z.number(),
-            operator: z.enum(["gt", "lt", "gte", "lte", "eq"]),
-            timePeriod: z.number(),
-            type: z.nativeEnum(AlertType),
-            action: z.nativeEnum(TriggerAction),
-            actionParams: z
-              .object({
-                members: z.array(z.string()).optional(),
-                slackWebhook: z.string().optional(),
-              })
-              .optional(),
+        alert: alertSchemaBase
+          .extend({
             triggerId: z.string().optional(),
           })
+          .superRefine(alertSchemaRefinement)
           .optional(),
       }),
     )
@@ -233,7 +298,7 @@ export const graphsRouter = createTRPCRouter({
         where: { customGraphId: input.graphId, projectId: input.projectId },
       });
 
-      if (input.alert?.enabled) {
+      if (input.alert?.enabled && input.alert.action && input.alert.type) {
         if (existingTrigger) {
           // Update existing trigger
           await prisma.trigger.update({
@@ -243,10 +308,10 @@ export const graphsRouter = createTRPCRouter({
               action: input.alert.action,
               actionParams: {
                 ...input.alert.actionParams,
-                threshold: input.alert.threshold,
-                operator: input.alert.operator,
-                timePeriod: input.alert.timePeriod,
-              },
+                threshold: input.alert.threshold!,
+                operator: input.alert.operator!,
+                timePeriod: input.alert.timePeriod!,
+              } as Prisma.InputJsonValue,
               alertType: input.alert.type,
               active: true,
               deleted: false,
@@ -254,24 +319,23 @@ export const graphsRouter = createTRPCRouter({
           });
         } else {
           // Create new trigger
-          await prisma.trigger.create({
-            data: {
-              id: nanoid(),
-              name: `Alert: ${input.name}`,
-              projectId: input.projectId,
-              action: input.alert.action,
-              actionParams: {
-                ...input.alert.actionParams,
-                threshold: input.alert.threshold,
-                operator: input.alert.operator,
-                timePeriod: input.alert.timePeriod,
-              },
-              filters: JSON.stringify({}),
-              alertType: input.alert.type,
-              active: true,
-              lastRunAt: new Date().getTime(),
-              customGraphId: input.graphId,
+          const triggerData = buildGraphAlertTriggerData(
+            nanoid(),
+            input.name,
+            input.projectId,
+            input.alert.action,
+            {
+              ...input.alert.actionParams,
+              threshold: input.alert.threshold!,
+              operator: input.alert.operator!,
+              timePeriod: input.alert.timePeriod!,
             },
+            input.alert.type,
+            input.graphId,
+          );
+
+          await prisma.trigger.create({
+            data: triggerData,
           });
         }
       } else if (existingTrigger) {

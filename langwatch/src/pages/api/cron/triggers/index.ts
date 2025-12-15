@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from "next";
+import type { Trigger, Project } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { processCustomGraphTrigger } from "./customGraphTrigger";
 import { processTraceBasedTrigger } from "./traceBasedTrigger";
@@ -20,20 +21,30 @@ export default async function handler(
   //   return res.status(401).end();
   // }
 
-  const projects = await prisma.project.findMany({
-    where: {
-      firstMessage: true,
-    },
-  });
+  let triggers: Trigger[];
+  let projects: Project[];
 
-  const triggers = await prisma.trigger.findMany({
-    where: {
-      active: true,
-      projectId: {
-        in: projects.map((project) => project.id),
+  try {
+    projects = await prisma.project.findMany({
+      where: {
+        firstMessage: true,
       },
-    },
-  });
+    });
+
+    triggers = await prisma.trigger.findMany({
+      where: {
+        active: true,
+        projectId: {
+          in: projects.map((project) => project.id),
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Failed to fetch triggers",
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
 
   const results = [];
 
@@ -51,4 +62,3 @@ export default async function handler(
 
   return res.status(200).json(results);
 }
-

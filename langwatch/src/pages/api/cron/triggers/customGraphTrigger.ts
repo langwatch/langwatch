@@ -1,5 +1,15 @@
-import { type Project, type Trigger, TriggerAction } from "@prisma/client";
+import {
+  type Project,
+  type Trigger,
+  TriggerAction,
+  Prisma,
+} from "@prisma/client";
 import { timeseries } from "~/server/analytics/timeseries";
+import type {
+  SeriesInputType,
+  TimeseriesInputType,
+} from "~/server/analytics/registry";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { prisma } from "~/server/db";
 import type { Trace } from "~/server/tracer/types";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -7,6 +17,23 @@ import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
 import type { ActionParams, TriggerData, TriggerResult } from "./types";
 import { checkThreshold, updateAlert } from "./utils";
+
+// Graph config stored in database (subset of CustomGraphInput)
+type StoredGraphConfig = Pick<
+  CustomGraphInput,
+  "series" | "groupBy" | "groupByKey" | "timeScale"
+>;
+
+// Types for timeseries results (no existing type found, so we define it)
+interface TimeseriesBucket {
+  date: string;
+  [seriesName: string]: string | number;
+}
+
+interface TimeseriesResult {
+  previousPeriod: TimeseriesBucket[];
+  currentPeriod: TimeseriesBucket[];
+}
 
 export const processCustomGraphTrigger = async (
   trigger: Trigger,
@@ -29,8 +56,30 @@ export const processCustomGraphTrigger = async (
     };
   }
 
-  const params = actionParams as any;
+  const params = actionParams as unknown as ActionParams;
+
+  if (!params) {
+    return {
+      triggerId,
+      status: "error",
+      message: "ActionParams is missing from trigger",
+    };
+  }
+
   const { threshold, operator, timePeriod } = params;
+
+  if (
+    threshold === undefined ||
+    operator === undefined ||
+    timePeriod === undefined
+  ) {
+    return {
+      triggerId,
+      status: "error",
+      message:
+        "Missing required fields in ActionParams: threshold, operator, or timePeriod",
+    };
+  }
 
   try {
     // Fetch the custom graph
@@ -51,10 +100,9 @@ export const processCustomGraphTrigger = async (
     const startDate = new Date(endDate.getTime() - timePeriod * 60 * 1000);
 
     // Parse graph configuration
-    const graphData = customGraph.graph as any;
-    const series = graphData.series?.[0]; // Only one series allowed
+    const graphData = customGraph.graph as unknown as StoredGraphConfig;
 
-    if (!series) {
+    if (!graphData || !graphData.series || graphData.series.length === 0) {
       return {
         triggerId,
         status: "error",
@@ -62,25 +110,34 @@ export const processCustomGraphTrigger = async (
       };
     }
 
+    const series = graphData.series[0]; // Only one series allowed
+
+    if (!series || !series.name || !series.metric || !series.aggregation) {
+      return {
+        triggerId,
+        status: "error",
+        message: "Invalid series configuration in graph",
+      };
+    }
+
     // Build timeseries input
-    const timeseriesInput = {
+    const seriesInput: SeriesInputType = {
+      metric: series.metric as SeriesInputType["metric"],
+      aggregation: series.aggregation as SeriesInputType["aggregation"],
+      key: series.key,
+      subkey: series.subkey,
+      pipeline: series.pipeline as SeriesInputType["pipeline"],
+      filters: series.filters as SeriesInputType["filters"],
+      asPercent: series.asPercent,
+    };
+
+    const timeseriesInput: TimeseriesInputType = {
       projectId,
       startDate: startDate.getTime(),
       endDate: endDate.getTime(),
-      filters: (customGraph.filters as any) ?? {},
-      series: [
-        {
-          name: series.name,
-          metric: series.metric,
-          aggregation: series.aggregation,
-          key: series.key,
-          subkey: series.subkey,
-          pipeline: series.pipeline,
-          filters: series.filters,
-          asPercent: series.asPercent,
-        },
-      ],
-      groupBy: graphData.groupBy,
+      filters: (customGraph.filters as Prisma.JsonObject) ?? {},
+      series: [seriesInput],
+      groupBy: graphData.groupBy as TimeseriesInputType["groupBy"],
       timeScale: graphData.timeScale ?? 60,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
@@ -176,18 +233,22 @@ export const processCustomGraphTrigger = async (
   }
 };
 
-const calculateCurrentValue = (timeseriesResult: any, series: any): number => {
+const calculateCurrentValue = (
+  timeseriesResult: TimeseriesResult,
+  series: CustomGraphInput["series"][number],
+): number => {
   let currentValue = 0;
 
   // Handle the structure: { previousPeriod: [...], currentPeriod: [...] }
-  const dataPoints = timeseriesResult?.currentPeriod || [];
+  const dataPoints = timeseriesResult.currentPeriod;
 
   if (dataPoints.length > 0) {
     const values = dataPoints
-      .map((entry: any) => {
+      .map((entry) => {
         // Try to find the value by series name first
-        if (entry[series.name] !== undefined) {
-          return entry[series.name];
+        const seriesValue = entry[series.name];
+        if (typeof seriesValue === "number") {
+          return seriesValue;
         }
 
         // If not found, look for the first numeric value (excluding 'date')
@@ -199,13 +260,13 @@ const calculateCurrentValue = (timeseriesResult: any, series: any): number => {
 
         return 0;
       })
-      .filter((v: any) => typeof v === "number");
+      .filter((v): v is number => typeof v === "number");
 
     if (values.length > 0) {
-      // Use sum for count/cardinality, average for others
+      // Use sum for cardinality/terms, average for others
       if (
-        series.aggregation === "count" ||
-        series.aggregation === "cardinality"
+        series.aggregation === "cardinality" ||
+        series.aggregation === "terms"
       ) {
         currentValue = values.reduce((a: number, b: number) => a + b, 0);
       } else {
