@@ -47,12 +47,12 @@ def setup_example_prompts():
     prompts = {
         f"cached-prompt-{base_time}": {
             "prompt": "You are a helpful assistant that provides concise answers.",
-            "model": "openai/gpt-4"
+            "model": "openai/gpt-4",
         },
         f"local-only-prompt-{base_time}": {
             "prompt": "You are a specialized assistant for technical questions.",
-            "model": "openai/gpt-3.5-turbo"
-        }
+            "model": "openai/gpt-3.5-turbo",
+        },
     }
 
     created_prompts = {}
@@ -62,7 +62,7 @@ def setup_example_prompts():
                 handle=handle,
                 prompt=config["prompt"],
                 messages=[{"role": "system", "content": config["prompt"]}],
-                model=config["model"]
+                model=config["model"],
             )
             created_prompts[handle] = prompt
             print(f"✅ Created prompt: {handle}")
@@ -74,11 +74,11 @@ def setup_example_prompts():
 
 def demonstrate_materialized_first(prompt_handle: str):
     """Demonstrate MATERIALIZED_FIRST policy - default behavior."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("📥 MATERIALIZED_FIRST (Default Policy)")
     print("   Strategy: Local first → API fallback")
     print("   Use when: You want fast local access with server backup")
-    print("="*60)
+    print("=" * 60)
 
     try:
         start_time = time.time()
@@ -96,17 +96,16 @@ def demonstrate_materialized_first(prompt_handle: str):
 
 def demonstrate_always_fetch(prompt_handle: str):
     """Demonstrate ALWAYS_FETCH policy - always contact API first."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🌐 ALWAYS_FETCH Policy")
     print("   Strategy: API first → local fallback")
     print("   Use when: You need the latest version from server")
-    print("="*60)
+    print("=" * 60)
 
     try:
         start_time = time.time()
         prompt = langwatch.prompts.get(
-            prompt_handle,
-            fetch_policy=FetchPolicy.ALWAYS_FETCH
+            prompt_handle, fetch_policy=FetchPolicy.ALWAYS_FETCH
         )
         end_time = time.time()
 
@@ -121,11 +120,11 @@ def demonstrate_always_fetch(prompt_handle: str):
 
 def demonstrate_cache_ttl(prompt_handle: str):
     """Demonstrate CACHE_TTL policy - time-based caching."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("⏰ CACHE_TTL Policy")
     print("   Strategy: Cache for X minutes, then refresh")
     print("   Use when: You want periodic updates but cache performance")
-    print("="*60)
+    print("=" * 60)
 
     try:
         # First call - should cache
@@ -134,7 +133,7 @@ def demonstrate_cache_ttl(prompt_handle: str):
         prompt1 = langwatch.prompts.get(
             prompt_handle,
             fetch_policy=FetchPolicy.CACHE_TTL,
-            cache_ttl_minutes=0.5  # 30 seconds for demo
+            cache_ttl_minutes=0.5,  # 30 seconds for demo
         )
         end_time = time.time()
 
@@ -145,9 +144,7 @@ def demonstrate_cache_ttl(prompt_handle: str):
         print("   Second call (should use cache):")
         start_time = time.time()
         prompt2 = langwatch.prompts.get(
-            prompt_handle,
-            fetch_policy=FetchPolicy.CACHE_TTL,
-            cache_ttl_minutes=0.5
+            prompt_handle, fetch_policy=FetchPolicy.CACHE_TTL, cache_ttl_minutes=0.5
         )
         end_time = time.time()
 
@@ -160,11 +157,11 @@ def demonstrate_cache_ttl(prompt_handle: str):
 
 def demonstrate_materialized_only_with_local_setup(prompt_handle: str):
     """Demonstrate MATERIALIZED_ONLY policy with local prompt setup."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("💾 MATERIALIZED_ONLY Policy")
     print("   Strategy: Local files only, no API calls")
     print("   Use when: You want offline capability or guaranteed no network calls")
-    print("="*60)
+    print("=" * 60)
 
     # Create a temporary directory for local setup
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -182,8 +179,7 @@ def demonstrate_materialized_only_with_local_setup(prompt_handle: str):
 
                 # Try to get prompt (will likely fail without local setup)
                 prompt = langwatch.prompts.get(
-                    prompt_handle,
-                    fetch_policy=FetchPolicy.MATERIALIZED_ONLY
+                    prompt_handle, fetch_policy=FetchPolicy.MATERIALIZED_ONLY
                 )
 
                 print(f"   Model: {prompt.model}")
@@ -239,9 +235,9 @@ def main():
         demonstrate_cache_ttl(prompt_handle)
         demonstrate_materialized_only_with_local_setup(prompt_handle)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("📚 Fetch Policies Summary")
-        print("="*60)
+        print("=" * 60)
         print("• MATERIALIZED_FIRST: Fast local access, API fallback")
         print("• ALWAYS_FETCH: Always get latest from server")
         print("• CACHE_TTL: Balance freshness with performance")
@@ -250,7 +246,7 @@ def main():
 
     finally:
         # Clean up
-        if 'prompts' in locals():
+        if "prompts" in locals():
             cleanup_prompts(prompts)
 
 
