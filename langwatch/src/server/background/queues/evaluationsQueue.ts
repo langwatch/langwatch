@@ -87,7 +87,7 @@ export const scheduleEvaluation = async ({
       {
         jobId,
         // Add a little delay to wait for the spans to be fully collected
-        delay: delay ?? 4000,
+        delay: delay ?? 30_000,
       },
     );
   }

@@ -1,18 +1,18 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
+import { ArrowUp, Copy, RefreshCw } from "react-feather";
 import { LuEllipsisVertical, LuTrash2 } from "react-icons/lu";
-import { Copy, RefreshCw, ArrowUp } from "react-feather";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { usePrompts } from "~/prompts/hooks/usePrompts";
-import { api } from "~/utils/api";
-import { getDisplayHandle } from "./PublishedPromptsList";
 import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
 import { PushToCopiesDialog } from "~/prompts/components/PushToCopiesDialog";
+import { usePrompts } from "~/prompts/hooks/usePrompts";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { api } from "~/utils/api";
+import { getDisplayHandle } from "./PublishedPromptsList";
 
 interface PublishedPromptActionsProps {
   promptId: string;
@@ -160,7 +160,7 @@ export function PublishedPromptActions({
               <Tooltip
                 content={
                   !hasPromptsUpdatePermission
-                    ? "You need prompts:update permission to push to copies"
+                    ? "You need prompts:update permission to push to replicas"
                     : undefined
                 }
                 disabled={hasPromptsUpdatePermission}
@@ -176,14 +176,14 @@ export function PublishedPromptActions({
                   }
                   disabled={!hasPromptsUpdatePermission}
                 >
-                  <ArrowUp size={16} /> Push to copies
+                  <ArrowUp size={16} /> Push to replicas
                 </Menu.Item>
               </Tooltip>
             )}
             <Tooltip
               content={
                 !hasPromptsCreatePermission
-                  ? "You need prompts:create permission to copy prompts"
+                  ? "You need prompts:create permission to replicate prompts"
                   : undefined
               }
               disabled={hasPromptsCreatePermission}
@@ -199,7 +199,7 @@ export function PublishedPromptActions({
                 }
                 disabled={!hasPromptsCreatePermission}
               >
-                <Copy size={16} /> Copy to another project
+                <Copy size={16} /> Replicate to another project
               </Menu.Item>
             </Tooltip>
             <Tooltip

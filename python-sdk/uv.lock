@@ -2881,7 +2881,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.7.0"
+version = "0.7.2"
 source = { editable = "." }
 dependencies = [
     { name = "attrs" },

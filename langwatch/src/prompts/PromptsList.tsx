@@ -8,29 +8,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
+import { useCallback, useState } from "react";
 import {
+  ArrowUp,
+  Copy,
   Edit,
   MoreVertical,
-  Trash2,
-  Copy,
   RefreshCw,
-  ArrowUp,
+  Trash2,
 } from "react-feather";
-import { useState, useCallback } from "react";
 import { LuBuilding } from "react-icons/lu";
-import { CopyPromptDialog } from "./components/CopyPromptDialog";
-import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
-
 import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
+import { CopyPromptDialog } from "./components/CopyPromptDialog";
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
-import { api } from "~/utils/api";
-import { toaster } from "~/components/ui/toaster";
+import { PushToCopiesDialog } from "./components/PushToCopiesDialog";
 
 /**
  * Flat interface for prompt list items
@@ -319,7 +318,7 @@ export function PromptsList({
                         <Tooltip
                           content={
                             !hasPromptsUpdatePermission
-                              ? "You need prompts:update permission to push to copies"
+                              ? "You need prompts:update permission to push to replicas"
                               : undefined
                           }
                           disabled={hasPromptsUpdatePermission}
@@ -335,14 +334,14 @@ export function PromptsList({
                             }
                             disabled={!hasPromptsUpdatePermission}
                           >
-                            <ArrowUp size={16} /> Push to copies
+                            <ArrowUp size={16} /> Push to replicas
                           </Menu.Item>
                         </Tooltip>
                       )}
                       <Tooltip
                         content={
                           !hasPromptsCreatePermission
-                            ? "You need prompts:create permission to copy prompts"
+                            ? "You need prompts:create permission to replicate prompts"
                             : undefined
                         }
                         disabled={hasPromptsCreatePermission}
@@ -365,7 +364,7 @@ export function PromptsList({
                           }
                           disabled={!hasPromptsCreatePermission}
                         >
-                          <Copy size={16} /> Copy to another project
+                          <Copy size={16} /> Replicate to another project
                         </Menu.Item>
                       </Tooltip>
                       <Tooltip

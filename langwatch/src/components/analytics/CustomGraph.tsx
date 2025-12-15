@@ -82,6 +82,7 @@ export type CustomGraphInput = {
     | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
+  groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
