@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.9.0...typescript-sdk@v0.10.0) (2025-12-15)
+
+
+### Features
+
+* implement FetchPolicy for prompt retrieval ([#968](https://github.com/langwatch/langwatch/issues/968)) ([4530d6d](https://github.com/langwatch/langwatch/commit/4530d6d8135b70c07731a4d9ae454c4b19b7ce13))
+* migrate from npm to pnpm ([#940](https://github.com/langwatch/langwatch/issues/940)) ([ce52474](https://github.com/langwatch/langwatch/commit/ce52474c3023ccb4714e4a33373d3c644f1496bf))
+
 ## [0.9.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.8.2...typescript-sdk@v0.9.0) (2025-12-03)
 
 
