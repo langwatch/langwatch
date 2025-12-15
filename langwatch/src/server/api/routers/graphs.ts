@@ -160,6 +160,7 @@ export const graphsRouter = createTRPCRouter({
       const trigger = await prisma.trigger.findUnique({
         where: {
           customGraphId: id,
+          projectId: input.projectId,
         },
       });
 
@@ -229,7 +230,7 @@ export const graphsRouter = createTRPCRouter({
 
       // Handle trigger update/create/delete
       const existingTrigger = await prisma.trigger.findUnique({
-        where: { customGraphId: input.graphId },
+        where: { customGraphId: input.graphId, projectId: input.projectId },
       });
 
       if (input.alert?.enabled) {

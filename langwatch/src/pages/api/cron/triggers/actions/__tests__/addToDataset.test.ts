@@ -1,0 +1,234 @@
+import { TriggerAction } from "@prisma/client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TriggerContext } from "../../types";
+import { handleAddToDataset } from "../addToDataset";
+
+vi.mock("~/server/api/routers/datasetRecord", () => ({
+  createManyDatasetRecords: vi.fn(),
+}));
+
+vi.mock("~/server/db", () => ({
+  prisma: {
+    trigger: {
+      findUnique: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("~/server/tracer/tracesMapping", () => ({
+  mapTraceToDatasetEntry: vi.fn(),
+}));
+
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: vi.fn(),
+}));
+
+import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+import { prisma } from "~/server/db";
+import { mapTraceToDatasetEntry } from "~/server/tracer/tracesMapping";
+import { captureException } from "~/utils/posthogErrorCapture";
+
+describe("handleAddToDataset", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when adding traces to dataset", () => {
+    it("fetches trigger, maps traces, and creates dataset records", async () => {
+      const mockTrigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: {
+            mapping: { field1: { source: "input", key: "value", subkey: "" } },
+            expansions: ["input", "output"],
+          },
+        },
+      };
+
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
+        { field1: "value1", field2: "value2" },
+      ]);
+
+      const context: TriggerContext = {
+        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        projects: [],
+        triggerData: [
+          {
+            input: "test input",
+            output: "test output",
+            traceId: "trace-1",
+            projectId: "project-1",
+            fullTrace: { trace_id: "trace-1" } as any,
+          },
+        ],
+        projectSlug: "test-project",
+      };
+
+      await handleAddToDataset(context);
+
+      expect(prisma.trigger.findUnique).toHaveBeenCalledWith({
+        where: { id: "trigger-1", projectId: "project-1" },
+      });
+
+      expect(mapTraceToDatasetEntry).toHaveBeenCalled();
+
+      expect(createManyDatasetRecords).toHaveBeenCalledWith({
+        datasetId: "dataset-1",
+        projectId: "project-1",
+        datasetRecords: expect.arrayContaining([
+          expect.objectContaining({
+            field1: "value1",
+            field2: "value2",
+            selected: true,
+          }),
+        ]),
+      });
+    });
+  });
+
+  describe("when entry contains string with null bytes", () => {
+    it("removes null bytes from the string", async () => {
+      const mockTrigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: {
+            mapping: {},
+            expansions: [],
+          },
+        },
+      };
+
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
+        { field1: "test\u0000value", field2: "clean\u0000\u0000data" },
+      ]);
+
+      const context: TriggerContext = {
+        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        projects: [],
+        triggerData: [
+          {
+            input: "",
+            output: "",
+            traceId: "trace-1",
+            projectId: "project-1",
+            fullTrace: {} as any,
+          },
+        ],
+        projectSlug: "test-project",
+      };
+
+      await handleAddToDataset(context);
+
+      expect(createManyDatasetRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          datasetRecords: expect.arrayContaining([
+            expect.objectContaining({
+              field1: "testvalue",
+              field2: "cleandata",
+            }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  describe("when entry contains non-string values", () => {
+    it("preserves the value unchanged", async () => {
+      const mockTrigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: {
+            mapping: {},
+            expansions: [],
+          },
+        },
+      };
+
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
+        { number: 42, boolean: true, object: { nested: "value" } },
+      ]);
+
+      const context: TriggerContext = {
+        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        projects: [],
+        triggerData: [
+          {
+            input: "",
+            output: "",
+            traceId: "trace-1",
+            projectId: "project-1",
+            fullTrace: {} as any,
+          },
+        ],
+        projectSlug: "test-project",
+      };
+
+      await handleAddToDataset(context);
+
+      expect(createManyDatasetRecords).toHaveBeenCalledWith(
+        expect.objectContaining({
+          datasetRecords: expect.arrayContaining([
+            expect.objectContaining({
+              number: 42,
+              boolean: true,
+              object: { nested: "value" },
+            }),
+          ]),
+        }),
+      );
+    });
+  });
+
+  describe("when createManyDatasetRecords throws an error", () => {
+    it("captures the exception with full context", async () => {
+      const error = new Error("Dataset creation failed");
+      const mockTrigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        actionParams: {
+          datasetId: "dataset-1",
+          datasetMapping: { mapping: {}, expansions: [] },
+        },
+      };
+
+      vi.mocked(prisma.trigger.findUnique).mockResolvedValue(mockTrigger as any);
+      vi.mocked(mapTraceToDatasetEntry).mockReturnValue([{}]);
+      vi.mocked(createManyDatasetRecords).mockRejectedValue(error);
+
+      const context: TriggerContext = {
+        trigger: { id: "trigger-1", projectId: "project-1" } as any,
+        projects: [],
+        triggerData: [
+          {
+            input: "",
+            output: "",
+            traceId: "trace-1",
+            projectId: "project-1",
+            fullTrace: {} as any,
+          },
+        ],
+        projectSlug: "test-project",
+      };
+
+      await handleAddToDataset(context);
+
+      expect(captureException).toHaveBeenCalledWith(error, {
+        extra: {
+          triggerId: "trigger-1",
+          projectId: "project-1",
+          action: TriggerAction.ADD_TO_DATASET,
+        },
+      });
+    });
+  });
+});
+
