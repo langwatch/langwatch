@@ -1,7 +1,11 @@
 import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { useRouter } from "next/router";
 import numeral from "numeral";
+import qs from "qs";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
+import { availableFilters } from "../../server/filters/registry";
+import { buildMetadataFilterParams } from "../../utils/buildMetadataFilterParams";
 import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
@@ -69,6 +73,8 @@ export function TraceSummary(props: { traceId: string }) {
 
 const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
   function TraceSummaryValues({ trace }, ref) {
+    const router = useRouter();
+
     // Helper functions to improve readability
     const hasTraceCost = () => {
       return (
@@ -106,24 +112,34 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
 
     /**
      * Handle metadata tag click.
-     * Note: This is a quick hack to open the current page in a new tab with the prompt_id filter applied
-     * since the double update of the query params has race conditions and we can't use the current hooks.
-     *
-     * TODO: Create a more robust/seemless way to open the current page in a new tab with the prompt_id filter applied,
-     * probably that will work for all of the metadata tags.
-     *
-     * @param key - The key of the metadata tag.
-     * @param value - The value of the metadata tag.
+     * Navigates to the messages page with the appropriate filter applied.
      */
-    const handleMetadataTagClick = async (key: string, value: string) => {
-      if (key === "prompt_ids") {
-        // Open current page in new tab with prompt_id filter applied
-        const baseUrl = window.location.origin + window.location.pathname;
-        const newUrl = new URL(baseUrl);
-        newUrl.searchParams.set("prompt_id", value);
-        // Open in new tab
-        window.open(newUrl.toString(), "_blank");
-      }
+    const handleMetadataTagClick = (
+      key: string,
+      value: string,
+      originalValue: unknown,
+    ) => {
+      const filterParams = buildMetadataFilterParams(key, value, originalValue);
+
+      // Remove existing filters, keep other query params (drawer, view, etc)
+      const nonFilterParams = Object.fromEntries(
+        Object.entries(router.query).filter(
+          ([key]) =>
+            !Object.values(availableFilters).some((f) =>
+              key.startsWith(f.urlKey),
+            ) && key !== "query",
+        ),
+      );
+
+      void router.push(
+        "?" +
+          qs.stringify(
+            { ...nonFilterParams, ...filterParams },
+            { allowDots: true, arrayFormat: "comma" },
+          ),
+        undefined,
+        { shallow: true },
+      );
     };
 
     return (
@@ -211,8 +227,9 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
                   key={i}
                   label={key}
                   value={renderValue as string}
+                  copyable
                   onClick={() =>
-                    void handleMetadataTagClick(key, renderValue as string)
+                    handleMetadataTagClick(key, renderValue as string, value)
                   }
                 />
               )
