@@ -6,13 +6,14 @@ on:
       - published
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish-sdk-npm:
     if: startsWith(github.event.release.tag_name, 'typescript-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +25,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 26
           cache: pnpm
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
@@ -58,9 +59,7 @@ jobs:
 
       - name: Publish to npm
         working-directory: ./typescript-sdk
-        run: pnpm publish --provenance --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
         id: get_version
