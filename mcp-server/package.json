@@ -21,7 +21,8 @@
     "start": "tsx src/index.ts",
     "build": "tsup && node build.js",
     "prepublish": "pnpm run build",
-    "test": "vitest"
+    "test": "vitest",
+    "test:ci": "vitest run"
   },
   "author": "",
   "license": "MIT",

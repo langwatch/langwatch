@@ -4,7 +4,14 @@
   "private": true,
   "engines": {
     "node": "20.x",
-    "npm": ">=10.0.0"
+    "npm": ">=10.0.0",
+    "pnpm": "10.24.0"
+  },
+  "volta": {
+    "node": "20.19.6",
+    "npm": "10.8.2",
+    "yarn": "1.22.22",
+    "pnpm": "10.24.0"
   },
   "scripts": {
     "build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint",

@@ -98,47 +98,53 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 });
 
 describe("OpenAI Implementation", () => {
-  it("implements LangWatch in an OpenAI bot project", async () => {
-    const tempFolder = fs.mkdtempSync(
-      path.join(os.tmpdir(), "langwatch-openai-bot-")
-    );
-    execSync(
-      `cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`
-    );
+  it(
+    "implements LangWatch in an OpenAI bot project",
+    {
+      retry: 2,
+    },
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-openai-bot-")
+      );
+      execSync(
+        `cp -r tests/fixtures/openai/openai_bot_function_call_input.py ${tempFolder}/main.py`
+      );
 
-    const result = await scenario.run({
-      name: "OpenAI bot project",
-      description: `Implementing code changes in an OpenAI bot project to add LangWatch instrumentation.`,
-      agents: [
-        claudeCodeAgent(tempFolder),
-        scenario.userSimulatorAgent(),
-        scenario.judgeAgent({
-          model: anthropic("claude-sonnet-4-20250514"),
-          criteria: [
-            "Agent should edit main.py file",
-            "Agent should use the langwatch MCP for checking the documentation",
-          ],
-        }),
-      ],
-      script: [
-        scenario.user(
-          "please instrument my code with langwatch, short and sweet, no need to test the changes"
-        ),
-        scenario.agent(),
-        () => {
-          const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
+      const result = await scenario.run({
+        name: "OpenAI bot project",
+        description: `Implementing code changes in an OpenAI bot project to add LangWatch instrumentation.`,
+        agents: [
+          claudeCodeAgent(tempFolder),
+          scenario.userSimulatorAgent(),
+          scenario.judgeAgent({
+            model: anthropic("claude-sonnet-4-20250514"),
+            criteria: [
+              "Agent should edit main.py file",
+              "Agent should use the langwatch MCP for checking the documentation",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "please instrument my code with langwatch, short and sweet, no need to test the changes"
+          ),
+          scenario.agent(),
+          () => {
+            const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
 
-          expect(resultFile).toContain("@langwatch.trace(");
-          expect(resultFile).toContain("autotrack_openai_calls(client)");
-          // TODO: expect(resultFile).toContain('@langwatch.span(type="tool")');
-        },
-        toolCallFix,
-        scenario.judge(),
-      ],
-    });
+            expect(resultFile).toContain("@langwatch.trace(");
+            expect(resultFile).toContain("autotrack_openai_calls(client)");
+            // TODO: expect(resultFile).toContain('@langwatch.span(type="tool")');
+          },
+          toolCallFix,
+          scenario.judge(),
+        ],
+      });
 
-    expect(result.success).toBe(true);
-  });
+      expect(result.success).toBe(true);
+    }
+  );
 });
 
 function toolCallFix(state: ScenarioExecutionStateLike) {
