@@ -6,8 +6,6 @@
 ### Features
 
 * implement FetchPolicy enum for Python SDK  ([#989](https://github.com/langwatch/langwatch/issues/989)) ([43de904](https://github.com/langwatch/langwatch/commit/43de904de08ec54a78aece35da155a8a3cb4289d))
-* migrate from npm to pnpm ([#940](https://github.com/langwatch/langwatch/issues/940)) ([ce52474](https://github.com/langwatch/langwatch/commit/ce52474c3023ccb4714e4a33373d3c644f1496bf))
-
 
 ### Bug Fixes
 
