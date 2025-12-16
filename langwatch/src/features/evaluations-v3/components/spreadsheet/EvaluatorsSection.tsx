@@ -47,11 +47,11 @@ export function EvaluatorsSection({
 
   // Calculate total width - each evaluator shows one column per agent
   const columnWidth = 140;
-  const addButtonWidth = 160;
+  const emptyStateWidth = 260;
   const columnsPerEvaluator = Math.max(agents.length, 1);
   const totalWidth = evaluators.length > 0
-    ? evaluators.length * columnsPerEvaluator * columnWidth + addButtonWidth
-    : addButtonWidth + 100;
+    ? evaluators.length * columnsPerEvaluator * columnWidth
+    : emptyStateWidth;
 
   const hasEvaluators = evaluators.length > 0;
   const hasAgents = agents.length > 0;
@@ -80,11 +80,20 @@ export function EvaluatorsSection({
       </SuperHeader>
 
       {/* Column Headers */}
-      <HStack gap={0} width="full">
-        {!hasEvaluators ? (
+      {!hasEvaluators ? (
+        <>
+          {/* Empty header row 1 */}
           <Box
             height="36px"
-            width={`${addButtonWidth + 100}px`}
+            width={`${emptyStateWidth}px`}
+            background="green.50"
+            borderBottom="1px solid"
+            borderColor="green.200"
+          />
+          {/* Empty header row 2 with Add Evaluator button */}
+          <Box
+            height="36px"
+            width={`${emptyStateWidth}px`}
             background="gray.50"
             borderBottom="2px solid"
             borderColor="gray.300"
@@ -119,8 +128,10 @@ export function EvaluatorsSection({
               </Box>
             </Button>
           </Box>
-        ) : (
-          evaluators.map((evaluator) => (
+        </>
+      ) : (
+        <HStack gap={0} width="full">
+          {evaluators.map((evaluator) => (
             <EvaluatorColumnHeaders
               key={evaluator.id}
               evaluator={evaluator}
@@ -130,18 +141,9 @@ export function EvaluatorsSection({
               onEdit={() => setActiveModal({ type: "edit-evaluator", evaluatorId: evaluator.id })}
               onMapInputs={() => setActiveModal({ type: "evaluator-mapping", evaluatorId: evaluator.id })}
             />
-          ))
-        )}
-        {hasEvaluators && (
-          <Box
-            height="36px"
-            minWidth={`${addButtonWidth}px`}
-            background="gray.50"
-            borderBottom="2px solid"
-            borderColor="gray.300"
-          />
-        )}
-      </HStack>
+          ))}
+        </HStack>
+      )}
 
       {/* Data Rows */}
       {Array.from({ length: rowCount }).map((_, rowIndex) => (
@@ -149,7 +151,7 @@ export function EvaluatorsSection({
           {!hasEvaluators ? (
             <Box
               height="40px"
-              width={`${addButtonWidth + 100}px`}
+              width={`${emptyStateWidth}px`}
               background={rowIndex % 2 === 0 ? "white" : "gray.50"}
               borderBottom="1px solid"
               borderColor="gray.100"
@@ -168,15 +170,6 @@ export function EvaluatorsSection({
                 isRunning={currentRun?.status === "running"}
               />
             ))
-          )}
-          {hasEvaluators && (
-            <Box
-              height="40px"
-              minWidth={`${addButtonWidth}px`}
-              background={rowIndex % 2 === 0 ? "white" : "gray.50"}
-              borderBottom="1px solid"
-              borderColor="gray.100"
-            />
           )}
         </HStack>
       ))}

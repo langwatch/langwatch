@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx biome:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsgo:*)",
+      "Bash(git diff:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm prisma migrate dev:*)",
+      "Bash(pnpm prisma migrate diff:*)",
+      "Bash(pnpm prisma generate:*)"
+    ]
+  }
+}

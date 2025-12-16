@@ -3,12 +3,14 @@ import type { RefObject } from "react";
 import { z } from "zod";
 import { create } from "zustand";
 
+// Import from workflowStoreCore to avoid circular dependency
+// (useWorkflowStore imports useEvaluationWizardStore, so we can't import from there)
 import {
   initialState as initialWorkflowStore,
+  store as workflowStore,
   type WorkflowStore,
   type State as WorkflowStoreState,
-  store as workflowStore,
-} from "../../../../../optimization_studio/hooks/useWorkflowStore";
+} from "../../../../../optimization_studio/hooks/workflowStoreCore";
 import type { Workflow } from "../../../../../optimization_studio/types/dsl";
 import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import { mappingStateSchema } from "../../../../../server/tracer/tracesMapping";
@@ -150,7 +152,7 @@ export type EvaluationWizardStore = State & {
   workflowStore: WorkflowStore;
 };
 
-export const initialState: State = {
+export const getInitialState = (): State => ({
   experimentSlug: undefined,
   wizardState: {
     step: "task",
@@ -159,7 +161,7 @@ export const initialState: State = {
   isAutosaving: false,
   autosaveDisabled: false,
   workflowStore: initialWorkflowStore,
-};
+});
 
 const store = (
   set: (
@@ -174,11 +176,11 @@ const store = (
   get: () => EvaluationWizardStore,
 ): EvaluationWizardStore => {
   const store: EvaluationWizardStore = {
-    ...initialState,
+    ...getInitialState(),
     reset() {
       set((current) => ({
         ...current,
-        ...initialState,
+        ...getInitialState(),
         workflowStore: createWorkflowStore(set, get),
       }));
     },

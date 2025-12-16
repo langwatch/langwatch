@@ -49,6 +49,7 @@ export type EvaluationV3Actions = {
   setDatasetColumn: (columnId: string, updates: Partial<DatasetColumn>) => void;
   addDatasetColumn: (column: DatasetColumn) => void;
   removeDatasetColumn: (columnId: string) => void;
+  setDatasetColumns: (columns: DatasetColumn[]) => void;
   reorderDatasetColumns: (fromIndex: number, toIndex: number) => void;
 
   setCellValue: (rowId: string, columnId: string, value: string | number | boolean | null) => void;
@@ -210,6 +211,29 @@ const storeCreator = (
         dataset: {
           ...state.dataset,
           columns: state.dataset.columns.filter((col) => col.id !== columnId),
+          rows: newRows,
+        },
+        hasUnsavedChanges: true,
+      };
+    }),
+
+  setDatasetColumns: (columns: DatasetColumn[]) =>
+    set((state) => {
+      if (state.dataset.type !== "inline") return state;
+      // Update rows to have values for all new columns
+      const columnIds = new Set(columns.map((c) => c.id));
+      const newRows = state.dataset.rows.map((row) => {
+        const newValues: Record<string, string | number | boolean | null> = {};
+        for (const col of columns) {
+          newValues[col.id] = row.values[col.id] ?? "";
+        }
+        return { ...row, values: newValues };
+      });
+      return {
+        ...state,
+        dataset: {
+          ...state.dataset,
+          columns,
           rows: newRows,
         },
         hasUnsavedChanges: true,

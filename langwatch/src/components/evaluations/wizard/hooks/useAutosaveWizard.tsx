@@ -8,14 +8,22 @@ import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowSt
 import { api } from "../../../../utils/api";
 import { toaster } from "../../../ui/toaster";
 import {
-  initialState,
+  getInitialState,
   useEvaluationWizardStore,
 } from "./evaluation-wizard-store/useEvaluationWizardStore";
 
-const stringifiedInitialState = JSON.stringify({
-  wizardState: initialState.wizardState,
-  dsl: getWorkflow(initialState.workflowStore),
-});
+// Compute initial state string lazily to avoid circular dependency issues
+let _stringifiedInitialState: string | null = null;
+const getStringifiedInitialState = () => {
+  if (_stringifiedInitialState === null) {
+    const initialState = getInitialState();
+    _stringifiedInitialState = JSON.stringify({
+      wizardState: initialState.wizardState,
+      dsl: getWorkflow(initialState.workflowStore),
+    });
+  }
+  return _stringifiedInitialState;
+};
 
 let lastAutosave = 0;
 
@@ -103,7 +111,7 @@ const useAutosaveWizard = () => {
     if (now - lastAutosave < 100) return;
     lastAutosave = now;
 
-    if (!!experiment.data?.id || stringifiedState !== stringifiedInitialState) {
+    if (!!experiment.data?.id || stringifiedState !== getStringifiedInitialState()) {
       void (async () => {
         try {
           const icon = dsl.workflow_id ? dsl.icon : getRandomWorkflowIcon();

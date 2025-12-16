@@ -43,10 +43,10 @@ export function AgentsSection({
 
   // Calculate total width based on agents
   const columnWidth = 200;
-  const addButtonWidth = 160;
+  const emptyStateWidth = 260;
   const totalWidth = agents.length > 0
-    ? agents.reduce((sum, agent) => sum + agent.outputs.length * columnWidth, 0) + addButtonWidth
-    : addButtonWidth + 100;
+    ? agents.reduce((sum, agent) => sum + agent.outputs.length * columnWidth, 0)
+    : emptyStateWidth;
 
   const hasAgents = agents.length > 0;
 
@@ -76,11 +76,20 @@ export function AgentsSection({
       </SuperHeader>
 
       {/* Column Headers */}
-      <HStack gap={0} width="full">
-        {!hasAgents ? (
+      {!hasAgents ? (
+        <>
+          {/* Empty header row 1 */}
           <Box
             height="36px"
-            width={`${addButtonWidth + 100}px`}
+            width={`${emptyStateWidth}px`}
+            background="purple.50"
+            borderBottom="1px solid"
+            borderColor="purple.200"
+          />
+          {/* Empty header row 2 with Add Agent button */}
+          <Box
+            height="36px"
+            width={`${emptyStateWidth}px`}
             background="gray.50"
             borderBottom="2px solid"
             borderColor="gray.300"
@@ -114,8 +123,10 @@ export function AgentsSection({
               </Box>
             </Button>
           </Box>
-        ) : (
-          agents.map((agent) => (
+        </>
+      ) : (
+        <HStack gap={0} width="full">
+          {agents.map((agent) => (
             <AgentColumnHeaders
               key={agent.id}
               agent={agent}
@@ -124,18 +135,9 @@ export function AgentsSection({
               onEdit={() => setActiveModal({ type: "edit-agent", agentId: agent.id })}
               onMapInputs={() => setActiveModal({ type: "agent-mapping", agentId: agent.id })}
             />
-          ))
-        )}
-        {hasAgents && (
-          <Box
-            height="36px"
-            minWidth={`${addButtonWidth}px`}
-            background="gray.50"
-            borderBottom="2px solid"
-            borderColor="gray.300"
-          />
-        )}
-      </HStack>
+          ))}
+        </HStack>
+      )}
 
       {/* Data Rows */}
       {Array.from({ length: rowCount }).map((_, rowIndex) => (
@@ -143,7 +145,7 @@ export function AgentsSection({
           {!hasAgents ? (
             <Box
               height="40px"
-              width={`${addButtonWidth + 100}px`}
+              width={`${emptyStateWidth}px`}
               background={rowIndex % 2 === 0 ? "white" : "gray.50"}
               borderBottom="1px solid"
               borderColor="gray.100"
@@ -161,15 +163,6 @@ export function AgentsSection({
                 isRunning={currentRun?.status === "running"}
               />
             ))
-          )}
-          {hasAgents && (
-            <Box
-              height="40px"
-              minWidth={`${addButtonWidth}px`}
-              background={rowIndex % 2 === 0 ? "white" : "gray.50"}
-              borderBottom="1px solid"
-              borderColor="gray.100"
-            />
           )}
         </HStack>
       ))}

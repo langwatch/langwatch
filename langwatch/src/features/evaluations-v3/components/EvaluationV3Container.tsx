@@ -29,12 +29,14 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import { useAutosaveV3 } from "../hooks/useAutosaveV3";
 import { useRunEvaluationV3 } from "../hooks/useRunEvaluationV3";
 import { useEvaluationEventsV3 } from "../hooks/useEvaluationEventsV3";
-import { AddAgentModal } from "./modals/AddAgentModal";
-import { AddEvaluatorModal } from "./modals/AddEvaluatorModal";
-import { AgentMappingModal } from "./modals/AgentMappingModal";
-import { EvaluatorMappingModal } from "./modals/EvaluatorMappingModal";
+import { AgentSettingsPanel } from "./panels/AgentSettingsPanel";
+import { EvaluatorSettingsPanel } from "./panels/EvaluatorSettingsPanel";
+import { DatasetPickerPanel } from "./panels/DatasetPickerPanel";
+import { SaveDatasetPanel } from "./panels/SaveDatasetPanel";
 import { HistoryPanel } from "./header/HistoryPanel";
 import { useState, useEffect, useCallback } from "react";
+import { useDrawer } from "../../../hooks/useDrawer";
+import type { DatasetColumns } from "../../../server/datasets/types";
 import { LuSquare } from "react-icons/lu";
 
 export function EvaluationV3Container() {
@@ -42,8 +44,10 @@ export function EvaluationV3Container() {
     name,
     isAutosaving,
     activeModal,
+    dataset,
     setName,
     setActiveModal,
+    setDatasetColumns,
     hasRequiredConfiguration,
     currentRun,
   } = useEvaluationV3Store(
@@ -51,17 +55,47 @@ export function EvaluationV3Container() {
       name: s.name,
       isAutosaving: s.isAutosaving,
       activeModal: s.activeModal,
+      dataset: s.dataset,
       setName: s.setName,
       setActiveModal: s.setActiveModal,
+      setDatasetColumns: s.setDatasetColumns,
       hasRequiredConfiguration: s.hasRequiredConfiguration,
       currentRun: s.currentRun,
     }))
   );
 
+  const { openDrawer } = useDrawer();
   const { undo, redo, canUndo, canRedo } = useEvaluationV3Undo();
   const [showHistory, setShowHistory] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(name);
+
+  // Handle dataset-columns modal by opening the existing drawer
+  useEffect(() => {
+    if (activeModal?.type === "dataset-columns") {
+      // Convert v3 columns to the format expected by AddOrEditDatasetDrawer
+      const columnTypes: DatasetColumns = dataset.columns.map((col) => ({
+        name: col.name,
+        type: col.type as DatasetColumns[number]["type"],
+      }));
+
+      openDrawer("addOrEditDataset", {
+        datasetToSave: {
+          name: dataset.type === "saved" ? dataset.name : "Inline Dataset",
+          columnTypes,
+        },
+        onSuccess: (result: { datasetId: string; name: string; columnTypes: DatasetColumns }) => {
+          // Update v3 store with new columns
+          setDatasetColumns(result.columnTypes.map((col, idx) => ({
+            id: dataset.columns[idx]?.id ?? `col_${idx}`,
+            name: col.name,
+            type: col.type,
+          })));
+        },
+      });
+      setActiveModal(null);
+    }
+  }, [activeModal, dataset, openDrawer, setActiveModal, setDatasetColumns]);
 
   // Autosave hook
   useAutosaveV3();
@@ -277,37 +311,34 @@ export function EvaluationV3Container() {
         )}
       </HStack>
 
-      {/* Modals */}
-      {activeModal?.type === "add-agent" && (
-        <AddAgentModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal?.type === "edit-agent" && (
-        <AddAgentModal
-          agentId={activeModal.agentId}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal?.type === "add-evaluator" && (
-        <AddEvaluatorModal onClose={() => setActiveModal(null)} />
-      )}
-      {activeModal?.type === "edit-evaluator" && (
-        <AddEvaluatorModal
-          evaluatorId={activeModal.evaluatorId}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal?.type === "agent-mapping" && (
-        <AgentMappingModal
-          agentId={activeModal.agentId}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-      {activeModal?.type === "evaluator-mapping" && (
-        <EvaluatorMappingModal
-          evaluatorId={activeModal.evaluatorId}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
+      {/* Side Panels */}
+      <AgentSettingsPanel
+        isOpen={activeModal?.type === "add-agent" || activeModal?.type === "edit-agent" || activeModal?.type === "agent-mapping"}
+        agentId={
+          activeModal?.type === "edit-agent" ? activeModal.agentId :
+          activeModal?.type === "agent-mapping" ? activeModal.agentId :
+          undefined
+        }
+        onClose={() => setActiveModal(null)}
+      />
+      <EvaluatorSettingsPanel
+        isOpen={activeModal?.type === "add-evaluator" || activeModal?.type === "edit-evaluator" || activeModal?.type === "evaluator-mapping"}
+        evaluatorId={
+          activeModal?.type === "edit-evaluator" ? activeModal.evaluatorId :
+          activeModal?.type === "evaluator-mapping" ? activeModal.evaluatorId :
+          undefined
+        }
+        onClose={() => setActiveModal(null)}
+      />
+      {/* DatasetColumnsPanel handled via useDrawer -> addOrEditDataset */}
+      <DatasetPickerPanel
+        isOpen={activeModal?.type === "choose-dataset"}
+        onClose={() => setActiveModal(null)}
+      />
+      <SaveDatasetPanel
+        isOpen={activeModal?.type === "save-dataset"}
+        onClose={() => setActiveModal(null)}
+      />
     </Box>
   );
 }

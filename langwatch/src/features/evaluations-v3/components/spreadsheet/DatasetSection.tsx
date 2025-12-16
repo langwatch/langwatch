@@ -55,7 +55,8 @@ export function DatasetSection({
 
   // Calculate total width
   const columnWidth = 180;
-  const totalWidth = columns.length * columnWidth + 80; // Extra for add button
+  const addColumnWidth = 40; // Smaller width for add button
+  const totalWidth = columns.length * columnWidth + addColumnWidth;
 
   const handleAddColumn = () => {
     const newId = `column_${Date.now()}`;
@@ -105,7 +106,28 @@ export function DatasetSection({
         </HStack>
       </SuperHeader>
 
-      {/* Column Headers */}
+      {/* Column Headers - Top row with empty space to align with agents */}
+      <HStack gap={0} width="full">
+        {columns.map((column) => (
+          <Box
+            key={column.id}
+            height="36px"
+            minWidth={`${columnWidth}px`}
+            background="blue.50"
+            borderBottom="1px solid"
+            borderColor="blue.200"
+          />
+        ))}
+        {/* Add Column Button - empty row */}
+        <Box
+          height="36px"
+          minWidth={`${addColumnWidth}px`}
+          background="gray.50"
+          borderBottom="1px solid"
+          borderColor="gray.200"
+        />
+      </HStack>
+      {/* Column Headers - Bottom row with column names */}
       <HStack gap={0} width="full">
         {columns.map((column) => (
           <ColumnHeader
@@ -117,7 +139,7 @@ export function DatasetSection({
         {/* Add Column Button */}
         <Box
           height="36px"
-          minWidth="80px"
+          minWidth={`${addColumnWidth}px`}
           background="gray.50"
           borderBottom="2px solid"
           borderColor="gray.300"
@@ -132,7 +154,7 @@ export function DatasetSection({
               size="xs"
               onClick={handleAddColumn}
             >
-              <LuPlus size={14} />
+              <LuPlus size={12} />
             </IconButton>
           </Tooltip>
         </Box>
@@ -199,7 +221,7 @@ export function DatasetSection({
             {/* Empty cell for add column area */}
             <Box
               height="40px"
-              minWidth="80px"
+              minWidth={`${addColumnWidth}px`}
               background={rowIndex % 2 === 0 ? "white" : "gray.50"}
               borderBottom="1px solid"
               borderColor="gray.100"
