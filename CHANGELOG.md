@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.10.0...langwatch@v1.11.0) (2025-12-16)
+
+
+### Features
+
+* add migrations for clickhouse datastore ([#916](https://github.com/langwatch/langwatch/issues/916)) ([509fbe6](https://github.com/langwatch/langwatch/commit/509fbe61b7f9182c280ecac2aca7b44ccdda0344))
+* allow to filter on analytics group ([#991](https://github.com/langwatch/langwatch/issues/991)) ([0037046](https://github.com/langwatch/langwatch/commit/0037046c62640187fd80bc10254a4c50492bbce7))
+* audit logs ([#908](https://github.com/langwatch/langwatch/issues/908)) ([43b59ce](https://github.com/langwatch/langwatch/commit/43b59ce1857108ce5376e75f8946442fb9503425))
+* copy project workflows and datasets ([#864](https://github.com/langwatch/langwatch/issues/864)) ([e3e4292](https://github.com/langwatch/langwatch/commit/e3e4292062c275b8d6ad7207adafca914bcafcc5))
+* implement adaptive throttling for cold storage migration ([075b63f](https://github.com/langwatch/langwatch/commit/075b63f54a3eb95de351cdb7299c8c29d123efb5))
+* implement FetchPolicy enum for Python SDK  ([#989](https://github.com/langwatch/langwatch/issues/989)) ([43de904](https://github.com/langwatch/langwatch/commit/43de904de08ec54a78aece35da155a8a3cb4289d))
+* migrate from npm to pnpm ([#940](https://github.com/langwatch/langwatch/issues/940)) ([ce52474](https://github.com/langwatch/langwatch/commit/ce52474c3023ccb4714e4a33373d3c644f1496bf))
+* **scenario-events:** add trace limit middleware to block requests w… ([#935](https://github.com/langwatch/langwatch/issues/935)) ([7af7793](https://github.com/langwatch/langwatch/commit/7af77934be2486359dcf43fe2612b1792ca57bf1))
+
+
+### Bug Fixes
+
+* auto-correct reasoning model config for DSPy compatibility ([#978](https://github.com/langwatch/langwatch/issues/978)) ([#979](https://github.com/langwatch/langwatch/issues/979)) ([47e45b6](https://github.com/langwatch/langwatch/commit/47e45b67ec33ff7870e6faf734ff4244c8e49f64))
+* defaults for gpt-5 and default model deleting during execution ([6d3d8a8](https://github.com/langwatch/langwatch/commit/6d3d8a8235f5c4e7d96b3231284284e3f24ff726))
+* display scenario runs with errors when MESSAGE_SNAPSHOT is missing ([#985](https://github.com/langwatch/langwatch/issues/985)) ([6642080](https://github.com/langwatch/langwatch/commit/664208038d518ce3c1a673f933c86a4c6789d6cb)), closes [#984](https://github.com/langwatch/langwatch/issues/984)
+* do not skip running evaluation on traces if they have error but also input and output ([8ec6140](https://github.com/langwatch/langwatch/commit/8ec61400b15cbcedf130ab4dad3b29d8746196e9))
+* improve handling of clickhouse url parsing ([#933](https://github.com/langwatch/langwatch/issues/933)) ([aafe164](https://github.com/langwatch/langwatch/commit/aafe164e1c5058576dc26b02c1d7225acc652cad))
+* increase the delay for evaluations to not run twice, many agents actually can take 30s to run in normal conditions ([b758e8b](https://github.com/langwatch/langwatch/commit/b758e8b59fd938e27e8e661fb80db50d8e287831))
+* metadata tags filter traces when clicked ([#963](https://github.com/langwatch/langwatch/issues/963)) ([75f7359](https://github.com/langwatch/langwatch/commit/75f7359f7533462f21dad7fe00b323ed6dac0574))
+* **prompts-api:** derive output schema from storage to prevent drift ([#952](https://github.com/langwatch/langwatch/issues/952)) ([d8c3536](https://github.com/langwatch/langwatch/commit/d8c3536d7f6497cf4fe7ee459fa6f79b25d90d32))
+* rerun evaluations if new spans arrive even after 30s but less than 1h ([79ba316](https://github.com/langwatch/langwatch/commit/79ba3163c64f224e3d2b640b5340f1503fc57c48))
+* tiny alignment fix ([#972](https://github.com/langwatch/langwatch/issues/972)) ([6c20454](https://github.com/langwatch/langwatch/commit/6c20454ecf5a1407cf0f93a9eb211587cba1f7ac))
+* use drawer hook fix ([#973](https://github.com/langwatch/langwatch/issues/973)) ([e40aa4b](https://github.com/langwatch/langwatch/commit/e40aa4b71e193f0d4bae766c807626756cf82b0e))
+
+
+### Miscellaneous
+
+* add agent simulations to the readme ([#961](https://github.com/langwatch/langwatch/issues/961)) ([b3d35e4](https://github.com/langwatch/langwatch/commit/b3d35e4eed7b1c7817ad9e61d677fbdbb3633145))
+* **main:** release python-sdk 0.8.0 ([#944](https://github.com/langwatch/langwatch/issues/944)) ([cbfefe9](https://github.com/langwatch/langwatch/commit/cbfefe918dc33ac53503e8e738a77b2dad1b02d1))
+* migrate ESLint and Prettier to BiomeJS ([#956](https://github.com/langwatch/langwatch/issues/956)) ([f57199e](https://github.com/langwatch/langwatch/commit/f57199ed742dcd6a9a8838999dc1cf4652316406))
+
+
+### Code Refactoring
+
+* rename 'copy' to 'replicate' in UI text for cross-project duplication ([#990](https://github.com/langwatch/langwatch/issues/990)) ([e289a11](https://github.com/langwatch/langwatch/commit/e289a111a0037f12a0eda5ca5e8b2189bfdf31e8))
+
 ## [1.10.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.9.0...langwatch@v1.10.0) (2025-12-04)
 
 
