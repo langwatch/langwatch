@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.2...python-sdk@v0.8.0) (2025-12-16)
+
+
+### Features
+
+* implement FetchPolicy enum for Python SDK  ([#989](https://github.com/langwatch/langwatch/issues/989)) ([43de904](https://github.com/langwatch/langwatch/commit/43de904de08ec54a78aece35da155a8a3cb4289d))
+* migrate from npm to pnpm ([#940](https://github.com/langwatch/langwatch/issues/940)) ([ce52474](https://github.com/langwatch/langwatch/commit/ce52474c3023ccb4714e4a33373d3c644f1496bf))
+
+
+### Bug Fixes
+
+* rerun evaluations if new spans arrive even after 30s but less than 1h ([79ba316](https://github.com/langwatch/langwatch/commit/79ba3163c64f224e3d2b640b5340f1503fc57c48))
+
 ## [0.7.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.1...python-sdk@v0.7.2) (2025-12-03)
 
 
