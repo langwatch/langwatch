@@ -896,10 +896,12 @@ export const experimentsRouter = createTRPCRouter({
       const baseSlug = slugify(experimentName);
 
       // Find a unique slug by appending -2, -3, etc. if needed
+      const MAX_ATTEMPTS = 100;
       let newSlug = baseSlug;
       let index = 2;
+      let attempts = 0;
 
-      while (true) {
+      while (attempts < MAX_ATTEMPTS) {
         const existingExperiment = await ctx.prisma.experiment.findFirst({
           where: {
             projectId: input.projectId,
@@ -913,6 +915,12 @@ export const experimentsRouter = createTRPCRouter({
 
         newSlug = `${baseSlug}-${index}`;
         index++;
+        attempts++;
+      }
+
+      // Fallback to random suffix if we hit the limit (should never happen in practice)
+      if (attempts >= MAX_ATTEMPTS) {
+        newSlug = `${baseSlug}-${nanoid(8)}`;
       }
 
       const newExperiment = await ctx.prisma.experiment.create({

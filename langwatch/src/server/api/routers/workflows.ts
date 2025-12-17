@@ -1046,7 +1046,11 @@ export const copyWorkflowWithDatasets = async ({
       // Check parameters for Demonstrations
       if (node.data && "parameters" in node.data && node.data.parameters) {
         for (const param of node.data.parameters) {
-          if (param.type === "dataset" && isDatasetRef(param.value)) {
+          if (
+            param.type === "dataset" &&
+            param.value != null &&
+            isDatasetRef(param.value)
+          ) {
             await processDatasetRef(param.value);
           }
         }
