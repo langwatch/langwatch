@@ -1,8 +1,7 @@
 import isDeepEqual from "fast-deep-equal";
 import debounce from "lodash-es/debounce";
-import { temporal, type TemporalState } from "zundo";
+import { temporal } from "zundo";
 import { create, type StateCreator } from "zustand";
-import { useStoreWithEqualityFn } from "zustand/traditional";
 
 import type { DatasetColumnType } from "~/server/datasets/types";
 
@@ -11,7 +10,6 @@ import {
   type AgentConfig,
   type CellPosition,
   type DatasetColumn,
-  type EvaluationResults,
   type EvaluatorConfig,
   type EvaluationsV3Actions,
   type EvaluationsV3State,
@@ -156,6 +154,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         ...state.agentMappings,
         [agent.id]: {},
       },
+      evaluatorMappings: {
+        ...state.evaluatorMappings,
+        [agent.id]: {},
+      },
     }));
   },
 
@@ -172,9 +174,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const agentMappings = { ...state.agentMappings };
       delete agentMappings[agentId];
 
+      const evaluatorMappings = { ...state.evaluatorMappings };
+      delete evaluatorMappings[agentId];
+
       return {
         agents: state.agents.filter((a) => a.id !== agentId),
         agentMappings,
+        evaluatorMappings,
       };
     });
   },
@@ -192,46 +198,76 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   // -------------------------------------------------------------------------
-  // Evaluator actions
+  // Per-agent evaluator actions
   // -------------------------------------------------------------------------
 
-  addEvaluator: (evaluator) => {
-    set((state) => ({
-      evaluators: [...state.evaluators, evaluator],
-      evaluatorMappings: {
-        ...state.evaluatorMappings,
-        [evaluator.id]: {},
-      },
-    }));
+  addEvaluatorToAgent: (agentId, evaluator) => {
+    set((state) => {
+      const agent = state.agents.find((a) => a.id === agentId);
+      if (!agent) return state;
+
+      return {
+        agents: state.agents.map((a) =>
+          a.id === agentId
+            ? { ...a, evaluators: [...a.evaluators, evaluator] }
+            : a
+        ),
+        evaluatorMappings: {
+          ...state.evaluatorMappings,
+          [agentId]: {
+            ...state.evaluatorMappings[agentId],
+            [evaluator.id]: {},
+          },
+        },
+      };
+    });
   },
 
-  updateEvaluator: (evaluatorId, updates) => {
+  updateAgentEvaluator: (agentId, evaluatorId, updates) => {
     set((state) => ({
-      evaluators: state.evaluators.map((e) =>
-        e.id === evaluatorId ? { ...e, ...updates } : e
+      agents: state.agents.map((a) =>
+        a.id === agentId
+          ? {
+              ...a,
+              evaluators: a.evaluators.map((e) =>
+                e.id === evaluatorId ? { ...e, ...updates } : e
+              ),
+            }
+          : a
       ),
     }));
   },
 
-  removeEvaluator: (evaluatorId) => {
+  removeAgentEvaluator: (agentId, evaluatorId) => {
     set((state) => {
       const evaluatorMappings = { ...state.evaluatorMappings };
-      delete evaluatorMappings[evaluatorId];
+      if (evaluatorMappings[agentId]) {
+        const agentEvalMappings = { ...evaluatorMappings[agentId] };
+        delete agentEvalMappings[evaluatorId];
+        evaluatorMappings[agentId] = agentEvalMappings;
+      }
 
       return {
-        evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
+        agents: state.agents.map((a) =>
+          a.id === agentId
+            ? { ...a, evaluators: a.evaluators.filter((e) => e.id !== evaluatorId) }
+            : a
+        ),
         evaluatorMappings,
       };
     });
   },
 
-  setEvaluatorMapping: (evaluatorId, inputField, mapping) => {
+  setAgentEvaluatorMapping: (agentId, evaluatorId, inputField, mapping) => {
     set((state) => ({
       evaluatorMappings: {
         ...state.evaluatorMappings,
-        [evaluatorId]: {
-          ...state.evaluatorMappings[evaluatorId],
-          [inputField]: mapping,
+        [agentId]: {
+          ...state.evaluatorMappings[agentId],
+          [evaluatorId]: {
+            ...state.evaluatorMappings[agentId]?.[evaluatorId],
+            [inputField]: mapping,
+          },
         },
       },
     }));
@@ -265,12 +301,13 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // UI actions
   // -------------------------------------------------------------------------
 
-  openOverlay: (type, targetId) => {
+  openOverlay: (type, targetId, evaluatorId) => {
     set({
       ui: {
         ...get().ui,
         openOverlay: type,
         overlayTargetId: targetId,
+        overlayEvaluatorId: evaluatorId,
       },
     });
   },
@@ -281,6 +318,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         ...get().ui,
         openOverlay: undefined,
         overlayTargetId: undefined,
+        overlayEvaluatorId: undefined,
       },
     });
   },
@@ -338,6 +376,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setExpandedEvaluator: (expanded) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        expandedEvaluator: expanded,
+      },
+    }));
+  },
+
   // -------------------------------------------------------------------------
   // Reset
   // -------------------------------------------------------------------------
@@ -357,7 +404,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
  */
 type PartializedState = Pick<
   EvaluationsV3State,
-  "name" | "dataset" | "agents" | "agentMappings" | "evaluators" | "evaluatorMappings"
+  "name" | "dataset" | "agents" | "agentMappings" | "evaluatorMappings"
 >;
 
 /**
@@ -369,7 +416,6 @@ const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   dataset: state.dataset,
   agents: state.agents,
   agentMappings: state.agentMappings,
-  evaluators: state.evaluators,
   evaluatorMappings: state.evaluatorMappings,
 });
 

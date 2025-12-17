@@ -109,6 +109,7 @@ export function AgentConfigPanel() {
       name: name || `${agentType === "llm" ? "LLM" : "Code"} Agent`,
       inputs: detectedInputs.map((id) => ({ identifier: id, type: "str" })),
       outputs: [{ identifier: "output", type: "str" }],
+      evaluators: existingAgent?.evaluators ?? [], // Preserve existing evaluators
       ...(agentType === "llm"
         ? {
             llmConfig: { model },
