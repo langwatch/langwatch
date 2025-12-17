@@ -15,7 +15,8 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical } from "react-feather";
+import { useState } from "react";
+import { Copy, MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
@@ -27,6 +28,7 @@ import {
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
+import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   formatEvaluationSummary,
@@ -43,6 +45,11 @@ import { api } from "../../utils/api";
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
+  const [copyDialogState, setCopyDialogState] = useState<{
+    open: boolean;
+    experimentId: string;
+    evaluationName: string;
+  } | null>(null);
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
@@ -350,6 +357,26 @@ function EvaluationsV2() {
                                           <LuPencil size={16} />
                                           Edit
                                         </Menu.Item>
+                                        {hasPermission(
+                                          "evaluations:manage",
+                                        ) && (
+                                          <Menu.Item
+                                            value="replicate"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setCopyDialogState({
+                                                open: true,
+                                                experimentId: experiment.id,
+                                                evaluationName:
+                                                  experiment.name ??
+                                                  experiment.slug,
+                                              });
+                                            }}
+                                          >
+                                            <Copy size={16} />
+                                            Replicate to another project
+                                          </Menu.Item>
+                                        )}
                                         <Menu.Item
                                           value="delete"
                                           color="red.500"
@@ -381,6 +408,14 @@ function EvaluationsV2() {
           )}
         </VStack>
       </Container>
+      {copyDialogState && (
+        <CopyEvaluationDialog
+          open={copyDialogState.open}
+          onClose={() => setCopyDialogState(null)}
+          experimentId={copyDialogState.experimentId}
+          evaluationName={copyDialogState.evaluationName}
+        />
+      )}
     </DashboardLayout>
   );
 }

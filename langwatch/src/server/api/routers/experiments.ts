@@ -941,9 +941,30 @@ export const experimentsRouter = createTRPCRouter({
         commitMessage: `Copied from ${experiment.workflow.name}`,
       });
 
-      // Create new experiment
+      // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
-      const newSlug = slugify(experimentName);
+      const baseSlug = slugify(experimentName);
+      
+      // Find a unique slug by appending -2, -3, etc. if needed
+      let newSlug = baseSlug;
+      let index = 2;
+      
+      while (true) {
+        const existingExperiment = await ctx.prisma.experiment.findFirst({
+          where: {
+            projectId: input.projectId,
+            slug: newSlug,
+          },
+        });
+        
+        if (!existingExperiment) {
+          break;
+        }
+        
+        newSlug = `${baseSlug}-${index}`;
+        index++;
+      }
+      
       const newExperiment = await ctx.prisma.experiment.create({
         data: {
           id: `experiment_${nanoid()}`,
