@@ -1,7 +1,7 @@
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { ChatMessage } from "~/server/tracer/types";
-import type { Field, ExecutionStatus, LLMConfig } from "~/optimization_studio/types/dsl";
+import type { Field, LLMConfig } from "~/optimization_studio/types/dsl";
 
 // ============================================================================
 // Dataset Types
@@ -18,6 +18,18 @@ export type InlineDataset = {
   name?: string;
   columns: DatasetColumn[];
   records: Record<string, string[]>; // columnId -> array of values per row
+};
+
+// ============================================================================
+// Evaluator Types (defined first as AgentConfig uses it)
+// ============================================================================
+
+export type EvaluatorConfig = {
+  id: string;
+  evaluatorType: EvaluatorTypes | `custom/${string}`;
+  name: string;
+  settings: Record<string, unknown>;
+  inputs: Field[];
 };
 
 // ============================================================================
@@ -43,18 +55,9 @@ export type AgentConfig = {
   // Common
   inputs: Field[];
   outputs: Field[];
-};
 
-// ============================================================================
-// Evaluator Types
-// ============================================================================
-
-export type EvaluatorConfig = {
-  id: string;
-  evaluatorType: EvaluatorTypes | `custom/${string}`;
-  name: string;
-  settings: Record<string, unknown>;
-  inputs: Field[];
+  // Per-agent evaluators
+  evaluators: EvaluatorConfig[];
 };
 
 // ============================================================================
@@ -78,11 +81,14 @@ export type AgentMappings = Record<string, Record<string, FieldMapping>>;
 // agentId -> { inputFieldName -> mapping }
 
 /**
- * Mappings for an evaluator's inputs.
- * Maps input field identifier -> source mapping.
+ * Mappings for evaluators within agents.
+ * Nested by agentId -> evaluatorId -> inputField -> mapping
  */
-export type EvaluatorMappings = Record<string, Record<string, FieldMapping>>;
-// evaluatorId -> { inputFieldName -> mapping }
+export type EvaluatorMappings = Record<
+  string,
+  Record<string, Record<string, FieldMapping>>
+>;
+// agentId -> evaluatorId -> { inputFieldName -> mapping }
 
 // ============================================================================
 // Execution Results Types
@@ -98,8 +104,9 @@ export type EvaluationResults = {
   total?: number;
   // Per-row results
   agentOutputs: Record<string, unknown[]>; // agentId -> array of outputs per row
-  evaluatorResults: Record<string, unknown[]>; // evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // agentId/evaluatorId -> array of errors per row
+  // Evaluator results nested by agent
+  evaluatorResults: Record<string, Record<string, unknown[]>>; // agentId -> evaluatorId -> array of results per row
+  errors: Record<string, string[]>; // agentId -> array of errors per row
 };
 
 // ============================================================================
@@ -119,10 +126,16 @@ export type CellPosition = {
 
 export type UIState = {
   openOverlay?: OverlayType;
-  overlayTargetId?: string; // which agent/evaluator is being configured
+  overlayTargetId?: string; // which agent is being configured
+  overlayEvaluatorId?: string; // which evaluator within the agent (for evaluator overlay)
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   selectedRows: Set<number>;
+  expandedEvaluator?: {
+    agentId: string;
+    evaluatorId: string;
+    row: number;
+  };
 };
 
 // ============================================================================
@@ -138,12 +151,11 @@ export type EvaluationsV3State = {
   // Dataset (inline by default)
   dataset: InlineDataset;
 
-  // Agents (multiple for comparison)
+  // Agents (multiple for comparison) - each agent has its own evaluators
   agents: AgentConfig[];
   agentMappings: AgentMappings;
 
-  // Evaluators (multiple)
-  evaluators: EvaluatorConfig[];
+  // Evaluator mappings (per-agent, per-evaluator)
   evaluatorMappings: EvaluatorMappings;
 
   // Execution results (populated after run)
@@ -182,14 +194,16 @@ export type EvaluationsV3Actions = {
     mapping: FieldMapping
   ) => void;
 
-  // Evaluator actions
-  addEvaluator: (evaluator: EvaluatorConfig) => void;
-  updateEvaluator: (
+  // Per-agent evaluator actions
+  addEvaluatorToAgent: (agentId: string, evaluator: EvaluatorConfig) => void;
+  updateAgentEvaluator: (
+    agentId: string,
     evaluatorId: string,
     updates: Partial<EvaluatorConfig>
   ) => void;
-  removeEvaluator: (evaluatorId: string) => void;
-  setEvaluatorMapping: (
+  removeAgentEvaluator: (agentId: string, evaluatorId: string) => void;
+  setAgentEvaluatorMapping: (
+    agentId: string,
     evaluatorId: string,
     inputField: string,
     mapping: FieldMapping
@@ -200,13 +214,20 @@ export type EvaluationsV3Actions = {
   clearResults: () => void;
 
   // UI actions
-  openOverlay: (type: OverlayType, targetId?: string) => void;
+  openOverlay: (
+    type: OverlayType,
+    targetId?: string,
+    evaluatorId?: string
+  ) => void;
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
   setEditingCell: (cell: CellPosition | undefined) => void;
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;
+  setExpandedEvaluator: (
+    expanded: { agentId: string; evaluatorId: string; row: number } | undefined
+  ) => void;
 
   // Reset
   reset: () => void;
@@ -245,7 +266,6 @@ export const createInitialState = (): EvaluationsV3State => ({
   dataset: createInitialDataset(),
   agents: [],
   agentMappings: {},
-  evaluators: [],
   evaluatorMappings: {},
   results: createInitialResults(),
   ui: createInitialUIState(),

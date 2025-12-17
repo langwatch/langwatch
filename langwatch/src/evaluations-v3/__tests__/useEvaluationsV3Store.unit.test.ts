@@ -91,6 +91,7 @@ describe("useEvaluationsV3Store", () => {
       name: `Agent ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
+      evaluators: [],
     });
 
     it("adds an agent", () => {
@@ -138,7 +139,16 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Evaluator operations", () => {
+  describe("Per-agent evaluator operations", () => {
+    const createTestAgent = (id: string): AgentConfig => ({
+      id,
+      type: "llm",
+      name: `Agent ${id}`,
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      evaluators: [],
+    });
+
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
       id,
       evaluatorType: "langevals/exact_match",
@@ -147,48 +157,59 @@ describe("useEvaluationsV3Store", () => {
       inputs: [{ identifier: "output", type: "str" }],
     });
 
-    it("adds an evaluator", () => {
+    it("adds an evaluator to an agent", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addAgent(createTestAgent("agent-1"));
+      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluators).toHaveLength(1);
-      expect(state.evaluators[0]?.name).toBe("Evaluator eval-1");
-      expect(state.evaluatorMappings["eval-1"]).toBeDefined();
+      const agent = state.agents.find((a) => a.id === "agent-1");
+      expect(agent?.evaluators).toHaveLength(1);
+      expect(agent?.evaluators[0]?.name).toBe("Evaluator eval-1");
+      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]).toBeDefined();
     });
 
-    it("updates an evaluator", () => {
+    it("updates an evaluator within an agent", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.updateEvaluator("eval-1", { name: "Updated Evaluator" });
+      store.addAgent(createTestAgent("agent-1"));
+      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
+      store.updateAgentEvaluator("agent-1", "eval-1", {
+        name: "Updated Evaluator",
+      });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
+      const agent = state.agents.find((a) => a.id === "agent-1");
+      expect(agent?.evaluators[0]?.name).toBe("Updated Evaluator");
     });
 
-    it("removes an evaluator", () => {
+    it("removes an evaluator from an agent", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.removeEvaluator("eval-1");
+      store.addAgent(createTestAgent("agent-1"));
+      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
+      store.removeAgentEvaluator("agent-1", "eval-1");
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluators).toHaveLength(0);
-      expect(state.evaluatorMappings["eval-1"]).toBeUndefined();
+      const agent = state.agents.find((a) => a.id === "agent-1");
+      expect(agent?.evaluators).toHaveLength(0);
+      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]).toBeUndefined();
     });
 
-    it("sets evaluator mapping", () => {
+    it("sets evaluator mapping for an agent", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.setEvaluatorMapping("eval-1", "output", {
+      store.addAgent(createTestAgent("agent-1"));
+      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
+      store.setAgentEvaluatorMapping("agent-1", "eval-1", "output", {
         source: "agent-1",
         sourceField: "output",
       });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluatorMappings["eval-1"]?.["output"]).toEqual({
-        source: "agent-1",
-        sourceField: "output",
-      });
+      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]?.["output"]).toEqual(
+        {
+          source: "agent-1",
+          sourceField: "output",
+        }
+      );
     });
   });
 
@@ -200,6 +221,16 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       expect(state.ui.openOverlay).toBe("agent");
       expect(state.ui.overlayTargetId).toBe("agent-1");
+    });
+
+    it("opens overlay with evaluator target", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.openOverlay("evaluator", "agent-1", "eval-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.openOverlay).toBe("evaluator");
+      expect(state.ui.overlayTargetId).toBe("agent-1");
+      expect(state.ui.overlayEvaluatorId).toBe("eval-1");
     });
 
     it("closes overlay", () => {
@@ -250,7 +281,9 @@ describe("useEvaluationsV3Store", () => {
       expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(true);
 
       store.toggleRowSelection(0);
-      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(false);
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(
+        false
+      );
     });
 
     it("selects all rows", () => {
@@ -267,6 +300,22 @@ describe("useEvaluationsV3Store", () => {
       store.clearRowSelection();
 
       expect(useEvaluationsV3Store.getState().ui.selectedRows.size).toBe(0);
+    });
+
+    it("sets expanded evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setExpandedEvaluator({
+        agentId: "agent-1",
+        evaluatorId: "eval-1",
+        row: 0,
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.expandedEvaluator).toEqual({
+        agentId: "agent-1",
+        evaluatorId: "eval-1",
+        row: 0,
+      });
     });
   });
 
@@ -313,6 +362,7 @@ describe("useEvaluationsV3Store", () => {
         name: "Agent",
         inputs: [],
         outputs: [],
+        evaluators: [],
       });
       store.reset();
 
@@ -338,23 +388,23 @@ describe("useEvaluationsV3Store", () => {
       // Wait for debounce
       await new Promise((resolve) => setTimeout(resolve, 150));
 
-      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
-        "Second value"
-      );
+      expect(
+        useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+      ).toBe("Second value");
 
       // Undo
       useEvaluationsV3Store.temporal.getState().undo();
 
-      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
-        "First value"
-      );
+      expect(
+        useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+      ).toBe("First value");
 
       // Redo
       useEvaluationsV3Store.temporal.getState().redo();
 
-      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
-        "Second value"
-      );
+      expect(
+        useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+      ).toBe("Second value");
     });
 
     it("does not track UI state changes in undo history", async () => {

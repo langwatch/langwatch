@@ -1,21 +1,25 @@
+/**
+ * DSL Adapter for Evaluations V3
+ *
+ * Converts between the V3 UI state structure and the workflow DSL.
+ * This allows us to save evaluations in the existing workflow format
+ * while using a simpler UI-focused state structure.
+ *
+ * Structure: Dataset (entry) -> Agent nodes -> Evaluator nodes (per-agent)
+ */
+
 import type { Edge, Node } from "@xyflow/react";
-import { nanoid } from "nanoid";
 
 import type {
-  Code,
+  Workflow,
   Entry,
+  Signature,
+  Code,
   Evaluator,
   Field,
-  NodeDataset,
-  Signature,
-  Workflow,
 } from "~/optimization_studio/types/dsl";
-import { DEFAULT_MAX_TOKENS } from "~/optimization_studio/utils/registryUtils";
-import { DEFAULT_MODEL } from "~/utils/constants";
-
 import type {
   AgentConfig,
-  DatasetColumn,
   EvaluationsV3State,
   EvaluatorConfig,
   FieldMapping,
@@ -23,157 +27,194 @@ import type {
 } from "../types";
 
 // ============================================================================
-// State → DSL Conversion
+// State to Workflow (Saving)
 // ============================================================================
 
 /**
- * Convert dataset columns to workflow fields.
+ * Convert V3 state to workflow DSL for persistence.
  */
-const columnsToFields = (columns: DatasetColumn[]): Field[] => {
-  return columns.map((col) => ({
-    identifier: col.name,
-    type: col.type === "string" ? "str" : col.type === "number" ? "float" : "str",
-  }));
-};
+export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
+  const entryNode = createEntryNode(state.dataset);
 
-/**
- * Convert inline dataset to NodeDataset format.
- */
-const datasetToNodeDataset = (dataset: InlineDataset): NodeDataset => {
-  if (dataset.id) {
-    // Saved dataset - just reference by ID
-    return {
-      id: dataset.id,
-      name: dataset.name,
-    };
-  }
+  const agentNodes: Array<Node<Signature> | Node<Code>> = [];
+  const evaluatorNodes: Array<Node<Evaluator>> = [];
 
-  // Inline dataset - include records
+  // Create agent nodes and their evaluator nodes
+  state.agents.forEach((agent, agentIndex) => {
+    const agentNode =
+      agent.type === "llm"
+        ? createSignatureNode(agent, agentIndex)
+        : createCodeNode(agent, agentIndex);
+
+    agentNodes.push(agentNode);
+
+    // Create evaluator nodes for this agent
+    agent.evaluators.forEach((evaluator, evalIndex) => {
+      const evaluatorNode = createEvaluatorNode(
+        evaluator,
+        agent.id,
+        agentIndex,
+        evalIndex
+      );
+      evaluatorNodes.push(evaluatorNode);
+    });
+  });
+
+  const agentEdges = buildAgentEdges(state.agents, state.agentMappings);
+  const evaluatorEdges = buildEvaluatorEdges(
+    state.agents,
+    state.evaluatorMappings
+  );
+
   return {
-    name: dataset.name,
-    inline: {
-      records: dataset.records,
-      columnTypes: dataset.columns.map((col) => ({
-        name: col.name,
-        type: col.type,
-      })),
+    spec_version: "1.4",
+    name: state.name,
+    icon: "🧪",
+    description: "Evaluation workflow",
+    version: "1.0",
+    default_llm: {
+      model: "openai/gpt-4o-mini",
+      temperature: 0,
+      max_tokens: 2048,
     },
+    template_adapter: "default",
+    enable_tracing: true,
+    nodes: [entryNode, ...agentNodes, ...evaluatorNodes] as Workflow["nodes"],
+    edges: [...agentEdges, ...evaluatorEdges],
+    state: {},
   };
 };
 
 /**
- * Create entry node from dataset.
+ * Create the entry node from the dataset.
  */
-const createEntryNode = (dataset: InlineDataset): Node<Entry> => ({
-  id: "entry",
-  type: "entry",
-  position: { x: 0, y: 0 },
-  deletable: false,
-  data: {
-    name: "Entry",
-    outputs: columnsToFields(dataset.columns),
-    entry_selection: "first",
-    train_size: 0.8,
-    test_size: 0.2,
-    seed: 42,
-    dataset: datasetToNodeDataset(dataset),
-  },
-});
+const createEntryNode = (dataset: InlineDataset): Node<Entry> => {
+  const outputs: Field[] = dataset.columns.map((col) => ({
+    identifier: col.id,
+    type:
+      col.type === "string" ? "str" : col.type === "number" ? "float" : "str",
+  }));
+
+  return {
+    id: "entry",
+    type: "entry",
+    data: {
+      name: "Dataset",
+      outputs,
+      entry_selection: "first",
+      train_size: 0.8,
+      test_size: 0.2,
+      seed: 42,
+    },
+    position: { x: 0, y: 0 },
+  };
+};
 
 /**
- * Create signature (LLM) node from agent config.
+ * Create a signature (LLM) node from an agent config.
+ * Uses the `parameters` array structure expected by the DSL.
  */
 const createSignatureNode = (
   agent: AgentConfig,
   index: number
-): Node<Signature> => ({
-  id: agent.id,
-  type: "signature",
-  position: { x: 300, y: index * 150 },
-  data: {
-    name: agent.name,
-    parameters: [
-      {
-        identifier: "llm",
-        type: "llm",
-        value: agent.llmConfig ?? { model: DEFAULT_MODEL },
-      },
-      {
-        identifier: "prompting_technique",
-        type: "prompting_technique",
-        value: undefined,
-      },
-      {
-        identifier: "instructions",
-        type: "str",
-        value: agent.instructions ?? "",
-      },
-      {
-        identifier: "messages",
-        type: "chat_messages",
-        value: agent.messages ?? [{ role: "user", content: "{{input}}" }],
-      },
-      {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: undefined,
-      },
-    ],
-    inputs: agent.inputs,
-    outputs: agent.outputs,
-  },
-});
+): Node<Signature> => {
+  const parameters: Field[] = [];
+
+  // LLM config parameter
+  if (agent.llmConfig) {
+    parameters.push({
+      identifier: "llm",
+      type: "llm",
+      value: agent.llmConfig,
+    });
+  }
+
+  // Instructions parameter
+  if (agent.instructions) {
+    parameters.push({
+      identifier: "instructions",
+      type: "str",
+      value: agent.instructions,
+    });
+  }
+
+  // Messages/prompts parameter
+  if (agent.messages) {
+    parameters.push({
+      identifier: "messages",
+      type: "chat_messages",
+      value: agent.messages,
+    });
+  }
+
+  return {
+    id: agent.id,
+    type: "signature",
+    data: {
+      name: agent.name,
+      inputs: agent.inputs,
+      outputs: agent.outputs,
+      parameters,
+    },
+    position: { x: 300, y: index * 200 },
+  };
+};
 
 /**
- * Create code node from agent config.
+ * Create a code node from an agent config.
+ * Uses the `parameters` array structure expected by the DSL.
  */
-const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => ({
-  id: agent.id,
-  type: "code",
-  position: { x: 300, y: index * 150 },
-  data: {
-    name: agent.name,
-    parameters: [
-      {
-        identifier: "code",
-        type: "code",
-        value: agent.code ?? "",
-      },
-    ],
-    inputs: agent.inputs,
-    outputs: agent.outputs,
-  },
-});
+const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
+  const parameters: Field[] = [];
+
+  // Code parameter
+  if (agent.code) {
+    parameters.push({
+      identifier: "code",
+      type: "code",
+      value: agent.code,
+    });
+  }
+
+  return {
+    id: agent.id,
+    type: "code",
+    data: {
+      name: agent.name,
+      inputs: agent.inputs,
+      outputs: agent.outputs,
+      parameters,
+    },
+    position: { x: 300, y: index * 200 },
+  };
+};
 
 /**
- * Create evaluator node from evaluator config.
+ * Create an evaluator node for a specific agent.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
-  index: number
-): Node<Evaluator> => ({
-  id: evaluator.id,
-  type: "evaluator",
-  position: { x: 600, y: index * 150 },
-  data: {
-    name: evaluator.name,
-    cls: "LangWatchEvaluator",
-    evaluator: evaluator.evaluatorType,
-    parameters: Object.entries(evaluator.settings).map(([key, value]) => ({
-      identifier: key,
-      type: "str",
-      value,
-    })),
-    inputs: evaluator.inputs,
-    outputs: [
-      { identifier: "passed", type: "bool" },
-      { identifier: "score", type: "float" },
-    ],
-  },
-});
+  agentId: string,
+  agentIndex: number,
+  evalIndex: number
+): Node<Evaluator> => {
+  return {
+    id: `${agentId}.${evaluator.id}`,
+    type: "evaluator",
+    data: {
+      name: evaluator.name,
+      cls: "LangWatchEvaluator",
+      inputs: evaluator.inputs,
+      outputs: [{ identifier: "passed", type: "bool" }],
+      evaluator: evaluator.evaluatorType,
+      ...evaluator.settings,
+    },
+    position: { x: 600, y: agentIndex * 200 + evalIndex * 100 },
+  };
+};
 
 /**
- * Build edges from agent mappings.
+ * Build edges connecting entry to agents based on mappings.
  */
 const buildAgentEdges = (
   agents: AgentConfig[],
@@ -185,20 +226,15 @@ const buildAgentEdges = (
     const mappings = agentMappings[agent.id] ?? {};
 
     for (const [inputField, mapping] of Object.entries(mappings)) {
-      const sourceId = mapping.source === "dataset" ? "entry" : mapping.source;
-      const sourceHandle =
-        mapping.source === "dataset"
-          ? `outputs.${mapping.sourceField}`
-          : `outputs.${mapping.sourceField}`;
-
-      edges.push({
-        id: `edge-${nanoid()}`,
-        source: sourceId,
-        sourceHandle,
-        target: agent.id,
-        targetHandle: `inputs.${inputField}`,
-        type: "default",
-      });
+      if (mapping.source === "dataset") {
+        edges.push({
+          id: `entry->${agent.id}.${inputField}`,
+          source: "entry",
+          sourceHandle: `output-${mapping.sourceField}`,
+          target: agent.id,
+          targetHandle: `input-${inputField}`,
+        });
+      }
     }
   }
 
@@ -206,285 +242,57 @@ const buildAgentEdges = (
 };
 
 /**
- * Build edges from evaluator mappings.
+ * Build edges connecting agents to their evaluators.
  */
 const buildEvaluatorEdges = (
-  evaluators: EvaluatorConfig[],
-  evaluatorMappings: Record<string, Record<string, FieldMapping>>,
-  agents: AgentConfig[]
+  agents: AgentConfig[],
+  evaluatorMappings: Record<
+    string,
+    Record<string, Record<string, FieldMapping>>
+  >
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const evaluator of evaluators) {
-    const mappings = evaluatorMappings[evaluator.id] ?? {};
+  for (const agent of agents) {
+    const agentEvalMappings = evaluatorMappings[agent.id] ?? {};
 
-    for (const [inputField, mapping] of Object.entries(mappings)) {
-      const sourceId = mapping.source === "dataset" ? "entry" : mapping.source;
-      const sourceHandle =
-        mapping.source === "dataset"
-          ? `outputs.${mapping.sourceField}`
-          : `outputs.${mapping.sourceField}`;
+    for (const evaluator of agent.evaluators) {
+      const evalMappings = agentEvalMappings[evaluator.id] ?? {};
+      const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
 
-      edges.push({
-        id: `edge-${nanoid()}`,
-        source: sourceId,
-        sourceHandle,
-        target: evaluator.id,
-        targetHandle: `inputs.${inputField}`,
-        type: "default",
-      });
+      for (const [inputField, mapping] of Object.entries(evalMappings)) {
+        if (mapping.source === "dataset") {
+          // From dataset
+          edges.push({
+            id: `entry->${evaluatorNodeId}.${inputField}`,
+            source: "entry",
+            sourceHandle: `output-${mapping.sourceField}`,
+            target: evaluatorNodeId,
+            targetHandle: `input-${inputField}`,
+          });
+        } else if (mapping.source === agent.id) {
+          // From this agent's output
+          edges.push({
+            id: `${agent.id}->${evaluatorNodeId}.${inputField}`,
+            source: agent.id,
+            sourceHandle: `output-${mapping.sourceField}`,
+            target: evaluatorNodeId,
+            targetHandle: `input-${inputField}`,
+          });
+        }
+      }
     }
   }
 
   return edges;
 };
 
-/**
- * Convert V3 state to Workflow DSL for saving/execution.
- */
-export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
-  const entryNode = createEntryNode(state.dataset);
-
-  const agentNodes = state.agents.map((agent, index) =>
-    agent.type === "llm"
-      ? createSignatureNode(agent, index)
-      : createCodeNode(agent, index)
-  );
-
-  const evaluatorNodes = state.evaluators.map((evaluator, index) =>
-    createEvaluatorNode(evaluator, index)
-  );
-
-  const agentEdges = buildAgentEdges(state.agents, state.agentMappings);
-  const evaluatorEdges = buildEvaluatorEdges(
-    state.evaluators,
-    state.evaluatorMappings,
-    state.agents
-  );
-
-  return {
-    spec_version: "1.4",
-    workflow_id: undefined,
-    experiment_id: state.experimentId,
-    name: state.name,
-    icon: "📊",
-    description: "",
-    version: "1.0",
-    default_llm: {
-      model: DEFAULT_MODEL,
-      temperature: 1.0,
-      max_tokens: DEFAULT_MAX_TOKENS,
-    },
-    template_adapter: "default",
-    enable_tracing: true,
-    workflow_type: "evaluator",
-    nodes: [entryNode, ...agentNodes, ...evaluatorNodes] as Workflow["nodes"],
-    edges: [...agentEdges, ...evaluatorEdges],
-    state: {},
-  };
-};
-
 // ============================================================================
-// DSL → State Conversion
+// Workflow to State (Loading)
 // ============================================================================
 
 /**
- * Extract dataset from entry node.
- */
-const extractDatasetFromEntry = (
-  entryNode: Node<Entry> | undefined
-): InlineDataset => {
-  if (!entryNode?.data) {
-    return {
-      columns: [
-        { id: "input", name: "input", type: "string" },
-        { id: "expected_output", name: "expected_output", type: "string" },
-      ],
-      records: {
-        input: ["", "", ""],
-        expected_output: ["", "", ""],
-      },
-    };
-  }
-
-  const nodeDataset = entryNode.data.dataset;
-
-  // If it's a saved dataset reference
-  if (nodeDataset?.id) {
-    return {
-      id: nodeDataset.id,
-      name: nodeDataset.name,
-      columns:
-        entryNode.data.outputs?.map((output) => ({
-          id: output.identifier,
-          name: output.identifier,
-          type: "string" as const,
-        })) ?? [],
-      records: {},
-    };
-  }
-
-  // If it's an inline dataset
-  if (nodeDataset?.inline) {
-    const columns: DatasetColumn[] =
-      nodeDataset.inline.columnTypes?.map((col) => ({
-        id: col.name,
-        name: col.name,
-        type: col.type,
-      })) ?? [];
-
-    return {
-      name: nodeDataset.name,
-      columns,
-      records: nodeDataset.inline.records ?? {},
-    };
-  }
-
-  // Default empty dataset
-  return {
-    columns:
-      entryNode.data.outputs?.map((output) => ({
-        id: output.identifier,
-        name: output.identifier,
-        type: "string" as const,
-      })) ?? [],
-    records: {},
-  };
-};
-
-/**
- * Convert signature node to agent config.
- */
-const signatureNodeToAgentConfig = (
-  node: Node<Signature>
-): AgentConfig => {
-  const llmParam = node.data.parameters?.find((p) => p.identifier === "llm");
-  const instructionsParam = node.data.parameters?.find(
-    (p) => p.identifier === "instructions"
-  );
-  const messagesParam = node.data.parameters?.find(
-    (p) => p.identifier === "messages"
-  );
-
-  return {
-    id: node.id,
-    type: "llm",
-    name: node.data.name ?? "LLM Agent",
-    llmConfig: llmParam?.value as AgentConfig["llmConfig"],
-    instructions: instructionsParam?.value as string | undefined,
-    messages: messagesParam?.value as AgentConfig["messages"],
-    inputs: node.data.inputs ?? [],
-    outputs: node.data.outputs ?? [],
-  };
-};
-
-/**
- * Convert code node to agent config.
- */
-const codeNodeToAgentConfig = (node: Node<Code>): AgentConfig => {
-  const codeParam = node.data.parameters?.find((p) => p.identifier === "code");
-
-  return {
-    id: node.id,
-    type: "code",
-    name: node.data.name ?? "Code Agent",
-    code: codeParam?.value as string | undefined,
-    inputs: node.data.inputs ?? [],
-    outputs: node.data.outputs ?? [],
-  };
-};
-
-/**
- * Convert node to agent config based on type.
- */
-const nodeToAgentConfig = (node: Node): AgentConfig => {
-  if (node.type === "signature") {
-    return signatureNodeToAgentConfig(node as Node<Signature>);
-  }
-  return codeNodeToAgentConfig(node as Node<Code>);
-};
-
-/**
- * Convert evaluator node to evaluator config.
- */
-const nodeToEvaluatorConfig = (node: Node<Evaluator>): EvaluatorConfig => {
-  const settings: Record<string, unknown> = {};
-
-  for (const param of node.data.parameters ?? []) {
-    settings[param.identifier] = param.value;
-  }
-
-  return {
-    id: node.id,
-    evaluatorType: node.data.evaluator ?? "langevals/exact_match",
-    name: node.data.name ?? "Evaluator",
-    settings,
-    inputs: node.data.inputs ?? [],
-  };
-};
-
-/**
- * Extract agent mappings from edges.
- */
-const extractAgentMappings = (
-  edges: Edge[],
-  agentNodes: Node[]
-): Record<string, Record<string, FieldMapping>> => {
-  const agentIds = new Set(agentNodes.map((n) => n.id));
-  const mappings: Record<string, Record<string, FieldMapping>> = {};
-
-  for (const edge of edges) {
-    if (!agentIds.has(edge.target)) continue;
-
-    const inputField = edge.targetHandle?.replace("inputs.", "") ?? "";
-    const sourceField = edge.sourceHandle?.replace("outputs.", "") ?? "";
-    const source = edge.source === "entry" ? "dataset" : edge.source;
-
-    if (!mappings[edge.target]) {
-      mappings[edge.target] = {};
-    }
-
-    mappings[edge.target]![inputField] = {
-      source,
-      sourceField,
-    };
-  }
-
-  return mappings;
-};
-
-/**
- * Extract evaluator mappings from edges.
- */
-const extractEvaluatorMappings = (
-  edges: Edge[],
-  evaluatorNodes: Node[]
-): Record<string, Record<string, FieldMapping>> => {
-  const evaluatorIds = new Set(evaluatorNodes.map((n) => n.id));
-  const mappings: Record<string, Record<string, FieldMapping>> = {};
-
-  for (const edge of edges) {
-    if (!evaluatorIds.has(edge.target)) continue;
-
-    const inputField = edge.targetHandle?.replace("inputs.", "") ?? "";
-    const sourceField = edge.sourceHandle?.replace("outputs.", "") ?? "";
-    const source = edge.source === "entry" ? "dataset" : edge.source;
-
-    if (!mappings[edge.target]) {
-      mappings[edge.target] = {};
-    }
-
-    mappings[edge.target]![inputField] = {
-      source,
-      sourceField,
-    };
-  }
-
-  return mappings;
-};
-
-/**
- * Convert Workflow DSL to V3 state on load.
+ * Convert workflow DSL to V3 state for UI display.
  */
 export const workflowToState = (
   workflow: Workflow
@@ -493,71 +301,196 @@ export const workflowToState = (
     | Node<Entry>
     | undefined;
 
+  const dataset = entryNode ? extractDataset(entryNode) : undefined;
+
   const agentNodes = workflow.nodes.filter(
     (n) => n.type === "signature" || n.type === "code"
-  );
+  ) as Array<Node<Signature> | Node<Code>>;
 
   const evaluatorNodes = workflow.nodes.filter(
     (n) => n.type === "evaluator"
-  ) as Node<Evaluator>[];
+  ) as Array<Node<Evaluator>>;
+
+  // Build agents with their evaluators
+  const agents: AgentConfig[] = agentNodes.map((node) =>
+    extractAgent(node, evaluatorNodes)
+  );
+
+  const agentMappings = extractAgentMappings(workflow.edges, agents);
+  const evaluatorMappings = extractEvaluatorMappings(
+    workflow.edges,
+    agents,
+    evaluatorNodes
+  );
 
   return {
     name: workflow.name,
-    experimentId: workflow.experiment_id,
-    dataset: extractDatasetFromEntry(entryNode),
-    agents: agentNodes.map(nodeToAgentConfig),
-    evaluators: evaluatorNodes.map(nodeToEvaluatorConfig),
-    agentMappings: extractAgentMappings(workflow.edges, agentNodes),
-    evaluatorMappings: extractEvaluatorMappings(workflow.edges, evaluatorNodes),
+    dataset,
+    agents,
+    agentMappings,
+    evaluatorMappings,
   };
 };
 
-// ============================================================================
-// Utility Functions
-// ============================================================================
+/**
+ * Extract dataset from entry node.
+ */
+const extractDataset = (entryNode: Node<Entry>): InlineDataset => {
+  const columns =
+    entryNode.data.outputs?.map((output: Field) => ({
+      id: output.identifier,
+      name: output.identifier,
+      type:
+        output.type === "str"
+          ? ("string" as const)
+          : output.type === "float" || output.type === "int"
+            ? ("number" as const)
+            : ("string" as const),
+    })) ?? [];
+
+  const records: Record<string, string[]> = {};
+  for (const col of columns) {
+    records[col.id] = [];
+  }
+
+  return { columns, records };
+};
 
 /**
- * Check if two states have different data that would affect the DSL.
- * Used for dirty checking / autosave.
+ * Extract agent config from a signature or code node, including its evaluators.
  */
-export const hasStateChanged = (
-  prev: EvaluationsV3State,
-  current: EvaluationsV3State
-): boolean => {
-  // Compare datasets
-  if (JSON.stringify(prev.dataset) !== JSON.stringify(current.dataset)) {
-    return true;
+const extractAgent = (
+  node: Node<Signature> | Node<Code>,
+  evaluatorNodes: Array<Node<Evaluator>>
+): AgentConfig => {
+  // Find evaluators that belong to this agent (their ID starts with agentId.)
+  const agentEvaluators = evaluatorNodes
+    .filter((e) => e.id.startsWith(`${node.id}.`))
+    .map((evalNode) => extractEvaluator(evalNode, node.id));
+
+  const params = node.data.parameters ?? [];
+  const llmParam = params.find((p: Field) => p.identifier === "llm");
+  const instructionsParam = params.find(
+    (p: Field) => p.identifier === "instructions"
+  );
+  const messagesParam = params.find((p: Field) => p.identifier === "messages");
+  const codeParam = params.find((p: Field) => p.identifier === "code");
+
+  if (node.type === "signature") {
+    return {
+      id: node.id,
+      type: "llm",
+      name: node.data.name ?? node.id,
+      inputs: node.data.inputs ?? [],
+      outputs: node.data.outputs ?? [],
+      llmConfig: llmParam?.value as AgentConfig["llmConfig"],
+      instructions: instructionsParam?.value as string | undefined,
+      messages: messagesParam?.value as AgentConfig["messages"],
+      evaluators: agentEvaluators,
+    };
+  } else {
+    return {
+      id: node.id,
+      type: "code",
+      name: node.data.name ?? node.id,
+      inputs: node.data.inputs ?? [],
+      outputs: node.data.outputs ?? [],
+      code: codeParam?.value as string | undefined,
+      evaluators: agentEvaluators,
+    };
+  }
+};
+
+/**
+ * Extract evaluator config from an evaluator node.
+ */
+const extractEvaluator = (
+  node: Node<Evaluator>,
+  agentId: string
+): EvaluatorConfig => {
+  // The evaluator ID is the node ID minus the "agentId." prefix
+  const evaluatorId = node.id.replace(`${agentId}.`, "");
+
+  const { name, inputs, outputs, evaluator, cls, ...settings } = node.data;
+
+  return {
+    id: evaluatorId,
+    evaluatorType:
+      (evaluator as EvaluatorConfig["evaluatorType"]) ?? "custom/unknown",
+    name: name ?? evaluatorId,
+    settings,
+    inputs: inputs ?? [],
+  };
+};
+
+/**
+ * Extract agent input mappings from edges.
+ */
+const extractAgentMappings = (
+  edges: Edge[],
+  agents: AgentConfig[]
+): Record<string, Record<string, FieldMapping>> => {
+  const mappings: Record<string, Record<string, FieldMapping>> = {};
+
+  for (const agent of agents) {
+    mappings[agent.id] = {};
+
+    const agentEdges = edges.filter((e) => e.target === agent.id);
+    for (const edge of agentEdges) {
+      const inputField = edge.targetHandle?.replace("input-", "") ?? "";
+      const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
+
+      if (edge.source === "entry") {
+        mappings[agent.id]![inputField] = {
+          source: "dataset",
+          sourceField,
+        };
+      }
+    }
   }
 
-  // Compare agents
-  if (JSON.stringify(prev.agents) !== JSON.stringify(current.agents)) {
-    return true;
+  return mappings;
+};
+
+/**
+ * Extract evaluator input mappings from edges.
+ */
+const extractEvaluatorMappings = (
+  edges: Edge[],
+  agents: AgentConfig[],
+  _evaluatorNodes: Array<Node<Evaluator>>
+): Record<string, Record<string, Record<string, FieldMapping>>> => {
+  const mappings: Record<
+    string,
+    Record<string, Record<string, FieldMapping>>
+  > = {};
+
+  for (const agent of agents) {
+    mappings[agent.id] = {};
+
+    for (const evaluator of agent.evaluators) {
+      const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
+      mappings[agent.id]![evaluator.id] = {};
+
+      const evalEdges = edges.filter((e) => e.target === evaluatorNodeId);
+      for (const edge of evalEdges) {
+        const inputField = edge.targetHandle?.replace("input-", "") ?? "";
+        const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
+
+        if (edge.source === "entry") {
+          mappings[agent.id]![evaluator.id]![inputField] = {
+            source: "dataset",
+            sourceField,
+          };
+        } else if (edge.source === agent.id) {
+          mappings[agent.id]![evaluator.id]![inputField] = {
+            source: agent.id,
+            sourceField,
+          };
+        }
+      }
+    }
   }
 
-  // Compare evaluators
-  if (JSON.stringify(prev.evaluators) !== JSON.stringify(current.evaluators)) {
-    return true;
-  }
-
-  // Compare mappings
-  if (
-    JSON.stringify(prev.agentMappings) !==
-    JSON.stringify(current.agentMappings)
-  ) {
-    return true;
-  }
-
-  if (
-    JSON.stringify(prev.evaluatorMappings) !==
-    JSON.stringify(current.evaluatorMappings)
-  ) {
-    return true;
-  }
-
-  // Compare name
-  if (prev.name !== current.name) {
-    return true;
-  }
-
-  return false;
+  return mappings;
 };

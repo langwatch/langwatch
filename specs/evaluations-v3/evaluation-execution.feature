@@ -8,7 +8,7 @@ Feature: Evaluation execution
     Given I render the EvaluationsV3 spreadsheet table
     And the dataset has 3 rows with test data
     And an agent "GPT-4o" is configured and mapped
-    And an evaluator "Exact Match" is configured and mapped
+    And agent "GPT-4o" has evaluator "Exact Match" configured and mapped
 
   Scenario: Run evaluation button is enabled when ready
     Then the "Evaluate" button is enabled
@@ -22,24 +22,31 @@ Feature: Evaluation execution
     When I click the "Evaluate" button
     Then the "Evaluate" button changes to a "Stop" button
     And all agent output cells show loading skeleton bars
-    And all evaluator cells show loading skeleton bars
+    And the evaluator chips inside agent cells show loading state
 
   Scenario: Results stream in as they complete
     Given an evaluation is running
     When the first row completes processing
     Then the skeleton in row 0 agent cell is replaced with the actual output
-    And the skeleton in row 0 evaluator cell is replaced with the result
+    And the evaluator chips in row 0 update with their results
     And the other rows still show loading skeletons
 
-  Scenario: Show success status in evaluator cell
+  Scenario: Evaluator chips show pass status
     When I run the evaluation
-    And row 0 passes the evaluation
-    Then the evaluator cell for row 0 shows a success indicator
+    And row 0 passes the "Exact Match" evaluator
+    Then the "Exact Match" chip in row 0 shows a success indicator (green checkmark)
 
-  Scenario: Show failure status in evaluator cell
+  Scenario: Evaluator chips show fail status
     When I run the evaluation
-    And row 0 fails the evaluation
-    Then the evaluator cell for row 0 shows a failure indicator
+    And row 0 fails the "Exact Match" evaluator
+    Then the "Exact Match" chip in row 0 shows a failure indicator (red X)
+
+  Scenario: Expand evaluator chip to see details
+    When I run the evaluation
+    And results are displayed
+    And I click on the "Exact Match" evaluator chip in row 0
+    Then the chip expands to show full result details
+    And I see the score, reasoning, or other evaluator-specific output
 
   Scenario: Show error in cell when execution fails
     When I run the evaluation
@@ -59,10 +66,25 @@ Feature: Evaluation execution
     And results are displayed
     And I double-click a dataset cell
     Then I can edit the cell value
-    And the corresponding result cells show as stale or clear
+    And the corresponding agent cell shows as stale or clears
 
   Scenario: Run evaluation on selected rows only
     Given rows 0 and 2 are selected via checkboxes
     When I click the "Run" button in the selection toolbar
     Then only rows 0 and 2 show loading skeletons
     And row 1 remains unchanged
+
+  Scenario: Multiple agents with separate evaluators
+    Given agents "GPT-4o" and "Claude Opus" are configured
+    And agent "GPT-4o" has evaluator "Exact Match"
+    And agent "Claude Opus" has evaluator "LLM as Judge"
+    When I run the evaluation
+    Then "GPT-4o" cells show "Exact Match" chip results
+    And "Claude Opus" cells show "LLM as Judge" chip results
+
+  Scenario: Same evaluator on multiple agents
+    Given agents "GPT-4o" and "Claude Opus" are configured
+    And both agents have evaluator "Exact Match"
+    When I run the evaluation
+    Then each agent cell shows its own "Exact Match" result
+    And I can compare pass rates between agents

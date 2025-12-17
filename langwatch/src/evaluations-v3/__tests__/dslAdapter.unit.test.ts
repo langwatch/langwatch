@@ -3,11 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Workflow } from "~/optimization_studio/types/dsl";
 
 import { createInitialState, type EvaluationsV3State } from "../types";
-import {
-  hasStateChanged,
-  stateToWorkflow,
-  workflowToState,
-} from "../utils/dslAdapter";
+import { stateToWorkflow, workflowToState } from "../utils/dslAdapter";
 
 describe("DSL Adapter", () => {
   describe("stateToWorkflow", () => {
@@ -44,6 +40,7 @@ describe("DSL Adapter", () => {
             messages: [{ role: "user", content: "Hello {{input}}" }],
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
+            evaluators: [],
           },
         ],
       };
@@ -67,6 +64,7 @@ describe("DSL Adapter", () => {
             code: 'return {"output": "hello"}',
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
+            evaluators: [],
           },
         ],
       };
@@ -78,16 +76,25 @@ describe("DSL Adapter", () => {
       expect(codeNode?.id).toBe("agent-1");
     });
 
-    it("creates evaluator nodes", () => {
+    it("creates evaluator nodes for per-agent evaluators", () => {
       const state: EvaluationsV3State = {
         ...createInitialState(),
-        evaluators: [
+        agents: [
           {
-            id: "eval-1",
-            evaluatorType: "langevals/exact_match",
-            name: "Exact Match",
-            settings: {},
-            inputs: [{ identifier: "output", type: "str" }],
+            id: "agent-1",
+            type: "llm",
+            name: "Agent",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            evaluators: [
+              {
+                id: "eval-1",
+                evaluatorType: "langevals/exact_match",
+                name: "Exact Match",
+                settings: {},
+                inputs: [{ identifier: "output", type: "str" }],
+              },
+            ],
           },
         ],
       };
@@ -96,8 +103,11 @@ describe("DSL Adapter", () => {
 
       const evaluatorNode = workflow.nodes.find((n) => n.type === "evaluator");
       expect(evaluatorNode).toBeDefined();
-      expect(evaluatorNode?.id).toBe("eval-1");
-      expect((evaluatorNode?.data as { evaluator?: string })?.evaluator).toBe("langevals/exact_match");
+      // Evaluator node ID is prefixed with agent ID
+      expect(evaluatorNode?.id).toBe("agent-1.eval-1");
+      expect(
+        (evaluatorNode?.data as { evaluator?: string })?.evaluator
+      ).toBe("langevals/exact_match");
     });
 
     it("creates edges from agent mappings", () => {
@@ -110,6 +120,7 @@ describe("DSL Adapter", () => {
             name: "Agent",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
+            evaluators: [],
           },
         ],
         agentMappings: {
@@ -124,11 +135,11 @@ describe("DSL Adapter", () => {
       const edge = workflow.edges.find((e) => e.target === "agent-1");
       expect(edge).toBeDefined();
       expect(edge?.source).toBe("entry");
-      expect(edge?.sourceHandle).toBe("outputs.input");
-      expect(edge?.targetHandle).toBe("inputs.input");
+      expect(edge?.sourceHandle).toBe("output-input");
+      expect(edge?.targetHandle).toBe("input-input");
     });
 
-    it("creates edges from evaluator mappings", () => {
+    it("creates edges from evaluator mappings within agents", () => {
       const state: EvaluationsV3State = {
         ...createInitialState(),
         agents: [
@@ -138,54 +149,68 @@ describe("DSL Adapter", () => {
             name: "Agent",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-          },
-        ],
-        evaluators: [
-          {
-            id: "eval-1",
-            evaluatorType: "langevals/exact_match",
-            name: "Exact Match",
-            settings: {},
-            inputs: [
-              { identifier: "output", type: "str" },
-              { identifier: "expected_output", type: "str" },
+            evaluators: [
+              {
+                id: "eval-1",
+                evaluatorType: "langevals/exact_match",
+                name: "Exact Match",
+                settings: {},
+                inputs: [
+                  { identifier: "output", type: "str" },
+                  { identifier: "expected_output", type: "str" },
+                ],
+              },
             ],
           },
         ],
         evaluatorMappings: {
-          "eval-1": {
-            output: { source: "agent-1", sourceField: "output" },
-            expected_output: { source: "dataset", sourceField: "expected_output" },
+          "agent-1": {
+            "eval-1": {
+              output: { source: "agent-1", sourceField: "output" },
+              expected_output: {
+                source: "dataset",
+                sourceField: "expected_output",
+              },
+            },
           },
         },
       };
 
       const workflow = stateToWorkflow(state);
 
-      const edges = workflow.edges.filter((e) => e.target === "eval-1");
+      const edges = workflow.edges.filter(
+        (e) => e.target === "agent-1.eval-1"
+      );
       expect(edges).toHaveLength(2);
 
-      const outputEdge = edges.find((e) => e.targetHandle === "inputs.output");
+      const outputEdge = edges.find((e) => e.targetHandle === "input-output");
       expect(outputEdge?.source).toBe("agent-1");
 
       const expectedEdge = edges.find(
-        (e) => e.targetHandle === "inputs.expected_output"
+        (e) => e.targetHandle === "input-expected_output"
       );
       expect(expectedEdge?.source).toBe("entry");
     });
   });
 
   describe("workflowToState", () => {
+    const createBaseWorkflow = (): Workflow => ({
+      spec_version: "1.4",
+      name: "Test",
+      icon: "📊",
+      description: "",
+      version: "1.0",
+      default_llm: { model: "openai/gpt-4o" },
+      template_adapter: "default",
+      enable_tracing: true,
+      nodes: [],
+      edges: [],
+      state: {},
+    });
+
     it("extracts dataset from entry node", () => {
       const workflow: Workflow = {
-        spec_version: "1.4",
-        name: "Test",
-        icon: "📊",
-        description: "",
-        version: "1.0",
-        default_llm: { model: "openai/gpt-4o" },
-        template_adapter: "default",
-        enable_tracing: true,
+        ...createBaseWorkflow(),
         nodes: [
           {
             id: "entry",
@@ -201,41 +226,21 @@ describe("DSL Adapter", () => {
               train_size: 0.8,
               test_size: 0.2,
               seed: 42,
-              dataset: {
-                inline: {
-                  records: {
-                    question: ["Q1", "Q2"],
-                    answer: ["A1", "A2"],
-                  },
-                  columnTypes: [
-                    { name: "question", type: "string" },
-                    { name: "answer", type: "string" },
-                  ],
-                },
-              },
             },
           },
         ],
-        edges: [],
-        state: {},
       };
 
       const state = workflowToState(workflow);
 
       expect(state.dataset?.columns).toHaveLength(2);
-      expect(state.dataset?.records["question"]).toEqual(["Q1", "Q2"]);
+      expect(state.dataset?.columns[0]?.id).toBe("question");
+      expect(state.dataset?.columns[1]?.id).toBe("answer");
     });
 
-    it("extracts agents from signature nodes", () => {
+    it("extracts agents from signature nodes with their evaluators", () => {
       const workflow: Workflow = {
-        spec_version: "1.4",
-        name: "Test",
-        icon: "📊",
-        description: "",
-        version: "1.0",
-        default_llm: { model: "openai/gpt-4o" },
-        template_adapter: "default",
-        enable_tracing: true,
+        ...createBaseWorkflow(),
         nodes: [
           {
             id: "entry",
@@ -256,25 +261,23 @@ describe("DSL Adapter", () => {
             position: { x: 300, y: 0 },
             data: {
               name: "My LLM",
-              parameters: [
-                {
-                  identifier: "llm",
-                  type: "llm",
-                  value: { model: "openai/gpt-4o" },
-                },
-                {
-                  identifier: "instructions",
-                  type: "str",
-                  value: "Be helpful",
-                },
-              ],
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
             },
           },
+          {
+            id: "agent-1.eval-1",
+            type: "evaluator",
+            position: { x: 600, y: 0 },
+            data: {
+              name: "Exact Match",
+              cls: "LangWatchEvaluator",
+              evaluator: "langevals/exact_match",
+              inputs: [{ identifier: "output", type: "str" }],
+              outputs: [],
+            },
+          },
         ],
-        edges: [],
-        state: {},
       };
 
       const state = workflowToState(workflow);
@@ -282,69 +285,17 @@ describe("DSL Adapter", () => {
       expect(state.agents).toHaveLength(1);
       expect(state.agents?.[0]?.type).toBe("llm");
       expect(state.agents?.[0]?.name).toBe("My LLM");
-      expect(state.agents?.[0]?.instructions).toBe("Be helpful");
-    });
-
-    it("extracts evaluators from evaluator nodes", () => {
-      const workflow: Workflow = {
-        spec_version: "1.4",
-        name: "Test",
-        icon: "📊",
-        description: "",
-        version: "1.0",
-        default_llm: { model: "openai/gpt-4o" },
-        template_adapter: "default",
-        enable_tracing: true,
-        nodes: [
-          {
-            id: "entry",
-            type: "entry",
-            position: { x: 0, y: 0 },
-            data: {
-              name: "Entry",
-              outputs: [],
-              entry_selection: "first",
-              train_size: 0.8,
-              test_size: 0.2,
-              seed: 42,
-            },
-          },
-          {
-            id: "eval-1",
-            type: "evaluator",
-            position: { x: 600, y: 0 },
-            data: {
-              name: "Exact Match",
-              cls: "LangWatchEvaluator",
-              evaluator: "langevals/exact_match",
-              parameters: [],
-              inputs: [{ identifier: "output", type: "str" }],
-              outputs: [],
-            },
-          },
-        ],
-        edges: [],
-        state: {},
-      };
-
-      const state = workflowToState(workflow);
-
-      expect(state.evaluators).toHaveLength(1);
-      expect(state.evaluators?.[0]?.evaluatorType).toBe(
+      // Evaluator should be extracted into the agent
+      expect(state.agents?.[0]?.evaluators).toHaveLength(1);
+      expect(state.agents?.[0]?.evaluators[0]?.id).toBe("eval-1");
+      expect(state.agents?.[0]?.evaluators[0]?.evaluatorType).toBe(
         "langevals/exact_match"
       );
     });
 
     it("extracts mappings from edges", () => {
       const workflow: Workflow = {
-        spec_version: "1.4",
-        name: "Test",
-        icon: "📊",
-        description: "",
-        version: "1.0",
-        default_llm: { model: "openai/gpt-4o" },
-        template_adapter: "default",
-        enable_tracing: true,
+        ...createBaseWorkflow(),
         nodes: [
           {
             id: "entry",
@@ -365,7 +316,6 @@ describe("DSL Adapter", () => {
             position: { x: 300, y: 0 },
             data: {
               name: "Agent",
-              parameters: [],
               inputs: [{ identifier: "input", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
             },
@@ -375,13 +325,11 @@ describe("DSL Adapter", () => {
           {
             id: "e1",
             source: "entry",
-            sourceHandle: "outputs.input",
+            sourceHandle: "output-input",
             target: "agent-1",
-            targetHandle: "inputs.input",
-            type: "default",
+            targetHandle: "input-input",
           },
         ],
-        state: {},
       };
 
       const state = workflowToState(workflow);
@@ -391,69 +339,82 @@ describe("DSL Adapter", () => {
         sourceField: "input",
       });
     });
-  });
 
-  describe("hasStateChanged", () => {
-    it("returns false for identical states", () => {
-      const state = createInitialState();
-      expect(hasStateChanged(state, state)).toBe(false);
-    });
-
-    it("returns true when name changes", () => {
-      const prev = createInitialState();
-      const current = { ...prev, name: "Different Name" };
-      expect(hasStateChanged(prev, current)).toBe(true);
-    });
-
-    it("returns true when dataset changes", () => {
-      const prev = createInitialState();
-      const current = {
-        ...prev,
-        dataset: {
-          ...prev.dataset,
-          records: { input: ["new value"], expected_output: [] },
-        },
-      };
-      expect(hasStateChanged(prev, current)).toBe(true);
-    });
-
-    it("returns true when agents change", () => {
-      const prev = createInitialState();
-      const current: EvaluationsV3State = {
-        ...prev,
-        agents: [
+    it("extracts evaluator mappings within agents", () => {
+      const workflow: Workflow = {
+        ...createBaseWorkflow(),
+        nodes: [
+          {
+            id: "entry",
+            type: "entry",
+            position: { x: 0, y: 0 },
+            data: {
+              name: "Entry",
+              outputs: [{ identifier: "expected_output", type: "str" }],
+              entry_selection: "first",
+              train_size: 0.8,
+              test_size: 0.2,
+              seed: 42,
+            },
+          },
           {
             id: "agent-1",
-            type: "llm",
-            name: "Agent",
-            inputs: [],
-            outputs: [],
+            type: "signature",
+            position: { x: 300, y: 0 },
+            data: {
+              name: "Agent",
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+            },
+          },
+          {
+            id: "agent-1.eval-1",
+            type: "evaluator",
+            position: { x: 600, y: 0 },
+            data: {
+              name: "Exact Match",
+              cls: "LangWatchEvaluator",
+              evaluator: "langevals/exact_match",
+              inputs: [
+                { identifier: "output", type: "str" },
+                { identifier: "expected_output", type: "str" },
+              ],
+              outputs: [],
+            },
+          },
+        ],
+        edges: [
+          {
+            id: "e1",
+            source: "agent-1",
+            sourceHandle: "output-output",
+            target: "agent-1.eval-1",
+            targetHandle: "input-output",
+          },
+          {
+            id: "e2",
+            source: "entry",
+            sourceHandle: "output-expected_output",
+            target: "agent-1.eval-1",
+            targetHandle: "input-expected_output",
           },
         ],
       };
-      expect(hasStateChanged(prev, current)).toBe(true);
-    });
 
-    it("ignores UI state changes", () => {
-      const prev = createInitialState();
-      const current: EvaluationsV3State = {
-        ...prev,
-        ui: { openOverlay: "agent", overlayTargetId: "agent-1" },
-      };
-      expect(hasStateChanged(prev, current)).toBe(false);
-    });
+      const state = workflowToState(workflow);
 
-    it("ignores results changes", () => {
-      const prev = createInitialState();
-      const current: EvaluationsV3State = {
-        ...prev,
-        results: {
-          ...prev.results,
-          status: "running",
-          progress: 50,
-        },
-      };
-      expect(hasStateChanged(prev, current)).toBe(false);
+      expect(
+        state.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["output"]
+      ).toEqual({
+        source: "agent-1",
+        sourceField: "output",
+      });
+      expect(
+        state.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["expected_output"]
+      ).toEqual({
+        source: "dataset",
+        sourceField: "expected_output",
+      });
     });
   });
 
@@ -480,6 +441,18 @@ describe("DSL Adapter", () => {
             llmConfig: { model: "openai/gpt-4o" },
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
+            evaluators: [
+              {
+                id: "eval-1",
+                evaluatorType: "langevals/exact_match",
+                name: "Match",
+                settings: {},
+                inputs: [
+                  { identifier: "output", type: "str" },
+                  { identifier: "expected_output", type: "str" },
+                ],
+              },
+            ],
           },
         ],
         agentMappings: {
@@ -487,22 +460,12 @@ describe("DSL Adapter", () => {
             input: { source: "dataset", sourceField: "input" },
           },
         },
-        evaluators: [
-          {
-            id: "eval-1",
-            evaluatorType: "langevals/exact_match",
-            name: "Match",
-            settings: {},
-            inputs: [
-              { identifier: "output", type: "str" },
-              { identifier: "expected_output", type: "str" },
-            ],
-          },
-        ],
         evaluatorMappings: {
-          "eval-1": {
-            output: { source: "agent-1", sourceField: "output" },
-            expected_output: { source: "dataset", sourceField: "expected" },
+          "agent-1": {
+            "eval-1": {
+              output: { source: "agent-1", sourceField: "output" },
+              expected_output: { source: "dataset", sourceField: "expected" },
+            },
           },
         },
       };
@@ -513,19 +476,22 @@ describe("DSL Adapter", () => {
       // Name should be preserved
       expect(restoredState.name).toBe(originalState.name);
 
-      // Agents should be preserved
+      // Agents should be preserved with their evaluators
       expect(restoredState.agents).toHaveLength(1);
       expect(restoredState.agents?.[0]?.id).toBe("agent-1");
       expect(restoredState.agents?.[0]?.type).toBe("llm");
+      expect(restoredState.agents?.[0]?.evaluators).toHaveLength(1);
+      expect(restoredState.agents?.[0]?.evaluators[0]?.id).toBe("eval-1");
 
-      // Evaluators should be preserved
-      expect(restoredState.evaluators).toHaveLength(1);
-      expect(restoredState.evaluators?.[0]?.id).toBe("eval-1");
-
-      // Mappings should be preserved
+      // Agent mappings should be preserved
       expect(restoredState.agentMappings?.["agent-1"]?.["input"]).toEqual(
         originalState.agentMappings["agent-1"]?.["input"]
       );
+
+      // Evaluator mappings should be preserved
+      expect(
+        restoredState.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["output"]
+      ).toEqual(originalState.evaluatorMappings["agent-1"]?.["eval-1"]?.output);
     });
   });
 });

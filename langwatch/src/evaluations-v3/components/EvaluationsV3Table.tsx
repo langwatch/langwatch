@@ -1,4 +1,13 @@
-import { Box, Button, Checkbox, HStack, Portal, Text, Textarea } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Checkbox,
+  HStack,
+  Portal,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -10,6 +19,8 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   Code,
   Database,
   Hash,
@@ -17,6 +28,7 @@ import {
   MessageSquare,
   Plus,
   Type,
+  X,
 } from "react-feather";
 
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
@@ -32,13 +44,12 @@ import { EditableCell } from "./DatasetSection/EditableCell";
 type RowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  agents: Record<string, unknown>;
-  evaluators: Record<string, unknown>;
+  agents: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
 };
 
-type SuperHeaderType = "dataset" | "agents" | "evaluators";
+type SuperHeaderType = "dataset" | "agents";
 
-type ColumnType = "checkbox" | "dataset" | "agent" | "evaluator";
+type ColumnType = "checkbox" | "dataset" | "agent";
 
 // ============================================================================
 // Pulsing Dot Indicator (radar-style)
@@ -135,11 +146,6 @@ const superHeaderConfig: Record<
     color: "green.400",
     icon: <LLMIcon />,
   },
-  evaluators: {
-    title: "Evaluators",
-    color: "#5FD15D",
-    icon: <Check size={14} />,
-  },
 };
 
 function SuperHeader({
@@ -176,7 +182,7 @@ function SuperHeader({
             _hover={{ color: "gray.700" }}
           >
             <Plus size={12} />
-            Add {type === "agents" ? "Agent" : "Evaluator"}
+            Add Agent
             {showWarning && <PulsingDot />}
           </Button>
         )}
@@ -249,136 +255,203 @@ function SelectionToolbar({
 }
 
 // ============================================================================
-// Selectable Cell Wrapper - handles selection outline for any cell type
+// Evaluator Chip Component
 // ============================================================================
 
-type SelectableCellProps = {
-  columnId: string;
+type EvaluatorChipProps = {
+  evaluator: EvaluatorConfig;
+  result: unknown;
+  agentId: string;
   row: number;
-  columnType: ColumnType;
-  children: React.ReactNode;
-  onSelect: () => void;
-  onActivate: () => void; // Double-click or Enter
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEdit: () => void;
 };
 
-function SelectableCell({
-  columnId,
-  row,
-  columnType,
-  children,
-  onSelect,
-  onActivate,
-}: SelectableCellProps) {
-  const { ui } = useEvaluationsV3Store((state) => ({ ui: state.ui }));
+function EvaluatorChip({
+  evaluator,
+  result,
+  isExpanded,
+  onToggleExpand,
+  onEdit,
+}: EvaluatorChipProps) {
+  // Determine pass/fail status from result
+  let status: "pending" | "passed" | "failed" | "error" = "pending";
+  let score: number | undefined;
 
-  const isSelected =
-    ui.selectedCell?.row === row && ui.selectedCell?.columnId === columnId;
+  if (result !== null && result !== undefined) {
+    if (typeof result === "boolean") {
+      status = result ? "passed" : "failed";
+    } else if (typeof result === "object") {
+      const obj = result as Record<string, unknown>;
+      if ("passed" in obj) {
+        status = obj.passed ? "passed" : "failed";
+      }
+      if ("score" in obj && typeof obj.score === "number") {
+        score = obj.score;
+      }
+      if ("error" in obj) {
+        status = "error";
+      }
+    }
+  }
+
+  const statusColors = {
+    pending: { bg: "gray.100", color: "gray.600", icon: null },
+    passed: { bg: "green.100", color: "green.700", icon: <Check size={10} /> },
+    failed: { bg: "red.100", color: "red.700", icon: <X size={10} /> },
+    error: { bg: "orange.100", color: "orange.700", icon: <X size={10} /> },
+  };
+
+  const statusConfig = statusColors[status];
 
   return (
-    <td
-      onClick={onSelect}
-      onDoubleClick={onActivate}
-      style={{
-        outline: isSelected
-          ? "2px solid var(--chakra-colors-blue-500)"
-          : "none",
-        outlineOffset: "-1px",
-        position: isSelected ? "relative" : undefined,
-        zIndex: isSelected ? 5 : undefined,
-        userSelect: "none",
-      }}
-    >
-      {children}
-    </td>
+    <Box>
+      <HStack
+        as="button"
+        onClick={onToggleExpand}
+        bg={statusConfig.bg}
+        color={statusConfig.color}
+        paddingX={2}
+        paddingY={1}
+        borderRadius="md"
+        fontSize="11px"
+        fontWeight="medium"
+        gap={1}
+        _hover={{ opacity: 0.8 }}
+        cursor="pointer"
+      >
+        {statusConfig.icon}
+        <Text>{evaluator.name}</Text>
+        {score !== undefined && <Text>({score.toFixed(2)})</Text>}
+        {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+      </HStack>
+
+      {isExpanded && (
+        <Box
+          marginTop={2}
+          padding={2}
+          bg="gray.50"
+          borderRadius="md"
+          fontSize="12px"
+        >
+          <VStack align="stretch" gap={1}>
+            <Text fontWeight="medium">Result:</Text>
+            <Text color="gray.600" whiteSpace="pre-wrap">
+              {result === null || result === undefined
+                ? "No result yet"
+                : typeof result === "object"
+                  ? JSON.stringify(result, null, 2)
+                  : String(result)}
+            </Text>
+            <Button
+              size="xs"
+              variant="ghost"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+              marginTop={1}
+            >
+              Edit Configuration
+            </Button>
+          </VStack>
+        </Box>
+      )}
+    </Box>
   );
 }
 
 // ============================================================================
-// View-Only Cell Viewer (for agent/evaluator cells)
+// Agent Cell Content Component
 // ============================================================================
 
-type CellViewerProps = {
-  value: unknown;
-  isOpen: boolean;
-  onClose: () => void;
-  anchorRef: React.RefObject<HTMLElement | null>;
+type AgentCellContentProps = {
+  agent: AgentConfig;
+  output: unknown;
+  evaluatorResults: Record<string, unknown>;
+  row: number;
 };
 
-function CellViewer({ value, isOpen, onClose, anchorRef }: CellViewerProps) {
-  const [style, setStyle] = useState<React.CSSProperties>({});
+function AgentCellContent({
+  agent,
+  output,
+  evaluatorResults,
+  row,
+}: AgentCellContentProps) {
+  const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
+    (state) => ({
+      ui: state.ui,
+      openOverlay: state.openOverlay,
+      setExpandedEvaluator: state.setExpandedEvaluator,
+    })
+  );
 
-  useEffect(() => {
-    if (isOpen && anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setStyle({
-        position: "fixed",
-        top: rect.top - 8,
-        left: rect.left - 8,
-        width: Math.max(rect.width + 16, 300),
-        minHeight: rect.height,
-        zIndex: 1000,
-      });
-    }
-  }, [isOpen, anchorRef]);
-
-  useEffect(() => {
-    if (isOpen) {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Escape" || e.key === "Enter") {
-          e.preventDefault();
-          e.stopPropagation();
-          onClose();
-        }
-      };
-      document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
-    }
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  const displayValue =
-    value === null || value === undefined
+  const displayOutput =
+    output === null || output === undefined
       ? ""
-      : typeof value === "object"
-        ? JSON.stringify(value, null, 2)
-        : String(value);
+      : typeof output === "object"
+        ? JSON.stringify(output)
+        : String(output);
 
   return (
-    <Portal>
-      <Box
-        style={style}
-        bg="white"
-        borderRadius="md"
-        boxShadow="0 0 0 2px var(--chakra-colors-gray-300), 0 4px 12px rgba(0,0,0,0.15)"
-        overflow="hidden"
-        onClick={(e) => e.stopPropagation()}
+    <VStack align="stretch" gap={2}>
+      {/* Agent output */}
+      <Text fontSize="13px" lineClamp={3}>
+        {displayOutput || <Text as="span" color="gray.400">No output yet</Text>}
+      </Text>
+
+      {/* Evaluator chips */}
+      {agent.evaluators.length > 0 && (
+        <HStack flexWrap="wrap" gap={1}>
+          {agent.evaluators.map((evaluator) => {
+            const isExpanded =
+              ui.expandedEvaluator?.agentId === agent.id &&
+              ui.expandedEvaluator?.evaluatorId === evaluator.id &&
+              ui.expandedEvaluator?.row === row;
+
+            return (
+              <EvaluatorChip
+                key={evaluator.id}
+                evaluator={evaluator}
+                result={evaluatorResults[evaluator.id]}
+                agentId={agent.id}
+                row={row}
+                isExpanded={isExpanded}
+                onToggleExpand={() => {
+                  if (isExpanded) {
+                    setExpandedEvaluator(undefined);
+                  } else {
+                    setExpandedEvaluator({
+                      agentId: agent.id,
+                      evaluatorId: evaluator.id,
+                      row,
+                    });
+                  }
+                }}
+                onEdit={() => openOverlay("evaluator", agent.id, evaluator.id)}
+              />
+            );
+          })}
+        </HStack>
+      )}
+
+      {/* Add evaluator button */}
+      <Button
+        size="xs"
+        variant="ghost"
+        color="gray.500"
+        onClick={(e) => {
+          e.stopPropagation();
+          openOverlay("evaluator", agent.id);
+        }}
+        justifyContent="flex-start"
+        paddingX={1}
       >
-        <Textarea
-          value={displayValue}
-          readOnly
-          minHeight="80px"
-          resize="vertical"
-          border="none"
-          borderRadius="0"
-          fontSize="13px"
-          padding={2}
-          bg="gray.50"
-          _focus={{ outline: "none", boxShadow: "none" }}
-        />
-        <Box
-          paddingX={2}
-          paddingY={1}
-          fontSize="10px"
-          color="gray.500"
-          borderTop="1px solid"
-          borderColor="gray.100"
-          bg="white"
-        >
-          Press Escape or Enter to close
-        </Box>
-      </Box>
-    </Portal>
+        <Plus size={10} />
+        <Text marginLeft={1}>Add evaluator</Text>
+      </Button>
+    </VStack>
   );
 }
 
@@ -390,7 +463,6 @@ export function EvaluationsV3Table() {
   const {
     dataset,
     agents,
-    evaluators,
     results,
     ui,
     openOverlay,
@@ -403,7 +475,6 @@ export function EvaluationsV3Table() {
   } = useEvaluationsV3Store((state) => ({
     dataset: state.dataset,
     agents: state.agents,
-    evaluators: state.evaluators,
     results: state.results,
     ui: state.ui,
     openOverlay: state.openOverlay,
@@ -422,14 +493,6 @@ export function EvaluationsV3Table() {
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
 
-  // State for viewing non-editable cells
-  const [viewingCell, setViewingCell] = useState<{
-    row: number;
-    columnId: string;
-    value: unknown;
-  } | null>(null);
-  const viewingCellRef = useRef<HTMLDivElement>(null);
-
   // Build list of ALL navigable column IDs with their types
   const allColumns = useMemo(() => {
     const cols: Array<{ id: string; type: ColumnType }> = [];
@@ -447,19 +510,14 @@ export function EvaluationsV3Table() {
       cols.push({ id: `agent.${agent.id}`, type: "agent" });
     }
 
-    // Evaluator columns
-    for (const evaluator of evaluators) {
-      cols.push({ id: `evaluator.${evaluator.id}`, type: "evaluator" });
-    }
-
     return cols;
-  }, [dataset.columns, agents, evaluators]);
+  }, [dataset.columns, agents]);
 
   // Keyboard navigation handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if we're editing or viewing a cell
-      if (ui.editingCell || viewingCell) return;
+      // Don't handle if we're editing a cell
+      if (ui.editingCell) return;
 
       const selectedCell = ui.selectedCell;
       if (!selectedCell) return;
@@ -476,16 +534,13 @@ export function EvaluationsV3Table() {
         case " ":
           e.preventDefault();
           if (currentCol?.type === "checkbox") {
-            // Toggle row selection
             toggleRowSelection(selectedCell.row);
           } else if (currentCol?.type === "dataset") {
-            // Enter edit mode for dataset cells
             setEditingCell({
               row: selectedCell.row,
               columnId: selectedCell.columnId,
             });
           }
-          // For agent/evaluator, Enter could open viewer but let's keep it simple
           break;
 
         case "ArrowUp":
@@ -569,7 +624,6 @@ export function EvaluationsV3Table() {
   }, [
     ui.editingCell,
     ui.selectedCell,
-    viewingCell,
     allColumns,
     displayRowCount,
     setSelectedCell,
@@ -590,17 +644,19 @@ export function EvaluationsV3Table() {
       agents: Object.fromEntries(
         agents.map((agent) => [
           agent.id,
-          results.agentOutputs[agent.id]?.[index] ?? null,
-        ])
-      ),
-      evaluators: Object.fromEntries(
-        evaluators.map((evaluator) => [
-          evaluator.id,
-          results.evaluatorResults[evaluator.id]?.[index] ?? null,
+          {
+            output: results.agentOutputs[agent.id]?.[index] ?? null,
+            evaluators: Object.fromEntries(
+              agent.evaluators.map((evaluator) => [
+                evaluator.id,
+                results.evaluatorResults[agent.id]?.[evaluator.id]?.[index] ?? null,
+              ])
+            ),
+          },
         ])
       ),
     }));
-  }, [dataset, agents, evaluators, results, displayRowCount]);
+  }, [dataset, agents, results, displayRowCount]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -670,33 +726,30 @@ export function EvaluationsV3Table() {
       );
     }
 
-    // Agent columns
+    // Agent columns (each agent is ONE column, with output + evaluators inside)
     for (const agent of agents) {
       cols.push(
         columnHelper.accessor((row) => row.agents[agent.id], {
           id: `agent.${agent.id}`,
           header: () => <AgentHeader agent={agent} />,
-          cell: (info) => <AgentCell value={info.getValue()} />,
-          size: 200,
+          cell: (info) => {
+            const data = info.getValue() as {
+              output: unknown;
+              evaluators: Record<string, unknown>;
+            };
+            return (
+              <AgentCellContent
+                agent={agent}
+                output={data?.output}
+                evaluatorResults={data?.evaluators ?? {}}
+                row={info.row.index}
+              />
+            );
+          },
+          size: 280,
           meta: {
             columnType: "agent" as ColumnType,
             columnId: `agent.${agent.id}`,
-          },
-        })
-      );
-    }
-
-    // Evaluator columns
-    for (const evaluator of evaluators) {
-      cols.push(
-        columnHelper.accessor((row) => row.evaluators[evaluator.id], {
-          id: `evaluator.${evaluator.id}`,
-          header: () => <EvaluatorHeader evaluator={evaluator} />,
-          cell: (info) => <EvaluatorCell value={info.getValue()} />,
-          size: 150,
-          meta: {
-            columnType: "evaluator" as ColumnType,
-            columnId: `evaluator.${evaluator.id}`,
           },
         })
       );
@@ -706,7 +759,6 @@ export function EvaluationsV3Table() {
   }, [
     dataset.columns,
     agents,
-    evaluators,
     columnHelper,
     selectedRows,
     allSelected,
@@ -726,7 +778,6 @@ export function EvaluationsV3Table() {
   // Calculate colspan for super headers
   const datasetColSpan = 1 + dataset.columns.length;
   const agentsColSpan = Math.max(agents.length, 1);
-  const evaluatorsColSpan = Math.max(evaluators.length, 1);
 
   // Helper to render cell with selection support
   const renderCell = useCallback(
@@ -757,12 +808,6 @@ export function EvaluationsV3Table() {
           setEditingCell({ row: rowIndex, columnId: meta.columnId });
         } else if (meta.columnType === "checkbox") {
           toggleRowSelection(rowIndex);
-        } else if (meta.columnType === "agent" || meta.columnType === "evaluator") {
-          // Open viewer for agent/evaluator cells
-          const value = cell.getValue();
-          if (value !== null && value !== undefined) {
-            setViewingCell({ row: rowIndex, columnId: meta.columnId, value });
-          }
         }
       };
 
@@ -806,28 +851,14 @@ export function EvaluationsV3Table() {
             position: isSelected ? "relative" : undefined,
             zIndex: isSelected ? 5 : undefined,
             userSelect: "none",
+            verticalAlign: "top",
           }}
         >
-          <Box
-            ref={
-              viewingCell?.row === rowIndex &&
-              viewingCell?.columnId === meta.columnId
-                ? viewingCellRef
-                : undefined
-            }
-          >
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-          </Box>
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </td>
       );
     },
-    [
-      ui.selectedCell,
-      viewingCell,
-      setSelectedCell,
-      setEditingCell,
-      toggleRowSelection,
-    ]
+    [ui.selectedCell, setSelectedCell, setEditingCell, toggleRowSelection]
   );
 
   return (
@@ -873,11 +904,6 @@ export function EvaluationsV3Table() {
               onAddClick={() => openOverlay("agent")}
               showWarning={agents.length === 0}
             />
-            <SuperHeader
-              type="evaluators"
-              colSpan={evaluatorsColSpan}
-              onAddClick={() => openOverlay("evaluator")}
-            />
           </tr>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
@@ -892,16 +918,9 @@ export function EvaluationsV3Table() {
                 </th>
               ))}
               {agents.length === 0 && (
-                <th style={{ minWidth: 150 }}>
+                <th style={{ minWidth: 200 }}>
                   <Text fontSize="xs" color="gray.400" fontStyle="italic">
                     Click "Add Agent" above
-                  </Text>
-                </th>
-              )}
-              {evaluators.length === 0 && (
-                <th style={{ minWidth: 150 }}>
-                  <Text fontSize="xs" color="gray.400" fontStyle="italic">
-                    Click "Add Evaluator" above
                   </Text>
                 </th>
               )}
@@ -913,24 +932,17 @@ export function EvaluationsV3Table() {
             <tr key={row.id}>
               {row.getVisibleCells().map((cell) => renderCell(cell, row.index))}
               {agents.length === 0 && <td />}
-              {evaluators.length === 0 && <td />}
             </tr>
           ))}
         </tbody>
       </table>
 
-      {/* Cell viewer for agent/evaluator cells */}
-      <CellViewer
-        value={viewingCell?.value}
-        isOpen={!!viewingCell}
-        onClose={() => setViewingCell(null)}
-        anchorRef={viewingCellRef}
-      />
-
       <SelectionToolbar
         selectedCount={selectedRows.size}
         onRun={() => console.log("Run selected:", Array.from(selectedRows))}
-        onDelete={() => console.log("Delete selected:", Array.from(selectedRows))}
+        onDelete={() =>
+          console.log("Delete selected:", Array.from(selectedRows))
+        }
         onClear={clearRowSelection}
       />
     </Box>
@@ -938,7 +950,7 @@ export function EvaluationsV3Table() {
 }
 
 // ============================================================================
-// Cell Components
+// Agent Header Component
 // ============================================================================
 
 function AgentHeader({ agent }: { agent: AgentConfig }) {
@@ -962,90 +974,5 @@ function AgentHeader({ agent }: { agent: AgentConfig }) {
         {agent.name}
       </Text>
     </HStack>
-  );
-}
-
-function AgentCell({ value }: { value: unknown }) {
-  if (value === null || value === undefined) return null;
-
-  const displayValue =
-    typeof value === "object" ? JSON.stringify(value) : String(value);
-
-  return (
-    <Text fontSize="13px" lineClamp={3}>
-      {displayValue}
-    </Text>
-  );
-}
-
-function EvaluatorHeader({ evaluator }: { evaluator: EvaluatorConfig }) {
-  const { openOverlay } = useEvaluationsV3Store((state) => ({
-    openOverlay: state.openOverlay,
-  }));
-
-  return (
-    <HStack
-      gap={2}
-      cursor="pointer"
-      onClick={() => openOverlay("evaluator", evaluator.id)}
-      _hover={{ color: "green.600" }}
-    >
-      <ColorfulBlockIcon color="#5FD15D" size="xs" icon={<Check size={12} />} />
-      <Text fontSize="13px" fontWeight="medium">
-        {evaluator.name}
-      </Text>
-    </HStack>
-  );
-}
-
-function EvaluatorCell({ value }: { value: unknown }) {
-  if (value === null || value === undefined) return null;
-
-  if (typeof value === "boolean") {
-    return (
-      <Text
-        fontSize="13px"
-        color={value ? "green.600" : "red.600"}
-        fontWeight="medium"
-      >
-        {value ? "✓ Passed" : "✗ Failed"}
-      </Text>
-    );
-  }
-
-  if (typeof value === "number") {
-    return (
-      <Text fontSize="13px" fontWeight="medium">
-        {value.toFixed(2)}
-      </Text>
-    );
-  }
-
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    if ("passed" in obj) {
-      return (
-        <Text
-          fontSize="13px"
-          color={obj.passed ? "green.600" : "red.600"}
-          fontWeight="medium"
-        >
-          {obj.passed ? "✓ Passed" : "✗ Failed"}
-        </Text>
-      );
-    }
-    if ("score" in obj && typeof obj.score === "number") {
-      return (
-        <Text fontSize="13px" fontWeight="medium">
-          {obj.score.toFixed(2)}
-        </Text>
-      );
-    }
-  }
-
-  return (
-    <Text fontSize="13px" lineClamp={2}>
-      {JSON.stringify(value)}
-    </Text>
   );
 }
