@@ -190,6 +190,8 @@ export const workflowRouter = createTRPCRouter({
           dsl: {
             ...dsl,
             workflow_id: newWorkflow.id,
+            experiment_id: "", // Clear experiment_id from source project
+            state: {}, // Clear state from source project
             version: "1",
           },
         },
