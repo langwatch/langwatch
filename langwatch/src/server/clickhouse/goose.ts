@@ -61,6 +61,11 @@ function parseConnectionUrl(connectionUrl?: string): {
   const parsed = new URL(url);
   const database = parsed.pathname.replace(/^\//, "") || "langwatch";
 
+  // Set secure=true for HTTPS connections
+  if (parsed.protocol === "https:" && !parsed.searchParams.has("secure")) {
+    parsed.searchParams.set("secure", "true");
+  }
+
   // Convert HTTP URL to clickhouse:// protocol for goose
   if (parsed.protocol === "http:" || parsed.protocol === "https:") {
     parsed.protocol = "clickhouse:";
