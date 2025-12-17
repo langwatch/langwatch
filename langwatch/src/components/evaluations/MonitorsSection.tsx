@@ -208,7 +208,8 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               }}
                               disabled={!hasPermission("evaluations:manage")}
                             >
-                              <Copy size={16} /> Replicate to another project
+                              <CopyIcon size={16} /> Replicate to another
+                              project
                             </Menu.Item>
                           </Tooltip>
                         )}
