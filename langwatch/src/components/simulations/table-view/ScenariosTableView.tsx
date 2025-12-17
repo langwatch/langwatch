@@ -11,7 +11,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { createScenarioColumns, generateDynamicColumns } from "./scenarioColumns";
 import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
-import { StatusCell, VerdictCell, DurationCell, TimestampCell } from "./cells";
+import { StatusCell, VerdictCell, DurationCell, TimestampCell, ActionsCell } from "./cells";
 import type { ScenarioRunRow } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
@@ -75,6 +75,8 @@ export function ScenariosTableView() {
           return { ...col, cell: DurationCell };
         case "timestamp":
           return { ...col, cell: TimestampCell };
+        case "actions":
+          return { ...col, cell: ActionsCell };
         default:
           return col;
       }

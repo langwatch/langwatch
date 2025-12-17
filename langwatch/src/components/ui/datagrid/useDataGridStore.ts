@@ -90,6 +90,11 @@ export function createDataGridStore<T>(config: DataGridConfig<T>) {
     );
   }
 
+  // Get non-hideable column IDs to ensure they're always visible
+  const nonHideableColumnIds = config.columns
+    .filter((col) => col.hideable === false)
+    .map((col) => col.id);
+
   // Create persisted store
   return create<DataGridStore<T>>()(
     persist(
@@ -104,6 +109,16 @@ export function createDataGridStore<T>(config: DataGridConfig<T>) {
           pinnedColumns: state.pinnedColumns,
           pageSize: state.pageSize,
         }),
+        merge: (persistedState, currentState) => {
+          const merged = { ...currentState, ...(persistedState as object) };
+          // Ensure non-hideable columns are always visible
+          if (merged.visibleColumns instanceof Set) {
+            for (const colId of nonHideableColumnIds) {
+              merged.visibleColumns.add(colId);
+            }
+          }
+          return merged;
+        },
       }
     )
   );
@@ -188,6 +203,13 @@ function createStoreActions<T>(
     setColumns: (columns) => set({ columns }),
     toggleColumnVisibility: (columnId) =>
       set((state) => {
+        // Check if column is hideable
+        const column = state.columns.find((c) => c.id === columnId);
+        if (column?.hideable === false) {
+          // Cannot hide this column
+          return state;
+        }
+
         const newVisibleColumns = new Set(state.visibleColumns);
         if (newVisibleColumns.has(columnId)) {
           newVisibleColumns.delete(columnId);

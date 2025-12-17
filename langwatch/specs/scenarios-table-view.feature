@@ -58,6 +58,12 @@ Feature: Scenarios Table View
     Then I see nested trace data with inputs and outputs
 
   @e2e
+  Scenario: Open run details via actions column
+    Given I am on the simulations page in Table View
+    When I click the actions button on a scenario row
+    Then I am navigated to the run details page
+
+  @e2e
   Scenario: Customize columns and share view via URL
     Given I am on the simulations page in Table View
     When I hide the Duration column

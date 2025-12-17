@@ -51,6 +51,9 @@ export interface DataGridColumnDef<T> {
   /** Whether column is visible by default */
   defaultVisible?: boolean;
 
+  /** Whether column can be hidden (false = always visible) */
+  hideable?: boolean;
+
   /** Pin column to left or right */
   pinned?: "left" | "right" | false;
 

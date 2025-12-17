@@ -1,0 +1,35 @@
+import { IconButton, Link } from "@chakra-ui/react";
+import NextLink from "next/link";
+import { useRouter } from "next/router";
+import { ExternalLink } from "lucide-react";
+import type { CellContext } from "@tanstack/react-table";
+import type { ScenarioRunRow } from "../types";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+
+/**
+ * Actions cell with icon button to open the run in a dedicated page
+ */
+export function ActionsCell({ row }: CellContext<ScenarioRunRow, unknown>) {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+  const projectSlug = project?.slug ?? "";
+  const data = row.original;
+
+  // Build the URL to the scenario run page
+  const runUrl = `/${projectSlug}/simulations/${data.scenarioSetId}/${data.batchRunId}/${data.scenarioRunId}`;
+
+  return (
+    <Link asChild onClick={(e) => e.stopPropagation()}>
+      <NextLink href={runUrl} target="_blank">
+        <IconButton
+          aria-label="Open run details"
+          size="xs"
+          variant="ghost"
+          title="Open run details"
+        >
+          <ExternalLink size={14} />
+        </IconButton>
+      </NextLink>
+    </Link>
+  );
+}
