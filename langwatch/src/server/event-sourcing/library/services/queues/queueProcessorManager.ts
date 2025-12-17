@@ -11,7 +11,12 @@ import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import { ConfigurationError, ValidationError } from "../errorHandling";
+import {
+  ConfigurationError,
+  LockError,
+  ValidationError,
+} from "../errorHandling";
+import type { DistributedLock } from "../../utils/distributedLock";
 
 /**
  * Configuration extracted from a command handler class, merged with options.
@@ -24,6 +29,7 @@ interface HandlerConfig<Payload> {
     payload: Payload,
   ) => Record<string, string | number | boolean>;
   concurrency?: number;
+  lockTtlMs?: number;
 }
 
 /**
@@ -38,6 +44,7 @@ interface CommandHandlerOptions<Payload> {
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
+  lockTtlMs?: number;
 }
 
 /**
@@ -53,6 +60,7 @@ function extractHandlerConfig<Payload>(
     makeJobId?: (payload: Payload) => string;
     delay?: number;
     concurrency?: number;
+    lockTtlMs?: number;
   },
   options?: CommandHandlerOptions<Payload>,
 ): HandlerConfig<Payload> {
@@ -65,6 +73,7 @@ function extractHandlerConfig<Payload>(
       options?.spanAttributes ??
       HandlerClass.getSpanAttributes?.bind(HandlerClass),
     concurrency: options?.concurrency ?? HandlerClass.concurrency,
+    lockTtlMs: options?.lockTtlMs ?? HandlerClass.lockTtlMs,
   };
 }
 
@@ -82,6 +91,10 @@ function createCommandDispatcher<Payload, EventType extends Event>(
     context: EventStoreReadContext<EventType>,
   ) => Promise<void>,
   factory: QueueProcessorFactory,
+  aggregateType: AggregateType,
+  commandName: string,
+  distributedLock?: DistributedLock,
+  commandLockTtlMs: number = 30000,
 ): EventSourcedQueueProcessor<Payload> {
   const processor = factory.create<Payload>({
     name: queueName,
@@ -103,79 +116,126 @@ function createCommandDispatcher<Payload, EventType extends Event>(
       const tenantId = createTenantId((payload as any).tenantId);
       const aggregateId = config.getAggregateId(payload);
 
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
+      // Acquire distributed lock if configured
+      // Lock key format: command:${tenantId}:${aggregateType}:${aggregateId}:${commandName}
+      const lockKey = `command:${tenantId}:${aggregateType}:${aggregateId}:${commandName}`;
+      const lockHandle = distributedLock
+        ? await distributedLock.acquire(lockKey, commandLockTtlMs)
+        : null;
 
-      // Handler returns events
-      const events = await handler.handle(command);
-
-      // Validate that handler returned events, not the payload
-      if (!events) {
-        throw new ValidationError(
-          `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
-          "events",
-          void 0,
-          { commandType, payload },
+      if (distributedLock && !lockHandle) {
+        throw new LockError(
+          lockKey,
+          "processCommand",
+          `Cannot acquire lock for command: ${lockKey}. Another process is processing this command. Will retry.`,
+          {
+            commandType,
+            commandName,
+            aggregateId,
+            tenantId,
+          },
         );
       }
 
-      if (!Array.isArray(events)) {
-        throw new ValidationError(
-          `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
-          "events",
-          events,
-          { commandType, payload },
+      try {
+        const command = createCommand(
+          tenantId,
+          aggregateId,
+          commandType,
+          payload,
         );
-      }
 
-      // Validate each event structure before storing
-      for (let i = 0; i < events.length; i++) {
-        const event = events[i];
-        if (!event) {
+        // Handler returns events
+        const events = await handler.handle(command);
+
+        // Validate that handler returned events, not the payload
+        if (!events) {
           throw new ValidationError(
-            `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+            `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
+            "events",
+            void 0,
+            { commandType, payload },
+          );
+        }
+
+        if (!Array.isArray(events)) {
+          throw new ValidationError(
+            `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
             "events",
             events,
-            { commandType, payload, index: i },
+            { commandType, payload },
           );
         }
 
-        if (!EventUtils.isValidEvent(event)) {
-          // Try to get more detailed validation error
-          const parseResult = EventSchema.safeParse(event);
-          const validationError =
-            parseResult.success === false
-              ? `Validation errors: ${parseResult.error.issues
-                  .map(
-                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
-                  )
-                  .join(", ")}`
-              : "Unknown validation error";
+        // Validate each event structure before storing
+        for (let i = 0; i < events.length; i++) {
+          const event = events[i];
+          if (!event) {
+            throw new ValidationError(
+              `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
+              "events",
+              events,
+              { commandType, payload, index: i },
+            );
+          }
 
-          throw new ValidationError(
-            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
-            "events",
-            event,
-            {
-              commandType,
-              payload,
-              index: i,
-              validationErrors:
-                parseResult.success === false
-                  ? parseResult.error.issues
-                  : void 0,
-            },
-          );
+          if (!EventUtils.isValidEvent(event)) {
+            // Try to get more detailed validation error
+            const parseResult = EventSchema.safeParse(event);
+            const validationError =
+              parseResult.success === false
+                ? `Validation errors: ${parseResult.error.issues
+                    .map(
+                      (issue: any) =>
+                        `${issue.path.join(".")}: ${issue.message}`,
+                    )
+                    .join(", ")}`
+                : "Unknown validation error";
+
+            throw new ValidationError(
+              `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
+              "events",
+              event,
+              {
+                commandType,
+                payload,
+                index: i,
+                validationErrors:
+                  parseResult.success === false
+                    ? parseResult.error.issues
+                    : void 0,
+              },
+            );
+          }
         }
-      }
 
-      // Store events automatically
-      if (events.length > 0) {
-        await storeEventsFn(events, { tenantId });
+        // Store events automatically
+        if (events.length > 0) {
+          await storeEventsFn(events, { tenantId });
+        }
+      } finally {
+        // Always release lock, even on errors
+        if (lockHandle) {
+          try {
+            await distributedLock!.release(lockHandle);
+          } catch (error) {
+            // Command execution already completed; lock release failure is non-critical
+            // Log error but don't throw to avoid masking original error
+            const logger = createLogger(
+              "langwatch:event-sourcing:queue-processor-manager",
+            );
+            logger.error(
+              {
+                commandType,
+                commandName,
+                aggregateId,
+                tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to release distributed lock after command execution",
+            );
+          }
+        }
       }
     },
   });
@@ -211,6 +271,9 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     "langwatch:event-sourcing:queue-processor-manager",
   );
   private readonly queueProcessorFactory?: QueueProcessorFactory;
+  private readonly distributedLock?: DistributedLock;
+  private readonly commandLockTtlMs: number;
+
   // Queue processors for event handlers (one per handler)
   private readonly handlerQueueProcessors = new Map<
     string,
@@ -230,12 +293,18 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   constructor({
     aggregateType,
     queueProcessorFactory,
+    distributedLock,
+    commandLockTtlMs = 30000,
   }: {
     aggregateType: AggregateType;
     queueProcessorFactory?: QueueProcessorFactory;
+    distributedLock?: DistributedLock;
+    commandLockTtlMs?: number;
   }) {
     this.aggregateType = aggregateType;
     this.queueProcessorFactory = queueProcessorFactory;
+    this.distributedLock = distributedLock;
+    this.commandLockTtlMs = commandLockTtlMs;
   }
 
   /**
@@ -300,9 +369,12 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Initializes queue processors for all registered projections.
    * Each projection gets its own queue processor for async processing.
    *
-   * **Serial Processing**: Uses event ID as job ID to prevent deduplication (all events are queued).
+   * **Serial Processing**: By default, uses event ID as job ID to prevent deduplication (all events are queued).
    * The distributed lock in `updateProjectionByName` ensures serial processing per aggregate.
    * When lock acquisition fails, BullMQ will retry the job with backoff.
+   *
+   * **Debouncing**: When `debounceMs` is configured, omit the timestamp and ksuid from the job ID to enable job replacement.
+   * Later events for the same aggregate replace earlier queued jobs, effectively debouncing projection updates.
    *
    * @param projections - Map of projection definitions
    * @param processProjectionEventCallback - Callback to process a single event for a projection
@@ -319,28 +391,51 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       return;
     }
 
-    for (const [projectionName] of Object.entries(projections)) {
+    for (const [projectionName, projectionDef] of Object.entries(projections)) {
       const queueName = `${this.aggregateType}/projection/${projectionName}`;
+      const debounceMs =
+        projectionDef.options?.debounceMs;
 
-      // Use event ID directly as job ID - event IDs are unique, preventing deduplication
-      // Distributed lock ensures serial processing per aggregate
+      // If debouncing is enabled, omit the timestamp and ksuid from the job ID to enable job replacement
+      // Otherwise, use event ID to ensure all events are processed
       const makeProjectionJobId = (event: EventType): string => {
-        this.logger.debug(
-          {
-            projectionName,
-            eventId: event.id,
-            tenantId: event.tenantId,
-            aggregateId: String(event.aggregateId),
-            eventType: event.type,
-          },
-          "Created projection job ID from event ID",
-        );
-        return event.id;
+        if (debounceMs !== void 0) {
+          // Use aggregate ID for debouncing - same aggregate = same job ID
+          // This allows BullMQ to replace queued jobs for the same aggregate
+          const jobId = `${String(event.tenantId)}:${String(event.timestamp)}:${String(event.aggregateId)}`;
+          this.logger.debug(
+            {
+              projectionName,
+              eventId: event.id,
+              tenantId: event.tenantId,
+              aggregateId: String(event.aggregateId),
+              eventType: event.type,
+              debounceMs,
+            },
+            "Created projection job ID from aggregate ID (debouncing enabled)",
+          );
+          return jobId;
+        } else {
+          // Use event ID directly - event IDs are unique, preventing deduplication
+          // Distributed lock ensures serial processing per aggregate
+          this.logger.debug(
+            {
+              projectionName,
+              eventId: event.id,
+              tenantId: event.tenantId,
+              aggregateId: String(event.aggregateId),
+              eventType: event.type,
+            },
+            "Created projection job ID from event ID",
+          );
+          return this.createDefaultJobId(event);
+        }
       };
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         makeJobId: makeProjectionJobId,
+        delay: debounceMs,
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
@@ -442,6 +537,9 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       // Create queue name
       const queueName = `${pipelineName}/command/${commandName}`;
 
+      // Use per-command lockTtlMs if provided, otherwise use default
+      const effectiveLockTtlMs = config.lockTtlMs ?? this.commandLockTtlMs;
+
       // Create and register dispatcher
       const dispatcher = createCommandDispatcher(
         commandType,
@@ -450,7 +548,11 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         config,
         queueName,
         storeEventsFn,
-        this.queueProcessorFactory,
+        this.queueProcessorFactory!,
+        this.aggregateType,
+        commandName,
+        this.distributedLock,
+        effectiveLockTtlMs,
       );
 
       this.commandQueueProcessors.set(commandName, dispatcher);
