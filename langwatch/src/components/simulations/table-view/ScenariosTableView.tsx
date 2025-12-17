@@ -327,40 +327,45 @@ export function ScenariosTableView() {
     [router]
   );
 
-  // Export handler
+  // Export mutation
+  const exportMutation = api.scenarios.exportScenariosCsv.useMutation();
+
+  // Export handler - exports ALL filtered data with visible columns
   const handleExport = useCallback(async () => {
     if (!project?.id) return;
 
-    // Get visible columns from selector
-    const visibleColumnIds = Array.from(visibleColumns);
+    // Get visible columns (excluding actions column and internal columns)
+    const visibleColumnIds = Array.from(visibleColumns).filter(
+      (col) => col !== "actions" && !col.startsWith("__")
+    );
 
-    // Call export API
-    const response = await fetch("/api/scenarios/export", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    try {
+      // Call tRPC export mutation with current filters, sorting, and visible columns
+      const result = await exportMutation.mutateAsync({
         projectId: project.id,
-        filters,
+        filters: filters.map((f) => ({
+          columnId: f.columnId,
+          operator: f.operator,
+          value: f.value,
+        })),
         columns: visibleColumnIds,
         includeTraces: false,
-      }),
-    });
+      });
 
-    if (!response.ok) {
-      throw new Error("Export failed");
+      // Download the CSV
+      const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Export failed:", error);
     }
-
-    // Download the CSV
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `scenarios-${new Date().toISOString().split("T")[0]}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-  }, [project?.id, filters, visibleColumns]);
+  }, [project?.id, filters, visibleColumns, exportMutation]);
 
   // Get enum options for filter dropdowns
   const getEnumOptions = useCallback((columnId: string): string[] => {
