@@ -26,11 +26,33 @@ import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
  * Creates a mock EventStore with default implementations.
  */
 export function createMockEventStore<T extends Event>(): EventStore<T> {
-  return {
+  const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    getEventsUpTo: vi
+      .fn()
+      .mockImplementation(
+        async (aggregateId, context, aggregateType, upToEvent) => {
+          // Default implementation: get all events and filter
+          const allEvents = await mockStore.getEvents(
+            aggregateId,
+            context,
+            aggregateType,
+          );
+          const upToIndex = allEvents.findIndex(
+            (e: T) => e.id === upToEvent.id,
+          );
+          if (upToIndex === -1) {
+            throw new Error(
+              `Event ${upToEvent.id} not found in aggregate ${aggregateId}`,
+            );
+          }
+          return allEvents.slice(0, upToIndex + 1);
+        },
+      ),
     countEventsBefore: vi.fn().mockResolvedValue(0),
   };
+  return mockStore;
 }
 
 /**
@@ -66,7 +88,7 @@ export function createMockEventHandler<
       id: "test-projection-id",
       aggregateId: "test-aggregate",
       tenantId: createTenantId("test-tenant"),
-      version: 1000000,
+      version: "2025-12-17",
       data: {},
     } as TProjection),
   };
@@ -178,6 +200,7 @@ export function createTestEvent(
   tenantId: TenantId,
   type: EventType = EVENT_TYPES[0],
   timestamp = 1000000,
+  version = "2025-12-17",
   data: unknown = {},
   id?: string,
 ): Event {
@@ -190,6 +213,7 @@ export function createTestEvent(
     aggregateType,
     tenantId,
     timestamp,
+    version,
     type,
     data,
   };
@@ -202,7 +226,7 @@ export function createTestProjection<Data = unknown>(
   aggregateId: string,
   tenantId: TenantId,
   data: Data = {} as Data,
-  version = 1000000,
+  version = "2025-12-17",
   id?: string,
 ): Projection<Data> {
   return {
@@ -251,7 +275,7 @@ export function createTestTenantId(value = "test-tenant"): TenantId {
  * Creates a test AggregateType.
  */
 export function createTestAggregateType(): AggregateType {
-  return "span_ingestion";
+  return "trace";
 }
 
 /**
@@ -264,7 +288,7 @@ export const TEST_CONSTANTS = {
   PROJECTION_NAME: "test-projection",
   PIPELINE_NAME: "test-pipeline",
   HANDLER_NAME: "test-handler",
-  AGGREGATE_TYPE: "span_ingestion" as const satisfies AggregateType,
+  AGGREGATE_TYPE: "trace" as const satisfies AggregateType,
   EVENT_TYPE_1: EVENT_TYPES[0],
   EVENT_TYPE_2: EVENT_TYPES[1] ?? EVENT_TYPES[0],
 } as const;
@@ -294,6 +318,7 @@ export function cleanupTestEnvironment(): void {
 export function createTestContext() {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
+  const eventVersion = "2025-12-17";
   const context = createTestEventStoreReadContext(tenantId);
-  return { aggregateType, tenantId, context };
+  return { aggregateType, tenantId, eventVersion, context };
 }

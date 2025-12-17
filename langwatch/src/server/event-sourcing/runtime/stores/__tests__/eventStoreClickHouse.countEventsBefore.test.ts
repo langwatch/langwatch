@@ -9,7 +9,7 @@ import { EventRepositoryClickHouse } from "../repositories/eventRepositoryClickH
 describe("EventStoreClickHouse - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
 
   let mockClickHouseClient: ClickHouseClient;
   let store: EventStoreClickHouse;
@@ -88,7 +88,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       expect(mockClickHouseClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
           query: expect.stringContaining(
-            "toUnixTimestamp64Milli(EventTimestamp) <",
+            "EventTimestamp <",
           ),
           query_params: expect.objectContaining({
             beforeTimestamp: timestamp,
@@ -234,12 +234,12 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       expect(callArgs).toBeDefined();
       if (callArgs && typeof callArgs === "object" && "query" in callArgs) {
         const query = String(callArgs.query);
-        // Verify query contains both conditions (ClickHouse uses toUnixTimestamp64Milli for conversion)
+        // Verify query contains both conditions
         expect(query).toMatch(
-          /toUnixTimestamp64Milli\(EventTimestamp\)\s*<\s*\{beforeTimestamp:UInt64\}/s,
+          /EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s,
         );
         expect(query).toMatch(
-          /toUnixTimestamp64Milli\(EventTimestamp\)\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
+          /EventTimestamp\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
         );
       }
     });
