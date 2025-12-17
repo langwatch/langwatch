@@ -15,7 +15,8 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical } from "react-feather";
+import { useState } from "react";
+import { Copy, MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
@@ -27,6 +28,7 @@ import {
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
+import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   formatEvaluationSummary,
@@ -43,6 +45,11 @@ import { api } from "../../utils/api";
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
+  const [copyDialogState, setCopyDialogState] = useState<{
+    open: boolean;
+    experimentId: string;
+    evaluationName: string;
+  } | null>(null);
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
@@ -220,164 +227,178 @@ function EvaluationsV2() {
                               </Table.Row>
                             ))
                           : experiments.data
-                            ? experiments.data?.map((experiment, i) => (
-                                <Table.Row
-                                  cursor="pointer"
-                                  onClick={() => {
-                                    if (experiment.wizardState) {
-                                      void router.push({
-                                        pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
-                                      });
-                                    } else {
-                                      void router.push({
-                                        pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                      });
-                                    }
-                                  }}
-                                  key={i}
-                                >
-                                  <Table.Cell>
-                                    <OverflownTextWithTooltip
-                                      lineClamp={1}
-                                      wordBreak="break-word"
-                                    >
-                                      {experiment.name ?? experiment.slug}
-                                    </OverflownTextWithTooltip>
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <Badge
-                                      colorPalette="gray"
-                                      variant="outline"
-                                    >
-                                      {experiment.wizardState?.task
-                                        ? taskTypeToLabel[
-                                            experiment.wizardState.task
-                                          ]
-                                        : experimentTypeToLabel[
-                                            experiment.type
-                                          ]}
-                                    </Badge>
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <OverflownTextWithTooltip
-                                      lineClamp={1}
-                                      wordBreak="break-word"
-                                    >
-                                      {experiment.dataset?.name ?? "-"}
-                                    </OverflownTextWithTooltip>
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.primaryMetric ? (
-                                      <>
-                                        <Text
-                                          as="span"
-                                          fontSize="xs"
-                                          color="gray.600"
-                                        >
-                                          {
-                                            experiment.runsSummary.primaryMetric
-                                              .name
-                                          }
-                                          : &nbsp;
-                                        </Text>
-                                        <Text as="span" fontWeight="semibold">
-                                          {formatEvaluationSummary(
-                                            experiment.runsSummary
-                                              .primaryMetric,
-                                            true,
-                                          )}
-                                        </Text>
-                                      </>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.count || ""}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.latestRun
-                                      ?.timestamps && (
-                                      <>
-                                        {getFinishedAt(
-                                          experiment.runsSummary.latestRun
-                                            .timestamps,
-                                          new Date().getTime(),
-                                        ) ? (
-                                          <HStack color="green.500">
-                                            <LuCircleCheckBig size={16} />
-                                            Completed
-                                          </HStack>
-                                        ) : experiment.runsSummary.latestRun
-                                            .timestamps.stopped_at ? (
-                                          <HStack color="red.500">
-                                            <LuCircleX size={16} />
-                                            Stopped
-                                          </HStack>
-                                        ) : (
-                                          <HStack color="blue.500">
-                                            <LuClock size={16} />
-                                            Running
-                                          </HStack>
+                          ? experiments.data?.map((experiment, i) => (
+                              <Table.Row
+                                cursor="pointer"
+                                onClick={() => {
+                                  if (experiment.wizardState) {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                    });
+                                  } else {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                    });
+                                  }
+                                }}
+                                key={i}
+                              >
+                                <Table.Cell>
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.name ?? experiment.slug}
+                                  </OverflownTextWithTooltip>
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <Badge colorPalette="gray" variant="outline">
+                                    {experiment.wizardState?.task
+                                      ? taskTypeToLabel[
+                                          experiment.wizardState.task
+                                        ]
+                                      : experimentTypeToLabel[experiment.type]}
+                                  </Badge>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.dataset?.name ?? "-"}
+                                  </OverflownTextWithTooltip>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.runsSummary.primaryMetric ? (
+                                    <>
+                                      <Text
+                                        as="span"
+                                        fontSize="xs"
+                                        color="gray.600"
+                                      >
+                                        {
+                                          experiment.runsSummary.primaryMetric
+                                            .name
+                                        }
+                                        : &nbsp;
+                                      </Text>
+                                      <Text as="span" fontWeight="semibold">
+                                        {formatEvaluationSummary(
+                                          experiment.runsSummary.primaryMetric,
+                                          true,
                                         )}
-                                      </>
-                                    )}
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    {new Date(
-                                      experiment.updatedAt,
-                                    ).toLocaleString()}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <Box
-                                      width="full"
-                                      height="full"
-                                      display="flex"
-                                      justifyContent="end"
-                                    >
-                                      <Menu.Root>
-                                        <Menu.Trigger
+                                      </Text>
+                                    </>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.runsSummary.count || ""}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.runsSummary.latestRun
+                                    ?.timestamps && (
+                                    <>
+                                      {getFinishedAt(
+                                        experiment.runsSummary.latestRun
+                                          .timestamps,
+                                        new Date().getTime(),
+                                      ) ? (
+                                        <HStack color="green.500">
+                                          <LuCircleCheckBig size={16} />
+                                          Completed
+                                        </HStack>
+                                      ) : experiment.runsSummary.latestRun
+                                          .timestamps.stopped_at ? (
+                                        <HStack color="red.500">
+                                          <LuCircleX size={16} />
+                                          Stopped
+                                        </HStack>
+                                      ) : (
+                                        <HStack color="blue.500">
+                                          <LuClock size={16} />
+                                          Running
+                                        </HStack>
+                                      )}
+                                    </>
+                                  )}
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  {new Date(
+                                    experiment.updatedAt,
+                                  ).toLocaleString()}
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <Box
+                                    width="full"
+                                    height="full"
+                                    display="flex"
+                                    justifyContent="end"
+                                  >
+                                    <Menu.Root>
+                                      <Menu.Trigger
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                        }}
+                                      >
+                                        <MoreVertical size={16} />
+                                      </Menu.Trigger>
+                                      <Menu.Content>
+                                        <Menu.Item
+                                          value="edit"
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            void router.push(
+                                              `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                            );
                                           }}
                                         >
-                                          <MoreVertical size={16} />
-                                        </Menu.Trigger>
-                                        <Menu.Content>
+                                          <LuPencil size={16} />
+                                          Edit
+                                        </Menu.Item>
+                                        {hasPermission(
+                                          "evaluations:manage",
+                                        ) && (
                                           <Menu.Item
-                                            value="edit"
+                                            value="replicate"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              void router.push(
-                                                `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
-                                              );
-                                            }}
-                                          >
-                                            <LuPencil size={16} />
-                                            Edit
-                                          </Menu.Item>
-                                          <Menu.Item
-                                            value="delete"
-                                            color="red.500"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleDeleteExperiment(
-                                                experiment.id,
-                                                experiment.name ??
+                                              setCopyDialogState({
+                                                open: true,
+                                                experimentId: experiment.id,
+                                                evaluationName:
+                                                  experiment.name ??
                                                   experiment.slug,
-                                              );
+                                              });
                                             }}
                                           >
-                                            <LuTrash size={16} />
-                                            Delete
+                                            <Copy size={16} />
+                                            Replicate to another project
                                           </Menu.Item>
-                                        </Menu.Content>
-                                      </Menu.Root>
-                                    </Box>
-                                  </Table.Cell>
-                                </Table.Row>
-                              ))
-                            : null}
+                                        )}
+                                        <Menu.Item
+                                          value="delete"
+                                          color="red.500"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteExperiment(
+                                              experiment.id,
+                                              experiment.name ??
+                                                experiment.slug,
+                                            );
+                                          }}
+                                        >
+                                          <LuTrash size={16} />
+                                          Delete
+                                        </Menu.Item>
+                                      </Menu.Content>
+                                    </Menu.Root>
+                                  </Box>
+                                </Table.Cell>
+                              </Table.Row>
+                            ))
+                          : null}
                       </Table.Body>
                     </Table.Root>
                   )}
@@ -387,6 +408,14 @@ function EvaluationsV2() {
           )}
         </VStack>
       </Container>
+      {copyDialogState && (
+        <CopyEvaluationDialog
+          open={copyDialogState.open}
+          onClose={() => setCopyDialogState(null)}
+          experimentId={copyDialogState.experimentId}
+          evaluationName={copyDialogState.evaluationName}
+        />
+      )}
     </DashboardLayout>
   );
 }

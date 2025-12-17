@@ -3,7 +3,11 @@ import type {
   QueryDslBoolQuery,
   SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
-import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  ExperimentType,
+  Prisma,
+} from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
@@ -33,9 +37,12 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { saveOrCommitWorkflowVersion } from "./workflows";
+import {
+  copyWorkflowWithDatasets,
+  saveOrCommitWorkflowVersion,
+} from "./workflows";
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -789,6 +796,150 @@ export const experimentsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  copy: protectedProcedure
+    .input(
+      z.object({
+        experimentId: z.string(),
+        projectId: z.string(),
+        sourceProjectId: z.string(),
+        copyDatasets: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission("evaluations:manage"))
+    .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least evaluations:manage permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "evaluations:manage",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to manage evaluations in the source project",
+        });
+      }
+
+      const experiment = await ctx.prisma.experiment.findUnique({
+        where: {
+          id: input.experimentId,
+          projectId: input.sourceProjectId,
+        },
+        include: {
+          workflow: {
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment workflow not found",
+        });
+      }
+
+      const { workflowId, dsl } = await copyWorkflowWithDatasets({
+        ctx,
+        workflow: {
+          id: experiment.workflow.id,
+          name: experiment.workflow.name,
+          icon: experiment.workflow.icon,
+          description: experiment.workflow.description,
+          latestVersion: experiment.workflow.latestVersion,
+        },
+        targetProjectId: input.projectId,
+        sourceProjectId: input.sourceProjectId,
+        copyDatasets: input.copyDatasets,
+        copiedFromWorkflowId: experiment.workflowId,
+      });
+
+      const newWorkflow = await ctx.prisma.workflow.findFirst({
+        where: {
+          id: workflowId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!newWorkflow) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create workflow",
+        });
+      }
+
+      // Save workflow version
+      await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId,
+          dsl,
+        },
+        autoSaved: false,
+        commitMessage: `Copied from ${experiment.workflow.name}`,
+      });
+
+      // Create new experiment with unique slug
+      const experimentName = experiment.name ?? experiment.slug;
+      const baseSlug = slugify(experimentName);
+
+      // Find a unique slug by appending -2, -3, etc. if needed
+      const MAX_ATTEMPTS = 100;
+      let newSlug = baseSlug;
+      let index = 2;
+      let attempts = 0;
+
+      while (attempts < MAX_ATTEMPTS) {
+        const existingExperiment = await ctx.prisma.experiment.findFirst({
+          where: {
+            projectId: input.projectId,
+            slug: newSlug,
+          },
+        });
+
+        if (!existingExperiment) {
+          break;
+        }
+
+        newSlug = `${baseSlug}-${index}`;
+        index++;
+        attempts++;
+      }
+
+      // Fallback to random suffix if we hit the limit (should never happen in practice)
+      if (attempts >= MAX_ATTEMPTS) {
+        newSlug = `${baseSlug}-${nanoid(8)}`;
+      }
+
+      const newExperiment = await ctx.prisma.experiment.create({
+        data: {
+          id: `experiment_${nanoid()}`,
+          name: experimentName,
+          slug: newSlug,
+          projectId: input.projectId,
+          type: experiment.type,
+          workflowId,
+          ...(experiment.wizardState && {
+            wizardState: experiment.wizardState as Prisma.InputJsonValue,
+          }),
+        },
+      });
+
+      return { experiment: newExperiment, workflow: newWorkflow };
+    }),
+
   /**
    * isLastExperimentADraft
    */
@@ -887,8 +1038,8 @@ const findNextDraftName = async (projectId: string) => {
     },
   });
 
-  const draftCount = experiments.filter((draft) =>
-    draft.name?.startsWith("Draft"),
+  const draftCount = experiments.filter(
+    (draft) => draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -1069,9 +1220,8 @@ const getExperimentBatchEvaluationRuns = async (
         dataset_average_duration: runAgg?.dataset_average_duration.value as
           | number
           | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
-          | number
-          | undefined,
+        evaluations_average_cost: runAgg?.evaluations_cost.average_cost
+          .value as number | undefined,
         evaluations_average_duration: runAgg?.evaluations_cost.average_duration
           .value as number | undefined,
         evaluations: Object.fromEntries(
