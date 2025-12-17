@@ -15,3 +15,12 @@ export const DEFAULT_MAX_TOKENS = 64_000;
 export const MIN_MAX_TOKENS = 256;
 
 export const FALLBACK_MAX_TOKENS = 64_000;
+
+export const KSUID_RESOURCES = {
+  EVENT: "event",
+  TRACE_SUMMARY: "tracesummary",
+  SPAN: "span",
+  USER: "user",
+  PROJECT: "proj",
+  ORGANIZATION: "org",
+} as const;

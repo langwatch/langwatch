@@ -1,8 +1,10 @@
 import { loadEnvConfig } from "@next/env";
 import { WorkersRestart } from "./server/background/errors";
 import { createLogger } from "./utils/logger";
+import { setEnvironment } from "@langwatch/ksuid";
 
 loadEnvConfig(process.cwd());
+setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 const logger = createLogger("langwatch:workers");
 
