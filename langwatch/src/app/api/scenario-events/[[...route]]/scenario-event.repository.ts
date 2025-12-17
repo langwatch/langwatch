@@ -972,6 +972,10 @@ export class ScenarioEventRepository {
    * Searches scenario runs with filtering, sorting, and pagination.
    * All operations are performed server-side in Elasticsearch for efficiency.
    *
+   * Status filtering requires special handling:
+   * - IN_PROGRESS: RUN_STARTED events without a matching RUN_FINISHED event
+   * - Other statuses: Query RUN_FINISHED events directly
+   *
    * @param projectId - The project identifier
    * @param filters - Array of filter conditions
    * @param sorting - Sort configuration
@@ -1006,27 +1010,57 @@ export class ScenarioEventRepository {
     const pageSize = pagination?.pageSize ?? 20;
     const from = (page - 1) * pageSize;
 
-    // Build the query
+    // Check if we have a status filter
+    const statusFilter = filters?.find((f) => f.columnId === "status");
+    const nonStatusFilters = filters?.filter((f) => f.columnId !== "status") ?? [];
+
+    // Build sort
+    const sortField = sorting
+      ? this.mapColumnToField(sorting.columnId) ?? "timestamp"
+      : "timestamp";
+    const sortOrder = sorting?.order ?? "desc";
+
+    // Status filtering requires different query strategies
+    if (statusFilter && statusFilter.value === "IN_PROGRESS") {
+      // IN_PROGRESS: Find RUN_STARTED events without a matching RUN_FINISHED event
+      return this.searchInProgressRuns({
+        projectId: validatedProjectId,
+        filters: nonStatusFilters,
+        sorting: { field: sortField, order: sortOrder },
+        pagination: { from, size: pageSize },
+        search,
+      });
+    } else if (statusFilter) {
+      // Other statuses: Query RUN_FINISHED events directly
+      return this.searchFinishedRunsByStatus({
+        projectId: validatedProjectId,
+        status: statusFilter.value as string,
+        filters: nonStatusFilters,
+        sorting: { field: sortField, order: sortOrder },
+        pagination: { from, size: pageSize },
+        search,
+      });
+    }
+
+    // No status filter: Query RUN_STARTED events (default behavior)
     const mustClauses: any[] = [
       { term: { [ES_FIELDS.projectId]: validatedProjectId } },
       { term: { type: ScenarioEventType.RUN_STARTED } },
     ];
 
-    // Add filter clauses
-    if (filters && filters.length > 0) {
-      for (const filter of filters) {
-        const fieldMapping = this.mapColumnToField(filter.columnId);
-        if (!fieldMapping) continue;
+    // Add non-status filter clauses
+    for (const filter of nonStatusFilters) {
+      const fieldMapping = this.mapColumnToField(filter.columnId);
+      if (!fieldMapping) continue;
 
-        if (filter.operator === "eq") {
-          mustClauses.push({ term: { [fieldMapping]: filter.value } });
-        } else if (filter.operator === "contains") {
-          mustClauses.push({
-            wildcard: {
-              [fieldMapping]: `*${String(filter.value).toLowerCase()}*`,
-            },
-          });
-        }
+      if (filter.operator === "eq") {
+        mustClauses.push({ term: { [fieldMapping]: filter.value } });
+      } else if (filter.operator === "contains") {
+        mustClauses.push({
+          wildcard: {
+            [fieldMapping]: `*${String(filter.value).toLowerCase()}*`,
+          },
+        });
       }
     }
 
@@ -1044,12 +1078,6 @@ export class ScenarioEventRepository {
         },
       });
     }
-
-    // Build sort
-    const sortField = sorting
-      ? this.mapColumnToField(sorting.columnId) ?? "timestamp"
-      : "timestamp";
-    const sortOrder = sorting?.order ?? "desc";
 
     const response = await client.search({
       index: SCENARIO_EVENTS_INDEX.alias,
@@ -1083,6 +1111,220 @@ export class ScenarioEventRepository {
       scenarioRunIds,
       totalCount,
     };
+  }
+
+  /**
+   * Searches for IN_PROGRESS runs (RUN_STARTED without matching RUN_FINISHED).
+   * Uses a terms aggregation to find all finished run IDs, then excludes them.
+   */
+  private async searchInProgressRuns({
+    projectId,
+    filters,
+    sorting,
+    pagination,
+    search,
+  }: {
+    projectId: string;
+    filters: Array<{ columnId: string; operator: "eq" | "contains"; value?: unknown }>;
+    sorting: { field: string; order: "asc" | "desc" };
+    pagination: { from: number; size: number };
+    search?: string;
+  }): Promise<{ scenarioRunIds: string[]; totalCount: number }> {
+    const client = await this.getClient();
+
+    // First, get all scenarioRunIds that have a RUN_FINISHED event
+    const finishedResponse = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: projectId } },
+              { term: { type: ScenarioEventType.RUN_FINISHED } },
+            ],
+          },
+        },
+        aggs: {
+          finished_runs: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 10000,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    const finishedRunIds = (
+      (finishedResponse.aggregations?.finished_runs as { buckets: Array<{ key: string }> })
+        ?.buckets ?? []
+    ).map((b) => b.key);
+
+    // Now query RUN_STARTED events, excluding those that have finished
+    const mustClauses: any[] = [
+      { term: { [ES_FIELDS.projectId]: projectId } },
+      { term: { type: ScenarioEventType.RUN_STARTED } },
+    ];
+
+    const mustNotClauses: any[] = [];
+    if (finishedRunIds.length > 0) {
+      mustNotClauses.push({
+        terms: { [ES_FIELDS.scenarioRunId]: finishedRunIds },
+      });
+    }
+
+    // Add other filters
+    for (const filter of filters) {
+      const fieldMapping = this.mapColumnToField(filter.columnId);
+      if (!fieldMapping) continue;
+
+      if (filter.operator === "eq") {
+        mustClauses.push({ term: { [fieldMapping]: filter.value } });
+      } else if (filter.operator === "contains") {
+        mustClauses.push({
+          wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
+        });
+      }
+    }
+
+    // Add global search
+    if (search) {
+      mustClauses.push({
+        bool: {
+          should: [
+            { wildcard: { [ES_FIELDS.scenarioId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { "metadata.name": `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.scenarioSetId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.batchRunId]: `*${search.toLowerCase()}*` } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            must: mustClauses,
+            must_not: mustNotClauses,
+          },
+        },
+        sort: [{ [sorting.field]: { order: sorting.order } }],
+        from: pagination.from,
+        size: pagination.size,
+        track_total_hits: true,
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    const totalCount =
+      typeof response.hits?.total === "number"
+        ? response.hits.total
+        : response.hits?.total?.value ?? 0;
+
+    const scenarioRunIds = hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
+
+    return { scenarioRunIds, totalCount };
+  }
+
+  /**
+   * Searches for runs with a specific finished status (SUCCESS, ERROR, FAILED, CANCELLED).
+   * Queries RUN_FINISHED events directly.
+   */
+  private async searchFinishedRunsByStatus({
+    projectId,
+    status,
+    filters,
+    sorting,
+    pagination,
+    search,
+  }: {
+    projectId: string;
+    status: string;
+    filters: Array<{ columnId: string; operator: "eq" | "contains"; value?: unknown }>;
+    sorting: { field: string; order: "asc" | "desc" };
+    pagination: { from: number; size: number };
+    search?: string;
+  }): Promise<{ scenarioRunIds: string[]; totalCount: number }> {
+    const client = await this.getClient();
+
+    const mustClauses: any[] = [
+      { term: { [ES_FIELDS.projectId]: projectId } },
+      { term: { type: ScenarioEventType.RUN_FINISHED } },
+      { term: { status: status } },
+    ];
+
+    // Add other filters (note: some filters like "name" are on RUN_STARTED, not RUN_FINISHED)
+    // For now, we'll add filters that exist on RUN_FINISHED
+    for (const filter of filters) {
+      // Skip filters that don't exist on RUN_FINISHED events
+      if (filter.columnId === "name" || filter.columnId === "description") {
+        continue; // These are on RUN_STARTED metadata, not RUN_FINISHED
+      }
+
+      const fieldMapping = this.mapColumnToField(filter.columnId);
+      if (!fieldMapping) continue;
+
+      if (filter.operator === "eq") {
+        mustClauses.push({ term: { [fieldMapping]: filter.value } });
+      } else if (filter.operator === "contains") {
+        mustClauses.push({
+          wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
+        });
+      }
+    }
+
+    // Add global search (limited to fields on RUN_FINISHED)
+    if (search) {
+      mustClauses.push({
+        bool: {
+          should: [
+            { wildcard: { [ES_FIELDS.scenarioId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.scenarioSetId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.batchRunId]: `*${search.toLowerCase()}*` } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            must: mustClauses,
+          },
+        },
+        sort: [{ [sorting.field]: { order: sorting.order } }],
+        from: pagination.from,
+        size: pagination.size,
+        track_total_hits: true,
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    const totalCount =
+      typeof response.hits?.total === "number"
+        ? response.hits.total
+        : response.hits?.total?.value ?? 0;
+
+    const scenarioRunIds = hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
+
+    return { scenarioRunIds, totalCount };
   }
 
   /**
