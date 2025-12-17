@@ -105,7 +105,7 @@ export function DataGridTable<T>({
       ),
       cell: col.cell
         ? (ctx: CellContext<T, unknown>) => col.cell!(ctx)
-        : undefined,
+        : (ctx: CellContext<T, unknown>) => <Text>{ctx.getValue()}</Text>,
       size: col.width,
       minSize: col.minWidth,
       maxSize: col.maxWidth,

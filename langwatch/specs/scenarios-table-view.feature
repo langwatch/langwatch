@@ -8,7 +8,6 @@ Feature: Scenarios Table View with Generic DataGrid
     Given I am logged in as a user with scenarios:view permission
     And I have a project with scenario execution data
     And scenarios have associated traces with metadata
-
   # ============================================================================
   # View Navigation
   # ============================================================================
@@ -33,7 +32,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I click on a batch run ID link
     Then I am navigated to the batch run page
     And I see the grid view for that batch run
-
   # ============================================================================
   # Expandable Rows
   # ============================================================================
@@ -60,7 +58,6 @@ Feature: Scenarios Table View with Generic DataGrid
     Then I see dynamic columns for metadata.user_id and metadata.session_id
     And these columns are hidden by default
     And I can show them via column visibility settings
-
   # ============================================================================
   # Column Popover Menu
   # ============================================================================
@@ -68,7 +65,7 @@ Feature: Scenarios Table View with Generic DataGrid
   @integration
   Scenario: Open column popover menu
     Given I am on the simulations page in Table View
-    When I click on the Status column header dropdown
+    When I click on the Status column header dropdown 3 vertical dots
     Then I see a popover menu with sort, filter, and group options
 
   @integration
@@ -136,7 +133,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I click Pin to Left
     Then the Name column is pinned to the left side
     And it stays visible when scrolling horizontally
-
   # ============================================================================
   # Filter Bar
   # ============================================================================
@@ -162,7 +158,6 @@ Feature: Scenarios Table View with Generic DataGrid
     Given I am on the simulations page in Table View
     When I enter login error in the search box
     Then I see scenarios whose name or content contains login error
-
   # ============================================================================
   # Dynamic Columns
   # ============================================================================
@@ -180,7 +175,6 @@ Feature: Scenarios Table View with Generic DataGrid
     And I have enabled the metadata.user_id column
     When I filter metadata.user_id contains test-user
     Then I only see scenarios whose traces have user_id containing test-user
-
   # ============================================================================
   # Column Visibility Persistence
   # ============================================================================
@@ -207,7 +201,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I copy the current URL
     And another user navigates to that URL
     Then they see the same column visibility settings
-
   # ============================================================================
   # URL Parameter Synchronization
   # ============================================================================
@@ -215,11 +208,11 @@ Feature: Scenarios Table View with Generic DataGrid
   @integration
   Scenario: Load table view with filters from URL
     Given I have a URL with filter parameters:
-      | Parameter | Value |
-      | view | table |
-      | filters | status eq FAILED |
-      | sortBy | timestamp |
-      | sortOrder | desc |
+      | Parameter | Value            |
+      | view      | table            |
+      | filters   | status eq FAILED |
+      | sortBy    | timestamp        |
+      | sortOrder | desc             |
     When I navigate to that URL
     Then I see the Table View
     And the status filter shows FAILED
@@ -232,7 +225,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I copy the current URL
     And another user navigates to that URL
     Then they see the same filtered and sorted view
-
   # ============================================================================
   # CSV Export
   # ============================================================================
@@ -259,7 +251,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I export scenarios as CSV with Include Traces option
     Then the CSV contains trace-level rows
     And each trace row includes its metadata
-
   # ============================================================================
   # Pagination
   # ============================================================================
@@ -278,7 +269,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I change the page size to 50
     Then I see up to 50 scenario runs per page
     And the pageSize parameter in the URL is updated
-
   # ============================================================================
   # Shared Controls
   # ============================================================================
@@ -290,7 +280,6 @@ Feature: Scenarios Table View with Generic DataGrid
     When I switch to Table View
     Then I see the same filter and export controls
     And filters applied in one view persist in the other
-
   # ============================================================================
   # Suite Execution Time
   # ============================================================================
@@ -301,7 +290,6 @@ Feature: Scenarios Table View with Generic DataGrid
     And I have filtered to a specific batch run
     Then I see the total execution time for the batch
     And the time is calculated as the sum of all scenario durations
-
   # ============================================================================
   # Error Handling
   # ============================================================================
