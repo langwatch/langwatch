@@ -5,13 +5,9 @@
  */
 
 import {
-  SPAN_INGESTION_COMMAND_TYPES,
-  SPAN_INGESTION_EVENT_TYPES,
-} from "../pipelines/span-ingestion/schemas/typeIdentifiers";
-import {
-  TRACE_AGGREGATION_COMMAND_TYPES,
-  TRACE_AGGREGATION_EVENT_TYPES,
-} from "../pipelines/trace-aggregation/schemas/typeIdentifiers";
+  TRACE_PROCESSING_COMMAND_TYPES,
+  TRACE_PROCESSING_EVENT_TYPES,
+} from "../pipelines/trace-processing/schemas/constants";
 
 /**
  * Test event type identifiers for integration tests.
@@ -23,8 +19,7 @@ const TEST_EVENT_TYPES = ["test.integration.event"] as const;
  * All event type identifiers defined in schemas.
  */
 export const EVENT_TYPE_IDENTIFIERS = [
-  ...SPAN_INGESTION_EVENT_TYPES,
-  ...TRACE_AGGREGATION_EVENT_TYPES,
+  ...TRACE_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -32,8 +27,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
  * All command type identifiers defined in schemas.
  */
 export const COMMAND_TYPE_IDENTIFIERS = [
-  ...SPAN_INGESTION_COMMAND_TYPES,
-  ...TRACE_AGGREGATION_COMMAND_TYPES,
+  ...TRACE_PROCESSING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -44,10 +38,10 @@ const TEST_AGGREGATE_TYPE = "test_aggregate" as const;
 
 /**
  * Aggregate type identifiers extracted from event/command identifiers.
- * Aggregate types are the third segment in the identifier (e.g., "span_ingestion" from "lw.obs.span_ingestion.recorded").
+ * Note: "span" aggregate was removed as span storage is now handled
+ * via event handler in the trace-processing pipeline.
  */
 export const AGGREGATE_TYPE_IDENTIFIERS = [
-  "span_ingestion",
-  "trace_aggregation",
+  "trace",
   TEST_AGGREGATE_TYPE,
 ] as const;

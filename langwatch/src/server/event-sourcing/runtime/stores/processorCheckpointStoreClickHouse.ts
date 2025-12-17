@@ -10,6 +10,7 @@ import {
   buildCheckpointKey,
   parseCheckpointKey,
 } from "../../library/utils/checkpointKey";
+import type { CheckpointCacheRedis } from "./checkpointCacheRedis";
 import type {
   CheckpointRecord,
   CheckpointRepository,
@@ -19,8 +20,25 @@ import type {
  * ClickHouse implementation of ProcessorCheckpointStore.
  * Provides distributed checkpoint storage for multi-instance deployments.
  *
+ * Optionally uses Redis cache for immediate checkpoint visibility,
+ * solving ClickHouse's eventual consistency lag with ReplacingMergeTree + FINAL.
+ *
+ * **Checkpoint Versioning:**
+ * - Uses ReplacingMergeTree with SequenceNumber as version column for correct ordering
+ * - ORDER BY (TenantId, CheckpointKey, Status) - separates failed checkpoints from normal ones
+ * - Failed checkpoints persist independently and block all future events for that aggregate
+ * - Normal checkpoints (processed/pending) replace each other based on SequenceNumber
+ * - ReplacingMergeTree merges automatically remove superseded versions within each Status partition
+ * - No TTL DELETE - latest checkpoints are never deleted
+ *
+ * **Failure Handling:**
+ * - When an event fails, it creates a failed checkpoint that persists until manually cleared
+ * - Failed checkpoints block ALL future events for that aggregate (checked via hasFailedEvents())
+ * - The same failed event can retry and succeed, which clears the failure and unblocks processing
+ * - Use getFailedEvents() to retrieve failures requiring review
+ * - Use clearCheckpoint() to manually clear a failure after investigation
+ *
  * Schema in /server/clickhouse/migrations/00003_create_processor_checkpoints.sql
- * ```
  */
 export class ProcessorCheckpointStoreClickHouse
   implements ProcessorCheckpointStore
@@ -32,7 +50,10 @@ export class ProcessorCheckpointStoreClickHouse
     "langwatch:event-sourcing:checkpoint-store:clickhouse",
   );
 
-  constructor(private readonly repository: CheckpointRepository) {}
+  constructor(
+    private readonly repository: CheckpointRepository,
+    private readonly cache?: CheckpointCacheRedis,
+  ) {}
 
   async saveCheckpoint<EventType extends Event>(
     tenantId: TenantId,
@@ -106,6 +127,16 @@ export class ProcessorCheckpointStoreClickHouse
 
           // Delegate to repository
           await this.repository.insertCheckpointRecord(record);
+
+          // Cache checkpoint immediately after ClickHouse insert for fast reads
+          if (this.cache) {
+            await this.cache.set(checkpointKey, {
+              sequenceNumber,
+              status,
+              eventId: event.id,
+              timestamp: event.timestamp,
+            });
+          }
 
           this.logger.debug(
             {
@@ -285,7 +316,79 @@ export class ProcessorCheckpointStoreClickHouse
             aggregateId,
           );
 
-          // Get record from repository
+          // Check cache first for fast reads
+          if (this.cache) {
+            const cached = await this.cache.get(checkpointKey);
+            if (cached && cached.sequenceNumber >= sequenceNumber) {
+              // Match the ClickHouse query semantics:
+              // 1. "processed" checkpoint with seq >= requested means requested seq is done
+              // 2. "pending" checkpoint with seq > requested means requested seq must be done
+              //    (otherwise the higher sequence couldn't have started)
+              // 3. "pending" checkpoint with seq = requested means it's STILL processing - NOT valid
+              const isValid =
+                cached.status === "processed" ||
+                (cached.status === "pending" &&
+                  cached.sequenceNumber > sequenceNumber);
+
+              if (isValid) {
+                // Cache hit - convert to full checkpoint format
+                this.logger.debug(
+                  {
+                    processorName,
+                    processorType,
+                    tenantId,
+                    aggregateType,
+                    aggregateId,
+                    sequenceNumber,
+                    cachedSequence: cached.sequenceNumber,
+                    cachedStatus: cached.status,
+                  },
+                  "Found checkpoint in cache",
+                );
+
+                // If we found a pending checkpoint for a HIGHER sequence, convert the result
+                // to indicate the requested sequence is processed (since it must be for the
+                // higher sequence to have started)
+                // This matches the logic in getCheckpointRecordBySequenceNumber
+                if (
+                  cached.status === "pending" &&
+                  cached.sequenceNumber > sequenceNumber
+                ) {
+                  return {
+                    processorName,
+                    processorType,
+                    eventId: cached.eventId,
+                    status: "processed" as const,
+                    eventTimestamp: cached.timestamp,
+                    sequenceNumber: sequenceNumber,
+                    processedAt: void 0,
+                    failedAt: void 0,
+                    errorMessage: void 0,
+                    tenantId,
+                    aggregateType,
+                    aggregateId,
+                  };
+                }
+
+                return {
+                  processorName,
+                  processorType,
+                  eventId: cached.eventId,
+                  status: cached.status as "pending" | "processed" | "failed",
+                  eventTimestamp: cached.timestamp,
+                  sequenceNumber: cached.sequenceNumber,
+                  processedAt: void 0,
+                  failedAt: void 0,
+                  errorMessage: void 0,
+                  tenantId,
+                  aggregateType,
+                  aggregateId,
+                };
+              }
+            }
+          }
+
+          // Fallback to ClickHouse
           const record =
             await this.repository.getCheckpointRecordBySequenceNumber(
               checkpointKey,
