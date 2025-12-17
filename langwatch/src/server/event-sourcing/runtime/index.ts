@@ -1,5 +1,5 @@
 import { createLogger } from "~/utils/logger";
-import type { AggregateType, Event, Projection } from "../library";
+import type { AggregateType, Event, ParentLink, Projection } from "../library";
 import { EventSourcingService } from "../library";
 import type {
   EventSourcingPipelineDefinition,
@@ -10,15 +10,19 @@ const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 
 export class EventSourcingPipeline<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
-> implements RegisteredPipeline<EventType, ProjectionType>
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
+> implements RegisteredPipeline<EventType, ProjectionTypes>
 {
   public readonly name!: string;
   public readonly aggregateType!: AggregateType;
-  public readonly service!: EventSourcingService<EventType, ProjectionType>;
+  public readonly service!: EventSourcingService<EventType, ProjectionTypes>;
+  public readonly parentLinks!: ParentLink<EventType>[];
 
   constructor(
-    definition: EventSourcingPipelineDefinition<EventType, ProjectionType>,
+    definition: EventSourcingPipelineDefinition<EventType, ProjectionTypes>,
   ) {
     // Use Object.defineProperty to make properties truly readonly at runtime
     Object.defineProperty(this, "name", {
@@ -33,35 +37,44 @@ export class EventSourcingPipeline<
       enumerable: true,
       configurable: false,
     });
-
-    // Checkpoint store is now provided by the builder (from EventSourcingRuntime)
-    // or explicitly injected for testing
-    const checkpointStore = definition.processorCheckpointStore;
+    Object.defineProperty(this, "parentLinks", {
+      value: definition.parentLinks ?? [],
+      writable: false,
+      enumerable: true,
+      configurable: false,
+    });
 
     pipelineLogger.debug(
       {
         pipelineName: definition.name,
-        checkpointStoreType: checkpointStore
-          ? checkpointStore.constructor.name
+        checkpointStoreType: definition.processorCheckpointStore
+          ? definition.processorCheckpointStore.constructor.name
           : "none",
-        checkpointStoreSource: checkpointStore ? "provided" : "none",
+        checkpointStoreSource: definition.processorCheckpointStore
+          ? "provided"
+          : "none",
       },
       "Initialized event-sourcing pipeline",
     );
 
+    if (!definition.distributedLock) {
+      throw new Error("distributedLock is required for EventSourcingService");
+    }
+
     Object.defineProperty(this, "service", {
-      value: new EventSourcingService<EventType, ProjectionType>({
+      value: new EventSourcingService<EventType, ProjectionTypes>({
         pipelineName: definition.name,
         aggregateType: definition.aggregateType,
         eventStore: definition.eventStore,
         projections: definition.projections,
         eventPublisher: definition.eventPublisher,
         eventHandlers: definition.eventHandlers,
-        processorCheckpointStore: checkpointStore,
+        processorCheckpointStore: definition.processorCheckpointStore,
         queueProcessorFactory: definition.queueProcessorFactory,
         distributedLock: definition.distributedLock,
         handlerLockTtlMs: definition.handlerLockTtlMs,
         updateLockTtlMs: definition.updateLockTtlMs,
+        commandLockTtlMs: definition.commandLockTtlMs,
       }),
       writable: false,
       enumerable: true,
