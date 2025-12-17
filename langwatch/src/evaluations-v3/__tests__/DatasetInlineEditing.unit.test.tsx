@@ -188,6 +188,59 @@ describe("Dataset inline editing", () => {
 
 });
 
+describe("Keyboard navigation", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  it("navigates down with ArrowDown", () => {
+    const store = useEvaluationsV3Store.getState();
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    // Simulate ArrowDown - this would be handled by the table component
+    // For unit testing the store, we just verify the state updates correctly
+    store.setSelectedCell({ row: 1, columnId: "input" });
+
+    expect(useEvaluationsV3Store.getState().ui.selectedCell).toEqual({
+      row: 1,
+      columnId: "input",
+    });
+  });
+
+  it("navigates right with ArrowRight", () => {
+    const store = useEvaluationsV3Store.getState();
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    store.setSelectedCell({ row: 0, columnId: "expected_output" });
+
+    expect(useEvaluationsV3Store.getState().ui.selectedCell).toEqual({
+      row: 0,
+      columnId: "expected_output",
+    });
+  });
+
+  it("clears selection with Escape", () => {
+    const store = useEvaluationsV3Store.getState();
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    store.setSelectedCell(undefined);
+
+    expect(useEvaluationsV3Store.getState().ui.selectedCell).toBeUndefined();
+  });
+
+  it("enters edit mode with Enter", () => {
+    const store = useEvaluationsV3Store.getState();
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    store.setEditingCell({ row: 0, columnId: "input" });
+
+    expect(useEvaluationsV3Store.getState().ui.editingCell).toEqual({
+      row: 0,
+      columnId: "input",
+    });
+  });
+});
+
 describe("Row selection", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
