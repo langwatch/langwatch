@@ -75,28 +75,11 @@ export class CheckpointManager<EventType extends Event = Event> {
         String(event.aggregateId),
       );
 
-      // Safety check: Don't overwrite failed checkpoints unless we're explicitly saving a failed status
-      // This prevents overwriting failed checkpoints with pending/processed statuses
-      if (status !== "failed" && this.processorCheckpointStore) {
-        const existingCheckpoint =
-          await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
-        if (existingCheckpoint?.status === "failed") {
-          this.logger.warn(
-            {
-              processorName,
-              processorType,
-              eventId: event.id,
-              aggregateId: String(event.aggregateId),
-              status,
-              sequenceNumber,
-              failedSequenceNumber: existingCheckpoint.sequenceNumber,
-            },
-            "Cannot save checkpoint - failed checkpoint exists. Failure detector should have caught this.",
-          );
-          // Don't overwrite failed checkpoint
-          return;
-        }
-      }
+      // Note: We skip the failed checkpoint check here because:
+      // 1. FailureDetector.hasFailedEvents() already checked for failed events before processing
+      // 2. IdempotencyChecker.checkAndClaim() already checked for failed checkpoints and loaded the checkpoint
+      // 3. By the time we reach saveCheckpointSafely, validation has already ensured no failed checkpoints exist
+      // This eliminates redundant checkpoint loads (2 per event: pending + processed)
 
       this.logger.debug(
         {

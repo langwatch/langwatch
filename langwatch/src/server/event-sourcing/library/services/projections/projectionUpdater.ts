@@ -3,8 +3,15 @@ import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { TenantId } from "../../domain/tenantId";
-import type { Event, EventOrderingStrategy } from "../../domain/types";
-import type { ProjectionDefinition } from "../../projection.types";
+import type {
+  Event,
+  EventOrderingStrategy,
+  Projection,
+} from "../../domain/types";
+import type {
+  ProjectionDefinition,
+  ProjectionTypeFromDefinition,
+} from "../../projection.types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type {
   EventStore,
@@ -30,7 +37,13 @@ import type { EventProcessorValidator } from "../validation/eventProcessorValida
  * Manages projection updates for event sourcing.
  * Handles both synchronous and asynchronous (queue-based) projection updates.
  */
-export class ProjectionUpdater<EventType extends Event = Event> {
+export class ProjectionUpdater<
+  EventType extends Event = Event,
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
+> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.projection-updater",
   );
@@ -44,7 +57,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     ProjectionDefinition<EventType, any>
   >;
   private readonly processorCheckpointStore?: ProcessorCheckpointStore;
-  private readonly distributedLock?: DistributedLock;
+  private readonly distributedLock: DistributedLock;
   private readonly updateLockTtlMs: number;
   private readonly ordering: EventOrderingStrategy<EventType>;
   private readonly validator: EventProcessorValidator<EventType>;
@@ -67,7 +80,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     eventStore: EventStore<EventType>;
     projections?: Map<string, ProjectionDefinition<EventType, any>>;
     processorCheckpointStore?: ProcessorCheckpointStore;
-    distributedLock?: DistributedLock;
+    distributedLock: DistributedLock;
     updateLockTtlMs: number;
     ordering: EventOrderingStrategy<EventType>;
     validator: EventProcessorValidator<EventType>;
@@ -78,6 +91,16 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     this.eventStore = eventStore;
     this.projections = projections;
     this.processorCheckpointStore = processorCheckpointStore;
+
+    if (!distributedLock) {
+      throw new ConfigurationError(
+        "ProjectionUpdater",
+        "distributedLock is required. Concurrent event processing for the same aggregate requires a distributed lock to prevent race conditions and ensure correct failure handling. Please provide a DistributedLock implementation (e.g., Redis-based lock).",
+        {
+          aggregateType,
+        },
+      );
+    }
     this.distributedLock = distributedLock;
     this.updateLockTtlMs = updateLockTtlMs;
     this.ordering = ordering;
@@ -90,10 +113,10 @@ export class ProjectionUpdater<EventType extends Event = Event> {
    * Updates all registered projections for aggregates affected by the given events.
    *
    * If queue processors are available, events are dispatched to queues asynchronously.
-   * Otherwise, projections are updated inline (fallback for backwards compatibility).
+   * Otherwise, projections are updated inline.
    *
    * **Concurrency:** Projection updates for different aggregates run concurrently.
-   * Updates for the same aggregate are serialized via distributed lock (if configured).
+   * Updates for the same aggregate are serialized via distributed lock (required).
    *
    * **Failure Modes:**
    * - Errors in individual projection updates are logged but don't fail the operation
@@ -104,8 +127,33 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     if (!this.projections || this.projections.size === 0) {
+      this.logger.warn(
+        {
+          aggregateType: this.aggregateType,
+          eventCount: events.length,
+          tenantId: context.tenantId,
+        },
+        "No projections registered, skipping projection updates",
+      );
       return;
     }
+
+    const projectionCount = this.projections.size;
+    const hasProjectionQueues =
+      this.queueManager.getProjectionQueueProcessors().size > 0;
+    const dispatchMode = hasProjectionQueues ? "async" : "sync";
+
+    this.logger.info(
+      {
+        aggregateType: this.aggregateType,
+        eventCount: events.length,
+        tenantId: context.tenantId,
+        projectionCount,
+        dispatchMode,
+        projectionNames: Array.from(this.projections.keys()),
+      },
+      "Starting projection updates",
+    );
 
     return await this.tracer.withActiveSpan(
       "ProjectionUpdater.updateProjectionsForAggregates",
@@ -115,19 +163,30 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           "aggregate.type": this.aggregateType,
           "event.count": events.length,
           "tenant.id": context.tenantId,
-          "projection.count": this.projections.size,
-          "dispatch.mode":
-            this.queueManager.getProjectionQueueProcessors().size > 0
-              ? "async"
-              : "sync",
+          "projection.count": projectionCount,
+          "dispatch.mode": dispatchMode,
         },
       },
       async (span) => {
         EventUtils.validateTenantId(context, "updateProjectionsForAggregates");
 
         // If queue processors are available, use async queue-based dispatch
-        if (this.queueManager.getProjectionQueueProcessors().size > 0) {
+        if (hasProjectionQueues) {
+          this.logger.debug(
+            {
+              eventCount: events.length,
+              projectionCount,
+            },
+            "Dispatching events to projection queues",
+          );
           await this.dispatchEventsToProjectionQueues(events);
+          this.logger.info(
+            {
+              eventCount: events.length,
+              projectionCount,
+            },
+            "Dispatched events to projection queues",
+          );
           return;
         }
 
@@ -144,6 +203,14 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         span.setAttributes({
           "aggregate.count": eventsByAggregate.size,
         });
+
+        this.logger.debug(
+          {
+            aggregateCount: eventsByAggregate.size,
+            projectionCount,
+          },
+          "Processing projections inline (sync mode)",
+        );
 
         for (const aggregateId of eventsByAggregate.keys()) {
           const eventsForAggregate = eventsByAggregate.get(aggregateId)!;
@@ -191,6 +258,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             }
           }
         }
+
+        this.logger.info(
+          {
+            aggregateCount: eventsByAggregate.size,
+            projectionCount,
+            eventCount: events.length,
+          },
+          "Completed inline projection updates",
+        );
       },
     );
   }
@@ -218,6 +294,9 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           return;
         }
 
+        let dispatchedCount = 0;
+        let skippedCount = 0;
+
         // Dispatch events to queues
         for (const event of events) {
           for (const projectionName of this.projections.keys()) {
@@ -236,6 +315,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
               if (hasFailures) {
                 // For projections, skip processing gracefully (don't throw)
                 // This allows storeEvents to succeed even when processing is skipped
+                skippedCount++;
                 this.logger.warn(
                   {
                     projectionName,
@@ -269,6 +349,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
                 "event.aggregate_id": String(event.aggregateId),
               });
               await queueProcessor.send(event);
+              dispatchedCount++;
+              this.logger.debug(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                },
+                "Dispatched event to projection queue",
+              );
             } catch (error) {
               span.addEvent("projection.queue.send.error", {
                 "projection.name": projectionName,
@@ -276,6 +365,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
                 "error.message":
                   error instanceof Error ? error.message : String(error),
               });
+
               // Queue processor handles retries internally
               if (this.logger) {
                 this.logger.error(
@@ -293,6 +383,16 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             }
           }
         }
+
+        this.logger.info(
+          {
+            eventCount: events.length,
+            projectionCount: this.projections.size,
+            dispatchedCount,
+            skippedCount,
+          },
+          "Dispatched events to projection queues",
+        );
       },
     );
   }
@@ -326,12 +426,29 @@ export class ProjectionUpdater<EventType extends Event = Event> {
       async () => {
         EventUtils.validateTenantId(context, "processProjectionEvent");
 
+        // Fetch events up to and including the current event for processing
+        // This ensures we don't include events that haven't been processed yet
+        const eventsUpToCurrent = await this.eventStore.getEventsUpTo(
+          String(event.aggregateId),
+          context,
+          this.aggregateType,
+          event,
+        );
+
         // Validate event processing prerequisites (sequence number, idempotency, ordering)
+        // Skip ordering check if projection has disableOrderingGuaranteeAndDebounceMs enabled
+        // Pass eventsUpToCurrent for sequence number computation
         const sequenceNumber = await this.validator.validateEventProcessing(
           projectionName,
           "projection",
           event,
           context,
+          {
+            skipOrderingCheck: Boolean(
+              projectionDef.options?.debounceMs,
+            ),
+            events: eventsUpToCurrent,
+          },
         );
 
         this.logger.debug(
@@ -365,14 +482,17 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             sequenceNumber,
           );
 
-          // Rebuild projection from all events for the aggregate
+          // Rebuild projection from events up to and including the current event
+          // This returns both the projection and all events that were processed in the batch
+          // Pass eventsUpToCurrent to avoid duplicate query and ensure we only process up to this event
           await this.updateProjectionByName(
             projectionName,
             String(event.aggregateId),
             context,
+            { events: eventsUpToCurrent },
           );
 
-          // Save checkpoint as "processed" on success
+          // Checkpoint the event we just processed
           await this.checkpointManager.saveCheckpointSafely(
             projectionName,
             "projection",
@@ -388,8 +508,9 @@ export class ProjectionUpdater<EventType extends Event = Event> {
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
               eventType: event.type,
+              sequenceNumber,
             },
-            "Saved processed checkpoint for projection",
+            "Saved processed checkpoint for projection with sequence number",
           );
         } catch (error) {
           const errorMessage =
@@ -402,18 +523,17 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           const isOrderingError = isSequentialOrderingError(error);
 
           if (isLockError || isOrderingError) {
-            this.logger.warn(
+            this.logger.debug(
               {
                 projectionName,
                 eventId: event.id,
                 aggregateId: String(event.aggregateId),
                 tenantId: event.tenantId,
-                error: errorMessage,
                 errorType: isLockError ? "lock" : "ordering",
               },
               isLockError
-                ? "Projection processing blocked by distributed lock; retrying without marking failure"
-                : "Projection processing blocked by sequential ordering; retrying without marking failure",
+                ? "Projection processing blocked by lock, will retry (expected behavior)"
+                : "Projection processing blocked by ordering, will retry (expected behavior)",
             );
           } else {
             await this.checkpointManager.saveCheckpointSafely(
@@ -472,17 +592,23 @@ export class ProjectionUpdater<EventType extends Event = Event> {
    * @param aggregateId - The aggregate to update projection for
    * @param context - Security context with required tenantId for event store access
    * @param options - Optional options including projection store context override
-   * @returns The updated projection
+   * @returns Object containing both the updated projection and the events that were processed
    * @throws {Error} If projection name not found, no events found, lock acquisition fails, or tenantId is invalid
    */
-  async updateProjectionByName<ProjectionName extends string>(
+  async updateProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<any> {
+  ): Promise<{
+    projection: ProjectionTypes[ProjectionName];
+    events: readonly EventType[];
+  }> {
     // Always validate the event-store read context
     EventUtils.validateTenantId(context, "updateProjectionByName");
+
     // Also validate the projection-store write context if it differs
     if (options?.projectionStoreContext) {
       EventUtils.validateTenantId(
@@ -524,11 +650,12 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         const lockKey = `update:${context.tenantId}:${this.aggregateType}:${String(
           aggregateId,
         )}:${projectionName}`;
-        const lockHandle = this.distributedLock
-          ? await this.distributedLock.acquire(lockKey, this.updateLockTtlMs)
-          : null;
+        const lockHandle = await this.distributedLock.acquire(
+          lockKey,
+          this.updateLockTtlMs,
+        );
 
-        if (this.distributedLock && !lockHandle) {
+        if (!lockHandle) {
           throw new LockError(
             lockKey,
             "updateProjection",
@@ -553,15 +680,25 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             "Updating projection",
           );
 
-          span.addEvent("event_store.fetch.start");
-          const events = await this.eventStore.getEvents(
-            aggregateId,
-            context,
-            this.aggregateType,
-          );
-          span.addEvent("event_store.fetch.complete", {
-            "event.count": events.length,
-          });
+          // Use pre-fetched events if provided, otherwise fetch from event store
+          let events: readonly EventType[];
+          if (options?.events) {
+            events = options.events;
+            span.addEvent("event_store.fetch.skipped", {
+              "event.count": events.length,
+              reason: "using pre-fetched events",
+            });
+          } else {
+            span.addEvent("event_store.fetch.start");
+            events = await this.eventStore.getEvents(
+              aggregateId,
+              context,
+              this.aggregateType,
+            );
+            span.addEvent("event_store.fetch.complete", {
+              "event.count": events.length,
+            });
+          }
 
           if (events.length === 0) {
             throw new ValidationError(
@@ -636,7 +773,7 @@ export class ProjectionUpdater<EventType extends Event = Event> {
                   .aggregationStatus
               : void 0;
 
-          this.logger.debug(
+          this.logger.info(
             {
               projectionName,
               aggregateId: String(aggregateId),
@@ -663,23 +800,25 @@ export class ProjectionUpdater<EventType extends Event = Event> {
             );
           }
 
-          return projection;
+          // Return both the projection and the events that were processed
+          return {
+            projection,
+            events,
+          };
         } finally {
-          if (lockHandle) {
-            try {
-              await this.distributedLock!.release(lockHandle);
-            } catch (error) {
-              // Update already completed successfully; lock release failure is non-critical
-              this.logger.error(
-                {
-                  projectionName,
-                  aggregateId: String(aggregateId),
-                  tenantId: context.tenantId,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-                "Failed to release distributed lock after projection update",
-              );
-            }
+          try {
+            await this.distributedLock.release(lockHandle);
+          } catch (error) {
+            // Update already completed successfully; lock release failure is non-critical
+            this.logger.error(
+              {
+                projectionName,
+                aggregateId: String(aggregateId),
+                tenantId: context.tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to release distributed lock after projection update",
+            );
           }
         }
       },
@@ -695,11 +834,13 @@ export class ProjectionUpdater<EventType extends Event = Event> {
    * @returns The projection, or null if not found
    * @throws Error if projection name not found or not configured
    */
-  async getProjectionByName<ProjectionName extends string>(
+  async getProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-  ): Promise<unknown> {
+  ): Promise<ProjectionTypes[ProjectionName] | null> {
     EventUtils.validateTenantId(context, "getProjectionByName");
 
     if (!this.projections) {
@@ -753,7 +894,9 @@ export class ProjectionUpdater<EventType extends Event = Event> {
    * @returns True if the projection exists, false otherwise
    * @throws Error if projection name not found or not configured
    */
-  async hasProjectionByName<ProjectionName extends string>(
+  async hasProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,

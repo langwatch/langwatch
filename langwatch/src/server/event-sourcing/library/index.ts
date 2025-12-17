@@ -64,6 +64,7 @@ export type {
   Event,
   EventMetadataBase,
   EventOrderingStrategy,
+  ParentLink,
   ProcessorCheckpoint,
   Projection,
   ProjectionEnvelope,
@@ -122,17 +123,4 @@ export {
   RedisDistributedLock,
 } from "./utils/distributedLock";
 export type { CreateEventOptions } from "./utils/event.utils";
-export {
-  buildEventMetadataWithCurrentProcessingTraceparent,
-  buildProjectionMetadata,
-  createEvent,
-  createEventStream,
-  createProjection,
-  EventUtils,
-  eventBelongsToAggregate,
-  filterEventsByType,
-  getLatestProjection,
-  isValidEvent,
-  isValidProjection,
-  sortEventsByTimestamp,
-} from "./utils/event.utils";
+export { EventUtils } from "./utils/event.utils";
