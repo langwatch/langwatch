@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Box, Table, Text } from "@chakra-ui/react";
+import { Box, Table, Text, Link } from "@chakra-ui/react";
+import NextLink from "next/link";
 import {
   useReactTable,
   getCoreRowModel,
@@ -64,6 +65,26 @@ export function DataGridTable<T>({
     visibleColumns.has(col.id)
   );
 
+  // Helper to create default cell renderer that handles linkTo and accessor values
+  const createDefaultCellRenderer = (col: DataGridColumnDef<T>) => {
+    return (ctx: CellContext<T, unknown>) => {
+      const value = ctx.getValue();
+      const displayValue = value == null ? "" : String(value);
+
+      // If column has linkTo, render as a link
+      if (col.linkTo) {
+        const href = col.linkTo(ctx.row.original);
+        return (
+          <Link asChild color="blue.500" _hover={{ textDecoration: "underline" }}>
+            <NextLink href={href}>{displayValue}</NextLink>
+          </Link>
+        );
+      }
+
+      return <Text>{displayValue}</Text>;
+    };
+  };
+
   // Convert our column defs to TanStack Table format
   const tanstackColumns: ColumnDef<T>[] = [
     // Expand column (if expandable content is provided)
@@ -103,9 +124,10 @@ export function DataGridTable<T>({
           enumOptions={getEnumOptions?.(col.id)}
         />
       ),
+      // Use custom cell renderer if provided, otherwise use default renderer
       cell: col.cell
         ? (ctx: CellContext<T, unknown>) => col.cell!(ctx)
-        : (ctx: CellContext<T, unknown>) => <Text>{ctx.getValue()}</Text>,
+        : createDefaultCellRenderer(col),
       size: col.width,
       minSize: col.minWidth,
       maxSize: col.maxWidth,
