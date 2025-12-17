@@ -16,13 +16,14 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
-import { spanIngestionService } from "../../../../../server/event-sourcing/pipelines/span-ingestion/services/spanIngestionService";
+import { TraceRequestCollectionService } from "../../../../../server/event-sourcing/pipelines/trace-processing/services";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
 import { createLogger } from "../../../../../utils/logger";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
+const traceRequestCollectionService = new TraceRequestCollectionService();
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -185,9 +186,17 @@ async function handleTracesRequest(req: NextRequest) {
         }
       }
 
+      // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
+      let clickHouseTask: Promise<void> | null = null;
+      if (project.featureClickHouse) {
+        clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
+          project.id,
+          traceRequest,
+        );
+      }
+
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
-      const clickHouseTasks: Promise<void>[] = [];
 
       const promises = await tracer.withActiveSpan(
         "TracesV1.duplicateTracesCheck",
@@ -226,16 +235,6 @@ async function handleTracesRequest(req: NextRequest) {
               "collecting traces",
             );
 
-            if (project.featureClickHouse) {
-              clickHouseTasks.push(
-                spanIngestionService.ingestSpanCollection(
-                  project.id,
-                  traceForCollection,
-                  traceRequest,
-                ),
-              );
-            }
-
             promises.push(
               scheduleTraceCollectionWithFallback({
                 ...traceForCollection,
@@ -254,9 +253,9 @@ async function handleTracesRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
-        if (clickHouseTasks.length > 0) {
+        if (clickHouseTask) {
           try {
-            await Promise.allSettled(clickHouseTasks);
+            await clickHouseTask;
           } catch {
             /* ignore, errors non-blocking and caught by tracing layer */
           }
@@ -272,9 +271,9 @@ async function handleTracesRequest(req: NextRequest) {
         },
       );
 
-      if (clickHouseTasks.length > 0) {
+      if (clickHouseTask) {
         try {
-          await Promise.allSettled(clickHouseTasks);
+          await clickHouseTask;
         } catch {
           /* ignore, errors non-blocking and caught by tracing layer */
         }
