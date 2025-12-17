@@ -1,5 +1,5 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
-import { createIndex } from "../helpers";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
+import { getCurrentWriteIndex } from "../helpers";
 import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
 
 /**
@@ -7,20 +7,20 @@ import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
  * This is a non-destructive change - only adds a new mapping.
  */
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
-  await createIndex({
-    index: SCENARIO_EVENTS_INDEX.base,
-    mappings: {
-      metadata: {
-        properties: {
-          name: {
-            type: "text",
-            fields: {
-              keyword: { type: "keyword" },
-            },
-          },
+  const currentIndex = await getCurrentWriteIndex({
+    indexSpec: SCENARIO_EVENTS_INDEX,
+    client,
+  });
+
+  await client.indices.putMapping({
+    index: currentIndex,
+    properties: {
+      name: {
+        type: "text",
+        fields: {
+          keyword: { type: "keyword" },
         },
       },
     },
-    client,
   });
 };
