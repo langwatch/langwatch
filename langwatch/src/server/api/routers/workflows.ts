@@ -1,5 +1,6 @@
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
+import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { generateText, tool } from "ai";
 import { createPatch } from "diff";
@@ -102,96 +103,35 @@ export const workflowRouter = createTRPCRouter({
         });
       }
 
-      // Deep clone DSL to ensure mutability
-      const dsl = JSON.parse(
-        JSON.stringify(workflow.latestVersion.dsl),
-      ) as Workflow;
-      const datasetIdMap = new Map<string, { id: string; name: string }>();
+      const { workflowId, dsl } = await copyWorkflowWithDatasets({
+        ctx,
+        workflow,
+        targetProjectId: input.projectId,
+        sourceProjectId: input.sourceProjectId,
+        copyDatasets: input.copyDatasets,
+        copiedFromWorkflowId: input.workflowId,
+      });
 
-      if (input.copyDatasets) {
-        const datasetService = DatasetService.create(ctx.prisma);
-
-        // Type guard for dataset reference
-        const isDatasetRef = (
-          value: unknown,
-        ): value is { id?: string; name?: string } => {
-          if (!value || typeof value !== "object") return false;
-          const obj = value as Record<string, unknown>;
-          return (
-            (obj.id === undefined || typeof obj.id === "string") &&
-            (obj.name === undefined || typeof obj.name === "string")
-          );
-        };
-
-        // Helper to process dataset reference
-        const processDatasetRef = async (datasetRef: {
-          id?: string;
-          name?: string;
-        }) => {
-          if (!datasetRef.id) return;
-
-          if (datasetIdMap.has(datasetRef.id)) {
-            const newDataset = datasetIdMap.get(datasetRef.id)!;
-            datasetRef.id = newDataset.id;
-            datasetRef.name = newDataset.name;
-            return;
-          }
-
-          // Create new dataset in target project using service
-          const newDataset = await datasetService.copyDataset({
-            sourceDatasetId: datasetRef.id,
-            sourceProjectId: input.sourceProjectId,
-            targetProjectId: input.projectId,
-          });
-
-          datasetIdMap.set(datasetRef.id, {
-            id: newDataset.id,
-            name: newDataset.name,
-          });
-
-          datasetRef.id = newDataset.id;
-          datasetRef.name = newDataset.name;
-        };
-
-        // Traverse nodes to find datasets
-        for (const node of dsl.nodes) {
-          // Check Entry node dataset
-          if (node.data && "dataset" in node.data && node.data.dataset) {
-            await processDatasetRef(node.data.dataset);
-          }
-
-          // Check parameters for Demonstrations
-          if (node.data && "parameters" in node.data && node.data.parameters) {
-            for (const param of node.data.parameters) {
-              if (param.type === "dataset" && isDatasetRef(param.value)) {
-                await processDatasetRef(param.value);
-              }
-            }
-          }
-        }
-      }
-
-      const newWorkflow = await ctx.prisma.workflow.create({
-        data: {
-          id: `workflow_${nanoid()}`,
+      const newWorkflow = await ctx.prisma.workflow.findFirst({
+        where: {
+          id: workflowId,
           projectId: input.projectId,
-          name: workflow.name,
-          icon: workflow.icon,
-          description: workflow.description,
-          copiedFromWorkflowId: input.workflowId,
         },
       });
+
+      if (!newWorkflow) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create workflow",
+        });
+      }
 
       const version = await saveOrCommitWorkflowVersion({
         ctx,
         input: {
           projectId: input.projectId,
-          workflowId: newWorkflow.id,
-          dsl: {
-            ...dsl,
-            workflow_id: newWorkflow.id,
-            version: "1",
-          },
+          workflowId,
+          dsl,
         },
         autoSaved: false,
         commitMessage: "Copied from " + workflow.name,
@@ -1012,6 +952,128 @@ ${diff}
       return result;
     }),
 });
+
+/**
+ * Copies a workflow with optional dataset copying.
+ * This is a shared utility used by both workflow and experiment copy operations.
+ */
+export const copyWorkflowWithDatasets = async ({
+  ctx,
+  workflow,
+  targetProjectId,
+  sourceProjectId,
+  copyDatasets,
+  copiedFromWorkflowId,
+}: {
+  ctx: { prisma: PrismaClient; session: Session };
+  workflow: {
+    id: string;
+    name: string;
+    icon: string | null;
+    description: string | null;
+    latestVersion: { dsl: JsonValue } | null;
+  };
+  targetProjectId: string;
+  sourceProjectId: string;
+  copyDatasets?: boolean;
+  copiedFromWorkflowId?: string;
+}): Promise<{ workflowId: string; dsl: Workflow }> => {
+  if (!workflow.latestVersion?.dsl) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Workflow version not found",
+    });
+  }
+
+  // Deep clone DSL to ensure mutability
+  const dsl = JSON.parse(
+    JSON.stringify(workflow.latestVersion.dsl),
+  ) as Workflow;
+  const datasetIdMap = new Map<string, { id: string; name: string }>();
+
+  if (copyDatasets) {
+    const datasetService = DatasetService.create(ctx.prisma);
+
+    // Type guard for dataset reference
+    const isDatasetRef = (
+      value: unknown,
+    ): value is { id?: string; name?: string } => {
+      if (!value || typeof value !== "object") return false;
+      const obj = value as Record<string, unknown>;
+      return (
+        (obj.id === undefined || typeof obj.id === "string") &&
+        (obj.name === undefined || typeof obj.name === "string")
+      );
+    };
+
+    // Helper to process dataset reference
+    const processDatasetRef = async (datasetRef: {
+      id?: string;
+      name?: string;
+    }) => {
+      if (!datasetRef.id) return;
+
+      if (datasetIdMap.has(datasetRef.id)) {
+        const newDataset = datasetIdMap.get(datasetRef.id)!;
+        datasetRef.id = newDataset.id;
+        datasetRef.name = newDataset.name;
+        return;
+      }
+
+      // Create new dataset in target project using service
+      const newDataset = await datasetService.copyDataset({
+        sourceDatasetId: datasetRef.id,
+        sourceProjectId,
+        targetProjectId,
+      });
+
+      datasetIdMap.set(datasetRef.id, {
+        id: newDataset.id,
+        name: newDataset.name,
+      });
+
+      datasetRef.id = newDataset.id;
+      datasetRef.name = newDataset.name;
+    };
+
+    // Traverse nodes to find datasets
+    for (const node of dsl.nodes) {
+      // Check Entry node dataset
+      if (node.data && "dataset" in node.data && node.data.dataset) {
+        await processDatasetRef(node.data.dataset);
+      }
+
+      // Check parameters for Demonstrations
+      if (node.data && "parameters" in node.data && node.data.parameters) {
+        for (const param of node.data.parameters) {
+          if (param.type === "dataset" && isDatasetRef(param.value)) {
+            await processDatasetRef(param.value);
+          }
+        }
+      }
+    }
+  }
+
+  // Create new workflow
+  const newWorkflow = await ctx.prisma.workflow.create({
+    data: {
+      id: `workflow_${nanoid()}`,
+      projectId: targetProjectId,
+      name: workflow.name,
+      icon: workflow.icon ?? "",
+      description: workflow.description ?? "",
+      copiedFromWorkflowId: copiedFromWorkflowId ?? workflow.id,
+    },
+  });
+
+  // Update DSL with new workflow ID
+  dsl.workflow_id = newWorkflow.id;
+  dsl.version = "1";
+  dsl.experiment_id = "";
+  dsl.state = {};
+
+  return { workflowId: newWorkflow.id, dsl };
+};
 
 export const saveOrCommitWorkflowVersion = async ({
   ctx,
