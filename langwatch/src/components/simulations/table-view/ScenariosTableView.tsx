@@ -146,21 +146,58 @@ export function ScenariosTableView() {
 
     if (scenarioData) {
       // Transform ScenarioRunData to ScenarioRunRow format
-      const rows: ScenarioRunRow[] = scenarioData.rows.map((run) => ({
-        scenarioRunId: run.scenarioRunId,
-        scenarioId: run.scenarioId,
-        scenarioSetId: run.scenarioSetId ?? "",
-        batchRunId: run.batchRunId,
-        name: run.name ?? null,
-        description: run.description ?? null,
-        status: run.status,
-        verdict: run.results?.verdict ?? null,
-        timestamp: run.timestamp,
-        durationInMs: run.durationInMs,
-        metCriteria: run.results?.metCriteria ?? [],
-        unmetCriteria: run.results?.unmetCriteria ?? [],
-        traces: [], // TODO: Populate when includeTraces is true
-      }));
+      const rows: ScenarioRunRow[] = scenarioData.rows.map((run) => {
+        // Extract trace info from messages
+        const traceMap = new Map<string, { input: string; output: string; timestamp: number }>();
+
+        for (const message of run.messages ?? []) {
+          const traceId = (message as { trace_id?: string }).trace_id;
+          if (traceId) {
+            const existing = traceMap.get(traceId) ?? { input: "", output: "", timestamp: 0 };
+            const content = typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message.content ?? "");
+
+            // Determine if this is input or output based on role
+            const role = (message as { role?: string }).role;
+            if (role === "user" || role === "human") {
+              existing.input = content;
+            } else if (role === "assistant" || role === "ai") {
+              existing.output = content;
+            }
+            existing.timestamp = (message as { timestamp?: number }).timestamp ?? run.timestamp;
+            traceMap.set(traceId, existing);
+          }
+        }
+
+        // Convert trace map to TraceRow array
+        const traces = Array.from(traceMap.entries()).map(([traceId, data]) => ({
+          traceId,
+          timestamp: data.timestamp,
+          input: data.input,
+          output: data.output,
+          metadata: {},
+          spanCount: 0,
+          totalTokens: 0,
+          totalCost: 0,
+        }));
+
+        return {
+          scenarioRunId: run.scenarioRunId,
+          scenarioId: run.scenarioId,
+          scenarioSetId: run.scenarioSetId ?? "",
+          batchRunId: run.batchRunId,
+          name: run.name ?? null,
+          description: run.description ?? null,
+          status: run.status,
+          verdict: run.results?.verdict ?? null,
+          timestamp: run.timestamp,
+          durationInMs: run.durationInMs,
+          metCriteria: run.results?.metCriteria ?? [],
+          unmetCriteria: run.results?.unmetCriteria ?? [],
+          traces,
+        };
+      });
 
       store.getState().setRows(rows);
       store.getState().setTotalCount(scenarioData.totalCount);
