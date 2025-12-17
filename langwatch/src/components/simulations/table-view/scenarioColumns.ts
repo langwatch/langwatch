@@ -106,6 +106,16 @@ export function createScenarioColumns(
       sortable: false,
       defaultVisible: false,
     },
+    {
+      id: "actions",
+      header: "",
+      accessorKey: "scenarioRunId", // Dummy accessor
+      filterable: false,
+      sortable: false,
+      defaultVisible: true,
+      hideable: false, // Always visible
+      width: 50,
+    },
   ];
 }
 

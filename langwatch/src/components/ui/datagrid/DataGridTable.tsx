@@ -279,12 +279,6 @@ export function DataGridTable<T>({
                         <Table.Row
                           key={row.id}
                           _hover={{ bg: "gray.50" }}
-                          cursor={renderExpandedContent ? "pointer" : "default"}
-                          onClick={() => {
-                            if (renderExpandedContent) {
-                              onToggleRowExpansion(row.id);
-                            }
-                          }}
                         >
                           {row.getVisibleCells().map((cell) => (
                             <Table.Cell
@@ -323,12 +317,6 @@ export function DataGridTable<T>({
                 <Table.Row
                   key={row.id}
                   _hover={{ bg: "gray.50" }}
-                  cursor={renderExpandedContent ? "pointer" : "default"}
-                  onClick={() => {
-                    if (renderExpandedContent) {
-                      onToggleRowExpansion(row.id);
-                    }
-                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <Table.Cell
