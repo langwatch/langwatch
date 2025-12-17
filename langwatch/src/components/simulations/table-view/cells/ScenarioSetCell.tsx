@@ -1,20 +1,30 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Text, Link } from "@chakra-ui/react";
 import type { CellContext } from "@tanstack/react-table";
 import { ExternalLink } from "lucide-react";
+import NextLink from "next/link";
+import { useRouter } from "next/router";
 import type { ScenarioRunRow } from "../types";
 
 /**
  * Scenario Set ID cell - shows ID with external link icon
+ * Includes link to scenario set page
  */
-export function ScenarioSetCell({ getValue }: CellContext<ScenarioRunRow, unknown>) {
+export function ScenarioSetCell({ getValue, row }: CellContext<ScenarioRunRow, unknown>) {
+  const router = useRouter();
+  const projectSlug = router.query.project as string;
   const scenarioSetId = String(getValue() ?? "");
+  const href = `/${projectSlug}/simulations/${row.original.scenarioSetId}`;
 
   return (
-    <HStack gap={1}>
-      <Text fontSize="sm" truncate maxW="150px">
-        {scenarioSetId}
-      </Text>
-      <ExternalLink size={12} color="gray" />
-    </HStack>
+    <Link asChild color="blue.500" _hover={{ textDecoration: "underline" }}>
+      <NextLink href={href}>
+        <HStack gap={1}>
+          <Text fontSize="sm" truncate maxW="150px">
+            {scenarioSetId}
+          </Text>
+          <ExternalLink size={12} />
+        </HStack>
+      </NextLink>
+    </Link>
   );
 }

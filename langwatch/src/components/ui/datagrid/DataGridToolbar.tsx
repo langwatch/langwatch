@@ -1,4 +1,4 @@
-import { Button, Flex, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Text } from "@chakra-ui/react";
 import { Download, Eye, RefreshCw } from "lucide-react";
 import {
   PopoverRoot,
@@ -45,74 +45,72 @@ export function DataGridToolbar<T>({
   getEnumOptions,
 }: DataGridToolbarProps<T>) {
   return (
-    <Flex direction="column" gap={2}>
-      {/* Filter Bar */}
-      <FilterBar
-        columns={columns}
-        filters={filters}
-        globalSearch={globalSearch}
-        onAddFilter={onAddFilter}
-        onRemoveFilter={onRemoveFilter}
-        onClearFilters={onClearFilters}
-        onGlobalSearchChange={onGlobalSearchChange}
-        getEnumOptions={getEnumOptions}
-      />
+    <Flex direction="row" align="center" justify="space-between" gap={4} px={3}>
+      {/* Filter Bar - takes available space */}
+      <Box flex={1}>
+        <FilterBar
+          columns={columns}
+          filters={filters}
+          globalSearch={globalSearch}
+          onAddFilter={onAddFilter}
+          onRemoveFilter={onRemoveFilter}
+          onClearFilters={onClearFilters}
+          onGlobalSearchChange={onGlobalSearchChange}
+          getEnumOptions={getEnumOptions}
+        />
+      </Box>
 
-      {/* Actions Row */}
-      <Flex justify="space-between" align="center" px={3}>
-        <HStack gap={2}>
-          {/* Column Visibility */}
-          <PopoverRoot>
-            <PopoverTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Eye size={14} />
-                <Text ml={1}>Columns</Text>
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent width="250px">
-              <PopoverBody>
-                <Flex direction="column" gap={2}>
-                  <Text fontWeight="medium" fontSize="sm" mb={1}>
-                    Visible Columns
-                  </Text>
-                  {columns.map((column) => (
-                    <Checkbox
-                      key={column.id}
-                      checked={visibleColumns.has(column.id)}
-                      onCheckedChange={() =>
-                        onToggleColumnVisibility(column.id)
-                      }
-                    >
-                      {column.header}
-                    </Checkbox>
-                  ))}
-                </Flex>
-              </PopoverBody>
-            </PopoverContent>
-          </PopoverRoot>
-        </HStack>
-
-        <HStack gap={2}>
-          {/* Refresh */}
-          {onRefresh && (
-            <Button size="sm" variant="outline" onClick={onRefresh}>
-              <RefreshCw size={14} />
-              <Text ml={1}>Refresh</Text>
+      {/* Right side controls */}
+      <HStack gap={2} flexShrink={0}>
+        {/* Column Visibility */}
+        <PopoverRoot>
+          <PopoverTrigger asChild>
+            <Button size="sm" variant="outline">
+              <Eye size={14} />
+              <Text ml={1}>Columns</Text>
             </Button>
-          )}
+          </PopoverTrigger>
+          <PopoverContent width="250px">
+            <PopoverBody>
+              <Flex direction="column" gap={2}>
+                <Text fontWeight="medium" fontSize="sm" mb={1}>
+                  Visible Columns
+                </Text>
+                {columns.map((column) => (
+                  <Checkbox
+                    key={column.id}
+                    checked={visibleColumns.has(column.id)}
+                    onCheckedChange={() =>
+                      onToggleColumnVisibility(column.id)
+                    }
+                  >
+                    {column.header}
+                  </Checkbox>
+                ))}
+              </Flex>
+            </PopoverBody>
+          </PopoverContent>
+        </PopoverRoot>
 
-          {/* Export */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onExport}
-            loading={isExporting}
-          >
-            <Download size={14} />
-            <Text ml={1}>Export CSV</Text>
+        {/* Refresh */}
+        {onRefresh && (
+          <Button size="sm" variant="outline" onClick={onRefresh}>
+            <RefreshCw size={14} />
+            <Text ml={1}>Refresh</Text>
           </Button>
-        </HStack>
-      </Flex>
+        )}
+
+        {/* Export */}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onExport}
+          loading={isExporting}
+        >
+          <Download size={14} />
+          <Text ml={1}>Export CSV</Text>
+        </Button>
+      </HStack>
     </Flex>
   );
 }

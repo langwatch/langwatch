@@ -253,7 +253,7 @@ export function DataGridTable<T>({
                 {/* Group header row */}
                 <Table.Row
                   key={`group-${group.groupValue}`}
-                  bg="gray.100"
+                  // bg="gray.100"
                   cursor="pointer"
                   onClick={() => toggleGroup(group.groupValue)}
                 >
