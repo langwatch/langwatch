@@ -40,7 +40,7 @@ export function createScenarioColumns(
       filterable: true,
       filterType: "text",
       sortable: true,
-      defaultVisible: true,
+      defaultVisible: false,
     },
     {
       id: "status",
@@ -71,7 +71,7 @@ export function createScenarioColumns(
     },
     {
       id: "timestamp",
-      header: "Run Time",
+      header: "Date",
       accessorKey: "timestamp",
       filterable: true,
       filterType: "date",
@@ -83,9 +83,8 @@ export function createScenarioColumns(
       id: "durationInMs",
       header: "Duration",
       accessorKey: "durationInMs",
-      filterable: true,
-      filterType: "number",
-      sortable: true,
+      filterable: false,
+      sortable: false,
       defaultVisible: true,
     },
     {

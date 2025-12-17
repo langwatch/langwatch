@@ -40,6 +40,8 @@ interface DataGridTableProps<T> {
   getEnumOptions?: (columnId: string) => string[];
   isLoading?: boolean;
   emptyMessage?: string;
+  /** Called when a row is clicked (not on expand toggle) */
+  onRowClick?: (row: T) => void;
 }
 
 /**
@@ -65,6 +67,7 @@ export function DataGridTable<T>({
   getEnumOptions,
   isLoading,
   emptyMessage = "No data available",
+  onRowClick,
 }: DataGridTableProps<T>) {
   // Filter to visible columns and add expand column if needed
   const visibleColumnDefs = columnDefs.filter((col) =>
@@ -279,6 +282,8 @@ export function DataGridTable<T>({
                         <Table.Row
                           key={row.id}
                           _hover={{ bg: "gray.50" }}
+                          cursor={onRowClick ? "pointer" : undefined}
+                          onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                         >
                           {row.getVisibleCells().map((cell) => (
                             <Table.Cell
@@ -317,6 +322,8 @@ export function DataGridTable<T>({
                 <Table.Row
                   key={row.id}
                   _hover={{ bg: "gray.50" }}
+                  cursor={onRowClick ? "pointer" : undefined}
+                  onClick={onRowClick ? () => onRowClick(row.original) : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <Table.Cell
