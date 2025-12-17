@@ -18,7 +18,7 @@ import {
   Pin,
   X,
 } from "lucide-react";
-import { format, subDays, startOfDay } from "date-fns";
+import { format, subDays, subMinutes, startOfDay } from "date-fns";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -100,9 +100,13 @@ export function ColumnPopover<T>({
     }
   };
 
-  const handleQuickDateSelect = (days: number) => {
+  const handleQuickDateSelect = (minutes: number) => {
     const endDate = new Date();
-    const startDate = startOfDay(subDays(endDate, days - 1));
+    // For times less than a day, use minutes; otherwise use days
+    const startDate =
+      minutes < 1440
+        ? subMinutes(endDate, minutes)
+        : startOfDay(subDays(endDate, minutes / 1440 - 1));
     onAddFilter({
       columnId: column.id,
       operator: "between",
@@ -209,18 +213,20 @@ export function ColumnPopover<T>({
                   </HStack>
                 ) : column.filterType === "date" ? (
                   <VStack align="stretch" gap={2}>
-                    <HStack gap={2}>
+                    <HStack gap={2} flexWrap="wrap">
                       {[
-                        { label: "Today", days: 1 },
-                        { label: "7d", days: 7 },
-                        { label: "30d", days: 30 },
-                        { label: "90d", days: 90 },
+                        { label: "5m", minutes: 5 },
+                        { label: "15m", minutes: 15 },
+                        { label: "Today", minutes: 1440 },
+                        { label: "7d", minutes: 7 * 1440 },
+                        { label: "30d", minutes: 30 * 1440 },
+                        { label: "90d", minutes: 90 * 1440 },
                       ].map((opt) => (
                         <Button
                           key={opt.label}
                           size="xs"
                           variant="outline"
-                          onClick={() => handleQuickDateSelect(opt.days)}
+                          onClick={() => handleQuickDateSelect(opt.minutes)}
                         >
                           {opt.label}
                         </Button>

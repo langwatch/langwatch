@@ -44,29 +44,27 @@ export function ColumnHeader<T>({
 
   return (
     <Flex align="center" gap={1}>
-      <Text
-        fontWeight="bold"
-        fontSize="xs"
-        cursor={column.sortable ? "pointer" : "default"}
-        onClick={() => {
-          if (column.sortable) {
-            if (!isSorted) {
-              onSort(column.id, "asc");
-            } else if (sortOrder === "asc") {
-              onSort(column.id, "desc");
-            } else {
-              onSort(column.id, null);
-            }
-          }
-        }}
-        _hover={column.sortable ? { color: "blue.500" } : undefined}
-      >
+      <Text fontWeight="bold" fontSize="xs">
         {column.header}
       </Text>
 
       {/* Sort indicator */}
       {column.sortable && (
-        <Flex color={isSorted ? "blue.500" : "gray.400"}>
+        <Flex
+          color={isSorted ? "blue.500" : "gray.400"}
+          cursor={column.sortable ? "pointer" : "default"}
+          onClick={() => {
+            if (column.sortable) {
+              if (!isSorted) {
+                onSort(column.id, "asc");
+              } else if (sortOrder === "asc") {
+                onSort(column.id, "desc");
+              } else {
+                onSort(column.id, null);
+              }
+            }
+          }}
+        >
           {isSorted ? (
             sortOrder === "asc" ? (
               <ChevronUp size={14} />
