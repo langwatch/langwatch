@@ -206,7 +206,7 @@ describe("EventSourcing", () => {
       });
 
       const instance = new EventSourcing(runtime);
-      const builder = instance.registerPipeline<TestEvent, TestProjection>();
+      const builder = instance.registerPipeline<TestEvent>();
 
       expect(builder).toBeInstanceOf(PipelineBuilder);
     });

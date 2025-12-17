@@ -8,8 +8,9 @@ import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 describe("EventStoreMemory - countEventsBefore", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
   const eventType = EVENT_TYPES[0];
+  const eventVersion = "2025-12-17";
 
   let store: EventStoreMemory;
 
@@ -27,6 +28,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         timestamp,
@@ -53,6 +55,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -62,6 +65,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         2000,
@@ -71,6 +75,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 3 },
         void 0,
         3000,
@@ -103,6 +108,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 1 },
           void 0,
           sameTimestamp,
@@ -116,6 +122,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 2 },
           void 0,
           sameTimestamp,
@@ -128,6 +135,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 3 },
           void 0,
           sameTimestamp,
@@ -177,6 +185,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId1,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -186,6 +195,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId2,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         1000,
@@ -233,6 +243,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 1 },
           void 0,
           sameTimestamp,
@@ -245,6 +256,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 2 },
           void 0,
           sameTimestamp,
@@ -257,6 +269,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 3 },
           void 0,
           sameTimestamp,
@@ -288,6 +301,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -297,6 +311,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         2000,
@@ -306,6 +321,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 3 },
         void 0,
         2000, // Same timestamp as event2
@@ -318,6 +334,7 @@ describe("EventStoreMemory - countEventsBefore", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 4 },
         void 0,
         3000,
