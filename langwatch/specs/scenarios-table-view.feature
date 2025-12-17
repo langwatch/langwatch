@@ -55,7 +55,16 @@ Feature: Scenarios Table View
   Scenario: Expand row to view trace details
     Given I am on the simulations page in Table View
     When I expand a scenario row
-    Then I see nested trace data with inputs and outputs
+    Then I see a nested table with trace data
+    And columns include Trace ID, Timestamp, Input, Output, Tokens, Cost
+
+  @e2e
+  Scenario: Click trace to open details drawer
+    Given I am on the simulations page in Table View
+    And I have expanded a scenario row
+    When I click on a trace row
+    Then the trace details drawer opens
+    And I see the full trace timeline and spans
 
   @e2e
   Scenario: Open run details via actions column

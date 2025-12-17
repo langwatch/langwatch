@@ -1,4 +1,8 @@
-import { Box, Table, Text } from "@chakra-ui/react";
+import { useMemo } from "react";
+import { Box, Text } from "@chakra-ui/react";
+import { DataGridTable } from "~/components/ui/datagrid/DataGridTable";
+import { useDrawer } from "~/hooks/useDrawer";
+import { createTraceColumns } from "./traceColumns";
 import type { ScenarioRunRow, TraceRow } from "./types";
 
 interface ScenarioExpandedContentProps {
@@ -7,9 +11,25 @@ interface ScenarioExpandedContentProps {
 
 /**
  * Expanded row content showing traces for a scenario run
+ * Uses DataGridTable for consistent UX with the parent table
  */
 export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
+  const { openDrawer } = useDrawer();
   const traces = row.traces ?? [];
+
+  // Create columns for the trace table
+  const traceColumns = useMemo(() => createTraceColumns(), []);
+
+  // All columns visible by default
+  const visibleColumns = useMemo(
+    () => new Set(traceColumns.map((col) => col.id)),
+    [traceColumns]
+  );
+
+  // Handle row click - open trace details drawer
+  const handleRowClick = (trace: TraceRow) => {
+    openDrawer("traceDetails", { traceId: trace.traceId });
+  };
 
   if (traces.length === 0) {
     return (
@@ -26,64 +46,25 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
       <Text fontWeight="medium" fontSize="sm" mb={2}>
         Traces ({traces.length})
       </Text>
-      <Table.Root size="sm" variant="outline">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Trace ID</Table.ColumnHeader>
-            <Table.ColumnHeader>Input</Table.ColumnHeader>
-            <Table.ColumnHeader>Output</Table.ColumnHeader>
-            <Table.ColumnHeader>Tokens</Table.ColumnHeader>
-            <Table.ColumnHeader>Cost</Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {traces.map((trace) => (
-            <TraceTableRow key={trace.traceId} trace={trace} />
-          ))}
-        </Table.Body>
-      </Table.Root>
+      <DataGridTable<TraceRow>
+        data={traces}
+        columns={traceColumns}
+        visibleColumns={visibleColumns}
+        sorting={null}
+        filters={[]}
+        groupBy={null}
+        expandedRows={new Set()}
+        getRowId={(trace) => trace.traceId}
+        onSort={() => {}}
+        onAddFilter={() => {}}
+        onRemoveFilter={() => {}}
+        onGroupBy={() => {}}
+        onToggleColumnVisibility={() => {}}
+        onPinColumn={() => {}}
+        onToggleRowExpansion={() => {}}
+        onRowClick={handleRowClick}
+        emptyMessage="No traces available"
+      />
     </Box>
-  );
-}
-
-interface TraceTableRowProps {
-  trace: TraceRow;
-}
-
-function TraceTableRow({ trace }: TraceTableRowProps) {
-  const truncate = (text: string, maxLength: number) => {
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + "...";
-  };
-
-  const formatCost = (cost: number) => {
-    if (cost === 0) return "-";
-    return `$${cost.toFixed(4)}`;
-  };
-
-  return (
-    <Table.Row>
-      <Table.Cell>
-        <Text fontFamily="mono" fontSize="xs">
-          {truncate(trace.traceId, 12)}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm" maxW="200px" truncate>
-          {truncate(trace.input, 50)}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm" maxW="200px" truncate>
-          {truncate(trace.output, 50)}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm">{trace.totalTokens || "-"}</Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm">{formatCost(trace.totalCost)}</Text>
-      </Table.Cell>
-    </Table.Row>
   );
 }

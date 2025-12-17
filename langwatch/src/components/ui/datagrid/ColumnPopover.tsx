@@ -14,7 +14,7 @@ import {
   ArrowUp,
   Eye,
   EyeOff,
-  Filter,
+  MoreVertical,
   Pin,
   X,
 } from "lucide-react";
@@ -94,7 +94,7 @@ export function ColumnPopover<T>({
           variant="ghost"
           ml={1}
         >
-          <Filter size={14} />
+          <MoreVertical size={14} />
         </IconButton>
       </PopoverTrigger>
       <PopoverContent width="280px">

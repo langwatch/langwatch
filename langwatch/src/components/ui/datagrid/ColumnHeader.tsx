@@ -1,5 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
 import type { Header } from "@tanstack/react-table";
 import { ColumnPopover } from "./ColumnPopover";
 import type { DataGridColumnDef, FilterState, SortingState } from "./types";
@@ -45,8 +45,8 @@ export function ColumnHeader<T>({
   return (
     <Flex align="center" gap={1}>
       <Text
-        fontWeight="medium"
-        fontSize="sm"
+        fontWeight="bold"
+        fontSize="xs"
         cursor={column.sortable ? "pointer" : "default"}
         onClick={() => {
           if (column.sortable) {
@@ -65,9 +65,17 @@ export function ColumnHeader<T>({
       </Text>
 
       {/* Sort indicator */}
-      {isSorted && (
-        <Flex color="blue.500">
-          {sortOrder === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+      {column.sortable && (
+        <Flex color={isSorted ? "blue.500" : "gray.400"}>
+          {isSorted ? (
+            sortOrder === "asc" ? (
+              <ChevronUp size={14} />
+            ) : (
+              <ChevronDown size={14} />
+            )
+          ) : (
+            <ChevronsUpDown size={14} />
+          )}
         </Flex>
       )}
 
