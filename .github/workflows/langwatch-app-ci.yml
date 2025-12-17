@@ -200,6 +200,52 @@ jobs:
         working-directory: langwatch
         run: pnpm elastic:migrate
 
+      - name: Configure ClickHouse storage policy
+        working-directory: langwatch
+        run: |
+          # Run ClickHouse migrations
+          pnpm clickhouse:migrate
+
+          # Get ClickHouse container ID
+          CLICKHOUSE_CONTAINER=$(docker ps --filter "ancestor=clickhouse/clickhouse-server:latest" --format "{{.ID}}")
+          
+          # Create storage policy config file
+          cat > /tmp/storage_policy.xml << 'EOF'
+          <clickhouse>
+              <storage_configuration>
+                  <disks>
+                      <hot>
+                          <path>/var/lib/clickhouse/</path>
+                      </hot>
+                      <cold>
+                          <path>/var/lib/clickhouse/</path>
+                      </cold>
+                  </disks>
+                  <policies>
+                      <local_primary>
+                          <volumes>
+                              <hot>
+                                  <disk>hot</disk>
+                              </hot>
+                              <cold>
+                                  <disk>cold</disk>
+                              </cold>
+                          </volumes>
+                      </local_primary>
+                  </policies>
+              </storage_configuration>
+          </clickhouse>
+          EOF
+          
+          # Copy config file into ClickHouse container
+          docker cp /tmp/storage_policy.xml $CLICKHOUSE_CONTAINER:/etc/clickhouse-server/config.d/storage_policy.xml
+          
+          # Set proper ownership (ClickHouse runs as clickhouse user)
+          docker exec $CLICKHOUSE_CONTAINER chown clickhouse:clickhouse /etc/clickhouse-server/config.d/storage_policy.xml
+          
+          # Reload ClickHouse configuration (using password from service container env)
+          docker exec -e CLICKHOUSE_PASSWORD=ci_password $CLICKHOUSE_CONTAINER clickhouse-client --password=ci_password --query "SYSTEM RELOAD CONFIG"
+
       - name: Run integration tests with coverage
         working-directory: langwatch
         run: pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text
