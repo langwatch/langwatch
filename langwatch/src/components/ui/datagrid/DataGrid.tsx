@@ -19,13 +19,14 @@ interface DataGridProps<T> {
   renderExpandedContent?: (row: T) => ReactNode;
   /** Function to get enum options for a column (for dynamic options) */
   getEnumOptions?: (columnId: string) => string[];
-  /** Callback when filters/sorting/pagination changes (for data fetching) */
+  /** Callback when filters/sorting/pagination/groupBy changes (for data fetching) */
   onStateChange?: (state: {
     filters: FilterState[];
     sorting: SortingState | null;
     page: number;
     pageSize: number;
     globalSearch: string;
+    groupBy: string | null;
   }) => void;
   /** Callback for CSV export */
   onExport?: () => void;
@@ -91,6 +92,7 @@ export function DataGrid<T>({
       page,
       pageSize,
       globalSearch,
+      groupBy,
     });
   };
 
@@ -103,6 +105,7 @@ export function DataGrid<T>({
       page: 1,
       pageSize,
       globalSearch,
+      groupBy,
     });
   };
 
@@ -118,6 +121,7 @@ export function DataGrid<T>({
       page: 1,
       pageSize,
       globalSearch,
+      groupBy,
     });
   };
 
@@ -130,6 +134,7 @@ export function DataGrid<T>({
       page: 1,
       pageSize,
       globalSearch: "",
+      groupBy,
     });
   };
 
@@ -142,6 +147,7 @@ export function DataGrid<T>({
       page: 1,
       pageSize,
       globalSearch: search,
+      groupBy,
     });
   };
 
@@ -154,6 +160,7 @@ export function DataGrid<T>({
       page: newPage,
       pageSize,
       globalSearch,
+      groupBy,
     });
   };
 
@@ -166,6 +173,20 @@ export function DataGrid<T>({
       page: 1,
       pageSize: newPageSize,
       globalSearch,
+      groupBy,
+    });
+  };
+
+  // Handle group by change
+  const handleGroupBy = (columnId: string | null) => {
+    setGroupBy(columnId);
+    onStateChange?.({
+      filters,
+      sorting,
+      page: 1,
+      pageSize,
+      globalSearch,
+      groupBy: columnId,
     });
   };
 
@@ -228,7 +249,7 @@ export function DataGrid<T>({
           onSort={handleSort}
           onAddFilter={handleAddFilter}
           onRemoveFilter={handleRemoveFilter}
-          onGroupBy={setGroupBy}
+          onGroupBy={handleGroupBy}
           onToggleColumnVisibility={toggleColumnVisibility}
           onPinColumn={pinColumn}
           onToggleRowExpansion={toggleRowExpansion}

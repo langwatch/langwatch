@@ -17,6 +17,7 @@ interface ColumnHeaderProps<T> {
   onToggleVisibility: (columnId: string) => void;
   onPin: (columnId: string, position: "left" | "right" | false) => void;
   enumOptions?: string[];
+  enumLabels?: Record<string, string>;
 }
 
 /**
@@ -35,6 +36,7 @@ export function ColumnHeader<T>({
   onToggleVisibility,
   onPin,
   enumOptions,
+  enumLabels,
 }: ColumnHeaderProps<T>) {
   const isSorted = sorting?.columnId === column.id;
   const sortOrder = isSorted ? sorting.order : null;
@@ -94,6 +96,7 @@ export function ColumnHeader<T>({
           onToggleVisibility={onToggleVisibility}
           onPin={onPin}
           enumOptions={enumOptions}
+          enumLabels={enumLabels}
         />
       )}
     </Flex>

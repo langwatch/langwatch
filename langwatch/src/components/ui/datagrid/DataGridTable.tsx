@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Box, Table, Text, Link } from "@chakra-ui/react";
+import { useMemo, useState, type ReactNode } from "react";
+import { Box, Flex, Table, Text, Link } from "@chakra-ui/react";
 import NextLink from "next/link";
 import {
   useReactTable,
@@ -9,10 +9,16 @@ import {
   type HeaderContext,
   type CellContext,
 } from "@tanstack/react-table";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { ColumnHeader } from "./ColumnHeader";
 import { ExpandableRow } from "./ExpandableRow";
 import { ExpandToggleCell } from "./cells/ExpandToggleCell";
 import type { DataGridColumnDef, FilterState, SortingState } from "./types";
+
+interface GroupedData<T> {
+  groupValue: string;
+  rows: T[];
+}
 
 interface DataGridTableProps<T> {
   data: T[];
@@ -64,6 +70,52 @@ export function DataGridTable<T>({
   const visibleColumnDefs = columnDefs.filter((col) =>
     visibleColumns.has(col.id)
   );
+
+  // Group data if groupBy is set
+  const groupedData = useMemo((): GroupedData<T>[] | null => {
+    if (!groupBy) return null;
+
+    const groupCol = columnDefs.find((col) => col.id === groupBy);
+    if (!groupCol) return null;
+
+    const groups = new Map<string, T[]>();
+    for (const row of data) {
+      const accessor = groupCol.accessorKey as keyof T;
+      const value = String(row[accessor] ?? "(empty)");
+      const existing = groups.get(value) ?? [];
+      existing.push(row);
+      groups.set(value, existing);
+    }
+
+    return Array.from(groups.entries()).map(([groupValue, rows]) => ({
+      groupValue,
+      rows,
+    }));
+  }, [data, groupBy, columnDefs]);
+
+  // Track expanded groups (all expanded by default)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    () => new Set(groupedData?.map((g) => g.groupValue) ?? [])
+  );
+
+  // Update expanded groups when groupedData changes
+  useMemo(() => {
+    if (groupedData) {
+      setExpandedGroups(new Set(groupedData.map((g) => g.groupValue)));
+    }
+  }, [groupBy]);
+
+  const toggleGroup = (groupValue: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupValue)) {
+        next.delete(groupValue);
+      } else {
+        next.add(groupValue);
+      }
+      return next;
+    });
+  };
 
   // Helper to create default cell renderer that handles linkTo and accessor values
   const createDefaultCellRenderer = (col: DataGridColumnDef<T>) => {
@@ -122,6 +174,7 @@ export function DataGridTable<T>({
           onToggleVisibility={onToggleColumnVisibility}
           onPin={onPinColumn}
           enumOptions={getEnumOptions?.(col.id)}
+          enumLabels={col.enumLabels}
         />
       ),
       // Use custom cell renderer if provided, otherwise use default renderer
@@ -190,7 +243,81 @@ export function DataGridTable<T>({
                 </Text>
               </Table.Cell>
             </Table.Row>
+          ) : groupedData ? (
+            // Render grouped rows
+            groupedData.map((group) => (
+              <>
+                {/* Group header row */}
+                <Table.Row
+                  key={`group-${group.groupValue}`}
+                  bg="gray.100"
+                  cursor="pointer"
+                  onClick={() => toggleGroup(group.groupValue)}
+                >
+                  <Table.Cell colSpan={totalColumns}>
+                    <Flex align="center" gap={2} py={1}>
+                      {expandedGroups.has(group.groupValue) ? (
+                        <ChevronDown size={16} />
+                      ) : (
+                        <ChevronRight size={16} />
+                      )}
+                      <Text fontWeight="semibold">
+                        {group.groupValue}
+                      </Text>
+                      <Text color="gray.500" fontSize="sm">
+                        ({group.rows.length} items)
+                      </Text>
+                    </Flex>
+                  </Table.Cell>
+                </Table.Row>
+                {/* Group rows (if expanded) */}
+                {expandedGroups.has(group.groupValue) &&
+                  table.getRowModel().rows
+                    .filter((row) => group.rows.some((r) => getRowId(r) === row.id))
+                    .map((row) => (
+                      <>
+                        <Table.Row
+                          key={row.id}
+                          _hover={{ bg: "gray.50" }}
+                          cursor={renderExpandedContent ? "pointer" : "default"}
+                          onClick={() => {
+                            if (renderExpandedContent) {
+                              onToggleRowExpansion(row.id);
+                            }
+                          }}
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <Table.Cell
+                              key={cell.id}
+                              style={{
+                                width: cell.column.getSize(),
+                                minWidth: cell.column.columnDef.minSize,
+                                maxWidth: cell.column.columnDef.maxSize,
+                              }}
+                            >
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </Table.Cell>
+                          ))}
+                        </Table.Row>
+                        {/* Expanded content */}
+                        {renderExpandedContent && expandedRows.has(row.id) && (
+                          <ExpandableRow
+                            row={row}
+                            isExpanded={expandedRows.has(row.id)}
+                            colSpan={totalColumns}
+                          >
+                            {renderExpandedContent(row.original)}
+                          </ExpandableRow>
+                        )}
+                      </>
+                    ))}
+              </>
+            ))
           ) : (
+            // Render ungrouped rows
             table.getRowModel().rows.map((row) => (
               <>
                 <Table.Row

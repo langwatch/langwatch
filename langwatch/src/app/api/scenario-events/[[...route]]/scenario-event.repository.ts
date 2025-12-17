@@ -1461,9 +1461,9 @@ export class ScenarioEventRepository {
       return [];
     }
 
-    // For status field, we need to query run_finished events
+    // For status and verdict fields, we need to query run_finished events
     const eventType =
-      columnId === "status"
+      columnId === "status" || columnId === "verdict"
         ? ScenarioEventType.RUN_FINISHED
         : ScenarioEventType.RUN_STARTED;
 
@@ -1626,6 +1626,131 @@ export class ScenarioEventRepository {
       });
       return [];
     }
+  }
+
+  /**
+   * Searches scenario runs with grouping by a specified field.
+   * Returns aggregated groups with counts and top hits for preview.
+   *
+   * @param projectId - The project identifier
+   * @param groupBy - Field to group by
+   * @param filters - Array of filter conditions
+   * @param sorting - Sort configuration
+   * @param pagination - Page and pageSize for groups
+   * @returns Grouped scenario run data with counts
+   */
+  async searchGroupedScenarioRuns({
+    projectId,
+    groupBy,
+    filters,
+    sorting,
+    pagination,
+  }: {
+    projectId: string;
+    groupBy: string;
+    filters?: Array<{
+      columnId: string;
+      operator: "eq" | "contains";
+      value?: unknown;
+    }>;
+    sorting?: { columnId: string; order: "asc" | "desc" };
+    pagination?: { page: number; pageSize: number };
+  }): Promise<{
+    groups: Array<{
+      groupValue: string;
+      count: number;
+      scenarioRunIds: string[];
+    }>;
+    totalGroups: number;
+  }> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    const page = pagination?.page ?? 1;
+    const pageSize = pagination?.pageSize ?? 20;
+
+    // Map groupBy column to ES field
+    const groupField = this.mapColumnToField(groupBy);
+    if (!groupField) {
+      return { groups: [], totalGroups: 0 };
+    }
+
+    // Build filter clauses
+    const filterClauses: any[] = [
+      { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+      { term: { type: ScenarioEventType.RUN_STARTED } },
+    ];
+
+    for (const filter of filters ?? []) {
+      const fieldMapping = this.mapColumnToField(filter.columnId);
+      if (!fieldMapping) continue;
+
+      if (filter.operator === "eq") {
+        filterClauses.push({ term: { [fieldMapping]: filter.value } });
+      } else if (filter.operator === "contains") {
+        filterClauses.push({
+          wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
+        });
+      }
+    }
+
+    // Get grouped results using composite aggregation for pagination
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: filterClauses,
+          },
+        },
+        aggs: {
+          total_groups: {
+            cardinality: {
+              field: groupField,
+            },
+          },
+          grouped: {
+            terms: {
+              field: groupField,
+              size: page * pageSize, // Get enough groups for current page
+              order: { _count: sorting?.order ?? "desc" },
+            },
+            aggs: {
+              // Get top scenario run IDs for each group
+              top_runs: {
+                top_hits: {
+                  size: 100, // Max runs per group that will be fetched
+                  sort: [{ timestamp: { order: "desc" } }],
+                  _source: [ES_FIELDS.scenarioRunId],
+                },
+              },
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    const totalGroups =
+      (response.aggregations as any)?.total_groups?.value ?? 0;
+
+    const buckets =
+      (response.aggregations as any)?.grouped?.buckets ?? [];
+
+    // Extract groups for current page
+    const startIdx = (page - 1) * pageSize;
+    const endIdx = page * pageSize;
+    const pageBuckets = buckets.slice(startIdx, endIdx);
+
+    const groups = pageBuckets.map((bucket: any) => ({
+      groupValue: String(bucket.key),
+      count: bucket.doc_count,
+      scenarioRunIds: (bucket.top_runs?.hits?.hits ?? [])
+        .map((hit: any) => hit._source?.scenario_run_id)
+        .filter(Boolean),
+    }));
+
+    return { groups, totalGroups };
   }
 
   /**

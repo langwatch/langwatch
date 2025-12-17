@@ -497,6 +497,73 @@ export class ScenarioEventService {
   }
 
   /**
+   * Retrieves grouped scenario runs with pagination for the table view.
+   * Grouping is performed server-side in Elasticsearch using aggregations.
+   *
+   * @param {Object} params - The parameters for retrieving grouped runs
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.groupBy - Column to group by
+   * @param {Array} params.filters - Filter conditions
+   * @param {Object} params.sorting - Sort configuration
+   * @param {Object} params.pagination - Page and pageSize
+   * @returns {Promise<Object>} Grouped scenario run data
+   */
+  async getGroupedScenarioRuns({
+    projectId,
+    groupBy,
+    filters,
+    sorting,
+    pagination,
+  }: {
+    projectId: string;
+    groupBy: string;
+    filters?: Array<{
+      columnId: string;
+      operator: "eq" | "contains";
+      value?: unknown;
+    }>;
+    sorting?: { columnId: string; order: "asc" | "desc" };
+    pagination?: { page: number; pageSize: number };
+  }): Promise<{
+    groups: Array<{
+      groupValue: string;
+      count: number;
+      rows: ScenarioRunData[];
+    }>;
+    totalGroups: number;
+  }> {
+    // Search for grouped scenario runs with filters applied at the ES level
+    const { groups, totalGroups } =
+      await this.eventRepository.searchGroupedScenarioRuns({
+        projectId,
+        groupBy,
+        filters,
+        sorting,
+        pagination,
+      });
+
+    // Fetch full run data for each group
+    const groupsWithData = await Promise.all(
+      groups.map(async (group) => {
+        const runs = await this.getScenarioRunDataBatch({
+          projectId,
+          scenarioRunIds: group.scenarioRunIds,
+        });
+        return {
+          groupValue: group.groupValue,
+          count: group.count,
+          rows: runs,
+        };
+      })
+    );
+
+    return {
+      groups: groupsWithData,
+      totalGroups,
+    };
+  }
+
+  /**
    * Gets available metadata keys for dynamic columns.
    * Scans scenario events to find unique metadata field names.
    *

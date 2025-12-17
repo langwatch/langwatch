@@ -171,6 +171,28 @@ export const scenarioRouter = createTRPCRouter({
       });
     }),
 
+  // Get grouped scenario runs for table view with grouping enabled
+  getGroupedScenarioRuns: protectedProcedure
+    .input(
+      projectSchema.extend({
+        groupBy: z.string(),
+        filters: z.array(filterSchema).optional(),
+        sorting: sortingSchema.optional(),
+        pagination: paginationSchema.optional(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      return await scenarioRunnerService.getGroupedScenarioRuns({
+        projectId: input.projectId,
+        groupBy: input.groupBy,
+        filters: input.filters,
+        sorting: input.sorting,
+        pagination: input.pagination,
+      });
+    }),
+
   // Get available metadata keys for dynamic columns
   getAvailableMetadataKeys: protectedProcedure
     .input(projectSchema)

@@ -63,6 +63,9 @@ export interface DataGridColumnDef<T> {
   /** Available values for enum filter type */
   enumValues?: string[];
 
+  /** Display labels for enum values (key: value, value: label) */
+  enumLabels?: Record<string, string>;
+
   /** Whether column can be sorted */
   sortable?: boolean;
 

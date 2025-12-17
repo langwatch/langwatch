@@ -17,6 +17,7 @@ export function createScenarioColumns(
       filterable: true,
       filterType: "text",
       sortable: true,
+      groupable: true,
       defaultVisible: true,
     },
     {
@@ -27,6 +28,7 @@ export function createScenarioColumns(
       filterable: true,
       filterType: "text",
       sortable: true,
+      groupable: true,
       defaultVisible: true,
     },
     {
@@ -58,6 +60,11 @@ export function createScenarioColumns(
       filterable: true,
       filterType: "enum",
       enumValues: Object.values(Verdict),
+      enumLabels: {
+        [Verdict.SUCCESS]: "Pass",
+        [Verdict.FAILURE]: "Fail",
+        [Verdict.INCONCLUSIVE]: "Inconclusive",
+      },
       sortable: true,
       groupable: true,
       defaultVisible: true,
