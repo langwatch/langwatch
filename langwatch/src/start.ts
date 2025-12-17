@@ -7,6 +7,7 @@ import type { Duplex } from "stream";
 import { parse } from "url";
 import { initializeBackgroundWorkers } from "./server/background/init";
 import { createLogger } from "./utils/logger";
+import { setEnvironment } from "@langwatch/ksuid";
 
 const logger = createLogger("langwatch:start");
 
@@ -59,6 +60,9 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 
 module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
+  const env = process.env.ENVIRONMENT ?? "local";
+  setEnvironment(env);
+
   const hostname = "0.0.0.0";
   const port = parseInt(process.env.PORT ?? "5560");
   // when using middleware `hostname` and `port` must be provided below
