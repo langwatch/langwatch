@@ -2,6 +2,7 @@ import json
 import os
 import importlib
 import random
+import inspect
 from typing import Optional, Sequence, cast
 import pytest
 import asyncio
@@ -81,10 +82,12 @@ async def test_example(example_file: str):
         pytest.skip(
             "litellm_bot.py requires CEREBRAS_API_KEY environment variable to be set"
         )
-    if example_file == "langgraph_rag_bot_with_threads.py" or example_file == "langchain_rag_bot.py" or example_file == "langchain_rag_bot_with_threads.py":
-        pytest.skip(
-            "throwing memory issues with threads"
-        )
+    if (
+        example_file == "langgraph_rag_bot_with_threads.py"
+        or example_file == "langchain_rag_bot.py"
+        or example_file == "langchain_rag_bot_with_threads.py"
+    ):
+        pytest.skip("throwing memory issues with threads")
 
     module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
@@ -145,16 +148,20 @@ async def test_example(example_file: str):
     # Call the main function
     with langwatch.trace() as trace:
         try:
-            if "documentation" in example_file:
-                if asyncio.iscoroutinefunction(main_func):
-                    await main_func()
-                else:
-                    main_func()
-            else:
+            # Check if main function takes parameters
+            sig = inspect.signature(main_func)
+            takes_parameters = len(sig.parameters) > 0
+
+            if takes_parameters:
                 if asyncio.iscoroutinefunction(main_func):
                     await main_func(mock_message)
                 else:
                     main_func(mock_message)
+            else:
+                if asyncio.iscoroutinefunction(main_func):
+                    await main_func()
+                else:
+                    main_func()
         except Exception as e:
             if str(e) != "This exception will be captured by LangWatch automatically":
                 # FIXME: Skip tests that depend on external ColBERTv2 service when it's unavailable

@@ -8,6 +8,8 @@ from .login import login
 from .state import get_api_key, get_endpoint
 from .__version__ import __version__
 from .utils.initialization import ensure_setup, setup
+from .prompts.types import FetchPolicy
+
 
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
@@ -153,5 +155,5 @@ __all__ = [
     "evaluations",
     "langchain",
     "dspy",
-    "prompts",
+    "FetchPolicy",
 ]
