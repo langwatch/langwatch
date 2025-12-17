@@ -15,6 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     CLICKHOUSE_URL: z.string().url().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
+    ENVIRONMENT: z.enum(["production", "staging", "development", "local"]).default("production"),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_PROVIDER: z.string().optional(),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
@@ -99,7 +100,7 @@ export const env = createEnv({
     ENABLE_CLICKHOUSE: z.boolean().optional(),
 
     // ClickHouse Migration Configuration
-    CLICKHOUSE_REPLICATED: z.string().optional(),
+    CLICKHOUSE_REPLICATED: z.boolean().optional(),
   },
 
   /**
@@ -119,6 +120,7 @@ export const env = createEnv({
     DATABASE_URL: process.env.DATABASE_URL,
     CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
     NODE_ENV: process.env.NODE_ENV,
+    ENVIRONMENT: process.env.ENVIRONMENT,
     BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
@@ -198,7 +200,9 @@ export const env = createEnv({
     ENABLE_CLICKHOUSE:
       process.env.ENABLE_CLICKHOUSE === "true" ||
       process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
-    CLICKHOUSE_REPLICATED: process.env.CLICKHOUSE_REPLICATED,
+    CLICKHOUSE_REPLICATED:
+      process.env.CLICKHOUSE_REPLICATED === "true" ||
+      process.env.CLICKHOUSE_REPLICATED?.toLowerCase() === "true",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
