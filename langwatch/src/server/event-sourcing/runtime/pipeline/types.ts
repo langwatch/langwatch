@@ -1,7 +1,10 @@
 import type { AggregateType } from "../../library/domain/aggregateType";
-import type { Event, Projection } from "../../library/domain/types";
+import type { Event, ParentLink, Projection } from "../../library/domain/types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
-import type { ProjectionDefinitions } from "../../library/projection.types";
+import type {
+  ProjectionDefinitions,
+  ProjectionTypeMap,
+} from "../../library/projection.types";
 import type { EventPublisher } from "../../library/publishing/eventPublisher.types";
 import type {
   EventSourcedQueueDefinition,
@@ -14,7 +17,7 @@ import type { DistributedLock } from "../../library/utils/distributedLock";
 
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
-  _ProjectionType extends Projection = Projection,
+  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
 > {
   /**
    * Logical name for this pipeline, used for logging/metrics.
@@ -29,7 +32,7 @@ export interface EventSourcingPipelineDefinition<
    * Map of projection definitions for multiple projections support.
    * Each projection has a unique name, store, and handler.
    */
-  projections?: ProjectionDefinitions<EventType>;
+  projections?: ProjectionDefinitions<EventType, ProjectionTypes>;
   /**
    * Optional event publisher for publishing events to external systems.
    */
@@ -71,15 +74,34 @@ export interface EventSourcingPipelineDefinition<
    * Default: 5 minutes
    */
   updateLockTtlMs?: number;
+  /**
+   * Time-to-live for command locks in milliseconds.
+   * Prevents locks from being held indefinitely if a process crashes.
+   * Default: 30 seconds
+   */
+  commandLockTtlMs?: number;
+  /**
+   * Parent links defining relationships to other aggregate types.
+   * Used by tools like deja-view to navigate between related aggregates.
+   */
+  parentLinks?: ParentLink<EventType>[];
 }
 
 export interface RegisteredPipeline<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
 > {
   name: string;
   aggregateType: AggregateType;
-  service: EventSourcingService<EventType, ProjectionType>;
+  service: EventSourcingService<EventType, ProjectionTypes>;
+  /**
+   * Parent links defining relationships to other aggregate types.
+   * Used by tools like deja-view to navigate between related aggregates.
+   */
+  parentLinks: ParentLink<EventType>[];
 }
 
 /**

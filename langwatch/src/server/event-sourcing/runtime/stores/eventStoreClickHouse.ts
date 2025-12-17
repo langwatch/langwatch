@@ -61,11 +61,20 @@ export class EventStoreClickHouse<EventType extends Event = Event>
             this.recordToEvent(record, aggregateId),
           );
 
-          // Deduplicate by Event ID (keep first occurrence when sorted by timestamp)
+          // Deduplicate by Event ID (keep first occurrence - database already returns sorted by timestamp then eventId)
           const seenEventIds = new Set<string>();
           const deduplicatedEvents = events.filter((event) => {
             if (!event.id) {
-              // If no Event ID, keep the event (shouldn't happen but handle gracefully)
+              // If no Event ID, keep the event
+              this.logger.error(
+                {
+                  aggregateId: String(aggregateId),
+                  tenantId: context.tenantId,
+                  aggregateType,
+                },
+                "Event has no event ID",
+              );
+
               return true;
             }
             if (seenEventIds.has(event.id)) {
@@ -87,6 +96,78 @@ export class EventStoreClickHouse<EventType extends Event = Event>
               errorName: error instanceof Error ? error.name : void 0,
             },
             "Failed to get events from ClickHouse",
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
+  async getEventsUpTo(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    upToEvent: EventType,
+  ): Promise<readonly EventType[]> {
+    // Validate tenant context
+    EventUtils.validateTenantId(context, "EventStoreClickHouse.getEventsUpTo");
+
+    return await this.tracer.withActiveSpan(
+      "EventStoreClickHouse.getEventsUpTo",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.id": String(aggregateId),
+          "tenant.id": context.tenantId,
+          "aggregate.type": aggregateType,
+          "up_to.event_id": upToEvent.id,
+          "up_to.timestamp": upToEvent.timestamp,
+        },
+      },
+      async () => {
+        try {
+          // Get event records up to and including the specified event from repository
+          const records = await this.repository.getEventRecordsUpTo(
+            context.tenantId,
+            aggregateType,
+            aggregateId,
+            upToEvent.timestamp,
+            upToEvent.id,
+          );
+
+          // Transform records to events
+          const events = records.map((record) =>
+            this.recordToEvent(record, aggregateId),
+          );
+
+          // Deduplicate by Event ID (keep first occurrence - database already returns sorted by timestamp then eventId)
+          const seenEventIds = new Set<string>();
+          const deduplicatedEvents = events.filter((event) => {
+            if (!event.id) {
+              // If no Event ID, keep the event (shouldn't happen but handle gracefully)
+              return true;
+            }
+            if (seenEventIds.has(event.id)) {
+              return false; // Skip duplicate
+            }
+            seenEventIds.add(event.id);
+            return true;
+          });
+
+          return deduplicatedEvents;
+        } catch (error) {
+          this.logger.error(
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              upToEventId: upToEvent.id,
+              upToTimestamp: upToEvent.timestamp,
+              error: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : void 0,
+              errorName: error instanceof Error ? error.name : void 0,
+            },
+            "Failed to get events up to event from ClickHouse",
           );
           throw error;
         }
@@ -371,6 +452,7 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       tenantId: createTenantId(record.TenantId),
       timestamp: timestampMs,
       type: record.EventType as EventType["type"],
+      version: record.EventVersion,
       data: payload,
       metadata: {
         processingTraceparent: record.ProcessingTraceparent || void 0,
@@ -391,6 +473,7 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       EventId: event.id,
       EventTimestamp: event.timestamp,
       EventType: event.type,
+      EventVersion: event.version,
       EventPayload: event.data ?? {},
       ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
     };

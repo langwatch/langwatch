@@ -77,12 +77,9 @@ export class EventSourcing {
    * If event sourcing is disabled (ENABLE_EVENT_SOURCING=false), returns a
    * DisabledPipelineBuilder that creates no-op pipelines that log warnings.
    */
-  registerPipeline<
-    EventType extends Event,
-    ProjectionType extends Projection = Projection,
-  >():
-    | PipelineBuilder<EventType, ProjectionType>
-    | DisabledPipelineBuilder<EventType, ProjectionType> {
+  registerPipeline<EventType extends Event>():
+    | PipelineBuilder<EventType>
+    | DisabledPipelineBuilder<EventType> {
     return this.tracer.withActiveSpan(
       "EventSourcing.registerPipeline",
       {
@@ -92,11 +89,11 @@ export class EventSourcing {
         // Return disabled builder if event sourcing is disabled
         if (!this.runtime.isEnabled || !this.runtime.eventStore) {
           this.runtime.logDisabledWarning({ pipeline: "registerPipeline" });
-          return new DisabledPipelineBuilder<EventType, ProjectionType>();
+          return new DisabledPipelineBuilder<EventType>();
         }
 
-        return new PipelineBuilder<EventType, ProjectionType>({
-          eventStore: this.runtime.eventStore,
+        return new PipelineBuilder<EventType>({
+          eventStore: this.runtime.eventStore as EventStore<EventType>,
           queueProcessorFactory: this.runtime.queueProcessorFactory,
           distributedLock: this.runtime.distributedLock,
           processorCheckpointStore: this.runtime.checkpointStore,
