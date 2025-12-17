@@ -130,14 +130,8 @@ export const workflowRouter = createTRPCRouter({
         ctx,
         input: {
           projectId: input.projectId,
-          workflowId: newWorkflow.id,
-          dsl: {
-            ...dsl,
-            workflow_id: newWorkflow.id,
-            experiment_id: "", // Clear experiment_id from source project
-            state: {}, // Clear state from source project
-            version: "1",
-          },
+          workflowId,
+          dsl,
         },
         autoSaved: false,
         commitMessage: "Copied from " + workflow.name,
