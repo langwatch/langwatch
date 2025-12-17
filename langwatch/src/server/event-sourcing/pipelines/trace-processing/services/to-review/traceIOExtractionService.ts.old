@@ -1,0 +1,331 @@
+// import { SpanKind } from "@opentelemetry/api";
+// import { getLangWatchTracer } from "langwatch";
+// import type { SpanData } from "../schemas/commands";
+// import {
+//   extractTypedValueFromSpan,
+//   type TypedValue,
+// } from "../utils/typedValueExtraction.utils";
+// import { typedValueToText } from "../utils/typedValueConversion.utils";
+// import { isEmptyJson } from "../utils/jsonTextConversion.utils";
+
+// // ============================================================================
+// // Types
+// // ============================================================================
+
+// /**
+//  * Represents a span organized in a tree structure with its children.
+//  */
+// export interface SpanTreeNode {
+//   span: SpanData;
+//   children: SpanTreeNode[];
+// }
+
+// /**
+//  * Options for flattening a span tree.
+//  */
+// export type FlattenMode = "outside-in" | "inside-out";
+
+// // ============================================================================
+// // Helper Functions
+// // ============================================================================
+
+// const getSpanType = (span: SpanData): string => {
+//   const type = span.attributes["langwatch.span.type"];
+//   return typeof type === "string" ? type : "unknown";
+// };
+
+// const shouldExcludeSpan = (span: SpanData): boolean => {
+//   const type = getSpanType(span);
+//   return type === "evaluation" || type === "guardrail";
+// };
+
+// const isAgnoAgentInput = (span: SpanData): boolean => {
+//   const scopeName = span.instrumentationScope.name;
+//   return (
+//     scopeName?.includes("openinference.instrumentation.agno") === true &&
+//     getSpanType(span) === "agent"
+//   );
+// };
+
+// // ============================================================================
+// // Service
+// // ============================================================================
+
+// /**
+//  * Service for extracting input/output text from spans using tree traversal
+//  * and framework-specific heuristics.
+//  *
+//  * @example
+//  * ```typescript
+//  * const service = new TraceIOExtractionService();
+//  * const input = service.extractFirstInput(spans);
+//  * const output = service.extractLastOutput(spans);
+//  * ```
+//  */
+// export class TraceIOExtractionService {
+//   private readonly tracer = getLangWatchTracer(
+//     "langwatch.trace-processing.io-extraction",
+//   );
+
+//   /**
+//    * Extracts the first meaningful input from the trace.
+//    * Uses span tree traversal to find the topmost input, filtering out
+//    * evaluation and guardrail spans.
+//    */
+//   extractFirstInput(spans: SpanData[]): string {
+//     return this.tracer.withActiveSpan(
+//       "TraceIOExtractionService.extractFirstInput",
+//       {
+//         kind: SpanKind.INTERNAL,
+//         attributes: { "span.count": spans.length },
+//       },
+//       (otelSpan) => {
+//         const tree = this.organizeSpansIntoTree(spans);
+//         const orderedSpans = this.flattenSpanTree(tree, "outside-in");
+
+//         // Filter to spans with valid inputs
+//         const spansWithInput = orderedSpans.filter((span) => {
+//           const input = extractTypedValueFromSpan(span, "input");
+//           if (!input) return false;
+//           if (shouldExcludeSpan(span)) return false;
+//           if (input.type === "json" && isEmptyJson(input.value)) return false;
+//           if (isAgnoAgentInput(span)) return false;
+//           return true;
+//         });
+
+//         const firstSpan = spansWithInput[0];
+
+//         if (!firstSpan) {
+//           otelSpan.setAttributes({
+//             "input.found": false,
+//             "fallback.used": true,
+//           });
+//           return this.getHttpFallback(orderedSpans);
+//         }
+
+//         let input = extractTypedValueFromSpan(firstSpan, "input");
+//         otelSpan.setAttributes({
+//           "input.found": true,
+//           "span.type": getSpanType(firstSpan),
+//         });
+
+//         // Special case: Haystack
+//         if (
+//           getSpanType(firstSpan) === "chain" &&
+//           firstSpan.instrumentationScope.name?.includes("haystack") &&
+//           input?.type === "json"
+//         ) {
+//           otelSpan.addEvent("haystack.specialcase");
+//           const data = (input.value as Record<string, unknown>)?.data;
+//           if (typeof data === "object" && data !== null) {
+//             const firstValue = Object.values(data)[0];
+//             input = { type: "json", value: firstValue };
+//           }
+//         }
+
+//         if (!input) return "";
+
+//         let text = typedValueToText(input, false);
+
+//         // Fallback: RunnableSequence - try next span's input
+//         if (!text && firstSpan.name?.startsWith("RunnableSequence")) {
+//           otelSpan.addEvent("runnable.fallback");
+//           const nextSpan = spansWithInput[1];
+//           if (nextSpan) {
+//             const nextInput = extractTypedValueFromSpan(nextSpan, "input");
+//             if (nextInput) {
+//               text = typedValueToText(nextInput, false);
+//             }
+//           }
+//         }
+
+//         otelSpan.setAttributes({
+//           "input.length": text.length,
+//           "fallback.used": !text,
+//         });
+
+//         return text;
+//       },
+//     );
+//   }
+
+//   /**
+//    * Extracts the last meaningful output from the trace.
+//    * Prioritizes single top-level node output, then falls back to last-finishing span.
+//    */
+//   extractLastOutput(spans: SpanData[]): string {
+//     return this.tracer.withActiveSpan(
+//       "TraceIOExtractionService.extractLastOutput",
+//       {
+//         kind: SpanKind.INTERNAL,
+//         attributes: { "span.count": spans.length },
+//       },
+//       (otelSpan) => {
+//         const tree = this.organizeSpansIntoTree(spans);
+
+//         const hasValidOutput = (span: SpanData): boolean => {
+//           const output = extractTypedValueFromSpan(span, "output");
+//           if (!output) return false;
+//           if (shouldExcludeSpan(span)) return false;
+//           if (output.type === "json" && isEmptyJson(output.value)) return false;
+//           return true;
+//         };
+
+//         // Try single top-level node first
+//         const topLevelWithOutput = this.flattenSpanTree(tree, "inside-out")
+//           .filter(hasValidOutput)
+//           .reverse();
+
+//         if (topLevelWithOutput.length === 1 && topLevelWithOutput[0]) {
+//           const span = topLevelWithOutput[0];
+//           otelSpan.setAttributes({
+//             "output.found": true,
+//             "span.type": getSpanType(span),
+//             "output.source": "single_top_level",
+//           });
+
+//           const output = extractTypedValueFromSpan(span, "output");
+//           if (output) {
+//             const text = typedValueToText(output, true);
+//             otelSpan.setAttributes({ "output.length": text.length });
+//             return text;
+//           }
+//         }
+
+//         // Fall back to last-finishing span
+//         const sortedByEndTime = spans
+//           .filter(hasValidOutput)
+//           .sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
+
+//         const lastSpan = sortedByEndTime[0];
+
+//         if (!lastSpan) {
+//           otelSpan.setAttributes({
+//             "output.found": false,
+//             "fallback.used": true,
+//           });
+//           return this.getHttpStatusFallback(tree);
+//         }
+
+//         otelSpan.setAttributes({
+//           "output.found": true,
+//           "span.type": getSpanType(lastSpan),
+//           "output.source": "last_finishing",
+//         });
+
+//         const output = extractTypedValueFromSpan(lastSpan, "output");
+//         if (!output) return "";
+
+//         const text = typedValueToText(output, true);
+//         otelSpan.setAttributes({
+//           "output.length": text.length,
+//           "fallback.used": false,
+//         });
+
+//         return text;
+//       },
+//     );
+//   }
+
+//   /**
+//    * Organizes flat array of spans into a tree structure.
+//    */
+//   organizeSpansIntoTree(spans: SpanData[]): SpanTreeNode[] {
+//     return this.tracer.withActiveSpan(
+//       "TraceIOExtractionService.organizeSpansIntoTree",
+//       {
+//         kind: SpanKind.INTERNAL,
+//         attributes: { "span.count": spans.length },
+//       },
+//       (otelSpan) => {
+//         // Sort by start time for chronological ordering
+//         const sorted = [...spans].sort(
+//           (a, b) => a.startTimeUnixMs - b.startTimeUnixMs,
+//         );
+
+//         // Build node map
+//         const nodeMap = new Map<string, SpanTreeNode>();
+//         for (const span of sorted) {
+//           nodeMap.set(span.spanId, { span, children: [] });
+//         }
+
+//         // Build parent-child relationships
+//         for (const span of sorted) {
+//           if (span.parentSpanId && nodeMap.has(span.parentSpanId)) {
+//             const node = nodeMap.get(span.spanId)!;
+//             const parent = nodeMap.get(span.parentSpanId)!;
+//             parent.children.push(node);
+//           }
+//         }
+
+//         // Extract root nodes
+//         const roots = Array.from(nodeMap.values()).filter(
+//           (node) =>
+//             !node.span.parentSpanId || !nodeMap.has(node.span.parentSpanId),
+//         );
+
+//         otelSpan.setAttributes({ "tree.root_node_count": roots.length });
+//         return roots;
+//       },
+//     );
+//   }
+
+//   /**
+//    * Flattens a span tree into an array using specified traversal order.
+//    */
+//   flattenSpanTree(tree: SpanTreeNode[], mode: FlattenMode): SpanData[] {
+//     return this.tracer.withActiveSpan(
+//       "TraceIOExtractionService.flattenSpanTree",
+//       {
+//         kind: SpanKind.INTERNAL,
+//         attributes: { "tree.mode": mode, "tree.root_count": tree.length },
+//       },
+//       (otelSpan) => {
+//         const result: SpanData[] = [];
+
+//         const traverse = (nodes: SpanTreeNode[]) => {
+//           for (const node of nodes) {
+//             if (mode === "outside-in") result.push(node.span);
+//             if (node.children.length > 0) traverse(node.children);
+//             if (mode === "inside-out") result.push(node.span);
+//           }
+//         };
+
+//         traverse(tree);
+//         otelSpan.setAttributes({ "result.node_count": result.length });
+//         return result;
+//       },
+//     );
+//   }
+
+//   private getHttpFallback(orderedSpans: SpanData[]): string {
+//     const topSpan = orderedSpans.find((span) => !span.parentSpanId);
+//     if (!topSpan) return "";
+
+//     const httpMethod = topSpan.attributes["http.method"];
+//     const httpTarget = topSpan.attributes["http.target"];
+
+//     if (typeof httpMethod === "string" && typeof httpTarget === "string") {
+//       return `${httpMethod} ${httpTarget}`;
+//     }
+
+//     return topSpan.name ?? "";
+//   }
+
+//   private getHttpStatusFallback(tree: SpanTreeNode[]): string {
+//     const topSpan = this.flattenSpanTree(tree, "outside-in").find(
+//       (span) => !span.parentSpanId,
+//     );
+
+//     if (topSpan) {
+//       const status = topSpan.attributes["http.status_code"];
+//       if (typeof status === "number") {
+//         return status.toString();
+//       }
+//     }
+
+//     return "";
+//   }
+// }
+
+// export const traceIOExtractionService = new TraceIOExtractionService();

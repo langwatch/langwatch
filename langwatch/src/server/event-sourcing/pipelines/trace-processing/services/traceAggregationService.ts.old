@@ -1,0 +1,520 @@
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+import { createLogger } from "../../../../../utils/logger";
+import { ValidationError } from "../../../library/services/errorHandling";
+// import { traceAttributesService } from "./traceAttributesService";
+// import { traceIOExtractionService } from "./traceIOExtractionService";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+/**
+ * Result of trace aggregation containing all computed metrics.
+ */
+export interface TraceAggregationResult {
+  traceId: string;
+  spanIds: string[];
+  totalSpans: number;
+  startTimeUnixMs: number;
+  endTimeUnixMs: number;
+  durationMs: number;
+  serviceNames: string[];
+  rootSpanId: string | null;
+  IOSchemaVersion: "2025-11-23";
+  ComputedInput: string | null;
+  ComputedOutput: string | null;
+  ComputedAttributes: Record<string, string>;
+  TimeToFirstTokenMs: number | null;
+  TimeToLastTokenMs: number | null;
+  TokensPerSecond: number | null;
+  ContainsErrorStatus: boolean;
+  ContainsOKStatus: boolean;
+  Models: string[];
+  TopicId: string | null;
+  SubTopicId: string | null;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+  HasAnnotation: boolean | null;
+  ThreadId: string | null;
+  UserId: string | null;
+  CustomerId: string | null;
+  Labels: string[];
+  PromptIds: string[];
+  PromptVersionIds: string[];
+  Attributes: Record<string, string>;
+  TotalCost: number | null;
+  TokensEstimated: boolean;
+  ErrorMessage: string | null;
+}
+
+interface TokenMetrics {
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalCost: number;
+  tokensEstimated: boolean;
+}
+
+interface StatusInfo {
+  containsError: boolean;
+  containsOK: boolean;
+  errorMessage: string | null;
+  hasAnnotation: boolean | null;
+  computedAttributes: Record<string, string>;
+}
+
+interface TokenTiming {
+  timeToFirstTokenMs: number | null;
+  timeToLastTokenMs: number | null;
+}
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+const isValidTimestamp = (ts: number | undefined | null): ts is number =>
+  typeof ts === "number" && ts > 0 && isFinite(ts);
+
+/**
+ * Extracts unique service names from spans.
+ */
+const extractServiceNames = (spans: SpanData[]): string[] => {
+  const names = new Set<string>();
+  for (const span of spans) {
+    const name = span.resourceAttributes?.["service.name"];
+    if (typeof name === "string" && name.length > 0) {
+      names.add(name);
+    }
+  }
+  return Array.from(names).sort();
+};
+
+/**
+ * Finds the root span ID (span with no parent in this trace).
+ */
+const findRootSpanId = (spans: SpanData[]): string | null => {
+  if (spans.length === 0) return null;
+
+  const spanIds = new Set(spans.map((s) => s.spanId));
+
+  for (const span of spans) {
+    if (!span.parentSpanId || !spanIds.has(span.parentSpanId)) {
+      return span.spanId;
+    }
+  }
+
+  return spans[0]?.spanId ?? null;
+};
+
+/**
+ * Extracts unique model names from spans.
+ */
+const extractModels = (spans: SpanData[]): string[] => {
+  const models = new Set<string>();
+
+  for (const span of spans) {
+    const attrs = span.attributes ?? {};
+    const candidates = [
+      attrs["gen_ai.response.model"],
+      attrs["gen_ai.request.model"],
+      attrs.model,
+    ];
+
+    for (const model of candidates) {
+      if (typeof model === "string" && model) {
+        models.add(model);
+      }
+    }
+  }
+
+  return Array.from(models).sort();
+};
+
+/**
+ * Extracts token counts and cost from spans.
+ */
+const extractTokenMetrics = (spans: SpanData[]): TokenMetrics => {
+  const metrics: TokenMetrics = {
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    totalCost: 0,
+    tokensEstimated: false,
+  };
+
+  for (const span of spans) {
+    const attrs = span.attributes ?? {};
+
+    // Input tokens (GenAI)
+    const inputTokens = attrs["gen_ai.usage.input_tokens"];
+    const promptTokens = attrs["gen_ai.usage.prompt_tokens"];
+    const legacyPrompt = attrs["llm.prompt_tokens"];
+    if (typeof inputTokens === "number" && inputTokens > 0) {
+      metrics.totalPromptTokens += inputTokens;
+    }
+    if (typeof promptTokens === "number" && promptTokens > 0) {
+      metrics.totalPromptTokens += promptTokens;
+    }
+    if (typeof legacyPrompt === "number" && legacyPrompt > 0) {
+      metrics.totalPromptTokens += legacyPrompt;
+    }
+
+    // Output tokens (GenAI)
+    const outputTokens = attrs["gen_ai.usage.output_tokens"];
+    const completionTokens = attrs["gen_ai.usage.completion_tokens"];
+    const legacyCompletion = attrs["llm.completion_tokens"];
+    if (typeof outputTokens === "number" && outputTokens > 0) {
+      metrics.totalCompletionTokens += outputTokens;
+    }
+    if (typeof completionTokens === "number" && completionTokens > 0) {
+      metrics.totalCompletionTokens += completionTokens;
+    }
+    if (typeof legacyCompletion === "number" && legacyCompletion > 0) {
+      metrics.totalCompletionTokens += legacyCompletion;
+    }
+
+    // Cost
+    const cost = attrs["langwatch.span.cost"];
+    if (typeof cost === "number" && cost > 0) {
+      metrics.totalCost += cost;
+    }
+
+    // Estimated flag
+    if (attrs["langwatch.tokens.estimated"] === true) {
+      metrics.tokensEstimated = true;
+    }
+  }
+
+  return metrics;
+};
+
+/**
+ * Extracts status and computed attributes from spans.
+ */
+const extractStatusInfo = (spans: SpanData[]): StatusInfo => {
+  const info: StatusInfo = {
+    containsError: false,
+    containsOK: false,
+    errorMessage: null,
+    hasAnnotation: null,
+    computedAttributes: {},
+  };
+
+  for (const span of spans) {
+    const attrs = span.attributes ?? {};
+
+    // Annotation flag
+    const hasAnnotation = attrs["has.annotation"];
+    if (typeof hasAnnotation === "boolean") {
+      info.hasAnnotation = hasAnnotation || info.hasAnnotation === true;
+    }
+
+    // Status
+    if (span.status.code === SpanStatusCode.OK) {
+      info.containsOK = true;
+    } else if (span.status.code === SpanStatusCode.ERROR) {
+      info.containsError = true;
+      if (span.status.message && !info.errorMessage) {
+        info.errorMessage = span.status.message;
+      }
+    }
+
+    // Computed attributes
+    for (const [key, value] of Object.entries(attrs)) {
+      if (
+        typeof value === "string" &&
+        (key.startsWith("computed.") ||
+          key.startsWith("metadata.") ||
+          key.startsWith("trace."))
+      ) {
+        info.computedAttributes[key] = value;
+      }
+    }
+  }
+
+  return info;
+};
+
+const FIRST_TOKEN_EVENTS = new Set([
+  "gen_ai.content.chunk",
+  "first_token",
+  "llm.first_token",
+]);
+
+const LAST_TOKEN_EVENTS = new Set([
+  "gen_ai.content.chunk",
+  "last_token",
+  "llm.last_token",
+]);
+
+/**
+ * Extracts token timing from span events.
+ */
+const extractTokenTiming = (spans: SpanData[]): TokenTiming => {
+  const timing: TokenTiming = {
+    timeToFirstTokenMs: null,
+    timeToLastTokenMs: null,
+  };
+
+  for (const span of spans) {
+    if (!span.events?.length) continue;
+
+    for (const event of span.events) {
+      const timeDelta = event.timeUnixMs - span.startTimeUnixMs;
+
+      if (FIRST_TOKEN_EVENTS.has(event.name)) {
+        if (
+          timing.timeToFirstTokenMs === null ||
+          timeDelta < timing.timeToFirstTokenMs
+        ) {
+          timing.timeToFirstTokenMs = timeDelta;
+        }
+      }
+
+      if (LAST_TOKEN_EVENTS.has(event.name)) {
+        if (
+          timing.timeToLastTokenMs === null ||
+          timeDelta > timing.timeToLastTokenMs
+        ) {
+          timing.timeToLastTokenMs = timeDelta;
+        }
+      }
+    }
+  }
+
+  return timing;
+};
+
+/**
+ * Computes tokens per second.
+ */
+const computeTokensPerSecond = (
+  completionTokens: number | null,
+  durationMs: number,
+): number | null => {
+  if (completionTokens === null || completionTokens <= 0 || durationMs <= 0) {
+    return null;
+  }
+  return Math.round((completionTokens / durationMs) * 1000);
+};
+
+/**
+ * Converts token metrics to nullable format for output.
+ */
+const formatTokenMetrics = (metrics: TokenMetrics) => ({
+  TotalPromptTokenCount:
+    metrics.totalPromptTokens > 0 ? metrics.totalPromptTokens : null,
+  TotalCompletionTokenCount:
+    metrics.totalCompletionTokens > 0 ? metrics.totalCompletionTokens : null,
+  TotalCost:
+    metrics.totalCost > 0 ? Number(metrics.totalCost.toFixed(6)) : null,
+  TokensEstimated: metrics.tokensEstimated,
+});
+
+// ============================================================================
+// Service
+// ============================================================================
+
+const logger = createLogger("langwatch:trace-processing:aggregation-service");
+
+/**
+ * Service that handles aggregating spans into trace metadata.
+ *
+ * @example
+ * ```typescript
+ * const result = traceAggregationService.aggregateTrace(spans);
+ * console.log(result.totalSpans, result.durationMs);
+ * ```
+ */
+export class TraceAggregationService {
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.trace-processing.aggregation",
+  );
+
+  /**
+   * Aggregates spans into trace metadata.
+   *
+   * @param spans - Array of spans to aggregate
+   * @returns Aggregated trace metrics
+   * @throws ValidationError if no valid spans provided
+   */
+  aggregateTrace(spans: SpanData[]): TraceAggregationResult {
+    return this.tracer.withActiveSpan(
+      "TraceAggregationService.aggregateTrace",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "span.count": spans.length,
+          "trace.id": spans[0]?.traceId ?? "unknown",
+        },
+      },
+      (otelSpan) => {
+        // Validate input
+        this.validateSpans(spans, otelSpan);
+
+        // Filter to valid timestamps
+        const validSpans = this.filterValidTimestamps(spans, otelSpan);
+
+        // Basic metrics
+        const traceId = spans[0]!.traceId;
+        const spanIds = spans.map((s) => s.spanId);
+        const { startTimeUnixMs, endTimeUnixMs, durationMs } =
+          this.computeTiming(validSpans);
+
+        // Extract all metrics
+        const serviceNames = extractServiceNames(spans);
+        const rootSpanId = findRootSpanId(spans);
+        const models = extractModels(spans);
+        const tokenMetrics = extractTokenMetrics(spans);
+        const statusInfo = extractStatusInfo(spans);
+        const tokenTiming = extractTokenTiming(spans);
+
+        // IO extraction
+        const ComputedInput = traceIOExtractionService.extractFirstInput(spans);
+        const ComputedOutput =
+          traceIOExtractionService.extractLastOutput(spans);
+
+        // Trace attributes extraction
+        const traceAttrs = traceAttributesService.extract(spans);
+
+        // Build SDK attributes
+        const attributes: Record<string, string> = {};
+        if (traceAttrs.sdkName) attributes["sdk.name"] = traceAttrs.sdkName;
+        if (traceAttrs.sdkVersion)
+          attributes["sdk.version"] = traceAttrs.sdkVersion;
+        if (traceAttrs.sdkLanguage)
+          attributes["sdk.language"] = traceAttrs.sdkLanguage;
+
+        // Format outputs
+        const formatted = formatTokenMetrics(tokenMetrics);
+        const TokensPerSecond = computeTokensPerSecond(
+          formatted.TotalCompletionTokenCount,
+          durationMs,
+        );
+
+        otelSpan.setAttributes({
+          "trace.duration_ms": durationMs,
+          "trace.total_tokens":
+            (formatted.TotalPromptTokenCount ?? 0) +
+            (formatted.TotalCompletionTokenCount ?? 0),
+          "trace.total_cost": formatted.TotalCost ?? 0,
+          "trace.models": models.join(","),
+          "trace.has_error": statusInfo.containsError,
+        });
+
+        return {
+          traceId,
+          spanIds,
+          totalSpans: spans.length,
+          startTimeUnixMs,
+          endTimeUnixMs,
+          durationMs,
+          serviceNames,
+          rootSpanId,
+          IOSchemaVersion: "2025-11-23" as const,
+          ComputedInput: ComputedInput || null,
+          ComputedOutput: ComputedOutput || null,
+          ComputedAttributes: statusInfo.computedAttributes,
+          TimeToFirstTokenMs: tokenTiming.timeToFirstTokenMs,
+          TimeToLastTokenMs: tokenTiming.timeToLastTokenMs,
+          TokensPerSecond,
+          ContainsErrorStatus: statusInfo.containsError,
+          ContainsOKStatus: statusInfo.containsOK,
+          Models: models,
+          TopicId: null,
+          SubTopicId: null,
+          ...formatted,
+          HasAnnotation: statusInfo.hasAnnotation,
+          ThreadId: traceAttrs.threadId,
+          UserId: traceAttrs.userId,
+          CustomerId: traceAttrs.customerId,
+          Labels: traceAttrs.labels,
+          PromptIds: traceAttrs.promptIds,
+          PromptVersionIds: traceAttrs.promptVersionIds,
+          Attributes: attributes,
+          ErrorMessage: statusInfo.errorMessage,
+        };
+      },
+    );
+  }
+
+  private validateSpans(
+    spans: SpanData[],
+    otelSpan: { addEvent: (name: string) => void },
+  ): void {
+    if (spans.length === 0 || !spans[0]) {
+      throw new ValidationError(
+        "Cannot aggregate trace with no spans",
+        "spans",
+        spans,
+      );
+    }
+
+    const expectedTraceId = spans[0].traceId;
+    for (const span of spans) {
+      if (span.traceId !== expectedTraceId) {
+        throw new ValidationError(
+          "Cannot aggregate trace: spans have different traceId values",
+          "spans",
+          spans,
+        );
+      }
+    }
+
+    otelSpan.addEvent("validation.complete");
+  }
+
+  private filterValidTimestamps(
+    spans: SpanData[],
+    otelSpan: { setAttributes: (attrs: Record<string, number>) => void },
+  ): SpanData[] {
+    const valid = spans.filter((span) => {
+      const validStart = isValidTimestamp(span.startTimeUnixMs);
+      const validEnd = isValidTimestamp(span.endTimeUnixMs);
+
+      if (!validStart || !validEnd) {
+        logger.warn(
+          { traceId: span.traceId, spanId: span.spanId },
+          "Span has invalid timestamps, excluding from timing calculation",
+        );
+        return false;
+      }
+      return true;
+    });
+
+    otelSpan.setAttributes({
+      "span.invalid_count": spans.length - valid.length,
+    });
+
+    if (valid.length === 0) {
+      throw new ValidationError(
+        "Cannot aggregate trace: all spans have invalid timestamps",
+        "spans",
+        spans,
+      );
+    }
+
+    return valid;
+  }
+
+  private computeTiming(spans: SpanData[]): {
+    startTimeUnixMs: number;
+    endTimeUnixMs: number;
+    durationMs: number;
+  } {
+    let minStart = Infinity;
+    let maxEnd = -Infinity;
+
+    for (const span of spans) {
+      if (span.startTimeUnixMs < minStart) minStart = span.startTimeUnixMs;
+      if (span.endTimeUnixMs > maxEnd) maxEnd = span.endTimeUnixMs;
+    }
+
+    return {
+      startTimeUnixMs: minStart,
+      endTimeUnixMs: maxEnd,
+      durationMs: maxEnd - minStart,
+    };
+  }
+}
+
+export const traceAggregationService = new TraceAggregationService();
