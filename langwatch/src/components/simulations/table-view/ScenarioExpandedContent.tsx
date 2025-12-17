@@ -98,13 +98,13 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
   }
 
   return (
-    <Box p={4} bg="gray.50">
+    <Box p={1} bg="gray.50">
       <Box
         border="1px solid"
         borderColor="gray.200"
         borderRadius="md"
         overflow="hidden"
-        bg="white"
+        bg="gray.50"
       >
         <DataGridTable<TraceRow>
           data={traces}
