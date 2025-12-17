@@ -1,6 +1,6 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
-import { getCurrentWriteIndex } from "../helpers";
 import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
+import { getCurrentWriteIndex } from "../helpers";
 
 /**
  * Adds a keyword subfield to metadata.name for sorting support.
