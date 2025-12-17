@@ -923,10 +923,9 @@ export const experimentsRouter = createTRPCRouter({
           projectId: input.projectId,
           type: experiment.type,
           workflowId,
-          wizardState:
-            experiment.wizardState !== null
-              ? (experiment.wizardState as Prisma.InputJsonValue)
-              : undefined,
+          ...(experiment.wizardState && {
+            wizardState: experiment.wizardState as Prisma.InputJsonValue,
+          }),
         },
       });
 
