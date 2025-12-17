@@ -1,6 +1,6 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
-import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
+import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "~/server/elasticsearch";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./enums";
 import { scenarioEventSchema } from "./schemas";
@@ -1064,16 +1064,39 @@ export class ScenarioEventRepository {
       }
     }
 
-    // Add global search
+    // Add global search - includes cross-index trace metadata search
     if (search) {
+      // Search trace metadata for matching trace IDs
+      const matchingTraceIds = await this.searchTraceMetadataForTraceIds({
+        projectId: validatedProjectId,
+        search,
+      });
+
+      const shouldClauses: any[] = [
+        { wildcard: { [ES_FIELDS.scenarioId]: `*${search.toLowerCase()}*` } },
+        { wildcard: { "metadata.name": `*${search.toLowerCase()}*` } },
+        { wildcard: { [ES_FIELDS.scenarioSetId]: `*${search.toLowerCase()}*` } },
+        { wildcard: { [ES_FIELDS.batchRunId]: `*${search.toLowerCase()}*` } },
+      ];
+
+      // If we found matching traces, add them to the search
+      if (matchingTraceIds.length > 0) {
+        // Find scenarioRunIds that have these trace IDs in their messages
+        const scenarioRunIdsFromTraces = await this.getScenarioRunIdsFromTraceIds({
+          projectId: validatedProjectId,
+          traceIds: matchingTraceIds,
+        });
+
+        if (scenarioRunIdsFromTraces.length > 0) {
+          shouldClauses.push({
+            terms: { [ES_FIELDS.scenarioRunId]: scenarioRunIdsFromTraces },
+          });
+        }
+      }
+
       mustClauses.push({
         bool: {
-          should: [
-            { wildcard: { [ES_FIELDS.scenarioId]: `*${search.toLowerCase()}*` } },
-            { wildcard: { "metadata.name": `*${search.toLowerCase()}*` } },
-            { wildcard: { [ES_FIELDS.scenarioSetId]: `*${search.toLowerCase()}*` } },
-            { wildcard: { [ES_FIELDS.batchRunId]: `*${search.toLowerCase()}*` } },
-          ],
+          should: shouldClauses,
           minimum_should_match: 1,
         },
       });
@@ -1328,7 +1351,8 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Maps column IDs to Elasticsearch field names
+   * Maps column IDs to Elasticsearch field names.
+   * Note: Some fields like durationInMs don't exist directly in ES and cannot be sorted server-side.
    */
   private mapColumnToField(columnId: string): string | null {
     const fieldMap: Record<string, string> = {
@@ -1336,10 +1360,12 @@ export class ScenarioEventRepository {
       scenarioSetId: ES_FIELDS.scenarioSetId,
       batchRunId: ES_FIELDS.batchRunId,
       scenarioRunId: ES_FIELDS.scenarioRunId,
-      name: "metadata.name",
+      name: "metadata.name.keyword", // Use keyword subfield for sorting
       status: "status",
       timestamp: "timestamp",
-      // Dynamic metadata fields
+      verdict: "results.verdict",
+      // Note: durationInMs is computed from RUN_STARTED and RUN_FINISHED timestamps,
+      // so it cannot be sorted server-side in ES. Falls back to timestamp sort.
     };
 
     // Handle metadata.* columns
@@ -1468,6 +1494,138 @@ export class ScenarioEventRepository {
     const buckets =
       (response.aggregations as any)?.unique_values?.buckets ?? [];
     return buckets.map((bucket: { key: string }) => String(bucket.key));
+  }
+
+  /**
+   * Searches trace metadata for matching trace IDs.
+   * Used by global search to find scenario runs via their associated traces.
+   *
+   * @param projectId - The project identifier
+   * @param search - Search query to match against trace metadata
+   * @returns Array of trace IDs that match the search
+   */
+  private async searchTraceMetadataForTraceIds({
+    projectId,
+    search,
+  }: {
+    projectId: string;
+    search: string;
+  }): Promise<string[]> {
+    const client = await this.getClient();
+    const searchLower = search.toLowerCase();
+
+    try {
+      const response = await client.search({
+        index: TRACE_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              filter: [{ term: { project_id: projectId } }],
+              should: [
+                // Search in reserved metadata fields (keyword types - use wildcard)
+                { wildcard: { "metadata.user_id": `*${searchLower}*` } },
+                { wildcard: { "metadata.thread_id": `*${searchLower}*` } },
+                { wildcard: { "metadata.customer_id": `*${searchLower}*` } },
+                // Search in prompt_ids array (keyword type)
+                { wildcard: { "metadata.prompt_ids": `*${searchLower}*` } },
+                // Search trace input/output (text fields - use match for tokenized search)
+                { match_phrase: { "input.value": { query: search, slop: 2 } } },
+                { match_phrase: { "output.value": { query: search, slop: 2 } } },
+                // Also search individual words
+                { match: { "input.value": { query: search, operator: "and" } } },
+                { match: { "output.value": { query: search, operator: "and" } } },
+              ],
+              minimum_should_match: 1,
+            },
+          },
+          _source: ["trace_id"],
+          size: 100, // Limit to prevent excessive cross-index joins
+        },
+      });
+
+      const hits = response.hits?.hits ?? [];
+      return hits
+        .map((hit) => {
+          const source = hit._source as Record<string, any>;
+          return source?.trace_id as string;
+        })
+        .filter(Boolean);
+    } catch (error) {
+      // If trace index doesn't exist or query fails, return empty array
+      // This allows the search to continue with just scenario event fields
+      captureException({
+        message: "Failed to search trace metadata",
+        error,
+        projectId,
+        search,
+      });
+      return [];
+    }
+  }
+
+  /**
+   * Gets scenario run IDs that have messages referencing the given trace IDs.
+   * Used to link traces back to their scenario runs.
+   *
+   * @param projectId - The project identifier
+   * @param traceIds - Array of trace IDs to search for
+   * @returns Array of scenario run IDs
+   */
+  private async getScenarioRunIdsFromTraceIds({
+    projectId,
+    traceIds,
+  }: {
+    projectId: string;
+    traceIds: string[];
+  }): Promise<string[]> {
+    if (traceIds.length === 0) {
+      return [];
+    }
+
+    const client = await this.getClient();
+
+    try {
+      const response = await client.search({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              filter: [
+                { term: { [ES_FIELDS.projectId]: projectId } },
+                { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
+                // messages is an object array (not nested), so we query directly
+                { terms: { "messages.trace_id": traceIds } },
+              ],
+            },
+          },
+          aggs: {
+            unique_scenario_runs: {
+              terms: {
+                field: ES_FIELDS.scenarioRunId,
+                size: 100,
+              },
+            },
+          },
+          size: 0,
+        },
+      });
+
+      return (
+        (
+          response.aggregations?.unique_scenario_runs as {
+            buckets: Array<{ key: string }>;
+          }
+        )?.buckets ?? []
+      ).map((bucket) => bucket.key);
+    } catch (error) {
+      captureException({
+        message: "Failed to get scenario run IDs from trace IDs",
+        error,
+        projectId,
+        traceIds,
+      });
+      return [];
+    }
   }
 
   /**
