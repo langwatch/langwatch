@@ -3,7 +3,11 @@ import type {
   QueryDslBoolQuery,
   SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
-import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  ExperimentType,
+  Prisma,
+} from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
@@ -890,11 +894,11 @@ export const experimentsRouter = createTRPCRouter({
       // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
       const baseSlug = slugify(experimentName);
-      
+
       // Find a unique slug by appending -2, -3, etc. if needed
       let newSlug = baseSlug;
       let index = 2;
-      
+
       while (true) {
         const existingExperiment = await ctx.prisma.experiment.findFirst({
           where: {
@@ -902,15 +906,15 @@ export const experimentsRouter = createTRPCRouter({
             slug: newSlug,
           },
         });
-        
+
         if (!existingExperiment) {
           break;
         }
-        
+
         newSlug = `${baseSlug}-${index}`;
         index++;
       }
-      
+
       const newExperiment = await ctx.prisma.experiment.create({
         data: {
           id: `experiment_${nanoid()}`,
@@ -919,7 +923,10 @@ export const experimentsRouter = createTRPCRouter({
           projectId: input.projectId,
           type: experiment.type,
           workflowId,
-          wizardState: experiment.wizardState as JsonValue,
+          wizardState:
+            experiment.wizardState !== null
+              ? (experiment.wizardState as Prisma.InputJsonValue)
+              : undefined,
         },
       });
 
@@ -1024,8 +1031,8 @@ const findNextDraftName = async (projectId: string) => {
     },
   });
 
-  const draftCount = experiments.filter((draft) =>
-    draft.name?.startsWith("Draft"),
+  const draftCount = experiments.filter(
+    (draft) => draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -1206,9 +1213,8 @@ const getExperimentBatchEvaluationRuns = async (
         dataset_average_duration: runAgg?.dataset_average_duration.value as
           | number
           | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
-          | number
-          | undefined,
+        evaluations_average_cost: runAgg?.evaluations_cost.average_cost
+          .value as number | undefined,
         evaluations_average_duration: runAgg?.evaluations_cost.average_duration
           .value as number | undefined,
         evaluations: Object.fromEntries(
