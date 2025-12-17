@@ -43,28 +43,33 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
 
   return (
     <Box p={4} bg="gray.50">
-      <Text fontWeight="medium" fontSize="sm" mb={2}>
-        Traces ({traces.length})
-      </Text>
-      <DataGridTable<TraceRow>
-        data={traces}
-        columns={traceColumns}
-        visibleColumns={visibleColumns}
-        sorting={null}
-        filters={[]}
-        groupBy={null}
-        expandedRows={new Set()}
-        getRowId={(trace) => trace.traceId}
-        onSort={() => {}}
-        onAddFilter={() => {}}
-        onRemoveFilter={() => {}}
-        onGroupBy={() => {}}
-        onToggleColumnVisibility={() => {}}
-        onPinColumn={() => {}}
-        onToggleRowExpansion={() => {}}
-        onRowClick={handleRowClick}
-        emptyMessage="No traces available"
-      />
+      <Box
+        border="1px solid"
+        borderColor="gray.200"
+        borderRadius="md"
+        overflow="hidden"
+        bg="white"
+      >
+        <DataGridTable<TraceRow>
+          data={traces}
+          columns={traceColumns}
+          visibleColumns={visibleColumns}
+          sorting={null}
+          filters={[]}
+          groupBy={null}
+          expandedRows={new Set()}
+          getRowId={(trace) => trace.traceId}
+          onSort={() => {}}
+          onAddFilter={() => {}}
+          onRemoveFilter={() => {}}
+          onGroupBy={() => {}}
+          onToggleColumnVisibility={() => {}}
+          onPinColumn={() => {}}
+          onToggleRowExpansion={() => {}}
+          onRowClick={handleRowClick}
+          emptyMessage="No traces available"
+        />
+      </Box>
     </Box>
   );
 }
