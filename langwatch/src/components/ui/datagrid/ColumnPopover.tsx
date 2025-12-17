@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Box,
   Button,
+  Field,
   Flex,
   HStack,
   IconButton,
@@ -12,12 +13,12 @@ import {
 import {
   ArrowDown,
   ArrowUp,
-  Eye,
   EyeOff,
   MoreVertical,
   Pin,
   X,
 } from "lucide-react";
+import { format, subDays, startOfDay } from "date-fns";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -61,6 +62,8 @@ export function ColumnPopover<T>({
 }: ColumnPopoverProps<T>) {
   const [filterValue, setFilterValue] = useState("");
   const [selectedEnumValue, setSelectedEnumValue] = useState<string>("");
+  const [dateStart, setDateStart] = useState<string>("");
+  const [dateEnd, setDateEnd] = useState<string>("");
 
   const columnFilters = filters.filter((f) => f.columnId === column.id);
   const isSorted = sorting?.columnId === column.id;
@@ -75,6 +78,18 @@ export function ColumnPopover<T>({
         value: selectedEnumValue,
       });
       setSelectedEnumValue("");
+    } else if (column.filterType === "date" && (dateStart || dateEnd)) {
+      // For date filters, store as JSON with start/end
+      onAddFilter({
+        columnId: column.id,
+        operator: "between",
+        value: JSON.stringify({
+          start: dateStart ? new Date(dateStart).toISOString() : null,
+          end: dateEnd ? new Date(dateEnd).toISOString() : null,
+        }),
+      });
+      setDateStart("");
+      setDateEnd("");
     } else if (filterValue.trim()) {
       onAddFilter({
         columnId: column.id,
@@ -82,6 +97,33 @@ export function ColumnPopover<T>({
         value: filterValue.trim(),
       });
       setFilterValue("");
+    }
+  };
+
+  const handleQuickDateSelect = (days: number) => {
+    const endDate = new Date();
+    const startDate = startOfDay(subDays(endDate, days - 1));
+    onAddFilter({
+      columnId: column.id,
+      operator: "between",
+      value: JSON.stringify({
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+      }),
+    });
+  };
+
+  const formatDateFilterDisplay = (value: string) => {
+    try {
+      const parsed = JSON.parse(value);
+      const start = parsed.start ? format(new Date(parsed.start), "MMM d") : "";
+      const end = parsed.end ? format(new Date(parsed.end), "MMM d") : "";
+      if (start && end) return `${start} - ${end}`;
+      if (start) return `From ${start}`;
+      if (end) return `Until ${end}`;
+      return value;
+    } catch {
+      return value;
     }
   };
 
@@ -165,6 +207,47 @@ export function ColumnPopover<T>({
                       Add
                     </Button>
                   </HStack>
+                ) : column.filterType === "date" ? (
+                  <VStack align="stretch" gap={2}>
+                    <HStack gap={2}>
+                      {[
+                        { label: "Today", days: 1 },
+                        { label: "7d", days: 7 },
+                        { label: "30d", days: 30 },
+                        { label: "90d", days: 90 },
+                      ].map((opt) => (
+                        <Button
+                          key={opt.label}
+                          size="xs"
+                          variant="outline"
+                          onClick={() => handleQuickDateSelect(opt.days)}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </HStack>
+                    <Field.Root>
+                      <Field.Label fontSize="xs">Start</Field.Label>
+                      <Input
+                        type="datetime-local"
+                        size="sm"
+                        value={dateStart}
+                        onChange={(e) => setDateStart(e.target.value)}
+                      />
+                    </Field.Root>
+                    <Field.Root>
+                      <Field.Label fontSize="xs">End</Field.Label>
+                      <Input
+                        type="datetime-local"
+                        size="sm"
+                        value={dateEnd}
+                        onChange={(e) => setDateEnd(e.target.value)}
+                      />
+                    </Field.Root>
+                    <Button size="sm" onClick={handleAddFilter}>
+                      Apply Date Range
+                    </Button>
+                  </VStack>
                 ) : (
                   <HStack>
                     <Input
@@ -202,8 +285,16 @@ export function ColumnPopover<T>({
                         fontSize="sm"
                       >
                         <Text>
-                          {filter.operator === "eq" ? "=" : "contains"}{" "}
-                          {(enumLabels ?? column.enumLabels)?.[String(filter.value)] ?? String(filter.value)}
+                          {filter.operator === "eq"
+                            ? "="
+                            : filter.operator === "between"
+                              ? ""
+                              : "contains"}{" "}
+                          {filter.operator === "between"
+                            ? formatDateFilterDisplay(String(filter.value))
+                            : (enumLabels ?? column.enumLabels)?.[
+                                String(filter.value)
+                              ] ?? String(filter.value)}
                         </Text>
                         <IconButton
                           aria-label="Remove filter"
