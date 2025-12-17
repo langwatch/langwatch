@@ -2,7 +2,7 @@ import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import React, { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { SetCard } from "~/components/simulations";
+import { SetCard, SimulationsTabs, ScenariosTableView } from "~/components/simulations";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -50,8 +50,60 @@ function SimulationsPageContent() {
 
   const handleSetClick = (scenarioSetId: string) => {
     // Navigate to the specific set page using the catch-all route
-    void router.push(`${router.asPath}/${scenarioSetId}`);
+    void router.push(`${router.asPath.split("?")[0]}/${scenarioSetId}`);
   };
+
+  // Grid view content
+  const gridViewContent = (
+    <>
+      {/* Show loading state */}
+      {isLoading && (
+        <VStack gap={4} align="center" py={8}>
+          <Spinner borderWidth="3px" animationDuration="0.8s" />
+        </VStack>
+      )}
+
+      {/* Show error state */}
+      {error && (
+        <VStack gap={4} align="center" py={8}>
+          <Text color="red.500">Error loading simulation batches</Text>
+          <Text fontSize="sm" color="gray.600">
+            {error.message}
+          </Text>
+        </VStack>
+      )}
+
+      {/* Show empty state when no batches */}
+      {!isLoading &&
+        !error &&
+        (!scenarioSetsData || scenarioSetsData.length === 0) && (
+          <ScenarioInfoCard />
+        )}
+
+      {/* Render grid of scenario sets */}
+      {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
+        <Grid
+          templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+          gap={6}
+          width="full"
+        >
+          {sortedScenarioSetsData.map((setData) => (
+            <SetCard
+              {...setData}
+              key={setData.scenarioSetId}
+              onClick={() => handleSetClick(setData.scenarioSetId)}
+            />
+          ))}
+        </Grid>
+      )}
+    </>
+  );
+
+  // Table view content
+  const tableViewContent = <ScenariosTableView />;
+
+  // Check if we have any data to show tabs
+  const hasData = sortedScenarioSetsData && sortedScenarioSetsData.length > 0;
 
   return (
     <DashboardLayout>

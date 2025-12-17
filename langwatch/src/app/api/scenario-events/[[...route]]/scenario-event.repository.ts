@@ -969,6 +969,266 @@ export class ScenarioEventRepository {
   }
 
   /**
+   * Searches scenario runs with filtering, sorting, and pagination.
+   * All operations are performed server-side in Elasticsearch for efficiency.
+   *
+   * @param projectId - The project identifier
+   * @param filters - Array of filter conditions
+   * @param sorting - Sort configuration
+   * @param pagination - Page and pageSize
+   * @param search - Global search query
+   * @returns Paginated scenario run data with total count
+   */
+  async searchScenarioRuns({
+    projectId,
+    filters,
+    sorting,
+    pagination,
+    search,
+  }: {
+    projectId: string;
+    filters?: Array<{
+      columnId: string;
+      operator: "eq" | "contains";
+      value?: unknown;
+    }>;
+    sorting?: { columnId: string; order: "asc" | "desc" };
+    pagination?: { page: number; pageSize: number };
+    search?: string;
+  }): Promise<{
+    scenarioRunIds: string[];
+    totalCount: number;
+  }> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    const page = pagination?.page ?? 1;
+    const pageSize = pagination?.pageSize ?? 20;
+    const from = (page - 1) * pageSize;
+
+    // Build the query
+    const mustClauses: any[] = [
+      { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+      { term: { type: ScenarioEventType.RUN_STARTED } },
+    ];
+
+    // Add filter clauses
+    if (filters && filters.length > 0) {
+      for (const filter of filters) {
+        const fieldMapping = this.mapColumnToField(filter.columnId);
+        if (!fieldMapping) continue;
+
+        if (filter.operator === "eq") {
+          mustClauses.push({ term: { [fieldMapping]: filter.value } });
+        } else if (filter.operator === "contains") {
+          mustClauses.push({
+            wildcard: {
+              [fieldMapping]: `*${String(filter.value).toLowerCase()}*`,
+            },
+          });
+        }
+      }
+    }
+
+    // Add global search
+    if (search) {
+      mustClauses.push({
+        bool: {
+          should: [
+            { wildcard: { [ES_FIELDS.scenarioId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { "metadata.name": `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.scenarioSetId]: `*${search.toLowerCase()}*` } },
+            { wildcard: { [ES_FIELDS.batchRunId]: `*${search.toLowerCase()}*` } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    }
+
+    // Build sort
+    const sortField = sorting
+      ? this.mapColumnToField(sorting.columnId) ?? "timestamp"
+      : "timestamp";
+    const sortOrder = sorting?.order ?? "desc";
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            must: mustClauses,
+          },
+        },
+        sort: [{ [sortField]: { order: sortOrder } }],
+        from,
+        size: pageSize,
+        track_total_hits: true,
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    const totalCount =
+      typeof response.hits?.total === "number"
+        ? response.hits.total
+        : response.hits?.total?.value ?? 0;
+
+    const scenarioRunIds = hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
+
+    return {
+      scenarioRunIds,
+      totalCount,
+    };
+  }
+
+  /**
+   * Maps column IDs to Elasticsearch field names
+   */
+  private mapColumnToField(columnId: string): string | null {
+    const fieldMap: Record<string, string> = {
+      scenarioId: ES_FIELDS.scenarioId,
+      scenarioSetId: ES_FIELDS.scenarioSetId,
+      batchRunId: ES_FIELDS.batchRunId,
+      scenarioRunId: ES_FIELDS.scenarioRunId,
+      name: "metadata.name",
+      status: "status",
+      timestamp: "timestamp",
+      // Dynamic metadata fields
+    };
+
+    // Handle metadata.* columns
+    if (columnId.startsWith("metadata.")) {
+      return columnId;
+    }
+
+    return fieldMap[columnId] ?? null;
+  }
+
+  /**
+   * Gets unique metadata keys from scenario events.
+   * Scans the metadata field to find all unique keys.
+   *
+   * @param projectId - The project identifier
+   * @returns Array of unique metadata keys
+   */
+  async getUniqueMetadataKeys({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    // Use a scripted aggregation to get unique metadata keys
+    // This queries run_started events which contain metadata
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { type: ScenarioEventType.RUN_STARTED } },
+              { exists: { field: "metadata" } },
+            ],
+          },
+        },
+        aggs: {
+          metadata_keys: {
+            scripted_metric: {
+              init_script: "state.keys = new HashSet()",
+              map_script: `
+                if (doc.containsKey('metadata') && params._source != null && params._source.metadata != null) {
+                  for (key in params._source.metadata.keySet()) {
+                    state.keys.add(key);
+                  }
+                }
+              `,
+              combine_script: "return state.keys",
+              reduce_script: `
+                def allKeys = new HashSet();
+                for (state in states) {
+                  if (state != null) {
+                    allKeys.addAll(state);
+                  }
+                }
+                return allKeys.toArray();
+              `,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    const keys =
+      (response.aggregations as any)?.metadata_keys?.value ?? [];
+    return Array.isArray(keys) ? keys.filter((k: any) => typeof k === "string") : [];
+  }
+
+  /**
+   * Gets filter options (unique values) for a specific column.
+   * Used to populate dropdown filters in the UI.
+   *
+   * @param projectId - The project identifier
+   * @param columnId - The column to get options for
+   * @returns Array of unique values for the column
+   */
+  async getFilterOptions({
+    projectId,
+    columnId,
+  }: {
+    projectId: string;
+    columnId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const client = await this.getClient();
+
+    const fieldMapping = this.mapColumnToField(columnId);
+    if (!fieldMapping) {
+      return [];
+    }
+
+    // For status field, we need to query run_finished events
+    const eventType =
+      columnId === "status"
+        ? ScenarioEventType.RUN_FINISHED
+        : ScenarioEventType.RUN_STARTED;
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { type: eventType } },
+              { exists: { field: fieldMapping } },
+            ],
+          },
+        },
+        aggs: {
+          unique_values: {
+            terms: {
+              field: fieldMapping,
+              size: 1000,
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    const buckets =
+      (response.aggregations as any)?.unique_values?.buckets ?? [];
+    return buckets.map((bucket: { key: string }) => String(bucket.key));
+  }
+
+  /**
    * Gets or creates a cached Elasticsearch client for test environment.
    * Avoids recreating the client on every operation for better performance.
    *
