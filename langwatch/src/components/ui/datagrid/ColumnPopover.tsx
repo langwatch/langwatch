@@ -39,6 +39,7 @@ interface ColumnPopoverProps<T> {
   onToggleVisibility: (columnId: string) => void;
   onPin: (columnId: string, position: "left" | "right" | false) => void;
   enumOptions?: string[];
+  enumLabels?: Record<string, string>;
 }
 
 /**
@@ -56,6 +57,7 @@ export function ColumnPopover<T>({
   onToggleVisibility,
   onPin,
   enumOptions,
+  enumLabels,
 }: ColumnPopoverProps<T>) {
   const [filterValue, setFilterValue] = useState("");
   const [selectedEnumValue, setSelectedEnumValue] = useState<string>("");
@@ -155,7 +157,7 @@ export function ColumnPopover<T>({
                       <option value="">Select value...</option>
                       {(enumOptions ?? column.enumValues ?? []).map((opt) => (
                         <option key={opt} value={opt}>
-                          {opt}
+                          {(enumLabels ?? column.enumLabels)?.[opt] ?? opt}
                         </option>
                       ))}
                     </select>
@@ -201,7 +203,7 @@ export function ColumnPopover<T>({
                       >
                         <Text>
                           {filter.operator === "eq" ? "=" : "contains"}{" "}
-                          {String(filter.value)}
+                          {(enumLabels ?? column.enumLabels)?.[String(filter.value)] ?? String(filter.value)}
                         </Text>
                         <IconButton
                           aria-label="Remove filter"

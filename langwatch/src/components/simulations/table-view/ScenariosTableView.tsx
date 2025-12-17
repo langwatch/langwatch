@@ -13,6 +13,7 @@ import { createScenarioColumns, generateDynamicColumns } from "./scenarioColumns
 import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
 import { StatusCell, VerdictCell, DurationCell, TimestampCell } from "./cells";
 import type { ScenarioRunRow } from "./types";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
 
 /**
@@ -107,16 +108,17 @@ export function ScenariosTableView() {
   const pageSize = useStore((state) => state.pageSize);
   const globalSearch = useStore((state) => state.globalSearch);
   const visibleColumns = useStore((state) => state.visibleColumns);
+  const groupBy = useStore((state) => state.groupBy);
 
   // Get the full state for passing to DataGrid (but don't use it in effects)
   const storeState = useStore();
 
-  // Fetch filtered scenario runs
+  // Fetch filtered scenario runs (ungrouped)
   const {
     data: scenarioData,
-    isLoading,
-    error,
-    refetch,
+    isLoading: isLoadingUngrouped,
+    error: errorUngrouped,
+    refetch: refetchUngrouped,
   } = api.scenarios.getFilteredScenarioRuns.useQuery(
     {
       projectId: project?.id ?? "",
@@ -134,84 +136,136 @@ export function ScenariosTableView() {
       includeTraces: true,
     },
     {
-      enabled: !!project?.id,
-      refetchInterval: 30000, // Refetch every 30 seconds
+      enabled: !!project?.id && !groupBy,
+      refetchInterval: 30000,
     }
   );
 
-  // Update store when data changes - use getState() for imperative updates
+  // Fetch grouped scenario runs
+  const {
+    data: groupedData,
+    isLoading: isLoadingGrouped,
+    error: errorGrouped,
+    refetch: refetchGrouped,
+  } = api.scenarios.getGroupedScenarioRuns.useQuery(
+    {
+      projectId: project?.id ?? "",
+      groupBy: groupBy ?? "",
+      filters: filters.map((f) => ({
+        columnId: f.columnId,
+        operator: f.operator,
+        value: f.value,
+      })),
+      sorting: sorting ?? undefined,
+      pagination: {
+        page,
+        pageSize,
+      },
+    },
+    {
+      enabled: !!project?.id && !!groupBy,
+      refetchInterval: 30000,
+    }
+  );
+
+  const isLoading = groupBy ? isLoadingGrouped : isLoadingUngrouped;
+  const error = groupBy ? errorGrouped : errorUngrouped;
+  const refetch = groupBy ? refetchGrouped : refetchUngrouped;
+
+  // Helper to transform ScenarioRunData to ScenarioRunRow
+  const transformRunData = useCallback((run: ScenarioRunData): ScenarioRunRow => {
+    const traceMap = new Map<string, { input: string; output: string; timestamp: number }>();
+
+    for (const message of run.messages ?? []) {
+      const traceId = (message as { trace_id?: string }).trace_id;
+      if (traceId) {
+        const existing = traceMap.get(traceId) ?? { input: "", output: "", timestamp: 0 };
+        const content = typeof message.content === "string"
+          ? message.content
+          : JSON.stringify(message.content ?? "");
+
+        const role = (message as { role?: string }).role;
+        if (role === "user" || role === "human") {
+          existing.input = content;
+        } else if (role === "assistant" || role === "ai") {
+          existing.output = content;
+        }
+        existing.timestamp = (message as { timestamp?: number }).timestamp ?? run.timestamp;
+        traceMap.set(traceId, existing);
+      }
+    }
+
+    const traces = Array.from(traceMap.entries()).map(([traceId, data]) => ({
+      traceId,
+      timestamp: data.timestamp,
+      input: data.input,
+      output: data.output,
+      metadata: {},
+      spanCount: 0,
+      totalTokens: 0,
+      totalCost: 0,
+    }));
+
+    return {
+      scenarioRunId: run.scenarioRunId,
+      scenarioId: run.scenarioId,
+      scenarioSetId: run.scenarioSetId ?? "",
+      batchRunId: run.batchRunId,
+      name: run.name ?? null,
+      description: run.description ?? null,
+      status: run.status,
+      verdict: run.results?.verdict ?? null,
+      timestamp: run.timestamp,
+      durationInMs: run.durationInMs,
+      metCriteria: run.results?.metCriteria ?? [],
+      unmetCriteria: run.results?.unmetCriteria ?? [],
+      traces,
+    };
+  }, []);
+
+  // Update store when ungrouped data changes
   useEffect(() => {
     const store = storeRef.current;
-    if (!store) return;
+    if (!store || groupBy) return; // Skip if grouping
 
     if (scenarioData) {
-      // Transform ScenarioRunData to ScenarioRunRow format
-      const rows: ScenarioRunRow[] = scenarioData.rows.map((run) => {
-        // Extract trace info from messages
-        const traceMap = new Map<string, { input: string; output: string; timestamp: number }>();
-
-        for (const message of run.messages ?? []) {
-          const traceId = (message as { trace_id?: string }).trace_id;
-          if (traceId) {
-            const existing = traceMap.get(traceId) ?? { input: "", output: "", timestamp: 0 };
-            const content = typeof message.content === "string"
-              ? message.content
-              : JSON.stringify(message.content ?? "");
-
-            // Determine if this is input or output based on role
-            const role = (message as { role?: string }).role;
-            if (role === "user" || role === "human") {
-              existing.input = content;
-            } else if (role === "assistant" || role === "ai") {
-              existing.output = content;
-            }
-            existing.timestamp = (message as { timestamp?: number }).timestamp ?? run.timestamp;
-            traceMap.set(traceId, existing);
-          }
-        }
-
-        // Convert trace map to TraceRow array
-        const traces = Array.from(traceMap.entries()).map(([traceId, data]) => ({
-          traceId,
-          timestamp: data.timestamp,
-          input: data.input,
-          output: data.output,
-          metadata: {},
-          spanCount: 0,
-          totalTokens: 0,
-          totalCost: 0,
-        }));
-
-        return {
-          scenarioRunId: run.scenarioRunId,
-          scenarioId: run.scenarioId,
-          scenarioSetId: run.scenarioSetId ?? "",
-          batchRunId: run.batchRunId,
-          name: run.name ?? null,
-          description: run.description ?? null,
-          status: run.status,
-          verdict: run.results?.verdict ?? null,
-          timestamp: run.timestamp,
-          durationInMs: run.durationInMs,
-          metCriteria: run.results?.metCriteria ?? [],
-          unmetCriteria: run.results?.unmetCriteria ?? [],
-          traces,
-        };
-      });
-
+      const rows = scenarioData.rows.map(transformRunData);
       store.getState().setRows(rows);
       store.getState().setTotalCount(scenarioData.totalCount);
 
-      // Add dynamic columns from metadata keys
       if (scenarioData.metadataKeys.length > 0) {
         const dynamicCols = generateDynamicColumns(scenarioData.metadataKeys);
         const allColumns = [...baseColumns, ...dynamicCols];
         store.getState().setColumns(allColumns);
       }
     }
-    store.getState().setIsLoading(isLoading);
-    store.getState().setError(error?.message ?? null);
-  }, [scenarioData, isLoading, error, baseColumns]);
+    store.getState().setIsLoading(isLoadingUngrouped);
+    store.getState().setError(errorUngrouped?.message ?? null);
+  }, [scenarioData, isLoadingUngrouped, errorUngrouped, baseColumns, groupBy, transformRunData]);
+
+  // Update store when grouped data changes
+  useEffect(() => {
+    const store = storeRef.current;
+    if (!store || !groupBy) return; // Skip if not grouping
+
+    if (groupedData) {
+      // Flatten grouped data into rows for display
+      // The DataGridTable handles the visual grouping
+      const allRows: ScenarioRunRow[] = [];
+      for (const group of groupedData.groups) {
+        for (const run of group.rows) {
+          allRows.push(transformRunData(run));
+        }
+      }
+      store.getState().setRows(allRows);
+      // For grouped view, total count is the number of groups * avg group size
+      // But we'll show it as total items
+      const totalItems = groupedData.groups.reduce((sum, g) => sum + g.count, 0);
+      store.getState().setTotalCount(totalItems);
+    }
+    store.getState().setIsLoading(isLoadingGrouped);
+    store.getState().setError(errorGrouped?.message ?? null);
+  }, [groupedData, isLoadingGrouped, errorGrouped, groupBy, transformRunData]);
 
   // Sync state changes to URL
   const handleStateChange = useCallback(
@@ -221,6 +275,7 @@ export function ScenariosTableView() {
       page: number;
       pageSize: number;
       globalSearch: string;
+      groupBy: string | null;
     }) => {
       const query: Record<string, string> = {
         ...router.query,
@@ -257,6 +312,12 @@ export function ScenariosTableView() {
         query.search = state.globalSearch;
       } else {
         delete query.search;
+      }
+
+      if (state.groupBy) {
+        query.groupBy = state.groupBy;
+      } else {
+        delete query.groupBy;
       }
 
       void router.replace({ query }, undefined, { shallow: true });
