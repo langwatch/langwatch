@@ -1,0 +1,1 @@
+export { CanonicalizeSpanAttributesService } from "./canonicalizeSpanAttributesService";
