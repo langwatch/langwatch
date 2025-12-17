@@ -22,7 +22,7 @@ server.tool(
       ),
   },
   async ({ url }) => {
-    let urlToFetch = url || "https://docs.langwatch.ai/llms.txt";
+    let urlToFetch = url || "https://langwatch.ai/docs/llms.txt";
     if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
@@ -30,7 +30,7 @@ server.tool(
       if (!urlToFetch.startsWith("/")) {
         urlToFetch = "/" + urlToFetch;
       }
-      urlToFetch = "https://docs.langwatch.ai" + urlToFetch;
+      urlToFetch = "https://langwatch.ai/docs" + urlToFetch;
     }
     const response = await fetch(urlToFetch);
 
@@ -52,7 +52,7 @@ server.tool(
       ),
   },
   async ({ url }) => {
-    let urlToFetch = url || "https://scenario.langwatch.ai/llms.txt";
+    let urlToFetch = url || "https://langwatch.ai/scenario/llms.txt";
     if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
@@ -60,7 +60,7 @@ server.tool(
       if (!urlToFetch.startsWith("/")) {
         urlToFetch = "/" + urlToFetch;
       }
-      urlToFetch = "https://scenario.langwatch.ai" + urlToFetch;
+      urlToFetch = "https://langwatch.ai/scenario" + urlToFetch;
     }
     const response = await fetch(urlToFetch);
 
