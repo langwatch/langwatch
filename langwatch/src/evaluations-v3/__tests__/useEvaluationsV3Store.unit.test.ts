@@ -1,0 +1,391 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import {
+  createInitialState,
+  type AgentConfig,
+  type EvaluatorConfig,
+} from "../types";
+
+describe("useEvaluationsV3Store", () => {
+  beforeEach(() => {
+    // Reset store before each test
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  describe("Dataset operations", () => {
+    it("sets cell value", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setCellValue(0, "input", "Hello world");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.dataset.records["input"]?.[0]).toBe("Hello world");
+    });
+
+    it("expands records array when setting value at higher row index", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setCellValue(5, "input", "Value at row 5");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.dataset.records["input"]?.length).toBe(6);
+      expect(state.dataset.records["input"]?.[5]).toBe("Value at row 5");
+    });
+
+    it("adds a new column", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addColumn({
+        id: "context",
+        name: "context",
+        type: "string",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.dataset.columns).toHaveLength(3);
+      expect(state.dataset.columns[2]?.name).toBe("context");
+      expect(state.dataset.records["context"]).toBeDefined();
+    });
+
+    it("removes a column", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.removeColumn("expected_output");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.dataset.columns).toHaveLength(1);
+      expect(state.dataset.records["expected_output"]).toBeUndefined();
+    });
+
+    it("renames a column", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.renameColumn("input", "user_question");
+
+      const state = useEvaluationsV3Store.getState();
+      const column = state.dataset.columns.find((c) => c.id === "input");
+      expect(column?.name).toBe("user_question");
+    });
+
+    it("updates column type", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.updateColumnType("input", "json");
+
+      const state = useEvaluationsV3Store.getState();
+      const column = state.dataset.columns.find((c) => c.id === "input");
+      expect(column?.type).toBe("json");
+    });
+
+    it("returns correct row count", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      // Initial state has 3 empty rows
+      expect(store.getRowCount()).toBe(3);
+
+      store.setCellValue(10, "input", "Value");
+
+      expect(useEvaluationsV3Store.getState().getRowCount()).toBe(11);
+    });
+  });
+
+  describe("Agent operations", () => {
+    const createTestAgent = (id: string): AgentConfig => ({
+      id,
+      type: "llm",
+      name: `Agent ${id}`,
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+    });
+
+    it("adds an agent", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent(createTestAgent("agent-1"));
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.agents).toHaveLength(1);
+      expect(state.agents[0]?.name).toBe("Agent agent-1");
+      expect(state.agentMappings["agent-1"]).toBeDefined();
+    });
+
+    it("updates an agent", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent(createTestAgent("agent-1"));
+      store.updateAgent("agent-1", { name: "Updated Agent" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.agents[0]?.name).toBe("Updated Agent");
+    });
+
+    it("removes an agent", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent(createTestAgent("agent-1"));
+      store.removeAgent("agent-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.agents).toHaveLength(0);
+      expect(state.agentMappings["agent-1"]).toBeUndefined();
+    });
+
+    it("sets agent mapping", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent(createTestAgent("agent-1"));
+      store.setAgentMapping("agent-1", "input", {
+        source: "dataset",
+        sourceField: "input",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.agentMappings["agent-1"]?.["input"]).toEqual({
+        source: "dataset",
+        sourceField: "input",
+      });
+    });
+  });
+
+  describe("Evaluator operations", () => {
+    const createTestEvaluator = (id: string): EvaluatorConfig => ({
+      id,
+      evaluatorType: "langevals/exact_match",
+      name: `Evaluator ${id}`,
+      settings: {},
+      inputs: [{ identifier: "output", type: "str" }],
+    });
+
+    it("adds an evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.evaluators[0]?.name).toBe("Evaluator eval-1");
+      expect(state.evaluatorMappings["eval-1"]).toBeDefined();
+    });
+
+    it("updates an evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.updateEvaluator("eval-1", { name: "Updated Evaluator" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
+    });
+
+    it("removes an evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.removeEvaluator("eval-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators).toHaveLength(0);
+      expect(state.evaluatorMappings["eval-1"]).toBeUndefined();
+    });
+
+    it("sets evaluator mapping", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.setEvaluatorMapping("eval-1", "output", {
+        source: "agent-1",
+        sourceField: "output",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluatorMappings["eval-1"]?.["output"]).toEqual({
+        source: "agent-1",
+        sourceField: "output",
+      });
+    });
+  });
+
+  describe("UI state operations", () => {
+    it("opens overlay with target", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.openOverlay("agent", "agent-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.openOverlay).toBe("agent");
+      expect(state.ui.overlayTargetId).toBe("agent-1");
+    });
+
+    it("closes overlay", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.openOverlay("agent", "agent-1");
+      store.closeOverlay();
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.openOverlay).toBeUndefined();
+      expect(state.ui.overlayTargetId).toBeUndefined();
+    });
+
+    it("sets selected cell", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setSelectedCell({ row: 0, columnId: "input" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.selectedCell).toEqual({
+        row: 0,
+        columnId: "input",
+      });
+    });
+
+    it("sets editing cell", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setEditingCell({ row: 0, columnId: "input" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.editingCell).toEqual({
+        row: 0,
+        columnId: "input",
+      });
+    });
+
+    it("clears editing cell", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setEditingCell({ row: 0, columnId: "input" });
+      store.setEditingCell(undefined);
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.editingCell).toBeUndefined();
+    });
+
+    it("toggles row selection", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.toggleRowSelection(0);
+
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(true);
+
+      store.toggleRowSelection(0);
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(false);
+    });
+
+    it("selects all rows", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.selectAllRows(5);
+
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.size).toBe(5);
+    });
+
+    it("clears row selection", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.toggleRowSelection(0);
+      store.toggleRowSelection(1);
+      store.clearRowSelection();
+
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.size).toBe(0);
+    });
+  });
+
+  describe("Results operations", () => {
+    it("sets results", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setResults({
+        status: "running",
+        progress: 5,
+        total: 10,
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.results.status).toBe("running");
+      expect(state.results.progress).toBe(5);
+      expect(state.results.total).toBe(10);
+    });
+
+    it("clears results", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setResults({
+        status: "success",
+        runId: "run-123",
+        agentOutputs: { "agent-1": ["output1"] },
+      });
+      store.clearResults();
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.results.status).toBe("idle");
+      expect(state.results.runId).toBeUndefined();
+      expect(state.results.agentOutputs).toEqual({});
+    });
+  });
+
+  describe("Reset", () => {
+    it("resets to initial state", () => {
+      const store = useEvaluationsV3Store.getState();
+      const initialState = createInitialState();
+
+      store.setName("Modified Name");
+      store.addAgent({
+        id: "agent-1",
+        type: "llm",
+        name: "Agent",
+        inputs: [],
+        outputs: [],
+      });
+      store.reset();
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.name).toBe(initialState.name);
+      expect(state.agents).toEqual([]);
+    });
+  });
+
+  describe("Undo/Redo (temporal)", () => {
+    it("tracks dataset changes in undo history", async () => {
+      const store = useEvaluationsV3Store.getState();
+
+      // Make a change
+      store.setCellValue(0, "input", "First value");
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Make another change
+      store.setCellValue(0, "input", "Second value");
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
+        "Second value"
+      );
+
+      // Undo
+      useEvaluationsV3Store.temporal.getState().undo();
+
+      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
+        "First value"
+      );
+
+      // Redo
+      useEvaluationsV3Store.temporal.getState().redo();
+
+      expect(useEvaluationsV3Store.getState().dataset.records["input"]?.[0]).toBe(
+        "Second value"
+      );
+    });
+
+    it("does not track UI state changes in undo history", async () => {
+      const store = useEvaluationsV3Store.getState();
+
+      // Set initial data
+      store.setCellValue(0, "input", "Initial");
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Make a UI change (should not be tracked)
+      store.setEditingCell({ row: 0, columnId: "input" });
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Check undo doesn't undo UI state
+      const pastStatesCount =
+        useEvaluationsV3Store.temporal.getState().pastStates.length;
+
+      // UI changes alone should not create new undo entries
+      store.setEditingCell({ row: 1, columnId: "input" });
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Same number of past states (UI changes are not tracked)
+      expect(
+        useEvaluationsV3Store.temporal.getState().pastStates.length
+      ).toBeLessThanOrEqual(pastStatesCount);
+    });
+  });
+});

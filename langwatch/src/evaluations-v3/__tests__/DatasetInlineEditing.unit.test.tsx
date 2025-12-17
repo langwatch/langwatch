@@ -1,0 +1,236 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { EditableCell } from "../components/DatasetSection/EditableCell";
+
+// Wrapper with Chakra provider
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+// Helper to render with store reset and Chakra provider
+const renderCell = (value: string, row: number, columnId: string) => {
+  return render(<EditableCell value={value} row={row} columnId={columnId} />, {
+    wrapper: Wrapper,
+  });
+};
+
+describe("Dataset inline editing", () => {
+  beforeEach(() => {
+    // Reset store before each test
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    // Clean up DOM after each test
+    cleanup();
+  });
+
+  describe("Select a cell (via store)", () => {
+    it("tracks selected cell in store", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.setSelectedCell({ row: 0, columnId: "input" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.selectedCell).toEqual({ row: 0, columnId: "input" });
+    });
+  });
+
+  describe("Edit a cell by setting editingCell in store", () => {
+    it("enters edit mode and shows textarea", async () => {
+      renderCell("original", 0, "input");
+
+      // Set editing cell directly (in real app, this is done by DatasetCellTd on double-click)
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+
+      // Should show textarea with the value
+      const textarea = await screen.findByRole("textbox");
+      expect(textarea).toBeInTheDocument();
+      expect(textarea).toHaveValue("original");
+    });
+  });
+
+  describe("Cancel cell edit with Escape", () => {
+    it("reverts to original value on Escape", async () => {
+      const user = userEvent.setup();
+      renderCell("original", 0, "input");
+
+      // Enter edit mode
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+
+      // Type something
+      const textarea = await screen.findByRole("textbox");
+      await user.clear(textarea);
+      await user.type(textarea, "modified");
+
+      // Press Escape
+      await user.keyboard("{Escape}");
+
+      // Should revert - the store value should not be updated
+      const state = useEvaluationsV3Store.getState();
+      expect(state.dataset.records["input"]?.[0]).toBe("");
+    });
+  });
+
+  describe("Confirm cell edit with Enter", () => {
+    it("saves value on Enter", async () => {
+      const user = userEvent.setup();
+      renderCell("", 0, "input");
+
+      // Enter edit mode
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+
+      // Type new value
+      const textarea = await screen.findByRole("textbox");
+      await user.type(textarea, "modified");
+
+      // Press Enter
+      await user.keyboard("{Enter}");
+
+      // Store should be updated
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        expect(state.dataset.records["input"]?.[0]).toBe("modified");
+      });
+    });
+  });
+
+  describe("Cell editor positioning", () => {
+    it("shows editor with help text", async () => {
+      renderCell("original", 0, "input");
+
+      // Enter edit mode
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+
+      // Should show textarea with help text
+      expect(await screen.findByText(/Enter to save/i)).toBeInTheDocument();
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
+  describe("Undo cell edit", () => {
+    it("undoes cell edit via store temporal", async () => {
+      const user = userEvent.setup();
+      renderCell("", 0, "input");
+
+      // Make an edit
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      const textarea = await screen.findByRole("textbox");
+      await user.type(textarea, "first value");
+      await user.keyboard("{Enter}");
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Verify value was saved
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        expect(state.dataset.records["input"]?.[0]).toBe("first value");
+      });
+
+      // Trigger undo via store
+      useEvaluationsV3Store.temporal.getState().undo();
+
+      // Value should be reverted
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        expect(state.dataset.records["input"]?.[0]).toBe("");
+      });
+    });
+  });
+
+  describe("Redo cell edit", () => {
+    it("redoes cell edit after undo", async () => {
+      const user = userEvent.setup();
+      renderCell("", 0, "input");
+
+      // Make an edit
+      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      const textarea = await screen.findByRole("textbox");
+      await user.type(textarea, "modified");
+      await user.keyboard("{Enter}");
+
+      // Wait for debounce
+      await new Promise((resolve) => setTimeout(resolve, 150));
+
+      // Verify saved
+      await waitFor(() => {
+        expect(
+          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+        ).toBe("modified");
+      });
+
+      // Undo
+      useEvaluationsV3Store.temporal.getState().undo();
+
+      await waitFor(() => {
+        expect(
+          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+        ).toBe("");
+      });
+
+      // Redo
+      useEvaluationsV3Store.temporal.getState().redo();
+
+      await waitFor(() => {
+        expect(
+          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
+        ).toBe("modified");
+      });
+    });
+  });
+
+});
+
+describe("Row selection", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  it("toggles row selection", () => {
+    const store = useEvaluationsV3Store.getState();
+
+    store.toggleRowSelection(0);
+    expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(true);
+
+    store.toggleRowSelection(0);
+    expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(false);
+  });
+
+  it("selects multiple rows", () => {
+    const store = useEvaluationsV3Store.getState();
+
+    store.toggleRowSelection(0);
+    store.toggleRowSelection(2);
+
+    const state = useEvaluationsV3Store.getState();
+    expect(state.ui.selectedRows.has(0)).toBe(true);
+    expect(state.ui.selectedRows.has(1)).toBe(false);
+    expect(state.ui.selectedRows.has(2)).toBe(true);
+  });
+
+  it("selects all rows", () => {
+    const store = useEvaluationsV3Store.getState();
+
+    store.selectAllRows(5);
+
+    const state = useEvaluationsV3Store.getState();
+    expect(state.ui.selectedRows.size).toBe(5);
+  });
+
+  it("clears row selection", () => {
+    const store = useEvaluationsV3Store.getState();
+
+    store.toggleRowSelection(0);
+    store.toggleRowSelection(1);
+    store.clearRowSelection();
+
+    expect(useEvaluationsV3Store.getState().ui.selectedRows.size).toBe(0);
+  });
+});
