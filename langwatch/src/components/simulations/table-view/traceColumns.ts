@@ -1,11 +1,13 @@
 import type { DataGridColumnDef } from "~/components/ui/datagrid";
 import type { TraceRow } from "./types";
 import {
+  TraceArrowCell,
   TraceIdCell,
   TraceTimestampCell,
   TraceTextCell,
   TraceTokensCell,
   TraceCostCell,
+  TraceMetadataCell,
 } from "./cells/TraceCells";
 
 /**
@@ -13,6 +15,16 @@ import {
  */
 export function createTraceColumns(): DataGridColumnDef<TraceRow>[] {
   return [
+    {
+      id: "arrow",
+      header: "",
+      accessorKey: "traceId",
+      cell: TraceArrowCell,
+      filterable: false,
+      sortable: false,
+      defaultVisible: true,
+      width: 40,
+    },
     {
       id: "traceId",
       header: "Trace ID",
@@ -72,6 +84,16 @@ export function createTraceColumns(): DataGridColumnDef<TraceRow>[] {
       sortable: false,
       defaultVisible: true,
       width: 80,
+    },
+    {
+      id: "metadata",
+      header: "Metadata",
+      accessorKey: "metadata",
+      cell: TraceMetadataCell,
+      filterable: false,
+      sortable: false,
+      defaultVisible: true,
+      width: 200,
     },
   ];
 }

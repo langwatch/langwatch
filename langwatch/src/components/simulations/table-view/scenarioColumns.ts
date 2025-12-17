@@ -1,6 +1,7 @@
 import type { DataGridColumnDef } from "~/components/ui/datagrid";
 import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { ScenarioRunRow } from "./types";
+import { ScenarioSetCell } from "./cells/ScenarioSetCell";
 
 /**
  * Creates scenario column definitions for the DataGrid
@@ -24,6 +25,7 @@ export function createScenarioColumns(
       id: "scenarioSetId",
       header: "Scenario Set",
       accessorKey: "scenarioSetId",
+      cell: ScenarioSetCell,
       linkTo: (row) => `/${projectSlug}/simulations/${row.scenarioSetId}`,
       filterable: true,
       filterType: "text",
