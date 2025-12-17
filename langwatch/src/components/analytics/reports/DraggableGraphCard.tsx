@@ -18,7 +18,7 @@ import {
   Grid,
   MoreVertical,
   Trash2,
-} from "react-feather";
+} from "lucide-react";
 import { CustomGraph, type CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { FilterDisplay } from "~/components/triggers/FilterDisplay";
 import { Menu } from "~/components/ui/menu";

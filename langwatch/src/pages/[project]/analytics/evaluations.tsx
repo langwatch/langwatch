@@ -8,7 +8,7 @@ import {
   SimpleGrid,
   Text,
 } from "@chakra-ui/react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
 import {
   CustomGraph,
   type CustomGraphInput,

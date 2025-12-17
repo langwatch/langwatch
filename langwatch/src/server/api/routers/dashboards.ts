@@ -134,6 +134,25 @@ export const dashboardsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("analytics:update"))
     .mutation(async ({ ctx, input }) => {
+      // Validate all dashboards exist and belong to the project
+      const existingDashboards = await ctx.prisma.dashboard.findMany({
+        where: {
+          id: { in: input.dashboardIds },
+          projectId: input.projectId,
+        },
+        select: { id: true },
+      });
+
+      const existingIds = new Set(existingDashboards.map((d) => d.id));
+      const missingIds = input.dashboardIds.filter((id) => !existingIds.has(id));
+
+      if (missingIds.length > 0) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Dashboards not found: ${missingIds.join(", ")}`,
+        });
+      }
+
       // Update order for each dashboard
       const updates = input.dashboardIds.map((dashboardId, index) =>
         ctx.prisma.dashboard.update({

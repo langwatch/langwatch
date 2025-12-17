@@ -1,7 +1,7 @@
 import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { Edit2 } from "react-feather";
+import { Edit2 } from "lucide-react";
 import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { FilterToggle } from "../filters/FilterToggle";

@@ -657,7 +657,11 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          void router.push(`/${project?.slug}/analytics/reports`);
+          // Navigate back to the same dashboard we came from
+          const dashboardUrl = dashboardId
+            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+            : `/${project?.slug}/analytics/reports`;
+          void router.push(dashboardUrl);
         },
       },
     );

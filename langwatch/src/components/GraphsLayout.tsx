@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { type PropsWithChildren, useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "react-feather";
+import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -83,6 +83,14 @@ function CustomDashboardsSection({ projectSlug }: { projectSlug: string }) {
         {
           onSuccess: () => {
             void dashboardsQuery.refetch();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error renaming dashboard",
+              type: "error",
+              duration: 3000,
+              meta: { closable: true },
+            });
           },
         }
       );
@@ -292,7 +300,7 @@ function CustomDashboardsSection({ projectSlug }: { projectSlug: string }) {
         cursor="pointer"
         _hover={{ color: "gray.700", background: "gray.50" }}
         onClick={handleCreateDashboard}
-        opacity={createDashboard.isLoading ? 0.5 : 1}
+        opacity={createDashboard.isPending ? 0.5 : 1}
       >
         <Plus size={14} />
         <Box fontSize="13px">Add Dashboard</Box>

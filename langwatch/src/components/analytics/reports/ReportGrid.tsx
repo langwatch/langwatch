@@ -3,6 +3,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type DragStartEvent,
   DragOverlay,
   PointerSensor,
   useSensor,
@@ -10,7 +11,7 @@ import {
 } from "@dnd-kit/core";
 import { rectSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { useState } from "react";
-import { BarChart2 } from "react-feather";
+import { BarChart2 } from "lucide-react";
 import {
   DraggableGraphCard,
   type GraphData,
@@ -53,8 +54,8 @@ export function ReportGrid({
     }),
   );
 
-  function handleDragStart(event: any) {
-    setActiveDragId(event.active.id);
+  function handleDragStart(event: DragStartEvent) {
+    setActiveDragId(event.active.id as string);
   }
 
   function handleDragEnd(event: DragEndEvent) {

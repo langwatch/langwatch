@@ -412,7 +412,6 @@ model CustomGraph {
     colSpan      Int         @default(1)
     rowSpan      Int         @default(1)
 
-    @@unique([id])
     @@index([projectId])
     @@index([dashboardId])
 }
