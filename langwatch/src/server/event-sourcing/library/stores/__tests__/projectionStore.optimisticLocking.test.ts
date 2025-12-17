@@ -52,36 +52,6 @@ describe("ProjectionStore - Optimistic Locking (Placeholder Tests)", () => {
       // Last write should win (no version conflict detection)
       // This documents current behavior - no optimistic locking
     });
-
-    it("projection stores do not detect version conflicts", async () => {
-      const store = createMockProjectionStore();
-
-      const projection1 = createTestProjection(
-        "aggregate-1",
-        tenantId,
-        {},
-        1000,
-        "proj-1",
-      );
-      const projection2 = createTestProjection(
-        "aggregate-1",
-        tenantId,
-        {},
-        500, // Older version - should conflict but doesn't
-        "proj-1",
-      );
-
-      // Store first projection
-      await store.storeProjection(projection1, context);
-
-      // Store second projection with older version - should conflict but doesn't
-      // (no optimistic locking, so it overwrites)
-      await expect(
-        store.storeProjection(projection2, context),
-      ).resolves.not.toThrow();
-
-      // Current behavior: no conflict detection, last write wins
-    });
   });
 
   describe("expected future behavior (documentation)", () => {

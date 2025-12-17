@@ -9,8 +9,9 @@ import { CheckpointRepositoryMemory } from "../repositories/checkpointRepository
 describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
   const pipelineName = "test-pipeline";
   const tenantId = createTenantId("test-tenant");
+  const eventVersion = "2025-12-17";
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
   const eventType = EVENT_TYPES[0];
 
   let store: ProcessorCheckpointStoreMemory;
@@ -32,6 +33,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -41,6 +43,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         2000,
@@ -107,6 +110,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -180,6 +184,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -254,6 +259,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -299,6 +305,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId1,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -308,6 +315,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId2,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         1000,
@@ -384,6 +392,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         3000, // Latest timestamp
@@ -393,6 +402,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         1000, // Earliest timestamp
@@ -402,6 +412,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 3 },
 
         void 0,
@@ -473,6 +484,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -535,6 +547,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -597,6 +610,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,

@@ -4,6 +4,7 @@ import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
 import { buildCheckpointKey } from "../../../utils/checkpointKey";
 import {
+  createMockDistributedLock,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
   createMockEventStore,
@@ -69,6 +70,8 @@ describe("EventHandlerDispatcher", () => {
         aggregateType,
       });
 
+    const distributedLock = createMockDistributedLock();
+
     return new EventHandlerDispatcher({
       aggregateType,
       eventHandlers: options.eventHandlers,
@@ -76,6 +79,7 @@ describe("EventHandlerDispatcher", () => {
       validator,
       checkpointManager,
       queueManager,
+      distributedLock,
     });
   }
 
@@ -468,6 +472,7 @@ describe("EventHandlerDispatcher", () => {
         tenantId,
         EVENT_TYPES[0],
         2000000,
+        "2025-12-17",
         {},
         "event2",
       );

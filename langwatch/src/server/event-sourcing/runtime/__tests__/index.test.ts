@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AggregateType, Event, Projection } from "../../library";
 import { EventSourcingService } from "../../library";
 import {
+  createMockDistributedLock,
   createMockEventHandlerDefinition,
   createMockEventPublisher,
   createMockEventStore,
@@ -35,6 +36,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -47,6 +49,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -59,6 +62,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -80,6 +84,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           "test-projection": projectionHandler,
         },
@@ -101,6 +106,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -120,6 +126,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -141,6 +148,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -162,6 +170,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -177,6 +186,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -190,6 +200,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -215,6 +226,7 @@ describe("EventSourcingPipeline", () => {
         name: "minimal-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -238,6 +250,7 @@ describe("EventSourcingPipeline", () => {
         name: "full-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           "test-projection": projectionHandler,
         },
@@ -265,6 +278,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: testEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);
@@ -273,17 +287,20 @@ describe("EventSourcingPipeline", () => {
       expect(pipeline.service).toBeInstanceOf(EventSourcingService);
     });
 
-    it("works with generic ProjectionType", () => {
+    it("works with generic ProjectionTypes", () => {
       interface TestProjection extends Projection {
         data: { result: number };
       }
 
-      const definition: EventSourcingPipelineDefinition<Event, TestProjection> =
-        {
-          name: "test-pipeline",
-          aggregateType,
-          eventStore: mockEventStore,
-        };
+      const definition: EventSourcingPipelineDefinition<
+        Event,
+        { testProjection: TestProjection }
+      > = {
+        name: "test-pipeline",
+        aggregateType,
+        eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
+      };
 
       const pipeline = new EventSourcingPipeline(definition);
 
@@ -296,12 +313,14 @@ describe("EventSourcingPipeline", () => {
         name: "pipeline-1",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const definition2: EventSourcingPipelineDefinition<Event> = {
         name: "pipeline-2",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline1 = new EventSourcingPipeline(definition1);
@@ -318,6 +337,7 @@ describe("EventSourcingPipeline", () => {
         name: "test-pipeline",
         aggregateType,
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       };
 
       const pipeline = new EventSourcingPipeline(definition);

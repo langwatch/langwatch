@@ -11,6 +11,7 @@ import {
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("Pipeline Builder Helper Functions", () => {
   beforeEach(() => {
@@ -31,12 +32,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("customDispatcher", HandlerClass)
         .build();
 
@@ -63,12 +65,13 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -103,12 +106,13 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -140,12 +144,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -167,12 +172,13 @@ describe("Pipeline Builder Helper Functions", () => {
         delay: 5000,
       });
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -192,12 +198,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -230,12 +237,13 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -270,12 +278,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -297,12 +306,13 @@ describe("Pipeline Builder Helper Functions", () => {
         concurrency: 10,
       });
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -322,12 +332,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 

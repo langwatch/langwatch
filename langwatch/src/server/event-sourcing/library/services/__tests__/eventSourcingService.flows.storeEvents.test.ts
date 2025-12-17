@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types";
 import { EventSourcingService } from "../eventSourcingService";
 import {
+  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventPublisher,
@@ -40,6 +41,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         aggregateType,
         eventStore,
         eventPublisher,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -81,6 +83,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         eventStore,
         eventPublisher,
         logger: logger as any,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -117,6 +120,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -151,6 +155,7 @@ describe("EventSourcingService - Store Events Flow", () => {
             projectionStore,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -198,6 +203,7 @@ describe("EventSourcingService - Store Events Flow", () => {
             projectionStore,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const aggregate1 = "aggregate-1";
@@ -258,6 +264,7 @@ describe("EventSourcingService - Store Events Flow", () => {
             projectionStore2,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -300,6 +307,7 @@ describe("EventSourcingService - Store Events Flow", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const timestamp = 1000000;
@@ -395,6 +403,7 @@ describe("EventSourcingService - Store Events Flow", () => {
             projectionStore,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -404,6 +413,9 @@ describe("EventSourcingService - Store Events Flow", () => {
           tenantId,
         ),
       ];
+
+      // Mock getEvents to return the same events that are being stored
+      eventStore.getEvents = vi.fn().mockResolvedValue(events);
 
       await service.storeEvents(events, context);
 
@@ -455,6 +467,7 @@ describe("EventSourcingService - Store Events Flow", () => {
             projectionStore,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -464,6 +477,9 @@ describe("EventSourcingService - Store Events Flow", () => {
           tenantId,
         ),
       ];
+
+      // Mock getEvents to return the same events that are being stored
+      eventStore.getEvents = vi.fn().mockResolvedValue(events);
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
