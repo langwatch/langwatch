@@ -37,12 +37,36 @@ Feature: Dataset inline editing
     And I press Enter
     Then the cell at row 0, column "input" displays "modified"
 
-  Scenario: Navigate to next cell with Tab
+  Scenario: Navigate to next cell with Tab while editing
     Given the dataset has 3 rows
     When I double-click the cell at row 0, column "input"
     And I type "value1"
     And I press Tab
-    Then the cell at row 0, column "expected_output" is in edit mode
+    Then the cell at row 0, column "expected_output" is selected
+
+  Scenario: Navigate with arrow keys
+    Given the dataset has 3 rows
+    And the cell at row 0, column "input" is selected
+    When I press ArrowRight
+    Then the cell at row 0, column "expected_output" is selected
+    When I press ArrowDown
+    Then the cell at row 1, column "expected_output" is selected
+    When I press ArrowLeft
+    Then the cell at row 1, column "input" is selected
+    When I press ArrowUp
+    Then the cell at row 0, column "input" is selected
+
+  Scenario: Enter edit mode with Enter key
+    Given the dataset has 3 rows
+    And the cell at row 0, column "input" is selected
+    When I press Enter
+    Then the cell at row 0, column "input" is in edit mode
+
+  Scenario: Clear selection with Escape
+    Given the dataset has 3 rows
+    And the cell at row 0, column "input" is selected
+    When I press Escape
+    Then no cell is selected
 
   Scenario: Select row with checkbox
     Given the dataset has 3 rows

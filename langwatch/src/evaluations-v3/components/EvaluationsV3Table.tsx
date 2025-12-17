@@ -1,4 +1,4 @@
-import { Box, Button, Checkbox, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, Checkbox, HStack, Portal, Text, Textarea } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -7,9 +7,8 @@ import {
   type ColumnDef,
   type Cell,
 } from "@tanstack/react-table";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  AlertCircle,
   Check,
   Code,
   Database,
@@ -38,6 +37,55 @@ type RowData = {
 };
 
 type SuperHeaderType = "dataset" | "agents" | "evaluators";
+
+type ColumnType = "checkbox" | "dataset" | "agent" | "evaluator";
+
+// ============================================================================
+// Pulsing Dot Indicator (radar-style)
+// ============================================================================
+
+function PulsingDot() {
+  return (
+    <>
+      <style>
+        {`
+          @keyframes evalRadar {
+            0% { transform: scale(1); opacity: 0.6; }
+            100% { transform: scale(2.5); opacity: 0; }
+          }
+        `}
+      </style>
+      <Box
+        as="span"
+        position="relative"
+        display="inline-flex"
+        alignItems="center"
+        justifyContent="center"
+        marginLeft={2}
+      >
+        {/* Expanding ring */}
+        <Box
+          as="span"
+          position="absolute"
+          width="8px"
+          height="8px"
+          borderRadius="full"
+          bg="blue.300"
+          style={{ animation: "evalRadar 1.5s ease-out infinite" }}
+        />
+        {/* Fixed center dot */}
+        <Box
+          as="span"
+          position="relative"
+          width="6px"
+          height="6px"
+          borderRadius="full"
+          bg="blue.500"
+        />
+      </Box>
+    </>
+  );
+}
 
 // ============================================================================
 // Column Type Icons
@@ -124,11 +172,12 @@ function SuperHeader({
             size="xs"
             variant="ghost"
             onClick={onAddClick}
-            color={showWarning ? "orange.500" : "gray.500"}
+            color="gray.500"
+            _hover={{ color: "gray.700" }}
           >
             <Plus size={12} />
             Add {type === "agents" ? "Agent" : "Evaluator"}
-            {showWarning && <AlertCircle size={12} style={{ marginLeft: 4 }} />}
+            {showWarning && <PulsingDot />}
           </Button>
         )}
       </HStack>
@@ -200,52 +249,136 @@ function SelectionToolbar({
 }
 
 // ============================================================================
-// Dataset Cell TD Wrapper
+// Selectable Cell Wrapper - handles selection outline for any cell type
 // ============================================================================
 
-type DatasetCellTdProps = {
-  cell: Cell<RowData, unknown>;
-  row: number;
+type SelectableCellProps = {
   columnId: string;
-  value: string;
+  row: number;
+  columnType: ColumnType;
+  children: React.ReactNode;
+  onSelect: () => void;
+  onActivate: () => void; // Double-click or Enter
 };
 
-function DatasetCellTd({ cell, row, columnId, value }: DatasetCellTdProps) {
-  const { ui, setSelectedCell, setEditingCell } = useEvaluationsV3Store(
-    (state) => ({
-      ui: state.ui,
-      setSelectedCell: state.setSelectedCell,
-      setEditingCell: state.setEditingCell,
-    })
-  );
+function SelectableCell({
+  columnId,
+  row,
+  columnType,
+  children,
+  onSelect,
+  onActivate,
+}: SelectableCellProps) {
+  const { ui } = useEvaluationsV3Store((state) => ({ ui: state.ui }));
 
   const isSelected =
     ui.selectedCell?.row === row && ui.selectedCell?.columnId === columnId;
 
-  const handleClick = useCallback(() => {
-    setSelectedCell({ row, columnId });
-  }, [row, columnId, setSelectedCell]);
-
-  const handleDoubleClick = useCallback(() => {
-    setSelectedCell({ row, columnId });
-    setEditingCell({ row, columnId });
-  }, [row, columnId, setSelectedCell, setEditingCell]);
-
   return (
     <td
-      key={cell.id}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
+      onClick={onSelect}
+      onDoubleClick={onActivate}
       style={{
-        outline: isSelected ? "2px solid var(--chakra-colors-blue-500)" : "none",
+        outline: isSelected
+          ? "2px solid var(--chakra-colors-blue-500)"
+          : "none",
         outlineOffset: "-1px",
         position: isSelected ? "relative" : undefined,
         zIndex: isSelected ? 5 : undefined,
         userSelect: "none",
       }}
     >
-      <EditableCell value={value} row={row} columnId={columnId} />
+      {children}
     </td>
+  );
+}
+
+// ============================================================================
+// View-Only Cell Viewer (for agent/evaluator cells)
+// ============================================================================
+
+type CellViewerProps = {
+  value: unknown;
+  isOpen: boolean;
+  onClose: () => void;
+  anchorRef: React.RefObject<HTMLElement | null>;
+};
+
+function CellViewer({ value, isOpen, onClose, anchorRef }: CellViewerProps) {
+  const [style, setStyle] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    if (isOpen && anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      setStyle({
+        position: "fixed",
+        top: rect.top - 8,
+        left: rect.left - 8,
+        width: Math.max(rect.width + 16, 300),
+        minHeight: rect.height,
+        zIndex: 1000,
+      });
+    }
+  }, [isOpen, anchorRef]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape" || e.key === "Enter") {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        }
+      };
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const displayValue =
+    value === null || value === undefined
+      ? ""
+      : typeof value === "object"
+        ? JSON.stringify(value, null, 2)
+        : String(value);
+
+  return (
+    <Portal>
+      <Box
+        style={style}
+        bg="white"
+        borderRadius="md"
+        boxShadow="0 0 0 2px var(--chakra-colors-gray-300), 0 4px 12px rgba(0,0,0,0.15)"
+        overflow="hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Textarea
+          value={displayValue}
+          readOnly
+          minHeight="80px"
+          resize="vertical"
+          border="none"
+          borderRadius="0"
+          fontSize="13px"
+          padding={2}
+          bg="gray.50"
+          _focus={{ outline: "none", boxShadow: "none" }}
+        />
+        <Box
+          paddingX={2}
+          paddingY={1}
+          fontSize="10px"
+          color="gray.500"
+          borderTop="1px solid"
+          borderColor="gray.100"
+          bg="white"
+        >
+          Press Escape or Enter to close
+        </Box>
+      </Box>
+    </Portal>
   );
 }
 
@@ -261,6 +394,8 @@ export function EvaluationsV3Table() {
     results,
     ui,
     openOverlay,
+    setSelectedCell,
+    setEditingCell,
     toggleRowSelection,
     selectAllRows,
     clearRowSelection,
@@ -272,22 +407,179 @@ export function EvaluationsV3Table() {
     results: state.results,
     ui: state.ui,
     openOverlay: state.openOverlay,
+    setSelectedCell: state.setSelectedCell,
+    setEditingCell: state.setEditingCell,
     toggleRowSelection: state.toggleRowSelection,
     selectAllRows: state.selectAllRows,
     clearRowSelection: state.clearRowSelection,
     getRowCount: state.getRowCount,
   }));
 
+  const tableRef = useRef<HTMLTableElement>(null);
   const rowCount = getRowCount();
+  const displayRowCount = Math.max(rowCount, 3);
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
 
+  // State for viewing non-editable cells
+  const [viewingCell, setViewingCell] = useState<{
+    row: number;
+    columnId: string;
+    value: unknown;
+  } | null>(null);
+  const viewingCellRef = useRef<HTMLDivElement>(null);
+
+  // Build list of ALL navigable column IDs with their types
+  const allColumns = useMemo(() => {
+    const cols: Array<{ id: string; type: ColumnType }> = [];
+
+    // Checkbox column
+    cols.push({ id: "__checkbox__", type: "checkbox" });
+
+    // Dataset columns
+    for (const col of dataset.columns) {
+      cols.push({ id: col.id, type: "dataset" });
+    }
+
+    // Agent columns
+    for (const agent of agents) {
+      cols.push({ id: `agent.${agent.id}`, type: "agent" });
+    }
+
+    // Evaluator columns
+    for (const evaluator of evaluators) {
+      cols.push({ id: `evaluator.${evaluator.id}`, type: "evaluator" });
+    }
+
+    return cols;
+  }, [dataset.columns, agents, evaluators]);
+
+  // Keyboard navigation handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if we're editing or viewing a cell
+      if (ui.editingCell || viewingCell) return;
+
+      const selectedCell = ui.selectedCell;
+      if (!selectedCell) return;
+
+      const currentColIndex = allColumns.findIndex(
+        (c) => c.id === selectedCell.columnId
+      );
+      if (currentColIndex === -1) return;
+
+      const currentCol = allColumns[currentColIndex];
+
+      switch (e.key) {
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          if (currentCol?.type === "checkbox") {
+            // Toggle row selection
+            toggleRowSelection(selectedCell.row);
+          } else if (currentCol?.type === "dataset") {
+            // Enter edit mode for dataset cells
+            setEditingCell({
+              row: selectedCell.row,
+              columnId: selectedCell.columnId,
+            });
+          }
+          // For agent/evaluator, Enter could open viewer but let's keep it simple
+          break;
+
+        case "ArrowUp":
+          e.preventDefault();
+          if (selectedCell.row > 0) {
+            setSelectedCell({
+              row: selectedCell.row - 1,
+              columnId: selectedCell.columnId,
+            });
+          }
+          break;
+
+        case "ArrowDown":
+          e.preventDefault();
+          if (selectedCell.row < displayRowCount - 1) {
+            setSelectedCell({
+              row: selectedCell.row + 1,
+              columnId: selectedCell.columnId,
+            });
+          }
+          break;
+
+        case "ArrowLeft":
+          e.preventDefault();
+          if (currentColIndex > 0) {
+            setSelectedCell({
+              row: selectedCell.row,
+              columnId: allColumns[currentColIndex - 1]!.id,
+            });
+          }
+          break;
+
+        case "ArrowRight":
+          e.preventDefault();
+          if (currentColIndex < allColumns.length - 1) {
+            setSelectedCell({
+              row: selectedCell.row,
+              columnId: allColumns[currentColIndex + 1]!.id,
+            });
+          }
+          break;
+
+        case "Tab":
+          e.preventDefault();
+          if (e.shiftKey) {
+            if (currentColIndex > 0) {
+              setSelectedCell({
+                row: selectedCell.row,
+                columnId: allColumns[currentColIndex - 1]!.id,
+              });
+            } else if (selectedCell.row > 0) {
+              setSelectedCell({
+                row: selectedCell.row - 1,
+                columnId: allColumns[allColumns.length - 1]!.id,
+              });
+            }
+          } else {
+            if (currentColIndex < allColumns.length - 1) {
+              setSelectedCell({
+                row: selectedCell.row,
+                columnId: allColumns[currentColIndex + 1]!.id,
+              });
+            } else if (selectedCell.row < displayRowCount - 1) {
+              setSelectedCell({
+                row: selectedCell.row + 1,
+                columnId: allColumns[0]!.id,
+              });
+            }
+          }
+          break;
+
+        case "Escape":
+          e.preventDefault();
+          setSelectedCell(undefined);
+          break;
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [
+    ui.editingCell,
+    ui.selectedCell,
+    viewingCell,
+    allColumns,
+    displayRowCount,
+    setSelectedCell,
+    setEditingCell,
+    toggleRowSelection,
+  ]);
+
   // Build row data from dataset records
   const rowData = useMemo((): RowData[] => {
-    const count = Math.max(rowCount, 3);
-
-    return Array.from({ length: count }, (_, index) => ({
+    return Array.from({ length: displayRowCount }, (_, index) => ({
       rowIndex: index,
       dataset: Object.fromEntries(
         dataset.columns.map((col) => [
@@ -308,7 +600,7 @@ export function EvaluationsV3Table() {
         ])
       ),
     }));
-  }, [dataset, agents, evaluators, results, rowCount]);
+  }, [dataset, agents, evaluators, results, displayRowCount]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -322,7 +614,9 @@ export function EvaluationsV3Table() {
         id: "select",
         header: () => (
           <Checkbox.Root
-            checked={allSelected ? true : someSelected ? "indeterminate" : false}
+            checked={
+              allSelected ? true : someSelected ? "indeterminate" : false
+            }
             onCheckedChange={() => {
               if (allSelected) {
                 clearRowSelection();
@@ -339,13 +633,17 @@ export function EvaluationsV3Table() {
           <Checkbox.Root
             checked={selectedRows.has(info.row.index)}
             onCheckedChange={() => toggleRowSelection(info.row.index)}
+            onClick={(e) => e.stopPropagation()}
           >
             <Checkbox.HiddenInput />
             <Checkbox.Control />
           </Checkbox.Root>
         ),
         size: 40,
-        meta: { superHeader: "dataset" as SuperHeaderType, isDatasetCell: false },
+        meta: {
+          columnType: "checkbox" as ColumnType,
+          columnId: "__checkbox__",
+        },
       })
     );
 
@@ -365,9 +663,8 @@ export function EvaluationsV3Table() {
           cell: (info) => info.getValue(),
           size: 200,
           meta: {
-            superHeader: "dataset" as SuperHeaderType,
-            isDatasetCell: true,
-            datasetColumnId: column.id,
+            columnType: "dataset" as ColumnType,
+            columnId: column.id,
           },
         })
       );
@@ -381,7 +678,10 @@ export function EvaluationsV3Table() {
           header: () => <AgentHeader agent={agent} />,
           cell: (info) => <AgentCell value={info.getValue()} />,
           size: 200,
-          meta: { superHeader: "agents" as SuperHeaderType, isDatasetCell: false },
+          meta: {
+            columnType: "agent" as ColumnType,
+            columnId: `agent.${agent.id}`,
+          },
         })
       );
     }
@@ -394,7 +694,10 @@ export function EvaluationsV3Table() {
           header: () => <EvaluatorHeader evaluator={evaluator} />,
           cell: (info) => <EvaluatorCell value={info.getValue()} />,
           size: 150,
-          meta: { superHeader: "evaluators" as SuperHeaderType, isDatasetCell: false },
+          meta: {
+            columnType: "evaluator" as ColumnType,
+            columnId: `evaluator.${evaluator.id}`,
+          },
         })
       );
     }
@@ -421,35 +724,111 @@ export function EvaluationsV3Table() {
   });
 
   // Calculate colspan for super headers
-  const datasetColSpan = 1 + dataset.columns.length; // checkbox + columns
+  const datasetColSpan = 1 + dataset.columns.length;
   const agentsColSpan = Math.max(agents.length, 1);
   const evaluatorsColSpan = Math.max(evaluators.length, 1);
 
-  // Helper to render cell - uses custom td for dataset cells
-  const renderCell = (cell: Cell<RowData, unknown>, rowIndex: number) => {
-    const meta = cell.column.columnDef.meta as {
-      isDatasetCell?: boolean;
-      datasetColumnId?: string;
-    } | undefined;
+  // Helper to render cell with selection support
+  const renderCell = useCallback(
+    (cell: Cell<RowData, unknown>, rowIndex: number) => {
+      const meta = cell.column.columnDef.meta as
+        | { columnType: ColumnType; columnId: string }
+        | undefined;
 
-    if (meta?.isDatasetCell && meta.datasetColumnId) {
+      if (!meta) {
+        return (
+          <td key={cell.id}>
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </td>
+        );
+      }
+
+      const isSelected =
+        ui.selectedCell?.row === rowIndex &&
+        ui.selectedCell?.columnId === meta.columnId;
+
+      const handleSelect = () => {
+        setSelectedCell({ row: rowIndex, columnId: meta.columnId });
+      };
+
+      const handleActivate = () => {
+        if (meta.columnType === "dataset") {
+          setSelectedCell({ row: rowIndex, columnId: meta.columnId });
+          setEditingCell({ row: rowIndex, columnId: meta.columnId });
+        } else if (meta.columnType === "checkbox") {
+          toggleRowSelection(rowIndex);
+        } else if (meta.columnType === "agent" || meta.columnType === "evaluator") {
+          // Open viewer for agent/evaluator cells
+          const value = cell.getValue();
+          if (value !== null && value !== undefined) {
+            setViewingCell({ row: rowIndex, columnId: meta.columnId, value });
+          }
+        }
+      };
+
+      // For dataset cells, use the EditableCell component
+      if (meta.columnType === "dataset") {
+        return (
+          <td
+            key={cell.id}
+            onClick={handleSelect}
+            onDoubleClick={handleActivate}
+            style={{
+              outline: isSelected
+                ? "2px solid var(--chakra-colors-blue-500)"
+                : "none",
+              outlineOffset: "-1px",
+              position: isSelected ? "relative" : undefined,
+              zIndex: isSelected ? 5 : undefined,
+              userSelect: "none",
+            }}
+          >
+            <EditableCell
+              value={(cell.getValue() as string) ?? ""}
+              row={rowIndex}
+              columnId={meta.columnId}
+            />
+          </td>
+        );
+      }
+
+      // For other cells
       return (
-        <DatasetCellTd
+        <td
           key={cell.id}
-          cell={cell}
-          row={rowIndex}
-          columnId={meta.datasetColumnId}
-          value={(cell.getValue() as string) ?? ""}
-        />
+          onClick={handleSelect}
+          onDoubleClick={handleActivate}
+          style={{
+            outline: isSelected
+              ? "2px solid var(--chakra-colors-blue-500)"
+              : "none",
+            outlineOffset: "-1px",
+            position: isSelected ? "relative" : undefined,
+            zIndex: isSelected ? 5 : undefined,
+            userSelect: "none",
+          }}
+        >
+          <Box
+            ref={
+              viewingCell?.row === rowIndex &&
+              viewingCell?.columnId === meta.columnId
+                ? viewingCellRef
+                : undefined
+            }
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </Box>
+        </td>
       );
-    }
-
-    return (
-      <td key={cell.id}>
-        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-      </td>
-    );
-  };
+    },
+    [
+      ui.selectedCell,
+      viewingCell,
+      setSelectedCell,
+      setEditingCell,
+      toggleRowSelection,
+    ]
+  );
 
   return (
     <Box
@@ -484,9 +863,8 @@ export function EvaluationsV3Table() {
         },
       }}
     >
-      <table>
+      <table ref={tableRef}>
         <thead>
-          {/* Super headers row */}
           <tr>
             <SuperHeader type="dataset" colSpan={datasetColSpan} />
             <SuperHeader
@@ -501,7 +879,6 @@ export function EvaluationsV3Table() {
               onAddClick={() => openOverlay("evaluator")}
             />
           </tr>
-          {/* Column headers row */}
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
@@ -514,7 +891,6 @@ export function EvaluationsV3Table() {
                       )}
                 </th>
               ))}
-              {/* Placeholder cells for Add buttons if no agents/evaluators */}
               {agents.length === 0 && (
                 <th style={{ minWidth: 150 }}>
                   <Text fontSize="xs" color="gray.400" fontStyle="italic">
@@ -536,7 +912,6 @@ export function EvaluationsV3Table() {
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id}>
               {row.getVisibleCells().map((cell) => renderCell(cell, row.index))}
-              {/* Placeholder cells for empty agents/evaluators */}
               {agents.length === 0 && <td />}
               {evaluators.length === 0 && <td />}
             </tr>
@@ -544,15 +919,18 @@ export function EvaluationsV3Table() {
         </tbody>
       </table>
 
-      {/* Selection toolbar */}
+      {/* Cell viewer for agent/evaluator cells */}
+      <CellViewer
+        value={viewingCell?.value}
+        isOpen={!!viewingCell}
+        onClose={() => setViewingCell(null)}
+        anchorRef={viewingCellRef}
+      />
+
       <SelectionToolbar
         selectedCount={selectedRows.size}
-        onRun={() => {
-          console.log("Run selected:", Array.from(selectedRows));
-        }}
-        onDelete={() => {
-          console.log("Delete selected:", Array.from(selectedRows));
-        }}
+        onRun={() => console.log("Run selected:", Array.from(selectedRows))}
+        onDelete={() => console.log("Delete selected:", Array.from(selectedRows))}
         onClear={clearRowSelection}
       />
     </Box>
@@ -563,11 +941,7 @@ export function EvaluationsV3Table() {
 // Cell Components
 // ============================================================================
 
-type AgentHeaderProps = {
-  agent: AgentConfig;
-};
-
-function AgentHeader({ agent }: AgentHeaderProps) {
+function AgentHeader({ agent }: { agent: AgentConfig }) {
   const { openOverlay } = useEvaluationsV3Store((state) => ({
     openOverlay: state.openOverlay,
   }));
@@ -591,14 +965,8 @@ function AgentHeader({ agent }: AgentHeaderProps) {
   );
 }
 
-type AgentCellProps = {
-  value: unknown;
-};
-
-function AgentCell({ value }: AgentCellProps) {
-  if (value === null || value === undefined) {
-    return null;
-  }
+function AgentCell({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return null;
 
   const displayValue =
     typeof value === "object" ? JSON.stringify(value) : String(value);
@@ -610,11 +978,7 @@ function AgentCell({ value }: AgentCellProps) {
   );
 }
 
-type EvaluatorHeaderProps = {
-  evaluator: EvaluatorConfig;
-};
-
-function EvaluatorHeader({ evaluator }: EvaluatorHeaderProps) {
+function EvaluatorHeader({ evaluator }: { evaluator: EvaluatorConfig }) {
   const { openOverlay } = useEvaluationsV3Store((state) => ({
     openOverlay: state.openOverlay,
   }));
@@ -634,14 +998,8 @@ function EvaluatorHeader({ evaluator }: EvaluatorHeaderProps) {
   );
 }
 
-type EvaluatorCellProps = {
-  value: unknown;
-};
-
-function EvaluatorCell({ value }: EvaluatorCellProps) {
-  if (value === null || value === undefined) {
-    return null;
-  }
+function EvaluatorCell({ value }: { value: unknown }) {
+  if (value === null || value === undefined) return null;
 
   if (typeof value === "boolean") {
     return (

@@ -87,12 +87,15 @@ export function EditableCell({ value, row, columnId }: EditableCellProps) {
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        e.stopPropagation(); // Prevent global handler from re-opening edit mode
         handleSave();
       } else if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation(); // Prevent global handler from clearing selection
         handleCancel();
       } else if (e.key === "Tab") {
         e.preventDefault();
+        e.stopPropagation();
         handleSave();
         // TODO: Move to next cell
       }
