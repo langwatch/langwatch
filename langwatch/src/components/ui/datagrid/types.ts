@@ -6,7 +6,7 @@ import type { CellContext, Row } from "@tanstack/react-table";
  * - 'contains' for text columns (LIKE search)
  * - 'eq' for enum columns (exact match with dropdown)
  */
-export type FilterOperator = "eq" | "contains";
+export type FilterOperator = "eq" | "contains" | "between";
 
 /**
  * Filter state representing a single filter condition
@@ -255,6 +255,13 @@ export interface DataGridConfig<T> {
 
   /** Storage key for localStorage persistence */
   storageKey?: string;
+
+  /**
+   * Enable URL sync for shareable table state.
+   * When true, filters/sorting/pagination sync to URL query params.
+   * URL state takes priority over localStorage on mount.
+   */
+  urlSync?: boolean;
 }
 
 /**

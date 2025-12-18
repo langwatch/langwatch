@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/router";
 import { Box, Text, VStack } from "@chakra-ui/react";
-import {
-  DataGrid,
-  createDataGridStore,
-  type FilterState,
-  type SortingState,
-} from "~/components/ui/datagrid";
+import { DataGrid, createDataGridStore } from "~/components/ui/datagrid";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { createScenarioColumns, generateDynamicColumns } from "./scenarioColumns";
+import {
+  createScenarioColumns,
+  generateDynamicColumns,
+} from "./scenarioColumns";
 import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
-import { StatusCell, VerdictCell, DurationCell, TimestampCell, ActionsCell } from "./cells";
+import {
+  StatusCell,
+  VerdictCell,
+  DurationCell,
+  TimestampCell,
+  ActionsCell,
+} from "./cells";
 import type { ScenarioRunRow } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
@@ -19,46 +22,14 @@ import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route
 /**
  * Table view for scenarios/simulations data
  * Uses the generic DataGrid component with scenario-specific configuration
+ *
+ * URL sync is handled automatically by the store via urlSync: true
+ * - Filters, sorting, pagination sync to URL query params
+ * - URL state takes priority over localStorage on mount
  */
 export function ScenariosTableView() {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const projectSlug = project?.slug ?? "";
-
-  // Parse URL parameters for initial state - only on first render
-  const initialUrlState = useRef<{
-    filters: FilterState[];
-    sorting: SortingState | undefined;
-    page: number;
-    pageSize: number;
-    search: string;
-  } | null>(null);
-
-  if (initialUrlState.current === null) {
-    const filtersParam = router.query.filters as string | undefined;
-    let filters: FilterState[] = [];
-    try {
-      filters = filtersParam ? JSON.parse(filtersParam) : [];
-    } catch {
-      filters = [];
-    }
-
-    const sortBy = router.query.sortBy as string | undefined;
-    const sortOrder = router.query.sortOrder as "asc" | "desc" | undefined;
-    const sorting = sortBy && sortOrder
-      ? { columnId: sortBy, order: sortOrder }
-      : { columnId: "timestamp", order: "desc" as const };
-
-    const pageParam = router.query.page as string | undefined;
-    const page = pageParam ? parseInt(pageParam, 10) : 1;
-
-    const pageSizeParam = router.query.pageSize as string | undefined;
-    const pageSize = pageSizeParam ? parseInt(pageSizeParam, 10) : 20;
-
-    const search = (router.query.search as string) ?? "";
-
-    initialUrlState.current = { filters, sorting, page, pageSize, search };
-  }
 
   // Create columns with cell renderers - memoized to avoid recreating on every render
   const baseColumns = useMemo(() => {
@@ -85,18 +56,18 @@ export function ScenariosTableView() {
 
   // Create the store once using useRef - this is the proper Zustand pattern
   // The store is created once and persists for the lifetime of the component
-  const storeRef = useRef<ReturnType<typeof createDataGridStore<ScenarioRunRow>> | null>(null);
+  // urlSync: true enables automatic URL param sync (handled by store internally)
+  const storeRef = useRef<ReturnType<
+    typeof createDataGridStore<ScenarioRunRow>
+  > | null>(null);
 
   if (storeRef.current === null) {
     storeRef.current = createDataGridStore<ScenarioRunRow>({
       columns: baseColumns,
-      defaultPageSize: initialUrlState.current.pageSize,
-      defaultSorting: initialUrlState.current.sorting,
-      defaultFilters: initialUrlState.current.filters,
-      defaultGlobalSearch: initialUrlState.current.search,
-      defaultPage: initialUrlState.current.page,
+      defaultSorting: { columnId: "timestamp", order: "desc" },
       getRowId: (row) => row.scenarioRunId,
       storageKey: project?.id ? `scenarios-table-${project.id}` : undefined,
+      urlSync: true, // Enable automatic URL sync
     });
   }
 
@@ -175,55 +146,67 @@ export function ScenariosTableView() {
   const error = groupBy ? errorGrouped : errorUngrouped;
 
   // Helper to transform ScenarioRunData to ScenarioRunRow
-  const transformRunData = useCallback((run: ScenarioRunData): ScenarioRunRow => {
-    const traceMap = new Map<string, { input: string; output: string; timestamp: number }>();
+  const transformRunData = useCallback(
+    (run: ScenarioRunData): ScenarioRunRow => {
+      const traceMap = new Map<
+        string,
+        { input: string; output: string; timestamp: number }
+      >();
 
-    for (const message of run.messages ?? []) {
-      const traceId = (message as { trace_id?: string }).trace_id;
-      if (traceId) {
-        const existing = traceMap.get(traceId) ?? { input: "", output: "", timestamp: 0 };
-        const content = typeof message.content === "string"
-          ? message.content
-          : JSON.stringify(message.content ?? "");
+      for (const message of run.messages ?? []) {
+        const traceId = (message as { trace_id?: string }).trace_id;
+        if (traceId) {
+          const existing = traceMap.get(traceId) ?? {
+            input: "",
+            output: "",
+            timestamp: 0,
+          };
+          const content =
+            typeof message.content === "string"
+              ? message.content
+              : JSON.stringify(message.content ?? "");
 
-        const role = (message as { role?: string }).role;
-        if (role === "user" || role === "human") {
-          existing.input = content;
-        } else if (role === "assistant" || role === "ai") {
-          existing.output = content;
+          const role = (message as { role?: string }).role;
+          if (role === "user" || role === "human") {
+            existing.input = content;
+          } else if (role === "assistant" || role === "ai") {
+            existing.output = content;
+          }
+          existing.timestamp =
+            (message as { timestamp?: number }).timestamp ?? run.timestamp;
+          traceMap.set(traceId, existing);
         }
-        existing.timestamp = (message as { timestamp?: number }).timestamp ?? run.timestamp;
-        traceMap.set(traceId, existing);
       }
-    }
 
-    const traces = Array.from(traceMap.entries()).map(([traceId, data]) => ({
-      traceId,
-      timestamp: data.timestamp,
-      input: data.input,
-      output: data.output,
-      metadata: {},
-      spanCount: 0,
-      totalTokens: 0,
-      totalCost: 0,
-    }));
+      const traces = Array.from(traceMap.entries()).map(([traceId, data]) => ({
+        traceId,
+        timestamp: data.timestamp,
+        input: data.input,
+        output: data.output,
+        metadata: {},
+        spanCount: 0,
+        totalTokens: 0,
+        totalCost: 0,
+      }));
 
-    return {
-      scenarioRunId: run.scenarioRunId,
-      scenarioId: run.scenarioId,
-      scenarioSetId: run.scenarioSetId ?? "",
-      batchRunId: run.batchRunId,
-      name: run.name ?? null,
-      description: run.description ?? null,
-      status: run.status,
-      verdict: run.results?.verdict ?? null,
-      timestamp: run.timestamp,
-      durationInMs: run.durationInMs,
-      metCriteria: run.results?.metCriteria ?? [],
-      unmetCriteria: run.results?.unmetCriteria ?? [],
-      traces,
-    };
-  }, []);
+      return {
+        scenarioRunId: run.scenarioRunId,
+        scenarioId: run.scenarioId,
+        scenarioSetId: run.scenarioSetId ?? "",
+        batchRunId: run.batchRunId,
+        name: run.name ?? null,
+        description: run.description ?? null,
+        status: run.status,
+        verdict: run.results?.verdict ?? null,
+        timestamp: run.timestamp,
+        durationInMs: run.durationInMs,
+        metCriteria: run.results?.metCriteria ?? [],
+        unmetCriteria: run.results?.unmetCriteria ?? [],
+        traces,
+      };
+    },
+    []
+  );
 
   // Update store when ungrouped data changes
   useEffect(() => {
@@ -243,7 +226,14 @@ export function ScenariosTableView() {
     }
     store.getState().setIsLoading(isLoadingUngrouped);
     store.getState().setError(errorUngrouped?.message ?? null);
-  }, [scenarioData, isLoadingUngrouped, errorUngrouped, baseColumns, groupBy, transformRunData]);
+  }, [
+    scenarioData,
+    isLoadingUngrouped,
+    errorUngrouped,
+    baseColumns,
+    groupBy,
+    transformRunData,
+  ]);
 
   // Update store when grouped data changes
   useEffect(() => {
@@ -266,64 +256,6 @@ export function ScenariosTableView() {
     store.getState().setIsLoading(isLoadingGrouped);
     store.getState().setError(errorGrouped?.message ?? null);
   }, [groupedData, isLoadingGrouped, errorGrouped, groupBy, transformRunData]);
-
-  // Sync state changes to URL
-  const handleStateChange = useCallback(
-    (state: {
-      filters: FilterState[];
-      sorting: SortingState | null;
-      page: number;
-      pageSize: number;
-      globalSearch: string;
-      groupBy: string | null;
-    }) => {
-      const query: Record<string, string> = {
-        ...router.query,
-        view: "table",
-      };
-
-      if (state.filters.length > 0) {
-        query.filters = JSON.stringify(state.filters);
-      } else {
-        delete query.filters;
-      }
-
-      if (state.sorting) {
-        query.sortBy = state.sorting.columnId;
-        query.sortOrder = state.sorting.order;
-      } else {
-        delete query.sortBy;
-        delete query.sortOrder;
-      }
-
-      if (state.page > 1) {
-        query.page = String(state.page);
-      } else {
-        delete query.page;
-      }
-
-      if (state.pageSize !== 20) {
-        query.pageSize = String(state.pageSize);
-      } else {
-        delete query.pageSize;
-      }
-
-      if (state.globalSearch) {
-        query.search = state.globalSearch;
-      } else {
-        delete query.search;
-      }
-
-      if (state.groupBy) {
-        query.groupBy = state.groupBy;
-      } else {
-        delete query.groupBy;
-      }
-
-      void router.replace({ query }, undefined, { shallow: true });
-    },
-    [router]
-  );
 
   // Export mutation
   const exportMutation = api.scenarios.exportScenariosCsv.useMutation();
@@ -398,7 +330,6 @@ export function ScenariosTableView() {
         getRowId={(row) => row.scenarioRunId}
         renderExpandedContent={renderExpandedContent}
         getEnumOptions={getEnumOptions}
-        onStateChange={handleStateChange}
         onExport={handleExport}
         isFetching={isFetching}
         emptyMessage="No scenario runs found. Try adjusting your filters."
