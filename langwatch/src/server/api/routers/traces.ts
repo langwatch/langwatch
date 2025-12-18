@@ -21,6 +21,7 @@ import {
   searchTraces,
 } from "~/server/elasticsearch/traces";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { esClient, TRACE_INDEX } from "../../elasticsearch";
 import type { Protections } from "../../elasticsearch/protections";
@@ -43,6 +44,7 @@ export const getAllForProjectInput = tracesFilterInput.extend({
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
   updatedAt: z.number().optional(),
+  scrollId: z.string().optional().nullable(),
 });
 
 export const tracesRouter = createTRPCRouter({
@@ -50,6 +52,22 @@ export const tracesRouter = createTRPCRouter({
     .input(getAllForProjectInput)
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getAllTracesForProject(
+        input,
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return await getAllTracesForProject({ input, ctx });
     }),
   getById: publicProcedure
@@ -292,6 +310,19 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return getTracesWithSpans(projectId, traceIds, protections);
     }),
 
@@ -460,11 +491,30 @@ export const tracesRouter = createTRPCRouter({
     .input(
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
-        scrollId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ ctx, input }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getAllTracesForProject(
+        {
+          ...input,
+          pageOffset: input.pageOffset ?? 0,
+          pageSize: input.pageSize ?? 10_000,
+        },
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return await getAllTracesForProject({
         input: {
           ...input,
@@ -494,7 +544,7 @@ export const getAllTracesForProject = async ({
   };
   downloadMode?: boolean;
   includeSpans?: boolean;
-  scrollId?: string;
+  scrollId?: string | null;
 }) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
     ...input,
