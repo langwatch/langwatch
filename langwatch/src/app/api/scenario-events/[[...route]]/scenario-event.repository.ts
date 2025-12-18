@@ -1447,7 +1447,7 @@ export class ScenarioEventRepository {
       scenarioSetId: ES_FIELDS.scenarioSetId,
       batchRunId: ES_FIELDS.batchRunId,
       scenarioRunId: ES_FIELDS.scenarioRunId,
-      name: "metadata.name.keyword", // Use keyword subfield for sorting
+      name: "metadata.name.keyword", // Use keyword subfield for sorting/aggregations
       status: "status",
       timestamp: "timestamp",
       verdict: "results.verdict",
@@ -1842,7 +1842,7 @@ export class ScenarioEventRepository {
             terms: {
               field: groupField,
               size: page * pageSize, // Get enough groups for current page
-              order: { _count: sorting?.order ?? "desc" },
+              order: { _key: sorting?.order ?? "asc" }, // Sort by group value (name) alphabetically
             },
             aggs: {
               // Get top scenario run IDs for each group

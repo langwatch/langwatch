@@ -76,6 +76,8 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
     openDrawer("traceDetails", { traceId: trace.traceId });
   };
 
+  console.log({ traceIds });
+
   if (traceIds.length === 0) {
     return (
       <Box p={4} bg="gray.50">
