@@ -5,7 +5,11 @@
  * This allows us to save evaluations in the existing workflow format
  * while using a simpler UI-focused state structure.
  *
- * Structure: Dataset (entry) -> Agent nodes -> Evaluator nodes (per-agent)
+ * Key concepts:
+ * - Evaluators are global/shared in state - agents reference them by ID
+ * - When saving to DSL, evaluators are duplicated per-agent with {agentId}.{evaluatorId} naming
+ * - When loading from DSL, evaluators are deduplicated back into global definitions
+ * - Mappings: agent.mappings for agent inputs, evaluator.mappings[agentId] for evaluator inputs
  */
 
 import type { Edge, Node } from "@xyflow/react";
@@ -32,6 +36,7 @@ import type {
 
 /**
  * Convert V3 state to workflow DSL for persistence.
+ * Evaluators are duplicated per-agent with clear naming for result mapping.
  */
 export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
   const entryNode = createEntryNode(state.dataset);
@@ -39,7 +44,7 @@ export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
   const agentNodes: Array<Node<Signature> | Node<Code>> = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
-  // Create agent nodes and their evaluator nodes
+  // Create agent nodes
   state.agents.forEach((agent, agentIndex) => {
     const agentNode =
       agent.type === "llm"
@@ -48,8 +53,12 @@ export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
 
     agentNodes.push(agentNode);
 
-    // Create evaluator nodes for this agent
-    agent.evaluators.forEach((evaluator, evalIndex) => {
+    // Create evaluator nodes for each evaluator this agent uses
+    // Evaluators are duplicated per-agent in the DSL
+    agent.evaluatorIds.forEach((evaluatorId, evalIndex) => {
+      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
+      if (!evaluator) return;
+
       const evaluatorNode = createEvaluatorNode(
         evaluator,
         agent.id,
@@ -60,11 +69,8 @@ export const stateToWorkflow = (state: EvaluationsV3State): Workflow => {
     });
   });
 
-  const agentEdges = buildAgentEdges(state.agents, state.agentMappings);
-  const evaluatorEdges = buildEvaluatorEdges(
-    state.agents,
-    state.evaluatorMappings
-  );
+  const agentEdges = buildAgentEdges(state.agents);
+  const evaluatorEdges = buildEvaluatorEdges(state.agents, state.evaluators);
 
   return {
     spec_version: "1.4",
@@ -191,6 +197,7 @@ const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
 
 /**
  * Create an evaluator node for a specific agent.
+ * Node ID is {agentId}.{evaluatorId} for clear result mapping back to the table.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -202,7 +209,7 @@ const createEvaluatorNode = (
     id: `${agentId}.${evaluator.id}`,
     type: "evaluator",
     data: {
-      name: evaluator.name,
+      name: `${evaluator.name}`,
       cls: "LangWatchEvaluator",
       inputs: evaluator.inputs,
       outputs: [{ identifier: "passed", type: "bool" }],
@@ -214,18 +221,13 @@ const createEvaluatorNode = (
 };
 
 /**
- * Build edges connecting entry to agents based on mappings.
+ * Build edges connecting entry to agents based on agent.mappings.
  */
-const buildAgentEdges = (
-  agents: AgentConfig[],
-  agentMappings: Record<string, Record<string, FieldMapping>>
-): Edge[] => {
+const buildAgentEdges = (agents: AgentConfig[]): Edge[] => {
   const edges: Edge[] = [];
 
   for (const agent of agents) {
-    const mappings = agentMappings[agent.id] ?? {};
-
-    for (const [inputField, mapping] of Object.entries(mappings)) {
+    for (const [inputField, mapping] of Object.entries(agent.mappings)) {
       if (mapping.source === "dataset") {
         edges.push({
           id: `entry->${agent.id}.${inputField}`,
@@ -243,24 +245,23 @@ const buildAgentEdges = (
 
 /**
  * Build edges connecting agents to their evaluators.
+ * Mappings are stored inside evaluator.mappings[agentId].
  */
 const buildEvaluatorEdges = (
   agents: AgentConfig[],
-  evaluatorMappings: Record<
-    string,
-    Record<string, Record<string, FieldMapping>>
-  >
+  evaluators: EvaluatorConfig[]
 ): Edge[] => {
   const edges: Edge[] = [];
 
   for (const agent of agents) {
-    const agentEvalMappings = evaluatorMappings[agent.id] ?? {};
+    for (const evaluatorId of agent.evaluatorIds) {
+      const evaluator = evaluators.find((e) => e.id === evaluatorId);
+      if (!evaluator) continue;
 
-    for (const evaluator of agent.evaluators) {
-      const evalMappings = agentEvalMappings[evaluator.id] ?? {};
+      const agentMappings = evaluator.mappings[agent.id] ?? {};
       const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
 
-      for (const [inputField, mapping] of Object.entries(evalMappings)) {
+      for (const [inputField, mapping] of Object.entries(agentMappings)) {
         if (mapping.source === "dataset") {
           // From dataset
           edges.push({
@@ -293,6 +294,7 @@ const buildEvaluatorEdges = (
 
 /**
  * Convert workflow DSL to V3 state for UI display.
+ * Evaluators are deduplicated - same evaluator type+settings become one global definition.
  */
 export const workflowToState = (
   workflow: Workflow
@@ -311,24 +313,24 @@ export const workflowToState = (
     (n) => n.type === "evaluator"
   ) as Array<Node<Evaluator>>;
 
-  // Build agents with their evaluators
-  const agents: AgentConfig[] = agentNodes.map((node) =>
-    extractAgent(node, evaluatorNodes)
+  // Extract global evaluators (deduplicated by evaluator ID within agent)
+  // and build per-agent mappings
+  const { evaluators, evaluatorsByAgent } = extractGlobalEvaluators(
+    evaluatorNodes,
+    workflow.edges,
+    agentNodes.map((n) => n.id)
   );
 
-  const agentMappings = extractAgentMappings(workflow.edges, agents);
-  const evaluatorMappings = extractEvaluatorMappings(
-    workflow.edges,
-    agents,
-    evaluatorNodes
+  // Build agents with their evaluatorIds and mappings
+  const agents: AgentConfig[] = agentNodes.map((node) =>
+    extractAgent(node, evaluatorsByAgent[node.id] ?? [], workflow.edges)
   );
 
   return {
     name: workflow.name,
     dataset,
+    evaluators,
     agents,
-    agentMappings,
-    evaluatorMappings,
   };
 };
 
@@ -357,17 +359,95 @@ const extractDataset = (entryNode: Node<Entry>): InlineDataset => {
 };
 
 /**
- * Extract agent config from a signature or code node, including its evaluators.
+ * Extract global evaluators from evaluator nodes.
+ * Deduplicates by evaluator ID (the part after the agent ID prefix).
+ * Returns evaluators with per-agent mappings and a mapping of which evaluators each agent has.
+ */
+const extractGlobalEvaluators = (
+  evaluatorNodes: Array<Node<Evaluator>>,
+  edges: Edge[],
+  agentIds: string[]
+): {
+  evaluators: EvaluatorConfig[];
+  evaluatorsByAgent: Record<string, string[]>;
+} => {
+  const evaluatorsMap = new Map<string, EvaluatorConfig>();
+  const evaluatorsByAgent: Record<string, string[]> = {};
+
+  for (const agentId of agentIds) {
+    evaluatorsByAgent[agentId] = [];
+  }
+
+  for (const node of evaluatorNodes) {
+    // Parse the node ID to get agentId and evaluatorId
+    // Format: {agentId}.{evaluatorId}
+    const dotIndex = node.id.indexOf(".");
+    if (dotIndex === -1) continue;
+
+    const agentId = node.id.substring(0, dotIndex);
+    const evaluatorId = node.id.substring(dotIndex + 1);
+
+    if (!agentIds.includes(agentId)) continue;
+
+    // Add to agent's evaluator list
+    if (!evaluatorsByAgent[agentId]!.includes(evaluatorId)) {
+      evaluatorsByAgent[agentId]!.push(evaluatorId);
+    }
+
+    // Extract evaluator config
+    const { name, inputs, evaluator, cls, outputs, ...settings } = node.data;
+
+    // Get or create the global evaluator
+    if (!evaluatorsMap.has(evaluatorId)) {
+      evaluatorsMap.set(evaluatorId, {
+        id: evaluatorId,
+        evaluatorType:
+          (evaluator as EvaluatorConfig["evaluatorType"]) ?? "custom/unknown",
+        name: name ?? evaluatorId,
+        settings,
+        inputs: inputs ?? [],
+        mappings: {},
+      });
+    }
+
+    // Extract mappings for this agent from edges
+    const evalConfig = evaluatorsMap.get(evaluatorId)!;
+    const evalEdges = edges.filter((e) => e.target === node.id);
+
+    evalConfig.mappings[agentId] = {};
+
+    for (const edge of evalEdges) {
+      const inputField = edge.targetHandle?.replace("input-", "") ?? "";
+      const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
+
+      if (edge.source === "entry") {
+        evalConfig.mappings[agentId]![inputField] = {
+          source: "dataset",
+          sourceField,
+        };
+      } else if (edge.source === agentId) {
+        evalConfig.mappings[agentId]![inputField] = {
+          source: agentId,
+          sourceField,
+        };
+      }
+    }
+  }
+
+  return {
+    evaluators: Array.from(evaluatorsMap.values()),
+    evaluatorsByAgent,
+  };
+};
+
+/**
+ * Extract agent config from a signature or code node.
  */
 const extractAgent = (
   node: Node<Signature> | Node<Code>,
-  evaluatorNodes: Array<Node<Evaluator>>
+  evaluatorIds: string[],
+  edges: Edge[]
 ): AgentConfig => {
-  // Find evaluators that belong to this agent (their ID starts with agentId.)
-  const agentEvaluators = evaluatorNodes
-    .filter((e) => e.id.startsWith(`${node.id}.`))
-    .map((evalNode) => extractEvaluator(evalNode, node.id));
-
   const params = node.data.parameters ?? [];
   const llmParam = params.find((p: Field) => p.identifier === "llm");
   const instructionsParam = params.find(
@@ -375,6 +455,9 @@ const extractAgent = (
   );
   const messagesParam = params.find((p: Field) => p.identifier === "messages");
   const codeParam = params.find((p: Field) => p.identifier === "code");
+
+  // Extract agent input mappings from edges
+  const mappings = extractAgentMappings(node.id, edges);
 
   if (node.type === "signature") {
     return {
@@ -386,7 +469,8 @@ const extractAgent = (
       llmConfig: llmParam?.value as AgentConfig["llmConfig"],
       instructions: instructionsParam?.value as string | undefined,
       messages: messagesParam?.value as AgentConfig["messages"],
-      evaluators: agentEvaluators,
+      mappings,
+      evaluatorIds,
     };
   } else {
     return {
@@ -396,99 +480,31 @@ const extractAgent = (
       inputs: node.data.inputs ?? [],
       outputs: node.data.outputs ?? [],
       code: codeParam?.value as string | undefined,
-      evaluators: agentEvaluators,
+      mappings,
+      evaluatorIds,
     };
   }
-};
-
-/**
- * Extract evaluator config from an evaluator node.
- */
-const extractEvaluator = (
-  node: Node<Evaluator>,
-  agentId: string
-): EvaluatorConfig => {
-  // The evaluator ID is the node ID minus the "agentId." prefix
-  const evaluatorId = node.id.replace(`${agentId}.`, "");
-
-  const { name, inputs, outputs, evaluator, cls, ...settings } = node.data;
-
-  return {
-    id: evaluatorId,
-    evaluatorType:
-      (evaluator as EvaluatorConfig["evaluatorType"]) ?? "custom/unknown",
-    name: name ?? evaluatorId,
-    settings,
-    inputs: inputs ?? [],
-  };
 };
 
 /**
  * Extract agent input mappings from edges.
  */
 const extractAgentMappings = (
-  edges: Edge[],
-  agents: AgentConfig[]
-): Record<string, Record<string, FieldMapping>> => {
-  const mappings: Record<string, Record<string, FieldMapping>> = {};
+  agentId: string,
+  edges: Edge[]
+): Record<string, FieldMapping> => {
+  const mappings: Record<string, FieldMapping> = {};
 
-  for (const agent of agents) {
-    mappings[agent.id] = {};
+  const agentEdges = edges.filter((e) => e.target === agentId);
+  for (const edge of agentEdges) {
+    const inputField = edge.targetHandle?.replace("input-", "") ?? "";
+    const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
 
-    const agentEdges = edges.filter((e) => e.target === agent.id);
-    for (const edge of agentEdges) {
-      const inputField = edge.targetHandle?.replace("input-", "") ?? "";
-      const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
-
-      if (edge.source === "entry") {
-        mappings[agent.id]![inputField] = {
-          source: "dataset",
-          sourceField,
-        };
-      }
-    }
-  }
-
-  return mappings;
-};
-
-/**
- * Extract evaluator input mappings from edges.
- */
-const extractEvaluatorMappings = (
-  edges: Edge[],
-  agents: AgentConfig[],
-  _evaluatorNodes: Array<Node<Evaluator>>
-): Record<string, Record<string, Record<string, FieldMapping>>> => {
-  const mappings: Record<
-    string,
-    Record<string, Record<string, FieldMapping>>
-  > = {};
-
-  for (const agent of agents) {
-    mappings[agent.id] = {};
-
-    for (const evaluator of agent.evaluators) {
-      const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
-      mappings[agent.id]![evaluator.id] = {};
-
-      const evalEdges = edges.filter((e) => e.target === evaluatorNodeId);
-      for (const edge of evalEdges) {
-        const inputField = edge.targetHandle?.replace("input-", "") ?? "";
-        const sourceField = edge.sourceHandle?.replace("output-", "") ?? "";
-
-        if (edge.source === "entry") {
-          mappings[agent.id]![evaluator.id]![inputField] = {
-            source: "dataset",
-            sourceField,
-          };
-        } else if (edge.source === agent.id) {
-          mappings[agent.id]![evaluator.id]![inputField] = {
-            source: agent.id,
-            sourceField,
-          };
-        }
-      }
+    if (edge.source === "entry") {
+      mappings[inputField] = {
+        source: "dataset",
+        sourceField,
+      };
     }
   }
 

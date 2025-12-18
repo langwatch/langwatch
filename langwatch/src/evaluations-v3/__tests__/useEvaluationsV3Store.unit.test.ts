@@ -91,7 +91,8 @@ describe("useEvaluationsV3Store", () => {
       name: `Agent ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
-      evaluators: [],
+      mappings: {},
+      evaluatorIds: [],
     });
 
     it("adds an agent", () => {
@@ -101,7 +102,6 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       expect(state.agents).toHaveLength(1);
       expect(state.agents[0]?.name).toBe("Agent agent-1");
-      expect(state.agentMappings["agent-1"]).toBeDefined();
     });
 
     it("updates an agent", () => {
@@ -120,10 +120,9 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.agents).toHaveLength(0);
-      expect(state.agentMappings["agent-1"]).toBeUndefined();
     });
 
-    it("sets agent mapping", () => {
+    it("sets agent mapping inside agent", () => {
       const store = useEvaluationsV3Store.getState();
       store.addAgent(createTestAgent("agent-1"));
       store.setAgentMapping("agent-1", "input", {
@@ -132,21 +131,91 @@ describe("useEvaluationsV3Store", () => {
       });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.agentMappings["agent-1"]?.["input"]).toEqual({
+      const agent = state.agents.find((a) => a.id === "agent-1");
+      expect(agent?.mappings["input"]).toEqual({
         source: "dataset",
         sourceField: "input",
       });
     });
+
+    it("removes agent and cleans up evaluator mappings", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent(createTestAgent("agent-1"));
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
+      store.setEvaluatorMapping("eval-1", "agent-1", "output", {
+        source: "agent-1",
+        sourceField: "output",
+      });
+      store.removeAgent("agent-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.agents).toHaveLength(0);
+      // Evaluator still exists but agent's mappings should be removed
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings["agent-1"]).toBeUndefined();
+    });
   });
 
-  describe("Per-agent evaluator operations", () => {
+  describe("Global evaluator operations", () => {
+    const createTestEvaluator = (id: string): EvaluatorConfig => ({
+      id,
+      evaluatorType: "langevals/exact_match",
+      name: `Evaluator ${id}`,
+      settings: {},
+      inputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+    });
+
+    it("adds a global evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.evaluators[0]?.name).toBe("Evaluator eval-1");
+    });
+
+    it("updates a global evaluator", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.updateEvaluator("eval-1", { name: "Updated Evaluator" });
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
+    });
+
+    it("removes a global evaluator and cleans up agent references", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addAgent({
+        id: "agent-1",
+        type: "llm",
+        name: "Agent 1",
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        evaluatorIds: [],
+      });
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
+      store.removeEvaluator("eval-1");
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.evaluators).toHaveLength(0);
+      const agent = state.agents.find((a) => a.id === "agent-1");
+      expect(agent?.evaluatorIds).not.toContain("eval-1");
+    });
+  });
+
+  describe("Agent-evaluator relationship operations", () => {
     const createTestAgent = (id: string): AgentConfig => ({
       id,
       type: "llm",
       name: `Agent ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
-      evaluators: [],
+      mappings: {},
+      evaluatorIds: [],
     });
 
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
@@ -155,61 +224,66 @@ describe("useEvaluationsV3Store", () => {
       name: `Evaluator ${id}`,
       settings: {},
       inputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
     });
 
-    it("adds an evaluator to an agent", () => {
+    it("adds an evaluator reference to an agent", () => {
       const store = useEvaluationsV3Store.getState();
       store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
 
       const state = useEvaluationsV3Store.getState();
       const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluators).toHaveLength(1);
-      expect(agent?.evaluators[0]?.name).toBe("Evaluator eval-1");
-      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]).toBeDefined();
+      expect(agent?.evaluatorIds).toContain("eval-1");
+      // Evaluator should have initialized mappings for this agent
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings["agent-1"]).toBeDefined();
     });
 
-    it("updates an evaluator within an agent", () => {
+    it("does not add duplicate evaluator reference", () => {
       const store = useEvaluationsV3Store.getState();
       store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
-      store.updateAgentEvaluator("agent-1", "eval-1", {
-        name: "Updated Evaluator",
-      });
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
+      store.addEvaluatorToAgent("agent-1", "eval-1"); // duplicate
 
       const state = useEvaluationsV3Store.getState();
       const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluators[0]?.name).toBe("Updated Evaluator");
+      expect(agent?.evaluatorIds).toHaveLength(1);
     });
 
-    it("removes an evaluator from an agent", () => {
+    it("removes an evaluator reference from an agent", () => {
       const store = useEvaluationsV3Store.getState();
       store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
-      store.removeAgentEvaluator("agent-1", "eval-1");
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
+      store.removeEvaluatorFromAgent("agent-1", "eval-1");
 
       const state = useEvaluationsV3Store.getState();
       const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluators).toHaveLength(0);
-      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]).toBeUndefined();
+      expect(agent?.evaluatorIds).not.toContain("eval-1");
+      // Evaluator should have removed mappings for this agent
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings["agent-1"]).toBeUndefined();
     });
 
     it("sets evaluator mapping for an agent", () => {
       const store = useEvaluationsV3Store.getState();
       store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluatorToAgent("agent-1", createTestEvaluator("eval-1"));
-      store.setAgentEvaluatorMapping("agent-1", "eval-1", "output", {
+      store.addEvaluator(createTestEvaluator("eval-1"));
+      store.addEvaluatorToAgent("agent-1", "eval-1");
+      store.setEvaluatorMapping("eval-1", "agent-1", "output", {
         source: "agent-1",
         sourceField: "output",
       });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.evaluatorMappings["agent-1"]?.["eval-1"]?.["output"]).toEqual(
-        {
-          source: "agent-1",
-          sourceField: "output",
-        }
-      );
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings["agent-1"]?.["output"]).toEqual({
+        source: "agent-1",
+        sourceField: "output",
+      });
     });
   });
 
@@ -362,7 +436,8 @@ describe("useEvaluationsV3Store", () => {
         name: "Agent",
         inputs: [],
         outputs: [],
-        evaluators: [],
+        mappings: {},
+        evaluatorIds: [],
       });
       store.reset();
 
@@ -438,4 +513,14 @@ describe("useEvaluationsV3Store", () => {
       ).toBeLessThanOrEqual(pastStatesCount);
     });
   });
+});
+
+// Helper function used in tests
+const createTestEvaluator = (id: string): EvaluatorConfig => ({
+  id,
+  evaluatorType: "langevals/exact_match",
+  name: `Evaluator ${id}`,
+  settings: {},
+  inputs: [{ identifier: "output", type: "str" }],
+  mappings: {},
 });
