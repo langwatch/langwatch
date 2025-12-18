@@ -7,7 +7,7 @@ import {
   getTenantIdString,
   verifyCheckpoint,
   verifyEventHandlerProcessed,
-  waitForQueueProcessing,
+  waitForCheckpoint,
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 
@@ -23,10 +23,12 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
   });
 
   afterEach(async () => {
-    // Clean up test data
-    await cleanupTestDataForTenant(tenantIdString);
-    // Close pipeline queues
+    // Close pipeline first to stop all workers and queues
     await pipeline.service.close();
+    // Wait a bit for all async operations to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Then clean up test data
+    await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("processes complete flow: command → event → handler → projection", async () => {
@@ -40,8 +42,21 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "test message",
     });
 
-    // Wait for queue processing
-    await waitForQueueProcessing(30000);
+    // Wait for handler and projection checkpoints
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      1,
+    );
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      1,
+    );
 
     // Verify event was stored
     const events = await pipeline.eventStore.getEvents(
@@ -99,8 +114,25 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "third",
     });
 
-    // Wait for queue processing
-    await waitForQueueProcessing(120_000);
+    // Wait for handler checkpoint at sequence 3
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      3,
+      10000,
+    );
+
+    // Wait for projection checkpoint at sequence 3 to ensure all events are processed
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      3,
+      10000,
+    );
 
     // Verify events were stored in order
     const events = await pipeline.eventStore.getEvents(
@@ -140,8 +172,23 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       value: 20,
     });
 
-    // Wait for processing
-    await waitForQueueProcessing(30000);
+    // Wait for checkpoints with longer timeout for ClickHouse consistency
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      1,
+      10000,
+    );
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      1,
+      10000,
+    );
 
     // Verify handler checkpoint
     const handlerCheckpoint = await verifyCheckpoint(
@@ -183,8 +230,18 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       ),
     );
 
-    // Wait for processing
-    await waitForQueueProcessing(30000);
+    // Wait for checkpoints for all aggregates
+    await Promise.all(
+      aggregateIds.map((aggregateId) =>
+        waitForCheckpoint(
+          "test_pipeline",
+          "testHandler",
+          aggregateId,
+          tenantIdString,
+          1,
+        ),
+      ),
+    );
 
     // Verify all aggregates were processed
     for (const aggregateId of aggregateIds) {
@@ -215,14 +272,20 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "first",
     });
 
-    await waitForQueueProcessing(10000);
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      1,
+    );
 
     // Verify initial projection
-    let projection = (await pipeline.service.getProjectionByName(
+    let projection = await pipeline.service.getProjectionByName(
       "testProjection",
       aggregateId,
       { tenantId },
-    )) as TestProjection | null;
+    );
     expect(projection?.data.totalValue).toBe(5);
     expect(projection?.data.eventCount).toBe(1);
 
@@ -234,14 +297,20 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       message: "second",
     });
 
-    await waitForQueueProcessing(10000);
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      2,
+    );
 
     // Verify projection was rebuilt with all events
-    projection = (await pipeline.service.getProjectionByName(
+    projection = await pipeline.service.getProjectionByName(
       "testProjection",
       aggregateId,
       { tenantId },
-    )) as TestProjection | null;
+    );
     expect(projection?.data.totalValue).toBe(15); // 5 + 10
     expect(projection?.data.eventCount).toBe(2);
     expect(projection?.data.lastMessage).toBe("second");
