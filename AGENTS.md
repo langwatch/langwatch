@@ -20,5 +20,7 @@
 |----------------|------------------|
 | Putting method-specific options interfaces in `types.ts` | Options interfaces belong in the file that uses them (e.g., `GetPromptOptions` in `prompts.facade.ts`) |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
+| Using npm for package management | Always use pnpm instead of npm for all package management tasks |
+
 
 

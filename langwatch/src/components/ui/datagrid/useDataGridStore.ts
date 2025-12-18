@@ -5,6 +5,7 @@ import type {
   DataGridState,
   DataGridConfig,
 } from "./types";
+import { DataGridUrlParams } from "./datagrid-url-params.util";
 
 /**
  * Creates initial state for the DataGrid store
@@ -75,15 +76,63 @@ const createSetStorage = (storageKey: string) =>
 
 /**
  * Creates a DataGrid store with the given configuration
+ *
+ * State priority (highest to lowest):
+ * 1. URL params (if urlSync enabled) - enables shareable links
+ * 2. localStorage (if storageKey provided) - persists UI preferences
+ * 3. Config defaults
+ *
  * @template T - The row data type
  */
 export function createDataGridStore<T>(config: DataGridConfig<T>) {
-  const initialState = createInitialState(config);
+  let initialState = createInitialState(config);
+
+  // Apply URL state if urlSync is enabled (URL takes priority over defaults)
+  if (config.urlSync) {
+    const urlState = DataGridUrlParams.readFromURL();
+    if (urlState.filters !== undefined) initialState.filters = urlState.filters;
+    if (urlState.sorting !== undefined) initialState.sorting = urlState.sorting;
+    if (urlState.page !== undefined) initialState.page = urlState.page;
+    if (urlState.pageSize !== undefined) initialState.pageSize = urlState.pageSize;
+    if (urlState.globalSearch !== undefined) initialState.globalSearch = urlState.globalSearch;
+    if (urlState.groupBy !== undefined) initialState.groupBy = urlState.groupBy;
+  }
+
+  // Wrapper that syncs URL-syncable state changes to URL
+  const createURLSyncedSet = (
+    originalSet: (
+      partial:
+        | Partial<DataGridStore<T>>
+        | ((state: DataGridStore<T>) => Partial<DataGridStore<T>>)
+    ) => void,
+    get: () => DataGridStore<T>
+  ) => {
+    if (!config.urlSync) return originalSet;
+
+    return (
+      partial:
+        | Partial<DataGridStore<T>>
+        | ((state: DataGridStore<T>) => Partial<DataGridStore<T>>)
+    ) => {
+      originalSet(partial);
+
+      // After state update, sync URL-syncable fields to URL
+      const state = get();
+      DataGridUrlParams.writeToURL({
+        filters: state.filters,
+        sorting: state.sorting,
+        page: state.page,
+        pageSize: state.pageSize,
+        globalSearch: state.globalSearch,
+        groupBy: state.groupBy,
+      });
+    };
+  };
 
   // If no storage key, create a non-persisted store
   if (!config.storageKey) {
     return create<DataGridStore<T>>()((set, get) =>
-      createStoreActions(set, get, initialState, config)
+      createStoreActions(createURLSyncedSet(set, get), get, initialState, config)
     );
   }
 
@@ -92,19 +141,20 @@ export function createDataGridStore<T>(config: DataGridConfig<T>) {
     .filter((col) => col.hideable === false)
     .map((col) => col.id);
 
-  // Create persisted store
+  // Create persisted store with optional URL sync
   return create<DataGridStore<T>>()(
     persist(
-      (set, get) => createStoreActions(set, get, initialState, config),
+      (set, get) => createStoreActions(createURLSyncedSet(set, get), get, initialState, config),
       {
         name: config.storageKey,
         storage: createSetStorage(config.storageKey),
         partialize: (state) => ({
-          // Only persist UI preferences, not data
+          // Only persist UI preferences to localStorage, not URL-synced state
           visibleColumns: state.visibleColumns,
           columnOrder: state.columnOrder,
           pinnedColumns: state.pinnedColumns,
-          pageSize: state.pageSize,
+          // Note: pageSize goes to URL if urlSync enabled, localStorage otherwise
+          ...(config.urlSync ? {} : { pageSize: state.pageSize }),
         }),
         merge: (persistedState, currentState) => {
           const merged = { ...currentState, ...(persistedState as object) };

@@ -17,6 +17,9 @@ export type {
 // Store
 export { createDataGridStore } from "./useDataGridStore";
 
+// URL Sync utilities
+export { DataGridUrlParams } from "./datagrid-url-params.util";
+
 // Components (to be added)
 export { DataGrid } from "./DataGrid";
 export { DataGridTable } from "./DataGridTable";
