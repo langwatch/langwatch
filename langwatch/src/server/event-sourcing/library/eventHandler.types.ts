@@ -41,6 +41,11 @@ export interface EventHandlerOptions<
    * Handlers will be executed in dependency order (dependencies first).
    */
   dependsOn?: RegisteredHandlerNames[];
+
+  /**
+   * Optional: Whether to disable the handler.
+   */
+  disabled?: boolean;
 }
 
 /**
