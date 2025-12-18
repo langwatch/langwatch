@@ -66,3 +66,15 @@ Edge cases not covered upfront are handled via regression tests. When a bug is f
 3. Fix and verify green
 
 This keeps the suite lean while ensuring real failures never recur.
+
+## Feature file organization
+
+Respect the hierarchy of the test files. 
+
+- e2e
+- integration
+- unit
+
+## Out of Scope tag @out-of-scope
+
+Planned features that are out of scope should still be included in the feature file with the appropriate tags for the level of the test, but should be tagged with `@out-of-scope`.
