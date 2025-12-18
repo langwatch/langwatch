@@ -26,7 +26,7 @@ import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluato
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
-const creatChecks = (checks: any) => {
+const renderGridItems = (checks: any) => {
   return checks.map((check: any) => {
     let checksAverage = {};
     let checksSummary = {};
@@ -233,7 +233,7 @@ function EvaluationsContent() {
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           {checks.data
-            ? creatChecks(
+            ? renderGridItems(
                 [...checks.data].sort((a, b) => {
                   // Enabled items first (true > false when comparing booleans)
                   if (a.enabled === b.enabled) return 0;
