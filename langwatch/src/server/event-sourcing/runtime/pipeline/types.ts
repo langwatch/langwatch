@@ -15,6 +15,28 @@ import type { ProcessorCheckpointStore } from "../../library/stores/eventHandler
 import type { EventStore } from "../../library/stores/eventStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
 
+/**
+ * Static metadata about a pipeline for tooling and introspection.
+ * This metadata is captured during pipeline building and exposed on the pipeline instance.
+ */
+export interface PipelineMetadata {
+  name: string;
+  aggregateType: AggregateType;
+  projections: Array<{
+    name: string;
+    handlerClassName: string;
+  }>;
+  eventHandlers: Array<{
+    name: string;
+    handlerClassName: string;
+    eventTypes?: string[];
+  }>;
+  commands: Array<{
+    name: string;
+    handlerClassName: string;
+  }>;
+}
+
 export interface EventSourcingPipelineDefinition<
   EventType extends Event = Event,
   ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
@@ -102,6 +124,11 @@ export interface RegisteredPipeline<
    * Used by tools like deja-view to navigate between related aggregates.
    */
   parentLinks: ParentLink<EventType>[];
+  /**
+   * Static metadata about this pipeline for tooling and introspection.
+   * Available without triggering runtime initialization.
+   */
+  metadata: PipelineMetadata;
 }
 
 /**
