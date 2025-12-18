@@ -40,7 +40,8 @@ describe("DSL Adapter", () => {
             messages: [{ role: "user", content: "Hello {{input}}" }],
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [],
+            mappings: {},
+            evaluatorIds: [],
           },
         ],
       };
@@ -64,7 +65,8 @@ describe("DSL Adapter", () => {
             code: 'return {"output": "hello"}',
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [],
+            mappings: {},
+            evaluatorIds: [],
           },
         ],
       };
@@ -76,9 +78,19 @@ describe("DSL Adapter", () => {
       expect(codeNode?.id).toBe("agent-1");
     });
 
-    it("creates evaluator nodes for per-agent evaluators", () => {
+    it("creates evaluator nodes duplicated per-agent", () => {
       const state: EvaluationsV3State = {
         ...createInitialState(),
+        evaluators: [
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            name: "Exact Match",
+            settings: {},
+            inputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+          },
+        ],
         agents: [
           {
             id: "agent-1",
@@ -86,15 +98,8 @@ describe("DSL Adapter", () => {
             name: "Agent",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [
-              {
-                id: "eval-1",
-                evaluatorType: "langevals/exact_match",
-                name: "Exact Match",
-                settings: {},
-                inputs: [{ identifier: "output", type: "str" }],
-              },
-            ],
+            mappings: {},
+            evaluatorIds: ["eval-1"],
           },
         ],
       };
@@ -103,14 +108,14 @@ describe("DSL Adapter", () => {
 
       const evaluatorNode = workflow.nodes.find((n) => n.type === "evaluator");
       expect(evaluatorNode).toBeDefined();
-      // Evaluator node ID is prefixed with agent ID
+      // Evaluator node ID is {agentId}.{evaluatorId}
       expect(evaluatorNode?.id).toBe("agent-1.eval-1");
       expect(
         (evaluatorNode?.data as { evaluator?: string })?.evaluator
       ).toBe("langevals/exact_match");
     });
 
-    it("creates edges from agent mappings", () => {
+    it("creates edges from agent mappings inside agent", () => {
       const state: EvaluationsV3State = {
         ...createInitialState(),
         agents: [
@@ -120,14 +125,12 @@ describe("DSL Adapter", () => {
             name: "Agent",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [],
+            mappings: {
+              input: { source: "dataset", sourceField: "input" },
+            },
+            evaluatorIds: [],
           },
         ],
-        agentMappings: {
-          "agent-1": {
-            input: { source: "dataset", sourceField: "input" },
-          },
-        },
       };
 
       const workflow = stateToWorkflow(state);
@@ -139,9 +142,30 @@ describe("DSL Adapter", () => {
       expect(edge?.targetHandle).toBe("input-input");
     });
 
-    it("creates edges from evaluator mappings within agents", () => {
+    it("creates edges from evaluator mappings stored inside evaluator", () => {
       const state: EvaluationsV3State = {
         ...createInitialState(),
+        evaluators: [
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            name: "Exact Match",
+            settings: {},
+            inputs: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
+            mappings: {
+              "agent-1": {
+                output: { source: "agent-1", sourceField: "output" },
+                expected_output: {
+                  source: "dataset",
+                  sourceField: "expected_output",
+                },
+              },
+            },
+          },
+        ],
         agents: [
           {
             id: "agent-1",
@@ -149,31 +173,10 @@ describe("DSL Adapter", () => {
             name: "Agent",
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [
-              {
-                id: "eval-1",
-                evaluatorType: "langevals/exact_match",
-                name: "Exact Match",
-                settings: {},
-                inputs: [
-                  { identifier: "output", type: "str" },
-                  { identifier: "expected_output", type: "str" },
-                ],
-              },
-            ],
+            mappings: {},
+            evaluatorIds: ["eval-1"],
           },
         ],
-        evaluatorMappings: {
-          "agent-1": {
-            "eval-1": {
-              output: { source: "agent-1", sourceField: "output" },
-              expected_output: {
-                source: "dataset",
-                sourceField: "expected_output",
-              },
-            },
-          },
-        },
       };
 
       const workflow = stateToWorkflow(state);
@@ -190,6 +193,56 @@ describe("DSL Adapter", () => {
         (e) => e.targetHandle === "input-expected_output"
       );
       expect(expectedEdge?.source).toBe("entry");
+    });
+
+    it("duplicates evaluator for each agent that uses it", () => {
+      const state: EvaluationsV3State = {
+        ...createInitialState(),
+        evaluators: [
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            name: "Exact Match",
+            settings: {},
+            inputs: [{ identifier: "output", type: "str" }],
+            mappings: {
+              "agent-1": {},
+              "agent-2": {},
+            },
+          },
+        ],
+        agents: [
+          {
+            id: "agent-1",
+            type: "llm",
+            name: "Agent 1",
+            inputs: [],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+            evaluatorIds: ["eval-1"],
+          },
+          {
+            id: "agent-2",
+            type: "llm",
+            name: "Agent 2",
+            inputs: [],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+            evaluatorIds: ["eval-1"],
+          },
+        ],
+      };
+
+      const workflow = stateToWorkflow(state);
+
+      const evaluatorNodes = workflow.nodes.filter(
+        (n) => n.type === "evaluator"
+      );
+      expect(evaluatorNodes).toHaveLength(2);
+      expect(evaluatorNodes.map((n) => n.id).sort()).toEqual([
+        "agent-1.eval-1",
+        "agent-2.eval-1",
+      ]);
     });
   });
 
@@ -238,7 +291,7 @@ describe("DSL Adapter", () => {
       expect(state.dataset?.columns[1]?.id).toBe("answer");
     });
 
-    it("extracts agents from signature nodes with their evaluators", () => {
+    it("extracts agents with evaluatorIds references", () => {
       const workflow: Workflow = {
         ...createBaseWorkflow(),
         nodes: [
@@ -285,15 +338,15 @@ describe("DSL Adapter", () => {
       expect(state.agents).toHaveLength(1);
       expect(state.agents?.[0]?.type).toBe("llm");
       expect(state.agents?.[0]?.name).toBe("My LLM");
-      // Evaluator should be extracted into the agent
-      expect(state.agents?.[0]?.evaluators).toHaveLength(1);
-      expect(state.agents?.[0]?.evaluators[0]?.id).toBe("eval-1");
-      expect(state.agents?.[0]?.evaluators[0]?.evaluatorType).toBe(
-        "langevals/exact_match"
-      );
+      // Agent should have evaluatorIds reference
+      expect(state.agents?.[0]?.evaluatorIds).toContain("eval-1");
+      // Evaluator should be extracted as global
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.evaluators?.[0]?.id).toBe("eval-1");
+      expect(state.evaluators?.[0]?.evaluatorType).toBe("langevals/exact_match");
     });
 
-    it("extracts mappings from edges", () => {
+    it("extracts agent mappings inside agent", () => {
       const workflow: Workflow = {
         ...createBaseWorkflow(),
         nodes: [
@@ -334,13 +387,13 @@ describe("DSL Adapter", () => {
 
       const state = workflowToState(workflow);
 
-      expect(state.agentMappings?.["agent-1"]?.["input"]).toEqual({
+      expect(state.agents?.[0]?.mappings["input"]).toEqual({
         source: "dataset",
         sourceField: "input",
       });
     });
 
-    it("extracts evaluator mappings within agents", () => {
+    it("extracts evaluator mappings inside global evaluator", () => {
       const workflow: Workflow = {
         ...createBaseWorkflow(),
         nodes: [
@@ -403,18 +456,93 @@ describe("DSL Adapter", () => {
 
       const state = workflowToState(workflow);
 
+      // Mappings should be inside the global evaluator, keyed by agentId
       expect(
-        state.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["output"]
+        state.evaluators?.[0]?.mappings["agent-1"]?.["output"]
       ).toEqual({
         source: "agent-1",
         sourceField: "output",
       });
       expect(
-        state.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["expected_output"]
+        state.evaluators?.[0]?.mappings["agent-1"]?.["expected_output"]
       ).toEqual({
         source: "dataset",
         sourceField: "expected_output",
       });
+    });
+
+    it("deduplicates evaluators from multiple agents", () => {
+      const workflow: Workflow = {
+        ...createBaseWorkflow(),
+        nodes: [
+          {
+            id: "entry",
+            type: "entry",
+            position: { x: 0, y: 0 },
+            data: {
+              name: "Entry",
+              outputs: [],
+              entry_selection: "first",
+              train_size: 0.8,
+              test_size: 0.2,
+              seed: 42,
+            },
+          },
+          {
+            id: "agent-1",
+            type: "signature",
+            position: { x: 300, y: 0 },
+            data: {
+              name: "Agent 1",
+              inputs: [],
+              outputs: [{ identifier: "output", type: "str" }],
+            },
+          },
+          {
+            id: "agent-2",
+            type: "signature",
+            position: { x: 300, y: 200 },
+            data: {
+              name: "Agent 2",
+              inputs: [],
+              outputs: [{ identifier: "output", type: "str" }],
+            },
+          },
+          {
+            id: "agent-1.eval-1",
+            type: "evaluator",
+            position: { x: 600, y: 0 },
+            data: {
+              name: "Exact Match",
+              cls: "LangWatchEvaluator",
+              evaluator: "langevals/exact_match",
+              inputs: [{ identifier: "output", type: "str" }],
+              outputs: [],
+            },
+          },
+          {
+            id: "agent-2.eval-1",
+            type: "evaluator",
+            position: { x: 600, y: 200 },
+            data: {
+              name: "Exact Match",
+              cls: "LangWatchEvaluator",
+              evaluator: "langevals/exact_match",
+              inputs: [{ identifier: "output", type: "str" }],
+              outputs: [],
+            },
+          },
+        ],
+      };
+
+      const state = workflowToState(workflow);
+
+      // Same evaluator ID should be deduplicated into one global evaluator
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.evaluators?.[0]?.id).toBe("eval-1");
+      // Both agents should reference it
+      expect(state.agents?.[0]?.evaluatorIds).toContain("eval-1");
+      expect(state.agents?.[1]?.evaluatorIds).toContain("eval-1");
     });
   });
 
@@ -433,6 +561,24 @@ describe("DSL Adapter", () => {
             expected: ["hi", "earth"],
           },
         },
+        evaluators: [
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            name: "Match",
+            settings: {},
+            inputs: [
+              { identifier: "output", type: "str" },
+              { identifier: "expected_output", type: "str" },
+            ],
+            mappings: {
+              "agent-1": {
+                output: { source: "agent-1", sourceField: "output" },
+                expected_output: { source: "dataset", sourceField: "expected" },
+              },
+            },
+          },
+        ],
         agents: [
           {
             id: "agent-1",
@@ -441,33 +587,12 @@ describe("DSL Adapter", () => {
             llmConfig: { model: "openai/gpt-4o" },
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
-            evaluators: [
-              {
-                id: "eval-1",
-                evaluatorType: "langevals/exact_match",
-                name: "Match",
-                settings: {},
-                inputs: [
-                  { identifier: "output", type: "str" },
-                  { identifier: "expected_output", type: "str" },
-                ],
-              },
-            ],
+            mappings: {
+              input: { source: "dataset", sourceField: "input" },
+            },
+            evaluatorIds: ["eval-1"],
           },
         ],
-        agentMappings: {
-          "agent-1": {
-            input: { source: "dataset", sourceField: "input" },
-          },
-        },
-        evaluatorMappings: {
-          "agent-1": {
-            "eval-1": {
-              output: { source: "agent-1", sourceField: "output" },
-              expected_output: { source: "dataset", sourceField: "expected" },
-            },
-          },
-        },
       };
 
       const workflow = stateToWorkflow(originalState);
@@ -476,22 +601,25 @@ describe("DSL Adapter", () => {
       // Name should be preserved
       expect(restoredState.name).toBe(originalState.name);
 
-      // Agents should be preserved with their evaluators
+      // Agents should be preserved with their evaluatorIds
       expect(restoredState.agents).toHaveLength(1);
       expect(restoredState.agents?.[0]?.id).toBe("agent-1");
       expect(restoredState.agents?.[0]?.type).toBe("llm");
-      expect(restoredState.agents?.[0]?.evaluators).toHaveLength(1);
-      expect(restoredState.agents?.[0]?.evaluators[0]?.id).toBe("eval-1");
+      expect(restoredState.agents?.[0]?.evaluatorIds).toContain("eval-1");
 
-      // Agent mappings should be preserved
-      expect(restoredState.agentMappings?.["agent-1"]?.["input"]).toEqual(
-        originalState.agentMappings["agent-1"]?.["input"]
+      // Global evaluators should be preserved
+      expect(restoredState.evaluators).toHaveLength(1);
+      expect(restoredState.evaluators?.[0]?.id).toBe("eval-1");
+
+      // Agent mappings should be preserved inside agent
+      expect(restoredState.agents?.[0]?.mappings["input"]).toEqual(
+        originalState.agents[0]?.mappings["input"]
       );
 
-      // Evaluator mappings should be preserved
+      // Evaluator mappings should be preserved inside evaluator
       expect(
-        restoredState.evaluatorMappings?.["agent-1"]?.["eval-1"]?.["output"]
-      ).toEqual(originalState.evaluatorMappings["agent-1"]?.["eval-1"]?.output);
+        restoredState.evaluators?.[0]?.mappings["agent-1"]?.["output"]
+      ).toEqual(originalState.evaluators[0]?.mappings["agent-1"]?.output);
     });
   });
 });

@@ -34,7 +34,6 @@ export function AgentConfigPanel() {
     dataset,
     addAgent,
     updateAgent,
-    agentMappings,
     setAgentMapping,
   } = useEvaluationsV3Store((state) => ({
     ui: state.ui,
@@ -43,7 +42,6 @@ export function AgentConfigPanel() {
     dataset: state.dataset,
     addAgent: state.addAgent,
     updateAgent: state.updateAgent,
-    agentMappings: state.agentMappings,
     setAgentMapping: state.setAgentMapping,
   }));
 
@@ -74,8 +72,8 @@ export function AgentConfigPanel() {
       );
       setCode(existingAgent.code ?? "");
 
-      // Load existing mappings
-      const mappings = agentMappings[existingAgent.id] ?? {};
+      // Load existing mappings from agent.mappings
+      const mappings = existingAgent.mappings ?? {};
       const mappingState: Record<string, string> = {};
       for (const [inputField, mapping] of Object.entries(mappings)) {
         mappingState[inputField] = mapping.sourceField;
@@ -91,7 +89,7 @@ export function AgentConfigPanel() {
       setCode("");
       setInputMapping({});
     }
-  }, [isOpen, existingAgent, agentMappings]);
+  }, [isOpen, existingAgent]);
 
   // Extract input variables from prompt template
   const extractInputsFromPrompt = useCallback((template: string): string[] => {
@@ -109,7 +107,8 @@ export function AgentConfigPanel() {
       name: name || `${agentType === "llm" ? "LLM" : "Code"} Agent`,
       inputs: detectedInputs.map((id) => ({ identifier: id, type: "str" })),
       outputs: [{ identifier: "output", type: "str" }],
-      evaluators: existingAgent?.evaluators ?? [], // Preserve existing evaluators
+      mappings: existingAgent?.mappings ?? {}, // Preserve existing mappings
+      evaluatorIds: existingAgent?.evaluatorIds ?? [], // Preserve existing evaluator references
       ...(agentType === "llm"
         ? {
             llmConfig: { model },
@@ -127,7 +126,7 @@ export function AgentConfigPanel() {
       addAgent(agentConfig);
     }
 
-    // Save input mappings
+    // Save input mappings (updates agent.mappings via setAgentMapping)
     for (const inputField of detectedInputs) {
       const sourceField = inputMapping[inputField];
       if (sourceField) {

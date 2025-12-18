@@ -74,17 +74,27 @@ Feature: Evaluation execution
     Then only rows 0 and 2 show loading skeletons
     And row 1 remains unchanged
 
-  Scenario: Multiple agents with separate evaluators
+  Scenario: Multiple agents with different evaluators
     Given agents "GPT-4o" and "Claude Opus" are configured
-    And agent "GPT-4o" has evaluator "Exact Match"
-    And agent "Claude Opus" has evaluator "LLM as Judge"
+    And agent "GPT-4o" uses evaluator "Exact Match"
+    And agent "Claude Opus" uses evaluator "LLM as Judge"
     When I run the evaluation
     Then "GPT-4o" cells show "Exact Match" chip results
     And "Claude Opus" cells show "LLM as Judge" chip results
 
-  Scenario: Same evaluator on multiple agents
+  Scenario: Same global evaluator on multiple agents
     Given agents "GPT-4o" and "Claude Opus" are configured
-    And both agents have evaluator "Exact Match"
+    And a global evaluator "Exact Match" exists
+    And both agents reference evaluator "Exact Match"
     When I run the evaluation
     Then each agent cell shows its own "Exact Match" result
+    And results are keyed by "{agentId}.{evaluatorId}" in the DSL execution
     And I can compare pass rates between agents
+
+  Scenario: Results mapped back using DSL node naming
+    Given agents "GPT-4o" and "Claude Opus" are configured
+    And both agents reference evaluator "Exact Match"
+    When the evaluation runs
+    Then DSL creates nodes "GPT-4o.Exact Match" and "Claude Opus.Exact Match"
+    And results for "GPT-4o.Exact Match" appear in GPT-4o's cell
+    And results for "Claude Opus.Exact Match" appear in Claude Opus's cell

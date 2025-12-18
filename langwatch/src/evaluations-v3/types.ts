@@ -21,15 +21,37 @@ export type InlineDataset = {
 };
 
 // ============================================================================
-// Evaluator Types (defined first as AgentConfig uses it)
+// Mapping Types (defined first as other types use them)
 // ============================================================================
 
+/**
+ * Maps a target field to a source field.
+ * Source can be "dataset" (for dataset columns) or an agent id (for agent outputs).
+ */
+export type FieldMapping = {
+  source: "dataset" | string; // "dataset" or agent id
+  sourceField: string;
+};
+
+// ============================================================================
+// Evaluator Types (global/shared, will be stored in DB in future)
+// ============================================================================
+
+/**
+ * Global evaluator configuration.
+ * Evaluators are shared across agents - agents reference them by ID.
+ * Per-agent mappings are stored inside the evaluator for easy access in the global panel.
+ * When generating DSL, evaluators are duplicated per-agent with {agentId}.{evaluatorId} naming.
+ */
 export type EvaluatorConfig = {
   id: string;
   evaluatorType: EvaluatorTypes | `custom/${string}`;
   name: string;
   settings: Record<string, unknown>;
   inputs: Field[];
+  // Per-agent input mappings for this evaluator
+  // agentId -> { inputFieldName -> mapping }
+  mappings: Record<string, Record<string, FieldMapping>>;
 };
 
 // ============================================================================
@@ -56,39 +78,13 @@ export type AgentConfig = {
   inputs: Field[];
   outputs: Field[];
 
-  // Per-agent evaluators
-  evaluators: EvaluatorConfig[];
+  // Agent input mappings (how agent inputs connect to dataset/other agents)
+  // inputFieldName -> mapping
+  mappings: Record<string, FieldMapping>;
+
+  // References to global evaluators by ID
+  evaluatorIds: string[];
 };
-
-// ============================================================================
-// Mapping Types
-// ============================================================================
-
-/**
- * Maps a target field to a source field.
- * Source can be "dataset" (for dataset columns) or an agent id (for agent outputs).
- */
-export type FieldMapping = {
-  source: "dataset" | string; // "dataset" or agent id
-  sourceField: string;
-};
-
-/**
- * Mappings for an agent's inputs.
- * Maps input field identifier -> source mapping.
- */
-export type AgentMappings = Record<string, Record<string, FieldMapping>>;
-// agentId -> { inputFieldName -> mapping }
-
-/**
- * Mappings for evaluators within agents.
- * Nested by agentId -> evaluatorId -> inputField -> mapping
- */
-export type EvaluatorMappings = Record<
-  string,
-  Record<string, Record<string, FieldMapping>>
->;
-// agentId -> evaluatorId -> { inputFieldName -> mapping }
 
 // ============================================================================
 // Execution Results Types
@@ -151,12 +147,13 @@ export type EvaluationsV3State = {
   // Dataset (inline by default)
   dataset: InlineDataset;
 
-  // Agents (multiple for comparison) - each agent has its own evaluators
-  agents: AgentConfig[];
-  agentMappings: AgentMappings;
+  // Global evaluators (shared definitions, will be stored in DB in future)
+  // Each evaluator contains per-agent mappings inside it
+  evaluators: EvaluatorConfig[];
 
-  // Evaluator mappings (per-agent, per-evaluator)
-  evaluatorMappings: EvaluatorMappings;
+  // Agents (multiple for comparison) - reference evaluators by ID
+  // Agent mappings are inside each agent
+  agents: AgentConfig[];
 
   // Execution results (populated after run)
   results: EvaluationResults;
@@ -194,17 +191,22 @@ export type EvaluationsV3Actions = {
     mapping: FieldMapping
   ) => void;
 
-  // Per-agent evaluator actions
-  addEvaluatorToAgent: (agentId: string, evaluator: EvaluatorConfig) => void;
-  updateAgentEvaluator: (
-    agentId: string,
+  // Global evaluator actions
+  addEvaluator: (evaluator: EvaluatorConfig) => void;
+  updateEvaluator: (
     evaluatorId: string,
     updates: Partial<EvaluatorConfig>
   ) => void;
-  removeAgentEvaluator: (agentId: string, evaluatorId: string) => void;
-  setAgentEvaluatorMapping: (
-    agentId: string,
+  removeEvaluator: (evaluatorId: string) => void;
+
+  // Agent-evaluator relationship actions
+  addEvaluatorToAgent: (agentId: string, evaluatorId: string) => void;
+  removeEvaluatorFromAgent: (agentId: string, evaluatorId: string) => void;
+
+  // Evaluator mapping actions (per-agent mappings stored inside evaluator)
+  setEvaluatorMapping: (
     evaluatorId: string,
+    agentId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
@@ -264,9 +266,8 @@ export const createInitialUIState = (): UIState => ({
 export const createInitialState = (): EvaluationsV3State => ({
   name: "New Evaluation",
   dataset: createInitialDataset(),
+  evaluators: [],
   agents: [],
-  agentMappings: {},
-  evaluatorMappings: {},
   results: createInitialResults(),
   ui: createInitialUIState(),
 });

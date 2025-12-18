@@ -150,14 +150,6 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   addAgent: (agent) => {
     set((state) => ({
       agents: [...state.agents, agent],
-      agentMappings: {
-        ...state.agentMappings,
-        [agent.id]: {},
-      },
-      evaluatorMappings: {
-        ...state.evaluatorMappings,
-        [agent.id]: {},
-      },
     }));
   },
 
@@ -171,105 +163,140 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   removeAgent: (agentId) => {
     set((state) => {
-      const agentMappings = { ...state.agentMappings };
-      delete agentMappings[agentId];
-
-      const evaluatorMappings = { ...state.evaluatorMappings };
-      delete evaluatorMappings[agentId];
+      // Also remove this agent's mappings from all evaluators
+      const evaluators = state.evaluators.map((e) => {
+        const mappings = { ...e.mappings };
+        delete mappings[agentId];
+        return { ...e, mappings };
+      });
 
       return {
         agents: state.agents.filter((a) => a.id !== agentId),
-        agentMappings,
-        evaluatorMappings,
+        evaluators,
       };
     });
   },
 
   setAgentMapping: (agentId, inputField, mapping) => {
     set((state) => ({
-      agentMappings: {
-        ...state.agentMappings,
-        [agentId]: {
-          ...state.agentMappings[agentId],
-          [inputField]: mapping,
-        },
-      },
-    }));
-  },
-
-  // -------------------------------------------------------------------------
-  // Per-agent evaluator actions
-  // -------------------------------------------------------------------------
-
-  addEvaluatorToAgent: (agentId, evaluator) => {
-    set((state) => {
-      const agent = state.agents.find((a) => a.id === agentId);
-      if (!agent) return state;
-
-      return {
-        agents: state.agents.map((a) =>
-          a.id === agentId
-            ? { ...a, evaluators: [...a.evaluators, evaluator] }
-            : a
-        ),
-        evaluatorMappings: {
-          ...state.evaluatorMappings,
-          [agentId]: {
-            ...state.evaluatorMappings[agentId],
-            [evaluator.id]: {},
-          },
-        },
-      };
-    });
-  },
-
-  updateAgentEvaluator: (agentId, evaluatorId, updates) => {
-    set((state) => ({
       agents: state.agents.map((a) =>
         a.id === agentId
           ? {
               ...a,
-              evaluators: a.evaluators.map((e) =>
-                e.id === evaluatorId ? { ...e, ...updates } : e
-              ),
+              mappings: {
+                ...a.mappings,
+                [inputField]: mapping,
+              },
             }
           : a
       ),
     }));
   },
 
-  removeAgentEvaluator: (agentId, evaluatorId) => {
+  // -------------------------------------------------------------------------
+  // Global evaluator actions
+  // -------------------------------------------------------------------------
+
+  addEvaluator: (evaluator) => {
+    set((state) => ({
+      evaluators: [...state.evaluators, evaluator],
+    }));
+  },
+
+  updateEvaluator: (evaluatorId, updates) => {
+    set((state) => ({
+      evaluators: state.evaluators.map((e) =>
+        e.id === evaluatorId ? { ...e, ...updates } : e
+      ),
+    }));
+  },
+
+  removeEvaluator: (evaluatorId) => {
+    set((state) => ({
+      evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
+      // Also remove this evaluator from all agents' evaluatorIds
+      agents: state.agents.map((a) => ({
+        ...a,
+        evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId),
+      })),
+    }));
+  },
+
+  // -------------------------------------------------------------------------
+  // Agent-evaluator relationship actions
+  // -------------------------------------------------------------------------
+
+  addEvaluatorToAgent: (agentId, evaluatorId) => {
     set((state) => {
-      const evaluatorMappings = { ...state.evaluatorMappings };
-      if (evaluatorMappings[agentId]) {
-        const agentEvalMappings = { ...evaluatorMappings[agentId] };
-        delete agentEvalMappings[evaluatorId];
-        evaluatorMappings[agentId] = agentEvalMappings;
-      }
+      const agent = state.agents.find((a) => a.id === agentId);
+      if (!agent) return state;
+
+      // Check if evaluator exists
+      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
+      if (!evaluator) return state;
+
+      // Don't add if already exists
+      if (agent.evaluatorIds.includes(evaluatorId)) return state;
 
       return {
         agents: state.agents.map((a) =>
           a.id === agentId
-            ? { ...a, evaluators: a.evaluators.filter((e) => e.id !== evaluatorId) }
+            ? { ...a, evaluatorIds: [...a.evaluatorIds, evaluatorId] }
             : a
         ),
-        evaluatorMappings,
+        // Initialize empty mappings for this agent in the evaluator
+        evaluators: state.evaluators.map((e) =>
+          e.id === evaluatorId
+            ? {
+                ...e,
+                mappings: {
+                  ...e.mappings,
+                  [agentId]: e.mappings[agentId] ?? {},
+                },
+              }
+            : e
+        ),
       };
     });
   },
 
-  setAgentEvaluatorMapping: (agentId, evaluatorId, inputField, mapping) => {
+  removeEvaluatorFromAgent: (agentId, evaluatorId) => {
     set((state) => ({
-      evaluatorMappings: {
-        ...state.evaluatorMappings,
-        [agentId]: {
-          ...state.evaluatorMappings[agentId],
-          [evaluatorId]: {
-            ...state.evaluatorMappings[agentId]?.[evaluatorId],
-            [inputField]: mapping,
-          },
-        },
-      },
+      agents: state.agents.map((a) =>
+        a.id === agentId
+          ? { ...a, evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId) }
+          : a
+      ),
+      // Remove this agent's mappings from the evaluator
+      evaluators: state.evaluators.map((e) => {
+        if (e.id !== evaluatorId) return e;
+        const mappings = { ...e.mappings };
+        delete mappings[agentId];
+        return { ...e, mappings };
+      }),
+    }));
+  },
+
+  // -------------------------------------------------------------------------
+  // Evaluator mapping actions (per-agent mappings stored inside evaluator)
+  // -------------------------------------------------------------------------
+
+  setEvaluatorMapping: (evaluatorId, agentId, inputField, mapping) => {
+    set((state) => ({
+      evaluators: state.evaluators.map((e) =>
+        e.id === evaluatorId
+          ? {
+              ...e,
+              mappings: {
+                ...e.mappings,
+                [agentId]: {
+                  ...e.mappings[agentId],
+                  [inputField]: mapping,
+                },
+              },
+            }
+          : e
+      ),
     }));
   },
 
@@ -404,7 +431,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
  */
 type PartializedState = Pick<
   EvaluationsV3State,
-  "name" | "dataset" | "agents" | "agentMappings" | "evaluatorMappings"
+  "name" | "dataset" | "evaluators" | "agents"
 >;
 
 /**
@@ -414,9 +441,8 @@ type PartializedState = Pick<
 const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   name: state.name,
   dataset: state.dataset,
+  evaluators: state.evaluators,
   agents: state.agents,
-  agentMappings: state.agentMappings,
-  evaluatorMappings: state.evaluatorMappings,
 });
 
 /**

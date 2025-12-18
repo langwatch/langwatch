@@ -371,6 +371,7 @@ type AgentCellContentProps = {
   output: unknown;
   evaluatorResults: Record<string, unknown>;
   row: number;
+  evaluatorsMap: Map<string, EvaluatorConfig>;
 };
 
 function AgentCellContent({
@@ -378,6 +379,7 @@ function AgentCellContent({
   output,
   evaluatorResults,
   row,
+  evaluatorsMap,
 }: AgentCellContentProps) {
   const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
     (state) => ({
@@ -394,6 +396,11 @@ function AgentCellContent({
         ? JSON.stringify(output)
         : String(output);
 
+  // Get evaluator configs for this agent's evaluatorIds
+  const agentEvaluators = agent.evaluatorIds
+    .map((id) => evaluatorsMap.get(id))
+    .filter((e): e is EvaluatorConfig => e !== undefined);
+
   return (
     <VStack align="stretch" gap={2}>
       {/* Agent output */}
@@ -402,9 +409,9 @@ function AgentCellContent({
       </Text>
 
       {/* Evaluator chips */}
-      {agent.evaluators.length > 0 && (
+      {agentEvaluators.length > 0 && (
         <HStack flexWrap="wrap" gap={1}>
-          {agent.evaluators.map((evaluator) => {
+          {agentEvaluators.map((evaluator) => {
             const isExpanded =
               ui.expandedEvaluator?.agentId === agent.id &&
               ui.expandedEvaluator?.evaluatorId === evaluator.id &&
@@ -462,6 +469,7 @@ function AgentCellContent({
 export function EvaluationsV3Table() {
   const {
     dataset,
+    evaluators,
     agents,
     results,
     ui,
@@ -474,6 +482,7 @@ export function EvaluationsV3Table() {
     getRowCount,
   } = useEvaluationsV3Store((state) => ({
     dataset: state.dataset,
+    evaluators: state.evaluators,
     agents: state.agents,
     results: state.results,
     ui: state.ui,
@@ -485,6 +494,12 @@ export function EvaluationsV3Table() {
     clearRowSelection: state.clearRowSelection,
     getRowCount: state.getRowCount,
   }));
+
+  // Create a map of evaluator IDs to evaluator configs for quick lookup
+  const evaluatorsMap = useMemo(
+    () => new Map(evaluators.map((e) => [e.id, e])),
+    [evaluators]
+  );
 
   const tableRef = useRef<HTMLTableElement>(null);
   const rowCount = getRowCount();
@@ -647,9 +662,9 @@ export function EvaluationsV3Table() {
           {
             output: results.agentOutputs[agent.id]?.[index] ?? null,
             evaluators: Object.fromEntries(
-              agent.evaluators.map((evaluator) => [
-                evaluator.id,
-                results.evaluatorResults[agent.id]?.[evaluator.id]?.[index] ?? null,
+              agent.evaluatorIds.map((evaluatorId) => [
+                evaluatorId,
+                results.evaluatorResults[agent.id]?.[evaluatorId]?.[index] ?? null,
               ])
             ),
           },
@@ -661,8 +676,8 @@ export function EvaluationsV3Table() {
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
 
-  const columns = useMemo((): ColumnDef<RowData, unknown>[] => {
-    const cols: ColumnDef<RowData, unknown>[] = [];
+  const columns = useMemo(() => {
+    const cols: ColumnDef<RowData>[] = [];
 
     // Checkbox column
     cols.push(
@@ -722,7 +737,7 @@ export function EvaluationsV3Table() {
             columnType: "dataset" as ColumnType,
             columnId: column.id,
           },
-        })
+        }) as ColumnDef<RowData>
       );
     }
 
@@ -743,6 +758,7 @@ export function EvaluationsV3Table() {
                 output={data?.output}
                 evaluatorResults={data?.evaluators ?? {}}
                 row={info.row.index}
+                evaluatorsMap={evaluatorsMap}
               />
             );
           },
@@ -751,7 +767,7 @@ export function EvaluationsV3Table() {
             columnType: "agent" as ColumnType,
             columnId: `agent.${agent.id}`,
           },
-        })
+        }) as ColumnDef<RowData>
       );
     }
 
@@ -759,6 +775,7 @@ export function EvaluationsV3Table() {
   }, [
     dataset.columns,
     agents,
+    evaluatorsMap,
     columnHelper,
     selectedRows,
     allSelected,
