@@ -23,6 +23,7 @@ export interface ActionParams {
   threshold?: number;
   operator?: string;
   timePeriod?: number;
+  seriesName?: string;
 }
 
 export interface TriggerData {

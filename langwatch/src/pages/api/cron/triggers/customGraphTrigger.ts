@@ -66,7 +66,7 @@ export const processCustomGraphTrigger = async (
     };
   }
 
-  const { threshold, operator, timePeriod } = params;
+  const { threshold, operator, timePeriod, seriesName } = params;
 
   if (
     threshold === undefined ||
@@ -110,7 +110,32 @@ export const processCustomGraphTrigger = async (
       };
     }
 
-    const series = graphData.series[0]; // Only one series allowed
+    if (!seriesName) {
+      return {
+        triggerId,
+        status: "error",
+        message: "seriesName is required in ActionParams",
+      };
+    }
+
+    // Find the series to monitor based on seriesName
+    // seriesName format: "index/key/aggregation" (e.g., "0/metadata.trace_id/cardinality")
+    const [indexStr] = seriesName.split("/");
+    const seriesIndex = parseInt(indexStr ?? "0", 10);
+
+    if (
+      isNaN(seriesIndex) ||
+      seriesIndex < 0 ||
+      seriesIndex >= graphData.series.length
+    ) {
+      return {
+        triggerId,
+        status: "error",
+        message: `Series index ${seriesIndex} not found in graph (has ${graphData.series.length} series)`,
+      };
+    }
+
+    const series = graphData.series[seriesIndex]!;
 
     if (!series || !series.name || !series.metric || !series.aggregation) {
       return {
@@ -146,7 +171,12 @@ export const processCustomGraphTrigger = async (
     const timeseriesResult = await timeseries(timeseriesInput);
 
     // Calculate current value (sum or average of the last period)
-    const currentValue = calculateCurrentValue(timeseriesResult, series);
+    // Use seriesName as the key to find the value in timeseries results
+    const currentValue = calculateCurrentValue(
+      timeseriesResult,
+      series,
+      seriesName,
+    );
 
     // Check threshold condition
     const conditionMet = checkThreshold(currentValue, threshold, operator);
@@ -236,6 +266,7 @@ export const processCustomGraphTrigger = async (
 const calculateCurrentValue = (
   timeseriesResult: TimeseriesResult,
   series: CustomGraphInput["series"][number],
+  seriesKey: string,
 ): number => {
   let currentValue = 0;
 
@@ -245,17 +276,10 @@ const calculateCurrentValue = (
   if (dataPoints.length > 0) {
     const values = dataPoints
       .map((entry) => {
-        // Try to find the value by series name first
-        const seriesValue = entry[series.name];
+        // Look up the value using the seriesKey (e.g., "0/metadata.trace_id/cardinality")
+        const seriesValue = entry[seriesKey];
         if (typeof seriesValue === "number") {
           return seriesValue;
-        }
-
-        // If not found, look for the first numeric value (excluding 'date')
-        for (const [key, value] of Object.entries(entry)) {
-          if (key !== "date" && typeof value === "number") {
-            return value;
-          }
         }
 
         return 0;

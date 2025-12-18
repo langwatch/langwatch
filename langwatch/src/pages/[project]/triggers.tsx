@@ -392,9 +392,15 @@ function Triggers() {
                                   value="edit"
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    openDrawer("editTriggerFilter", {
-                                      triggerId: trigger.id,
-                                    });
+                                    if (trigger.customGraphId) {
+                                      openDrawer("customGraphAlert", {
+                                        graphId: trigger.customGraphId,
+                                      });
+                                    } else {
+                                      openDrawer("editTriggerFilter", {
+                                        triggerId: trigger.id,
+                                      });
+                                    }
                                   }}
                                 >
                                   <Box
@@ -402,8 +408,14 @@ function Triggers() {
                                     alignItems="center"
                                     gap={2}
                                   >
-                                    <Filter size={14} />
-                                    Edit Filters
+                                    {trigger.customGraphId ? (
+                                      <Bell size={14} />
+                                    ) : (
+                                      <Filter size={14} />
+                                    )}
+                                    {trigger.customGraphId
+                                      ? "Edit Alert"
+                                      : "Edit Filters"}
                                   </Box>
                                 </Menu.Item>
                                 <Menu.Item

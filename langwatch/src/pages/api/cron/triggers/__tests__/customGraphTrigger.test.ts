@@ -53,6 +53,12 @@ describe("processCustomGraphTrigger", () => {
         id: "trigger-1",
         projectId: "project-1",
         customGraphId: null,
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
       } as unknown as Trigger;
 
       const result = await processCustomGraphTrigger(trigger, mockProjects);
@@ -71,7 +77,12 @@ describe("processCustomGraphTrigger", () => {
         id: "trigger-1",
         projectId: "project-1",
         customGraphId: "graph-1",
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue(null);
@@ -92,7 +103,12 @@ describe("processCustomGraphTrigger", () => {
         id: "trigger-1",
         projectId: "project-1",
         customGraphId: "graph-1",
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/metadata.trace_id/cardinality",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
@@ -112,6 +128,119 @@ describe("processCustomGraphTrigger", () => {
     });
   });
 
+  describe("when seriesName is missing", () => {
+    it("returns error status with message", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
+        },
+        filters: {},
+      } as any);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result).toEqual({
+        triggerId: "trigger-1",
+        status: "error",
+        message: "seriesName is required in ActionParams",
+      });
+    });
+  });
+
+  describe("when seriesName has invalid index", () => {
+    it("returns error status when index is out of bounds", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "5/count/count",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [{ name: "metric1", metric: "count", aggregation: "count" }],
+        },
+        filters: {},
+      } as any);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result).toEqual({
+        triggerId: "trigger-1",
+        status: "error",
+        message: "Series index 5 not found in graph (has 1 series)",
+      });
+    });
+  });
+
+  describe("when monitoring second series in multi-series graph", () => {
+    it("monitors the correct series based on index", async () => {
+      const trigger = {
+        id: "trigger-1",
+        projectId: "project-1",
+        customGraphId: "graph-1",
+        action: TriggerAction.SEND_EMAIL,
+        actionParams: {
+          threshold: 50,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "1/errors/count",
+        },
+      } as unknown as Trigger;
+
+      vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
+        id: "graph-1",
+        name: "Test Graph",
+        graph: {
+          series: [
+            { name: "successes", metric: "success", aggregation: "count" },
+            { name: "errors", metric: "errors", aggregation: "count" },
+          ],
+        },
+        filters: {},
+      } as any);
+
+      vi.mocked(timeseries).mockResolvedValue({
+        currentPeriod: [
+          { "1/errors/count": 60 },
+          { "1/errors/count": 70 },
+        ],
+        previousPeriod: [],
+      } as any);
+      vi.mocked(checkThreshold).mockReturnValue(true);
+
+      const result = await processCustomGraphTrigger(trigger, mockProjects);
+
+      expect(result).toEqual({
+        triggerId: "trigger-1",
+        status: "triggered",
+        value: 130,
+        threshold: 50,
+        operator: "gt",
+      });
+    });
+  });
+
   describe("when threshold condition is met", () => {
     it("returns triggered status and updates trigger", async () => {
       const trigger = {
@@ -125,6 +254,7 @@ describe("processCustomGraphTrigger", () => {
           operator: "gt",
           timePeriod: 60,
           members: [],
+          seriesName: "0/count/count",
         },
         message: "Custom message",
       } as unknown as Trigger;
@@ -146,7 +276,10 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [{ metric1: 15 }, { metric1: 20 }],
+        currentPeriod: [
+          { "0/count/count": 15 },
+          { "0/count/count": 20 },
+        ],
         previousPeriod: [],
       } as any);
 
@@ -179,7 +312,12 @@ describe("processCustomGraphTrigger", () => {
         projectId: "project-1",
         customGraphId: "graph-1",
         action: TriggerAction.SEND_EMAIL,
-        actionParams: { threshold: 100, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 100,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/count/count",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
@@ -198,7 +336,7 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [{ metric1: 5 }],
+        currentPeriod: [{ "0/count/count": 5 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(false);
@@ -231,6 +369,7 @@ describe("processCustomGraphTrigger", () => {
           operator: "gt",
           timePeriod: 60,
           slackWebhook: "https://hooks.slack.com/test",
+          seriesName: "0/count/count",
         },
       } as unknown as Trigger;
 
@@ -244,7 +383,7 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [{ metric1: 15 }],
+        currentPeriod: [{ "0/count/count": 15 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(true);
@@ -262,7 +401,12 @@ describe("processCustomGraphTrigger", () => {
         projectId: "project-1",
         customGraphId: "graph-1",
         action: TriggerAction.SEND_EMAIL,
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/count/avg",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
@@ -281,7 +425,11 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [{ metric1: 10 }, { metric1: 20 }, { metric1: 30 }],
+        currentPeriod: [
+          { "0/count/avg": 10 },
+          { "0/count/avg": 20 },
+          { "0/count/avg": 30 },
+        ],
         previousPeriod: [],
       } as any);
 
@@ -300,7 +448,12 @@ describe("processCustomGraphTrigger", () => {
         projectId: "project-1",
         customGraphId: "graph-1",
         action: TriggerAction.SEND_EMAIL,
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/count/count",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
@@ -331,7 +484,12 @@ describe("processCustomGraphTrigger", () => {
         projectId: "unknown-project",
         customGraphId: "graph-1",
         action: TriggerAction.SEND_EMAIL,
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/count/count",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockResolvedValue({
@@ -344,7 +502,7 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [{ metric1: 15 }],
+        currentPeriod: [{ "0/count/count": 15 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(true);
@@ -366,7 +524,12 @@ describe("processCustomGraphTrigger", () => {
         id: "trigger-1",
         projectId: "project-1",
         customGraphId: "graph-1",
-        actionParams: { threshold: 10, operator: "gt", timePeriod: 60 },
+        actionParams: {
+          threshold: 10,
+          operator: "gt",
+          timePeriod: 60,
+          seriesName: "0/count/count",
+        },
       } as unknown as Trigger;
 
       vi.mocked(prisma.customGraph.findUnique).mockRejectedValue(error);

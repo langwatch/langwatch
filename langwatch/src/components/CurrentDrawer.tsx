@@ -13,6 +13,7 @@ import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+import { AlertDrawer } from "../pages/[project]/analytics/custom/AlertDrawer";
 
 // Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
 export { useDrawer } from "../hooks/useDrawer";
@@ -33,6 +34,7 @@ const drawers = {
   addOrEditDataset: AddOrEditDatasetDrawer,
   editTriggerFilter: EditTriggerFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
+  customGraphAlert: AlertDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

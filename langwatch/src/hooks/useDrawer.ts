@@ -18,7 +18,8 @@ export type DrawerType =
   | "uploadCSV"
   | "addOrEditDataset"
   | "editTriggerFilter"
-  | "seriesFilters";
+  | "seriesFilters"
+  | "customGraphAlert";
 
 /** Generic callback type for drawer props - callers must narrow before use */
 type DrawerCallback = (...args: unknown[]) => void;
@@ -41,12 +42,23 @@ export function useDrawer() {
     props?: Record<string, unknown>,
     { replace }: { replace?: boolean } = {},
   ) => {
+    // Store complex props (functions and objects) separately - they can't be serialized to URL
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
         ([_key, value]) =>
           typeof value === "function" || typeof value === "object",
       ),
     ) as Record<string, DrawerCallback>;
+
+    // Filter out non-serializable props for URL
+    const serializableProps = Object.fromEntries(
+      Object.entries(props ?? {}).filter(
+        ([_key, value]) =>
+          typeof value !== "function" &&
+          typeof value !== "object" &&
+          typeof value !== "symbol",
+      ),
+    );
 
     const badKeys = Object.entries(props ?? {})
       .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
@@ -71,7 +83,7 @@ export function useDrawer() {
             ),
             drawer: {
               open: drawer,
-              ...props,
+              ...serializableProps,
             },
           },
           {

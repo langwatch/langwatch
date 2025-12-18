@@ -10,6 +10,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 interface AlertActionParams {
   members?: string[];
   slackWebhook?: string;
+  seriesName?: string;
 }
 
 // Base alert schema with all optional fields
@@ -24,6 +25,7 @@ const alertSchemaBase = z.object({
     .object({
       members: z.array(z.string()).optional(),
       slackWebhook: z.string().optional(),
+      seriesName: z.string().optional(),
     })
     .optional(),
 });
@@ -248,11 +250,13 @@ export const graphsRouter = createTRPCRouter({
           threshold: actionParams.threshold,
           operator: actionParams.operator,
           timePeriod: actionParams.timePeriod,
+          seriesName: actionParams.seriesName || "",
           type: trigger.alertType,
           action: trigger.action,
           actionParams: {
             members: actionParams.members,
             slackWebhook: actionParams.slackWebhook,
+            seriesName: actionParams.seriesName,
           },
           triggerId: trigger.id,
         };

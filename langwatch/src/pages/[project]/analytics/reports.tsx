@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
+import { useForm } from "react-hook-form";
 import {
   BarChart2,
   Bell,
@@ -33,12 +34,17 @@ import { FilterDisplay } from "~/components/triggers/FilterDisplay";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import {
+  customGraphInputToFormData,
+  type CustomGraphFormData,
+} from "./custom/index";
 
 interface GraphCardProps {
   graph: {
@@ -67,6 +73,14 @@ function GraphCard({
   isDeleting,
 }: GraphCardProps) {
   const router = useRouter();
+  const { openDrawer } = useDrawer();
+
+  // Create form instance from graph data for the alert drawer
+  const form = useForm<CustomGraphFormData>({
+    defaultValues: graph.graph
+      ? customGraphInputToFormData(graph.graph as CustomGraphInput)
+      : undefined,
+  });
 
   const hasFilters = useMemo(
     () =>
@@ -93,26 +107,43 @@ function GraphCard({
               {graph.name}
             </Text>
             <Spacer />
-            {graph.trigger && graph.trigger.active && (
+            {graph.trigger && graph.trigger.active ? (
               <Tooltip
-                content={`Alert enabled (${graph.trigger.alertType ?? "INFO"})`}
+                content={`Alert configured (${
+                  graph.trigger.alertType ?? "INFO"
+                })`}
                 positioning={{ placement: "top" }}
                 showArrow
               >
                 <Box padding={1}>
                   <Bell
-                    width={16}
-                    style={{ minWidth: 16 }}
-                    color={
-                      graph.trigger.alertType === "CRITICAL"
-                        ? "#E53E3E"
-                        : graph.trigger.alertType === "WARNING"
-                          ? "#D69E2E"
-                          : "#3182CE"
+                    width={18}
+                    color="black"
+                    cursor="pointer"
+                    onClick={() =>
+                      openDrawer("customGraphAlert", {
+                        form,
+                        graphId: graph.id,
+                      })
                     }
                   />
                 </Box>
               </Tooltip>
+            ) : (
+              <Button
+                variant="outline"
+                colorPalette="gray"
+                size="sm"
+                onClick={() =>
+                  openDrawer("customGraphAlert", {
+                    form,
+                    graphId: graph.id,
+                  })
+                }
+              >
+                <Bell width={16} />
+                Add alert
+              </Button>
             )}
             {hasFilters && (
               <Tooltip
