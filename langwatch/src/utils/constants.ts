@@ -23,4 +23,6 @@ export const KSUID_RESOURCES = {
   USER: "user",
   PROJECT: "proj",
   ORGANIZATION: "org",
+  PROJECT_USAGE: "projusage",
+  PROJECT_USAGE_PROCESSED: "projusageproccessed",
 } as const;

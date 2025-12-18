@@ -34,7 +34,6 @@ export class EventSourcing {
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.runtime",
   );
-
   constructor(
     private readonly runtime: EventSourcingRuntime = getEventSourcingRuntime(),
   ) {}
