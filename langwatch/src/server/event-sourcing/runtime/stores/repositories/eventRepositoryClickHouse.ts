@@ -4,20 +4,27 @@ import type { EventRecord, EventRepository } from "./eventRepository.types";
 
 const NUMERIC_STRING_REGEX = /^-?\d+(\.\d+)?$/;
 
+/**
+ * Normalizes payload values from ClickHouse.
+ *
+ * ClickHouse may serialize numeric values as strings (e.g., "123.45" instead of 123.45).
+ * This function converts those numeric strings back to numbers.
+ *
+ * IMPORTANT: This function intentionally does NOT parse JSON strings into objects/arrays.
+ * OTLP data contains stringValue fields that hold JSON-encoded content (e.g., message arrays).
+ * These must remain as strings to preserve the OTLP schema semantics.
+ */
 function normalizePayloadValue(value: unknown): unknown {
   if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return normalizePayloadValue(parsed);
-    } catch {
-      if (value.trim().length > 0 && NUMERIC_STRING_REGEX.test(value)) {
-        const numberValue = Number(value);
-        if (Number.isFinite(numberValue)) {
-          return numberValue;
-        }
+    // Only convert numeric strings to numbers
+    // Do NOT parse JSON strings - they should remain as strings
+    if (value.trim().length > 0 && NUMERIC_STRING_REGEX.test(value)) {
+      const numberValue = Number(value);
+      if (Number.isFinite(numberValue)) {
+        return numberValue;
       }
-      return value;
     }
+    return value;
   }
 
   if (Array.isArray(value)) {
