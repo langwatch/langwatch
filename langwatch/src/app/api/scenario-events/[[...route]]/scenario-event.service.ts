@@ -450,7 +450,7 @@ export class ScenarioEventService {
     projectId: string;
     filters?: Array<{
       columnId: string;
-      operator: "eq" | "contains";
+      operator: "eq" | "contains" | "between";
       value?: unknown;
     }>;
     sorting?: { columnId: string; order: "asc" | "desc" };
@@ -519,7 +519,7 @@ export class ScenarioEventService {
     groupBy: string;
     filters?: Array<{
       columnId: string;
-      operator: "eq" | "contains";
+      operator: "eq" | "contains" | "between";
       value?: unknown;
     }>;
     sorting?: { columnId: string; order: "asc" | "desc" };
@@ -625,7 +625,7 @@ export class ScenarioEventService {
     projectId: string;
     filters?: Array<{
       columnId: string;
-      operator: "eq" | "contains";
+      operator: "eq" | "contains" | "between";
       value?: unknown;
     }>;
     columns: string[];
