@@ -30,8 +30,8 @@ interface DataGridProps<T> {
   }) => void;
   /** Callback for CSV export */
   onExport?: () => void;
-  /** Callback for refresh */
-  onRefresh?: () => void;
+  /** Whether data is being fetched (for loading indicator) */
+  isFetching?: boolean;
   /** Empty state message */
   emptyMessage?: string;
   /** Error state message */
@@ -48,7 +48,7 @@ export function DataGrid<T>({
   getEnumOptions,
   onStateChange,
   onExport,
-  onRefresh,
+  isFetching,
   emptyMessage = "No data available",
   errorMessage,
 }: DataGridProps<T>) {
@@ -223,9 +223,6 @@ export function DataGrid<T>({
         <Text color="red.500" mb={4}>
           {errorMessage ?? error}
         </Text>
-        {onRefresh && (
-          <button onClick={onRefresh}>Retry</button>
-        )}
       </Box>
     );
   }
@@ -247,7 +244,7 @@ export function DataGrid<T>({
         onGlobalSearchChange={handleGlobalSearchChange}
         onToggleColumnVisibility={toggleColumnVisibility}
         onExport={handleExport}
-        onRefresh={onRefresh}
+        isFetching={isFetching}
       />
 
       {/* Table */}

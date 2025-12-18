@@ -1,5 +1,5 @@
-import { Box, Button, Flex, HStack, Text } from "@chakra-ui/react";
-import { Columns, Download, RefreshCw, RotateCcw } from "lucide-react";
+import { Box, Button, Flex, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Columns, Download, RotateCcw } from "lucide-react";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -18,13 +18,13 @@ interface DataGridToolbarProps<T> {
   sorting: SortingState | null;
   groupBy: string | null;
   isExporting: boolean;
+  isFetching?: boolean;
   onRemoveFilter: (columnId: string, index: number) => void;
   onClearFilters: () => void;
   onResetFiltersAndSorting: () => void;
   onGlobalSearchChange: (search: string) => void;
   onToggleColumnVisibility: (columnId: string) => void;
   onExport: () => void;
-  onRefresh?: () => void;
 }
 
 /**
@@ -38,13 +38,13 @@ export function DataGridToolbar<T>({
   sorting,
   groupBy,
   isExporting,
+  isFetching,
   onRemoveFilter,
   onClearFilters,
   onResetFiltersAndSorting,
   onGlobalSearchChange,
   onToggleColumnVisibility,
   onExport,
-  onRefresh,
 }: DataGridToolbarProps<T>) {
   const hasFiltersOrSorting =
     filters.length > 0 ||
@@ -64,6 +64,9 @@ export function DataGridToolbar<T>({
           onGlobalSearchChange={onGlobalSearchChange}
         />
       </Box>
+
+      {/* Loading indicator */}
+      {isFetching && <Spinner size="sm" color="gray.500" />}
 
       {/* Reset Filters & Sorting */}
       <Button
@@ -105,14 +108,6 @@ export function DataGridToolbar<T>({
             </PopoverBody>
           </PopoverContent>
         </PopoverRoot>
-
-        {/* Refresh */}
-        {onRefresh && (
-          <Button size="sm" variant="outline" onClick={onRefresh}>
-            <RefreshCw size={14} />
-            <Text ml={1}>Refresh</Text>
-          </Button>
-        )}
 
         {/* Export */}
         <Button
