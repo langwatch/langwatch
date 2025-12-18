@@ -8,7 +8,11 @@ import {
   type StartedRedisContainer,
 } from "@testcontainers/redis";
 import IORedis, { type Redis } from "ioredis";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import { createLogger } from "~/utils/logger";
+import { migrateUp } from "~/server/clickhouse/goose";
 
 const logger = createLogger("langwatch:event-sourcing:test-containers");
 
@@ -56,16 +60,10 @@ export async function startTestContainers(): Promise<{
   }
 
   // If using service containers (CI), connect to them directly
+  // Note: CI service containers must have `local_primary` storage policy pre-configured
   if (isUsingServiceContainers()) {
     const clickHouseUrl = process.env.CLICKHOUSE_URL!;
     const redisUrl = process.env.REDIS_URL!;
-
-    if (!clickHouseClient) {
-      // Don't set database in connection - we'll create it first
-      clickHouseClient = createClient({
-        url: new URL(clickHouseUrl),
-      });
-    }
 
     if (!redisConnection) {
       redisConnection = new IORedis(redisUrl, {
@@ -74,14 +72,12 @@ export async function startTestContainers(): Promise<{
       });
     }
 
-    // Initialize ClickHouse schema (creates database and tables)
-    await initializeClickHouseSchema(clickHouseClient);
+    // Run goose migrations to create database and tables
+    initializeClickHouseSchema(clickHouseUrl);
 
-    // Close the old client and create a new one with the database in the URL path
-    await clickHouseClient.close();
+    // Create client with the database in the URL path
     const urlWithDatabase = new URL(clickHouseUrl);
-
-    urlWithDatabase.pathname = "/test_langwatch";
+    urlWithDatabase.pathname = `/${TEST_DATABASE}`;
 
     clickHouseClient = createClient({ url: urlWithDatabase });
 
@@ -94,10 +90,19 @@ export async function startTestContainers(): Promise<{
   }
 
   // Otherwise, use testcontainers (local development)
-  // Start ClickHouse container with labels for cleanup tracking
+  // Start ClickHouse container with labels for cleanup tracking and storage policy config
   if (!clickHouseContainer) {
+    const storagePolicyConfigPath = createStoragePolicyConfigFile();
+
     clickHouseContainer = await new ClickHouseContainer()
       .withLabels(CONTAINER_LABELS)
+      .withCopyFilesToContainer([
+        {
+          source: storagePolicyConfigPath,
+          target: "/etc/clickhouse-server/config.d/storage.xml",
+        },
+      ])
+      .withStartupTimeout(15000)
       .start();
   }
 
@@ -108,10 +113,10 @@ export async function startTestContainers(): Promise<{
       .start();
   }
 
+  const clickHouseUrl = clickHouseContainer.getConnectionUrl();
+
   // Create ClickHouse client
   if (!clickHouseClient) {
-    const clickHouseUrl = clickHouseContainer.getConnectionUrl();
-    // Don't set database in connection - we'll create it first
     clickHouseClient = createClient({
       url: new URL(clickHouseUrl),
     });
@@ -127,21 +132,20 @@ export async function startTestContainers(): Promise<{
     await redisConnection.flushall();
   }
 
-  // Initialize ClickHouse schema (creates database and tables)
-  await initializeClickHouseSchema(clickHouseClient);
+  // Run goose migrations to create database and tables
+  initializeClickHouseSchema(clickHouseUrl);
 
   // Close the old client and create a new one with the database in the URL path
   await clickHouseClient.close();
-  const clickHouseUrl = clickHouseContainer.getConnectionUrl();
   const urlWithDatabase = new URL(clickHouseUrl);
-  urlWithDatabase.pathname = "/test_langwatch";
+  urlWithDatabase.pathname = `/${TEST_DATABASE}`;
 
   clickHouseClient = createClient({ url: urlWithDatabase });
 
   return {
     clickHouseClient,
     redisConnection,
-    clickHouseUrl: clickHouseContainer.getConnectionUrl(),
+    clickHouseUrl,
     redisUrl: redisContainer.getConnectionUrl(),
   };
 }
@@ -220,142 +224,64 @@ export function getTestRedisConnection(): Redis | null {
   return redisConnection;
 }
 
+const TEST_DATABASE = "test_langwatch";
+
 /**
- * Initializes ClickHouse schema with required tables.
+ * XML configuration for ClickHouse storage policy.
+ * Defines `local_primary` policy with `hot` and `cold` volumes.
+ * Uses different paths for custom disks to avoid conflict with default disk path.
+ * Note: We use different subdirectories to satisfy ClickHouse's requirement that custom disk paths
+ * must differ from the default disk path (/var/lib/clickhouse/).
  */
-async function initializeClickHouseSchema(
-  client: ClickHouseClient,
-): Promise<void> {
-  // Create database first
-  await client.exec({
-    query: `CREATE DATABASE IF NOT EXISTS "test_langwatch"`,
-  });
+const STORAGE_POLICY_CONFIG = `
+<clickhouse>
+    <storage_configuration>
+        <disks>
+            <hot>
+                <path>/var/lib/clickhouse/hot/</path>
+            </hot>
+            <cold>
+                <path>/var/lib/clickhouse/cold/</path>
+            </cold>
+        </disks>
+        <policies>
+            <local_primary>
+                <volumes>
+                    <hot>
+                        <disk>hot</disk>
+                    </hot>
+                    <cold>
+                        <disk>cold</disk>
+                    </cold>
+                </volumes>
+            </local_primary>
+        </policies>
+    </storage_configuration>
+</clickhouse>
+`.trim();
 
-  // Create event_log table
-  await client.exec({
-    query: `
-      CREATE TABLE IF NOT EXISTS "test_langwatch".event_log
-      (
-          "TenantId" String CODEC(ZSTD(1)),
-          "IdempotencyKey" String CODEC(ZSTD(1)),
-          "AggregateType" LowCardinality(String) CODEC(ZSTD(1)),
-          "AggregateId" String CODEC(ZSTD(1)),
-          "EventId" String CODEC(ZSTD(1)),
-          "EventType" LowCardinality(String) CODEC(ZSTD(1)),
-          "EventTimestamp" DateTime64(3) CODEC(Delta(4), ZSTD(1)),
-          "EventPayload" JSON CODEC(ZSTD(3)),
-          "ProcessingTraceparent" String DEFAULT '' CODEC(ZSTD(1)),
-          "CreatedAt" DateTime64(3) DEFAULT now64(3) CODEC(Delta(4), ZSTD(1))
-      )
-      ENGINE = MergeTree
-      PARTITION BY (TenantId, toDate(EventTimestamp))
-      ORDER BY (TenantId, AggregateType, AggregateId, EventTimestamp, EventId)
-      SETTINGS index_granularity = 8192
-    `,
-  });
+/**
+ * Creates a temporary storage policy config file for ClickHouse.
+ * Returns the path to the created file.
+ */
+function createStoragePolicyConfigFile(): string {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "clickhouse-config-"));
+  const configPath = path.join(tempDir, "storage_policy.xml");
+  fs.writeFileSync(configPath, STORAGE_POLICY_CONFIG);
+  return configPath;
+}
 
-  // Create processor_checkpoints table
-  await client.exec({
-    query: `
-      CREATE TABLE IF NOT EXISTS "test_langwatch".processor_checkpoints (
-        CheckpointKey String,
-        ProcessorName String,
-        ProcessorType String,
-        EventId String,
-        Status String,
-        EventTimestamp UInt64,
-        SequenceNumber UInt64,
-        ProcessedAt Nullable(UInt64),
-        FailedAt Nullable(UInt64),
-        ErrorMessage Nullable(String),
-        TenantId String,
-        AggregateType String,
-        AggregateId String,
-        UpdatedAt DateTime DEFAULT now()
-      )
-      ENGINE = ReplacingMergeTree(UpdatedAt)
-      PARTITION BY (TenantId, AggregateType)
-      ORDER BY (TenantId, CheckpointKey)
-    `,
-  });
-
-  // Create ingested_spans table
-  await client.exec({
-    query: `
-      CREATE TABLE IF NOT EXISTS "test_langwatch".ingested_spans
-      (
-          "Id" String CODEC(ZSTD(1)),
-          "Timestamp" DateTime64(3) CODEC(Delta(8), ZSTD(1)),
-          "TraceId" String CODEC(ZSTD(1)),
-          "SpanId" String CODEC(ZSTD(1)),
-          "TenantId" String CODEC(ZSTD(1)),
-          "ParentSpanId" String CODEC(ZSTD(1)),
-          "TraceState" String CODEC(ZSTD(1)),
-          "SpanName" LowCardinality(String) CODEC(ZSTD(1)),
-          "SpanKind" LowCardinality(String) CODEC(ZSTD(1)),
-          "ServiceName" LowCardinality(String) CODEC(ZSTD(1)),
-          "ResourceAttributes" Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-          "ScopeName" String CODEC(ZSTD(1)),
-          "ScopeVersion" String CODEC(ZSTD(1)),
-          "SpanAttributes" Map(LowCardinality(String), String) CODEC(ZSTD(1)),
-          "Duration" Int64 CODEC(ZSTD(1)),
-          "StatusCode" LowCardinality(String) CODEC(ZSTD(1)),
-          "StatusMessage" String CODEC(ZSTD(1)),
-          "Events.Timestamp" Array(DateTime64(3)) CODEC(ZSTD(1)),
-          "Events.Name" Array(LowCardinality(String)) CODEC(ZSTD(1)),
-          "Events.Attributes" Array(Map(LowCardinality(String), String)) CODEC(ZSTD(1)),
-          "Links.TraceId" Array(String) CODEC(ZSTD(1)),
-          "Links.SpanId" Array(String) CODEC(ZSTD(1)),
-          "Links.TraceState" Array(String) CODEC(ZSTD(1)),
-          "Links.Attributes" Array(Map(LowCardinality(String), String)) CODEC(ZSTD(1)),
-          INDEX idx_trace_id TraceId TYPE bloom_filter(0.001) GRANULARITY 1,
-          INDEX idx_res_attr_key mapKeys(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 4,
-          INDEX idx_res_attr_value mapValues(ResourceAttributes) TYPE bloom_filter(0.01) GRANULARITY 4,
-          INDEX idx_span_attr_key mapKeys(SpanAttributes) TYPE bloom_filter(0.01) GRANULARITY 4,
-          INDEX idx_span_attr_value mapValues(SpanAttributes) TYPE bloom_filter(0.01) GRANULARITY 4,
-          INDEX idx_duration Duration TYPE minmax GRANULARITY 1
-      )
-      ENGINE = ReplacingMergeTree(Timestamp)
-      PARTITION BY (toDate(Timestamp), TenantId)
-      ORDER BY (TenantId, TraceId, SpanId)
-      SETTINGS index_granularity = 8192
-    `,
-  });
-
-  // Create trace_summaries table
-  await client.exec({
-    query: `
-      CREATE TABLE IF NOT EXISTS "test_langwatch".trace_summaries
-      (
-        Id String CODEC(ZSTD(1)),
-        TenantId String CODEC(ZSTD(1)),
-        TraceId String CODEC(ZSTD(1)),
-        Version DateTime64(9) CODEC(Delta(8), ZSTD(1)),
-        IOSchemaVersion String CODEC(ZSTD(1)),
-        ComputedInput  Nullable(String) CODEC(ZSTD(1)),
-        ComputedOutput Nullable(String) CODEC(ZSTD(1)),
-        ComputedMetadata Map(String, String) CODEC(ZSTD(1)),
-        TimeToFirstTokenMs Nullable(UInt32),
-        TimeToLastTokenMs  Nullable(UInt32),
-        TotalDurationMs Int64,
-        TokensPerSecond Nullable(UInt32),
-        SpanCount UInt32,
-        ContainsErrorStatus Boolean,
-        ContainsOKStatus Boolean,
-        Models Array(String),
-        TopicId Nullable(String),
-        SubTopicId Nullable(String),
-        TotalPromptTokenCount Nullable(UInt32),
-        TotalCompletionTokenCount Nullable(UInt32),
-        HasAnnotation Nullable(Boolean),
-        CreatedAt DateTime64(9) CODEC(Delta(8), ZSTD(1)),
-        LastUpdatedAt DateTime64(9) CODEC(Delta(8), ZSTD(1))
-      )
-      ENGINE = ReplacingMergeTree(SpanCount)
-      PARTITION BY (toDate(CreatedAt), TenantId)
-      ORDER BY (TenantId, CreatedAt)
-      SETTINGS index_granularity = 8192
-    `,
+/**
+ * Initializes ClickHouse schema using goose migrations.
+ * Runs the same migrations as production to ensure schema parity.
+ *
+ * @param connectionUrl - The ClickHouse connection URL (without database)
+ */
+function initializeClickHouseSchema(connectionUrl: string): void {
+  migrateUp({
+    database: TEST_DATABASE,
+    connectionUrl,
+    verbose: true,
   });
 }
 
@@ -366,9 +292,15 @@ async function initializeClickHouseSchema(
  */
 export async function cleanupTestData(tenantId?: string): Promise<void> {
   // Clean up Redis queues (BullMQ stores queues in Redis)
-  if (redisConnection) {
+  // When tenantId is provided, queues should be closed before cleanup is called
+  // Only flush all Redis data when doing full cleanup (no tenantId)
+  if (redisConnection && !tenantId) {
+    // Full cleanup - flush all Redis data
     await redisConnection.flushall();
   }
+  // For tenant-specific cleanup, we don't clean up Redis here
+  // because queues should be closed first (which cleans up their keys)
+  // This prevents WRONGTYPE and "Missing key" errors from BullMQ
 
   if (!clickHouseClient) {
     return;
@@ -378,60 +310,65 @@ export async function cleanupTestData(tenantId?: string): Promise<void> {
     // Clean up specific tenant data using DELETE (TRUNCATE doesn't support WHERE)
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "test_langwatch".event_log DELETE WHERE TenantId = {tenantId:String}
+        ALTER TABLE "${TEST_DATABASE}".event_log DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
     });
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "test_langwatch".processor_checkpoints DELETE WHERE TenantId = {tenantId:String}
+        ALTER TABLE "${TEST_DATABASE}".processor_checkpoints DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
     });
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "test_langwatch".ingested_spans DELETE WHERE TenantId = {tenantId:String}
+        ALTER TABLE "${TEST_DATABASE}".stored_spans DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
     });
 
     await clickHouseClient.exec({
       query: `
-        ALTER TABLE "test_langwatch".trace_summaries DELETE WHERE TenantId = {tenantId:String}
+        ALTER TABLE "${TEST_DATABASE}".trace_summaries DELETE WHERE TenantId = {tenantId:String}
       `,
       query_params: { tenantId },
     });
 
     // Clean up test_event_handler_log table (created in testPipelines.ts)
-    await clickHouseClient.exec({
-      query: `
-        ALTER TABLE "test_langwatch".test_event_handler_log DELETE WHERE TenantId = {tenantId:String}
-      `,
-      query_params: { tenantId },
-    });
+    // Use try/catch since the table may not exist if no events were processed
+    try {
+      await clickHouseClient.exec({
+        query: `
+          ALTER TABLE "${TEST_DATABASE}".test_event_handler_log DELETE WHERE TenantId = {tenantId:String}
+        `,
+        query_params: { tenantId },
+      });
+    } catch {
+      // Table doesn't exist - this is fine
+    }
   } else {
     // Clean up all test data using TRUNCATE (synchronous and faster)
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".event_log`,
+      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".event_log`,
     });
 
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".processor_checkpoints`,
+      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".processor_checkpoints`,
     });
 
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".ingested_spans`,
+      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".stored_spans`,
     });
 
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".trace_summaries`,
+      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".trace_summaries`,
     });
 
     // Clean up test_event_handler_log table (created in testPipelines.ts)
     await clickHouseClient.exec({
-      query: `TRUNCATE TABLE IF EXISTS "test_langwatch".test_event_handler_log`,
+      query: `TRUNCATE TABLE IF EXISTS "${TEST_DATABASE}".test_event_handler_log`,
     });
   }
 }
