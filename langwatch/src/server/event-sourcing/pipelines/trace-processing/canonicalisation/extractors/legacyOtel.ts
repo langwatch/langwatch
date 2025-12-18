@@ -1,3 +1,28 @@
+/**
+ * Legacy OTel Attributes Extractor
+ *
+ * Handles: Legacy OpenTelemetry patterns and non-standard LLM attributes
+ * that don't fit the modern gen_ai.* semantic conventions.
+ *
+ * This extractor handles:
+ * - Legacy span type detection (type, langwatch.type, span.kind patterns)
+ * - Legacy input/output attributes (input.value, output.value)
+ * - Tool call argument extraction
+ * - Error type inference from various sources
+ *
+ * Detection: Presence of llm.request.type, type, input.value, output.value,
+ * or tool call indicators
+ *
+ * Note: Legacy gen_ai.* attributes (like gen_ai.prompt, gen_ai.completion)
+ * are handled by genAi.ts to keep namespace handling consolidated.
+ *
+ * Canonical attributes produced:
+ * - langwatch.span.type (from various legacy type indicators)
+ * - langwatch.input (from input.value, input, ai.toolCall.args)
+ * - langwatch.output (from output.value, output)
+ * - error.type (from exception.*, status.message, span.error.*)
+ */
+
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 import {
   safeJsonParse,
@@ -7,114 +32,112 @@ import {
 } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 
-/**
- * Extracts canonical attributes from legacy OpenTelemetry trace formats.
- * 
- * Handles:
- * - Type inference from various legacy formats (`type`, `langwatch.type`, `span.kind`, etc.)
- * - `llm.request.type` → `langwatch.span.type` = "llm"
- * - `ai.toolCall.args` → `langwatch.input`
- * - `output.value` / `output` → `langwatch.output`
- * - Error type inference from exception/status messages
- * 
- * This extractor handles older OpenTelemetry formats and legacy LangWatch attributes.
- * 
- * @example
- * ```typescript
- * const extractor = new LegacyOtelTracesExtractor();
- * extractor.apply(ctx);
- * ```
- */
 export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
   readonly id = "legacy-otel-traces";
 
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    // ---------------------------------------------------------------------
-    // Type inference / mapping
-    // ---------------------------------------------------------------------
-
+    // ─────────────────────────────────────────────────────────────────────────
+    // Span Type Detection
+    // Multiple legacy patterns for determining span type
+    // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.SPAN_TYPE)) {
-      // legacy direct
-      const direct = attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
-      if (typeof direct === "string" && ALLOWED_SPAN_TYPES.has(direct)) {
-        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, direct);
+      // Direct type attribute (legacy)
+      const directType = attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
+      if (typeof directType === "string" && ALLOWED_SPAN_TYPES.has(directType)) {
+        ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
         ctx.recordRule(`${this.id}:type(direct)`);
       }
 
-      // span kind strings (best-effort)
+      // Span kind strings (best-effort mapping)
       const spanKind =
         attrs.get(ATTR_KEYS.SPAN_KIND) ??
         attrs.get(ATTR_KEYS.OTEL_SPAN_KIND) ??
         attrs.get(ATTR_KEYS.INCOMING_SPAN_KIND);
       if (typeof spanKind === "string") {
-        if (spanKind.includes("SERVER"))
+        if (spanKind.includes("SERVER")) {
           ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "server");
-        if (spanKind.includes("CLIENT"))
+        }
+        if (spanKind.includes("CLIENT")) {
           ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "client");
-        if (spanKind.includes("PRODUCER"))
+        }
+        if (spanKind.includes("PRODUCER")) {
           ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "producer");
-        if (spanKind.includes("CONSUMER"))
+        }
+        if (spanKind.includes("CONSUMER")) {
           ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "consumer");
+        }
       }
 
-      // llm.request.type chat|completion => llm
-      const reqType = attrs.take(ATTR_KEYS.LLM_REQUEST_TYPE);
-      if (reqType === "chat" || reqType === "completion") {
+      // llm.request.type chat|completion → infer as LLM span
+      const requestType = attrs.take(ATTR_KEYS.LLM_REQUEST_TYPE);
+      if (requestType === "chat" || requestType === "completion") {
         inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:llm.request.type->llm`);
       }
 
-      // toolcall op name
-      const opName = attrs.get(ATTR_KEYS.OPERATION_NAME);
-      if (opName === "ai.toolCall" || attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)) {
+      // Tool call detection from operation name or explicit attribute
+      const operationName = attrs.get(ATTR_KEYS.OPERATION_NAME);
+      if (operationName === "ai.toolCall" || attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)) {
         ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
         ctx.recordRule(`${this.id}:toolcall->tool`);
       }
     }
 
-    // toolcall args: useful to surface into langwatch.input (and/or gen_ai.input.messages)
+    // ─────────────────────────────────────────────────────────────────────────
+    // Legacy Input/Output Extraction
+    // Maps input.value/input → langwatch.input
+    // Maps output.value/output → langwatch.output
+    // ─────────────────────────────────────────────────────────────────────────
+    const inputValue = attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
+    if (inputValue !== undefined) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, safeJsonParse(inputValue));
+      ctx.recordRule(`${this.id}:input->langwatch.input`);
+    }
+
+    const outputValue = attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
+    if (outputValue !== undefined) {
+      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, safeJsonParse(outputValue));
+      ctx.recordRule(`${this.id}:output->langwatch.output`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Tool Call Arguments
+    // Surface ai.toolCall.args as langwatch.input for tool spans
+    // ─────────────────────────────────────────────────────────────────────────
     const toolArgs = attrs.take(ATTR_KEYS.AI_TOOL_CALL_ARGS);
     if (toolArgs !== undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, safeJsonParse(toolArgs));
       ctx.recordRule(`${this.id}:ai.toolCall.args->langwatch.input`);
     }
 
-    // output.value/output legacy => langwatch.output
-    const outVal = attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
-    if (outVal !== undefined) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, safeJsonParse(outVal));
-      ctx.recordRule(`${this.id}:output->langwatch.output`);
-    }
-
-    // ---------------------------------------------------------------------
-    // error.type best-effort (don't override)
-    // ---------------------------------------------------------------------
-
+    // ─────────────────────────────────────────────────────────────────────────
+    // Error Type Inference
+    // Consolidates various error indicators into error.type
+    // Priority: span.error > exception > status.message
+    // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.ERROR_TYPE)) {
       const exceptionType = attrs.get(ATTR_KEYS.EXCEPTION_TYPE);
       const exceptionMsg = attrs.get(ATTR_KEYS.EXCEPTION_MESSAGE);
       const statusMsg = attrs.get(ATTR_KEYS.STATUS_MESSAGE);
 
-      const spanErrHas =
+      const spanErrorHas =
         attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ?? attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
-      const spanErrMsg =
+      const spanErrorMsg =
         attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ?? attrs.get(ATTR_KEYS.ERROR_MESSAGE);
 
-      if (
-        typeof spanErrHas === "boolean" &&
-        spanErrHas &&
-        isNonEmptyString(spanErrMsg)
-      ) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, spanErrMsg);
+      // Priority 1: Explicit span error flag with message
+      if (typeof spanErrorHas === "boolean" && spanErrorHas && isNonEmptyString(spanErrorMsg)) {
+        ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, spanErrorMsg);
         ctx.recordRule(`${this.id}:error(span.error)`);
-      } else if (
-        isNonEmptyString(exceptionType) &&
-        isNonEmptyString(exceptionMsg)
-      ) {
+      }
+      // Priority 2: Exception type and message
+      else if (isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg)) {
         ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, `${exceptionType}: ${exceptionMsg}`);
         ctx.recordRule(`${this.id}:error(exception)`);
-      } else if (isNonEmptyString(statusMsg)) {
+      }
+      // Priority 3: Status message fallback
+      else if (isNonEmptyString(statusMsg)) {
         ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, statusMsg);
         ctx.recordRule(`${this.id}:error(status.message)`);
       }
