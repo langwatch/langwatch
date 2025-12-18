@@ -15,10 +15,14 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await client.indices.putMapping({
     index: currentIndex,
     properties: {
-      name: {
-        type: "text",
-        fields: {
-          keyword: { type: "keyword" },
+      metadata: {
+        properties: {
+          name: {
+            type: "text",
+            fields: {
+              keyword: { type: "keyword" },
+            },
+          },
         },
       },
     },
