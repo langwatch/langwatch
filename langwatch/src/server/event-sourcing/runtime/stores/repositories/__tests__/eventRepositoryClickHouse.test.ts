@@ -38,7 +38,7 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     });
   });
 
-  it("parses JSON strings returned by ClickHouse and normalizes numbers", async () => {
+  it("does not parses JSON strings returned by ClickHouse", async () => {
     const client = createMockClient(
       JSON.stringify({
         data: { value: "123.45", text: "still-string" },
@@ -48,8 +48,6 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     const repository = new EventRepositoryClickHouse(client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
-    expect(rows[0]?.EventPayload).toEqual({
-      data: { value: 123.45, text: "still-string" },
-    });
+    expect(rows[0]?.EventPayload).toEqual("{\"data\":{\"value\":\"123.45\",\"text\":\"still-string\"}}");
   });
 });
