@@ -59,7 +59,7 @@ jobs:
 
       - name: Publish to npm
         working-directory: ./typescript-sdk
-        run: npm publish --provenance --access public --no-git-checks
+        run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
         id: get_version
