@@ -10,7 +10,7 @@ import {
   createMockProjectionStore,
   createTestAggregateType,
 } from "../../library/services/__tests__/testHelpers";
-import { EventSourcingPipeline } from "../index";
+import { EventSourcingPipeline } from "../pipeline";
 import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
