@@ -1141,7 +1141,7 @@ export class ScenarioEventRepository {
             must: mustClauses,
           },
         },
-        sort: [{ [sortField]: { order: sortOrder } }],
+        sort: [{ [sortField]: { order: sortOrder, unmapped_type: "keyword" } }],
         from,
         size: pageSize,
         track_total_hits: true,
@@ -1613,8 +1613,22 @@ export class ScenarioEventRepository {
                 { wildcard: { "metadata.user_id": `*${searchLower}*` } },
                 { wildcard: { "metadata.thread_id": `*${searchLower}*` } },
                 { wildcard: { "metadata.customer_id": `*${searchLower}*` } },
-                // Search in prompt_ids array (keyword type)
+                { wildcard: { "metadata.labels": `*${searchLower}*` } },
+                { wildcard: { "metadata.topic_id": `*${searchLower}*` } },
+                { wildcard: { "metadata.subtopic_id": `*${searchLower}*` } },
+                // Search in SDK metadata fields
+                { wildcard: { "metadata.sdk_version": `*${searchLower}*` } },
+                { wildcard: { "metadata.sdk_language": `*${searchLower}*` } },
+                { wildcard: { "metadata.sdk_name": `*${searchLower}*` } },
+                { wildcard: { "metadata.telemetry_sdk_version": `*${searchLower}*` } },
+                { wildcard: { "metadata.telemetry_sdk_language": `*${searchLower}*` } },
+                { wildcard: { "metadata.telemetry_sdk_name": `*${searchLower}*` } },
+                // Search in prompt_ids arrays (keyword type)
                 { wildcard: { "metadata.prompt_ids": `*${searchLower}*` } },
+                { wildcard: { "metadata.prompt_version_ids": `*${searchLower}*` } },
+                // Search in custom metadata (flattened type - use wildcard query)
+                // Flattened fields store values as keywords, so we need wildcard matching
+                { wildcard: { "metadata.custom": { value: `*${searchLower}*`, case_insensitive: true } } },
                 // Search trace input/output (text fields - use match for tokenized search)
                 { match_phrase: { "input.value": { query: search, slop: 2 } } },
                 { match_phrase: { "output.value": { query: search, slop: 2 } } },
