@@ -13,11 +13,26 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         filterParams: z.any().optional(),
+        dashboardId: z.string().optional(),
+        gridColumn: z.number().min(0).max(1).optional(),
+        gridRow: z.number().min(0).optional(),
+        colSpan: z.number().min(1).max(2).optional(),
+        rowSpan: z.number().min(1).max(2).optional(),
       }),
     )
     .use(checkProjectPermission("analytics:create"))
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
+
+      // If no gridRow provided, find the next available row
+      let gridRow = input.gridRow;
+      if (gridRow === undefined && input.dashboardId) {
+        const lastGraph = await ctx.prisma.customGraph.findFirst({
+          where: { dashboardId: input.dashboardId, projectId: input.projectId },
+          orderBy: { gridRow: "desc" },
+        });
+        gridRow = (lastGraph?.gridRow ?? -1) + 1;
+      }
 
       return ctx.prisma.customGraph.create({
         data: {
@@ -26,22 +41,37 @@ export const graphsRouter = createTRPCRouter({
           graph: graph,
           projectId: input.projectId,
           filters: input.filterParams?.filters ?? {},
+          dashboardId: input.dashboardId,
+          gridColumn: input.gridColumn ?? 0,
+          gridRow: gridRow ?? 0,
+          colSpan: input.colSpan ?? 1,
+          rowSpan: input.rowSpan ?? 1,
         },
       });
     }),
   getAll: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        dashboardId: z.string().optional(),
+      }),
+    )
     .use(checkProjectPermission("analytics:view"))
     .query(async ({ input, ctx }) => {
-      const { projectId } = input;
+      const { projectId, dashboardId } = input;
       const prisma = ctx.prisma;
 
-      const datasets = await prisma.customGraph.findMany({
-        where: { projectId },
-        orderBy: { createdAt: "desc" },
+      const graphs = await prisma.customGraph.findMany({
+        where: {
+          projectId,
+          ...(dashboardId ? { dashboardId } : {}),
+        },
+        orderBy: dashboardId
+          ? [{ gridRow: "asc" }, { gridColumn: "asc" }]
+          : { createdAt: "desc" },
       });
 
-      return datasets;
+      return graphs;
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
@@ -133,5 +163,63 @@ export const graphsRouter = createTRPCRouter({
           filters: input.filterParams?.filters ?? {},
         },
       });
+    }),
+
+  updateLayout: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        graphId: z.string(),
+        gridColumn: z.number().min(0).max(1),
+        gridRow: z.number().min(0),
+        colSpan: z.number().min(1).max(2),
+        rowSpan: z.number().min(1).max(2),
+      }),
+    )
+    .use(checkProjectPermission("analytics:update"))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.prisma.customGraph.update({
+        where: { id: input.graphId, projectId: input.projectId },
+        data: {
+          gridColumn: input.gridColumn,
+          gridRow: input.gridRow,
+          colSpan: input.colSpan,
+          rowSpan: input.rowSpan,
+        },
+      });
+    }),
+
+  batchUpdateLayouts: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        layouts: z.array(
+          z.object({
+            graphId: z.string(),
+            gridColumn: z.number().min(0).max(1),
+            gridRow: z.number().min(0),
+            colSpan: z.number().min(1).max(2),
+            rowSpan: z.number().min(1).max(2),
+          }),
+        ),
+      }),
+    )
+    .use(checkProjectPermission("analytics:update"))
+    .mutation(async ({ ctx, input }) => {
+      const updates = input.layouts.map((layout) =>
+        ctx.prisma.customGraph.update({
+          where: { id: layout.graphId, projectId: input.projectId },
+          data: {
+            gridColumn: layout.gridColumn,
+            gridRow: layout.gridRow,
+            colSpan: layout.colSpan,
+            rowSpan: layout.rowSpan,
+          },
+        }),
+      );
+
+      await ctx.prisma.$transaction(updates);
+
+      return { success: true };
     }),
 });

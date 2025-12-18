@@ -1,5 +1,6 @@
-import { Container, HStack, Text, VStack } from "@chakra-ui/react";
-import type { PropsWithChildren } from "react";
+import { Container, HStack, VStack } from "@chakra-ui/react";
+import { type PropsWithChildren } from "react";
+import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -73,9 +74,9 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             >
               Custom
             </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/reports`} paddingX={6}>
-              Reports
-            </MenuLink>
+            {project?.slug && (
+              <CustomDashboardsSection projectSlug={project.slug} />
+            )}
           </VStack>
         </VStack>
         <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>

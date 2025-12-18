@@ -206,6 +206,7 @@ model Project {
     datasets                 Dataset[]
     datasetRecords           DatasetRecord[]
     customGraphs             CustomGraph[]
+    dashboards               Dashboard[]
     batchEvaluations         BatchEvaluation[]
     piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
     capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
@@ -376,18 +377,43 @@ model DatasetRecord {
     @@index([createdAt])
 }
 
-model CustomGraph {
-    id        String   @id @default(nanoid())
+model Dashboard {
+    id        String        @id @default(nanoid())
     projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
+    project   Project       @relation(fields: [projectId], references: [id])
     name      String
-    graph     Json
-    filters   Json?
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    order     Int           @default(0)
+    createdAt DateTime      @default(now())
+    updatedAt DateTime      @default(now()) @updatedAt
+    graphs    CustomGraph[]
 
-    @@unique([id])
     @@index([projectId])
+    @@index([projectId, order])
+    @@map("Dashboard")
+}
+
+model CustomGraph {
+    id           String      @id @default(nanoid())
+    projectId    String
+    project      Project     @relation(fields: [projectId], references: [id])
+    name         String
+    graph        Json
+    filters      Json?
+    createdAt    DateTime    @default(now())
+    updatedAt    DateTime    @default(now()) @updatedAt
+
+    // Report page relationship
+    dashboardId String?
+    dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+    // Grid positioning (2-column grid)
+    gridColumn   Int         @default(0)
+    gridRow      Int         @default(0)
+    colSpan      Int         @default(1)
+    rowSpan      Int         @default(1)
+
+    @@index([projectId])
+    @@index([dashboardId])
 }
 
 model BatchEvaluation {

@@ -284,6 +284,7 @@ const CustomGraph_ = React.memo(
               .replace("Evaluation passed passed", "Evaluation Passed")
               .replace("Evaluation passed failed", "Evaluation Failed")
               .replace("Contains error", "Traces")
+              .replace(/^Evaluation label /i, "")
           : (series?.name ?? aggKey);
     };
 
