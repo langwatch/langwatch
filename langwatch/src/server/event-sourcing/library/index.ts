@@ -8,8 +8,16 @@
 
 export type {
   EventSourcingPipelineDefinition,
+  PipelineMetadata,
   RegisteredPipeline,
 } from "../runtime/pipeline";
+export type {
+  CommandHandlerOptions as StaticCommandHandlerOptions,
+  NoCommands,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "./pipeline/types";
+export { definePipeline } from "./pipeline/staticBuilder";
 export type {
   Command,
   CommandHandler,
