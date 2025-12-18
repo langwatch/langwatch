@@ -260,10 +260,8 @@ export function ScenariosTableView() {
         }
       }
       store.getState().setRows(allRows);
-      // For grouped view, total count is the number of groups * avg group size
-      // But we'll show it as total items
-      const totalItems = groupedData.groups.reduce((sum, g) => sum + g.count, 0);
-      store.getState().setTotalCount(totalItems);
+      // For grouped view, pagination is based on number of groups
+      store.getState().setTotalCount(groupedData.totalGroups);
     }
     store.getState().setIsLoading(isLoadingGrouped);
     store.getState().setError(errorGrouped?.message ?? null);

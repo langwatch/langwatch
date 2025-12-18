@@ -1,5 +1,5 @@
 import { Flex, Text } from "@chakra-ui/react";
-import { ChevronDown, ChevronUp, ChevronsUpDown } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronsUpDown, Filter, Ungroup } from "lucide-react";
 import type { Header } from "@tanstack/react-table";
 import { ColumnPopover } from "./ColumnPopover";
 import type { DataGridColumnDef, FilterState, SortingState } from "./types";
@@ -41,6 +41,7 @@ export function ColumnHeader<T>({
   const isSorted = sorting?.columnId === column.id;
   const sortOrder = isSorted ? sorting.order : null;
   const hasFilters = filters.some((f) => f.columnId === column.id);
+  const isGrouped = groupBy === column.id;
 
   return (
     <Flex align="center" gap={1}>
@@ -77,15 +78,22 @@ export function ColumnHeader<T>({
         </Flex>
       )}
 
+      {/* Grouped indicator */}
+      {isGrouped && (
+        <Flex color="blue.500" title="Grouped by this column"
+        border="1px solid"
+        borderColor="blue.500"
+        borderRadius="sm"
+        >
+          <Ungroup size={14} />
+        </Flex>
+      )}
+
       {/* Filter indicator */}
       {hasFilters && (
-        <Flex
-          w={2}
-          h={2}
-          borderRadius="full"
-          bg="blue.500"
-          title="Has active filters"
-        />
+        <Flex color="blue.500" title="Has active filters">
+          <Filter size={14} />
+        </Flex>
       )}
 
       {/* Popover menu */}
