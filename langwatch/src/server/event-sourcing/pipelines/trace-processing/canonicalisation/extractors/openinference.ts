@@ -1,31 +1,41 @@
+/**
+ * OpenInference Extractor
+ *
+ * Handles: OpenInference semantic conventions (openinference.* namespace)
+ * Reference: https://github.com/Arize-ai/openinference
+ *
+ * OpenInference is a set of conventions used by Arize Phoenix and related tools.
+ * This extractor primarily handles span kind mapping.
+ *
+ * Detection: Presence of openinference.span.kind attribute
+ *
+ * Canonical attributes produced:
+ * - langwatch.span.type (from openinference.span.kind)
+ */
+
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 import { ALLOWED_SPAN_TYPES } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 
-/**
- * Extracts canonical attributes from OpenInference spans.
- *
- * Handles:
- * - `openinference.span.kind` → `langwatch.span.type`
- *
- * Only sets type if not already explicitly set and the kind is in the allowed set.
- *
- * @example
- * ```typescript
- * const extractor = new OpenInferenceExtractor();
- * extractor.apply(ctx);
- * ```
- */
 export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
   readonly id = "openinference";
 
   apply(ctx: ExtractorContext): void {
-    const explicit = ctx.bag.attrs.get(ATTR_KEYS.SPAN_TYPE);
-    if (typeof explicit === "string" && ALLOWED_SPAN_TYPES.has(explicit)) return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Span Type (from openinference.span.kind)
+    // Skip if explicit type is already set
+    // ─────────────────────────────────────────────────────────────────────────
+    const explicitType = ctx.bag.attrs.get(ATTR_KEYS.SPAN_TYPE);
+    if (typeof explicitType === "string" && ALLOWED_SPAN_TYPES.has(explicitType)) {
+      return;
+    }
 
-    const raw = ctx.bag.attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
-    const kind = typeof raw === "string" ? raw.toLowerCase() : null;
-    if (!kind || !ALLOWED_SPAN_TYPES.has(kind)) return;
+    const rawKind = ctx.bag.attrs.take(ATTR_KEYS.OPENINFERENCE_SPAN_KIND);
+    const kind = typeof rawKind === "string" ? rawKind.toLowerCase() : null;
+
+    if (!kind || !ALLOWED_SPAN_TYPES.has(kind)) {
+      return;
+    }
 
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, kind);
     ctx.recordRule(`${this.id}:openinference.span.kind->langwatch.span.type`);

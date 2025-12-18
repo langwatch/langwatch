@@ -1,7 +1,29 @@
+/**
+ * Extractor Helper Functions
+ *
+ * This module provides shared utility functions used by multiple extractors
+ * for common operations like:
+ * - Type guards and value coercion
+ * - JSON parsing and message normalization
+ * - Input/output message extraction
+ * - Model and token usage extraction
+ * - Span type inference
+ *
+ * These helpers reduce code duplication and ensure consistent behavior
+ * across all extractors.
+ */
+
 import type { NormalizedEvent } from "../../schemas/spans";
 import type { ExtractorContext } from "./_types";
 import { ATTR_KEYS } from "./_constants";
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Type Guards & Basic Utilities
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Type guard for plain objects (non-null, non-array objects).
+ */
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
@@ -18,7 +40,9 @@ export interface MessageLike {
 }
 
 export const isMessageLike = (v: unknown): v is MessageLike =>
-  isRecord(v) && (typeof (v as MessageLike).role === "string" || (v as MessageLike).role === undefined);
+  isRecord(v) &&
+  (typeof (v as MessageLike).role === "string" ||
+    (v as MessageLike).role === undefined);
 
 export const asNumber = (v: unknown): number | null => {
   if (typeof v === "number" && Number.isFinite(v)) return v;
@@ -59,42 +83,53 @@ export const coerceToStringArray = (v: unknown): string[] | null => {
 };
 
 export const extractSystemInstructionFromMessages = (
-  messages: unknown,
-): { systemInstruction: string | null; remainingMessages: unknown } => {
+  messages: unknown
+): string | null => {
   if (!Array.isArray(messages) || messages.length === 0) {
-    return { systemInstruction: null, remainingMessages: messages };
+    return null;
   }
 
   const first = messages[0];
   if (!isMessageLike(first) || first.role !== "system") {
-    return { systemInstruction: null, remainingMessages: messages };
+    return null;
   }
 
   const content = first.content;
   if (content == null) {
-    return { systemInstruction: null, remainingMessages: messages };
+    return null;
   }
 
   if (typeof content === "string") {
-    return { systemInstruction: content, remainingMessages: messages.slice(1) };
+    return content;
   }
 
   if (Array.isArray(content)) {
     const parts = content
-      .map((p) => (isRecord(p) && typeof (p as Record<string, unknown>).text === "string" ? (p as Record<string, unknown>).text as string : null))
+      .map((p) =>
+        isRecord(p) && typeof (p as Record<string, unknown>).text === "string"
+          ? ((p as Record<string, unknown>).text as string)
+          : null
+      )
       .filter((p): p is string => p !== null);
 
     const extracted = parts.join("");
-    return {
-      systemInstruction: extracted.length > 0 ? extracted : "",
-      remainingMessages: messages.slice(1),
-    };
+    return extracted.length > 0 ? extracted : null;
   }
 
-  return { systemInstruction: null, remainingMessages: messages };
+  return null;
 };
 
-export const normaliseModelFromAiModelObject = (aiModel: unknown): string | null => {
+// ═══════════════════════════════════════════════════════════════════════════════
+// Model & Provider Helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Normalizes Vercel AI SDK model object to "provider/model" string.
+ * Example: { id: "gpt-4", provider: "openai.chat" } → "openai/gpt-4"
+ */
+export const normaliseModelFromAiModelObject = (
+  aiModel: unknown
+): string | null => {
   if (!isRecord(aiModel)) return null;
 
   const id = (aiModel as Record<string, unknown>).id;
@@ -136,6 +171,10 @@ export const spanTypeToGenAiOperationName = (t: unknown): string | null => {
   }
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Message Normalization & Extraction
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /**
  * Best-effort "messages" decoding from unknown payloads:
  * - array => assume messages
@@ -144,14 +183,43 @@ export const spanTypeToGenAiOperationName = (t: unknown): string | null => {
  */
 export const decodeMessagesPayload = (payload: unknown): unknown => {
   if (Array.isArray(payload)) return payload;
-  if (isRecord(payload) && Array.isArray((payload as Record<string, unknown>).messages)) {
+  if (
+    isRecord(payload) &&
+    Array.isArray((payload as Record<string, unknown>).messages)
+  ) {
     return (payload as Record<string, unknown>).messages;
   }
   return payload;
 };
 
 /**
+ * Unwraps messages that are wrapped in an extra `{ message: {...} }` object.
+ * Some telemetry formats wrap each message in an additional "message" property.
+ *
+ * Example:
+ *   Input:  [{ message: { role: "user", content: "hello" } }]
+ *   Output: [{ role: "user", content: "hello" }]
+ *
+ * @param messages - Array of potentially wrapped messages
+ * @returns Array with unwrapped messages
+ */
+export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
+  return messages.map((msg) => {
+    if (
+      isRecord(msg) &&
+      isRecord((msg as Record<string, unknown>).message) &&
+      // Ensure the wrapper only has "message" key (avoid false positives)
+      Object.keys(msg).length === 1
+    ) {
+      return (msg as Record<string, unknown>).message;
+    }
+    return msg;
+  });
+};
+
+/**
  * Normalizes various input formats to a messages array.
+ * Also handles wrapped messages (e.g., `[{ message: { role: "user", ... } }]`).
  *
  * @param raw - The raw input (string, array, or object)
  * @param defaultRole - Default role to use when converting string to message
@@ -165,10 +233,16 @@ export const normalizeToMessages = (
     return [{ role: defaultRole, content: raw }];
   }
   if (Array.isArray(raw)) {
-    return raw;
+    // Unwrap messages that are wrapped in { message: {...} }
+    return unwrapWrappedMessages(raw);
   }
-  if (isRecord(raw) && Array.isArray((raw as Record<string, unknown>).messages)) {
-    return (raw as Record<string, unknown>).messages as unknown[];
+  if (
+    isRecord(raw) &&
+    Array.isArray((raw as Record<string, unknown>).messages)
+  ) {
+    return unwrapWrappedMessages(
+      (raw as Record<string, unknown>).messages as unknown[]
+    );
   }
   // Fallback: wrap in message object
   return [{ role: defaultRole, content: raw }];
@@ -179,7 +253,11 @@ export const normalizeToMessages = (
  */
 export type MessageSource =
   | { type: "attr"; keys: readonly string[] }
-  | { type: "event"; name: string; extractor: (ev: NormalizedEvent) => unknown };
+  | {
+      type: "event";
+      name: string;
+      extractor: (ev: NormalizedEvent) => unknown;
+    };
 
 /**
  * Extracts input messages from various sources and sets them in the context.
@@ -207,10 +285,13 @@ export const extractInputMessages = (
           const decoded = decodeMessagesPayload(parsed);
           const msgs = normalizeToMessages(decoded, "user");
           if (msgs) {
-            const { systemInstruction, remainingMessages } = extractSystemInstructionFromMessages(msgs);
-            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, remainingMessages);
+            const systemInstruction = extractSystemInstructionFromMessages(msgs);
+            ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, msgs);
             if (systemInstruction !== null) {
-              ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION, systemInstruction);
+              ctx.setAttrIfAbsent(
+                ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+                systemInstruction
+              );
             }
             ctx.recordRule(ruleId);
             return true;
@@ -323,7 +404,8 @@ export const inferSpanTypeIfAbsent = (
 export const extractModelToBoth = (
   ctx: ExtractorContext,
   sourceKey: string,
-  transform: (raw: unknown) => string | null = (raw) => (typeof raw === "string" ? raw : null),
+  transform: (raw: unknown) => string | null = (raw) =>
+    typeof raw === "string" ? raw : null,
   ruleId: string
 ): boolean => {
   if (

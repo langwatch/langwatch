@@ -1,3 +1,30 @@
+/**
+ * Vercel AI SDK Extractor
+ *
+ * Handles: Vercel AI SDK telemetry (ai.* namespace)
+ * Reference: https://sdk.vercel.ai/docs/ai-sdk-core/telemetry
+ *
+ * The Vercel AI SDK uses its own attribute namespace and formats that differ
+ * from OTel GenAI conventions. This extractor normalises those to canonical
+ * attributes.
+ *
+ * Detection: Presence of ai.prompt, ai.prompt.messages, ai.response, ai.model,
+ * or ai.usage attributes
+ *
+ * Canonical attributes produced:
+ * - langwatch.span.type (llm)
+ * - gen_ai.request.model / gen_ai.response.model (from ai.model)
+ * - gen_ai.usage.input_tokens / gen_ai.usage.output_tokens (from ai.usage)
+ * - gen_ai.input.messages (from ai.prompt / ai.prompt.messages)
+ * - gen_ai.output.messages (from ai.response / ai.response.text)
+ *
+ * Special handling:
+ * - ai.model is an object with { id, provider } structure
+ * - ai.usage contains { promptTokens, completionTokens }
+ * - ai.response may contain toolCalls array
+ * - span.name is mapped to langwatch.span.type
+ */
+
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 import {
   safeJsonParse,
@@ -9,41 +36,56 @@ import {
 } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 
-/**
- * Extracts canonical attributes from Vercel AI SDK spans.
- *
- * Handles:
- * - `ai.prompt` / `ai.prompt.messages` → `gen_ai.input.messages`
- * - `ai.response` → `gen_ai.output.messages`
- * - `ai.model` → `gen_ai.request.model` / `gen_ai.response.model`
- * - `ai.usage` → `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens`
- * - Infers `langwatch.span.type` as "llm" if Vercel signals are present
- *
- * @example
- * ```typescript
- * const extractor = new VercelExtractor();
- * extractor.apply(ctx);
- * ```
- */
+const AI_SDK_SPAN_TYPE_MAP: Record<string, string> = {
+  // Text generation spans
+  "ai.generateText": "llm",
+  "ai.streamText": "llm",
+  "ai.generateObject": "llm",
+  "ai.streamObject": "llm",
+
+  // Provider-level spans
+  "ai.generateText.doGenerate": "llm",
+  "ai.streamText.doStream": "llm",
+  "ai.generateObject.doGenerate": "llm",
+  "ai.streamObject.doStream": "llm",
+
+  // Tool execution spans
+  "ai.toolCall": "tool",
+
+  // Embedding spans
+  "ai.embed": "component",
+  "ai.embedMany": "component",
+  "ai.embed.doEmbed": "component",
+  "ai.embedMany.doEmbed": "component",
+} as const;
+
 export class VercelExtractor implements CanonicalAttributesExtractor {
   readonly id = "vercel";
 
   apply(ctx: ExtractorContext): void {
     const { attrs } = ctx.bag;
 
-    const hasSignal =
-      attrs.has(ATTR_KEYS.AI_PROMPT) ||
-      attrs.has(ATTR_KEYS.AI_PROMPT_MESSAGES) ||
-      attrs.has(ATTR_KEYS.AI_RESPONSE) ||
-      attrs.has(ATTR_KEYS.AI_MODEL) ||
-      attrs.has(ATTR_KEYS.AI_USAGE);
+    // ─────────────────────────────────────────────────────────────────────────
+    // Detection Check
+    // Only proceed if Vercel AI SDK signals are present
+    // ─────────────────────────────────────────────────────────────────────────
+    if (ctx.span.instrumentationScope.name === "ai") return;
 
-    if (!hasSignal) return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Span Type
+    // Vercel AI SDK spans are LLM spans
+    // ─────────────────────────────────────────────────────────────────────────
+    const proposedSpanType = AI_SDK_SPAN_TYPE_MAP[ctx.span.name];
+    if (proposedSpanType) {
+      ctx.setAttr(ATTR_KEYS.SPAN_TYPE, proposedSpanType);
+      ctx.recordRule(`${this.id}:span.name->langwatch.span.type`);
+    }
 
-    // type (don't override explicit)
-    inferSpanTypeIfAbsent(ctx, "llm", `${this.id}:type=llm`);
-
-    // model
+    // ─────────────────────────────────────────────────────────────────────────
+    // Model Extraction
+    // ai.model is an object: { id: "gpt-4", provider: "openai.chat" }
+    // Normalized to "openai/gpt-4" format
+    // ─────────────────────────────────────────────────────────────────────────
     if (
       !extractModelToBoth(
         ctx,
@@ -52,74 +94,90 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         `${this.id}:ai.model->gen_ai.*.model`
       )
     ) {
-      // Consume even if not used to reduce leftovers
+      // Consume attribute even if not used, to reduce leftovers
       attrs.take(ATTR_KEYS.AI_MODEL);
     }
 
-    // usage
+    // ─────────────────────────────────────────────────────────────────────────
+    // Usage Tokens
+    // ai.usage contains { promptTokens, completionTokens }
+    // ─────────────────────────────────────────────────────────────────────────
     extractUsageTokens(
       ctx,
       { object: ATTR_KEYS.AI_USAGE },
       `${this.id}:ai.usage->gen_ai.usage`
     );
 
-    // input - handle Vercel's special format
+    // ─────────────────────────────────────────────────────────────────────────
+    // Input Messages
+    // Vercel uses ai.prompt.messages (array) or ai.prompt (string/object)
+    // Note: Custom handling required due to Vercel's flexible format
+    // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
       const promptRaw =
         attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ?? attrs.take(ATTR_KEYS.AI_PROMPT);
       const prompt = safeJsonParse(promptRaw);
 
       if (typeof prompt === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
-          { role: "user", content: prompt },
-        ]);
+        // Simple string prompt → wrap as user message
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
         ctx.recordRule(`${this.id}:ai.prompt(string)->gen_ai.input.messages`);
-      } else if (isRecord(prompt) && Array.isArray((prompt as Record<string, unknown>).messages)) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, (prompt as Record<string, unknown>).messages);
-        ctx.recordRule(`${this.id}:ai.prompt.messages->gen_ai.input.messages`);
+      } else if (isRecord(prompt)) {
+        // Object prompt → pass through (may be a single message)
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
+        ctx.recordRule(`${this.id}:ai.prompt.messages{}->gen_ai.input.messages`);
+      } else if (Array.isArray(prompt)) {
+        // Array of messages → pass through directly
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
+        ctx.recordRule(`${this.id}:ai.prompt.messages[]->gen_ai.input.messages`);
       } else if (promptRaw !== undefined) {
-        // best effort
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
-          { role: "user", content: prompt },
-        ]);
+        // Unknown format → best effort wrap as user message
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
         ctx.recordRule(`${this.id}:ai.prompt(unknown)->gen_ai.input.messages`);
       }
     } else {
+      // Output already exists, just consume to reduce leftovers
       attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES);
       attrs.take(ATTR_KEYS.AI_PROMPT);
     }
 
-    // output - handle Vercel's special format with toolCalls
+    // ─────────────────────────────────────────────────────────────────────────
+    // Output Messages
+    // Vercel's ai.response may contain:
+    // - { text: "...", toolCalls: [...] } object
+    // - Simple string
+    // Note: Custom handling required for toolCalls extraction
+    // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
-      const resp = safeJsonParse(attrs.take(ATTR_KEYS.AI_RESPONSE));
+      const response = safeJsonParse(
+        attrs.take(ATTR_KEYS.AI_RESPONSE) ?? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
+      );
 
-      if (isRecord(resp)) {
-        const msgs: unknown[] = [];
-        const respObj = resp as Record<string, unknown>;
+      if (isRecord(response)) {
+        const responseObj = response as Record<string, unknown>;
+        const messages: unknown[] = [];
 
-        if (
-          typeof respObj.text === "string" &&
-          respObj.text.length > 0
-        ) {
-          msgs.push({ role: "assistant", content: respObj.text });
-        }
-        if (Array.isArray(respObj.toolCalls)) {
-          msgs.push({ tool_calls: respObj.toolCalls });
+        // Extract text content
+        if (typeof responseObj.text === "string" && responseObj.text.length > 0) {
+          messages.push({ role: "assistant", content: responseObj.text });
         }
 
-        if (msgs.length > 0) {
-          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, msgs);
+        // Extract tool calls (Vercel-specific structure)
+        if (Array.isArray(responseObj.toolCalls)) {
+          messages.push({ tool_calls: responseObj.toolCalls });
+        }
+
+        if (messages.length > 0) {
+          ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
           ctx.recordRule(`${this.id}:ai.response->gen_ai.output.messages`);
         }
-      } else if (typeof resp === "string") {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
-          { role: "assistant", content: resp },
-        ]);
-        ctx.recordRule(
-          `${this.id}:ai.response(string)->gen_ai.output.messages`
-        );
+      } else if (typeof response === "string") {
+        // Simple string response
+        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content: response }]);
+        ctx.recordRule(`${this.id}:ai.response(string)->gen_ai.output.messages`);
       }
     } else {
+      // Output already exists, just consume to reduce leftovers
       attrs.take(ATTR_KEYS.AI_RESPONSE);
     }
   }

@@ -11,6 +11,7 @@ import {
   LangWatchExtractor,
   LegacyOtelTracesExtractor,
   LogfireExtractor,
+  MastraExtractor,
   OpenInferenceExtractor,
   StrandsExtractor,
   TraceloopExtractor,
@@ -29,6 +30,7 @@ export class CanonicalizeSpanAttributesService {
     // Priority is determined by the order of registration.
     new LangWatchExtractor(),
     new GenAIExtractor(),
+    new MastraExtractor(),
     new OpenInferenceExtractor(),
     new TraceloopExtractor(),
     new VercelExtractor(),

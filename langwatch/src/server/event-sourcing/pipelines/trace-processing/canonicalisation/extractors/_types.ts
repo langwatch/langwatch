@@ -1,6 +1,24 @@
+/**
+ * Extractor Type Definitions
+ *
+ * This module defines the core types used by the canonicalization extractor
+ * system, including the ExtractorContext and CanonicalAttributesExtractor
+ * interface.
+ */
+
 import type { NormalizedAttributes, NormalizedSpan } from "../../schemas/spans";
 import type { SpanDataBag } from "../spanDataBag";
 
+/**
+ * Context provided to each extractor during canonicalization.
+ *
+ * @property bag - Access to unconsumed attributes and events
+ * @property out - Output attributes map (canonical attributes)
+ * @property span - Span metadata for context
+ * @property recordRule - Record that a rule was applied
+ * @property setAttr - Set an output attribute
+ * @property setAttrIfAbsent - Set an output attribute only if not already set
+ */
 export type ExtractorContext = {
   bag: SpanDataBag;
   out: NormalizedAttributes;

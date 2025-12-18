@@ -1,36 +1,55 @@
+/**
+ * Haystack Extractor
+ *
+ * Handles: Haystack framework telemetry
+ * Reference: https://haystack.deepset.ai/
+ *
+ * Haystack is a framework for building RAG pipelines. This extractor handles
+ * retrieval.documents to extract RAG contexts.
+ *
+ * Detection: Presence of retrieval.documents attribute
+ *
+ * Canonical attributes produced:
+ * - langwatch.span.type (rag)
+ * - langwatch.rag.contexts (from retrieval.documents)
+ */
+
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 import { safeJsonParse, isRecord, inferSpanTypeIfAbsent } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 
-/**
- * Extracts canonical attributes from Haystack spans.
- * 
- * Handles:
- * - `retrieval.documents` → `langwatch.rag.contexts`
- * - Infers `langwatch.span.type` as "rag" if contexts are found
- * 
- * Extracts document content and IDs from Haystack's retrieval.documents format.
- * 
- * @example
- * ```typescript
- * const extractor = new HaystackExtractor();
- * extractor.apply(ctx);
- * ```
- */
 export class HaystackExtractor implements CanonicalAttributesExtractor {
   readonly id = "haystack";
 
   apply(ctx: ExtractorContext): void {
-    const docsRaw = ctx.bag.attrs.get(ATTR_KEYS.RETRIEVAL_DOCUMENTS);
-    if (docsRaw === undefined) return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Detection Check
+    // Only process spans from Haystack instrumentation
+    // ─────────────────────────────────────────────────────────────────────────
+    if (ctx.span.instrumentationScope.name !== "openinference.instrumentation.haystack") {
+      return;
+    }
 
-    const parsed = safeJsonParse(docsRaw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    // ─────────────────────────────────────────────────────────────────────────
+    // Retrieval Documents → RAG Contexts
+    // Haystack stores retrieved documents in retrieval.documents attribute
+    // ─────────────────────────────────────────────────────────────────────────
+    const documentsRaw = ctx.bag.attrs.get(ATTR_KEYS.RETRIEVAL_DOCUMENTS);
+    if (documentsRaw === void 0) {
+      return;
+    }
 
+    const parsed = safeJsonParse(documentsRaw);
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      return;
+    }
+
+    // Transform Haystack document format to LangWatch RAG context format
     const contexts = parsed
-      .map((d) => {
-        if (!isRecord(d)) return null;
-        const document = (d as Record<string, unknown>).document;
+      .map((doc) => {
+        if (!isRecord(doc)) return null;
+
+        const document = (doc as Record<string, unknown>).document;
         if (!isRecord(document)) return null;
 
         const content = (document as Record<string, unknown>).content;
@@ -38,19 +57,17 @@ export class HaystackExtractor implements CanonicalAttributesExtractor {
 
         const id = (document as Record<string, unknown>).id;
         return {
-          ...(typeof id === "string" && id.length > 0
-            ? { document_id: id }
-            : {}),
+          ...(typeof id === "string" && id.length > 0 ? { document_id: id } : {}),
           content,
         };
       })
-      .filter(
-        (x): x is { content: string; document_id?: string } => x !== null
-      );
+      .filter((x): x is { content: string; document_id?: string } => x !== null);
 
-    if (contexts.length === 0) return;
+    if (contexts.length === 0) {
+      return;
+    }
 
-    // we do not consume retrieval.documents (it's not "owned" by us unless you want it gone)
+    // Note: We do not consume retrieval.documents (it's not "owned" by this extractor)
     ctx.setAttr(ATTR_KEYS.LANGWATCH_RAG_CONTEXTS, contexts);
     inferSpanTypeIfAbsent(ctx, "rag", `${this.id}:type=rag`);
     ctx.recordRule(`${this.id}:retrieval.documents->langwatch.rag.contexts`);
