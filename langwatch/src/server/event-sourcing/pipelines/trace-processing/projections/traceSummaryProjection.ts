@@ -12,7 +12,7 @@ import type {
   TraceProcessingEvent,
 } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
-// import { traceAggregationService } from "../services/traceAggregationService";
+import { traceAggregationService } from "../services/traceAggregationService";
 import { SpanNormalizationPipelineService } from "../services";
 import { IdUtils } from "../utils/id.utils";
 import type { NormalizedSpan } from "../schemas/spans";
@@ -20,47 +20,48 @@ import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 
 /**
  * Summary data for trace metrics.
- * Matches the trace_summaries ClickHouse table schema.
+ * Matches the trace_summaries ClickHouse table schema exactly.
  */
 export interface TraceSummaryData {
   TraceId: string;
   SpanCount: number;
   TotalDurationMs: number;
-  IOSchemaVersion: string;
+
+  // I/O
+  ComputedIOSchemaVersion: string;
   ComputedInput: string | null;
   ComputedOutput: string | null;
-  ComputedAttributes: Record<string, string>;
+
+  // Timing
   TimeToFirstTokenMs: number | null;
   TimeToLastTokenMs: number | null;
   TokensPerSecond: number | null;
+
+  // Status
   ContainsErrorStatus: boolean;
   ContainsOKStatus: boolean;
+  ErrorMessage: string | null;
   Models: string[];
-  TopicId: string | null;
-  SubTopicId: string | null;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  HasAnnotation: boolean | null;
-  CreatedAt: number;
-  LastUpdatedAt: number;
 
-  // Reserved trace metadata
-  ThreadId: string | null;
-  UserId: string | null;
-  CustomerId: string | null;
-  Labels: string[];
-  PromptIds: string[];
-  PromptVersionIds: string[];
-
-  // Additional attributes (SDK info and other metadata)
-  Attributes: Record<string, string>;
-
-  // Cost metrics
+  // Cost
   TotalCost: number | null;
   TokensEstimated: boolean;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
 
-  // Error details
-  ErrorMessage: string | null;
+  // Trace intelligence (populated later by async processes)
+  TopicId: string | null;
+  SubTopicId: string | null;
+  HasAnnotation: boolean | null;
+
+  // Metadata (stored in Attributes Map)
+  // Includes: sdk.name, sdk.version, sdk.language, service.name,
+  // thread.id, user.id, customer.id, langgraph.thread_id
+  Attributes: Record<string, string>;
+
+  // Timestamps
+  CreatedAt: number;
+  LastUpdatedAt: number;
 }
 
 /**
@@ -91,7 +92,8 @@ export class TraceSummaryProjectionHandler
 {
   static readonly store = traceSummaryRepository;
 
-  private readonly spanNormalizationPipelineService = new SpanNormalizationPipelineService();
+  private readonly spanNormalizationPipelineService =
+    new SpanNormalizationPipelineService();
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.trace-summary-projection"
   );
@@ -127,13 +129,24 @@ export class TraceSummaryProjectionHandler
           if (isSpanReceivedEvent(event)) {
             if (!firstSpanReceivedEvent) firstSpanReceivedEvent = event;
 
+            // Debug: log raw event data
+            this.logger.debug(
+              {
+                spanName: event.data.span.name,
+                spanId: event.data.span.spanId,
+                eventCount: event.data.span.events?.length ?? 0,
+                rawEvents: JSON.stringify(event.data.span.events?.slice(0, 3)),
+              },
+              "Processing SpanReceivedEvent in projection"
+            );
+
             // Enrich pure span data with computed fields for aggregation
             normalizedSpans.push(
               this.spanNormalizationPipelineService.normalizeSpanReceived(
                 event.tenantId,
                 event.data.span,
                 event.data.resource,
-                event.data.instrumentationScope,
+                event.data.instrumentationScope
               )
             );
 
@@ -148,7 +161,7 @@ export class TraceSummaryProjectionHandler
           "span.count": normalizedSpans.length,
         });
 
-        // If no spans, return empty projection
+        // If no spans, throw an error
         if (!firstSpanReceivedEvent || normalizedSpans.length === 0) {
           this.logger.debug(
             {
@@ -162,31 +175,31 @@ export class TraceSummaryProjectionHandler
         }
 
         // Aggregate spans using the service
-        // span.addEvent("aggregate.start");
-        // const aggregatedData =
-        //   traceAggregationService.aggregateTrace(normalizedSpans);
+        span.addEvent("aggregate.start");
+        const aggregatedData =
+          traceAggregationService.aggregateTrace(normalizedSpans);
 
-        // span.setAttributes({
-        //   "trace.duration_ms": aggregatedData.durationMs,
-        //   "trace.total_spans": aggregatedData.totalSpans,
-        //   "trace.total_tokens":
-        //     (aggregatedData.TotalPromptTokenCount ?? 0) +
-        //     (aggregatedData.TotalCompletionTokenCount ?? 0),
-        //   "trace.total_cost": aggregatedData.TotalCost ?? 0,
-        //   "trace.has_error": aggregatedData.ContainsErrorStatus,
-        //   "trace.input_length": aggregatedData.ComputedInput?.length ?? 0,
-        //   "trace.output_length": aggregatedData.ComputedOutput?.length ?? 0,
-        // });
+        span.setAttributes({
+          "trace.duration_ms": aggregatedData.durationMs,
+          "trace.total_spans": aggregatedData.spanCount,
+          "trace.total_tokens":
+            (aggregatedData.totalPromptTokenCount ?? 0) +
+            (aggregatedData.totalCompletionTokenCount ?? 0),
+          "trace.total_cost": aggregatedData.totalCost ?? 0,
+          "trace.has_error": aggregatedData.containsErrorStatus,
+          "trace.input_length": aggregatedData.computedInput?.length ?? 0,
+          "trace.output_length": aggregatedData.computedOutput?.length ?? 0,
+        });
 
-        // this.logger.debug(
-        //   {
-        //     tenantId,
-        //     traceId: aggregatedData.traceId,
-        //     spanCount: aggregatedData.totalSpans,
-        //     durationMs: aggregatedData.durationMs,
-        //   },
-        //   "Computed trace summary from span events"
-        // );
+        this.logger.debug(
+          {
+            tenantId,
+            traceId: aggregatedData.traceId,
+            spanCount: aggregatedData.spanCount,
+            durationMs: aggregatedData.durationMs,
+          },
+          "Computed trace summary from span events"
+        );
 
         // Generate deterministic trace summary ID
         const traceSummaryId = IdUtils.generateDeterministicTraceSummaryId(
@@ -203,67 +216,37 @@ export class TraceSummaryProjectionHandler
           tenantId,
           version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
           data: {
-            TraceId: "",
-            SpanCount: 0,
-            TotalDurationMs: 0,
-            IOSchemaVersion: "",
-            ComputedInput: "",
-            ComputedOutput: "",
-            ComputedAttributes: {},
-            TimeToFirstTokenMs: null,
-            TimeToLastTokenMs: null,
-            TokensPerSecond: null,
-            ContainsErrorStatus: false,
-            ContainsOKStatus: false,
-            Models: [],
+            TraceId: aggregatedData.traceId,
+            SpanCount: aggregatedData.spanCount,
+            TotalDurationMs: aggregatedData.durationMs,
+
+            ComputedIOSchemaVersion: aggregatedData.computedIOSchemaVersion,
+            ComputedInput: aggregatedData.computedInput,
+            ComputedOutput: aggregatedData.computedOutput,
+
+            TimeToFirstTokenMs: aggregatedData.timeToFirstTokenMs,
+            TimeToLastTokenMs: aggregatedData.timeToLastTokenMs,
+            TokensPerSecond: aggregatedData.tokensPerSecond,
+
+            ContainsErrorStatus: aggregatedData.containsErrorStatus,
+            ContainsOKStatus: aggregatedData.containsOKStatus,
+            ErrorMessage: aggregatedData.errorMessage,
+            Models: aggregatedData.models,
+
+            TotalCost: aggregatedData.totalCost,
+            TokensEstimated: aggregatedData.tokensEstimated,
+            TotalPromptTokenCount: aggregatedData.totalPromptTokenCount,
+            TotalCompletionTokenCount: aggregatedData.totalCompletionTokenCount,
+
+            // These are populated by async processes later
             TopicId: null,
             SubTopicId: null,
-            TotalPromptTokenCount: null,
-            TotalCompletionTokenCount: null,
             HasAnnotation: null,
-            CreatedAt: 0,
-            LastUpdatedAt: lastUpdatedAt,
-            ThreadId: null,
-            UserId: "",
-            CustomerId: null,
-            Labels: [],
-            PromptIds: [],
-            PromptVersionIds: [],
-            Attributes: {},
-            TotalCost: null,
-            TokensEstimated: false,
-            ErrorMessage: null,
 
-            // TraceId: aggregatedData.traceId,
-            // SpanCount: aggregatedData.totalSpans,
-            // TotalDurationMs: aggregatedData.durationMs,
-            // IOSchemaVersion: aggregatedData.IOSchemaVersion,
-            // ComputedInput: aggregatedData.ComputedInput,
-            // ComputedOutput: aggregatedData.ComputedOutput,
-            // ComputedAttributes: aggregatedData.ComputedAttributes,
-            // TimeToFirstTokenMs: aggregatedData.TimeToFirstTokenMs,
-            // TimeToLastTokenMs: aggregatedData.TimeToLastTokenMs,
-            // TokensPerSecond: aggregatedData.TokensPerSecond,
-            // ContainsErrorStatus: aggregatedData.ContainsErrorStatus,
-            // ContainsOKStatus: aggregatedData.ContainsOKStatus,
-            // Models: aggregatedData.Models,
-            // TopicId: aggregatedData.TopicId,
-            // SubTopicId: aggregatedData.SubTopicId,
-            // TotalPromptTokenCount: aggregatedData.TotalPromptTokenCount,
-            // TotalCompletionTokenCount: aggregatedData.TotalCompletionTokenCount,
-            // HasAnnotation: aggregatedData.HasAnnotation,
-            // CreatedAt: createdAt ?? lastUpdatedAt,
-            // LastUpdatedAt: lastUpdatedAt,
-            // ThreadId: aggregatedData.ThreadId,
-            // UserId: aggregatedData.UserId,
-            // CustomerId: aggregatedData.CustomerId,
-            // Labels: aggregatedData.Labels,
-            // PromptIds: aggregatedData.PromptIds,
-            // PromptVersionIds: aggregatedData.PromptVersionIds,
-            // Attributes: aggregatedData.Attributes,
-            // TotalCost: aggregatedData.TotalCost,
-            // TokensEstimated: aggregatedData.TokensEstimated,
-            // ErrorMessage: aggregatedData.ErrorMessage,
+            Attributes: aggregatedData.attributes,
+
+            CreatedAt: createdAt ?? lastUpdatedAt,
+            LastUpdatedAt: lastUpdatedAt,
           },
         } satisfies TraceSummary;
       }

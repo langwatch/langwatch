@@ -23,76 +23,68 @@ import type { TraceSummaryRepository } from "./traceSummaryRepository";
 const TABLE_NAME = "trace_summaries" as const;
 
 /**
- * ClickHouse record matching the trace_summaries table schema.
+ * ClickHouse record matching the trace_summaries table schema exactly.
  */
 interface ClickHouseSummaryRecord {
   Id: string;
   TenantId: string;
   TraceId: string;
   Version: string;
-  IOSchemaVersion: string;
+  Attributes: Record<string, string>;
+
+  CreatedAt: string; // DateTime64(3) - millisecond precision
+  LastUpdatedAt: string;
+
+  // I/O
+  ComputedIOSchemaVersion: string;
   ComputedInput: string | null;
   ComputedOutput: string | null;
-  ComputedAttributes: Record<string, string>;
+
+  // Timing
   TimeToFirstTokenMs: number | null;
   TimeToLastTokenMs: number | null;
   TotalDurationMs: number;
   TokensPerSecond: number | null;
   SpanCount: number;
+
+  // Status
   ContainsErrorStatus: boolean;
   ContainsOKStatus: boolean;
+  ErrorMessage: string | null;
   Models: string[];
-  TopicId: string | null;
-  SubTopicId: string | null;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  HasAnnotation: boolean | null;
-  CreatedAt: string;
-  LastUpdatedAt: string;
-  ThreadId: string | null;
-  UserId: string | null;
-  CustomerId: string | null;
-  Labels: string[];
-  PromptIds: string[];
-  PromptVersionIds: string[];
-  Attributes: Record<string, string>;
+
+  // Cost
   TotalCost: number | null;
   TokensEstimated: boolean;
-  ErrorMessage: string | null;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+
+  // Trace intelligence
+  TopicId: string | null;
+  SubTopicId: string | null;
+  HasAnnotation: boolean | null;
 }
 
 /**
- * Converts a Unix millisecond timestamp to ClickHouse DateTime64 nanosecond string.
+ * Converts a Unix millisecond timestamp to ClickHouse DateTime64(3) format.
+ * DateTime64(3) expects milliseconds since epoch.
  *
  * @param timestampMs - Unix timestamp in milliseconds
- * @returns Nanosecond timestamp as string for ClickHouse DateTime64
- *
- * @example
- * ```typescript
- * const dateTime64 = timestampToDateTime64(1702468800000);
- * // Returns "1702468800000000000"
- * ```
+ * @returns Millisecond timestamp as string for ClickHouse DateTime64(3)
  */
 function timestampToDateTime64(timestampMs: number): string {
-  const timestampNs = BigInt(timestampMs) * BigInt(1_000_000);
-  return timestampNs.toString();
+  // DateTime64(3) uses milliseconds precision
+  return timestampMs.toString();
 }
 
 /**
- * Converts a ClickHouse DateTime64 nanosecond string to Unix millisecond timestamp.
+ * Converts a ClickHouse DateTime64(3) string to Unix millisecond timestamp.
  *
- * @param dateTime64 - Nanosecond timestamp string from ClickHouse DateTime64
+ * @param dateTime64 - Millisecond timestamp string from ClickHouse DateTime64(3)
  * @returns Unix timestamp in milliseconds
- *
- * @example
- * ```typescript
- * const timestampMs = dateTime64ToTimestamp("1702468800000000000");
- * // Returns 1702468800000
- * ```
  */
 function dateTime64ToTimestamp(dateTime64: string): number {
-  const timestampNs = BigInt(dateTime64);
-  return Number(timestampNs / BigInt(1_000_000));
+  return parseInt(dateTime64, 10);
 }
 
 /**
@@ -103,46 +95,46 @@ export class TraceSummaryRepositoryClickHouse<
 > implements TraceSummaryRepository<ProjectionType>
 {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-summary-repository",
+    "langwatch.trace-processing.trace-summary-repository"
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-summary-repository",
+    "langwatch:trace-processing:trace-summary-repository"
   );
 
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
 
   private mapClickHouseRecordToProjectionData(
-    record: ClickHouseSummaryRecord,
+    record: ClickHouseSummaryRecord
   ): TraceSummaryData {
     return {
       TraceId: record.TraceId,
       SpanCount: record.SpanCount,
       TotalDurationMs: record.TotalDurationMs,
-      IOSchemaVersion: record.IOSchemaVersion,
+
+      ComputedIOSchemaVersion: record.ComputedIOSchemaVersion,
       ComputedInput: record.ComputedInput,
       ComputedOutput: record.ComputedOutput,
-      ComputedAttributes: record.ComputedAttributes,
+
       TimeToFirstTokenMs: record.TimeToFirstTokenMs,
       TimeToLastTokenMs: record.TimeToLastTokenMs,
       TokensPerSecond: record.TokensPerSecond,
+
       ContainsErrorStatus: record.ContainsErrorStatus,
       ContainsOKStatus: record.ContainsOKStatus,
+      ErrorMessage: record.ErrorMessage,
       Models: record.Models,
-      TopicId: record.TopicId,
-      SubTopicId: record.SubTopicId,
+
+      TotalCost: record.TotalCost,
+      TokensEstimated: record.TokensEstimated,
       TotalPromptTokenCount: record.TotalPromptTokenCount,
       TotalCompletionTokenCount: record.TotalCompletionTokenCount,
+
+      TopicId: record.TopicId,
+      SubTopicId: record.SubTopicId,
       HasAnnotation: record.HasAnnotation,
-      ThreadId: record.ThreadId ?? null,
-      UserId: record.UserId ?? null,
-      CustomerId: record.CustomerId ?? null,
-      Labels: record.Labels ?? [],
-      PromptIds: record.PromptIds ?? [],
-      PromptVersionIds: record.PromptVersionIds ?? [],
+
       Attributes: record.Attributes ?? {},
-      TotalCost: record.TotalCost ?? null,
-      TokensEstimated: record.TokensEstimated,
-      ErrorMessage: record.ErrorMessage ?? null,
+
       CreatedAt: dateTime64ToTimestamp(record.CreatedAt),
       LastUpdatedAt: dateTime64ToTimestamp(record.LastUpdatedAt),
     };
@@ -153,48 +145,47 @@ export class TraceSummaryRepositoryClickHouse<
     tenantId: string,
     traceId: string,
     projectionId: string,
-    projectionVersion: string,
+    projectionVersion: string
   ): ClickHouseSummaryRecord {
     return {
       Id: projectionId,
       TenantId: tenantId,
       TraceId: traceId,
       Version: projectionVersion,
-      IOSchemaVersion: data.IOSchemaVersion,
+      Attributes: data.Attributes,
+
+      CreatedAt: timestampToDateTime64(data.CreatedAt),
+      LastUpdatedAt: timestampToDateTime64(data.LastUpdatedAt),
+
+      ComputedIOSchemaVersion: data.ComputedIOSchemaVersion,
       ComputedInput: data.ComputedInput,
       ComputedOutput: data.ComputedOutput,
-      ComputedAttributes: data.ComputedAttributes,
+
       TimeToFirstTokenMs: data.TimeToFirstTokenMs,
       TimeToLastTokenMs: data.TimeToLastTokenMs,
       TotalDurationMs: data.TotalDurationMs,
       TokensPerSecond: data.TokensPerSecond,
       SpanCount: data.SpanCount,
+
       ContainsErrorStatus: data.ContainsErrorStatus,
       ContainsOKStatus: data.ContainsOKStatus,
+      ErrorMessage: data.ErrorMessage,
       Models: data.Models,
-      TopicId: data.TopicId,
-      SubTopicId: data.SubTopicId,
-      TotalPromptTokenCount: data.TotalPromptTokenCount,
-      TotalCompletionTokenCount: data.TotalCompletionTokenCount,
-      HasAnnotation: data.HasAnnotation,
-      ThreadId: data.ThreadId,
-      UserId: data.UserId,
-      CustomerId: data.CustomerId,
-      Labels: data.Labels,
-      PromptIds: data.PromptIds,
-      PromptVersionIds: data.PromptVersionIds,
-      Attributes: data.Attributes,
+
       TotalCost: data.TotalCost,
       TokensEstimated: data.TokensEstimated,
-      ErrorMessage: data.ErrorMessage,
-      CreatedAt: timestampToDateTime64(data.CreatedAt),
-      LastUpdatedAt: timestampToDateTime64(data.LastUpdatedAt),
+      TotalPromptTokenCount: data.TotalPromptTokenCount,
+      TotalCompletionTokenCount: data.TotalCompletionTokenCount,
+
+      TopicId: data.TopicId,
+      SubTopicId: data.SubTopicId,
+      HasAnnotation: data.HasAnnotation,
     };
   }
 
   async getProjection(
     aggregateId: string,
-    context: ProjectionStoreReadContext,
+    context: ProjectionStoreReadContext
   ): Promise<ProjectionType | null> {
     return await this.tracer.withActiveSpan(
       "TraceSummaryRepositoryClickHouse.getProjection",
@@ -208,7 +199,7 @@ export class TraceSummaryRepositoryClickHouse<
       async () => {
         EventUtils.validateTenantId(
           context,
-          "TraceSummaryRepositoryClickHouse.getProjection",
+          "TraceSummaryRepositoryClickHouse.getProjection"
         );
 
         const traceId = String(aggregateId);
@@ -221,10 +212,12 @@ export class TraceSummaryRepositoryClickHouse<
                 TenantId,
                 TraceId,
                 Version,
-                IOSchemaVersion,
+                Attributes,
+                toString(CreatedAt) AS CreatedAt,
+                toString(LastUpdatedAt) AS LastUpdatedAt,
+                ComputedIOSchemaVersion,
                 ComputedInput,
                 ComputedOutput,
-                ComputedAttributes,
                 TimeToFirstTokenMs,
                 TimeToLastTokenMs,
                 TotalDurationMs,
@@ -232,18 +225,19 @@ export class TraceSummaryRepositoryClickHouse<
                 SpanCount,
                 ContainsErrorStatus,
                 ContainsOKStatus,
+                ErrorMessage,
                 Models,
-                TopicId,
-                SubTopicId,
+                TotalCost,
+                TokensEstimated,
                 TotalPromptTokenCount,
                 TotalCompletionTokenCount,
-                HasAnnotation,
-                CreatedAt,
-                LastUpdatedAt
+                TopicId,
+                SubTopicId,
+                HasAnnotation
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              ORDER BY Version DESC
+              ORDER BY LastUpdatedAt DESC
               LIMIT 1
             `,
             query_params: {
@@ -279,7 +273,7 @@ export class TraceSummaryRepositoryClickHouse<
               tenantId: context.tenantId,
               error: errorMessage,
             },
-            "Failed to get projection from ClickHouse",
+            "Failed to get projection from ClickHouse"
           );
           throw new StoreError(
             "getProjection",
@@ -287,16 +281,16 @@ export class TraceSummaryRepositoryClickHouse<
             `Failed to get projection for trace ${traceId}: ${errorMessage}`,
             ErrorCategory.CRITICAL,
             { traceId },
-            error,
+            error
           );
         }
-      },
+      }
     );
   }
 
   async storeProjection(
     projection: ProjectionType,
-    context: ProjectionStoreWriteContext,
+    context: ProjectionStoreWriteContext
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
       "TraceSummaryRepositoryClickHouse.storeProjection",
@@ -310,14 +304,14 @@ export class TraceSummaryRepositoryClickHouse<
       async () => {
         EventUtils.validateTenantId(
           context,
-          "TraceSummaryRepositoryClickHouse.storeProjection",
+          "TraceSummaryRepositoryClickHouse.storeProjection"
         );
 
         if (!EventUtils.isValidProjection(projection)) {
           throw new ValidationError(
             "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
             "projection",
-            projection,
+            projection
           );
         }
 
@@ -326,7 +320,7 @@ export class TraceSummaryRepositoryClickHouse<
             "storeProjection",
             `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
             projection.tenantId,
-            { contextTenantId: context.tenantId },
+            { contextTenantId: context.tenantId }
           );
         }
 
@@ -337,7 +331,7 @@ export class TraceSummaryRepositoryClickHouse<
             String(context.tenantId),
             traceId,
             projection.id,
-            projection.version,
+            projection.version
           );
 
           await this.clickHouseClient.insert({
@@ -352,7 +346,7 @@ export class TraceSummaryRepositoryClickHouse<
               traceId: traceId,
               projectionId: projection.id,
             },
-            "Stored projection to ClickHouse",
+            "Stored projection to ClickHouse"
           );
         } catch (error) {
           const errorMessage =
@@ -364,7 +358,7 @@ export class TraceSummaryRepositoryClickHouse<
               projectionId: projection.id,
               error: errorMessage,
             },
-            "Failed to store projection in ClickHouse",
+            "Failed to store projection in ClickHouse"
           );
           throw new StoreError(
             "storeProjection",
@@ -375,10 +369,10 @@ export class TraceSummaryRepositoryClickHouse<
               projectionId: projection.id,
               traceId: String(projection.aggregateId),
             },
-            error,
+            error
           );
         }
-      },
+      }
     );
   }
 }
