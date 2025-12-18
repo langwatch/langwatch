@@ -79,51 +79,23 @@ Feature: Scenarios Table View
     And I show the metadata.user_id column
     And I copy the current URL
     Then navigating to that URL shows the same column configuration
+
+  @e2e @out-of-scope
+  Scenario: Multi-column sorting
+    Given I am on the simulations page in Table View
+    When I sort by Status ascending then by Timestamp descending
+    Then scenarios are sorted by Status first, then by Timestamp within each status
+
+  @e2e
+  Scenario: Clear all filters
+    Given I am on the simulations page in Table View
+    And I have multiple filters applied
+    When I click Clear All Filters
+    Then all filters are removed
+    And I see all scenarios
   # ============================================================================
-  # Integration: Type-Aware Filtering
+  # Integration: Error Handling & Dynamic Data
   # ============================================================================
-
-  @integration
-  Scenario: Text column shows contains and not-contains operators
-    Given I am on the simulations page in Table View
-    When I open the Name column filter
-    Then I see "contains" and "not contains" operators
-
-  @integration
-  Scenario: Number column shows numeric comparison operators
-    Given I am on the simulations page in Table View
-    When I open a numeric column filter
-    Then I see operators: greater than, less than, equals, at least, at most
-
-  @integration
-  Scenario: Duration column shows time preset filters
-    Given I am on the simulations page in Table View
-    When I open the Duration column filter
-    Then I see presets: under 5m, under 30m, under 1h, under 3h, under 1d
-    And I can set a custom time range
-
-  @integration
-  Scenario: Enum column allows multi-select filtering
-    Given I am on the simulations page in Table View
-    When I open the Status column filter
-    And I select FAILED and ERROR
-    Then I see scenarios with either FAILED or ERROR status
-  # ============================================================================
-  # Integration: Column Operations
-  # ============================================================================
-
-  @integration
-  Scenario: Group rows by column value
-    Given I am on the simulations page in Table View
-    When I group by Status
-    Then rows are organized under status group headers
-    And each header shows the count for that status
-
-  @integration
-  Scenario: Pin column to left side
-    Given I am on the simulations page in Table View
-    When I pin the Name column to the left
-    Then Name stays visible when scrolling horizontally
 
   @integration
   Scenario: Dynamic metadata columns from traces
@@ -131,33 +103,6 @@ Feature: Scenarios Table View
     When I am on the simulations page in Table View
     Then column visibility shows metadata.user_id and metadata.session_id
     And I can enable and filter by these columns
-  # ============================================================================
-  # Integration: State Persistence
-  # ============================================================================
-
-  @integration
-  Scenario: Column visibility persists in localStorage
-    Given I am on the simulations page in Table View
-    And I hide the Duration column
-    When I refresh the page
-    Then the Duration column remains hidden
-
-  @integration
-  Scenario: URL parameters override localStorage preferences
-    Given I have Duration hidden in localStorage
-    And I have a URL with Duration visible in the columns parameter
-    When I navigate to that URL
-    Then the Duration column is visible
-
-  @integration
-  Scenario: Invalid URL parameters are ignored gracefully
-    Given I have a URL with malformed filter parameters
-    When I navigate to that URL
-    Then I see the Table View without errors
-    And invalid filters are not applied
-  # ============================================================================
-  # Integration: Error Handling
-  # ============================================================================
 
   @integration
   Scenario: Empty filter results show helpful message
@@ -171,6 +116,79 @@ Feature: Scenarios Table View
     When the scenarios API returns an error
     Then I see an error message
     And I can click Retry to reload
+  # ============================================================================
+  # Unit: Type-Aware Filtering (pure rendering logic)
+  # ============================================================================
+
+  @unit
+  Scenario: Text column shows contains and not-contains operators
+    Given a text column type
+    When I render the filter UI
+    Then I see "contains" and "not contains" operators
+
+  @unit
+  Scenario: Number column shows numeric comparison operators
+    Given a number column type
+    When I render the filter UI
+    Then I see operators: greater than, less than, equals, at least, at most
+
+  @unit
+  Scenario: Date column shows time preset filters
+    Given a date column type
+    When I render the filter UI
+    Then I see presets: under 5m, under 30m, under 1h, under 3h, under 1d
+    And I can set a custom time range
+
+  @unit
+  Scenario: Enum column allows multi-select filtering
+    Given an enum column type with values FAILED and ERROR
+    When I render the filter UI
+    Then I can select multiple values
+  # ============================================================================
+  # Unit: Column Operations (pure client-side UI)
+  # ============================================================================
+
+  @unit
+  Scenario: Group rows by column value
+    Given scenario rows with mixed Status values
+    When I group by Status
+    Then rows are organized under status group headers
+    And each header shows the count for that status
+
+  @unit @out-of-scope
+  Scenario: Column reordering via drag and drop
+    Given a list of columns in order [Name, Status, Duration]
+    When I reorder Status before Name
+    Then columns are [Status, Name, Duration]
+
+  @unit @out-of-scope
+  Scenario: Pin column to left side
+    Given a column configuration
+    When I pin the Name column
+    Then Name is marked as pinned in state
+  # ============================================================================
+  # Unit: State Persistence (pure client logic)
+  # ============================================================================
+
+  @unit
+  Scenario: Column visibility persists in localStorage
+    Given column visibility state
+    When I hide the Duration column and reload
+    Then the Duration column remains hidden in restored state
+
+  @unit
+  Scenario: URL parameters override localStorage preferences
+    Given Duration hidden in localStorage
+    And a URL with Duration visible in the columns parameter
+    When I parse state from URL
+    Then the Duration column is visible
+
+  @unit
+  Scenario: Invalid URL parameters are ignored gracefully
+    Given a URL with malformed filter parameters
+    When I parse state from URL
+    Then no errors are thrown
+    And invalid filters are not applied
   # ============================================================================
   # Unit Tests (implemented in *.unit.test.ts)
   # ============================================================================
