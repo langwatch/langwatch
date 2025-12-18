@@ -16,6 +16,7 @@ import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import {
   calculateGridPositions,
+  type GridLayout,
   ReportGrid,
   type SizeOption,
   sizeOptions,
@@ -151,15 +152,7 @@ function ReportsContent() {
     );
   };
 
-  const handleGraphsReorder = (
-    layouts: Array<{
-      graphId: string;
-      gridColumn: number;
-      gridRow: number;
-      colSpan: number;
-      rowSpan: number;
-    }>,
-  ) => {
+  const handleGraphsReorder = (layouts: GridLayout[]) => {
     batchUpdateLayouts.mutate(
       { projectId, layouts },
       {

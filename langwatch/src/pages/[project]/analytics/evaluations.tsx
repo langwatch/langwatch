@@ -177,7 +177,9 @@ const creatChecks = (checks: any) => {
               <HStack gap={2}>
                 <BarChart2 color="orange" />
                 <Heading size="sm">{check.name}</Heading>
-                <Text fontWeight={300}>- {traceCheck?.name}</Text>
+                {traceCheck && (
+                  <Text fontWeight={300}>- {traceCheck.name}</Text>
+                )}
               </HStack>
               {!check.enabled && (
                 <Text color="gray" fontSize="sm">

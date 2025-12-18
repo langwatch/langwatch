@@ -17,21 +17,14 @@ import {
   type GraphData,
   type SizeOption,
 } from "./DraggableGraphCard";
+import { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 
 interface ReportGridProps {
   graphs: GraphData[];
   projectSlug: string;
   onGraphDelete: (graphId: string) => void;
   onGraphSizeChange: (graphId: string, size: SizeOption) => void;
-  onGraphsReorder: (
-    layouts: Array<{
-      graphId: string;
-      gridColumn: number;
-      gridRow: number;
-      colSpan: number;
-      rowSpan: number;
-    }>,
-  ) => void;
+  onGraphsReorder: (layouts: GridLayout[]) => void;
   deletingGraphId: string | null;
 }
 
@@ -51,14 +44,14 @@ export function ReportGrid({
       activationConstraint: {
         distance: 8,
       },
-    }),
+    })
   );
 
-  function handleDragStart(event: DragStartEvent) {
+  const handleDragStart = (event: DragStartEvent) => {
     setActiveDragId(event.active.id as string);
-  }
+  };
 
-  function handleDragEnd(event: DragEndEvent) {
+  const handleDragEnd = (event: DragEndEvent) => {
     setActiveDragId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -76,7 +69,7 @@ export function ReportGrid({
       const layouts = calculateGridPositions(newOrder);
       onGraphsReorder(layouts);
     }
-  }
+  };
 
   return (
     <DndContext
@@ -142,93 +135,3 @@ export function ReportGrid({
     </DndContext>
   );
 }
-
-/**
- * Calculate grid positions for graphs after reordering.
- * This uses a simple row-by-row layout algorithm.
- */
-function calculateGridPositions(
-  graphs: GraphData[],
-): Array<{
-  graphId: string;
-  gridColumn: number;
-  gridRow: number;
-  colSpan: number;
-  rowSpan: number;
-}> {
-  const layouts: Array<{
-    graphId: string;
-    gridColumn: number;
-    gridRow: number;
-    colSpan: number;
-    rowSpan: number;
-  }> = [];
-
-  // Track which cells are occupied
-  // Grid is 2 columns wide, rows are dynamically added
-  const occupied: Set<string> = new Set();
-
-  const cellKey = (col: number, row: number) => `${col},${row}`;
-
-  const isAreaFree = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        if (c >= 2 || occupied.has(cellKey(c, r))) {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
-
-  const occupyArea = (
-    col: number,
-    row: number,
-    colSpan: number,
-    rowSpan: number,
-  ) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        occupied.add(cellKey(c, r));
-      }
-    }
-  };
-
-  for (const graph of graphs) {
-    const { colSpan, rowSpan } = graph;
-
-    // Find the first available position
-    let placed = false;
-    let row = 0;
-
-    while (!placed) {
-      for (let col = 0; col <= 2 - colSpan; col++) {
-        if (isAreaFree(col, row, colSpan, rowSpan)) {
-          occupyArea(col, row, colSpan, rowSpan);
-          layouts.push({
-            graphId: graph.id,
-            gridColumn: col,
-            gridRow: row,
-            colSpan,
-            rowSpan,
-          });
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        row++;
-      }
-    }
-  }
-
-  return layouts;
-}
-
-// Export for use when size changes
-export { calculateGridPositions };
