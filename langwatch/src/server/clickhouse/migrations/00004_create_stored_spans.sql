@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_spans
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}StartTime)
 PARTITION BY toYearWeek(StartTime)
 ORDER BY (TenantId, TraceId, SpanId)
-TTL EndTime + INTERVAL ${TIERED_STORED_SPANS_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
+TTL toDateTime(EndTime) + INTERVAL ${TIERED_STORED_SPANS_TABLE_HOT_DAYS:-2} DAY TO VOLUME 'cold'
 SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
 
 -- +goose StatementEnd
