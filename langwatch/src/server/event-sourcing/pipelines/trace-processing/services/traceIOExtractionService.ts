@@ -185,38 +185,15 @@ export class TraceIOExtractionService {
   );
 
   /**
-   * Extracts the first meaningful input from the trace as text.
-   * Uses span tree traversal to find the topmost input, filtering out
-   * evaluation and guardrail spans.
-   *
-   * @deprecated Use extractFirstInputRich for rich JSON data
-   */
-  extractFirstInput(spans: NormalizedSpan[]): string | null {
-    const result = this.extractFirstInputRich(spans);
-    return result?.text ?? null;
-  }
-
-  /**
-   * Extracts the last meaningful output from the trace as text.
-   * Prioritizes single top-level node output, then falls back to last-finishing span.
-   *
-   * @deprecated Use extractLastOutputRich for rich JSON data
-   */
-  extractLastOutput(spans: NormalizedSpan[]): string | null {
-    const result = this.extractLastOutputRich(spans);
-    return result?.text ?? null;
-  }
-
-  /**
    * Extracts the first meaningful input from the trace with rich JSON data.
    * Uses span tree traversal to find the topmost input, filtering out
    * evaluation and guardrail spans.
    *
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
-  extractFirstInputRich(spans: NormalizedSpan[]): ExtractedIO | null {
+  extractFirstInput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
-      "TraceIOExtractionService.extractFirstInputRich",
+      "TraceIOExtractionService.extractFirstInput",
       {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
@@ -304,9 +281,9 @@ export class TraceIOExtractionService {
    *
    * @returns ExtractedIO with both raw JSON and text representation, or null if not found
    */
-  extractLastOutputRich(spans: NormalizedSpan[]): ExtractedIO | null {
+  extractLastOutput(spans: NormalizedSpan[]): ExtractedIO | null {
     return this.tracer.withActiveSpan(
-      "TraceIOExtractionService.extractLastOutputRich",
+      "TraceIOExtractionService.extractLastOutput",
       {
         kind: SpanKind.INTERNAL,
         attributes: { "span.count": spans.length },
