@@ -4,6 +4,7 @@ export { HaystackExtractor } from "./haystack";
 export { LangWatchExtractor } from "./langwatch";
 export { LegacyOtelTracesExtractor } from "./legacyOtel";
 export { LogfireExtractor } from "./logfire";
+export { MastraExtractor } from "./mastra";
 export { OpenInferenceExtractor } from "./openinference";
 export { StrandsExtractor } from "./strands";
 export { TraceloopExtractor } from "./traceloop";
