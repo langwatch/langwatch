@@ -71,6 +71,7 @@ export function DataGrid<T>({
     addFilter,
     removeFilter,
     clearFilters,
+    resetFiltersAndSorting,
     setGlobalSearch,
     setSorting,
     setGroupBy,
@@ -135,6 +136,19 @@ export function DataGrid<T>({
       pageSize,
       globalSearch: "",
       groupBy,
+    });
+  };
+
+  // Handle reset all filters and sorting
+  const handleResetFiltersAndSorting = () => {
+    resetFiltersAndSorting();
+    onStateChange?.({
+      filters: [],
+      sorting: null,
+      page: 1,
+      pageSize,
+      globalSearch: "",
+      groupBy: null,
     });
   };
 
@@ -224,9 +238,12 @@ export function DataGrid<T>({
         visibleColumns={visibleColumns}
         filters={filters}
         globalSearch={globalSearch}
+        sorting={sorting}
+        groupBy={groupBy}
         isExporting={isExporting}
         onRemoveFilter={handleRemoveFilter}
         onClearFilters={handleClearFilters}
+        onResetFiltersAndSorting={handleResetFiltersAndSorting}
         onGlobalSearchChange={handleGlobalSearchChange}
         onToggleColumnVisibility={toggleColumnVisibility}
         onExport={handleExport}
