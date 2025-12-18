@@ -1,5 +1,8 @@
 import type { ZodSchema, z } from "zod";
 import type { CommandType } from "../domain/commandType";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:event-sourcing:command-schema");
 
 /**
  * Command schema that defines a command type with its payload type and validation.
@@ -14,7 +17,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
    * Validation function that checks if a payload matches the expected type.
    * Should return true if valid, false otherwise.
    */
-  readonly validate: (payload: unknown) => payload is Payload;
+  readonly validate: (payload: unknown) => z.SafeParseReturnType<unknown, Payload>;
   /**
    * Optional description of the command for documentation.
    */
@@ -47,9 +50,16 @@ export function defineCommandSchema<
 ): CommandSchema<z.infer<Schema>, Type> {
   return {
     type,
-    validate: (payload: unknown): payload is z.infer<Schema> => {
+    validate: (payload: unknown): z.SafeParseReturnType<unknown, Schema> => {
       const result = schema.safeParse(payload);
-      return result.success;
+      if (!result.success) {
+        logger.error({
+          error: result.error,
+          payload,
+        }, "Command payload validation failed");
+      }
+
+      return result;
     },
     description,
   };
