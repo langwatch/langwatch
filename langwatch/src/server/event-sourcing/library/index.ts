@@ -7,11 +7,6 @@
  */
 
 export type {
-  EventSourcingPipelineDefinition,
-  PipelineMetadata,
-  RegisteredPipeline,
-} from "../runtime/pipeline";
-export type {
   CommandHandlerOptions as StaticCommandHandlerOptions,
   NoCommands,
   RegisteredCommand,
