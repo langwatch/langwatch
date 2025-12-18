@@ -119,8 +119,8 @@ export function ScenariosTableView() {
   const {
     data: scenarioData,
     isLoading: isLoadingUngrouped,
+    isFetching: isFetchingUngrouped,
     error: errorUngrouped,
-    refetch: refetchUngrouped,
   } = api.scenarios.getFilteredScenarioRuns.useQuery(
     {
       projectId: project?.id ?? "",
@@ -147,8 +147,8 @@ export function ScenariosTableView() {
   const {
     data: groupedData,
     isLoading: isLoadingGrouped,
+    isFetching: isFetchingGrouped,
     error: errorGrouped,
-    refetch: refetchGrouped,
   } = api.scenarios.getGroupedScenarioRuns.useQuery(
     {
       projectId: project?.id ?? "",
@@ -171,8 +171,8 @@ export function ScenariosTableView() {
   );
 
   const isLoading = groupBy ? isLoadingGrouped : isLoadingUngrouped;
+  const isFetching = groupBy ? isFetchingGrouped : isFetchingUngrouped;
   const error = groupBy ? errorGrouped : errorUngrouped;
-  const refetch = groupBy ? refetchGrouped : refetchUngrouped;
 
   // Helper to transform ScenarioRunData to ScenarioRunRow
   const transformRunData = useCallback((run: ScenarioRunData): ScenarioRunRow => {
@@ -400,7 +400,7 @@ export function ScenariosTableView() {
         getEnumOptions={getEnumOptions}
         onStateChange={handleStateChange}
         onExport={handleExport}
-        onRefresh={() => void refetch()}
+        isFetching={isFetching}
         emptyMessage="No scenario runs found. Try adjusting your filters."
         errorMessage={error?.message}
       />
