@@ -12,6 +12,7 @@
 | Duplicating logic across languages/templates | Business logic lives in one place; templates consume pre-computed values |
 | Implementing code before writing tests | Follow Outside-In TDD: Write failing tests first, then implement minimal code to pass, then refactor |
 | Writing tests in the incorrect order | Outside-In TDD: examples drive E2E tests => then integration tests => then unit tests |
+| Editing existing database migrations | Never edit existing migrations; always create new migrations using CLI tools (e.g., `prisma migrate dev`) |
 
 ## TypeScript
 
@@ -19,5 +20,7 @@
 |----------------|------------------|
 | Putting method-specific options interfaces in `types.ts` | Options interfaces belong in the file that uses them (e.g., `GetPromptOptions` in `prompts.facade.ts`) |
 | Creating shared types for single-use interfaces | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files |
+| Using npm for package management | Always use pnpm instead of npm for all package management tasks |
+
 
 

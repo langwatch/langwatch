@@ -25,7 +25,13 @@ export function ExpandedTextDialog({
       size="5xl"
     >
       <Dialog.Backdrop />
-      <Dialog.Content>
+      <Dialog.Content
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+        portalled={true}
+        backdrop={false}
+      >
         <Dialog.Header
           background="gray.100"
           padding={3}
@@ -75,7 +81,7 @@ export function HoverableBigText({
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
   const [textExpanded, setTextExpanded] = useState<string | undefined>(
-    undefined,
+    undefined
   );
   const expandedVersion_ = expandedVersion ?? children;
 
@@ -84,7 +90,7 @@ export function HoverableBigText({
       ref.current
         ? Math.abs(ref.current.offsetWidth - ref.current.scrollWidth) > 2 ||
             Math.abs(ref.current.offsetHeight - ref.current.scrollHeight) > 2
-        : false,
+        : false
     );
   };
 
