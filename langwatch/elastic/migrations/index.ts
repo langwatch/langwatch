@@ -19,6 +19,7 @@ import * as set_type_for_prompt_metadata from "./202505220000_set_type_for_promp
 import * as simulations_mappings from "./202506280000_simulations_mappings";
 import * as add_simulations_trace_id from "./202508311847_add_simulations_trace_id";
 import * as add_evaluation_thread_id_and_inputs from "./202510031800_add_evaluation_thread_id_and_inputs";
+import * as add_scenario_metadata_name_keyword from "./202512181712_add_scenario_metadata_name_keyword";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -42,6 +43,7 @@ export const migrations = {
   "202508311847_add_simulations_trace_id": add_simulations_trace_id,
   "202510031800_add_evaluation_thread_id_and_inputs":
     add_evaluation_thread_id_and_inputs,
+  "202512181712_add_scenario_metadata_name_keyword": add_scenario_metadata_name_keyword,
 };
 
 // Export the migrations object for use in other modules
