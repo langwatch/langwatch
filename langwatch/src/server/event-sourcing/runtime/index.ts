@@ -3,6 +3,7 @@ import type { AggregateType, Event, ParentLink, Projection } from "../library";
 import { EventSourcingService } from "../library";
 import type {
   EventSourcingPipelineDefinition,
+  PipelineMetadata,
   RegisteredPipeline,
 } from "./pipeline";
 
@@ -20,10 +21,24 @@ export class EventSourcingPipeline<
   public readonly aggregateType!: AggregateType;
   public readonly service!: EventSourcingService<EventType, ProjectionTypes>;
   public readonly parentLinks!: ParentLink<EventType>[];
+  public readonly metadata!: PipelineMetadata;
 
   constructor(
-    definition: EventSourcingPipelineDefinition<EventType, ProjectionTypes>,
+    definition: EventSourcingPipelineDefinition<EventType, ProjectionTypes> & {
+      metadata?: PipelineMetadata;
+    },
   ) {
+    // Ensure metadata exists
+    if (!definition.metadata) {
+      definition.metadata = {
+        name: definition.name,
+        aggregateType: definition.aggregateType,
+        projections: [],
+        eventHandlers: [],
+        commands: [],
+      };
+    }
+
     // Use Object.defineProperty to make properties truly readonly at runtime
     Object.defineProperty(this, "name", {
       value: definition.name,
@@ -39,6 +54,12 @@ export class EventSourcingPipeline<
     });
     Object.defineProperty(this, "parentLinks", {
       value: definition.parentLinks ?? [],
+      writable: false,
+      enumerable: true,
+      configurable: false,
+    });
+    Object.defineProperty(this, "metadata", {
+      value: definition.metadata,
       writable: false,
       enumerable: true,
       configurable: false,

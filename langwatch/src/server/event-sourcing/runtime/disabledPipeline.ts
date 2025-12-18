@@ -6,6 +6,7 @@ import type {
 } from "../library/queues";
 import type { EventSourcingService } from "../library/services/eventSourcingService";
 import type {
+  PipelineMetadata,
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
@@ -77,10 +78,16 @@ export class DisabledPipeline<
   readonly service: EventSourcingService<EventType, ProjectionTypes>;
   readonly commands: Record<string, EventSourcedQueueProcessor<any>>;
   readonly parentLinks: ParentLink<EventType>[] = [];
+  readonly metadata: PipelineMetadata;
 
-  constructor(name: string, aggregateType: AggregateType) {
+  constructor(
+    name: string,
+    aggregateType: AggregateType,
+    metadata: PipelineMetadata,
+  ) {
     this.name = name;
     this.aggregateType = aggregateType;
+    this.metadata = metadata;
     this.service = new DisabledEventSourcingService(
       name,
     ) as unknown as EventSourcingService<EventType, ProjectionTypes>;
@@ -151,6 +158,13 @@ export class DisabledPipelineBuilderWithNameAndType<
   >,
 > {
   private _hasLoggedWarning = false;
+  private _projections: Array<{ name: string; handlerClassName: string }> = [];
+  private _eventHandlers: Array<{
+    name: string;
+    handlerClassName: string;
+    eventTypes?: string[];
+  }> = [];
+  private _commands: Array<{ name: string; handlerClassName: string }> = [];
 
   constructor(
     private readonly _name: string,
@@ -167,7 +181,11 @@ export class DisabledPipelineBuilderWithNameAndType<
     }
   }
 
-  withProjection(): this {
+  withProjection(name: string, HandlerClass: { name: string }): this {
+    this._projections.push({
+      name,
+      handlerClassName: HandlerClass.name,
+    });
     return this;
   }
 
@@ -175,11 +193,24 @@ export class DisabledPipelineBuilderWithNameAndType<
     return this;
   }
 
-  withEventHandler(): this {
+  withEventHandler(
+    name: string,
+    HandlerClass: { name: string },
+    options?: { eventTypes?: string[] },
+  ): this {
+    this._eventHandlers.push({
+      name,
+      handlerClassName: HandlerClass.name,
+      eventTypes: options?.eventTypes,
+    });
     return this;
   }
 
-  withCommand(): this {
+  withCommand(name: string, HandlerClass: { name: string }): this {
+    this._commands.push({
+      name,
+      handlerClassName: HandlerClass.name,
+    });
     return this;
   }
 
@@ -192,9 +223,19 @@ export class DisabledPipelineBuilderWithNameAndType<
     Record<string, EventSourcedQueueProcessor<any>>
   > {
     this.logWarningOnce();
+    
+    const metadata: PipelineMetadata = {
+      name: this._name,
+      aggregateType: this._aggregateType,
+      projections: this._projections,
+      eventHandlers: this._eventHandlers,
+      commands: this._commands,
+    };
+    
     const pipeline = new DisabledPipeline<EventType, ProjectionTypes>(
       this._name,
       this._aggregateType,
+      metadata,
     );
     return pipeline as PipelineWithCommandHandlers<
       RegisteredPipeline<EventType, ProjectionTypes>,

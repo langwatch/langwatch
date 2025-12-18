@@ -9,6 +9,7 @@ import type {
   EventStoreReadContext,
   ExtractCommandHandlerPayload,
   ParentLink,
+  PipelineMetadata,
   Projection,
   ProjectionHandlerClass,
 } from "../../library";
@@ -88,30 +89,6 @@ export interface CommandHandlerOptions<Payload> {
  * Builder for creating event sourcing pipelines with type-safe required fields.
  * Uses TypeScript type state machine pattern to enforce that all required fields
  * are provided before build() can be called.
- *
- * **Builder Pattern Flow:**
- * 1. Start with `registerPipeline()` which returns `PipelineBuilder`
- * 2. Call `withName(name)` → returns `PipelineBuilderWithName`
- * 3. Call `withAggregateType(type)` → returns `PipelineBuilderWithNameAndType`
- * 4. Optionally call `withProjection(name, HandlerClass)` multiple times to register projections
- * 5. Optionally call `withEventPublisher(publisher)` to register an event publisher
- * 6. Optionally call `withEventHandler(name, HandlerClass, options?)` to register event handlers
- * 7. Optionally call `withCommand(name, HandlerClass, options?)` to register command handlers
- * 8. Call `build()` to create the `RegisteredPipeline`
- *
- * **Example:**
- * ```typescript
- * const pipeline = eventSourcing
- *   .registerPipeline<MyEvent>()
- *   .withName("my-pipeline")
- *   .withAggregateType("trace")
- *   .withProjection("summary", SummaryProjectionHandler)
- *   .withProjection("analytics", AnalyticsProjectionHandler)
- *   .withEventPublisher(publisher)
- *   .withEventHandler("span-storage", SpanClickHouseHandler, { eventTypes: [...] })
- *   .withCommand("recordSpan", RecordSpanCommand, { delay: 5000 })
- *   .build();
- * ```
  */
 export class PipelineBuilder<EventType extends Event> {
   constructor(private readonly options: PipelineBuilderOptions<EventType>) {}
@@ -491,6 +468,25 @@ export class PipelineBuilderWithNameAndType<
         ? Object.fromEntries(this.eventHandlers)
         : void 0;
 
+    // Build metadata for tooling and introspection
+    const metadata: PipelineMetadata = {
+      name: this.name,
+      aggregateType: this.aggregateType,
+      projections: Array.from(this.projections.entries()).map(([name, def]) => ({
+        name,
+        handlerClassName: def.handler.constructor.name,
+      })),
+      eventHandlers: Array.from(this.eventHandlers.entries()).map(([name, def]) => ({
+        name,
+        handlerClassName: def.handler.constructor.name,
+        eventTypes: [...(def.options?.eventTypes || [])],
+      })),
+      commands: this.commandHandlers.map((reg) => ({
+        name: reg.name,
+        handlerClassName: reg.HandlerClass.name,
+      })),
+    };
+
     const pipeline = new EventSourcingPipeline<
       EventType,
       RegisteredProjections
@@ -508,6 +504,7 @@ export class PipelineBuilderWithNameAndType<
       commandLockTtlMs: this.options.commandLockTtlMs,
       processorCheckpointStore: this.options.processorCheckpointStore,
       parentLinks: this.parentLinks.length > 0 ? this.parentLinks : undefined,
+      metadata,
     });
 
     // Create dispatchers now that we have the service
