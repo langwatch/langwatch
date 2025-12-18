@@ -17,6 +17,7 @@ import {
   type WizardState,
   wizardStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { persistedEvaluationsV3StateSchema } from "../../../evaluations-v3/types/persistence";
 import {
   type Entry,
   type Evaluator,
@@ -188,6 +189,88 @@ export const experimentsRouter = createTRPCRouter({
       }
 
       return updatedExperiment;
+    }),
+
+  saveEvaluationsV3: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string().optional(),
+        state: persistedEvaluationsV3StateSchema,
+      }),
+    )
+    .use(checkProjectPermission("workflows:create"))
+    .mutation(async ({ input }) => {
+      const name = input.state.name || (await findNextDraftName(input.projectId));
+      const slug = slugify(name);
+
+      const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
+      // Convert to plain JSON for Prisma storage
+      const wizardStateJson = JSON.parse(JSON.stringify(input.state));
+      const experimentData = {
+        name,
+        slug,
+        projectId: input.projectId,
+        type: ExperimentType.EVALUATIONS_V3,
+        wizardState: wizardStateJson,
+      };
+
+      await prisma.experiment.upsert({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+        update: experimentData,
+        create: {
+          ...experimentData,
+          id: experimentId,
+        },
+      });
+
+      const updatedExperiment = await prisma.experiment.findUnique({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!updatedExperiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      return updatedExperiment;
+    }),
+
+  getEvaluationsV3BySlug: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentSlug: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:view"))
+    .query(async ({ input }) => {
+      const experiment = await getExperimentBySlug(
+        input.projectId,
+        input.experimentSlug,
+      );
+
+      if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Experiment is not an EVALUATIONS_V3 type",
+        });
+      }
+
+      return {
+        ...experiment,
+        wizardState: experiment.wizardState as z.infer<
+          typeof persistedEvaluationsV3StateSchema
+        > | null,
+      };
     }),
 
   saveAsMonitor: protectedProcedure

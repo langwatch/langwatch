@@ -13,11 +13,29 @@ export type DatasetColumn = {
   type: DatasetColumnType;
 };
 
+/**
+ * Inline dataset data - stored directly in state.
+ * Used for the default "Test Data" or newly created datasets.
+ */
 export type InlineDataset = {
-  id?: string; // undefined = inline, string = saved dataset reference
-  name?: string;
   columns: DatasetColumn[];
   records: Record<string, string[]>; // columnId -> array of values per row
+};
+
+/**
+ * A dataset reference in the workbench.
+ * Can be either inline (data stored here) or saved (reference to DB).
+ */
+export type DatasetReference = {
+  id: string; // Unique ID in workbench (e.g., "test-data" or nanoid)
+  name: string; // Display name (tab label)
+  type: "inline" | "saved";
+  // For inline datasets - contains the actual data
+  inline?: InlineDataset;
+  // For saved datasets - reference to DB dataset ID
+  datasetId?: string;
+  // Cached columns for mapping UI (always present)
+  columns: DatasetColumn[];
 };
 
 // ============================================================================
@@ -26,10 +44,11 @@ export type InlineDataset = {
 
 /**
  * Maps a target field to a source field.
- * Source can be "dataset" (for dataset columns) or an agent id (for agent outputs).
+ * Source can be "dataset" (with datasetId) or "agent" (with agentId).
  */
 export type FieldMapping = {
-  source: "dataset" | string; // "dataset" or agent id
+  source: "dataset" | "agent";
+  sourceId: string; // dataset ID or agent ID
   sourceField: string;
 };
 
@@ -113,7 +132,8 @@ export type OverlayType =
   | "agent"
   | "evaluator"
   | "dataset-columns"
-  | "dataset-switch";
+  | "dataset-switch"
+  | "dataset-add";
 
 export type CellPosition = {
   row: number;
@@ -144,8 +164,9 @@ export type EvaluationsV3State = {
   experimentSlug?: string;
   name: string;
 
-  // Dataset (inline by default)
-  dataset: InlineDataset;
+  // Multiple datasets with active selection
+  datasets: DatasetReference[];
+  activeDatasetId: string;
 
   // Global evaluators (shared definitions, will be stored in DB in future)
   // Each evaluator contains per-agent mappings inside it
@@ -158,7 +179,7 @@ export type EvaluationsV3State = {
   // Execution results (populated after run)
   results: EvaluationResults;
 
-  // UI state (not persisted to DSL)
+  // UI state (not persisted)
   ui: UIState;
 };
 
@@ -172,14 +193,29 @@ export type EvaluationsV3Actions = {
   setExperimentId: (id: string) => void;
   setExperimentSlug: (slug: string) => void;
 
-  // Dataset actions
-  setCellValue: (row: number, columnId: string, value: string) => void;
-  addColumn: (column: DatasetColumn) => void;
-  removeColumn: (columnId: string) => void;
-  renameColumn: (columnId: string, newName: string) => void;
-  updateColumnType: (columnId: string, type: DatasetColumnType) => void;
-  setDataset: (dataset: InlineDataset) => void;
-  getRowCount: () => number;
+  // Dataset management actions
+  addDataset: (dataset: DatasetReference) => void;
+  removeDataset: (datasetId: string) => void;
+  setActiveDataset: (datasetId: string) => void;
+  updateDataset: (datasetId: string, updates: Partial<DatasetReference>) => void;
+  exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
+
+  // Inline dataset cell/column actions (scoped to a dataset)
+  setCellValue: (
+    datasetId: string,
+    row: number,
+    columnId: string,
+    value: string
+  ) => void;
+  addColumn: (datasetId: string, column: DatasetColumn) => void;
+  removeColumn: (datasetId: string, columnId: string) => void;
+  renameColumn: (datasetId: string, columnId: string, newName: string) => void;
+  updateColumnType: (
+    datasetId: string,
+    columnId: string,
+    type: DatasetColumnType
+  ) => void;
+  getRowCount: (datasetId: string) => number;
 
   // Agent actions
   addAgent: (agent: AgentConfig) => void;
@@ -241,7 +277,9 @@ export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 // Initial State
 // ============================================================================
 
-export const createInitialDataset = (): InlineDataset => ({
+export const DEFAULT_TEST_DATA_ID = "test-data";
+
+export const createInitialInlineDataset = (): InlineDataset => ({
   columns: [
     { id: "input", name: "input", type: "string" },
     { id: "expected_output", name: "expected_output", type: "string" },
@@ -250,6 +288,17 @@ export const createInitialDataset = (): InlineDataset => ({
     input: ["", "", ""],
     expected_output: ["", "", ""],
   },
+});
+
+export const createInitialDataset = (): DatasetReference => ({
+  id: DEFAULT_TEST_DATA_ID,
+  name: "Test Data",
+  type: "inline",
+  inline: createInitialInlineDataset(),
+  columns: [
+    { id: "input", name: "input", type: "string" },
+    { id: "expected_output", name: "expected_output", type: "string" },
+  ],
 });
 
 export const createInitialResults = (): EvaluationResults => ({
@@ -265,7 +314,8 @@ export const createInitialUIState = (): UIState => ({
 
 export const createInitialState = (): EvaluationsV3State => ({
   name: "New Evaluation",
-  dataset: createInitialDataset(),
+  datasets: [createInitialDataset()],
+  activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],
   agents: [],
   results: createInitialResults(),

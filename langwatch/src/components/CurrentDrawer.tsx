@@ -8,6 +8,7 @@ import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
+import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
@@ -33,6 +34,7 @@ const drawers = {
   addOrEditDataset: AddOrEditDatasetDrawer,
   editTriggerFilter: EditTriggerFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
+  selectDataset: SelectDatasetDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 export function CurrentDrawer() {

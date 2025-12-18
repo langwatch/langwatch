@@ -10,14 +10,54 @@ import {
   type AgentConfig,
   type CellPosition,
   type DatasetColumn,
+  type DatasetReference,
   type EvaluatorConfig,
   type EvaluationsV3Actions,
   type EvaluationsV3State,
   type EvaluationsV3Store,
   type FieldMapping,
-  type InlineDataset,
   type OverlayType,
 } from "../types";
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+/**
+ * Remove all mappings that reference a specific dataset from agents and evaluators.
+ */
+const removeMappingsForDataset = (
+  state: EvaluationsV3State,
+  datasetId: string
+): { agents: AgentConfig[]; evaluators: EvaluatorConfig[] } => {
+  // Remove dataset mappings from agents
+  const agents = state.agents.map((agent) => {
+    const newMappings: Record<string, FieldMapping> = {};
+    for (const [field, mapping] of Object.entries(agent.mappings)) {
+      if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
+        newMappings[field] = mapping;
+      }
+    }
+    return { ...agent, mappings: newMappings };
+  });
+
+  // Remove dataset mappings from evaluators
+  const evaluators = state.evaluators.map((evaluator) => {
+    const newMappings: Record<string, Record<string, FieldMapping>> = {};
+    for (const [agentId, agentMappings] of Object.entries(evaluator.mappings)) {
+      const newAgentMappings: Record<string, FieldMapping> = {};
+      for (const [field, mapping] of Object.entries(agentMappings)) {
+        if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
+          newAgentMappings[field] = mapping;
+        }
+      }
+      newMappings[agentId] = newAgentMappings;
+    }
+    return { ...evaluator, mappings: newMappings };
+  });
+
+  return { agents, evaluators };
+};
 
 // ============================================================================
 // Store Implementation
@@ -43,12 +83,84 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   // -------------------------------------------------------------------------
-  // Dataset actions
+  // Dataset management actions
   // -------------------------------------------------------------------------
 
-  setCellValue: (row, columnId, value) => {
+  addDataset: (dataset) => {
+    set((state) => ({
+      datasets: [...state.datasets, dataset],
+    }));
+  },
+
+  removeDataset: (datasetId) => {
     set((state) => {
-      const records = { ...state.dataset.records };
+      // Can't remove the last dataset
+      if (state.datasets.length <= 1) return state;
+
+      // Remove the dataset
+      const newDatasets = state.datasets.filter((d) => d.id !== datasetId);
+
+      // If removing the active dataset, switch to first available
+      const newActiveDatasetId =
+        state.activeDatasetId === datasetId
+          ? newDatasets[0]!.id
+          : state.activeDatasetId;
+
+      // Clean up mappings pointing to this dataset
+      const { agents, evaluators } = removeMappingsForDataset(state, datasetId);
+
+      return {
+        datasets: newDatasets,
+        activeDatasetId: newActiveDatasetId,
+        agents,
+        evaluators,
+      };
+    });
+  },
+
+  setActiveDataset: (datasetId) => {
+    set((state) => {
+      // Verify dataset exists
+      if (!state.datasets.find((d) => d.id === datasetId)) return state;
+      return { activeDatasetId: datasetId };
+    });
+  },
+
+  updateDataset: (datasetId, updates) => {
+    set((state) => ({
+      datasets: state.datasets.map((d) =>
+        d.id === datasetId ? { ...d, ...updates } : d
+      ),
+    }));
+  },
+
+  exportInlineToSaved: (datasetId, savedDatasetId) => {
+    set((state) => ({
+      datasets: state.datasets.map((d) =>
+        d.id === datasetId
+          ? {
+              ...d,
+              type: "saved" as const,
+              datasetId: savedDatasetId,
+              inline: undefined,
+            }
+          : d
+      ),
+    }));
+  },
+
+  // -------------------------------------------------------------------------
+  // Inline dataset cell/column actions (scoped to a dataset)
+  // -------------------------------------------------------------------------
+
+  setCellValue: (datasetId, row, columnId, value) => {
+    set((state) => {
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+        return state;
+      }
+
+      const records = { ...dataset.inline.records };
       const columnValues = [...(records[columnId] ?? [])];
 
       // Ensure array is long enough
@@ -60,85 +172,142 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       records[columnId] = columnValues;
 
       return {
-        dataset: {
-          ...state.dataset,
-          records,
-        },
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? {
+                ...d,
+                inline: {
+                  ...d.inline!,
+                  records,
+                },
+              }
+            : d
+        ),
       };
     });
   },
 
-  addColumn: (column) => {
+  addColumn: (datasetId, column) => {
     set((state) => {
-      const rowCount = get().getRowCount();
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+        return state;
+      }
+
+      const rowCount = get().getRowCount(datasetId);
       const newColumnValues = Array(rowCount).fill("");
 
       return {
-        dataset: {
-          ...state.dataset,
-          columns: [...state.dataset.columns, column],
-          records: {
-            ...state.dataset.records,
-            [column.id]: newColumnValues,
-          },
-        },
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? {
+                ...d,
+                columns: [...d.columns, column],
+                inline: {
+                  ...d.inline!,
+                  columns: [...d.inline!.columns, column],
+                  records: {
+                    ...d.inline!.records,
+                    [column.id]: newColumnValues,
+                  },
+                },
+              }
+            : d
+        ),
       };
     });
   },
 
-  removeColumn: (columnId) => {
+  removeColumn: (datasetId, columnId) => {
     set((state) => {
-      const columns = state.dataset.columns.filter((c) => c.id !== columnId);
-      const records = { ...state.dataset.records };
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+        return state;
+      }
+
+      const columns = dataset.inline.columns.filter((c) => c.id !== columnId);
+      const records = { ...dataset.inline.records };
       delete records[columnId];
 
       return {
-        dataset: {
-          ...state.dataset,
-          columns,
-          records,
-        },
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? {
+                ...d,
+                columns: d.columns.filter((c) => c.id !== columnId),
+                inline: {
+                  ...d.inline!,
+                  columns,
+                  records,
+                },
+              }
+            : d
+        ),
       };
     });
   },
 
-  renameColumn: (columnId, newName) => {
+  renameColumn: (datasetId, columnId, newName) => {
     set((state) => {
-      const columns = state.dataset.columns.map((c) =>
-        c.id === columnId ? { ...c, name: newName } : c
-      );
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+        return state;
+      }
+
+      const updateColumns = (cols: DatasetColumn[]) =>
+        cols.map((c) => (c.id === columnId ? { ...c, name: newName } : c));
 
       return {
-        dataset: {
-          ...state.dataset,
-          columns,
-        },
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? {
+                ...d,
+                columns: updateColumns(d.columns),
+                inline: {
+                  ...d.inline!,
+                  columns: updateColumns(d.inline!.columns),
+                },
+              }
+            : d
+        ),
       };
     });
   },
 
-  updateColumnType: (columnId, type) => {
+  updateColumnType: (datasetId, columnId, type) => {
     set((state) => {
-      const columns = state.dataset.columns.map((c) =>
-        c.id === columnId ? { ...c, type } : c
-      );
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+        return state;
+      }
+
+      const updateColumns = (cols: DatasetColumn[]) =>
+        cols.map((c) => (c.id === columnId ? { ...c, type } : c));
 
       return {
-        dataset: {
-          ...state.dataset,
-          columns,
-        },
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? {
+                ...d,
+                columns: updateColumns(d.columns),
+                inline: {
+                  ...d.inline!,
+                  columns: updateColumns(d.inline!.columns),
+                },
+              }
+            : d
+        ),
       };
     });
   },
 
-  setDataset: (dataset) => {
-    set({ dataset });
-  },
-
-  getRowCount: () => {
+  getRowCount: (datasetId) => {
     const state = get();
-    const columnValues = Object.values(state.dataset.records);
+    const dataset = state.datasets.find((d) => d.id === datasetId);
+    if (!dataset || dataset.type !== "inline" || !dataset.inline) {
+      return 0;
+    }
+    const columnValues = Object.values(dataset.inline.records);
     if (columnValues.length === 0) return 0;
     return Math.max(...columnValues.map((v) => v.length));
   },
@@ -170,10 +339,22 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         return { ...e, mappings };
       });
 
-      return {
-        agents: state.agents.filter((a) => a.id !== agentId),
-        evaluators,
-      };
+      // Also remove mappings that reference this agent from other agents
+      const agents = state.agents
+        .filter((a) => a.id !== agentId)
+        .map((agent) => {
+          const newMappings: Record<string, FieldMapping> = {};
+          for (const [field, mapping] of Object.entries(agent.mappings)) {
+            if (
+              !(mapping.source === "agent" && mapping.sourceId === agentId)
+            ) {
+              newMappings[field] = mapping;
+            }
+          }
+          return { ...agent, mappings: newMappings };
+        });
+
+      return { agents, evaluators };
     });
   },
 
@@ -264,7 +445,10 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set((state) => ({
       agents: state.agents.map((a) =>
         a.id === agentId
-          ? { ...a, evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId) }
+          ? {
+              ...a,
+              evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId),
+            }
           : a
       ),
       // Remove this agent's mappings from the evaluator
@@ -431,7 +615,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
  */
 type PartializedState = Pick<
   EvaluationsV3State,
-  "name" | "dataset" | "evaluators" | "agents"
+  "name" | "datasets" | "activeDatasetId" | "evaluators" | "agents"
 >;
 
 /**
@@ -440,7 +624,8 @@ type PartializedState = Pick<
  */
 const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   name: state.name,
-  dataset: state.dataset,
+  datasets: state.datasets,
+  activeDatasetId: state.activeDatasetId,
   evaluators: state.evaluators,
   agents: state.agents,
 });

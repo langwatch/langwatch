@@ -122,6 +122,7 @@ function EvaluationsV2() {
     BATCH_EVALUATION_V2: "API Batch Evaluation",
     BATCH_EVALUATION: "Batch Evaluation",
     DSPY: "DSPy Optimization",
+    EVALUATIONS_V3: "Evaluations V3",
   };
 
   return (

@@ -18,7 +18,8 @@ export type DrawerType =
   | "uploadCSV"
   | "addOrEditDataset"
   | "editTriggerFilter"
-  | "seriesFilters";
+  | "seriesFilters"
+  | "selectDataset";
 
 /** Generic callback type for drawer props - callers must narrow before use */
 type DrawerCallback = (...args: unknown[]) => void;
