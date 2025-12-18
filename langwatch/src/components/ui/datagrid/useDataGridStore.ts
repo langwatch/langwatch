@@ -4,9 +4,6 @@ import type {
   DataGridStore,
   DataGridState,
   DataGridConfig,
-  DataGridColumnDef,
-  FilterState,
-  SortingState,
 } from "./types";
 
 /**
@@ -173,6 +170,7 @@ function createStoreActions<T>(
         return { filters: newFilters, page: 1 };
       }),
     clearFilters: () => set({ filters: [], globalSearch: "", page: 1 }),
+    resetFiltersAndSorting: () => set({ filters: [], globalSearch: "", sorting: null, groupBy: null, page: 1 }),
     setGlobalSearch: (globalSearch) => set({ globalSearch, page: 1 }),
 
     // Sort actions
