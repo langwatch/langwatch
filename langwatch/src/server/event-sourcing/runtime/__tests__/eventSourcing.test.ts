@@ -12,7 +12,7 @@ vi.mock("~/server/clickhouse/client", () => ({
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Event } from "../../library";
 import type { TenantId } from "../../library/domain/tenantId";
-import { createMockEventStore } from "../../library/services/__tests__/testHelpers";
+import { createMockEventStore, createMockDistributedLock } from "../../library/services/__tests__/testHelpers";
 import { DisabledPipelineBuilder } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
 import {
@@ -97,6 +97,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -109,6 +110,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -134,6 +136,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -146,6 +149,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -166,6 +170,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<TestEvent>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -180,6 +185,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -203,6 +209,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<TestEvent>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -215,6 +222,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<Event>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);
@@ -256,6 +264,7 @@ describe("EventSourcing", () => {
       const mockEventStore = createMockEventStore<SpecificEvent>();
       const runtime = EventSourcingRuntime.createForTesting({
         eventStore: mockEventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const instance = new EventSourcing(runtime);

@@ -2,11 +2,11 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { Event, EventStore, Projection, StaticPipelineDefinition } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
-import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
+import { DisabledPipeline } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
 import { PipelineBuilder } from "./pipeline";
-import { EventSourcingPipeline } from "./index";
+import { EventSourcingPipeline } from "./pipeline";
 import type {
   EventStoreReadContext,
   EventSourcedQueueProcessor,
@@ -28,16 +28,6 @@ type CommandsToProcessors<Commands extends RegisteredCommand> = {
  * Singleton that manages shared event sourcing infrastructure.
  * Provides a single event store instance that can be used by all pipelines,
  * since the database partitions by tenantId + aggregateType.
- *
- * **Design Considerations:**
- * - Uses singleton pattern for simplicity and shared state in production
- * - Delegates to EventSourcingRuntime for store creation and configuration
- * - Supports graceful degradation via ENABLE_EVENT_SOURCING env var
- * - Supports dependency injection via runtime parameter for testing
- *
- * **Usage:**
- * - Production: Use singleton via `EventSourcing.getInstance()` or `eventSourcing` export
- * - Testing: Use constructor with custom runtime: `new EventSourcing(EventSourcingRuntime.createForTesting(...))`
  */
 export class EventSourcing {
   private static instance: EventSourcing | null = null;

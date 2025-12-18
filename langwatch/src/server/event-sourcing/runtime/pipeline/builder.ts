@@ -27,7 +27,7 @@ import type { ExtractProjectionHandlerProjection } from "../../library/domain/ha
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
-import { EventSourcingPipeline } from "../index";
+import { EventSourcingPipeline } from "../pipeline";
 import type { QueueProcessorFactory } from "../queue";
 import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./types";
 
