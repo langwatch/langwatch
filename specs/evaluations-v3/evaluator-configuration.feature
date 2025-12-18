@@ -57,7 +57,8 @@ Feature: Evaluator configuration
     Given agent "GPT-4o" has evaluator "Exact Match"
     And the evaluator requires inputs "output" and "expected_output"
     When I open the evaluator configuration panel for agent "GPT-4o"
-    Then I can map "expected_output" to dataset column "expected_output"
+    Then I can map "expected_output" to dataset column "expected_output" from the active dataset
+    And the mapping includes the dataset ID (sourceId) for multi-dataset support
     And the mapping is stored specifically for agent "GPT-4o"
 
   Scenario: Map evaluator inputs from agent outputs

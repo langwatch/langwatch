@@ -1,13 +1,4 @@
-import {
-  Box,
-  Button,
-  Checkbox,
-  HStack,
-  Portal,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Checkbox, HStack, Text } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -17,25 +8,24 @@ import {
   type Cell,
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Code,
-  Database,
-  Hash,
-  List,
-  MessageSquare,
-  Plus,
-  Type,
-  X,
-} from "react-feather";
+import { Code } from "react-feather";
 
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { LLMIcon } from "~/components/icons/LLMIcon";
+import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { AgentConfig, EvaluatorConfig } from "../types";
+import type { AgentConfig, DatasetColumn, DatasetReference, EvaluatorConfig } from "../types";
+import type { DatasetColumnType } from "~/server/datasets/types";
+
 import { EditableCell } from "./DatasetSection/EditableCell";
+import { AgentCellContent, AgentHeader } from "./AgentSection/AgentCell";
+import {
+  ColumnTypeIcon,
+  SelectionToolbar,
+  SuperHeader,
+  type DatasetHandlers,
+} from "./TableUI";
 
 // ============================================================================
 // Types
@@ -47,428 +37,18 @@ type RowData = {
   agents: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
 };
 
-type SuperHeaderType = "dataset" | "agents";
-
 type ColumnType = "checkbox" | "dataset" | "agent";
-
-// ============================================================================
-// Pulsing Dot Indicator (radar-style)
-// ============================================================================
-
-function PulsingDot() {
-  return (
-    <>
-      <style>
-        {`
-          @keyframes evalRadar {
-            0% { transform: scale(1); opacity: 0.6; }
-            100% { transform: scale(2.5); opacity: 0; }
-          }
-        `}
-      </style>
-      <Box
-        as="span"
-        position="relative"
-        display="inline-flex"
-        alignItems="center"
-        justifyContent="center"
-        marginLeft={2}
-      >
-        {/* Expanding ring */}
-        <Box
-          as="span"
-          position="absolute"
-          width="8px"
-          height="8px"
-          borderRadius="full"
-          bg="blue.300"
-          style={{ animation: "evalRadar 1.5s ease-out infinite" }}
-        />
-        {/* Fixed center dot */}
-        <Box
-          as="span"
-          position="relative"
-          width="6px"
-          height="6px"
-          borderRadius="full"
-          bg="blue.500"
-        />
-      </Box>
-    </>
-  );
-}
-
-// ============================================================================
-// Column Type Icons
-// ============================================================================
-
-const ColumnTypeIcon = ({ type }: { type: string }) => {
-  const iconProps = { size: 12, strokeWidth: 2.5 };
-
-  switch (type) {
-    case "string":
-      return <Type {...iconProps} color="var(--chakra-colors-blue-500)" />;
-    case "number":
-      return <Hash {...iconProps} color="var(--chakra-colors-green-500)" />;
-    case "json":
-      return <List {...iconProps} color="var(--chakra-colors-purple-500)" />;
-    case "chat_messages":
-      return (
-        <MessageSquare {...iconProps} color="var(--chakra-colors-orange-500)" />
-      );
-    default:
-      return <Type {...iconProps} color="var(--chakra-colors-gray-400)" />;
-  }
-};
-
-// ============================================================================
-// Super Header Component
-// ============================================================================
-
-type SuperHeaderProps = {
-  type: SuperHeaderType;
-  colSpan: number;
-  onAddClick?: () => void;
-  showWarning?: boolean;
-};
-
-const superHeaderConfig: Record<
-  SuperHeaderType,
-  { title: string; color: string; icon: React.ReactNode }
-> = {
-  dataset: {
-    title: "Dataset",
-    color: "blue.400",
-    icon: <Database size={14} />,
-  },
-  agents: {
-    title: "Agents",
-    color: "green.400",
-    icon: <LLMIcon />,
-  },
-};
-
-function SuperHeader({
-  type,
-  colSpan,
-  onAddClick,
-  showWarning,
-}: SuperHeaderProps) {
-  const config = superHeaderConfig[type];
-
-  return (
-    <th
-      colSpan={colSpan}
-      style={{
-        padding: "12px 12px",
-        paddingLeft: type === "dataset" ? "52px" : "12px",
-        textAlign: "left",
-        borderBottom: "1px solid var(--chakra-colors-gray-200)",
-        backgroundColor: "white",
-        height: "48px",
-      }}
-    >
-      <HStack gap={2}>
-        <ColorfulBlockIcon color={config.color} size="sm" icon={config.icon} />
-        <Text fontWeight="semibold" fontSize="sm" color="gray.700">
-          {config.title}
-        </Text>
-        {onAddClick && (
-          <Button
-            size="xs"
-            variant="ghost"
-            onClick={onAddClick}
-            color="gray.500"
-            _hover={{ color: "gray.700" }}
-          >
-            <Plus size={12} />
-            Add Agent
-            {showWarning && <PulsingDot />}
-          </Button>
-        )}
-      </HStack>
-    </th>
-  );
-}
-
-// ============================================================================
-// Selection Toolbar
-// ============================================================================
-
-type SelectionToolbarProps = {
-  selectedCount: number;
-  onRun: () => void;
-  onDelete: () => void;
-  onClear: () => void;
-};
-
-function SelectionToolbar({
-  selectedCount,
-  onRun,
-  onDelete,
-  onClear,
-}: SelectionToolbarProps) {
-  if (selectedCount === 0) return null;
-
-  return (
-    <HStack
-      position="fixed"
-      bottom={4}
-      left="50%"
-      transform="translateX(-50%)"
-      bg="gray.800"
-      color="white"
-      paddingX={4}
-      paddingY={2}
-      borderRadius="lg"
-      boxShadow="lg"
-      gap={3}
-      zIndex={100}
-    >
-      <Text fontSize="sm">{selectedCount} selected</Text>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onRun}
-      >
-        ▶ Run
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onDelete}
-      >
-        🗑 Delete
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onClear}
-      >
-        ✕
-      </Button>
-    </HStack>
-  );
-}
-
-// ============================================================================
-// Evaluator Chip Component
-// ============================================================================
-
-type EvaluatorChipProps = {
-  evaluator: EvaluatorConfig;
-  result: unknown;
-  agentId: string;
-  row: number;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-  onEdit: () => void;
-};
-
-function EvaluatorChip({
-  evaluator,
-  result,
-  isExpanded,
-  onToggleExpand,
-  onEdit,
-}: EvaluatorChipProps) {
-  // Determine pass/fail status from result
-  let status: "pending" | "passed" | "failed" | "error" = "pending";
-  let score: number | undefined;
-
-  if (result !== null && result !== undefined) {
-    if (typeof result === "boolean") {
-      status = result ? "passed" : "failed";
-    } else if (typeof result === "object") {
-      const obj = result as Record<string, unknown>;
-      if ("passed" in obj) {
-        status = obj.passed ? "passed" : "failed";
-      }
-      if ("score" in obj && typeof obj.score === "number") {
-        score = obj.score;
-      }
-      if ("error" in obj) {
-        status = "error";
-      }
-    }
-  }
-
-  const statusColors = {
-    pending: { bg: "gray.100", color: "gray.600", icon: null },
-    passed: { bg: "green.100", color: "green.700", icon: <Check size={10} /> },
-    failed: { bg: "red.100", color: "red.700", icon: <X size={10} /> },
-    error: { bg: "orange.100", color: "orange.700", icon: <X size={10} /> },
-  };
-
-  const statusConfig = statusColors[status];
-
-  return (
-    <Box>
-      <HStack
-        as="button"
-        onClick={onToggleExpand}
-        bg={statusConfig.bg}
-        color={statusConfig.color}
-        paddingX={2}
-        paddingY={1}
-        borderRadius="md"
-        fontSize="11px"
-        fontWeight="medium"
-        gap={1}
-        _hover={{ opacity: 0.8 }}
-        cursor="pointer"
-      >
-        {statusConfig.icon}
-        <Text>{evaluator.name}</Text>
-        {score !== undefined && <Text>({score.toFixed(2)})</Text>}
-        {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-      </HStack>
-
-      {isExpanded && (
-        <Box
-          marginTop={2}
-          padding={2}
-          bg="gray.50"
-          borderRadius="md"
-          fontSize="12px"
-        >
-          <VStack align="stretch" gap={1}>
-            <Text fontWeight="medium">Result:</Text>
-            <Text color="gray.600" whiteSpace="pre-wrap">
-              {result === null || result === undefined
-                ? "No result yet"
-                : typeof result === "object"
-                  ? JSON.stringify(result, null, 2)
-                  : String(result)}
-            </Text>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              marginTop={1}
-            >
-              Edit Configuration
-            </Button>
-          </VStack>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-// ============================================================================
-// Agent Cell Content Component
-// ============================================================================
-
-type AgentCellContentProps = {
-  agent: AgentConfig;
-  output: unknown;
-  evaluatorResults: Record<string, unknown>;
-  row: number;
-  evaluatorsMap: Map<string, EvaluatorConfig>;
-};
-
-function AgentCellContent({
-  agent,
-  output,
-  evaluatorResults,
-  row,
-  evaluatorsMap,
-}: AgentCellContentProps) {
-  const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
-    (state) => ({
-      ui: state.ui,
-      openOverlay: state.openOverlay,
-      setExpandedEvaluator: state.setExpandedEvaluator,
-    })
-  );
-
-  const displayOutput =
-    output === null || output === undefined
-      ? ""
-      : typeof output === "object"
-        ? JSON.stringify(output)
-        : String(output);
-
-  // Get evaluator configs for this agent's evaluatorIds
-  const agentEvaluators = agent.evaluatorIds
-    .map((id) => evaluatorsMap.get(id))
-    .filter((e): e is EvaluatorConfig => e !== undefined);
-
-  return (
-    <VStack align="stretch" gap={2}>
-      {/* Agent output */}
-      <Text fontSize="13px" lineClamp={3}>
-        {displayOutput || <Text as="span" color="gray.400">No output yet</Text>}
-      </Text>
-
-      {/* Evaluator chips */}
-      {agentEvaluators.length > 0 && (
-        <HStack flexWrap="wrap" gap={1}>
-          {agentEvaluators.map((evaluator) => {
-            const isExpanded =
-              ui.expandedEvaluator?.agentId === agent.id &&
-              ui.expandedEvaluator?.evaluatorId === evaluator.id &&
-              ui.expandedEvaluator?.row === row;
-
-            return (
-              <EvaluatorChip
-                key={evaluator.id}
-                evaluator={evaluator}
-                result={evaluatorResults[evaluator.id]}
-                agentId={agent.id}
-                row={row}
-                isExpanded={isExpanded}
-                onToggleExpand={() => {
-                  if (isExpanded) {
-                    setExpandedEvaluator(undefined);
-                  } else {
-                    setExpandedEvaluator({
-                      agentId: agent.id,
-                      evaluatorId: evaluator.id,
-                      row,
-                    });
-                  }
-                }}
-                onEdit={() => openOverlay("evaluator", agent.id, evaluator.id)}
-              />
-            );
-          })}
-        </HStack>
-      )}
-
-      {/* Add evaluator button */}
-      <Button
-        size="xs"
-        variant="ghost"
-        color="gray.500"
-        onClick={(e) => {
-          e.stopPropagation();
-          openOverlay("evaluator", agent.id);
-        }}
-        justifyContent="flex-start"
-        paddingX={1}
-      >
-        <Plus size={10} />
-        <Text marginLeft={1}>Add evaluator</Text>
-      </Button>
-    </VStack>
-  );
-}
 
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export function EvaluationsV3Table() {
+  const { openDrawer } = useDrawer();
+
   const {
-    dataset,
+    datasets,
+    activeDatasetId,
     evaluators,
     agents,
     results,
@@ -480,8 +60,12 @@ export function EvaluationsV3Table() {
     selectAllRows,
     clearRowSelection,
     getRowCount,
+    addDataset,
+    setActiveDataset,
+    removeDataset,
   } = useEvaluationsV3Store((state) => ({
-    dataset: state.dataset,
+    datasets: state.datasets,
+    activeDatasetId: state.activeDatasetId,
     evaluators: state.evaluators,
     agents: state.agents,
     results: state.results,
@@ -493,7 +77,108 @@ export function EvaluationsV3Table() {
     selectAllRows: state.selectAllRows,
     clearRowSelection: state.clearRowSelection,
     getRowCount: state.getRowCount,
+    addDataset: state.addDataset,
+    setActiveDataset: state.setActiveDataset,
+    removeDataset: state.removeDataset,
   }));
+
+  // State for edit dataset panel
+  const [showEditDatasetPanel, setShowEditDatasetPanel] = useState(false);
+
+  // Get the active dataset
+  const activeDataset = useMemo(
+    () => datasets.find((d) => d.id === activeDatasetId),
+    [datasets, activeDatasetId]
+  );
+
+  // State for AddOrEditDatasetDrawer (for Save as dataset)
+  const [saveAsDatasetDrawerOpen, setSaveAsDatasetDrawerOpen] = useState(false);
+  const [datasetToSave, setDatasetToSave] = useState<{
+    name: string;
+    columnTypes: { name: string; type: DatasetColumnType }[];
+    datasetRecords: Array<{ id: string } & Record<string, string>>;
+  } | undefined>(undefined);
+
+  // Dataset handlers for drawer integration
+  const datasetHandlers = useMemo(
+    () => ({
+      onSelectExisting: () => {
+        openDrawer("selectDataset", {
+          onSelect: (dataset: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
+            // Add the selected dataset to the workbench
+            const columns: DatasetColumn[] = dataset.columnTypes.map((col, index) => ({
+              id: `${col.name}_${index}`,
+              name: col.name,
+              type: col.type,
+            }));
+            const newDataset: DatasetReference = {
+              id: `saved_${dataset.datasetId}`,
+              name: dataset.name,
+              type: "saved",
+              datasetId: dataset.datasetId,
+              columns,
+            };
+            addDataset(newDataset);
+            setActiveDataset(newDataset.id);
+          },
+        });
+      },
+      onUploadCSV: () => {
+        openDrawer("uploadCSV", {
+          onSuccess: (params: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
+            // Add the uploaded dataset to the workbench
+            const columns: DatasetColumn[] = params.columnTypes.map((col, index) => ({
+              id: `${col.name}_${index}`,
+              name: col.name,
+              type: col.type,
+            }));
+            const newDataset: DatasetReference = {
+              id: `saved_${params.datasetId}`,
+              name: params.name,
+              type: "saved",
+              datasetId: params.datasetId,
+              columns,
+            };
+            addDataset(newDataset);
+            setActiveDataset(newDataset.id);
+          },
+        });
+      },
+      onEditDataset: () => {
+        setShowEditDatasetPanel(true);
+      },
+      onSaveAsDataset: (dataset: DatasetReference) => {
+        if (dataset.type !== "inline" || !dataset.inline) return;
+
+        // Convert inline dataset to the format AddOrEditDatasetDrawer expects
+        const columns = dataset.inline.columns;
+        const records = dataset.inline.records;
+
+        // Convert column-based records to row-based records
+        const rowCount = Math.max(
+          ...Object.values(records).map((arr) => arr.length),
+          0
+        );
+        const datasetRecords: Array<{ id: string } & Record<string, string>> = [];
+
+        for (let i = 0; i < rowCount; i++) {
+          const row: { id: string } & Record<string, string> = { id: `row_${i}` };
+          for (const col of columns) {
+            row[col.name] = records[col.id]?.[i] ?? "";
+          }
+          datasetRecords.push(row);
+        }
+
+        setDatasetToSave({
+          name: dataset.name,
+          columnTypes: columns.map((col) => ({ name: col.name, type: col.type as DatasetColumnType })),
+          datasetRecords,
+        });
+        setSaveAsDatasetDrawerOpen(true);
+      },
+    }),
+    [openDrawer, addDataset, setActiveDataset]
+  );
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
   const evaluatorsMap = useMemo(
@@ -502,11 +187,14 @@ export function EvaluationsV3Table() {
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
-  const rowCount = getRowCount();
+  const rowCount = getRowCount(activeDatasetId);
   const displayRowCount = Math.max(rowCount, 3);
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
+
+  // Get columns from active dataset
+  const datasetColumns = activeDataset?.columns ?? [];
 
   // Build list of ALL navigable column IDs with their types
   const allColumns = useMemo(() => {
@@ -516,7 +204,7 @@ export function EvaluationsV3Table() {
     cols.push({ id: "__checkbox__", type: "checkbox" });
 
     // Dataset columns
-    for (const col of dataset.columns) {
+    for (const col of datasetColumns) {
       cols.push({ id: col.id, type: "dataset" });
     }
 
@@ -526,7 +214,7 @@ export function EvaluationsV3Table() {
     }
 
     return cols;
-  }, [dataset.columns, agents]);
+  }, [datasetColumns, agents]);
 
   // Keyboard navigation handler
   useEffect(() => {
@@ -646,14 +334,16 @@ export function EvaluationsV3Table() {
     toggleRowSelection,
   ]);
 
-  // Build row data from dataset records
+  // Build row data from active dataset records
   const rowData = useMemo((): RowData[] => {
+    const inlineData = activeDataset?.inline;
+
     return Array.from({ length: displayRowCount }, (_, index) => ({
       rowIndex: index,
       dataset: Object.fromEntries(
-        dataset.columns.map((col) => [
+        datasetColumns.map((col) => [
           col.id,
-          dataset.records[col.id]?.[index] ?? "",
+          inlineData?.records[col.id]?.[index] ?? "",
         ])
       ),
       agents: Object.fromEntries(
@@ -671,7 +361,7 @@ export function EvaluationsV3Table() {
         ])
       ),
     }));
-  }, [dataset, agents, results, displayRowCount]);
+  }, [activeDataset, datasetColumns, agents, results, displayRowCount]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -718,8 +408,8 @@ export function EvaluationsV3Table() {
       })
     );
 
-    // Dataset columns
-    for (const column of dataset.columns) {
+    // Dataset columns from active dataset
+    for (const column of datasetColumns) {
       cols.push(
         columnHelper.accessor((row) => row.dataset[column.id], {
           id: `dataset.${column.id}`,
@@ -773,7 +463,7 @@ export function EvaluationsV3Table() {
 
     return cols;
   }, [
-    dataset.columns,
+    datasetColumns,
     agents,
     evaluatorsMap,
     columnHelper,
@@ -793,7 +483,7 @@ export function EvaluationsV3Table() {
   });
 
   // Calculate colspan for super headers
-  const datasetColSpan = 1 + dataset.columns.length;
+  const datasetColSpan = 1 + datasetColumns.length;
   const agentsColSpan = Math.max(agents.length, 1);
 
   // Helper to render cell with selection support
@@ -849,6 +539,7 @@ export function EvaluationsV3Table() {
               value={(cell.getValue() as string) ?? ""}
               row={rowIndex}
               columnId={meta.columnId}
+              datasetId={activeDatasetId}
             />
           </td>
         );
@@ -875,7 +566,7 @@ export function EvaluationsV3Table() {
         </td>
       );
     },
-    [ui.selectedCell, setSelectedCell, setEditingCell, toggleRowSelection]
+    [ui.selectedCell, activeDatasetId, setSelectedCell, setEditingCell, toggleRowSelection]
   );
 
   return (
@@ -914,7 +605,12 @@ export function EvaluationsV3Table() {
       <table ref={tableRef}>
         <thead>
           <tr>
-            <SuperHeader type="dataset" colSpan={datasetColSpan} />
+            <SuperHeader
+              type="dataset"
+              colSpan={datasetColSpan}
+              activeDataset={activeDataset}
+              datasetHandlers={datasetHandlers}
+            />
             <SuperHeader
               type="agents"
               colSpan={agentsColSpan}
@@ -962,34 +658,42 @@ export function EvaluationsV3Table() {
         }
         onClear={clearRowSelection}
       />
-    </Box>
-  );
-}
 
-// ============================================================================
-// Agent Header Component
-// ============================================================================
-
-function AgentHeader({ agent }: { agent: AgentConfig }) {
-  const { openOverlay } = useEvaluationsV3Store((state) => ({
-    openOverlay: state.openOverlay,
-  }));
-
-  return (
-    <HStack
-      gap={2}
-      cursor="pointer"
-      onClick={() => openOverlay("agent", agent.id)}
-      _hover={{ color: "green.600" }}
-    >
-      <ColorfulBlockIcon
-        color={agent.type === "llm" ? "green.400" : "#3E5A60"}
-        size="xs"
-        icon={agent.type === "llm" ? <LLMIcon /> : <Code size={12} />}
+      {/* Save as dataset drawer */}
+      <AddOrEditDatasetDrawer
+        datasetToSave={datasetToSave}
+        open={saveAsDatasetDrawerOpen}
+        onClose={() => {
+          setSaveAsDatasetDrawerOpen(false);
+          setDatasetToSave(undefined);
+        }}
+        onSuccess={(savedDataset) => {
+          // Replace the inline dataset with a reference to the saved one
+          const currentDataset = datasets.find((d) => d.id === activeDatasetId);
+          if (currentDataset && currentDataset.type === "inline") {
+            // Build columns with proper types
+            const columns: DatasetColumn[] = savedDataset.columnTypes.map((col, index) => ({
+              id: `${col.name}_${index}`,
+              name: col.name,
+              type: col.type as DatasetColumnType,
+            }));
+            // Update the dataset to be a saved reference
+            const updatedDataset: DatasetReference = {
+              ...currentDataset,
+              type: "saved",
+              datasetId: savedDataset.datasetId,
+              inline: undefined,
+              columns,
+            };
+            // Remove the old dataset and add the new one
+            removeDataset(currentDataset.id);
+            addDataset(updatedDataset);
+            setActiveDataset(updatedDataset.id);
+          }
+          setSaveAsDatasetDrawerOpen(false);
+          setDatasetToSave(undefined);
+        }}
       />
-      <Text fontSize="13px" fontWeight="medium">
-        {agent.name}
-      </Text>
-    </HStack>
+    </Box>
   );
 }

@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EditableCell } from "../components/DatasetSection/EditableCell";
+import { DEFAULT_TEST_DATA_ID } from "../types";
 
 // Wrapper with Chakra provider
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -15,10 +16,18 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Helper to render with store reset and Chakra provider
-const renderCell = (value: string, row: number, columnId: string) => {
-  return render(<EditableCell value={value} row={row} columnId={columnId} />, {
-    wrapper: Wrapper,
-  });
+const renderCell = (value: string, row: number, columnId: string, datasetId: string = DEFAULT_TEST_DATA_ID) => {
+  return render(
+    <EditableCell value={value} row={row} columnId={columnId} datasetId={datasetId} />,
+    { wrapper: Wrapper }
+  );
+};
+
+// Helper to get active dataset records
+const getActiveDatasetRecords = () => {
+  const state = useEvaluationsV3Store.getState();
+  const activeDataset = state.datasets.find(d => d.id === state.activeDatasetId);
+  return activeDataset?.inline?.records;
 };
 
 describe("Dataset inline editing", () => {
@@ -73,8 +82,8 @@ describe("Dataset inline editing", () => {
       await user.keyboard("{Escape}");
 
       // Should revert - the store value should not be updated
-      const state = useEvaluationsV3Store.getState();
-      expect(state.dataset.records["input"]?.[0]).toBe("");
+      const records = getActiveDatasetRecords();
+      expect(records?.["input"]?.[0]).toBe("");
     });
   });
 
@@ -95,8 +104,8 @@ describe("Dataset inline editing", () => {
 
       // Store should be updated
       await waitFor(() => {
-        const state = useEvaluationsV3Store.getState();
-        expect(state.dataset.records["input"]?.[0]).toBe("modified");
+        const records = getActiveDatasetRecords();
+        expect(records?.["input"]?.[0]).toBe("modified");
       });
     });
   });
@@ -130,8 +139,8 @@ describe("Dataset inline editing", () => {
 
       // Verify value was saved
       await waitFor(() => {
-        const state = useEvaluationsV3Store.getState();
-        expect(state.dataset.records["input"]?.[0]).toBe("first value");
+        const records = getActiveDatasetRecords();
+        expect(records?.["input"]?.[0]).toBe("first value");
       });
 
       // Trigger undo via store
@@ -139,8 +148,8 @@ describe("Dataset inline editing", () => {
 
       // Value should be reverted
       await waitFor(() => {
-        const state = useEvaluationsV3Store.getState();
-        expect(state.dataset.records["input"]?.[0]).toBe("");
+        const records = getActiveDatasetRecords();
+        expect(records?.["input"]?.[0]).toBe("");
       });
     });
   });
@@ -161,31 +170,24 @@ describe("Dataset inline editing", () => {
 
       // Verify saved
       await waitFor(() => {
-        expect(
-          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
-        ).toBe("modified");
+        expect(getActiveDatasetRecords()?.["input"]?.[0]).toBe("modified");
       });
 
       // Undo
       useEvaluationsV3Store.temporal.getState().undo();
 
       await waitFor(() => {
-        expect(
-          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
-        ).toBe("");
+        expect(getActiveDatasetRecords()?.["input"]?.[0]).toBe("");
       });
 
       // Redo
       useEvaluationsV3Store.temporal.getState().redo();
 
       await waitFor(() => {
-        expect(
-          useEvaluationsV3Store.getState().dataset.records["input"]?.[0]
-        ).toBe("modified");
+        expect(getActiveDatasetRecords()?.["input"]?.[0]).toBe("modified");
       });
     });
   });
-
 });
 
 describe("Keyboard navigation", () => {

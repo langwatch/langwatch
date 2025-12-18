@@ -14,6 +14,7 @@ type EditableCellProps = {
   value: string;
   row: number;
   columnId: string;
+  datasetId: string;
 };
 
 /**
@@ -22,7 +23,7 @@ type EditableCellProps = {
  * Note: Selection outline is handled by the parent table on the <td> element.
  * This component only handles the edit mode textarea.
  */
-export function EditableCell({ value, row, columnId }: EditableCellProps) {
+export function EditableCell({ value, row, columnId, datasetId }: EditableCellProps) {
   const { setCellValue, setEditingCell, ui, setSelectedCell } =
     useEvaluationsV3Store((state) => ({
       setCellValue: state.setCellValue,
@@ -74,9 +75,9 @@ export function EditableCell({ value, row, columnId }: EditableCellProps) {
   }, [isEditing]);
 
   const handleSave = useCallback(() => {
-    setCellValue(row, columnId, editValue);
+    setCellValue(datasetId, row, columnId, editValue);
     setEditingCell(undefined);
-  }, [row, columnId, editValue, setCellValue, setEditingCell]);
+  }, [datasetId, row, columnId, editValue, setCellValue, setEditingCell]);
 
   const handleCancel = useCallback(() => {
     setEditValue(value);

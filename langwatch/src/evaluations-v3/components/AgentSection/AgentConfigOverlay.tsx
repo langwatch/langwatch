@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { AgentConfig, AgentType, FieldMapping } from "../../types";
@@ -24,14 +24,15 @@ import { ConfigPanel } from "../ConfigPanel";
  * - LLM configuration (model, instructions, prompt)
  * - Code configuration (code editor)
  * - Input/output field configuration
- * - Input mapping to dataset columns
+ * - Input mapping to dataset columns (with dataset source display)
  */
 export function AgentConfigPanel() {
   const {
     ui,
     closeOverlay,
     agents,
-    dataset,
+    datasets,
+    activeDatasetId,
     addAgent,
     updateAgent,
     setAgentMapping,
@@ -39,7 +40,8 @@ export function AgentConfigPanel() {
     ui: state.ui,
     closeOverlay: state.closeOverlay,
     agents: state.agents,
-    dataset: state.dataset,
+    datasets: state.datasets,
+    activeDatasetId: state.activeDatasetId,
     addAgent: state.addAgent,
     updateAgent: state.updateAgent,
     setAgentMapping: state.setAgentMapping,
@@ -51,6 +53,12 @@ export function AgentConfigPanel() {
     ? agents.find((a) => a.id === targetId)
     : undefined;
 
+  // Get active dataset
+  const activeDataset = useMemo(
+    () => datasets.find((d) => d.id === activeDatasetId),
+    [datasets, activeDatasetId]
+  );
+
   // Local form state
   const [agentType, setAgentType] = useState<AgentType>("llm");
   const [name, setName] = useState("");
@@ -58,7 +66,10 @@ export function AgentConfigPanel() {
   const [instructions, setInstructions] = useState("");
   const [promptTemplate, setPromptTemplate] = useState("{{input}}");
   const [code, setCode] = useState("");
-  const [inputMapping, setInputMapping] = useState<Record<string, string>>({});
+  // Local mapping state: inputField -> { sourceId, sourceField }
+  const [inputMapping, setInputMapping] = useState<
+    Record<string, { sourceId: string; sourceField: string }>
+  >({});
 
   // Initialize form when opening for existing agent
   useEffect(() => {
@@ -74,9 +85,17 @@ export function AgentConfigPanel() {
 
       // Load existing mappings from agent.mappings
       const mappings = existingAgent.mappings ?? {};
-      const mappingState: Record<string, string> = {};
+      const mappingState: Record<
+        string,
+        { sourceId: string; sourceField: string }
+      > = {};
       for (const [inputField, mapping] of Object.entries(mappings)) {
-        mappingState[inputField] = mapping.sourceField;
+        if (mapping.source === "dataset") {
+          mappingState[inputField] = {
+            sourceId: mapping.sourceId,
+            sourceField: mapping.sourceField,
+          };
+        }
       }
       setInputMapping(mappingState);
     } else if (isOpen && !existingAgent) {
@@ -99,6 +118,31 @@ export function AgentConfigPanel() {
 
   const detectedInputs =
     agentType === "llm" ? extractInputsFromPrompt(promptTemplate) : ["input"];
+
+  // Build mapping options from all datasets
+  const mappingOptions = useMemo(() => {
+    const options: Array<{
+      groupLabel: string;
+      datasetId: string;
+      columns: Array<{ id: string; name: string }>;
+    }> = [];
+
+    for (const dataset of datasets) {
+      options.push({
+        groupLabel:
+          dataset.id === activeDatasetId
+            ? `${dataset.name} (active)`
+            : dataset.name,
+        datasetId: dataset.id,
+        columns: dataset.columns.map((col) => ({
+          id: col.id,
+          name: col.name,
+        })),
+      });
+    }
+
+    return options;
+  }, [datasets, activeDatasetId]);
 
   const handleSave = useCallback(() => {
     const agentConfig: AgentConfig = {
@@ -128,11 +172,12 @@ export function AgentConfigPanel() {
 
     // Save input mappings (updates agent.mappings via setAgentMapping)
     for (const inputField of detectedInputs) {
-      const sourceField = inputMapping[inputField];
-      if (sourceField) {
+      const mapping = inputMapping[inputField];
+      if (mapping?.sourceId && mapping?.sourceField) {
         setAgentMapping(agentConfig.id, inputField, {
           source: "dataset",
-          sourceField,
+          sourceId: mapping.sourceId,
+          sourceField: mapping.sourceField,
         });
       }
     }
@@ -153,6 +198,34 @@ export function AgentConfigPanel() {
     setAgentMapping,
     closeOverlay,
   ]);
+
+  const handleMappingChange = (
+    inputField: string,
+    value: string // Format: "datasetId:columnName"
+  ) => {
+    if (!value) {
+      setInputMapping((prev) => {
+        const next = { ...prev };
+        delete next[inputField];
+        return next;
+      });
+      return;
+    }
+
+    const [sourceId, sourceField] = value.split(":");
+    if (sourceId && sourceField) {
+      setInputMapping((prev) => ({
+        ...prev,
+        [inputField]: { sourceId, sourceField },
+      }));
+    }
+  };
+
+  const getMappingValue = (inputField: string): string => {
+    const mapping = inputMapping[inputField];
+    if (!mapping) return "";
+    return `${mapping.sourceId}:${mapping.sourceField}`;
+  };
 
   return (
     <ConfigPanel
@@ -270,22 +343,24 @@ export function AgentConfigPanel() {
                 </Text>
                 <NativeSelect.Root flex={1}>
                   <NativeSelect.Field
-                    value={inputMapping[inputField] ?? ""}
+                    value={getMappingValue(inputField)}
                     onChange={(e) =>
-                      setInputMapping((prev) => ({
-                        ...prev,
-                        [inputField]: e.target.value,
-                      }))
+                      handleMappingChange(inputField, e.target.value)
                     }
                   >
                     <option value="">Select column...</option>
-                    <optgroup label="Dataset Columns">
-                      {dataset.columns.map((col) => (
-                        <option key={col.id} value={col.name}>
-                          {col.name}
-                        </option>
-                      ))}
-                    </optgroup>
+                    {mappingOptions.map((group) => (
+                      <optgroup key={group.datasetId} label={group.groupLabel}>
+                        {group.columns.map((col) => (
+                          <option
+                            key={`${group.datasetId}:${col.name}`}
+                            value={`${group.datasetId}:${col.name}`}
+                          >
+                            {col.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
                   </NativeSelect.Field>
                 </NativeSelect.Root>
               </HStack>

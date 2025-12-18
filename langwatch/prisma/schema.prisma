@@ -453,6 +453,7 @@ enum ExperimentType {
     DSPY
     BATCH_EVALUATION
     BATCH_EVALUATION_V2
+    EVALUATIONS_V3
 }
 
 model Experiment {
