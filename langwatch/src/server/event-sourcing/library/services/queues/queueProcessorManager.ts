@@ -104,17 +104,18 @@ function createCommandDispatcher<Payload, EventType extends Event>(
     options: config.concurrency ? { concurrency: config.concurrency } : void 0,
     async process(payload: Payload) {
       // Validate payload (also validated in send, but keep here for safety)
-      if (!commandSchema.validate(payload)) {
+      const { success, error, data: parsedPayload } = commandSchema.validate(payload);
+      if (!success || !parsedPayload) {
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType },
+          { commandType, validationError: error },
         );
       }
 
-      const tenantId = createTenantId((payload as any).tenantId);
-      const aggregateId = config.getAggregateId(payload);
+      const tenantId = createTenantId((parsedPayload as any).tenantId);
+      const aggregateId = config.getAggregateId(parsedPayload);
 
       // Acquire distributed lock if configured
       // Lock key format: command:${tenantId}:${aggregateType}:${aggregateId}:${commandName}
@@ -142,19 +143,19 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           tenantId,
           aggregateId,
           commandType,
-          payload,
+          parsedPayload,
         );
 
         // Handler returns events
         const events = await handler.handle(command);
 
-        // Validate that handler returned events, not the payload
+        // Validate that handler returned events, not the parsedPayload
         if (!events) {
           throw new ValidationError(
             `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
             "events",
             void 0,
-            { commandType, payload },
+            { commandType, parsedPayload },
           );
         }
 
@@ -163,7 +164,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
             "events",
             events,
-            { commandType, payload },
+            { commandType, parsedPayload },
           );
         }
 
@@ -175,7 +176,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
               `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
               "events",
               events,
-              { commandType, payload, index: i },
+              { commandType, parsedPayload, index: i },
             );
           }
 
@@ -193,12 +194,12 @@ function createCommandDispatcher<Payload, EventType extends Event>(
                 : "Unknown validation error";
 
             throw new ValidationError(
-              `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
+              `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}.`,
               "events",
               event,
               {
                 commandType,
-                payload,
+                parsedPayload,
                 index: i,
                 validationErrors:
                   parseResult.success === false
@@ -244,12 +245,13 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   return {
     async send(payload: Payload): Promise<void> {
       // Validate payload synchronously before queuing
-      if (!commandSchema.validate(payload)) {
+      const { success, error } = commandSchema.validate(payload);
+      if (!success) {
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType },
+          { commandType, validationError: error },
         );
       }
       // If validation passes, queue the job
