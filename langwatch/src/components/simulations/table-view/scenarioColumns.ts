@@ -13,7 +13,7 @@ export function createScenarioColumns(
   return [
     {
       id: "status",
-      header: "Status",
+      header: "",
       accessorKey: "status",
       filterable: false,
       sortable: false,
@@ -22,7 +22,7 @@ export function createScenarioColumns(
     },
     {
       id: "name",
-      header: "Scenario Name",
+      header: "Name",
       accessorKey: "name",
       filterable: true,
       filterType: "text",

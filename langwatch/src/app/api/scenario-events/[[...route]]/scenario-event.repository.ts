@@ -1836,41 +1836,61 @@ export class ScenarioEventRepository {
       : groupField;
 
     // Get grouped results using terms aggregation
-    const response = await client.search<unknown, Record<string, any>>({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: filterClauses,
-          },
-        },
-        aggs: {
-          total_groups: {
-            cardinality: {
-              field: aggregationField,
+    // Wrap in try-catch to handle fielddata errors on older indices without .keyword mapping
+    let response: any;
+    try {
+      response = await client.search<unknown, Record<string, any>>({
+        index: SCENARIO_EVENTS_INDEX.alias,
+        body: {
+          query: {
+            bool: {
+              filter: filterClauses,
             },
           },
-          grouped: {
-            terms: {
-              field: aggregationField,
-              size: page * pageSize,
-              order: { _key: sorting?.order ?? "asc" },
+          aggs: {
+            total_groups: {
+              cardinality: {
+                field: aggregationField,
+              },
             },
-            aggs: {
-              // Get top scenario run IDs for each group
-              top_runs: {
-                top_hits: {
-                  size: 100, // Max runs per group that will be fetched
-                  sort: [{ timestamp: { order: "desc" } }],
-                  _source: [ES_FIELDS.scenarioRunId],
+            grouped: {
+              terms: {
+                field: aggregationField,
+                size: page * pageSize,
+                order: { _key: sorting?.order ?? "asc" },
+              },
+              aggs: {
+                // Get top scenario run IDs for each group
+                top_runs: {
+                  top_hits: {
+                    size: 100, // Max runs per group that will be fetched
+                    sort: [{ timestamp: { order: "desc" } }],
+                    _source: [ES_FIELDS.scenarioRunId],
+                  },
                 },
               },
             },
           },
+          size: 0,
         },
-        size: 0,
-      },
-    });
+      });
+    } catch (error: any) {
+      // If aggregation fails due to fielddata error on text field, fall back to in-memory grouping
+      // This happens on indices created before the .keyword subfield was added
+      if (
+        groupField === "metadata.name" &&
+        (error?.message?.includes("Fielddata is disabled") ||
+          error?.meta?.body?.error?.caused_by?.type === "illegal_argument_exception")
+      ) {
+        return this.searchGroupedScenarioRunsByName({
+          projectId: validatedProjectId,
+          filters: filterClauses,
+          sorting,
+          pagination: { page, pageSize },
+        });
+      }
+      throw error;
+    }
 
     const totalGroups =
       (response.aggregations as any)?.total_groups?.value ?? 0;
