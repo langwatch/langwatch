@@ -50,7 +50,7 @@ describe("defineCommandSchema", () => {
       const testPayload = "test-payload";
       const result = schema.validate(testPayload);
 
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
     });
 
     it("returns true when validator returns true", () => {
@@ -59,7 +59,7 @@ describe("defineCommandSchema", () => {
 
       const result = schema.validate("valid-string");
 
-      expect(result).toBe(true);
+      expect(result.success).toBe(true);
     });
 
     it("returns false when validator returns false", () => {
@@ -68,7 +68,7 @@ describe("defineCommandSchema", () => {
 
       const result = schema.validate(123);
 
-      expect(result).toBe(false);
+      expect(result.success).toBe(false);
     });
 
     it("works with complex payload types", () => {
@@ -85,8 +85,8 @@ describe("defineCommandSchema", () => {
       const validPayload = { id: "test-id", data: [1, 2, 3] };
       const invalidPayload = { id: "test-id" };
 
-      expect(schema.validate(validPayload)).toBe(true);
-      expect(schema.validate(invalidPayload)).toBe(false);
+      expect(schema.validate(validPayload).success).toBe(true);
+      expect(schema.validate(invalidPayload).success).toBe(false);
     });
   });
 
