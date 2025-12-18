@@ -1447,7 +1447,7 @@ export class ScenarioEventRepository {
       scenarioSetId: ES_FIELDS.scenarioSetId,
       batchRunId: ES_FIELDS.batchRunId,
       scenarioRunId: ES_FIELDS.scenarioRunId,
-      name: "metadata.name.keyword", // Use keyword subfield for sorting/aggregations
+      name: "metadata.name", // Use base field - aggregations will use runtime script
       status: "status",
       timestamp: "timestamp",
       verdict: "results.verdict",
@@ -1777,9 +1777,15 @@ export class ScenarioEventRepository {
     }
 
     // Build filter clauses
+    // For keyword subfields like "metadata.name.keyword", check existence of base field
+    const existsField = groupField.endsWith(".keyword")
+      ? groupField.replace(/\.keyword$/, "")
+      : groupField;
+
     const filterClauses: any[] = [
       { term: { [ES_FIELDS.projectId]: validatedProjectId } },
       { term: { type: ScenarioEventType.RUN_STARTED } },
+      { exists: { field: existsField } }, // Only include documents that have the groupBy field
     ];
 
     for (const filter of filters ?? []) {
@@ -1823,8 +1829,14 @@ export class ScenarioEventRepository {
       }
     }
 
-    // Get grouped results using composite aggregation for pagination
-    const response = await client.search({
+    // For metadata.name, use the .keyword subfield (requires migration 202512171410)
+    // and documents need to be reindexed after the migration for keyword values to be indexed
+    const aggregationField = groupField === "metadata.name"
+      ? "metadata.name.keyword"
+      : groupField;
+
+    // Get grouped results using terms aggregation
+    const response = await client.search<unknown, Record<string, any>>({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
@@ -1835,14 +1847,14 @@ export class ScenarioEventRepository {
         aggs: {
           total_groups: {
             cardinality: {
-              field: groupField,
+              field: aggregationField,
             },
           },
           grouped: {
             terms: {
-              field: groupField,
-              size: page * pageSize, // Get enough groups for current page
-              order: { _key: sorting?.order ?? "asc" }, // Sort by group value (name) alphabetically
+              field: aggregationField,
+              size: page * pageSize,
+              order: { _key: sorting?.order ?? "asc" },
             },
             aggs: {
               // Get top scenario run IDs for each group
@@ -1866,6 +1878,17 @@ export class ScenarioEventRepository {
     const buckets =
       (response.aggregations as any)?.grouped?.buckets ?? [];
 
+    // If aggregation returned empty and we're grouping by name, fall back to in-memory grouping
+    // This handles cases where documents were indexed before the .keyword mapping was added
+    if (buckets.length === 0 && groupField === "metadata.name") {
+      return this.searchGroupedScenarioRunsByName({
+        projectId: validatedProjectId,
+        filters: filterClauses,
+        sorting,
+        pagination: { page, pageSize },
+      });
+    }
+
     // Extract groups for current page
     const startIdx = (page - 1) * pageSize;
     const endIdx = page * pageSize;
@@ -1880,6 +1903,91 @@ export class ScenarioEventRepository {
     }));
 
     return { groups, totalGroups };
+  }
+
+  /**
+   * Groups scenario runs by metadata.name using in-memory aggregation.
+   * This is needed because metadata.name is a text field that doesn't support terms aggregation.
+   */
+  private async searchGroupedScenarioRunsByName({
+    projectId,
+    filters,
+    sorting,
+    pagination,
+  }: {
+    projectId: string;
+    filters: any[];
+    sorting?: { columnId: string; order: "asc" | "desc" };
+    pagination: { page: number; pageSize: number };
+  }): Promise<{
+    groups: Array<{
+      groupValue: string;
+      count: number;
+      scenarioRunIds: string[];
+    }>;
+    totalGroups: number;
+  }> {
+    const client = await this.getClient();
+
+    // Fetch all matching documents with metadata.name
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: filters,
+          },
+        },
+        _source: ["metadata.name", ES_FIELDS.scenarioRunId, "timestamp"],
+        size: 10000, // Reasonable limit for in-memory grouping
+        sort: [{ timestamp: { order: "desc" } }],
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+
+    // Group documents by metadata.name in memory
+    const groupMap = new Map<string, { scenarioRunIds: string[]; count: number }>();
+
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const name = source?.metadata?.name as string;
+      const scenarioRunId = source?.scenario_run_id as string;
+
+      if (name && scenarioRunId) {
+        const existing = groupMap.get(name);
+        if (existing) {
+          existing.scenarioRunIds.push(scenarioRunId);
+          existing.count++;
+        } else {
+          groupMap.set(name, { scenarioRunIds: [scenarioRunId], count: 1 });
+        }
+      }
+    }
+
+    // Convert to array and sort
+    let groupArray = Array.from(groupMap.entries()).map(([key, value]) => ({
+      groupValue: key,
+      count: value.count,
+      scenarioRunIds: value.scenarioRunIds.slice(0, 100), // Limit scenario run IDs
+    }));
+
+    // Sort by group value (name)
+    const sortOrder = sorting?.order ?? "asc";
+    groupArray.sort((a, b) => {
+      const comparison = a.groupValue.localeCompare(b.groupValue);
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    const totalGroups = groupArray.length;
+
+    // Paginate
+    const { page, pageSize } = pagination;
+    const startIdx = (page - 1) * pageSize;
+    const endIdx = page * pageSize;
+    const paginatedGroups = groupArray.slice(startIdx, endIdx);
+
+    return { groups: paginatedGroups, totalGroups };
   }
 
   /**
