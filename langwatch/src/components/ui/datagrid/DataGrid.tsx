@@ -225,14 +225,12 @@ export function DataGrid<T>({
         filters={filters}
         globalSearch={globalSearch}
         isExporting={isExporting}
-        onAddFilter={handleAddFilter}
         onRemoveFilter={handleRemoveFilter}
         onClearFilters={handleClearFilters}
         onGlobalSearchChange={handleGlobalSearchChange}
         onToggleColumnVisibility={toggleColumnVisibility}
         onExport={handleExport}
         onRefresh={onRefresh}
-        getEnumOptions={getEnumOptions}
       />
 
       {/* Table */}
