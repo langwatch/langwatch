@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.1...mcp-server@v0.3.2) (2025-12-17)
+
+
+### Bug Fixes
+
+* update mcp docs urls to the new langwatch.ai/docs and /scenario instead of the previous subdomains ([5b1ce07](https://github.com/langwatch/langwatch/commit/5b1ce073adf580fb7f897da98e1cdd6a1e25135e))
+
 ## [0.3.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.0...mcp-server@v0.3.1) (2025-11-15)
 
 

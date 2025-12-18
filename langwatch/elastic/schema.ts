@@ -1,6 +1,7 @@
 import {
   type MappingDenseVectorProperty,
   type MappingProperty,
+  type MappingTextProperty,
 } from "@elastic/elasticsearch/lib/api/types";
 import { FLATENNED_TYPE } from "../src/server/elasticsearch";
 import type {
@@ -16,6 +17,7 @@ import {
 
 export type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
+  | MappingTextProperty
   | MappingDenseVectorProperty
   | { type: "knn_vector"; [key: string]: any };
 

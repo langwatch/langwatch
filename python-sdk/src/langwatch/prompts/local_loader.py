@@ -25,8 +25,13 @@ class LocalPromptLoader:
     """Loads prompts from local files in CLI format."""
 
     def __init__(self, base_path: Optional[Path] = None):
-        """Initialize with base path (defaults to current working directory)."""
-        self.base_path = base_path or Path.cwd()
+        """Initialize with base path (defaults to current working directory at load time)."""
+        self._base_path = base_path
+
+    @property
+    def base_path(self) -> Path:
+        """Get the base path, defaulting to current working directory if not set."""
+        return self._base_path or Path.cwd()
 
     def load_prompt(self, prompt_id: str) -> Optional[PromptData]:
         """

@@ -1,6 +1,6 @@
 # LangWatch 🏰 MCP Server
 
-The LangWatch MCP Server makes your AI coding assistant an expert in both [LangWatch](https://docs.langwatch.ai/), for automatically instrumenting your code, managing versioned prompts and creating evaluations; and [Scenario](https://scenario.langwatch.ai/), for automatically testing your agents via simulations.
+The LangWatch MCP Server makes your AI coding assistant an expert in both [LangWatch](https://langwatch.ai/docs), for automatically instrumenting your code, managing versioned prompts and creating evaluations; and [Scenario](https://langwatch.ai/scenario), for automatically testing your agents via simulations.
 
 ## Setup in your Coding Assistant 👩‍💻
 
@@ -53,5 +53,5 @@ Or ask it to write a scenario test:
 If you have questions or need help, join our community:
 
 - [Discord Community](https://discord.gg/kT4PhDS2gH)
-- [LangWatch Docs](https://docs.langwatch.ai/)
+- [LangWatch Docs](https://langwatch.ai/docs)
 - [Email Support](mailto:support@langwatch.ai)

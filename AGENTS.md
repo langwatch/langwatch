@@ -1,8 +1,6 @@
 # Agent Guidelines
 
 > **Purpose:** Behavioral corrections only—concrete mistakes LLMs repeat despite knowing principles.  
-> **Curation:** Add only after 2+ occurrences. Delete rows that stop appearing. Keep <15 rows.  
-> **Scope:** Domain-specific files (e.g., `langwatch/AGENTS.md`) inherit from root.
 
 ## General
 
@@ -12,6 +10,8 @@
 | Skipping test run after edits | Always run tests after any code change to catch regressions immediately |
 | Using undefined symbols without imports | Verify all symbols are imported before using them; run tests to catch `ReferenceError` |
 | Duplicating logic across languages/templates | Business logic lives in one place; templates consume pre-computed values |
+| Implementing code before writing tests | Follow Outside-In TDD: Write failing tests first, then implement minimal code to pass, then refactor |
+| Writing tests in the incorrect order | Outside-In TDD: examples drive E2E tests => then integration tests => then unit tests |
 
 ## TypeScript
 
