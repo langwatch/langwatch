@@ -96,15 +96,15 @@ export function DataGridTable<T>({
     }));
   }, [data, groupBy, columnDefs]);
 
-  // Track expanded groups (all expanded by default)
+  // Track expanded groups (all collapsed by default)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    () => new Set(groupedData?.map((g) => g.groupValue) ?? [])
+    () => new Set()
   );
 
-  // Update expanded groups when groupedData changes
+  // Reset expanded groups when groupBy changes
   useMemo(() => {
     if (groupedData) {
-      setExpandedGroups(new Set(groupedData.map((g) => g.groupValue)));
+      setExpandedGroups(new Set());
     }
   }, [groupBy]);
 
@@ -253,9 +253,9 @@ export function DataGridTable<T>({
                 {/* Group header row */}
                 <Table.Row
                   key={`group-${group.groupValue}`}
-                  // bg="gray.100"
                   cursor="pointer"
                   onClick={() => toggleGroup(group.groupValue)}
+                  _hover={{ bg: "gray.50" }}
                 >
                   <Table.Cell colSpan={totalColumns}>
                     <Flex align="center" gap={2} py={1}>
@@ -267,7 +267,7 @@ export function DataGridTable<T>({
                       <Text fontWeight="semibold">
                         {group.groupValue}
                       </Text>
-                      <Text color="gray.500" fontSize="sm">
+                      <Text color="gray.300" fontSize="sm">
                         ({group.rows.length} items)
                       </Text>
                     </Flex>
@@ -281,6 +281,7 @@ export function DataGridTable<T>({
                       <>
                         <Table.Row
                           key={row.id}
+                          bg="gray.50"
                           _hover={{ bg: "gray.50" }}
                           cursor={onRowClick ? "pointer" : undefined}
                           onClick={onRowClick ? () => onRowClick(row.original) : undefined}
