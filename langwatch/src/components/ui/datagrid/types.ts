@@ -183,6 +183,7 @@ export interface DataGridActions<T> {
   removeFilter: (columnId: string, index: number) => void;
   updateFilter: (index: number, filter: FilterState) => void;
   clearFilters: () => void;
+  resetFiltersAndSorting: () => void;
   setGlobalSearch: (search: string) => void;
 
   // Sort actions

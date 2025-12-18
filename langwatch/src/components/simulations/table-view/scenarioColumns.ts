@@ -22,7 +22,7 @@ export function createScenarioColumns(
     },
     {
       id: "name",
-      header: "Name",
+      header: "Scenario Name",
       accessorKey: "name",
       filterable: true,
       filterType: "text",
