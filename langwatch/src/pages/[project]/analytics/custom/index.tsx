@@ -672,6 +672,9 @@ function CustomGraphForm({
   const router = useRouter();
   const trpc = api.useContext();
 
+  // Get dashboardId from URL query param
+  const dashboardId = router.query.dashboard as string | undefined;
+
   const addGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
@@ -687,11 +690,16 @@ function CustomGraphForm({
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
         alert: formData.alert?.enabled ? formData.alert : undefined,
+        dashboardId: dashboardId,
       },
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          void router.push(`/${project?.slug}/analytics/reports`);
+          // Navigate back to the same page we came from
+          const dashboardUrl = dashboardId
+            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+            : `/${project?.slug}/analytics/reports`;
+          void router.push(dashboardUrl);
         },
       },
     );
@@ -713,7 +721,11 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          void router.push(`/${project?.slug}/analytics/reports`);
+          // Navigate back to the same dashboard we came from
+          const dashboardUrl = dashboardId
+            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+            : `/${project?.slug}/analytics/reports`;
+          void router.push(dashboardUrl);
         },
       },
     );

@@ -1,248 +1,193 @@
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  Grid,
-  GridItem,
-  HStack,
-  Skeleton,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
-import { useForm } from "react-hook-form";
-import {
-  BarChart2,
-  Bell,
-  Edit,
-  Filter,
-  MoreVertical,
-  Plus,
-  Trash2,
-} from "react-feather";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "~/components/analytics/CustomGraph";
+import { Plus } from "lucide-react";
+import { AnalyticsHeader } from "~/components/analytics/AnalyticsHeader";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
-import { FilterDisplay } from "~/components/triggers/FilterDisplay";
-import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useDrawer } from "~/hooks/useDrawer";
-import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import {
+  calculateGridPositions,
+  type GridLayout,
+  ReportGrid,
+  type SizeOption,
+  sizeOptions,
+} from "../../../components/analytics/reports";
 import { Link } from "../../../components/ui/link";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import {
-  customGraphInputToFormData,
-  type CustomGraphFormData,
-} from "./custom/index";
-
-interface GraphCardProps {
-  graph: {
-    id: string;
-    name: string;
-    graph: unknown;
-    filters: unknown;
-    trigger?: {
-      id: string;
-      active: boolean;
-      alertType: string | null;
-    } | null;
-  };
-  projectSlug: string;
-  onDelete: () => void;
-  isDeleting: boolean;
-}
-
-/**
- * Single Responsibility: Renders a single graph card with filters and actions
- */
-function GraphCard({
-  graph,
-  projectSlug,
-  onDelete,
-  isDeleting,
-}: GraphCardProps) {
-  const router = useRouter();
-  const { openDrawer } = useDrawer();
-
-  // Create form instance from graph data for the alert drawer
-  const form = useForm<CustomGraphFormData>({
-    defaultValues: graph.graph
-      ? customGraphInputToFormData(graph.graph as CustomGraphInput)
-      : undefined,
-  });
-
-  const hasFilters = useMemo(
-    () =>
-      !!(
-        graph.filters &&
-        typeof graph.filters === "object" &&
-        Object.keys(graph.filters).length > 0
-      ),
-    [graph.filters],
-  );
-
-  return (
-    <GridItem key={graph.id} display={"inline-grid"}>
-      <Card.Root>
-        <Card.Body>
-          <HStack align={"top"} marginBottom={4}>
-            <BarChart2 color="orange" />
-            <Text
-              marginLeft={2}
-              fontSize="md"
-              fontWeight="bold"
-              marginBottom={2}
-            >
-              {graph.name}
-            </Text>
-            <Spacer />
-            {graph.trigger && graph.trigger.active ? (
-              <Tooltip
-                content={`Alert configured (${
-                  graph.trigger.alertType ?? "INFO"
-                })`}
-                positioning={{ placement: "top" }}
-                showArrow
-              >
-                <Box padding={1}>
-                  <Bell
-                    width={18}
-                    color="black"
-                    cursor="pointer"
-                    onClick={() =>
-                      openDrawer("customGraphAlert", {
-                        form,
-                        graphId: graph.id,
-                      })
-                    }
-                  />
-                </Box>
-              </Tooltip>
-            ) : (
-              <Button
-                variant="outline"
-                colorPalette="gray"
-                size="sm"
-                onClick={() =>
-                  openDrawer("customGraphAlert", {
-                    form,
-                    graphId: graph.id,
-                  })
-                }
-              >
-                <Bell width={16} />
-                Add alert
-              </Button>
-            )}
-            {hasFilters && (
-              <Tooltip
-                content={
-                  <VStack
-                    align="start"
-                    backgroundColor="black"
-                    color="white"
-                    height="100%"
-                    textWrap="wrap"
-                  >
-                    <FilterDisplay
-                      filters={
-                        graph.filters as Record<
-                          FilterField,
-                          string[] | Record<string, string[]>
-                        >
-                      }
-                    />
-                  </VStack>
-                }
-                positioning={{ placement: "top" }}
-                showArrow
-              >
-                <Box padding={1}>
-                  <Filter width={16} style={{ minWidth: 16 }} />
-                </Box>
-              </Tooltip>
-            )}
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button variant="ghost" loading={isDeleting}>
-                  <MoreVertical />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                <Menu.Item
-                  value="edit"
-                  onClick={() => {
-                    void router.push(
-                      `/${projectSlug}/analytics/custom/${graph.id}`,
-                    );
-                  }}
-                >
-                  <Edit /> Edit Graph
-                </Menu.Item>
-                <Menu.Item value="delete" color="red.600" onClick={onDelete}>
-                  <Trash2 /> Delete Graph
-                </Menu.Item>
-              </Menu.Content>
-            </Menu.Root>
-          </HStack>
-          <CustomGraph
-            key={graph.id}
-            input={graph.graph as CustomGraphInput}
-            filters={
-              graph.filters as
-                | Record<FilterField, string[] | Record<string, string[]>>
-                | undefined
-            }
-          />
-        </Card.Body>
-      </Card.Root>
-    </GridItem>
-  );
-}
 
 function ReportsContent() {
   const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
+  const router = useRouter();
+  const projectId = project?.id ?? "";
 
-  const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
-  const deleteGraphs = api.graphs.delete.useMutation();
+  // Get dashboard ID from URL, or use first dashboard
+  const urlDashboardId = router.query.dashboard as string | undefined;
 
-  const deleteGraph = (id: string) => () => {
-    deleteGraphs.mutate(
-      { projectId: project?.id ?? "", id: id },
+  // Get or create first dashboard
+  const getOrCreateFirst = api.dashboards.getOrCreateFirst.useQuery(
+    { projectId },
+    { enabled: !!projectId && !urlDashboardId },
+  );
+
+  const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
+
+  // Fetch all dashboards to get current dashboard name
+  const dashboardsQuery = api.dashboards.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+
+  const currentDashboard = dashboardsQuery.data?.find(
+    (d) => d.id === activeDashboardId,
+  );
+  const dashboardTitle = currentDashboard?.name ?? "Reports";
+
+  // Graphs for the active dashboard
+  const graphsQuery = api.graphs.getAll.useQuery(
+    { projectId, dashboardId: activeDashboardId },
+    { enabled: !!projectId && !!activeDashboardId },
+  );
+
+  const deleteGraph = api.graphs.delete.useMutation();
+  const updateLayout = api.graphs.updateLayout.useMutation();
+  const batchUpdateLayouts = api.graphs.batchUpdateLayouts.useMutation();
+  const renameDashboard = api.dashboards.rename.useMutation();
+
+  const handleTitleSave = (newTitle: string) => {
+    if (activeDashboardId) {
+      renameDashboard.mutate(
+        { projectId, dashboardId: activeDashboardId, name: newTitle },
+        {
+          onSuccess: () => {
+            void dashboardsQuery.refetch();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Error renaming dashboard",
+              type: "error",
+              duration: 3000,
+              meta: { closable: true },
+            });
+          },
+        },
+      );
+    }
+  };
+
+  const handleGraphDelete = (graphId: string) => {
+    deleteGraph.mutate(
+      { projectId, id: graphId },
       {
         onSuccess: () => {
-          void graphs.refetch();
+          void graphsQuery.refetch();
         },
         onError: () => {
           toaster.create({
             title: "Error deleting graph",
             type: "error",
             duration: 3000,
-            meta: {
-              closable: true,
-            },
+            meta: { closable: true },
           });
         },
       },
     );
   };
 
+  const handleGraphSizeChange = (graphId: string, size: SizeOption) => {
+    const sizeConfig = sizeOptions.find((s) => s.value === size);
+    if (!sizeConfig) return;
+
+    const graph = graphsQuery.data?.find((g) => g.id === graphId);
+    if (!graph) return;
+
+    // Update this graph's size
+    updateLayout.mutate(
+      {
+        projectId,
+        graphId,
+        gridColumn: graph.gridColumn,
+        gridRow: graph.gridRow,
+        colSpan: sizeConfig.colSpan,
+        rowSpan: sizeConfig.rowSpan,
+      },
+      {
+        onSuccess: () => {
+          // Recalculate all positions after size change
+          const updatedGraphs = graphsQuery.data?.map((g) =>
+            g.id === graphId
+              ? {
+                  ...g,
+                  colSpan: sizeConfig.colSpan,
+                  rowSpan: sizeConfig.rowSpan,
+                }
+              : g,
+          );
+
+          if (updatedGraphs) {
+            const newLayouts = calculateGridPositions(updatedGraphs);
+            batchUpdateLayouts.mutate(
+              { projectId, layouts: newLayouts },
+              {
+                onSuccess: () => {
+                  void graphsQuery.refetch();
+                },
+              },
+            );
+          }
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error updating graph size",
+            type: "error",
+            duration: 3000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  const handleGraphsReorder = (layouts: GridLayout[]) => {
+    batchUpdateLayouts.mutate(
+      { projectId, layouts },
+      {
+        onSuccess: () => {
+          void graphsQuery.refetch();
+        },
+        onError: () => {
+          toaster.create({
+            title: "Error reordering graphs",
+            type: "error",
+            duration: 3000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
+  const graphs = graphsQuery.data ?? [];
+  const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
+
+  // Build add chart URL with current dashboard
+  const addChartUrl = activeDashboardId
+    ? `/${project?.slug}/analytics/custom?dashboard=${activeDashboardId}`
+    : `/${project?.slug}/analytics/custom`;
+
   return (
     <GraphsLayout>
-      <AnalyticsHeader title="Custom Reports" />
-      {graphs.data && graphs.data?.length === 0 && (
+      <AnalyticsHeader
+        title={dashboardTitle}
+        isEditable
+        onTitleSave={handleTitleSave}
+      />
+
+      {/* Empty state */}
+      {hasNoGraphs && (
         <Alert.Root
           status="info"
           borderStartWidth="4px"
@@ -261,36 +206,34 @@ function ReportsContent() {
           </VStack>
         </Alert.Root>
       )}
+
+      {/* Add chart button */}
       <HStack width="full" paddingBottom={6}>
         {project ? (
-          <Link href={`/${project.slug}/analytics/custom`}>
+          <Link href={addChartUrl}>
             <Plus /> Add chart
           </Link>
         ) : null}
       </HStack>
+
+      {/* Main content */}
       <HStack align="start" gap={6} width="full">
-        <Grid
-          templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
-          gap={5}
-          width={"100%"}
-        >
-          {graphs.data ? (
-            graphs.data.map((graph) => (
-              <GraphCard
-                key={graph.id}
-                graph={graph}
-                projectSlug={project?.slug ?? ""}
-                onDelete={deleteGraph(graph.id)}
-                isDeleting={
-                  deleteGraphs.isLoading &&
-                  deleteGraphs.variables?.id === graph.id
-                }
-              />
-            ))
+        <Box flex={1}>
+          {graphsQuery.isLoading ? (
+            <Skeleton height="300px" />
           ) : (
-            <Skeleton height="20px" />
+            <ReportGrid
+              graphs={graphs}
+              projectSlug={project?.slug ?? ""}
+              onGraphDelete={handleGraphDelete}
+              onGraphSizeChange={handleGraphSizeChange}
+              onGraphsReorder={handleGraphsReorder}
+              deletingGraphId={
+                deleteGraph.isLoading ? deleteGraph.variables?.id ?? null : null
+              }
+            />
           )}
-        </Grid>
+        </Box>
         {showFilters ? <FilterSidebar /> : null}
       </HStack>
     </GraphsLayout>

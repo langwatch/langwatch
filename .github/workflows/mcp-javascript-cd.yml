@@ -36,7 +36,7 @@ jobs:
 
       - name: Build and publish
         working-directory: mcp-server
-        run: npm publish --provenance --access public --no-git-checks
+        run: pnpm publish --provenance --access public --no-git-checks
 
       - name: Get version from tag or manifest
         id: get_version
