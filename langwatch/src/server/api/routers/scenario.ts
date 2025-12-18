@@ -12,7 +12,7 @@ const projectSchema = z.object({
 // Filter schema for table view
 const filterSchema = z.object({
   columnId: z.string(),
-  operator: z.enum(["eq", "contains"]),
+  operator: z.enum(["eq", "contains", "between"]),
   value: z.unknown(),
 });
 

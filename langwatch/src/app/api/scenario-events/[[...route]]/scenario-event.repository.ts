@@ -993,7 +993,7 @@ export class ScenarioEventRepository {
     projectId: string;
     filters?: Array<{
       columnId: string;
-      operator: "eq" | "contains";
+      operator: "eq" | "contains" | "between";
       value?: unknown;
     }>;
     sorting?: { columnId: string; order: "asc" | "desc" };
@@ -1061,6 +1061,37 @@ export class ScenarioEventRepository {
             [fieldMapping]: `*${String(filter.value).toLowerCase()}*`,
           },
         });
+      } else if (filter.operator === "between") {
+        // Handle date range filter - value can be:
+        // 1. JSON string with { start: ISO string, end: ISO string } (from frontend)
+        // 2. Object with { gte: number, lte: number }
+        let gte: number | undefined;
+        let lte: number | undefined;
+
+        if (typeof filter.value === "string") {
+          try {
+            const parsed = JSON.parse(filter.value);
+            if (parsed.start) gte = new Date(parsed.start).getTime();
+            if (parsed.end) lte = new Date(parsed.end).getTime();
+          } catch {
+            // Invalid JSON, skip filter
+          }
+        } else {
+          const rangeValue = filter.value as { gte?: number; lte?: number };
+          gte = rangeValue?.gte;
+          lte = rangeValue?.lte;
+        }
+
+        if (gte !== undefined || lte !== undefined) {
+          mustClauses.push({
+            range: {
+              [fieldMapping]: {
+                ...(gte !== undefined && { gte }),
+                ...(lte !== undefined && { lte }),
+              },
+            },
+          });
+        }
       }
     }
 
@@ -1148,7 +1179,7 @@ export class ScenarioEventRepository {
     search,
   }: {
     projectId: string;
-    filters: Array<{ columnId: string; operator: "eq" | "contains"; value?: unknown }>;
+    filters: Array<{ columnId: string; operator: "eq" | "contains" | "between"; value?: unknown }>;
     sorting: { field: string; order: "asc" | "desc" };
     pagination: { from: number; size: number };
     search?: string;
@@ -1208,6 +1239,34 @@ export class ScenarioEventRepository {
         mustClauses.push({
           wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
         });
+      } else if (filter.operator === "between") {
+        let gte: number | undefined;
+        let lte: number | undefined;
+
+        if (typeof filter.value === "string") {
+          try {
+            const parsed = JSON.parse(filter.value);
+            if (parsed.start) gte = new Date(parsed.start).getTime();
+            if (parsed.end) lte = new Date(parsed.end).getTime();
+          } catch {
+            // Invalid JSON, skip filter
+          }
+        } else {
+          const rangeValue = filter.value as { gte?: number; lte?: number };
+          gte = rangeValue?.gte;
+          lte = rangeValue?.lte;
+        }
+
+        if (gte !== undefined || lte !== undefined) {
+          mustClauses.push({
+            range: {
+              [fieldMapping]: {
+                ...(gte !== undefined && { gte }),
+                ...(lte !== undefined && { lte }),
+              },
+            },
+          });
+        }
       }
     }
 
@@ -1272,7 +1331,7 @@ export class ScenarioEventRepository {
   }: {
     projectId: string;
     status: string;
-    filters: Array<{ columnId: string; operator: "eq" | "contains"; value?: unknown }>;
+    filters: Array<{ columnId: string; operator: "eq" | "contains" | "between"; value?: unknown }>;
     sorting: { field: string; order: "asc" | "desc" };
     pagination: { from: number; size: number };
     search?: string;
@@ -1302,6 +1361,34 @@ export class ScenarioEventRepository {
         mustClauses.push({
           wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
         });
+      } else if (filter.operator === "between") {
+        let gte: number | undefined;
+        let lte: number | undefined;
+
+        if (typeof filter.value === "string") {
+          try {
+            const parsed = JSON.parse(filter.value);
+            if (parsed.start) gte = new Date(parsed.start).getTime();
+            if (parsed.end) lte = new Date(parsed.end).getTime();
+          } catch {
+            // Invalid JSON, skip filter
+          }
+        } else {
+          const rangeValue = filter.value as { gte?: number; lte?: number };
+          gte = rangeValue?.gte;
+          lte = rangeValue?.lte;
+        }
+
+        if (gte !== undefined || lte !== undefined) {
+          mustClauses.push({
+            range: {
+              [fieldMapping]: {
+                ...(gte !== undefined && { gte }),
+                ...(lte !== undefined && { lte }),
+              },
+            },
+          });
+        }
       }
     }
 
@@ -1650,7 +1737,7 @@ export class ScenarioEventRepository {
     groupBy: string;
     filters?: Array<{
       columnId: string;
-      operator: "eq" | "contains";
+      operator: "eq" | "contains" | "between";
       value?: unknown;
     }>;
     sorting?: { columnId: string; order: "asc" | "desc" };
@@ -1691,6 +1778,34 @@ export class ScenarioEventRepository {
         filterClauses.push({
           wildcard: { [fieldMapping]: `*${String(filter.value).toLowerCase()}*` },
         });
+      } else if (filter.operator === "between") {
+        let gte: number | undefined;
+        let lte: number | undefined;
+
+        if (typeof filter.value === "string") {
+          try {
+            const parsed = JSON.parse(filter.value);
+            if (parsed.start) gte = new Date(parsed.start).getTime();
+            if (parsed.end) lte = new Date(parsed.end).getTime();
+          } catch {
+            // Invalid JSON, skip filter
+          }
+        } else {
+          const rangeValue = filter.value as { gte?: number; lte?: number };
+          gte = rangeValue?.gte;
+          lte = rangeValue?.lte;
+        }
+
+        if (gte !== undefined || lte !== undefined) {
+          filterClauses.push({
+            range: {
+              [fieldMapping]: {
+                ...(gte !== undefined && { gte }),
+                ...(lte !== undefined && { lte }),
+              },
+            },
+          });
+        }
       }
     }
 
