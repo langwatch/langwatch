@@ -13,7 +13,7 @@ export function createScenarioColumns(
   return [
     {
       id: "status",
-      header: "",
+      header: "Status",
       accessorKey: "status",
       filterable: false,
       sortable: false,
@@ -32,7 +32,7 @@ export function createScenarioColumns(
     },
     {
       id: "scenarioSetId",
-      header: "Scenario Set",
+      header: "Set Id",
       accessorKey: "scenarioSetId",
       cell: ScenarioSetCell,
       linkTo: (row) => `/${projectSlug}/simulations/${row.scenarioSetId}`,
