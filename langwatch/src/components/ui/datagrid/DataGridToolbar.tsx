@@ -1,5 +1,5 @@
 import { Box, Button, Flex, HStack, Text } from "@chakra-ui/react";
-import { Download, Eye, RefreshCw } from "lucide-react";
+import { Columns, Download, Eye, RefreshCw } from "lucide-react";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -16,14 +16,12 @@ interface DataGridToolbarProps<T> {
   filters: FilterState[];
   globalSearch: string;
   isExporting: boolean;
-  onAddFilter: (filter: FilterState) => void;
   onRemoveFilter: (columnId: string, index: number) => void;
   onClearFilters: () => void;
   onGlobalSearchChange: (search: string) => void;
   onToggleColumnVisibility: (columnId: string) => void;
   onExport: () => void;
   onRefresh?: () => void;
-  getEnumOptions?: (columnId: string) => string[];
 }
 
 /**
@@ -35,14 +33,12 @@ export function DataGridToolbar<T>({
   filters,
   globalSearch,
   isExporting,
-  onAddFilter,
   onRemoveFilter,
   onClearFilters,
   onGlobalSearchChange,
   onToggleColumnVisibility,
   onExport,
   onRefresh,
-  getEnumOptions,
 }: DataGridToolbarProps<T>) {
   return (
     <Flex direction="row" align="center" justify="space-between" gap={4} px={3}>
@@ -52,11 +48,9 @@ export function DataGridToolbar<T>({
           columns={columns}
           filters={filters}
           globalSearch={globalSearch}
-          onAddFilter={onAddFilter}
           onRemoveFilter={onRemoveFilter}
           onClearFilters={onClearFilters}
           onGlobalSearchChange={onGlobalSearchChange}
-          getEnumOptions={getEnumOptions}
         />
       </Box>
 
@@ -66,7 +60,7 @@ export function DataGridToolbar<T>({
         <PopoverRoot>
           <PopoverTrigger asChild>
             <Button size="sm" variant="outline">
-              <Eye size={14} />
+              <Columns size={14} />
               <Text ml={1}>Columns</Text>
             </Button>
           </PopoverTrigger>

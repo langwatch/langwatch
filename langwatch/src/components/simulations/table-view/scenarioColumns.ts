@@ -12,6 +12,15 @@ export function createScenarioColumns(
 ): DataGridColumnDef<ScenarioRunRow>[] {
   return [
     {
+      id: "status",
+      header: "",
+      accessorKey: "status",
+      filterable: false,
+      sortable: false,
+      defaultVisible: true,
+      width: 40,
+    },
+    {
       id: "name",
       header: "Scenario Name",
       accessorKey: "name",
@@ -43,17 +52,6 @@ export function createScenarioColumns(
       filterType: "text",
       sortable: true,
       defaultVisible: false,
-    },
-    {
-      id: "status",
-      header: "Status",
-      accessorKey: "status",
-      filterable: true,
-      filterType: "enum",
-      enumValues: Object.values(ScenarioRunStatus),
-      sortable: true,
-      groupable: true,
-      defaultVisible: true,
     },
     {
       id: "verdict",
