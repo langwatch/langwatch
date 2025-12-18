@@ -1,50 +1,45 @@
-import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { z } from "zod";
+import { DashboardService } from "../../dashboards/dashboard.service";
+import { dashboardErrorHandler } from "../../dashboards/middleware";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+/**
+ * Dashboard Router - Manages dashboard CRUD operations
+ *
+ * ARCHITECTURE:
+ * - Router: Thin orchestration layer (input validation, permissions, error mapping)
+ * - Service: Business logic (order management, validation)
+ * - Repository: Data access layer (Prisma queries)
+ */
 export const dashboardsRouter = createTRPCRouter({
+  /**
+   * Gets all dashboards for a project.
+   */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("analytics:view"))
+    .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const dashboards = await ctx.prisma.dashboard.findMany({
-        where: { projectId: input.projectId },
-        orderBy: { order: "asc" },
-        include: {
-          _count: {
-            select: { graphs: true },
-          },
-        },
-      });
-
-      return dashboards;
+      const service = DashboardService.create(ctx.prisma);
+      return await service.getAll(input.projectId);
     }),
 
+  /**
+   * Gets a dashboard by id, including its graphs.
+   */
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), dashboardId: z.string() }))
     .use(checkProjectPermission("analytics:view"))
+    .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const dashboard = await ctx.prisma.dashboard.findFirst({
-        where: {
-          id: input.dashboardId,
-          projectId: input.projectId,
-        },
-        include: {
-          graphs: {
-            orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
-          },
-        },
-      });
-
-      if (!dashboard) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Dashboard not found" });
-      }
-
-      return dashboard;
+      const service = DashboardService.create(ctx.prisma);
+      return await service.getById(input.projectId, input.dashboardId);
     }),
 
+  /**
+   * Creates a new dashboard.
+   */
   create: protectedProcedure
     .input(
       z.object({
@@ -53,25 +48,15 @@ export const dashboardsRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("analytics:create"))
+    .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      // Get the highest order value
-      const lastDashboard = await ctx.prisma.dashboard.findFirst({
-        where: { projectId: input.projectId },
-        orderBy: { order: "desc" },
-      });
-
-      const newOrder = (lastDashboard?.order ?? -1) + 1;
-
-      return ctx.prisma.dashboard.create({
-        data: {
-          id: nanoid(),
-          projectId: input.projectId,
-          name: input.name,
-          order: newOrder,
-        },
-      });
+      const service = DashboardService.create(ctx.prisma);
+      return await service.create(input.projectId, input.name);
     }),
 
+  /**
+   * Renames a dashboard.
+   */
   rename: protectedProcedure
     .input(
       z.object({
@@ -81,24 +66,15 @@ export const dashboardsRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("analytics:update"))
+    .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const dashboard = await ctx.prisma.dashboard.findFirst({
-        where: {
-          id: input.dashboardId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!dashboard) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Dashboard not found" });
-      }
-
-      return ctx.prisma.dashboard.update({
-        where: { id: input.dashboardId, projectId: input.projectId },
-        data: { name: input.name },
-      });
+      const service = DashboardService.create(ctx.prisma);
+      return await service.rename(input.projectId, input.dashboardId, input.name);
     }),
 
+  /**
+   * Deletes a dashboard (cascades to graphs).
+   */
   delete: protectedProcedure
     .input(
       z.object({
@@ -107,24 +83,15 @@ export const dashboardsRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("analytics:delete"))
+    .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      const dashboard = await ctx.prisma.dashboard.findFirst({
-        where: {
-          id: input.dashboardId,
-          projectId: input.projectId,
-        },
-      });
-
-      if (!dashboard) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Dashboard not found" });
-      }
-
-      // This will cascade delete all graphs on the dashboard due to onDelete: Cascade
-      return ctx.prisma.dashboard.delete({
-        where: { id: input.dashboardId, projectId: input.projectId },
-      });
+      const service = DashboardService.create(ctx.prisma);
+      return await service.delete(input.projectId, input.dashboardId);
     }),
 
+  /**
+   * Reorders dashboards by updating their order field.
+   */
   reorderDashboards: protectedProcedure
     .input(
       z.object({
@@ -133,61 +100,22 @@ export const dashboardsRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("analytics:update"))
+    .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      // Validate all dashboards exist and belong to the project
-      const existingDashboards = await ctx.prisma.dashboard.findMany({
-        where: {
-          id: { in: input.dashboardIds },
-          projectId: input.projectId,
-        },
-        select: { id: true },
-      });
-
-      const existingIds = new Set(existingDashboards.map((d) => d.id));
-      const missingIds = input.dashboardIds.filter((id) => !existingIds.has(id));
-
-      if (missingIds.length > 0) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: `Dashboards not found: ${missingIds.join(", ")}`,
-        });
-      }
-
-      // Update order for each dashboard
-      const updates = input.dashboardIds.map((dashboardId, index) =>
-        ctx.prisma.dashboard.update({
-          where: { id: dashboardId, projectId: input.projectId },
-          data: { order: index },
-        }),
-      );
-
-      await ctx.prisma.$transaction(updates);
-
-      return { success: true };
+      const service = DashboardService.create(ctx.prisma);
+      return await service.reorder(input.projectId, input.dashboardIds);
     }),
 
-  // Get or create the first dashboard for a project (used when none exist)
+  /**
+   * Gets or creates the first dashboard for a project.
+   * Used to ensure every project has at least one dashboard.
+   */
   getOrCreateFirst: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("analytics:view"))
+    .use(dashboardErrorHandler)
     .query(async ({ ctx, input }) => {
-      const existingDashboard = await ctx.prisma.dashboard.findFirst({
-        where: { projectId: input.projectId },
-        orderBy: { order: "asc" },
-      });
-
-      if (existingDashboard) {
-        return existingDashboard;
-      }
-
-      // Create a default dashboard
-      return ctx.prisma.dashboard.create({
-        data: {
-          id: nanoid(),
-          projectId: input.projectId,
-          name: "Reports",
-          order: 0,
-        },
-      });
+      const service = DashboardService.create(ctx.prisma);
+      return await service.getOrCreateFirst(input.projectId);
     }),
 });
