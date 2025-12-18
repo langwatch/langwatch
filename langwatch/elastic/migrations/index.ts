@@ -43,7 +43,7 @@ export const migrations = {
   "202508311847_add_simulations_trace_id": add_simulations_trace_id,
   "202510031800_add_evaluation_thread_id_and_inputs":
     add_evaluation_thread_id_and_inputs,
-  "202512171410_add_scenario_name_keyword": add_scenario_name_keyword,
+  "202512171410_add_scenario_name_keyword": add_scenario_name_keyword
 };
 
 // Export the migrations object for use in other modules
