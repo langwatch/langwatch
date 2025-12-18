@@ -76,8 +76,6 @@ export class SpanNormalizationPipelineService {
         normalizedSpan.spanAttributes = canonicalizedResult.attributes;
         normalizedSpan.events = canonicalizedResult.events;
 
-        // TODO: coerce genai message io structure
-
         return normalizedSpan;
       }
     );
@@ -150,12 +148,22 @@ export class SpanNormalizationPipelineService {
         otlpSpan.attributes
       ),
 
-      events: otlpSpan.events.filter(Boolean).map((event) => {
+      events: otlpSpan.events.filter(e => Boolean(e)).map((event) => {
         const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
           event.timeUnixNano
         );
         const attributes = TraceRequestUtils.normalizeOtlpAttributes(
           event.attributes
+        );
+
+        // Debug: log event attributes
+        this.logger.debug(
+          {
+            eventName: event.name,
+            rawAttributes: JSON.stringify(event.attributes),
+            normalizedAttributes: JSON.stringify(attributes),
+          },
+          "Normalized event attributes"
         );
 
         return {
@@ -165,7 +173,7 @@ export class SpanNormalizationPipelineService {
         };
       }),
 
-      links: otlpSpan.links.filter(Boolean).map((link) => {
+      links: otlpSpan.links.filter(l => Boolean(l)).map((link) => {
         const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
         const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
         const attributes = TraceRequestUtils.normalizeOtlpAttributes(
@@ -197,7 +205,7 @@ export class SpanNormalizationPipelineService {
         const result = this.canonicalizeSpanAttributesService.canonicalize(
           normalizedSpan.spanAttributes,
           normalizedSpan.events,
-          normalizedSpan
+          normalizedSpan,
         );
 
         span.setAttributes({

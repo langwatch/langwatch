@@ -1,9 +1,17 @@
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import { ValidationError } from "../../../library/services/errorHandling";
-// import { traceAttributesService } from "./traceAttributesService";
-// import { traceIOExtractionService } from "./traceIOExtractionService";
+import type { NormalizedSpan, NormalizedStatusCode } from "../schemas/spans";
+import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
+import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
+import { traceIOExtractionService } from "./traceIOExtractionService";
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
 
 // ============================================================================
 // Types
@@ -11,41 +19,39 @@ import { ValidationError } from "../../../library/services/errorHandling";
 
 /**
  * Result of trace aggregation containing all computed metrics.
+ * Maps to the ClickHouse trace_summaries schema.
  */
 export interface TraceAggregationResult {
   traceId: string;
-  spanIds: string[];
-  totalSpans: number;
+  spanCount: number;
   startTimeUnixMs: number;
   endTimeUnixMs: number;
   durationMs: number;
-  serviceNames: string[];
-  rootSpanId: string | null;
-  IOSchemaVersion: "2025-11-23";
-  ComputedInput: string | null;
-  ComputedOutput: string | null;
-  ComputedAttributes: Record<string, string>;
-  TimeToFirstTokenMs: number | null;
-  TimeToLastTokenMs: number | null;
-  TokensPerSecond: number | null;
-  ContainsErrorStatus: boolean;
-  ContainsOKStatus: boolean;
-  Models: string[];
-  TopicId: string | null;
-  SubTopicId: string | null;
-  TotalPromptTokenCount: number | null;
-  TotalCompletionTokenCount: number | null;
-  HasAnnotation: boolean | null;
-  ThreadId: string | null;
-  UserId: string | null;
-  CustomerId: string | null;
-  Labels: string[];
-  PromptIds: string[];
-  PromptVersionIds: string[];
-  Attributes: Record<string, string>;
-  TotalCost: number | null;
-  TokensEstimated: boolean;
-  ErrorMessage: string | null;
+
+  // I/O
+  computedIOSchemaVersion: string;
+  computedInput: string | null;
+  computedOutput: string | null;
+
+  // Timing
+  timeToFirstTokenMs: number | null;
+  timeToLastTokenMs: number | null;
+  tokensPerSecond: number | null;
+
+  // Status
+  containsErrorStatus: boolean;
+  containsOKStatus: boolean;
+  errorMessage: string | null;
+  models: string[];
+
+  // Cost
+  totalCost: number | null;
+  tokensEstimated: boolean;
+  totalPromptTokenCount: number | null;
+  totalCompletionTokenCount: number | null;
+
+  // Metadata (stored in Attributes map)
+  attributes: Record<string, string>;
 }
 
 interface TokenMetrics {
@@ -59,8 +65,6 @@ interface StatusInfo {
   containsError: boolean;
   containsOK: boolean;
   errorMessage: string | null;
-  hasAnnotation: boolean | null;
-  computedAttributes: Record<string, string>;
 }
 
 interface TokenTiming {
@@ -76,48 +80,18 @@ const isValidTimestamp = (ts: number | undefined | null): ts is number =>
   typeof ts === "number" && ts > 0 && isFinite(ts);
 
 /**
- * Extracts unique service names from spans.
- */
-const extractServiceNames = (spans: SpanData[]): string[] => {
-  const names = new Set<string>();
-  for (const span of spans) {
-    const name = span.resourceAttributes?.["service.name"];
-    if (typeof name === "string" && name.length > 0) {
-      names.add(name);
-    }
-  }
-  return Array.from(names).sort();
-};
-
-/**
- * Finds the root span ID (span with no parent in this trace).
- */
-const findRootSpanId = (spans: SpanData[]): string | null => {
-  if (spans.length === 0) return null;
-
-  const spanIds = new Set(spans.map((s) => s.spanId));
-
-  for (const span of spans) {
-    if (!span.parentSpanId || !spanIds.has(span.parentSpanId)) {
-      return span.spanId;
-    }
-  }
-
-  return spans[0]?.spanId ?? null;
-};
-
-/**
  * Extracts unique model names from spans.
  */
-const extractModels = (spans: SpanData[]): string[] => {
+const extractModels = (spans: NormalizedSpan[]): string[] => {
   const models = new Set<string>();
 
   for (const span of spans) {
-    const attrs = span.attributes ?? {};
+    const attrs = span.spanAttributes;
     const candidates = [
-      attrs["gen_ai.response.model"],
-      attrs["gen_ai.request.model"],
-      attrs.model,
+      attrs[ATTR_KEYS.GEN_AI_RESPONSE_MODEL],
+      attrs[ATTR_KEYS.GEN_AI_REQUEST_MODEL],
+      attrs[ATTR_KEYS.LLM_MODEL_NAME],
+      attrs[ATTR_KEYS.AI_MODEL],
     ];
 
     for (const model of candidates) {
@@ -133,7 +107,7 @@ const extractModels = (spans: SpanData[]): string[] => {
 /**
  * Extracts token counts and cost from spans.
  */
-const extractTokenMetrics = (spans: SpanData[]): TokenMetrics => {
+const extractTokenMetrics = (spans: NormalizedSpan[]): TokenMetrics => {
   const metrics: TokenMetrics = {
     totalPromptTokens: 0,
     totalCompletionTokens: 0,
@@ -142,37 +116,27 @@ const extractTokenMetrics = (spans: SpanData[]): TokenMetrics => {
   };
 
   for (const span of spans) {
-    const attrs = span.attributes ?? {};
+    const attrs = span.spanAttributes;
 
-    // Input tokens (GenAI)
-    const inputTokens = attrs["gen_ai.usage.input_tokens"];
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"];
-    const legacyPrompt = attrs["llm.prompt_tokens"];
+    // Input/Prompt tokens (GenAI)
+    const inputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS];
+    const promptTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS];
     if (typeof inputTokens === "number" && inputTokens > 0) {
       metrics.totalPromptTokens += inputTokens;
-    }
-    if (typeof promptTokens === "number" && promptTokens > 0) {
+    } else if (typeof promptTokens === "number" && promptTokens > 0) {
       metrics.totalPromptTokens += promptTokens;
     }
-    if (typeof legacyPrompt === "number" && legacyPrompt > 0) {
-      metrics.totalPromptTokens += legacyPrompt;
-    }
 
-    // Output tokens (GenAI)
-    const outputTokens = attrs["gen_ai.usage.output_tokens"];
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"];
-    const legacyCompletion = attrs["llm.completion_tokens"];
+    // Output/Completion tokens (GenAI)
+    const outputTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS];
+    const completionTokens = attrs[ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS];
     if (typeof outputTokens === "number" && outputTokens > 0) {
       metrics.totalCompletionTokens += outputTokens;
-    }
-    if (typeof completionTokens === "number" && completionTokens > 0) {
+    } else if (typeof completionTokens === "number" && completionTokens > 0) {
       metrics.totalCompletionTokens += completionTokens;
     }
-    if (typeof legacyCompletion === "number" && legacyCompletion > 0) {
-      metrics.totalCompletionTokens += legacyCompletion;
-    }
 
-    // Cost
+    // Cost (LangWatch attribute)
     const cost = attrs["langwatch.span.cost"];
     if (typeof cost === "number" && cost > 0) {
       metrics.totalCost += cost;
@@ -188,45 +152,34 @@ const extractTokenMetrics = (spans: SpanData[]): TokenMetrics => {
 };
 
 /**
- * Extracts status and computed attributes from spans.
+ * Extracts status info from spans.
  */
-const extractStatusInfo = (spans: SpanData[]): StatusInfo => {
+const extractStatusInfo = (spans: NormalizedSpan[]): StatusInfo => {
   const info: StatusInfo = {
     containsError: false,
     containsOK: false,
     errorMessage: null,
-    hasAnnotation: null,
-    computedAttributes: {},
   };
 
   for (const span of spans) {
-    const attrs = span.attributes ?? {};
-
-    // Annotation flag
-    const hasAnnotation = attrs["has.annotation"];
-    if (typeof hasAnnotation === "boolean") {
-      info.hasAnnotation = hasAnnotation || info.hasAnnotation === true;
-    }
-
-    // Status
-    if (span.status.code === SpanStatusCode.OK) {
+    // Check status code
+    if (span.statusCode === StatusCode.OK) {
       info.containsOK = true;
-    } else if (span.status.code === SpanStatusCode.ERROR) {
+    } else if (span.statusCode === StatusCode.ERROR) {
       info.containsError = true;
-      if (span.status.message && !info.errorMessage) {
-        info.errorMessage = span.status.message;
+      if (span.statusMessage && !info.errorMessage) {
+        info.errorMessage = span.statusMessage;
       }
     }
 
-    // Computed attributes
-    for (const [key, value] of Object.entries(attrs)) {
-      if (
-        typeof value === "string" &&
-        (key.startsWith("computed.") ||
-          key.startsWith("metadata.") ||
-          key.startsWith("trace."))
-      ) {
-        info.computedAttributes[key] = value;
+    // Check for error attributes if no error message from status
+    if (!info.errorMessage) {
+      const attrs = span.spanAttributes;
+      const errorMsg =
+        attrs[ATTR_KEYS.ERROR_MESSAGE] ?? attrs[ATTR_KEYS.EXCEPTION_MESSAGE];
+      if (typeof errorMsg === "string") {
+        info.errorMessage = errorMsg;
+        info.containsError = true;
       }
     }
   }
@@ -249,7 +202,7 @@ const LAST_TOKEN_EVENTS = new Set([
 /**
  * Extracts token timing from span events.
  */
-const extractTokenTiming = (spans: SpanData[]): TokenTiming => {
+const extractTokenTiming = (spans: NormalizedSpan[]): TokenTiming => {
   const timing: TokenTiming = {
     timeToFirstTokenMs: null,
     timeToLastTokenMs: null,
@@ -289,7 +242,7 @@ const extractTokenTiming = (spans: SpanData[]): TokenTiming => {
  */
 const computeTokensPerSecond = (
   completionTokens: number | null,
-  durationMs: number,
+  durationMs: number
 ): number | null => {
   if (completionTokens === null || completionTokens <= 0 || durationMs <= 0) {
     return null;
@@ -301,14 +254,74 @@ const computeTokensPerSecond = (
  * Converts token metrics to nullable format for output.
  */
 const formatTokenMetrics = (metrics: TokenMetrics) => ({
-  TotalPromptTokenCount:
+  totalPromptTokenCount:
     metrics.totalPromptTokens > 0 ? metrics.totalPromptTokens : null,
-  TotalCompletionTokenCount:
+  totalCompletionTokenCount:
     metrics.totalCompletionTokens > 0 ? metrics.totalCompletionTokens : null,
-  TotalCost:
+  totalCost:
     metrics.totalCost > 0 ? Number(metrics.totalCost.toFixed(6)) : null,
-  TokensEstimated: metrics.tokensEstimated,
+  tokensEstimated: metrics.tokensEstimated,
 });
+
+/**
+ * Extracts metadata attributes to be stored in the Attributes map.
+ * This includes SDK info, thread/user context, and other trace-level metadata.
+ */
+const extractTraceAttributes = (
+  spans: NormalizedSpan[]
+): Record<string, string> => {
+  const attributes: Record<string, string> = {};
+
+  for (const span of spans) {
+    const spanAttrs = span.spanAttributes;
+    const resourceAttrs = span.resourceAttributes;
+
+    // SDK info from resource attributes
+    const sdkName = resourceAttrs["telemetry.sdk.name"];
+    const sdkVersion = resourceAttrs["telemetry.sdk.version"];
+    const sdkLanguage = resourceAttrs["telemetry.sdk.language"];
+    const serviceName = resourceAttrs["service.name"];
+
+    if (typeof sdkName === "string" && !attributes["sdk.name"]) {
+      attributes["sdk.name"] = sdkName;
+    }
+    if (typeof sdkVersion === "string" && !attributes["sdk.version"]) {
+      attributes["sdk.version"] = sdkVersion;
+    }
+    if (typeof sdkLanguage === "string" && !attributes["sdk.language"]) {
+      attributes["sdk.language"] = sdkLanguage;
+    }
+    if (typeof serviceName === "string" && !attributes["service.name"]) {
+      attributes["service.name"] = serviceName;
+    }
+
+    // Thread/User context from span attributes
+    const threadId = spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID];
+    const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
+    const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
+
+    if (typeof threadId === "string" && !attributes["thread.id"]) {
+      attributes["thread.id"] = threadId;
+    }
+    if (typeof userId === "string" && !attributes["user.id"]) {
+      attributes["user.id"] = userId;
+    }
+    if (typeof customerId === "string" && !attributes["customer.id"]) {
+      attributes["customer.id"] = customerId;
+    }
+
+    // LangGraph metadata
+    const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
+    if (
+      typeof langgraphThreadId === "string" &&
+      !attributes["langgraph.thread_id"]
+    ) {
+      attributes["langgraph.thread_id"] = langgraphThreadId;
+    }
+  }
+
+  return attributes;
+};
 
 // ============================================================================
 // Service
@@ -322,22 +335,22 @@ const logger = createLogger("langwatch:trace-processing:aggregation-service");
  * @example
  * ```typescript
  * const result = traceAggregationService.aggregateTrace(spans);
- * console.log(result.totalSpans, result.durationMs);
+ * console.log(result.spanCount, result.durationMs);
  * ```
  */
 export class TraceAggregationService {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.aggregation",
+    "langwatch.trace-processing.aggregation"
   );
 
   /**
    * Aggregates spans into trace metadata.
    *
-   * @param spans - Array of spans to aggregate
+   * @param spans - Array of normalized spans to aggregate
    * @returns Aggregated trace metrics
    * @throws ValidationError if no valid spans provided
    */
-  aggregateTrace(spans: SpanData[]): TraceAggregationResult {
+  aggregateTrace(spans: NormalizedSpan[]): TraceAggregationResult {
     return this.tracer.withActiveSpan(
       "TraceAggregationService.aggregateTrace",
       {
@@ -356,96 +369,97 @@ export class TraceAggregationService {
 
         // Basic metrics
         const traceId = spans[0]!.traceId;
-        const spanIds = spans.map((s) => s.spanId);
         const { startTimeUnixMs, endTimeUnixMs, durationMs } =
           this.computeTiming(validSpans);
 
         // Extract all metrics
-        const serviceNames = extractServiceNames(spans);
-        const rootSpanId = findRootSpanId(spans);
         const models = extractModels(spans);
         const tokenMetrics = extractTokenMetrics(spans);
         const statusInfo = extractStatusInfo(spans);
         const tokenTiming = extractTokenTiming(spans);
 
-        // IO extraction
-        const ComputedInput = traceIOExtractionService.extractFirstInput(spans);
-        const ComputedOutput =
-          traceIOExtractionService.extractLastOutput(spans);
+        // IO extraction (using the service) - store rich JSON as string
+        const inputResult = traceIOExtractionService.extractFirstInputRich(spans);
+        const outputResult = traceIOExtractionService.extractLastOutputRich(spans);
+        
+        // Serialize the raw JSON to string for storage
+        const computedInput = inputResult
+          ? (typeof inputResult.raw === "string" ? inputResult.raw : JSON.stringify(inputResult.raw))
+          : null;
+        const computedOutput = outputResult
+          ? (typeof outputResult.raw === "string" ? outputResult.raw : JSON.stringify(outputResult.raw))
+          : null;
 
         // Trace attributes extraction
-        const traceAttrs = traceAttributesService.extract(spans);
-
-        // Build SDK attributes
-        const attributes: Record<string, string> = {};
-        if (traceAttrs.sdkName) attributes["sdk.name"] = traceAttrs.sdkName;
-        if (traceAttrs.sdkVersion)
-          attributes["sdk.version"] = traceAttrs.sdkVersion;
-        if (traceAttrs.sdkLanguage)
-          attributes["sdk.language"] = traceAttrs.sdkLanguage;
+        const attributes = extractTraceAttributes(spans);
 
         // Format outputs
         const formatted = formatTokenMetrics(tokenMetrics);
-        const TokensPerSecond = computeTokensPerSecond(
-          formatted.TotalCompletionTokenCount,
-          durationMs,
+        const tokensPerSecond = computeTokensPerSecond(
+          formatted.totalCompletionTokenCount,
+          durationMs
         );
 
         otelSpan.setAttributes({
           "trace.duration_ms": durationMs,
           "trace.total_tokens":
-            (formatted.TotalPromptTokenCount ?? 0) +
-            (formatted.TotalCompletionTokenCount ?? 0),
-          "trace.total_cost": formatted.TotalCost ?? 0,
+            (formatted.totalPromptTokenCount ?? 0) +
+            (formatted.totalCompletionTokenCount ?? 0),
+          "trace.total_cost": formatted.totalCost ?? 0,
           "trace.models": models.join(","),
           "trace.has_error": statusInfo.containsError,
+          "trace.input_length": computedInput?.length ?? 0,
+          "trace.output_length": computedOutput?.length ?? 0,
         });
+
+        logger.debug(
+          {
+            traceId,
+            spanCount: spans.length,
+            durationMs,
+            hasInput: computedInput !== null,
+            hasOutput: computedOutput !== null,
+          },
+          "Computed trace aggregation"
+        );
 
         return {
           traceId,
-          spanIds,
-          totalSpans: spans.length,
+          spanCount: spans.length,
           startTimeUnixMs,
           endTimeUnixMs,
           durationMs,
-          serviceNames,
-          rootSpanId,
-          IOSchemaVersion: "2025-11-23" as const,
-          ComputedInput: ComputedInput || null,
-          ComputedOutput: ComputedOutput || null,
-          ComputedAttributes: statusInfo.computedAttributes,
-          TimeToFirstTokenMs: tokenTiming.timeToFirstTokenMs,
-          TimeToLastTokenMs: tokenTiming.timeToLastTokenMs,
-          TokensPerSecond,
-          ContainsErrorStatus: statusInfo.containsError,
-          ContainsOKStatus: statusInfo.containsOK,
-          Models: models,
-          TopicId: null,
-          SubTopicId: null,
+
+          computedIOSchemaVersion: COMPUTED_IO_SCHEMA_VERSION,
+          computedInput,
+          computedOutput,
+
+          timeToFirstTokenMs: tokenTiming.timeToFirstTokenMs,
+          timeToLastTokenMs: tokenTiming.timeToLastTokenMs,
+          tokensPerSecond,
+
+          containsErrorStatus: statusInfo.containsError,
+          containsOKStatus: statusInfo.containsOK,
+          errorMessage: statusInfo.errorMessage,
+          models,
+
           ...formatted,
-          HasAnnotation: statusInfo.hasAnnotation,
-          ThreadId: traceAttrs.threadId,
-          UserId: traceAttrs.userId,
-          CustomerId: traceAttrs.customerId,
-          Labels: traceAttrs.labels,
-          PromptIds: traceAttrs.promptIds,
-          PromptVersionIds: traceAttrs.promptVersionIds,
-          Attributes: attributes,
-          ErrorMessage: statusInfo.errorMessage,
+
+          attributes,
         };
-      },
+      }
     );
   }
 
   private validateSpans(
-    spans: SpanData[],
-    otelSpan: { addEvent: (name: string) => void },
+    spans: NormalizedSpan[],
+    otelSpan: { addEvent: (name: string) => void }
   ): void {
     if (spans.length === 0 || !spans[0]) {
       throw new ValidationError(
         "Cannot aggregate trace with no spans",
         "spans",
-        spans,
+        spans
       );
     }
 
@@ -455,7 +469,7 @@ export class TraceAggregationService {
         throw new ValidationError(
           "Cannot aggregate trace: spans have different traceId values",
           "spans",
-          spans,
+          spans
         );
       }
     }
@@ -464,9 +478,9 @@ export class TraceAggregationService {
   }
 
   private filterValidTimestamps(
-    spans: SpanData[],
-    otelSpan: { setAttributes: (attrs: Record<string, number>) => void },
-  ): SpanData[] {
+    spans: NormalizedSpan[],
+    otelSpan: { setAttributes: (attrs: Record<string, number>) => void }
+  ): NormalizedSpan[] {
     const valid = spans.filter((span) => {
       const validStart = isValidTimestamp(span.startTimeUnixMs);
       const validEnd = isValidTimestamp(span.endTimeUnixMs);
@@ -474,7 +488,7 @@ export class TraceAggregationService {
       if (!validStart || !validEnd) {
         logger.warn(
           { traceId: span.traceId, spanId: span.spanId },
-          "Span has invalid timestamps, excluding from timing calculation",
+          "Span has invalid timestamps, excluding from timing calculation"
         );
         return false;
       }
@@ -489,14 +503,14 @@ export class TraceAggregationService {
       throw new ValidationError(
         "Cannot aggregate trace: all spans have invalid timestamps",
         "spans",
-        spans,
+        spans
       );
     }
 
     return valid;
   }
 
-  private computeTiming(spans: SpanData[]): {
+  private computeTiming(spans: NormalizedSpan[]): {
     startTimeUnixMs: number;
     endTimeUnixMs: number;
     durationMs: number;

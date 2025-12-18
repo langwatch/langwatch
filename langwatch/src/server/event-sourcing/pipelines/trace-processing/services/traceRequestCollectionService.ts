@@ -2,12 +2,12 @@ import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
-import { traceProcessingPipeline } from "../pipeline";
 import {
   instrumentationScopeSchema,
   resourceSchema,
   spanSchema,
 } from "../schemas/otlp";
+import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
 
 /**
  * Service for collecting trace requests into the trace processing pipeline.
@@ -34,7 +34,7 @@ export class TraceRequestCollectionService {
    *
    * @example
    * ```typescript
-   * await spanIngestionService.handleOtlpTraceRequest(
+   * await traceRequestCollectionService.handleOtlpTraceRequest(
    *   projectId,
    *   traceRequest,
    * );
@@ -45,7 +45,7 @@ export class TraceRequestCollectionService {
     traceRequest: IExportTraceServiceRequest,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
-      "SpanIngestionService.handleOtlpTraceRequest",
+      "TraceRequestCollectionService.handleOtlpTraceRequest",
       {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
@@ -71,6 +71,10 @@ export class TraceRequestCollectionService {
               "Error parsing OTLP resource"
             );
           }
+
+          this.logger.info({
+            traceRequest,
+          }, "Processing OTLP resource span");
 
           // Iterate through scopeSpans → spans
           for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
@@ -119,15 +123,15 @@ export class TraceRequestCollectionService {
                 collectedSpanCount++;
               } catch (error) {
                 span.addEvent("span_ingestion_error", {
-                  "error.message": (error as Error).message,
+                  "error.message": (error instanceof Error ? error.message : String(error)),
                   "tenant.id": tenantId,
                 });
                 this.logger.error(
                   {
                     error,
                     tenantId,
-                    traceId: otelSpan.traceId,
-                    spanId: otelSpan.spanId,
+                    traceId: spanParseResult.data.traceId,
+                    spanId: spanParseResult.data.spanId,
                   },
                   "Error converting raw OTEL span"
                 );
@@ -145,4 +149,4 @@ export class TraceRequestCollectionService {
   }
 }
 
-export const spanIngestionService = new TraceRequestCollectionService();
+export const traceRequestCollectionService = new TraceRequestCollectionService();
