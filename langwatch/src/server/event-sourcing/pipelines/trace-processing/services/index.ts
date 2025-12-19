@@ -1,5 +1,4 @@
 export { SpanNormalizationPipelineService } from "./spanNormalizationPipelineService";
-export { TraceRequestCollectionService } from "./traceRequestCollectionService";
 export {
   TraceAggregationService,
   traceAggregationService,
