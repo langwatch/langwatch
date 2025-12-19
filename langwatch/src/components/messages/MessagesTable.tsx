@@ -25,6 +25,7 @@ import { LuChevronsUpDown, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
@@ -105,10 +106,18 @@ export function MessagesTable({
 
   navigationFooter.useUpdateTotalHits(traceGroups);
 
+  // Subscribe to real-time trace updates
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: () => void traceGroups.refetch(),
+    enabled: Boolean(project?.id),
+    pageOffset: navigationFooter.pageOffset,
+  });
+
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled: project?.id !== undefined,
+      enabled: project?.id !== void 0,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
