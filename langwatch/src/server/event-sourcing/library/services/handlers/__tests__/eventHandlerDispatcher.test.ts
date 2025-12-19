@@ -242,6 +242,76 @@ describe("EventHandlerDispatcher", () => {
       // EventHandlerDispatcher uses its own logger, so we can't verify the exact log call
       // But we can verify that dispatch was skipped (queue processor wasn't called)
     });
+
+    it("skips dispatch to disabled handlers (queue mode)", async () => {
+      const enabledHandler = createMockEventReactionHandler<Event>();
+      const disabledHandler = createMockEventReactionHandler<Event>();
+      const eventHandlers = new Map([
+        ["enabledHandler", createMockEventHandlerDefinition("enabledHandler", enabledHandler)],
+        ["disabledHandler", createMockEventHandlerDefinition("disabledHandler", disabledHandler, { disabled: true })],
+      ]);
+
+      const enabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+      const disabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueManager = new QueueProcessorManager({
+        aggregateType,
+      });
+      (queueManager as any).handlerQueueProcessors.set("enabledHandler", enabledQueueProcessor);
+      (queueManager as any).handlerQueueProcessors.set("disabledHandler", disabledQueueProcessor);
+
+      const dispatcher = createDispatcher({
+        eventHandlers,
+        queueManager,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await dispatcher.dispatchEventsToHandlers([event], context);
+
+      expect(enabledQueueProcessor.send).toHaveBeenCalledWith(event);
+      expect(disabledQueueProcessor.send).not.toHaveBeenCalled();
+    });
+
+    it("skips dispatch to disabled handlers (sync mode)", async () => {
+      const enabledHandler = createMockEventReactionHandler<Event>();
+      const disabledHandler = createMockEventReactionHandler<Event>();
+      const eventHandlers = new Map([
+        ["enabledHandler", createMockEventHandlerDefinition("enabledHandler", enabledHandler)],
+        ["disabledHandler", createMockEventHandlerDefinition("disabledHandler", disabledHandler, { disabled: true })],
+      ]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+
+      const dispatcher = createDispatcher({
+        eventHandlers,
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await dispatcher.dispatchEventsToHandlers([event], context);
+
+      expect(enabledHandler.handle).toHaveBeenCalledWith(event);
+      expect(disabledHandler.handle).not.toHaveBeenCalled();
+    });
   });
 
   describe("handleEvent", () => {

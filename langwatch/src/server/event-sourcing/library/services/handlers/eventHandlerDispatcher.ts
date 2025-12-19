@@ -368,7 +368,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     if (!this.eventHandlers || this.eventHandlers.size === 0) {
       return [];
     }
-    return Array.from(this.eventHandlers.keys());
+    return Array.from(this.eventHandlers.entries())
+      .filter(([, handlerDef]) => !handlerDef.options.disabled)
+      .map(([name]) => name);
   }
 
   /**
