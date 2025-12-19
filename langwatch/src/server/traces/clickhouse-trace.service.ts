@@ -234,16 +234,60 @@ export class ClickHouseTraceService {
           // Parse cursor from scrollId if present
           let cursor: ClickHouseScrollCursor | null = null;
           if (input.scrollId) {
+            this.logger.debug(
+              {
+                scrollId: input.scrollId,
+                hasScrollId: !!input.scrollId,
+              },
+              "Parsing scrollId from request"
+            );
             try {
               cursor = JSON.parse(
                 Buffer.from(input.scrollId, "base64").toString("utf-8")
               );
+
+              // Validate that cursor parameters match current request
+              if (cursor && cursor.sortDirection !== sortDirection) {
+                this.logger.warn(
+                  {
+                    cursorSortDirection: cursor.sortDirection,
+                    requestSortDirection: sortDirection,
+                  },
+                  "Sort direction mismatch in cursor, ignoring cursor"
+                );
+                cursor = null;
+              } else if (cursor && cursor.pageSize !== pageSize) {
+                this.logger.warn(
+                  {
+                    cursorPageSize: cursor.pageSize,
+                    requestPageSize: pageSize,
+                  },
+                  "Page size mismatch in cursor, ignoring cursor"
+                );
+                cursor = null;
+              }
+
+              this.logger.debug(
+                {
+                  cursorParsed: !!cursor,
+                  cursorLastTimestamp: cursor?.lastTimestamp,
+                  cursorLastTraceId: cursor?.lastTraceId,
+                  cursorSortDirection: cursor?.sortDirection,
+                  cursorPageSize: cursor?.pageSize,
+                },
+                "Cursor parsing and validation result"
+              );
             } catch (e) {
               this.logger.warn(
-                { scrollId: input.scrollId },
+                {
+                  scrollId: input.scrollId,
+                  error: e instanceof Error ? e.message : e,
+                },
                 "Invalid scrollId, starting from beginning"
               );
             }
+          } else {
+            this.logger.debug("No scrollId provided in request");
           }
 
           // Build the query with keyset pagination
@@ -269,6 +313,17 @@ export class ClickHouseTraceService {
             newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
               "base64"
             );
+
+            this.logger.debug(
+              {
+                lastTraceTimestamp: lastTrace.timestamps.started_at,
+                lastTraceId: lastTrace.trace_id,
+                tracesCount: traces.length,
+                pageSize,
+                newScrollId,
+              },
+              "Generated new scrollId"
+            );
           }
 
           // Group traces (for now, single-trace groups unless groupBy is specified)
@@ -283,6 +338,19 @@ export class ClickHouseTraceService {
           // Transform traces to include guardrail information
           const groups = rawGroups.map((group) =>
             transformTracesWithGuardrails(group)
+          );
+
+          this.logger.debug(
+            {
+              tracesReturned: traces.length,
+              totalHits,
+              hasScrollId: !!newScrollId,
+              firstTraceId: traces[0]?.trace_id,
+              firstTraceTimestamp: traces[0]?.timestamps.started_at,
+              lastTraceId: traces[traces.length - 1]?.trace_id,
+              lastTraceTimestamp: traces[traces.length - 1]?.timestamps.started_at,
+            },
+            "Returning traces result"
           );
 
           return {
@@ -344,6 +412,18 @@ export class ClickHouseTraceService {
 
         // Keyset pagination condition
         if (cursor) {
+          this.logger.debug(
+            {
+              cursorLastTimestamp: cursor.lastTimestamp,
+              cursorLastTraceId: cursor.lastTraceId,
+              cursorSortDirection: cursor.sortDirection,
+              cursorPageSize: cursor.pageSize,
+              currentSortDirection: sortDirection,
+              currentPageSize: pageSize,
+            },
+            "Using cursor for pagination"
+          );
+
           if (sortDirection === "desc") {
             // For descending order: get records BEFORE the cursor
             conditions.push(
@@ -884,9 +964,7 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
 /**
  * Transform traces to include guardrail information
  */
-function transformTracesWithGuardrails(
-  traces: Trace[],
-): TraceWithGuardrail[] {
+function transformTracesWithGuardrails(traces: Trace[]): TraceWithGuardrail[] {
   return traces.map((trace) => {
     return {
       ...trace,

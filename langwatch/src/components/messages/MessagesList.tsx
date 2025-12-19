@@ -53,6 +53,7 @@ export function MessagesList() {
       groupBy,
       pageOffset: navigationFooter.pageOffset,
       pageSize: navigationFooter.pageSize,
+      scrollId: router.query.scrollId as string | null,
     },
     queryOpts,
   );
@@ -79,12 +80,11 @@ export function MessagesList() {
   useEffect(() => {
     if (evaluations.data) {
       const pendingEvaluations = Object.values(evaluations.data)
-        .flatMap((checks) => checks)
+        .flat()
         .filter(
           (check) =>
-            (check.status == "scheduled" || check.status == "in_progress") &&
-            (check.timestamps.inserted_at ?? 0) >
-              new Date().getTime() - 1000 * 60 * 60 * 1,
+            (check.status === "scheduled" || check.status === "in_progress") &&
+            (check.timestamps.inserted_at ?? 0) >Date.now()- 1000 * 60 * 60 * 1,
         );
       if (pendingEvaluations.length > 0) {
         setEvaluationsCheckInterval(5000);
@@ -208,7 +208,7 @@ const ExpandableMessages = React.memo(
       setTimeout(() => setTransitionsEnabled(true), 100);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [traceGroups]);
-
+, cardRe
     return traceGroups.map((traceGroup, groupIndex) => {
       const isExpanded = !!expandedGroups[groupIndex];
       const zIndex = 1000 + traceGroups.length - groupIndex;

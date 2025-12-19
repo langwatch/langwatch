@@ -2,9 +2,7 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   CloseButton,
-  Container,
   Heading,
   HStack,
   Icon,
@@ -49,8 +47,7 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Link } from "../ui/link";
-import { Popover } from "../ui/popover";
-import { RedactedField } from "../ui/RedactedField";
+import { Popover } from "../ui/popoverui/RedactedField";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
@@ -98,6 +95,7 @@ export function MessagesTable({
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
       pageOffset: navigationFooter.pageOffset,
+      scrollId: router.query.scrollId as string | null,
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
@@ -485,7 +483,7 @@ export function MessagesTable({
       ),
       value: (trace: Trace) => {
         return trace.metrics?.first_token_ms
-          ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
+          ? `${numeral(trace.metrics.first_token_ms / 1000).format("0.[0]")}s`
           : "-";
       },
     },
@@ -513,7 +511,7 @@ export function MessagesTable({
       ),
       value: (trace: Trace) => {
         return trace.metrics?.total_time_ms
-          ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
+          ? `${numeral(trace.metrics.total_time_ms / 1000).format("0.[0]")}s`
           : "-";
       },
     },
