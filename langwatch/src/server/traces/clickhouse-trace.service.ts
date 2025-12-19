@@ -9,6 +9,7 @@ import {
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { createLogger } from "~/utils/logger";
 import { mapNormalizedSpansToSpans, mapTraceSummaryToTrace } from "./mappers";
 import { getLangWatchTracer } from "langwatch";
@@ -49,7 +50,7 @@ export interface GetAllTracesForProjectInput {
  * Mirrors the shape returned by the existing ES-based implementation.
  */
 export interface TracesForProjectResult {
-  groups: Trace[][];
+  groups: TraceWithGuardrail[][];
   totalHits: number;
   traceChecks: Record<string, Evaluation[]>;
   scrollId?: string;
@@ -271,13 +272,18 @@ export class ClickHouseTraceService {
           }
 
           // Group traces (for now, single-trace groups unless groupBy is specified)
-          const groups = this.groupTraces(traces, input.groupBy);
+          const rawGroups = this.groupTraces(traces, input.groupBy);
 
-          // Extract evaluations (empty)
+          // Extract evaluations (empty for now, ClickHouse doesn't have evaluations)
           const traceChecks: Record<string, Evaluation[]> = {};
           for (const trace of traces) {
             traceChecks[trace.trace_id] = [];
           }
+
+          // Transform traces to include guardrail information
+          const groups = rawGroups.map((group) =>
+            transformTracesWithGuardrails(group)
+          );
 
           return {
             groups,
@@ -579,7 +585,7 @@ export class ClickHouseTraceService {
           ts.Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt,
-          
+
           -- Span fields (prefixed with ss_)
           ss.Id AS ss_Id,
           ss.TraceId AS ss_TraceId,
@@ -873,4 +879,19 @@ interface JoinedTraceSpanRow extends TraceSummaryRow {
   ss_DroppedAttributesCount: number | null;
   ss_DroppedEventsCount: number | null;
   ss_DroppedLinksCount: number | null;
+}
+
+/**
+ * Transform traces to include guardrail information
+ */
+function transformTracesWithGuardrails(
+  traces: Trace[],
+): TraceWithGuardrail[] {
+  return traces.map((trace) => {
+    return {
+      ...trace,
+      lastGuardrail: void 0,
+      annotations: void 0,
+    };
+  });
 }
