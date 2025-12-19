@@ -5,7 +5,7 @@ import {
   type ActionExecutionMessage,
   type ResultMessage,
   Role,
-  TextMessage,
+  type TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import { useEffect } from "react";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";

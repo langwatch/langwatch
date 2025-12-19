@@ -5,7 +5,7 @@ import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 
 interface ScenarioRunHeaderProps {
   status?: ScenarioRunStatus;
-  name?: string;
+  name?: string | null;
   scenarioId?: string;
 }
 
@@ -23,7 +23,7 @@ export function ScenarioRunHeader({
     >
       <HStack justify="space-between" align="center">
         <VStack gap={4}>
-          <VStack align="space-between" gap={0}>
+          <VStack align="start" gap={0}>
             <HStack>
               <ScenarioRunStatusIcon status={status} />
               <Text fontSize="lg" fontWeight="semibold">
