@@ -6,7 +6,6 @@ import type { Event, Projection } from "../domain/types";
 import type { EventHandlerDefinition } from "../eventHandler.types";
 import type {
   ProjectionDefinition,
-  ProjectionTypeFromDefinition,
 } from "../projection.types";
 import type { EventPublisher } from "../publishing/eventPublisher.types";
 import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
@@ -28,6 +27,7 @@ import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
 import { QueueProcessorManager } from "./queues/queueProcessorManager";
 import { EventProcessorValidator } from "./validation/eventProcessorValidator";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 
 /**
  * Main service that orchestrates event sourcing.
