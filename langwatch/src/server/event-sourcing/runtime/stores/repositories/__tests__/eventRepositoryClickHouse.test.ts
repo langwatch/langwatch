@@ -48,6 +48,8 @@ describe("EventRepositoryClickHouse.getEventRecords", () => {
     const repository = new EventRepositoryClickHouse(client);
     const rows = await repository.getEventRecords("tenant", "agg", "id");
 
-    expect(rows[0]?.EventPayload).toEqual("{\"data\":{\"value\":\"123.45\",\"text\":\"still-string\"}}");
+    expect(rows[0]?.EventPayload).toEqual(
+      '{"data":{"value":"123.45","text":"still-string"}}',
+    );
   });
 });

@@ -91,7 +91,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         ctx,
         ATTR_KEYS.AI_MODEL,
         (raw) => normaliseModelFromAiModelObject(safeJsonParse(raw)),
-        `${this.id}:ai.model->gen_ai.*.model`
+        `${this.id}:ai.model->gen_ai.*.model`,
       )
     ) {
       // Consume attribute even if not used, to reduce leftovers
@@ -105,7 +105,7 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     extractUsageTokens(
       ctx,
       { object: ATTR_KEYS.AI_USAGE },
-      `${this.id}:ai.usage->gen_ai.usage`
+      `${this.id}:ai.usage->gen_ai.usage`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -115,24 +115,33 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
       const promptRaw =
-        attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ?? attrs.take(ATTR_KEYS.AI_PROMPT);
+        attrs.take(ATTR_KEYS.AI_PROMPT_MESSAGES) ??
+        attrs.take(ATTR_KEYS.AI_PROMPT);
       const prompt = safeJsonParse(promptRaw);
 
       if (typeof prompt === "string") {
         // Simple string prompt → wrap as user message
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
+          { role: "user", content: prompt },
+        ]);
         ctx.recordRule(`${this.id}:ai.prompt(string)->gen_ai.input.messages`);
       } else if (isRecord(prompt)) {
         // Object prompt → pass through (may be a single message)
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
-        ctx.recordRule(`${this.id}:ai.prompt.messages{}->gen_ai.input.messages`);
+        ctx.recordRule(
+          `${this.id}:ai.prompt.messages{}->gen_ai.input.messages`,
+        );
       } else if (Array.isArray(prompt)) {
         // Array of messages → pass through directly
         ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, prompt);
-        ctx.recordRule(`${this.id}:ai.prompt.messages[]->gen_ai.input.messages`);
+        ctx.recordRule(
+          `${this.id}:ai.prompt.messages[]->gen_ai.input.messages`,
+        );
       } else if (promptRaw !== undefined) {
         // Unknown format → best effort wrap as user message
-        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [{ role: "user", content: prompt }]);
+        ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, [
+          { role: "user", content: prompt },
+        ]);
         ctx.recordRule(`${this.id}:ai.prompt(unknown)->gen_ai.input.messages`);
       }
     } else {
@@ -150,7 +159,8 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
       const response = safeJsonParse(
-        attrs.take(ATTR_KEYS.AI_RESPONSE) ?? attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT)
+        attrs.take(ATTR_KEYS.AI_RESPONSE) ??
+          attrs.take(ATTR_KEYS.AI_RESPONSE_TEXT),
       );
 
       if (isRecord(response)) {
@@ -158,7 +168,10 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         const messages: unknown[] = [];
 
         // Extract text content
-        if (typeof responseObj.text === "string" && responseObj.text.length > 0) {
+        if (
+          typeof responseObj.text === "string" &&
+          responseObj.text.length > 0
+        ) {
           messages.push({ role: "assistant", content: responseObj.text });
         }
 
@@ -173,8 +186,12 @@ export class VercelExtractor implements CanonicalAttributesExtractor {
         }
       } else if (typeof response === "string") {
         // Simple string response
-        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [{ role: "assistant", content: response }]);
-        ctx.recordRule(`${this.id}:ai.response(string)->gen_ai.output.messages`);
+        ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, [
+          { role: "assistant", content: response },
+        ]);
+        ctx.recordRule(
+          `${this.id}:ai.response(string)->gen_ai.output.messages`,
+        );
       }
     } else {
       // Output already exists, just consume to reduce leftovers

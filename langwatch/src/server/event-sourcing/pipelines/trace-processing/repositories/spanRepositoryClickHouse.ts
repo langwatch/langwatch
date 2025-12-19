@@ -18,10 +18,10 @@ const TABLE_NAME = "stored_spans" as const;
  */
 export class SpanRepositoryClickHouse implements SpanRepository {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.span-repository"
+    "langwatch.trace-processing.span-repository",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:span-repository"
+    "langwatch:trace-processing:span-repository",
   );
 
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
@@ -40,7 +40,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       async (span) => {
         EventUtils.validateTenantId(
           { tenantId: normalizedSpan.tenantId },
-          "SpanRepositoryClickHouse.insertSpan"
+          "SpanRepositoryClickHouse.insertSpan",
         );
 
         try {
@@ -63,19 +63,19 @@ export class SpanRepositoryClickHouse implements SpanRepository {
               traceId: normalizedSpan.traceId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to insert span into ClickHouse"
+            "Failed to insert span into ClickHouse",
           );
 
           throw error;
         }
-      }
+      },
     );
   }
 
   async getSpanByTraceIdAndSpanId(
     tenantId: string,
     traceId: string,
-    spanId: string
+    spanId: string,
   ): Promise<NormalizedSpan | null> {
     return await this.tracer.withActiveSpan(
       "SpanRepositoryClickHouse.getSpanByTraceIdAndSpanId",
@@ -90,7 +90,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       async () => {
         EventUtils.validateTenantId(
           { tenantId },
-          "SpanRepositoryClickHouse.getSpanByTraceIdAndSpanId"
+          "SpanRepositoryClickHouse.getSpanByTraceIdAndSpanId",
         );
 
         try {
@@ -150,7 +150,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
 
           return this.transformClickHouseSpanToNormalizedSpan(
             firstRow,
-            tenantId
+            tenantId,
           );
         } catch (error) {
           this.logger.error(
@@ -160,18 +160,18 @@ export class SpanRepositoryClickHouse implements SpanRepository {
               traceId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to get span from ClickHouse"
+            "Failed to get span from ClickHouse",
           );
 
           throw error;
         }
-      }
+      },
     );
   }
 
   async getSpansByTraceId(
     tenantId: string,
-    traceId: string
+    traceId: string,
   ): Promise<NormalizedSpan[]> {
     return await this.tracer.withActiveSpan(
       "SpanRepositoryClickHouse.getSpansByTraceId",
@@ -230,8 +230,8 @@ export class SpanRepositoryClickHouse implements SpanRepository {
           return rows.map((row: unknown) =>
             this.transformClickHouseSpanToNormalizedSpan(
               row as ClickHouseSpan,
-              tenantId
-            )
+              tenantId,
+            ),
           );
         } catch (error) {
           this.logger.error(
@@ -240,17 +240,17 @@ export class SpanRepositoryClickHouse implements SpanRepository {
               traceId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to get spans from ClickHouse"
+            "Failed to get spans from ClickHouse",
           );
 
           throw error;
         }
-      }
+      },
     );
   }
 
   private transformNormalizedSpan(
-    normalizedSpan: NormalizedSpan
+    normalizedSpan: NormalizedSpan,
   ): ClickHouseSpan {
     // Extract service name from resource attributes
     const serviceNameAny =
@@ -281,11 +281,11 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       ScopeName: normalizedSpan.instrumentationScope.name,
       ScopeVersion: normalizedSpan.instrumentationScope.version,
       "Events.Timestamp": normalizedSpan.events.map(
-        (event) => event.timeUnixMs
+        (event) => event.timeUnixMs,
       ),
       "Events.Name": normalizedSpan.events.map((event) => event.name),
       "Events.Attributes": normalizedSpan.events.map(
-        (event) => event.attributes
+        (event) => event.attributes,
       ),
       "Links.TraceId": normalizedSpan.links.map((link) => link.traceId),
       "Links.SpanId": normalizedSpan.links.map((link) => link.spanId),
@@ -298,11 +298,11 @@ export class SpanRepositoryClickHouse implements SpanRepository {
 
   private transformClickHouseSpanToNormalizedSpan(
     clickHouseSpan: ClickHouseSpan,
-    tenantId: string
+    tenantId: string,
   ): NormalizedSpan {
     // Reconstruct events array
-    const events: NormalizedEvent[] = clickHouseSpan["Events.Timestamp"].map(
-      (timestamp, index) => {
+    const events: NormalizedEvent[] = clickHouseSpan["Events.Timestamp"]
+      .map((timestamp, index) => {
         const name = clickHouseSpan["Events.Name"][index];
         const attributes = clickHouseSpan["Events.Attributes"][index];
 
@@ -318,7 +318,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
               attributesEmpty: !attributes,
               timestampEmpty: !timestamp,
             },
-            "Event has no name, attributes, or timestamp"
+            "Event has no name, attributes, or timestamp",
           );
 
           return null;
@@ -329,12 +329,12 @@ export class SpanRepositoryClickHouse implements SpanRepository {
           timeUnixMs: timestamp,
           attributes,
         };
-      }
-    ).filter(e => e !== null);
+      })
+      .filter((e) => e !== null);
 
     // Reconstruct links array
-    const links: NormalizedLink[] = clickHouseSpan["Links.TraceId"].map(
-      (traceId, index) => {
+    const links: NormalizedLink[] = clickHouseSpan["Links.TraceId"]
+      .map((traceId, index) => {
         const spanId = clickHouseSpan["Links.SpanId"][index];
         const attributes = clickHouseSpan["Links.Attributes"][index];
 
@@ -350,7 +350,7 @@ export class SpanRepositoryClickHouse implements SpanRepository {
               spanIdEmpty: !spanId,
               attributesEmpty: !attributes,
             },
-            "Link has no trace id, span id, or attributes"
+            "Link has no trace id, span id, or attributes",
           );
 
           return null;
@@ -361,8 +361,8 @@ export class SpanRepositoryClickHouse implements SpanRepository {
           spanId,
           attributes,
         };
-      }
-    ).filter(l => l !== null);
+      })
+      .filter((l) => l !== null);
 
     return {
       id: clickHouseSpan.Id,

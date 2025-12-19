@@ -10,12 +10,14 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  * Postgres implementation of TraceDailyUsageRepository.
  * Uses atomic upsert operations for high-performance idempotent counting.
  */
-export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageRepository {
+export class TraceDailyUsageRepositoryPostgres
+  implements TraceDailyUsageRepository
+{
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-daily-usage-repository"
+    "langwatch.trace-processing.trace-daily-usage-repository",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-daily-usage-repository"
+    "langwatch:trace-processing:trace-daily-usage-repository",
   );
 
   async ensureTraceCounted(
@@ -30,7 +32,7 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
         attributes: {
           "tenant.id": tenantId,
           "trace.id": traceId,
-          "date": date.toISOString().split('T')[0],
+          date: date.toISOString().split("T")[0],
         },
       },
       async (span) => {
@@ -42,7 +44,9 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
             try {
               await tx.projectDailyUsageProcessedAggregates.create({
                 data: {
-                  id: generate(KSUID_RESOURCES.PROJECT_USAGE_PROCESSED).toString(),
+                  id: generate(
+                    KSUID_RESOURCES.PROJECT_USAGE_PROCESSED,
+                  ).toString(),
                   projectId: tenantId,
                   aggregateId: traceId,
                   date,
@@ -74,9 +78,8 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
 
               span.setAttributes({ "trace.counted": true });
               return true;
-
             } catch (error: any) {
-              if (error.code === 'P2002') {
+              if (error.code === "P2002") {
                 span.setAttributes({ "trace.already_counted": true });
                 return false;
               }
@@ -88,10 +91,10 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
             {
               tenantId,
               traceId,
-              date: date.toISOString().split('T')[0],
+              date: date.toISOString().split("T")[0],
               wasCounted: result,
             },
-            "Ensured trace counted for daily usage"
+            "Ensured trace counted for daily usage",
           );
 
           return result;
@@ -100,14 +103,14 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
             {
               tenantId,
               traceId,
-              date: date.toISOString().split('T')[0],
+              date: date.toISOString().split("T")[0],
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to ensure trace counted"
+            "Failed to ensure trace counted",
           );
           throw error;
         }
-      }
+      },
     );
   }
 
@@ -118,7 +121,7 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": tenantId,
-          "date": date.toISOString().split('T')[0],
+          date: date.toISOString().split("T")[0],
         },
       },
       async () => {
@@ -130,7 +133,7 @@ export class TraceDailyUsageRepositoryPostgres implements TraceDailyUsageReposit
             },
           },
         });
-      }
+      },
     );
   }
 }

@@ -29,7 +29,12 @@ describe("traceRequest.utils", () => {
         expect(result).toHaveProperty("llm.input_messages");
         const parsed = JSON.parse(result["llm.input_messages"] as string);
         expect(parsed).toEqual([
-          { message: { content: "You are a helpful web agent.", role: "system" } },
+          {
+            message: {
+              content: "You are a helpful web agent.",
+              role: "system",
+            },
+          },
           { message: { content: "Tell me a joke", role: "user" } },
         ]);
       });
@@ -278,7 +283,7 @@ describe("traceRequest.utils", () => {
 
       it("handles null-ish input", () => {
         const result = TraceRequestUtils.normalizeOtlpAttributes(
-          null as unknown as []
+          null as unknown as [],
         );
         expect(result).toEqual({});
       });

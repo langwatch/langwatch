@@ -44,8 +44,12 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.SPAN_TYPE)) {
       // Direct type attribute (legacy)
-      const directType = attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
-      if (typeof directType === "string" && ALLOWED_SPAN_TYPES.has(directType)) {
+      const directType =
+        attrs.take(ATTR_KEYS.TYPE) ?? attrs.take(ATTR_KEYS.LANGWATCH_TYPE);
+      if (
+        typeof directType === "string" &&
+        ALLOWED_SPAN_TYPES.has(directType)
+      ) {
         ctx.setAttr(ATTR_KEYS.SPAN_TYPE, directType);
         ctx.recordRule(`${this.id}:type(direct)`);
       }
@@ -78,7 +82,10 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
 
       // Tool call detection from operation name or explicit attribute
       const operationName = attrs.get(ATTR_KEYS.OPERATION_NAME);
-      if (operationName === "ai.toolCall" || attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)) {
+      if (
+        operationName === "ai.toolCall" ||
+        attrs.has(ATTR_KEYS.AI_TOOL_CALL_NAME)
+      ) {
         ctx.setAttrIfAbsent(ATTR_KEYS.SPAN_TYPE, "tool");
         ctx.recordRule(`${this.id}:toolcall->tool`);
       }
@@ -89,15 +96,20 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
     // Maps input.value/input → langwatch.input
     // Maps output.value/output → langwatch.output
     // ─────────────────────────────────────────────────────────────────────────
-    const inputValue = attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
+    const inputValue =
+      attrs.take(ATTR_KEYS.INPUT_VALUE) ?? attrs.take(ATTR_KEYS.INPUT);
     if (inputValue !== undefined) {
       ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_INPUT, safeJsonParse(inputValue));
       ctx.recordRule(`${this.id}:input->langwatch.input`);
     }
 
-    const outputValue = attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
+    const outputValue =
+      attrs.take(ATTR_KEYS.OUTPUT_VALUE) ?? attrs.take(ATTR_KEYS.OUTPUT);
     if (outputValue !== undefined) {
-      ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, safeJsonParse(outputValue));
+      ctx.setAttrIfAbsent(
+        ATTR_KEYS.LANGWATCH_OUTPUT,
+        safeJsonParse(outputValue),
+      );
       ctx.recordRule(`${this.id}:output->langwatch.output`);
     }
 
@@ -122,18 +134,30 @@ export class LegacyOtelTracesExtractor implements CanonicalAttributesExtractor {
       const statusMsg = attrs.get(ATTR_KEYS.STATUS_MESSAGE);
 
       const spanErrorHas =
-        attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ?? attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
+        attrs.get(ATTR_KEYS.SPAN_ERROR_HAS_ERROR) ??
+        attrs.get(ATTR_KEYS.ERROR_HAS_ERROR);
       const spanErrorMsg =
-        attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ?? attrs.get(ATTR_KEYS.ERROR_MESSAGE);
+        attrs.get(ATTR_KEYS.SPAN_ERROR_MESSAGE) ??
+        attrs.get(ATTR_KEYS.ERROR_MESSAGE);
 
       // Priority 1: Explicit span error flag with message
-      if (typeof spanErrorHas === "boolean" && spanErrorHas && isNonEmptyString(spanErrorMsg)) {
+      if (
+        typeof spanErrorHas === "boolean" &&
+        spanErrorHas &&
+        isNonEmptyString(spanErrorMsg)
+      ) {
         ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, spanErrorMsg);
         ctx.recordRule(`${this.id}:error(span.error)`);
       }
       // Priority 2: Exception type and message
-      else if (isNonEmptyString(exceptionType) && isNonEmptyString(exceptionMsg)) {
-        ctx.setAttrIfAbsent(ATTR_KEYS.ERROR_TYPE, `${exceptionType}: ${exceptionMsg}`);
+      else if (
+        isNonEmptyString(exceptionType) &&
+        isNonEmptyString(exceptionMsg)
+      ) {
+        ctx.setAttrIfAbsent(
+          ATTR_KEYS.ERROR_TYPE,
+          `${exceptionType}: ${exceptionMsg}`,
+        );
         ctx.recordRule(`${this.id}:error(exception)`);
       }
       // Priority 3: Status message fallback

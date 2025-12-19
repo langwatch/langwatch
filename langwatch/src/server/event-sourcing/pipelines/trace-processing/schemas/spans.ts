@@ -26,18 +26,15 @@ const normalizedAttributesValueSchema = z.union([
   z.array(normalizedAttributeScalarSchema),
 ]);
 
-const normalizedAttributesSchema = z.record(z.union([
-  z.string(),
-  z.boolean(),
-  z.number(),
-  z.bigint(),
-  z.array(z.union([
+const normalizedAttributesSchema = z.record(
+  z.union([
     z.string(),
     z.boolean(),
     z.number(),
     z.bigint(),
-  ])),
-]));
+    z.array(z.union([z.string(), z.boolean(), z.number(), z.bigint()])),
+  ]),
+);
 
 const normalizedSpanKindSchema = z.nativeEnum(NormalizedSpanKind);
 const normalizedStatusCodeSchema = z.nativeEnum(NormalizedStatusCode);
@@ -91,5 +88,9 @@ export type NormalizedSpan = z.infer<typeof normalizedSpanSchema>;
 
 export type NormalizedAttributes = z.infer<typeof normalizedAttributesSchema>;
 
-export type NormalizedAttrScalar = z.infer<typeof normalizedAttributeScalarSchema>;
-export type NormalizedAttrValue = z.infer<typeof normalizedAttributesValueSchema>;
+export type NormalizedAttrScalar = z.infer<
+  typeof normalizedAttributeScalarSchema
+>;
+export type NormalizedAttrValue = z.infer<
+  typeof normalizedAttributesValueSchema
+>;

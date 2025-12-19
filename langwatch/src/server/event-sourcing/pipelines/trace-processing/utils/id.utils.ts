@@ -27,17 +27,17 @@ import { KSUID_RESOURCES } from "~/utils/constants";
  */
 function generateDeterministicSpanRecordId(event: SpanReceivedEvent): string {
   const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-    event.data.span
+    event.data.span,
   );
   const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-    TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano)
+    TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
   );
 
   return generateDeterministicSpanRecordIdFromData(
     String(event.tenantId),
     traceId,
     spanId,
-    startTimeUnixMs
+    startTimeUnixMs,
   );
 }
 
@@ -56,11 +56,11 @@ function generateDeterministicSpanRecordIdFromData(
   tenantId: string,
   traceId: string,
   spanId: string,
-  startTimeUnixMs: number
+  startTimeUnixMs: number,
 ): string {
   EventUtils.validateTenantId(
     { tenantId },
-    "generateDeterministicSpanRecordIdFromData"
+    "generateDeterministicSpanRecordIdFromData",
   );
 
   // Create a deterministic hash from tenantId + traceId + spanId
@@ -86,7 +86,7 @@ function generateDeterministicSpanRecordIdFromData(
     "span",
     timestampSeconds,
     instance,
-    sequenceId
+    sequenceId,
   );
 
   return ksuid.toString();
@@ -115,13 +115,13 @@ function generateDeterministicSpanRecordIdFromData(
 function generateDeterministicTraceSummaryId(event: SpanReceivedEvent): string {
   const { traceId } = TraceRequestUtils.normalizeOtlpSpanIds(event.data.span);
   const startTimeUnixMs = TraceRequestUtils.convertUnixNanoToUnixMs(
-    TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano)
+    TraceRequestUtils.normalizeOtlpUnixNano(event.data.span.startTimeUnixNano),
   );
 
   return generateDeterministicTraceSummaryIdFromData(
     String(event.tenantId),
     traceId,
-    startTimeUnixMs
+    startTimeUnixMs,
   );
 }
 
@@ -144,11 +144,11 @@ function generateDeterministicTraceSummaryId(event: SpanReceivedEvent): string {
 function generateDeterministicTraceSummaryIdFromData(
   tenantId: string,
   traceId: string,
-  startTimeUnixMs: number
+  startTimeUnixMs: number,
 ): string {
   EventUtils.validateTenantId(
     { tenantId },
-    "generateDeterministicTraceSummaryIdFromData"
+    "generateDeterministicTraceSummaryIdFromData",
   );
 
   // Create a deterministic hash from tenantId + traceId + spanId
@@ -172,7 +172,7 @@ function generateDeterministicTraceSummaryIdFromData(
     KSUID_RESOURCES.TRACE_SUMMARY,
     timestampSeconds,
     instance,
-    sequenceId
+    sequenceId,
   );
 
   return ksuid.toString();

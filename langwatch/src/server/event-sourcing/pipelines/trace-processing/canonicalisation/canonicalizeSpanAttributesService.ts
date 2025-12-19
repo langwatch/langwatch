@@ -54,7 +54,7 @@ export class CanonicalizeSpanAttributesService {
   canonicalize(
     spanAttributes: NormalizedAttributes,
     events: NormalizedEvent[],
-    spanForContext: ExtractorContext["span"]
+    spanForContext: ExtractorContext["span"],
   ): CanonicalizeResult {
     const bag = new SpanDataBag(spanAttributes, events);
     const out: NormalizedAttributes = {};

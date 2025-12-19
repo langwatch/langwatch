@@ -95,16 +95,16 @@ export class TraceSummaryRepositoryClickHouse<
 > implements TraceSummaryRepository<ProjectionType>
 {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-summary-repository"
+    "langwatch.trace-processing.trace-summary-repository",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-summary-repository"
+    "langwatch:trace-processing:trace-summary-repository",
   );
 
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
 
   private mapClickHouseRecordToProjectionData(
-    record: ClickHouseSummaryRecord
+    record: ClickHouseSummaryRecord,
   ): TraceSummaryData {
     return {
       TraceId: record.TraceId,
@@ -145,7 +145,7 @@ export class TraceSummaryRepositoryClickHouse<
     tenantId: string,
     traceId: string,
     projectionId: string,
-    projectionVersion: string
+    projectionVersion: string,
   ): ClickHouseSummaryRecord {
     return {
       Id: projectionId,
@@ -185,7 +185,7 @@ export class TraceSummaryRepositoryClickHouse<
 
   async getProjection(
     aggregateId: string,
-    context: ProjectionStoreReadContext
+    context: ProjectionStoreReadContext,
   ): Promise<ProjectionType | null> {
     return await this.tracer.withActiveSpan(
       "TraceSummaryRepositoryClickHouse.getProjection",
@@ -199,7 +199,7 @@ export class TraceSummaryRepositoryClickHouse<
       async () => {
         EventUtils.validateTenantId(
           context,
-          "TraceSummaryRepositoryClickHouse.getProjection"
+          "TraceSummaryRepositoryClickHouse.getProjection",
         );
 
         const traceId = String(aggregateId);
@@ -273,7 +273,7 @@ export class TraceSummaryRepositoryClickHouse<
               tenantId: context.tenantId,
               error: errorMessage,
             },
-            "Failed to get projection from ClickHouse"
+            "Failed to get projection from ClickHouse",
           );
           throw new StoreError(
             "getProjection",
@@ -281,16 +281,16 @@ export class TraceSummaryRepositoryClickHouse<
             `Failed to get projection for trace ${traceId}: ${errorMessage}`,
             ErrorCategory.CRITICAL,
             { traceId },
-            error
+            error,
           );
         }
-      }
+      },
     );
   }
 
   async storeProjection(
     projection: ProjectionType,
-    context: ProjectionStoreWriteContext
+    context: ProjectionStoreWriteContext,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
       "TraceSummaryRepositoryClickHouse.storeProjection",
@@ -304,14 +304,14 @@ export class TraceSummaryRepositoryClickHouse<
       async () => {
         EventUtils.validateTenantId(
           context,
-          "TraceSummaryRepositoryClickHouse.storeProjection"
+          "TraceSummaryRepositoryClickHouse.storeProjection",
         );
 
         if (!EventUtils.isValidProjection(projection)) {
           throw new ValidationError(
             "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
             "projection",
-            projection
+            projection,
           );
         }
 
@@ -320,7 +320,7 @@ export class TraceSummaryRepositoryClickHouse<
             "storeProjection",
             `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
             projection.tenantId,
-            { contextTenantId: context.tenantId }
+            { contextTenantId: context.tenantId },
           );
         }
 
@@ -331,7 +331,7 @@ export class TraceSummaryRepositoryClickHouse<
             String(context.tenantId),
             traceId,
             projection.id,
-            projection.version
+            projection.version,
           );
 
           await this.clickHouseClient.insert({
@@ -346,7 +346,7 @@ export class TraceSummaryRepositoryClickHouse<
               traceId: traceId,
               projectionId: projection.id,
             },
-            "Stored projection to ClickHouse"
+            "Stored projection to ClickHouse",
           );
         } catch (error) {
           const errorMessage =
@@ -358,7 +358,7 @@ export class TraceSummaryRepositoryClickHouse<
               projectionId: projection.id,
               error: errorMessage,
             },
-            "Failed to store projection in ClickHouse"
+            "Failed to store projection in ClickHouse",
           );
           throw new StoreError(
             "storeProjection",
@@ -369,10 +369,10 @@ export class TraceSummaryRepositoryClickHouse<
               projectionId: projection.id,
               traceId: String(projection.aggregateId),
             },
-            error
+            error,
           );
         }
-      }
+      },
     );
   }
 }

@@ -33,11 +33,7 @@ export class SpanRepositoryMemory implements SpanRepository {
       },
       async () => {
         try {
-          const key = this.getKey(
-            data.tenantId,
-            data.traceId,
-            data.spanId,
-          );
+          const key = this.getKey(data.tenantId, data.traceId, data.spanId);
 
           this.spans.set(key, data);
           this.logger.debug(

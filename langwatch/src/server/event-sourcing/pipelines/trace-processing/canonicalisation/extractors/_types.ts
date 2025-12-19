@@ -32,7 +32,6 @@ export type ExtractorContext = {
   setAttrIfAbsent: (key: string, value: unknown) => void;
 };
 
-
 export interface CanonicalAttributesExtractor {
   /** Stable ID for debugging / tests */
   readonly id: string;

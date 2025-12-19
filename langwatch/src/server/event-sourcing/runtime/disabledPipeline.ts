@@ -223,7 +223,7 @@ export class DisabledPipelineBuilderWithNameAndType<
     Record<string, EventSourcedQueueProcessor<any>>
   > {
     this.logWarningOnce();
-    
+
     const metadata: PipelineMetadata = {
       name: this._name,
       aggregateType: this._aggregateType,
@@ -231,7 +231,7 @@ export class DisabledPipelineBuilderWithNameAndType<
       eventHandlers: this._eventHandlers,
       commands: this._commands,
     };
-    
+
     const pipeline = new DisabledPipeline<EventType, ProjectionTypes>(
       this._name,
       this._aggregateType,

@@ -9,10 +9,10 @@ import type {
   EventStoreReadContext,
   ExtractCommandHandlerPayload,
   ParentLink,
-  PipelineMetadata,
   Projection,
   ProjectionHandlerClass,
 } from "../../library";
+import type { PipelineMetadata } from "./types";
 import type {
   EventHandlerDefinition,
   EventHandlerOptions,
@@ -472,15 +472,19 @@ export class PipelineBuilderWithNameAndType<
     const metadata: PipelineMetadata = {
       name: this.name,
       aggregateType: this.aggregateType,
-      projections: Array.from(this.projections.entries()).map(([name, def]) => ({
-        name,
-        handlerClassName: def.handler.constructor.name,
-      })),
-      eventHandlers: Array.from(this.eventHandlers.entries()).map(([name, def]) => ({
-        name,
-        handlerClassName: def.handler.constructor.name,
-        eventTypes: [...(def.options?.eventTypes || [])],
-      })),
+      projections: Array.from(this.projections.entries()).map(
+        ([name, def]) => ({
+          name,
+          handlerClassName: def.handler.constructor.name,
+        }),
+      ),
+      eventHandlers: Array.from(this.eventHandlers.entries()).map(
+        ([name, def]) => ({
+          name,
+          handlerClassName: def.handler.constructor.name,
+          eventTypes: [...(def.options?.eventTypes || [])],
+        }),
+      ),
       commands: this.commandHandlers.map((reg) => ({
         name: reg.name,
         handlerClassName: reg.HandlerClass.name,

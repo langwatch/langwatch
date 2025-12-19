@@ -44,7 +44,9 @@ interface LangWatchStructuredValue {
   value: unknown;
 }
 
-const isLangWatchStructuredValue = (v: unknown): v is LangWatchStructuredValue =>
+const isLangWatchStructuredValue = (
+  v: unknown,
+): v is LangWatchStructuredValue =>
   isRecord(v) &&
   "type" in v &&
   "value" in v &&
@@ -63,7 +65,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
     // Note: May be upgraded to "llm" later if chat_messages input is detected
     // ─────────────────────────────────────────────────────────────────────────
     const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE);
-    if (typeof spanType === "string" && spanType.length > 0 && ALLOWED_SPAN_TYPES.has(spanType)) {
+    if (
+      typeof spanType === "string" &&
+      spanType.length > 0 &&
+      ALLOWED_SPAN_TYPES.has(spanType)
+    ) {
       ctx.setAttr(ATTR_KEYS.SPAN_TYPE, spanType);
       ctx.recordRule(`${this.id}:span.type`);
     }
@@ -77,7 +83,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       attrs.take(ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY) ??
       attrs.take(ATTR_KEYS.LANGWATCH_THREAD_ID_LEGACY_ROOT) ??
       attrs.take(ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID);
-    if (threadId !== undefined && typeof threadId === "string" && threadId.length > 0) {
+    if (
+      threadId !== undefined &&
+      typeof threadId === "string" &&
+      threadId.length > 0
+    ) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_CONVERSATION_ID, threadId);
       ctx.recordRule(`${this.id}:conversation.id`);
     }
@@ -141,19 +151,28 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
       if (isLangWatchStructuredValue(parsedInput)) {
         // Structured format: { type: "chat_messages", value: [...] }
-        if (parsedInput.type === "chat_messages" && Array.isArray(parsedInput.value)) {
+        if (
+          parsedInput.type === "chat_messages" &&
+          Array.isArray(parsedInput.value)
+        ) {
           // Use normalizeToMessages helper for consistent message handling
           const messages = normalizeToMessages(parsedInput.value, "user");
 
           if (messages) {
             // Set gen_ai.input.messages directly
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, messages);
-            ctx.recordRule(`${this.id}:input.chat_messages->gen_ai.input.messages`);
+            ctx.recordRule(
+              `${this.id}:input.chat_messages->gen_ai.input.messages`,
+            );
 
             // Extract system instruction using helper
-            const systemInstruction = extractSystemInstructionFromMessages(messages);
+            const systemInstruction =
+              extractSystemInstructionFromMessages(messages);
             if (systemInstruction !== null) {
-              ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION, systemInstruction);
+              ctx.setAttrIfAbsent(
+                ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
+                systemInstruction,
+              );
             }
 
             // Upgrade span type to "llm" when we have chat messages input
@@ -173,7 +192,9 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
       } else {
         // Legacy behavior: flatten single-element arrays
         const normalizedInput =
-          Array.isArray(parsedInput) && parsedInput.length === 1 ? parsedInput[0] : parsedInput;
+          Array.isArray(parsedInput) && parsedInput.length === 1
+            ? parsedInput[0]
+            : parsedInput;
         ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, normalizedInput);
         ctx.recordRule(`${this.id}:input`);
       }
@@ -190,23 +211,33 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
 
       if (isLangWatchStructuredValue(parsedOutput)) {
         // Structured format: { type: "...", value: [...] }
-        if (parsedOutput.type === "chat_messages" && Array.isArray(parsedOutput.value)) {
+        if (
+          parsedOutput.type === "chat_messages" &&
+          Array.isArray(parsedOutput.value)
+        ) {
           // Use normalizeToMessages helper for consistent message handling
           const messages = normalizeToMessages(parsedOutput.value, "assistant");
 
           if (messages && messages.length > 0) {
             // Chat messages output - map directly to gen_ai.output.messages
             ctx.setAttr(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES, messages);
-            ctx.recordRule(`${this.id}:output.chat_messages->gen_ai.output.messages`);
+            ctx.recordRule(
+              `${this.id}:output.chat_messages->gen_ai.output.messages`,
+            );
 
             // Keep unwrapped messages for langwatch.output display
             ctx.setAttr(ATTR_KEYS.LANGWATCH_OUTPUT, messages);
             ctx.recordRule(`${this.id}:output`);
           }
-        } else if (parsedOutput.type === "json" && Array.isArray(parsedOutput.value)) {
+        } else if (
+          parsedOutput.type === "json" &&
+          Array.isArray(parsedOutput.value)
+        ) {
           // JSON output (e.g., from DSPy) - wrap as assistant message
           const content = parsedOutput.value
-            .map((item) => (typeof item === "string" ? item : JSON.stringify(item)))
+            .map((item) =>
+              typeof item === "string" ? item : JSON.stringify(item),
+            )
             .join("\n");
 
           // Use normalizeToMessages for consistent output format

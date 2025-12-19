@@ -17,10 +17,10 @@ import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSo
  */
 export class TraceRequestCollectionService {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.span-ingestion"
+    "langwatch.trace-processing.span-ingestion",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:span-ingestion"
+    "langwatch:trace-processing:span-ingestion",
   );
 
   /**
@@ -50,7 +50,7 @@ export class TraceRequestCollectionService {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
           "tenant.id": tenantId,
-          "trace_request_count": traceRequest.resourceSpans?.length ?? 0,
+          trace_request_count: traceRequest.resourceSpans?.length ?? 0,
         },
       },
       async (span) => {
@@ -68,7 +68,7 @@ export class TraceRequestCollectionService {
                 result: resourceParseResult,
                 tenantId,
               },
-              "Error parsing OTLP resource"
+              "Error parsing OTLP resource",
             );
           }
 
@@ -83,7 +83,7 @@ export class TraceRequestCollectionService {
                   result: scopeParseResult,
                   tenantId,
                 },
-                "Error parsing OTLP scope"
+                "Error parsing OTLP scope",
               );
             }
 
@@ -99,7 +99,7 @@ export class TraceRequestCollectionService {
                     result: spanParseResult,
                     tenantId,
                   },
-                  "Error parsing OTLP span, dropping"
+                  "Error parsing OTLP span, dropping",
                 );
               }
               // Dropping broken span - needed to enforce type safety.
@@ -119,7 +119,8 @@ export class TraceRequestCollectionService {
                 collectedSpanCount++;
               } catch (error) {
                 span.addEvent("span_ingestion_error", {
-                  "error.message": (error instanceof Error ? error.message : String(error)),
+                  "error.message":
+                    error instanceof Error ? error.message : String(error),
                   "tenant.id": tenantId,
                 });
                 this.logger.error(
@@ -129,7 +130,7 @@ export class TraceRequestCollectionService {
                     traceId: spanParseResult.data.traceId,
                     spanId: spanParseResult.data.spanId,
                   },
-                  "Error converting raw OTEL span"
+                  "Error converting raw OTEL span",
                 );
                 ingestionFailureCount++;
               }
@@ -140,9 +141,10 @@ export class TraceRequestCollectionService {
         span.setAttribute("spans.ingestion.successes", collectedSpanCount);
         span.setAttribute("spans.ingestion.failures", ingestionFailureCount);
         span.setAttribute("spans.ingestion.drops", droppedSpanCount);
-      }
+      },
     );
   }
 }
 
-export const traceRequestCollectionService = new TraceRequestCollectionService();
+export const traceRequestCollectionService =
+  new TraceRequestCollectionService();

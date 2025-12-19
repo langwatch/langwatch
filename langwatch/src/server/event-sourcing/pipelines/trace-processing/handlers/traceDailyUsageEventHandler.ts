@@ -24,10 +24,10 @@ export class TraceDailyUsageEventHandler
   private readonly spanNormalizationPipelineService =
     new SpanNormalizationPipelineService();
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-daily-usage-handler"
+    "langwatch.trace-processing.trace-daily-usage-handler",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-daily-usage-handler"
+    "langwatch:trace-processing:trace-daily-usage-handler",
   );
 
   /**
@@ -44,33 +44,39 @@ export class TraceDailyUsageEventHandler
           "event.type": event.type,
           "tenant.id": event.tenantId,
           "trace.id": TraceRequestUtils.normalizeOtlpId(
-            event.data.span.traceId
+            event.data.span.traceId,
           ),
           "span.id": TraceRequestUtils.normalizeOtlpId(event.data.span.spanId),
         },
       },
       async (span) => {
-        const traceId = TraceRequestUtils.normalizeOtlpId(event.data.span.traceId);
+        const traceId = TraceRequestUtils.normalizeOtlpId(
+          event.data.span.traceId,
+        );
 
         // Normalize timestamp to day boundary for consistent daily aggregation
         const eventDate = new Date(event.timestamp);
-        const date = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+        const date = new Date(
+          eventDate.getFullYear(),
+          eventDate.getMonth(),
+          eventDate.getDate(),
+        );
 
         this.logger.debug(
           {
             tenantId: event.tenantId,
             traceId,
             eventDate: eventDate.toISOString(),
-            normalizedDate: date.toISOString().split('T')[0],
+            normalizedDate: date.toISOString().split("T")[0],
           },
-          "Processing trace for daily usage tracking"
+          "Processing trace for daily usage tracking",
         );
 
         try {
           const wasCounted = await traceDailyUsageRepository.ensureTraceCounted(
             event.tenantId,
             traceId,
-            date
+            date,
           );
 
           span.setAttributes({
@@ -83,18 +89,18 @@ export class TraceDailyUsageEventHandler
               {
                 tenantId: event.tenantId,
                 traceId,
-                date: date.toISOString().split('T')[0],
+                date: date.toISOString().split("T")[0],
               },
-              "Incremented daily trace count for tenant"
+              "Incremented daily trace count for tenant",
             );
           } else {
             this.logger.debug(
               {
                 tenantId: event.tenantId,
                 traceId,
-                date: date.toISOString().split('T')[0],
+                date: date.toISOString().split("T")[0],
               },
-              "Trace already counted for this tenant-day, skipping"
+              "Trace already counted for this tenant-day, skipping",
             );
           }
         } catch (error) {
@@ -102,14 +108,14 @@ export class TraceDailyUsageEventHandler
             {
               tenantId: event.tenantId,
               traceId,
-              date: date.toISOString().split('T')[0],
+              date: date.toISOString().split("T")[0],
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to update daily usage tracking"
+            "Failed to update daily usage tracking",
           );
           throw error;
         }
-      }
+      },
     );
   }
 

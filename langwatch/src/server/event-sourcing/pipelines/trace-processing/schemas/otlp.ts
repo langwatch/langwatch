@@ -40,12 +40,14 @@ export const idSchema = z.union([
   z.string(),
   bytesSchema,
   // This is needed, because JSON.stringify converts Uint8Array to an object, lol.
-  z.record(z.string(), z.number()).transform((obj) => {
-    const values = Object.entries(obj)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([, v]) => v);
-    return Buffer.from(new Uint8Array(values)).toString("hex");
-  }),
+  z
+    .record(z.string(), z.number())
+    .transform((obj) => {
+      const values = Object.entries(obj)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, v]) => v);
+      return Buffer.from(new Uint8Array(values)).toString("hex");
+    }),
 ]);
 
 /**
@@ -57,10 +59,19 @@ export const idSchema = z.union([
 export const anyValueSchema: z.ZodType<OtlpAnyValue> = z.object({
   stringValue: z.string().nullable().optional(),
   boolValue: z.union([z.boolean(), z.string()]).nullable().optional(),
-  intValue: z.union([z.number(), z.string(), longBitsSchema]).nullable().optional(),
+  intValue: z
+    .union([z.number(), z.string(), longBitsSchema])
+    .nullable()
+    .optional(),
   doubleValue: z.union([z.number(), z.string()]).nullable().optional(),
-  arrayValue: z.lazy(() => arrayValueSchema).optional().nullable(),
-  kvlistValue: z.lazy(() => keyValueListSchema).optional().nullable(),
+  arrayValue: z
+    .lazy(() => arrayValueSchema)
+    .optional()
+    .nullable(),
+  kvlistValue: z
+    .lazy(() => keyValueListSchema)
+    .optional()
+    .nullable(),
   bytesValue: bytesSchema.optional().nullable(),
 });
 
@@ -169,4 +180,6 @@ export const exportTraceServiceRequestSchema = z.object({
 
 export type OtlpSpan = z.infer<typeof spanSchema>;
 export type OtlpResource = z.infer<typeof resourceSchema>;
-export type OtlpInstrumentationScope = z.infer<typeof instrumentationScopeSchema>;
+export type OtlpInstrumentationScope = z.infer<
+  typeof instrumentationScopeSchema
+>;

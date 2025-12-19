@@ -95,14 +95,14 @@ export class TraceSummaryProjectionHandler
   private readonly spanNormalizationPipelineService =
     new SpanNormalizationPipelineService();
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-summary-projection"
+    "langwatch.trace-processing.trace-summary-projection",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-summary-projection"
+    "langwatch:trace-processing:trace-summary-projection",
   );
 
   handle(
-    stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>
+    stream: EventStream<TraceProcessingEvent["tenantId"], TraceProcessingEvent>,
   ): TraceSummary {
     return this.tracer.withActiveSpan(
       "TraceSummaryProjectionHandler.handle",
@@ -137,7 +137,7 @@ export class TraceSummaryProjectionHandler
                 eventCount: event.data.span.events?.length ?? 0,
                 rawEvents: JSON.stringify(event.data.span.events?.slice(0, 3)),
               },
-              "Processing SpanReceivedEvent in projection"
+              "Processing SpanReceivedEvent in projection",
             );
 
             // Enrich pure span data with computed fields for aggregation
@@ -146,8 +146,8 @@ export class TraceSummaryProjectionHandler
                 event.tenantId,
                 event.data.span,
                 event.data.resource,
-                event.data.instrumentationScope
-              )
+                event.data.instrumentationScope,
+              ),
             );
 
             if (createdAt === null) {
@@ -168,7 +168,7 @@ export class TraceSummaryProjectionHandler
               tenantId,
               aggregateId,
             },
-            "No spans found for trace, returning empty projection"
+            "No spans found for trace, returning empty projection",
           );
 
           throw new Error("No spans found for trace");
@@ -198,12 +198,12 @@ export class TraceSummaryProjectionHandler
             spanCount: aggregatedData.spanCount,
             durationMs: aggregatedData.durationMs,
           },
-          "Computed trace summary from span events"
+          "Computed trace summary from span events",
         );
 
         // Generate deterministic trace summary ID
         const traceSummaryId = IdUtils.generateDeterministicTraceSummaryId(
-          firstSpanReceivedEvent
+          firstSpanReceivedEvent,
         );
 
         span.addEvent("projection.build.complete", {
@@ -249,7 +249,7 @@ export class TraceSummaryProjectionHandler
             LastUpdatedAt: lastUpdatedAt,
           },
         } satisfies TraceSummary;
-      }
+      },
     );
   }
 }
