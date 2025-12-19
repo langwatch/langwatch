@@ -247,8 +247,16 @@ describe("EventHandlerDispatcher", () => {
       const enabledHandler = createMockEventReactionHandler<Event>();
       const disabledHandler = createMockEventReactionHandler<Event>();
       const eventHandlers = new Map([
-        ["enabledHandler", createMockEventHandlerDefinition("enabledHandler", enabledHandler)],
-        ["disabledHandler", createMockEventHandlerDefinition("disabledHandler", disabledHandler, { disabled: true })],
+        [
+          "enabledHandler",
+          createMockEventHandlerDefinition("enabledHandler", enabledHandler),
+        ],
+        [
+          "disabledHandler",
+          createMockEventHandlerDefinition("disabledHandler", disabledHandler, {
+            disabled: true,
+          }),
+        ],
       ]);
 
       const enabledQueueProcessor: EventSourcedQueueProcessor<Event> = {
@@ -263,8 +271,14 @@ describe("EventHandlerDispatcher", () => {
       const queueManager = new QueueProcessorManager({
         aggregateType,
       });
-      (queueManager as any).handlerQueueProcessors.set("enabledHandler", enabledQueueProcessor);
-      (queueManager as any).handlerQueueProcessors.set("disabledHandler", disabledQueueProcessor);
+      (queueManager as any).handlerQueueProcessors.set(
+        "enabledHandler",
+        enabledQueueProcessor,
+      );
+      (queueManager as any).handlerQueueProcessors.set(
+        "disabledHandler",
+        disabledQueueProcessor,
+      );
 
       const dispatcher = createDispatcher({
         eventHandlers,
@@ -287,14 +301,24 @@ describe("EventHandlerDispatcher", () => {
       const enabledHandler = createMockEventReactionHandler<Event>();
       const disabledHandler = createMockEventReactionHandler<Event>();
       const eventHandlers = new Map([
-        ["enabledHandler", createMockEventHandlerDefinition("enabledHandler", enabledHandler)],
-        ["disabledHandler", createMockEventHandlerDefinition("disabledHandler", disabledHandler, { disabled: true })],
+        [
+          "enabledHandler",
+          createMockEventHandlerDefinition("enabledHandler", enabledHandler),
+        ],
+        [
+          "disabledHandler",
+          createMockEventHandlerDefinition("disabledHandler", disabledHandler, {
+            disabled: true,
+          }),
+        ],
       ]);
 
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue(null);
 
       const dispatcher = createDispatcher({
         eventHandlers,

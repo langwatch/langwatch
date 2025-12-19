@@ -19,6 +19,7 @@ import type {
   RegisteredCommand,
   StaticPipelineDefinition,
 } from "./types";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Builder for creating static pipeline definitions without runtime dependencies.
@@ -51,7 +52,11 @@ export class StaticPipelineBuilderWithName<EventType extends Event = Event> {
 
   withAggregateType(
     aggregateType: AggregateType,
-  ): StaticPipelineBuilderWithNameAndType<EventType, ProjectionTypeMap, NoCommands> {
+  ): StaticPipelineBuilderWithNameAndType<
+    EventType,
+    ProjectionTypeMap,
+    NoCommands
+  > {
     return new StaticPipelineBuilderWithNameAndType(this.name, aggregateType);
   }
 
@@ -88,6 +93,7 @@ export class StaticPipelineBuilderWithNameAndType<
     options?: CommandHandlerOptions;
   }> = [];
   private parentLinks: Array<ParentLink<EventType>> = [];
+  private featureFlagService?: FeatureFlagServiceInterface;
 
   constructor(
     private readonly name: string,
@@ -154,6 +160,20 @@ export class StaticPipelineBuilderWithNameAndType<
   }
 
   /**
+   * Register a feature flag service for kill switches.
+   * When provided, enables automatic feature flag-based kill switches for all components.
+   *
+   * @param featureFlagService - Feature flag service implementation
+   * @returns Builder instance for method chaining
+   */
+  withFeatureFlagService(
+    featureFlagService: FeatureFlagServiceInterface,
+  ): this {
+    this.featureFlagService = featureFlagService;
+    return this;
+  }
+
+  /**
    * Register an event handler class that reacts to individual events.
    *
    * @param name - Unique name for this handler within the pipeline
@@ -199,7 +219,8 @@ export class StaticPipelineBuilderWithNameAndType<
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
-    RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
+    | RegisteredCommands
+    | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
   > {
     if (this.commands.some((c) => c.name === name)) {
       throw new ConfigurationError(
@@ -213,7 +234,8 @@ export class StaticPipelineBuilderWithNameAndType<
     return this as unknown as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections,
-      RegisteredCommands | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
+      | RegisteredCommands
+      | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
     >;
   }
 
@@ -223,15 +245,21 @@ export class StaticPipelineBuilderWithNameAndType<
    *
    * @returns Static pipeline definition that can be registered at runtime
    */
-  build(): StaticPipelineDefinition<EventType, RegisteredProjections, RegisteredCommands> {
+  build(): StaticPipelineDefinition<
+    EventType,
+    RegisteredProjections,
+    RegisteredCommands
+  > {
     // Build metadata for tooling and introspection
     const metadata: PipelineMetadata = {
       name: this.name,
       aggregateType: this.aggregateType,
-      projections: Array.from(this.projections.entries()).map(([name, def]) => ({
-        name,
-        handlerClassName: def.HandlerClass.name,
-      })),
+      projections: Array.from(this.projections.entries()).map(
+        ([name, def]) => ({
+          name,
+          handlerClassName: def.HandlerClass.name,
+        }),
+      ),
       eventHandlers: Array.from(this.eventHandlers.entries()).map(
         ([name, def]) => ({
           name,
@@ -251,6 +279,7 @@ export class StaticPipelineBuilderWithNameAndType<
       eventHandlers: this.eventHandlers,
       commands: this.commands,
       parentLinks: this.parentLinks,
+      featureFlagService: this.featureFlagService,
     };
   }
 }
@@ -268,7 +297,8 @@ export class StaticPipelineBuilderWithNameAndType<
  *   .build();
  * ```
  */
-export function definePipeline<EventType extends Event>(): StaticPipelineBuilder<EventType> {
+export function definePipeline<
+  EventType extends Event,
+>(): StaticPipelineBuilder<EventType> {
   return new StaticPipelineBuilder<EventType>();
 }
-

@@ -32,6 +32,7 @@ import {
 import type { UpdateProjectionOptions } from "../eventSourcingService.types";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Manages projection updates for event sourcing.
@@ -63,6 +64,7 @@ export class ProjectionUpdater<
   private readonly validator: EventProcessorValidator<EventType>;
   private readonly checkpointManager: CheckpointManager<EventType>;
   private readonly queueManager: QueueProcessorManager<EventType>;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     aggregateType,
@@ -75,6 +77,7 @@ export class ProjectionUpdater<
     validator,
     checkpointManager,
     queueManager,
+    featureFlagService,
   }: {
     aggregateType: AggregateType;
     eventStore: EventStore<EventType>;
@@ -86,6 +89,7 @@ export class ProjectionUpdater<
     validator: EventProcessorValidator<EventType>;
     checkpointManager: CheckpointManager<EventType>;
     queueManager: QueueProcessorManager<EventType>;
+    featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.eventStore = eventStore;
@@ -107,6 +111,58 @@ export class ProjectionUpdater<
     this.validator = validator;
     this.checkpointManager = checkpointManager;
     this.queueManager = queueManager;
+    this.featureFlagService = featureFlagService;
+  }
+
+  /**
+   * Generates a feature flag key for a component.
+   * Pattern: es:{pipeline_name}:{component_type}:{component_name}:killswitch
+   */
+  private generateFeatureFlagKey(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+  ): string {
+    return `es:${this.aggregateType}:${componentType}:${componentName}:killswitch`;
+  }
+
+  /**
+   * Checks if a component is disabled via feature flag kill switch.
+   * Returns true if the component should be disabled.
+   */
+  private async isComponentDisabled(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+    tenantId: string,
+    customKey?: string,
+  ): Promise<boolean> {
+    if (!this.featureFlagService) {
+      return false; // No feature flag service, component is enabled
+    }
+
+    const flagKey =
+      customKey ?? this.generateFeatureFlagKey(componentType, componentName);
+
+    try {
+      const isDisabled = await this.featureFlagService.isEnabled(
+        flagKey,
+        tenantId,
+        false,
+      );
+      if (isDisabled) {
+        this.logger.info(
+          { componentName, componentType, tenantId, flagKey },
+          "Component disabled via feature flag kill switch",
+        );
+      }
+      return isDisabled;
+    } catch (error) {
+      // Log error but don't fail - default to enabled
+      this.logger.warn(
+        { componentName, componentType, tenantId, flagKey, error },
+        "Error checking feature flag, defaulting to enabled",
+      );
+      return false;
+    }
   }
 
   /**
@@ -426,6 +482,17 @@ export class ProjectionUpdater<
       async () => {
         EventUtils.validateTenantId(context, "processProjectionEvent");
 
+        // Check kill switch - if enabled, skip projection processing
+        const isDisabled = await this.isComponentDisabled(
+          "projection",
+          projectionName,
+          event.tenantId,
+          projectionDef.options?.killSwitch?.customKey,
+        );
+        if (isDisabled) {
+          return; // Skip projection processing
+        }
+
         // Fetch events up to and including the current event for processing
         // This ensures we don't include events that haven't been processed yet
         const eventsUpToCurrent = await this.eventStore.getEventsUpTo(
@@ -444,9 +511,7 @@ export class ProjectionUpdater<
           event,
           context,
           {
-            skipOrderingCheck: Boolean(
-              projectionDef.options?.debounceMs,
-            ),
+            skipOrderingCheck: Boolean(projectionDef.options?.debounceMs),
             events: eventsUpToCurrent,
           },
         );
