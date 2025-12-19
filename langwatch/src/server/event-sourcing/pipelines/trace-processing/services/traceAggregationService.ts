@@ -242,7 +242,7 @@ const extractTokenTiming = (spans: NormalizedSpan[]): TokenTiming => {
  */
 const computeTokensPerSecond = (
   completionTokens: number | null,
-  durationMs: number
+  durationMs: number,
 ): number | null => {
   if (completionTokens === null || completionTokens <= 0 || durationMs <= 0) {
     return null;
@@ -268,7 +268,7 @@ const formatTokenMetrics = (metrics: TokenMetrics) => ({
  * This includes SDK info, thread/user context, and other trace-level metadata.
  */
 const extractTraceAttributes = (
-  spans: NormalizedSpan[]
+  spans: NormalizedSpan[],
 ): Record<string, string> => {
   const attributes: Record<string, string> = {};
 
@@ -311,7 +311,8 @@ const extractTraceAttributes = (
     }
 
     // LangGraph metadata
-    const langgraphThreadId = spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
+    const langgraphThreadId =
+      spanAttrs[ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID];
     if (
       typeof langgraphThreadId === "string" &&
       !attributes["langgraph.thread_id"]
@@ -340,7 +341,7 @@ const logger = createLogger("langwatch:trace-processing:aggregation-service");
  */
 export class TraceAggregationService {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.aggregation"
+    "langwatch.trace-processing.aggregation",
   );
 
   /**
@@ -381,13 +382,17 @@ export class TraceAggregationService {
         // IO extraction (using the service) - store rich JSON as string
         const inputResult = traceIOExtractionService.extractFirstInput(spans);
         const outputResult = traceIOExtractionService.extractLastOutput(spans);
-        
+
         // Serialize the raw JSON to string for storage
         const computedInput = inputResult
-          ? (typeof inputResult.raw === "string" ? inputResult.raw : JSON.stringify(inputResult.raw))
+          ? typeof inputResult.raw === "string"
+            ? inputResult.raw
+            : JSON.stringify(inputResult.raw)
           : null;
         const computedOutput = outputResult
-          ? (typeof outputResult.raw === "string" ? outputResult.raw : JSON.stringify(outputResult.raw))
+          ? typeof outputResult.raw === "string"
+            ? outputResult.raw
+            : JSON.stringify(outputResult.raw)
           : null;
 
         // Trace attributes extraction
@@ -397,7 +402,7 @@ export class TraceAggregationService {
         const formatted = formatTokenMetrics(tokenMetrics);
         const tokensPerSecond = computeTokensPerSecond(
           formatted.totalCompletionTokenCount,
-          durationMs
+          durationMs,
         );
 
         otelSpan.setAttributes({
@@ -420,7 +425,7 @@ export class TraceAggregationService {
             hasInput: computedInput !== null,
             hasOutput: computedOutput !== null,
           },
-          "Computed trace aggregation"
+          "Computed trace aggregation",
         );
 
         return {
@@ -447,19 +452,19 @@ export class TraceAggregationService {
 
           attributes,
         };
-      }
+      },
     );
   }
 
   private validateSpans(
     spans: NormalizedSpan[],
-    otelSpan: { addEvent: (name: string) => void }
+    otelSpan: { addEvent: (name: string) => void },
   ): void {
     if (spans.length === 0 || !spans[0]) {
       throw new ValidationError(
         "Cannot aggregate trace with no spans",
         "spans",
-        spans
+        spans,
       );
     }
 
@@ -469,7 +474,7 @@ export class TraceAggregationService {
         throw new ValidationError(
           "Cannot aggregate trace: spans have different traceId values",
           "spans",
-          spans
+          spans,
         );
       }
     }
@@ -479,7 +484,7 @@ export class TraceAggregationService {
 
   private filterValidTimestamps(
     spans: NormalizedSpan[],
-    otelSpan: { setAttributes: (attrs: Record<string, number>) => void }
+    otelSpan: { setAttributes: (attrs: Record<string, number>) => void },
   ): NormalizedSpan[] {
     const valid = spans.filter((span) => {
       const validStart = isValidTimestamp(span.startTimeUnixMs);
@@ -488,7 +493,7 @@ export class TraceAggregationService {
       if (!validStart || !validEnd) {
         logger.warn(
           { traceId: span.traceId, spanId: span.spanId },
-          "Span has invalid timestamps, excluding from timing calculation"
+          "Span has invalid timestamps, excluding from timing calculation",
         );
         return false;
       }
@@ -503,7 +508,7 @@ export class TraceAggregationService {
       throw new ValidationError(
         "Cannot aggregate trace: all spans have invalid timestamps",
         "spans",
-        spans
+        spans,
       );
     }
 

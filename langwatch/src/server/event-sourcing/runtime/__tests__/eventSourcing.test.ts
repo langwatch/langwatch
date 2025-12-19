@@ -12,14 +12,17 @@ vi.mock("~/server/clickhouse/client", () => ({
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { Event } from "../../library";
 import type { TenantId } from "../../library/domain/tenantId";
-import { createMockEventStore, createMockDistributedLock } from "../../library/services/__tests__/testHelpers";
+import {
+  createMockEventStore,
+  createMockDistributedLock,
+} from "../../library/services/__tests__/testHelpers";
 import { DisabledPipelineBuilder } from "../disabledPipeline";
 import { EventSourcing } from "../eventSourcing";
 import {
   EventSourcingRuntime,
   resetEventSourcingRuntime,
 } from "../eventSourcingRuntime";
-import { PipelineBuilder } from "../pipeline";
+import { PipelineBuilder } from "../index";
 import { EventStoreClickHouse } from "../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../stores/eventStoreMemory";
 

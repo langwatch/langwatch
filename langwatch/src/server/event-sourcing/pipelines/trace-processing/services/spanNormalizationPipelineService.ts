@@ -20,10 +20,10 @@ export class SpanNormalizationPipelineService {
   private readonly canonicalizeSpanAttributesService =
     new CanonicalizeSpanAttributesService();
   private readonly logger = createLogger(
-    "langwatch:trace-processing:span-normalization-pipeline-service"
+    "langwatch:trace-processing:span-normalization-pipeline-service",
   );
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.span-normalization-pipeline-service"
+    "langwatch.trace-processing.span-normalization-pipeline-service",
   );
 
   constructor() {}
@@ -32,7 +32,7 @@ export class SpanNormalizationPipelineService {
     tenantId: string,
     otlpSpan: OtlpSpan,
     otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null
+    otlpInstrumentationScope: OtlpInstrumentationScope | null,
   ): NormalizedSpan {
     return this.tracer.withActiveSpan(
       "SpanNormalizationPipelineService.normalizeSpanReceived",
@@ -47,14 +47,14 @@ export class SpanNormalizationPipelineService {
       (span) => {
         EventUtils.validateTenantId(
           { tenantId },
-          "SpanNormalizationPipelineService.normalizeSpanReceived"
+          "SpanNormalizationPipelineService.normalizeSpanReceived",
         );
 
         const normalizedSpan = this.decodeOtlpSpan(
           tenantId,
           otlpSpan,
           otlpResource,
-          otlpInstrumentationScope
+          otlpInstrumentationScope,
         );
 
         span.setAttributes({
@@ -67,7 +67,7 @@ export class SpanNormalizationPipelineService {
             spanId: normalizedSpan.spanId,
             spanRecordId: normalizedSpan.id,
           },
-          "Normalized span"
+          "Normalized span",
         );
 
         // canonicalize the span attributes
@@ -77,7 +77,7 @@ export class SpanNormalizationPipelineService {
         normalizedSpan.events = canonicalizedResult.events;
 
         return normalizedSpan;
-      }
+      },
     );
   }
 
@@ -85,16 +85,16 @@ export class SpanNormalizationPipelineService {
     tenantId: string,
     otlpSpan: OtlpSpan,
     otlpResource: OtlpResource | null,
-    otlpInstrumentationScope: OtlpInstrumentationScope | null
+    otlpInstrumentationScope: OtlpInstrumentationScope | null,
   ): NormalizedSpan {
     // decode span data
     const { traceId, spanId } =
       TraceRequestUtils.normalizeOtlpSpanIds(otlpSpan);
     const startTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.startTimeUnixNano
+      otlpSpan.startTimeUnixNano,
     );
     const endTimeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-      otlpSpan.endTimeUnixNano
+      otlpSpan.endTimeUnixNano,
     );
     const startTimeUnixMs =
       TraceRequestUtils.convertUnixNanoToUnixMs(startTimeUnixNano);
@@ -105,7 +105,7 @@ export class SpanNormalizationPipelineService {
       TraceRequestUtils.normalizeOtlpParentAndTraceContext(
         otlpSpan.parentSpanId,
         otlpSpan.traceState,
-        otlpSpan.flags
+        otlpSpan.flags,
       );
 
     return {
@@ -113,7 +113,7 @@ export class SpanNormalizationPipelineService {
         tenantId,
         traceId,
         spanId,
-        startTimeUnixMs
+        startTimeUnixMs,
       ),
       tenantId,
       traceId,
@@ -137,51 +137,55 @@ export class SpanNormalizationPipelineService {
       },
 
       statusCode: TraceRequestUtils.normalizeOtlpStatusCode(
-        otlpSpan.status.code
+        otlpSpan.status.code,
       ),
       statusMessage: otlpSpan.status.message ?? null,
 
       resourceAttributes: TraceRequestUtils.normalizeOtlpAttributes(
-        otlpResource?.attributes ?? []
+        otlpResource?.attributes ?? [],
       ),
       spanAttributes: TraceRequestUtils.normalizeOtlpAttributes(
-        otlpSpan.attributes
+        otlpSpan.attributes,
       ),
 
-      events: otlpSpan.events.filter(e => Boolean(e)).map((event) => {
-        const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
-          event.timeUnixNano
-        );
-        const attributes = TraceRequestUtils.normalizeOtlpAttributes(
-          event.attributes
-        );
+      events: otlpSpan.events
+        .filter((e) => Boolean(e))
+        .map((event) => {
+          const timeUnixNano = TraceRequestUtils.normalizeOtlpUnixNano(
+            event.timeUnixNano,
+          );
+          const attributes = TraceRequestUtils.normalizeOtlpAttributes(
+            event.attributes,
+          );
 
-        // Debug: log event attributes
-        this.logger.debug(
-          {
-            eventName: event.name,
-            rawAttributes: JSON.stringify(event.attributes),
-            normalizedAttributes: JSON.stringify(attributes),
-          },
-          "Normalized event attributes"
-        );
+          // Debug: log event attributes
+          this.logger.debug(
+            {
+              eventName: event.name,
+              rawAttributes: JSON.stringify(event.attributes),
+              normalizedAttributes: JSON.stringify(attributes),
+            },
+            "Normalized event attributes",
+          );
 
-        return {
-          name: event.name,
-          timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
-          attributes: attributes,
-        };
-      }),
+          return {
+            name: event.name,
+            timeUnixMs: TraceRequestUtils.convertUnixNanoToUnixMs(timeUnixNano),
+            attributes: attributes,
+          };
+        }),
 
-      links: otlpSpan.links.filter(l => Boolean(l)).map((link) => {
-        const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
-        const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
-        const attributes = TraceRequestUtils.normalizeOtlpAttributes(
-          link.attributes
-        );
+      links: otlpSpan.links
+        .filter((l) => Boolean(l))
+        .map((link) => {
+          const traceId = TraceRequestUtils.normalizeOtlpId(link.traceId);
+          const spanId = TraceRequestUtils.normalizeOtlpId(link.spanId);
+          const attributes = TraceRequestUtils.normalizeOtlpAttributes(
+            link.attributes,
+          );
 
-        return { traceId, spanId, attributes };
-      }),
+          return { traceId, spanId, attributes };
+        }),
 
       droppedAttributesCount: 0,
       droppedEventsCount: 0,
@@ -215,11 +219,11 @@ export class SpanNormalizationPipelineService {
           {
             appliedRules: result.appliedRules,
           },
-          "Canonicalized span attributes"
+          "Canonicalized span attributes",
         );
 
         return result;
-      }
+      },
     );
 
     return {

@@ -83,7 +83,7 @@ export const coerceToStringArray = (v: unknown): string[] | null => {
 };
 
 export const extractSystemInstructionFromMessages = (
-  messages: unknown
+  messages: unknown,
 ): string | null => {
   if (!Array.isArray(messages) || messages.length === 0) {
     return null;
@@ -108,7 +108,7 @@ export const extractSystemInstructionFromMessages = (
       .map((p) =>
         isRecord(p) && typeof (p as Record<string, unknown>).text === "string"
           ? ((p as Record<string, unknown>).text as string)
-          : null
+          : null,
       )
       .filter((p): p is string => p !== null);
 
@@ -128,7 +128,7 @@ export const extractSystemInstructionFromMessages = (
  * Example: { id: "gpt-4", provider: "openai.chat" } → "openai/gpt-4"
  */
 export const normaliseModelFromAiModelObject = (
-  aiModel: unknown
+  aiModel: unknown,
 ): string | null => {
   if (!isRecord(aiModel)) return null;
 
@@ -227,7 +227,7 @@ export const unwrapWrappedMessages = (messages: unknown[]): unknown[] => {
  */
 export const normalizeToMessages = (
   raw: unknown,
-  defaultRole: "user" | "assistant" = "user"
+  defaultRole: "user" | "assistant" = "user",
 ): unknown[] | null => {
   if (typeof raw === "string") {
     return [{ role: defaultRole, content: raw }];
@@ -241,7 +241,7 @@ export const normalizeToMessages = (
     Array.isArray((raw as Record<string, unknown>).messages)
   ) {
     return unwrapWrappedMessages(
-      (raw as Record<string, unknown>).messages as unknown[]
+      (raw as Record<string, unknown>).messages as unknown[],
     );
   }
   // Fallback: wrap in message object
@@ -270,7 +270,7 @@ export type MessageSource =
 export const extractInputMessages = (
   ctx: ExtractorContext,
   sources: MessageSource[],
-  ruleId: string
+  ruleId: string,
 ): boolean => {
   if (ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
     return false;
@@ -285,12 +285,13 @@ export const extractInputMessages = (
           const decoded = decodeMessagesPayload(parsed);
           const msgs = normalizeToMessages(decoded, "user");
           if (msgs) {
-            const systemInstruction = extractSystemInstructionFromMessages(msgs);
+            const systemInstruction =
+              extractSystemInstructionFromMessages(msgs);
             ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, msgs);
             if (systemInstruction !== null) {
               ctx.setAttrIfAbsent(
                 ATTR_KEYS.GEN_AI_REQUEST_SYSTEM_INSTRUCTION,
-                systemInstruction
+                systemInstruction,
               );
             }
             ctx.recordRule(ruleId);
@@ -331,7 +332,7 @@ export const extractInputMessages = (
 export const extractOutputMessages = (
   ctx: ExtractorContext,
   sources: MessageSource[],
-  ruleId: string
+  ruleId: string,
 ): boolean => {
   if (ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_OUTPUT_MESSAGES)) {
     return false;
@@ -384,7 +385,7 @@ export const extractOutputMessages = (
 export const inferSpanTypeIfAbsent = (
   ctx: ExtractorContext,
   type: string,
-  ruleId: string
+  ruleId: string,
 ): void => {
   if (!ctx.bag.attrs.has(ATTR_KEYS.SPAN_TYPE) && ALLOWED_SPAN_TYPES.has(type)) {
     ctx.setAttr(ATTR_KEYS.SPAN_TYPE, type);
@@ -406,7 +407,7 @@ export const extractModelToBoth = (
   sourceKey: string,
   transform: (raw: unknown) => string | null = (raw) =>
     typeof raw === "string" ? raw : null,
-  ruleId: string
+  ruleId: string,
 ): boolean => {
   if (
     ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ||
@@ -451,7 +452,7 @@ export type UsageTokenSources =
 export const extractUsageTokens = (
   ctx: ExtractorContext,
   sources: UsageTokenSources,
-  ruleId: string
+  ruleId: string,
 ): void => {
   let inTok: number | null = null;
   let outTok: number | null = null;

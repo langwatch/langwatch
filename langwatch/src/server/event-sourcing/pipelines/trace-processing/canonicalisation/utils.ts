@@ -1,4 +1,7 @@
-import type { NormalizedAttrValue, NormalizedAttrScalar } from "../schemas/spans";
+import type {
+  NormalizedAttrValue,
+  NormalizedAttrScalar,
+} from "../schemas/spans";
 
 export const toAttrValue = (v: unknown): NormalizedAttrValue | null => {
   if (v === null || v === undefined) return null;

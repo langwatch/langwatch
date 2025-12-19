@@ -181,7 +181,7 @@ const logger = createLogger("langwatch:trace-processing:io-extraction-service");
  */
 export class TraceIOExtractionService {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.io-extraction"
+    "langwatch.trace-processing.io-extraction",
   );
 
   /**
@@ -215,7 +215,7 @@ export class TraceIOExtractionService {
             orderedSpanIds: orderedSpans.map((s) => s.spanId),
             orderedSpanNames: orderedSpans.map((s) => s.name),
           },
-          "Extracting first input - ordered spans"
+          "Extracting first input - ordered spans",
         );
 
         // Filter to spans with valid inputs
@@ -223,7 +223,7 @@ export class TraceIOExtractionService {
           if (shouldExcludeSpan(span)) {
             logger.debug(
               { spanId: span.spanId, spanType: getSpanType(span) },
-              "Excluding span from input extraction"
+              "Excluding span from input extraction",
             );
             return false;
           }
@@ -234,11 +234,15 @@ export class TraceIOExtractionService {
               spanId: span.spanId,
               spanName: span.name,
               hasInput,
-              hasGenAiInput: span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !== undefined,
-              hasLangwatchInput: span.spanAttributes[ATTR_KEYS.LANGWATCH_INPUT] !== undefined,
-              genAiInputValue: span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
+              hasGenAiInput:
+                span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] !==
+                undefined,
+              hasLangwatchInput:
+                span.spanAttributes[ATTR_KEYS.LANGWATCH_INPUT] !== undefined,
+              genAiInputValue:
+                span.spanAttributes[ATTR_KEYS.GEN_AI_INPUT_MESSAGES],
             },
-            "Checking span for input"
+            "Checking span for input",
           );
           return hasInput;
         });
@@ -248,7 +252,7 @@ export class TraceIOExtractionService {
             spansWithInputCount: spansWithInput.length,
             spansWithInputIds: spansWithInput.map((s) => s.spanId),
           },
-          "Spans with valid input"
+          "Spans with valid input",
         );
 
         const firstSpan = spansWithInput[0];
@@ -271,7 +275,7 @@ export class TraceIOExtractionService {
         });
 
         return input;
-      }
+      },
     );
   }
 
@@ -347,7 +351,7 @@ export class TraceIOExtractionService {
         });
 
         return output;
-      }
+      },
     );
   }
 
@@ -360,7 +364,7 @@ export class TraceIOExtractionService {
    */
   private extractRichIOFromSpan(
     span: NormalizedSpan,
-    type: "input" | "output"
+    type: "input" | "output",
   ): ExtractedIO | null {
     const attrs = span.spanAttributes;
 
@@ -373,7 +377,7 @@ export class TraceIOExtractionService {
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "gen_ai.input.messages" },
-            "Extracted input from GenAI messages"
+            "Extracted input from GenAI messages",
           );
           return { raw, text };
         }
@@ -390,7 +394,7 @@ export class TraceIOExtractionService {
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "langwatch.input" },
-            "Extracted input from LangWatch attribute"
+            "Extracted input from LangWatch attribute",
           );
           return { raw, text };
         }
@@ -404,7 +408,7 @@ export class TraceIOExtractionService {
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "gen_ai.output.messages" },
-            "Extracted output from GenAI messages"
+            "Extracted output from GenAI messages",
           );
           return { raw, text };
         }
@@ -421,7 +425,7 @@ export class TraceIOExtractionService {
         if (text) {
           logger.debug(
             { spanId: span.spanId, source: "langwatch.output" },
-            "Extracted output from LangWatch attribute"
+            "Extracted output from LangWatch attribute",
           );
           return { raw, text };
         }
@@ -437,7 +441,7 @@ export class TraceIOExtractionService {
   organizeSpansIntoTree(spans: NormalizedSpan[]): SpanTreeNode[] {
     // Sort by start time for chronological ordering
     const sorted = [...spans].sort(
-      (a, b) => a.startTimeUnixMs - b.startTimeUnixMs
+      (a, b) => a.startTimeUnixMs - b.startTimeUnixMs,
     );
 
     // Build node map
@@ -457,8 +461,7 @@ export class TraceIOExtractionService {
 
     // Extract root nodes
     const roots = Array.from(nodeMap.values()).filter(
-      (node) =>
-        !node.span.parentSpanId || !nodeMap.has(node.span.parentSpanId)
+      (node) => !node.span.parentSpanId || !nodeMap.has(node.span.parentSpanId),
     );
 
     return roots;
@@ -498,7 +501,7 @@ export class TraceIOExtractionService {
 
   private getHttpStatusFallback(tree: SpanTreeNode[]): string | null {
     const topSpan = this.flattenSpanTree(tree, "outside-in").find(
-      (span) => !span.parentSpanId
+      (span) => !span.parentSpanId,
     );
 
     if (topSpan) {

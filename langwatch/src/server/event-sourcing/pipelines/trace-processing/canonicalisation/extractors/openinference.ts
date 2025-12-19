@@ -26,7 +26,10 @@ export class OpenInferenceExtractor implements CanonicalAttributesExtractor {
     // Skip if explicit type is already set
     // ─────────────────────────────────────────────────────────────────────────
     const explicitType = ctx.bag.attrs.get(ATTR_KEYS.SPAN_TYPE);
-    if (typeof explicitType === "string" && ALLOWED_SPAN_TYPES.has(explicitType)) {
+    if (
+      typeof explicitType === "string" &&
+      ALLOWED_SPAN_TYPES.has(explicitType)
+    ) {
       return;
     }
 

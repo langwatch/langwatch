@@ -104,7 +104,7 @@ export const OpenAIMessage = z.object({
               }),
             ]),
           }),
-        ])
+        ]),
       ),
       z.null(),
     ])
@@ -125,7 +125,7 @@ export const OpenAIMessage = z.object({
           name: z.string(),
           arguments: z.string(),
         }),
-      })
+      }),
     )
     .optional(),
   tool_call_id: z.string().optional(),
@@ -239,7 +239,7 @@ export const CohereMessage = z.object({
       z.object({
         name: z.string(),
         parameters: z.record(z.unknown()),
-      })
+      }),
     )
     .optional(),
   tool_results: z
@@ -250,7 +250,7 @@ export const CohereMessage = z.object({
           parameters: z.record(z.unknown()),
         }),
         outputs: z.array(z.record(z.unknown())),
-      })
+      }),
     )
     .optional(),
 });
@@ -276,7 +276,7 @@ export const BedrockClaudeMessage = z.object({
             data: z.string(),
           }),
         }),
-      ])
+      ]),
     ),
   ]),
 });
@@ -354,8 +354,8 @@ const hasAnthropicContentBlocks = (msg: Record<string, unknown>): boolean => {
       "type" in block &&
       ANTHROPIC_BLOCK_TYPES.includes(
         (block as { type: string })
-          .type as (typeof ANTHROPIC_BLOCK_TYPES)[number]
-      )
+          .type as (typeof ANTHROPIC_BLOCK_TYPES)[number],
+      ),
   );
 };
 

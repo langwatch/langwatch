@@ -87,9 +87,7 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       expect(count).toBe(1);
       expect(mockClickHouseClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining(
-            "EventTimestamp <",
-          ),
+          query: expect.stringContaining("EventTimestamp <"),
           query_params: expect.objectContaining({
             beforeTimestamp: timestamp,
             beforeEventId: eventId,

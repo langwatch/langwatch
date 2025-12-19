@@ -57,7 +57,8 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Operation Name (derived from span type)
     // ─────────────────────────────────────────────────────────────────────────
     if (!attrs.has(ATTR_KEYS.GEN_AI_OPERATION_NAME)) {
-      const spanType = attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
+      const spanType =
+        attrs.get(ATTR_KEYS.SPAN_TYPE) ?? attrs.get(ATTR_KEYS.TYPE);
       const operationName = spanTypeToGenAiOperationName(spanType);
       if (operationName) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_OPERATION_NAME, operationName);
@@ -69,7 +70,11 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // Provider Name (from legacy gen_ai.system)
     // ─────────────────────────────────────────────────────────────────────────
     const system = attrs.take(ATTR_KEYS.GEN_AI_SYSTEM);
-    if (system !== undefined && typeof system === "string" && system.length > 0) {
+    if (
+      system !== undefined &&
+      typeof system === "string" &&
+      system.length > 0
+    ) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_PROVIDER_NAME, system);
       ctx.recordRule(`${this.id}:provider.name`);
     }
@@ -82,7 +87,11 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       attrs.take(ATTR_KEYS.GEN_AI_AGENT_NAME) ??
       attrs.take(ATTR_KEYS.GEN_AI_AGENT) ??
       attrs.take(ATTR_KEYS.AGENT_NAME);
-    if (agentName !== undefined && typeof agentName === "string" && agentName.length > 0) {
+    if (
+      agentName !== undefined &&
+      typeof agentName === "string" &&
+      agentName.length > 0
+    ) {
       ctx.setAttr(ATTR_KEYS.GEN_AI_AGENT_NAME, agentName);
       ctx.recordRule(`${this.id}:agent.name`);
     }
@@ -94,7 +103,7 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
       ctx,
       ATTR_KEYS.LLM_MODEL_NAME,
       (raw) => (typeof raw === "string" ? raw : null),
-      `${this.id}:model(llm.model_name)`
+      `${this.id}:model(llm.model_name)`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -107,8 +116,13 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     extractInputMessages(
       ctx,
-      [{ type: "attr", keys: [ATTR_KEYS.GEN_AI_PROMPT, ATTR_KEYS.LLM_INPUT_MESSAGES] }],
-      `${this.id}:input.messages`
+      [
+        {
+          type: "attr",
+          keys: [ATTR_KEYS.GEN_AI_PROMPT, ATTR_KEYS.LLM_INPUT_MESSAGES],
+        },
+      ],
+      `${this.id}:input.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -121,8 +135,13 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     // ─────────────────────────────────────────────────────────────────────────
     extractOutputMessages(
       ctx,
-      [{ type: "attr", keys: [ATTR_KEYS.GEN_AI_COMPLETION, ATTR_KEYS.LLM_OUTPUT_MESSAGES] }],
-      `${this.id}:output.messages`
+      [
+        {
+          type: "attr",
+          keys: [ATTR_KEYS.GEN_AI_COMPLETION, ATTR_KEYS.LLM_OUTPUT_MESSAGES],
+        },
+      ],
+      `${this.id}:output.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -133,17 +152,25 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
     extractUsageTokens(
       ctx,
       {
-        input: [ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS, ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS],
-        output: [ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS, ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS],
+        input: [
+          ATTR_KEYS.GEN_AI_USAGE_INPUT_TOKENS,
+          ATTR_KEYS.GEN_AI_USAGE_PROMPT_TOKENS,
+        ],
+        output: [
+          ATTR_KEYS.GEN_AI_USAGE_OUTPUT_TOKENS,
+          ATTR_KEYS.GEN_AI_USAGE_COMPLETION_TOKENS,
+        ],
       },
-      `${this.id}:usage`
+      `${this.id}:usage`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
     // Request Parameters (from legacy llm.invocation_parameters)
     // Extracts model parameters like temperature, max_tokens, etc.
     // ─────────────────────────────────────────────────────────────────────────
-    const invocationParams = safeJsonParse(attrs.take(ATTR_KEYS.LLM_INVOCATION_PARAMETERS));
+    const invocationParams = safeJsonParse(
+      attrs.take(ATTR_KEYS.LLM_INVOCATION_PARAMETERS),
+    );
     if (isRecord(invocationParams)) {
       const params = invocationParams as Record<string, unknown>;
 
@@ -165,7 +192,10 @@ export class GenAIExtractor implements CanonicalAttributesExtractor {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_TOP_P, topP);
       }
       if (frequencyPenalty !== null) {
-        ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY, frequencyPenalty);
+        ctx.setAttr(
+          ATTR_KEYS.GEN_AI_REQUEST_FREQUENCY_PENALTY,
+          frequencyPenalty,
+        );
       }
       if (presencePenalty !== null) {
         ctx.setAttr(ATTR_KEYS.GEN_AI_REQUEST_PRESENCE_PENALTY, presencePenalty);

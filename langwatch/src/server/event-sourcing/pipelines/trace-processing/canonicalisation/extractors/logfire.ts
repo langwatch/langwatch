@@ -16,7 +16,12 @@
  */
 
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { safeJsonParse, extractInputMessages, extractOutputMessages, inferSpanTypeIfAbsent } from "./_helpers";
+import {
+  safeJsonParse,
+  extractInputMessages,
+  extractOutputMessages,
+  inferSpanTypeIfAbsent,
+} from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 import type { NormalizedEvent } from "../../schemas/spans";
 
@@ -33,7 +38,7 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
     extractInputMessages(
       ctx,
       [{ type: "attr", keys: [ATTR_KEYS.RAW_INPUT] }],
-      `${this.id}:raw_input->gen_ai.input.messages`
+      `${this.id}:raw_input->gen_ai.input.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -48,7 +53,8 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
           name: "gen_ai.choice",
           extractor: (event: NormalizedEvent) => {
             const eventAttrs = event.attributes as Record<string, unknown>;
-            const message = eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
+            const message =
+              eventAttrs.message ?? eventAttrs.content ?? eventAttrs.text;
 
             if (message !== undefined) {
               return { role: "assistant", content: safeJsonParse(message) };
@@ -57,7 +63,7 @@ export class LogfireExtractor implements CanonicalAttributesExtractor {
           },
         },
       ],
-      `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`
+      `${this.id}:event(gen_ai.choice)->gen_ai.output.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────

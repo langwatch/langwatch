@@ -16,7 +16,11 @@
  */
 
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { ALLOWED_SPAN_TYPES, extractInputMessages, extractOutputMessages } from "./_helpers";
+import {
+  ALLOWED_SPAN_TYPES,
+  extractInputMessages,
+  extractOutputMessages,
+} from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 
 export class TraceloopExtractor implements CanonicalAttributesExtractor {
@@ -48,7 +52,7 @@ export class TraceloopExtractor implements CanonicalAttributesExtractor {
     extractInputMessages(
       ctx,
       [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_INPUT] }],
-      `${this.id}:entity.input->gen_ai.input.messages`
+      `${this.id}:entity.input->gen_ai.input.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -57,7 +61,7 @@ export class TraceloopExtractor implements CanonicalAttributesExtractor {
     extractOutputMessages(
       ctx,
       [{ type: "attr", keys: [ATTR_KEYS.TRACELOOP_ENTITY_OUTPUT] }],
-      `${this.id}:entity.output->gen_ai.output.messages`
+      `${this.id}:entity.output->gen_ai.output.messages`,
     );
   }
 }
