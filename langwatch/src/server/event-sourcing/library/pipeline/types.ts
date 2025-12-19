@@ -27,12 +27,8 @@ export interface CommandHandlerOptions<Payload = any> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
-  spanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
+  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
   lockTtlMs?: number;
-  /** Kill switch configuration for this command handler */
-  killSwitch?: KillSwitchOptions;
 }
 
 /**
@@ -63,10 +59,7 @@ export type NoCommands = never;
  */
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<
-    string,
-    Projection
-  >,
+  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
   RegisteredCommands extends RegisteredCommand = NoCommands,
 > {
   /** Pipeline metadata for introspection and tooling */

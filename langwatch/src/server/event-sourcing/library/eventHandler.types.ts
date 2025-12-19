@@ -11,7 +11,7 @@ import type { KillSwitchOptions } from "./pipeline/types";
  */
 export interface EventHandlerOptions<
   EventType extends Event = Event,
-  RegisteredHandlerNames extends string = string,
+  AvailableDependencies extends string = string,
 > {
   /**
    * Optional: Event types this handler is interested in.
@@ -38,10 +38,11 @@ export interface EventHandlerOptions<
     event: EventType,
   ) => Record<string, string | number | boolean>;
   /**
-   * Optional: List of handler names this handler depends on.
-   * Handlers will be executed in dependency order (dependencies first).
+   * Optional: List of handler and projection names this handler depends on.
+   * Handlers will be executed after all dependencies complete.
+   * Can depend on both event handlers and projections.
    */
-  dependsOn?: RegisteredHandlerNames[];
+  dependsOn?: AvailableDependencies[];
 
   /**
    * Optional: Whether to disable the handler.
@@ -61,7 +62,7 @@ export interface EventHandlerOptions<
  */
 export interface EventHandlerDefinition<
   EventType extends Event = Event,
-  RegisteredHandlerNames extends string = string,
+  AvailableDependencies extends string = string,
 > {
   /**
    * Unique name for this handler within the pipeline.
@@ -75,7 +76,7 @@ export interface EventHandlerDefinition<
   /**
    * Options for configuring the handler.
    */
-  options: EventHandlerOptions<EventType, RegisteredHandlerNames>;
+  options: EventHandlerOptions<EventType, AvailableDependencies>;
 }
 
 /**
