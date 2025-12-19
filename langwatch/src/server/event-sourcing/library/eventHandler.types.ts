@@ -4,6 +4,7 @@
 
 import type { EventHandler } from "./domain/handlers/eventHandler";
 import type { Event } from "./domain/types";
+import type { KillSwitchOptions } from "./pipeline/types";
 
 /**
  * Options for configuring an event handler.
@@ -46,6 +47,12 @@ export interface EventHandlerOptions<
    * Optional: Whether to disable the handler.
    */
   disabled?: boolean;
+
+  /**
+   * Kill switch configuration for this event handler.
+   * When the feature flag is true, the handler is disabled.
+   */
+  killSwitch?: KillSwitchOptions;
 }
 
 /**

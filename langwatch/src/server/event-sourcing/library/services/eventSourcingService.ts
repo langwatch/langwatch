@@ -64,6 +64,7 @@ export class EventSourcingService<
     EventType,
     ProjectionTypes
   >;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     pipelineName,
@@ -79,6 +80,7 @@ export class EventSourcingService<
     updateLockTtlMs = DEFAULT_UPDATE_LOCK_TTL_MS,
     handlerLockTtlMs = 30000,
     queueProcessorFactory,
+    featureFlagService,
   }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
     processorCheckpointStore?: ProcessorCheckpointStore;
   }) {
@@ -96,6 +98,7 @@ export class EventSourcingService<
     this.logger =
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
+    this.featureFlagService = featureFlagService;
 
     // Warn in production if distributed lock is not provided
     if (process.env.NODE_ENV === "production" && !distributedLock) {
@@ -153,6 +156,7 @@ export class EventSourcingService<
     this.queueManager = new QueueProcessorManager<EventType>({
       aggregateType,
       queueProcessorFactory,
+      featureFlagService: this.featureFlagService,
     });
 
     this.handlerDispatcher = new EventHandlerDispatcher<EventType>({
@@ -164,6 +168,7 @@ export class EventSourcingService<
       queueManager: this.queueManager,
       distributedLock,
       handlerLockTtlMs,
+      featureFlagService: this.featureFlagService,
     });
 
     this.projectionUpdater = new ProjectionUpdater<EventType, ProjectionTypes>({
@@ -177,6 +182,7 @@ export class EventSourcingService<
       validator,
       checkpointManager,
       queueManager: this.queueManager,
+      featureFlagService: this.featureFlagService,
     });
 
     // Initialize queue processors for event handlers if factory is provided

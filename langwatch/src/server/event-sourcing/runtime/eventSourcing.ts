@@ -1,17 +1,25 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event, EventStore, Projection, StaticPipelineDefinition } from "../library";
+import type {
+  Event,
+  EventStore,
+  Projection,
+  StaticPipelineDefinition,
+} from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
-import { DisabledPipeline } from "./disabledPipeline";
+import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
-import { PipelineBuilder } from "./pipeline";
+import { PipelineBuilder } from "./index";
 import { EventSourcingPipeline } from "./pipeline";
 import type {
   EventStoreReadContext,
   EventSourcedQueueProcessor,
 } from "../library";
-import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./pipeline/types";
+import type {
+  PipelineWithCommandHandlers,
+  RegisteredPipeline,
+} from "./pipeline/types";
 
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 
@@ -94,13 +102,12 @@ export class EventSourcing {
    * ```
    */
   registerPipeline<EventType extends Event>() {
-    const eventStore = this.getEventStore<EventType>();
-    if (!eventStore) {
-      throw new Error("Event store not available. Event sourcing may be disabled.");
+    if (!this.runtime.eventStore || !this.runtime.distributedLock) {
+      return new DisabledPipelineBuilder<EventType>();
     }
 
     return new PipelineBuilder<EventType>({
-      eventStore,
+      eventStore: this.runtime.eventStore as EventStore<EventType>,
       queueProcessorFactory: this.runtime.queueProcessorFactory,
       distributedLock: this.runtime.distributedLock,
       processorCheckpointStore: this.runtime.checkpointStore,
@@ -159,7 +166,11 @@ export class EventSourcing {
         >;
 
         // Return disabled pipeline if event sourcing is disabled
-        if (!this.runtime.isEnabled || !this.runtime.eventStore) {
+        if (
+          !this.runtime.isEnabled ||
+          !this.runtime.eventStore ||
+          !this.runtime.distributedLock
+        ) {
           this.runtime.logDisabledWarning({
             pipeline: definition.metadata.name,
           });
@@ -175,7 +186,10 @@ export class EventSourcing {
 
         // Instantiate handlers
         const projections = new Map();
-        for (const [name, { HandlerClass, options }] of definition.projections) {
+        for (const [
+          name,
+          { HandlerClass, options },
+        ] of definition.projections) {
           projections.set(name, {
             name,
             store: HandlerClass.store,
@@ -185,7 +199,10 @@ export class EventSourcing {
         }
 
         const eventHandlers = new Map();
-        for (const [name, { HandlerClass, options }] of definition.eventHandlers) {
+        for (const [
+          name,
+          { HandlerClass, options },
+        ] of definition.eventHandlers) {
           eventHandlers.set(name, {
             name,
             handler: new HandlerClass(),
@@ -215,8 +232,12 @@ export class EventSourcing {
           queueProcessorFactory: this.runtime.queueProcessorFactory,
           distributedLock: this.runtime.distributedLock,
           processorCheckpointStore: this.runtime.checkpointStore,
-          parentLinks: definition.parentLinks.length > 0 ? definition.parentLinks : undefined,
+          parentLinks:
+            definition.parentLinks.length > 0
+              ? definition.parentLinks
+              : undefined,
           metadata: definition.metadata,
+          featureFlagService: definition.featureFlagService,
         });
 
         // Create store events function for command handlers
@@ -263,7 +284,7 @@ export const eventSourcing = EventSourcing.getInstance();
 
 /**
  * Register the defined pipelines
-*/
+ */
 export const traceProcessingPipeline = eventSourcing.register(
   traceProcessingPipelineDefinition,
 );
