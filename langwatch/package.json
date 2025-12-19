@@ -7,6 +7,7 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
+    "tool:stressed-n-blessed": "NODE_ENV=development pnpm --filter @langwatch/stressed-n-blessed dev",
     "build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint",
     "lint": "pnpm exec biome check src/",
     "lint:fix": "pnpm exec biome check src/ --write",
