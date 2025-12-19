@@ -5,7 +5,7 @@ import {
   type ActionExecutionMessage,
   type ResultMessage,
   Role,
-  type TextMessage,
+  TextMessage,
 } from "@copilotkit/runtime-client-gql";
 import { useEffect } from "react";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
@@ -70,7 +70,7 @@ function CustomCopilotKitChatInner({
         {
           error,
         },
-        "Failed to convert scenario messages to CopilotKit messages",
+        "Failed to convert scenario messages to CopilotKit messages"
       );
     }
   }, [messages, setMessages]);
@@ -98,16 +98,32 @@ function CustomCopilotKitChatInner({
           </VStack>
         );
       }}
-      RenderActionExecutionMessage={({ message }) =>
-        !smallerView ? (
-          <ToolCallMessage message={message as ActionExecutionMessage} />
-        ) : null
-      }
-      RenderResultMessage={({ message }) =>
-        !smallerView ? (
-          <ToolResultMessage message={message as ResultMessage} />
-        ) : null
-      }
+      RenderActionExecutionMessage={({ message }) => {
+        const message_ = message as ActionExecutionMessage & {
+          traceId?: string;
+        };
+
+        return (
+          <VStack align="flex-start" gap={6}>
+            <ToolCallMessage message={message_} />
+            {!smallerView && message_.traceId && (
+              <TraceMessage traceId={message_.traceId} />
+            )}
+          </VStack>
+        );
+      }}
+      RenderResultMessage={({ message }) => {
+        const message_ = message as ResultMessage & { traceId?: string };
+
+        return (
+          <VStack align="flex-start" gap={6}>
+            <ToolResultMessage message={message_} />
+            {!smallerView && message_.traceId && (
+              <TraceMessage traceId={message_.traceId} />
+            )}
+          </VStack>
+        );
+      }}
       Input={hideInput ? () => <div></div> : undefined}
     />
   );
