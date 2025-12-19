@@ -5,6 +5,7 @@ import { prisma } from "~/server/db";
 import type { TraceDailyUsageRepository } from "./traceDailyUsageRepository";
 import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
+import { startOfDay, formatISO } from "date-fns";
 
 /**
  * Postgres implementation of TraceDailyUsageRepository.
@@ -14,17 +15,18 @@ export class TraceDailyUsageRepositoryPostgres
   implements TraceDailyUsageRepository
 {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-daily-usage-repository",
+    "langwatch.trace-processing.trace-daily-usage-repository"
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-daily-usage-repository",
+    "langwatch:trace-processing:trace-daily-usage-repository"
   );
 
   async ensureTraceCounted(
     tenantId: string,
     traceId: string,
-    date: Date,
+    date: Date
   ): Promise<boolean> {
+    const dateStartOfDay = formatISO(startOfDay(date));
     return await this.tracer.withActiveSpan(
       "TraceDailyUsageRepositoryPostgres.ensureTraceCounted",
       {
@@ -32,69 +34,69 @@ export class TraceDailyUsageRepositoryPostgres
         attributes: {
           "tenant.id": tenantId,
           "trace.id": traceId,
-          date: date.toISOString().split("T")[0],
+          date: dateStartOfDay,
         },
       },
       async (span) => {
         try {
-          // Single atomic transaction handles everything
           const result = await prisma.$transaction(async (tx) => {
-            // Try to insert the processed trace record
-            // This will fail with unique constraint if already exists
-            try {
-              await tx.projectDailyUsageProcessedAggregates.create({
-                data: {
-                  id: generate(
-                    KSUID_RESOURCES.PROJECT_USAGE_PROCESSED,
-                  ).toString(),
-                  projectId: tenantId,
-                  aggregateId: traceId,
-                  date,
-                },
-              });
-
-              // If we get here, this is the first time processing this trace
-              // Increment the daily count
-              await tx.projectDailyUsage.upsert({
-                where: {
-                  projectId_date: {
+            // Try to record that we've processed this (projectId, aggregateId, date).
+            // Use createMany + skipDuplicates so duplicates don't throw (keeps logs clean).
+            const inserted =
+              await tx.projectDailyUsageProcessedAggregates.createMany({
+                data: [
+                  {
+                    id: generate(
+                      KSUID_RESOURCES.PROJECT_USAGE_PROCESSED
+                    ).toString(),
                     projectId: tenantId,
-                    date,
+                    aggregateId: traceId,
+                    date: dateStartOfDay,
                   },
-                },
-                update: {
-                  traceCount: {
-                    increment: 1,
-                  },
-                  updatedAt: new Date(),
-                },
-                create: {
-                  id: generate(KSUID_RESOURCES.PROJECT_USAGE).toString(),
-                  projectId: tenantId,
-                  date,
-                  traceCount: 1,
-                },
+                ],
+                skipDuplicates: true,
               });
 
-              span.setAttributes({ "trace.counted": true });
-              return true;
-            } catch (error: any) {
-              if (error.code === "P2002") {
-                span.setAttributes({ "trace.already_counted": true });
-                return false;
-              }
-              throw error;
+            // If count is 0, the unique row already existed => trace already counted.
+            if (inserted.count === 0) {
+              span.setAttributes({ "trace.already_counted": true });
+              return false;
             }
+
+            // First time processing this trace for the day: increment the daily count.
+            await tx.projectDailyUsage.upsert({
+              where: {
+                projectId_date: {
+                  projectId: tenantId,
+                  date: dateStartOfDay,
+                },
+              },
+              update: {
+                traceCount: {
+                  increment: 1,
+                },
+                updatedAt: new Date(),
+              },
+              create: {
+                id: generate(KSUID_RESOURCES.PROJECT_USAGE).toString(),
+                projectId: tenantId,
+                date: dateStartOfDay,
+                traceCount: 1,
+              },
+            });
+
+            span.setAttributes({ "trace.counted": true });
+            return true;
           });
 
           this.logger.debug(
             {
               tenantId,
               traceId,
-              date: date.toISOString().split("T")[0],
+              date: dateStartOfDay,
               wasCounted: result,
             },
-            "Ensured trace counted for daily usage",
+            "Ensured trace counted for daily usage"
           );
 
           return result;
@@ -103,25 +105,27 @@ export class TraceDailyUsageRepositoryPostgres
             {
               tenantId,
               traceId,
-              date: date.toISOString().split("T")[0],
+              date: dateStartOfDay,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to ensure trace counted",
+            "Failed to ensure trace counted"
           );
           throw error;
         }
-      },
+      }
     );
   }
 
   async getUsage(tenantId: string, date: Date) {
+    const dateStartOfDay = formatISO(startOfDay(date));
+
     return await this.tracer.withActiveSpan(
       "TraceDailyUsageRepositoryPostgres.getUsage",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "tenant.id": tenantId,
-          date: date.toISOString().split("T")[0],
+          date: dateStartOfDay,
         },
       },
       async () => {
@@ -129,11 +133,11 @@ export class TraceDailyUsageRepositoryPostgres
           where: {
             projectId_date: {
               projectId: tenantId,
-              date,
+              date: dateStartOfDay,
             },
           },
         });
-      },
+      }
     );
   }
 }

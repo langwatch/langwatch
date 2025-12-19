@@ -36,7 +36,7 @@ export const traceProcessingPipelineDefinition =
     .withEventHandler("traceDailyUsage", TraceDailyUsageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
       delay: 5000,
-      disabled: !env.IS_SAAS && false,
+      disabled: !env.IS_SAAS,
     })
     .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
