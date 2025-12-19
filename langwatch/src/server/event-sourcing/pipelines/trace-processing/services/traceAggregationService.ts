@@ -379,8 +379,8 @@ export class TraceAggregationService {
         const tokenTiming = extractTokenTiming(spans);
 
         // IO extraction (using the service) - store rich JSON as string
-        const inputResult = traceIOExtractionService.extractFirstInputRich(spans);
-        const outputResult = traceIOExtractionService.extractLastOutputRich(spans);
+        const inputResult = traceIOExtractionService.extractFirstInput(spans);
+        const outputResult = traceIOExtractionService.extractLastOutput(spans);
         
         // Serialize the raw JSON to string for storage
         const computedInput = inputResult
