@@ -75,8 +75,6 @@ function CustomCopilotKitChatInner({
     }
   }, [messages, setMessages]);
 
-  console.log(messages);
-
   return (
     <CopilotChat
       RenderTextMessage={({ message, AssistantMessage, UserMessage }) => {
@@ -86,7 +84,7 @@ function CustomCopilotKitChatInner({
           <VStack
             align={message_.role === Role.Assistant ? "flex-start" : "flex-end"}
           >
-            {AssistantMessage && message_.role === Role.Assistant && (
+            {message_.role === Role.Assistant && (
               <Markdown className="markdown">{message_.content}</Markdown>
             )}
             {UserMessage && message_.role === Role.User && (
