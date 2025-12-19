@@ -8,23 +8,29 @@ import type { TraceDailyUsageRepository } from "./traceDailyUsageRepository";
  * In-memory implementation of TraceDailyUsageRepository for testing.
  * Maintains deduplication state in memory.
  */
-export class TraceDailyUsageRepositoryMemory implements TraceDailyUsageRepository {
+export class TraceDailyUsageRepositoryMemory
+  implements TraceDailyUsageRepository
+{
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-daily-usage-repository-memory"
+    "langwatch.trace-processing.trace-daily-usage-repository-memory",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-daily-usage-repository-memory"
+    "langwatch:trace-processing:trace-daily-usage-repository-memory",
   );
 
   private usageRecords = new Map<string, ProjectDailyUsage>();
   private processedTraces = new Set<string>();
 
   private getUsageKey(tenantId: string, date: Date): string {
-    return `${tenantId}:${date.toISOString().split('T')[0]}`;
+    return `${tenantId}:${date.toISOString().split("T")[0]}`;
   }
 
-  private getProcessedKey(tenantId: string, traceId: string, date: Date): string {
-    return `${tenantId}:${traceId}:${date.toISOString().split('T')[0]}`;
+  private getProcessedKey(
+    tenantId: string,
+    traceId: string,
+    date: Date,
+  ): string {
+    return `${tenantId}:${traceId}:${date.toISOString().split("T")[0]}`;
   }
 
   async ensureTraceCounted(
@@ -39,7 +45,7 @@ export class TraceDailyUsageRepositoryMemory implements TraceDailyUsageRepositor
         attributes: {
           "tenant.id": tenantId,
           "trace.id": traceId,
-          "date": date.toISOString().split('T')[0],
+          date: date.toISOString().split("T")[0],
         },
       },
       async (span) => {
@@ -73,7 +79,7 @@ export class TraceDailyUsageRepositoryMemory implements TraceDailyUsageRepositor
 
         span.setAttributes({ "trace.counted": true });
         return true;
-      }
+      },
     );
   }
 

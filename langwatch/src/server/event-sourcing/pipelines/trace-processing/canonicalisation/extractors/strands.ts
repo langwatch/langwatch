@@ -17,7 +17,11 @@
  */
 
 import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { safeJsonParse, extractOutputMessages, inferSpanTypeIfAbsent } from "./_helpers";
+import {
+  safeJsonParse,
+  extractOutputMessages,
+  inferSpanTypeIfAbsent,
+} from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
 import type { NormalizedEvent } from "../../schemas/spans";
 import { createLogger } from "../../../../../../utils/logger";
@@ -36,9 +40,9 @@ const ROLE_EVENT_NAMES = [
 ] as const satisfies readonly string[];
 
 const OPERATION_NAMES_SPAN_TYPE_MAP: Record<string, string> = {
-  "chat": "llm",
-  "execute_tool": "tool",
-  "invoke_agent": "agent",
+  chat: "llm",
+  execute_tool: "tool",
+  invoke_agent: "agent",
 };
 
 /**
@@ -48,7 +52,9 @@ const OPERATION_NAMES_SPAN_TYPE_MAP: Record<string, string> = {
  * - Array of content parts: [{ text: "..." }]
  * - Nested in gen_ai.content attribute
  */
-const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => {
+const extractStrandsContent = (
+  eventAttrs: Record<string, unknown>,
+): unknown => {
   // Try various content attribute names
   const contentCandidates = [
     eventAttrs.content,
@@ -60,22 +66,26 @@ const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => 
 
   for (const candidate of contentCandidates) {
     if (candidate === undefined || candidate === null) continue;
-    
+
     // Parse JSON string if needed
     const parsed = safeJsonParse(candidate);
-    
+
     // If it's a non-empty string, use it
     if (typeof parsed === "string" && parsed.trim().length > 0) {
       return parsed;
     }
-    
+
     // If it's a non-empty array, use it
     if (Array.isArray(parsed) && parsed.length > 0) {
       return parsed;
     }
-    
+
     // If it's an object with content, extract it
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
       const obj = parsed as Record<string, unknown>;
       if (obj.text && typeof obj.text === "string") {
         return obj.text;
@@ -85,7 +95,7 @@ const extractStrandsContent = (eventAttrs: Record<string, unknown>): unknown => 
       }
     }
   }
-  
+
   return undefined;
 };
 
@@ -141,8 +151,11 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
         for (const event of events) {
           // Infer role from event name (e.g., "gen_ai.user.message" → "user")
           const role = eventName.split(".")[1];
-          const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
-          
+          const eventAttrs = (event.attributes ?? {}) as Record<
+            string,
+            unknown
+          >;
+
           // Debug: log event attributes to understand the structure
           logger.debug(
             {
@@ -151,16 +164,20 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
               eventAttrs: JSON.stringify(eventAttrs),
               attrKeys: Object.keys(eventAttrs),
             },
-            "Processing Strands input event"
+            "Processing Strands input event",
           );
-          
+
           const content = extractStrandsContent(eventAttrs);
 
           if (content !== void 0) {
             inputMessages.push({ role, content });
             logger.debug(
-              { role, contentType: typeof content, contentPreview: JSON.stringify(content).slice(0, 100) },
-              "Extracted Strands input message"
+              {
+                role,
+                contentType: typeof content,
+                contentPreview: JSON.stringify(content).slice(0, 100),
+              },
+              "Extracted Strands input message",
             );
           }
         }
@@ -182,17 +199,20 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
           type: "event",
           name: "gen_ai.choice",
           extractor: (event: NormalizedEvent) => {
-            const eventAttrs = (event.attributes ?? {}) as Record<string, unknown>;
-            
+            const eventAttrs = (event.attributes ?? {}) as Record<
+              string,
+              unknown
+            >;
+
             // Debug: log event attributes
             logger.debug(
               {
                 eventAttrs: JSON.stringify(eventAttrs),
                 attrKeys: Object.keys(eventAttrs),
               },
-              "Processing Strands output event"
+              "Processing Strands output event",
             );
-            
+
             const content = extractStrandsContent(eventAttrs);
             const role = (eventAttrs.role as string | undefined) ?? "assistant";
 
@@ -207,7 +227,7 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
           },
         },
       ],
-      `${this.id}:gen_ai.choice->gen_ai.output.messages`
+      `${this.id}:gen_ai.choice->gen_ai.output.messages`,
     );
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -215,7 +235,8 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
     // Models may appear as attributes; just record that we matched
     // ─────────────────────────────────────────────────────────────────────────
     const model =
-      attrs.get(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ?? attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
+      attrs.get(ATTR_KEYS.GEN_AI_REQUEST_MODEL) ??
+      attrs.get(ATTR_KEYS.GEN_AI_RESPONSE_MODEL);
     if (typeof model === "string" && model.length > 0) {
       ctx.recordRule(`${this.id}:matched`);
     }

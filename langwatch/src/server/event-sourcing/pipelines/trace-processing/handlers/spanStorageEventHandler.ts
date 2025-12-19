@@ -25,10 +25,10 @@ export class SpanStorageEventHandler
   private readonly spanNormalizationPipelineService =
     new SpanNormalizationPipelineService();
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.span-storage-handler"
+    "langwatch.trace-processing.span-storage-handler",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:span-storage-handler"
+    "langwatch:trace-processing:span-storage-handler",
   );
 
   /**
@@ -47,7 +47,7 @@ export class SpanStorageEventHandler
           "event.type": event.type,
           "tenant.id": event.tenantId,
           "trace.id": TraceRequestUtils.normalizeOtlpId(
-            event.data.span.traceId
+            event.data.span.traceId,
           ),
           "span.id": TraceRequestUtils.normalizeOtlpId(event.data.span.spanId),
         },
@@ -73,7 +73,7 @@ export class SpanStorageEventHandler
             eventId: event.id,
             spanRecordId: normalizedSpan.id,
           },
-          "Writing span to stored_spans"
+          "Writing span to stored_spans",
         );
 
         try {
@@ -90,7 +90,7 @@ export class SpanStorageEventHandler
               spanId: normalizedSpan.spanId,
               spanRecordId: normalizedSpan.id,
             },
-            "Successfully wrote span to stored_spans"
+            "Successfully wrote span to stored_spans",
           );
         } catch (error) {
           span.addEvent("span.storage.error", {
@@ -105,11 +105,11 @@ export class SpanStorageEventHandler
               spanId: normalizedSpan.spanId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to write span to stored_spans"
+            "Failed to write span to stored_spans",
           );
           throw error;
         }
-      }
+      },
     );
   }
 
@@ -126,12 +126,13 @@ export class SpanStorageEventHandler
    * This shows the span data that would be stored by this handler.
    */
   getDisplayData(event: SpanReceivedEvent) {
-    const normalizedSpan = this.spanNormalizationPipelineService.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+    const normalizedSpan =
+      this.spanNormalizationPipelineService.normalizeSpanReceived(
+        event.tenantId,
+        event.data.span,
+        event.data.resource,
+        event.data.instrumentationScope,
+      );
 
     return normalizedSpan;
   }

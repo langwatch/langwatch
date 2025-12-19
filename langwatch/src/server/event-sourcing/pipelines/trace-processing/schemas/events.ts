@@ -1,4 +1,5 @@
-import { z } from "zod";1
+import { z } from "zod";
+1;
 import { EventSchema } from "../../../library/domain/types";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./constants";
@@ -40,7 +41,7 @@ export type SpanReceivedEvent = z.infer<typeof spanReceivedEventSchema>;
  * Type guard for SpanReceivedEvent.
  */
 export function isSpanReceivedEvent(
-  event: TraceProcessingEvent
+  event: TraceProcessingEvent,
 ): event is SpanReceivedEvent {
   return event.type === SPAN_RECEIVED_EVENT_TYPE;
 }

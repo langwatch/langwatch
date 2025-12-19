@@ -33,6 +33,7 @@ export const traceSummaryRepository: TraceSummaryRepository = clickHouseClient
   ? new TraceSummaryRepositoryClickHouse(clickHouseClient)
   : new TraceSummaryRepositoryMemory();
 
-export const traceDailyUsageRepository: TraceDailyUsageRepository = env.DATABASE_URL
-  ? new TraceDailyUsageRepositoryPostgres()
-  : new TraceDailyUsageRepositoryMemory();
+export const traceDailyUsageRepository: TraceDailyUsageRepository =
+  env.DATABASE_URL
+    ? new TraceDailyUsageRepositoryPostgres()
+    : new TraceDailyUsageRepositoryMemory();

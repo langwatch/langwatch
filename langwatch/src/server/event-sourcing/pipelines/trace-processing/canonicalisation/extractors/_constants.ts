@@ -124,10 +124,9 @@ export const ATTR_KEYS = {
 
   // Logfire attributes
   RAW_INPUT: "raw_input",
-  
+
   // Mastra attributes
   MASTRA_INPUT: "input",
   MASTRA_OUTPUT: "mastra.output",
   MASTRA_SPAN_TYPE: "mastra.span.type",
 } as const;
-

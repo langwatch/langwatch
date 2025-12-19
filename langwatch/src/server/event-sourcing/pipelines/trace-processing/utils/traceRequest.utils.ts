@@ -2,15 +2,15 @@ import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
-import type {
-  Fixed64,
-} from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
+import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import { TraceState } from "@opentelemetry/core";
-import { NormalizedSpanKind,NormalizedStatusCode,type NormalizedAttributes } from "../schemas/spans";
+import {
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+  type NormalizedAttributes,
+} from "../schemas/spans";
 import { match } from "ts-pattern";
-import type { OtlpAnyValue,
-OtlpKeyValue, 
-OtlpSpan} from "../schemas/otlp";
+import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
 
 const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8
@@ -52,7 +52,11 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
   if ("stringValue" in v && typeof v.stringValue === "string") {
     return v.stringValue;
   }
-  if ("arrayValue" in v && v.arrayValue && Array.isArray(v.arrayValue?.values)) {
+  if (
+    "arrayValue" in v &&
+    v.arrayValue &&
+    Array.isArray(v.arrayValue?.values)
+  ) {
     return JSON.stringify(v.arrayValue.values);
   }
   if ("bytesValue" in v && v.bytesValue) {
@@ -71,7 +75,12 @@ const scalar = (v: OtlpAnyValue): AttributeScalar | undefined => {
     if (typeof v.intValue === "string") {
       return parseInt(v.intValue, 10);
     }
-    if (typeof v.intValue === "object" && v.intValue !== null && "high" in v.intValue && "low" in v.intValue) {
+    if (
+      typeof v.intValue === "object" &&
+      v.intValue !== null &&
+      "high" in v.intValue &&
+      "low" in v.intValue
+    ) {
       const { high, low } = v.intValue;
 
       return Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
@@ -99,7 +108,7 @@ const normalizeOtlpId = (id: string | Uint8Array): string => {
 };
 
 const normalizeOtlpSpanIds = (
-  span: OtlpSpan
+  span: OtlpSpan,
 ): { traceId: string; spanId: string } => {
   const traceId = normalizeOtlpId(span.traceId);
   const spanId = normalizeOtlpId(span.spanId);
@@ -120,7 +129,9 @@ const normalizeOtlpUnixNano = (value: Fixed64): number => {
     const { high, low } = value;
 
     if (typeof high === "number" && typeof low === "number") {
-      const bigIntValue = Number((BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn));
+      const bigIntValue = Number(
+        (BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn),
+      );
 
       return bigIntValue;
     }
@@ -132,7 +143,7 @@ const normalizeOtlpUnixNano = (value: Fixed64): number => {
 const normalizeOtlpParentAndTraceContext = (
   parentOtlpSpanId: string | Uint8Array | null | undefined,
   traceState: string | null | undefined,
-  spanFlags: number | null | undefined
+  spanFlags: number | null | undefined,
 ): ParentContext => {
   const parsedTraceState = parseTraceState(traceState);
   const parentSpanId = parentOtlpSpanId
@@ -149,7 +160,9 @@ const normalizeOtlpParentAndTraceContext = (
   };
 };
 
-const normalizeOtlpSpanKind = (kind: ESpanKind | string): NormalizedSpanKind => {
+const normalizeOtlpSpanKind = (
+  kind: ESpanKind | string,
+): NormalizedSpanKind => {
   return match(kind)
     .with(ESpanKind.SPAN_KIND_UNSPECIFIED, () => NormalizedSpanKind.UNSPECIFIED)
     .with("SPAN_KIND_UNSPECIFIED", () => NormalizedSpanKind.UNSPECIFIED)
@@ -166,7 +179,9 @@ const normalizeOtlpSpanKind = (kind: ESpanKind | string): NormalizedSpanKind => 
     .otherwise(() => NormalizedSpanKind.UNSPECIFIED);
 };
 
-const normalizeOtlpStatusCode = (statusCode: EStatusCode | string | undefined | null): NormalizedStatusCode => {
+const normalizeOtlpStatusCode = (
+  statusCode: EStatusCode | string | undefined | null,
+): NormalizedStatusCode => {
   return match(statusCode)
     .with(0, () => NormalizedStatusCode.UNSET)
     .with("STATUS_CODE_UNSET", () => NormalizedStatusCode.UNSET)
@@ -175,11 +190,11 @@ const normalizeOtlpStatusCode = (statusCode: EStatusCode | string | undefined | 
     .with(2, () => NormalizedStatusCode.ERROR)
     .with("STATUS_CODE_ERROR", () => NormalizedStatusCode.ERROR)
     .otherwise(() => NormalizedStatusCode.UNSET);
-}
+};
 
 const normalizeOtlpAnyValue = (
   root: OtlpAnyValue,
-  rootKey?: string
+  rootKey?: string,
 ): FlattenResult => {
   const out: FlattenResult = {};
 
@@ -209,7 +224,9 @@ const normalizeOtlpAnyValue = (
       if (vs.every(isScalar)) {
         set(
           prefix,
-          vs.map((x) => scalar(x)!).filter((x): x is AttributeScalar => x !== void 0),
+          vs
+            .map((x) => scalar(x)!)
+            .filter((x): x is AttributeScalar => x !== void 0),
         );
         return;
       }
@@ -236,7 +253,7 @@ const normalizeOtlpAnyValue = (
 };
 
 const normalizeOtlpAttributeValue = (
-  v: AttributeValue
+  v: AttributeValue,
 ): Exclude<NormalizedAttributes[string], undefined> | undefined => {
   if (v instanceof Uint8Array) return Buffer.from(v).toString("hex");
 
@@ -277,7 +294,10 @@ const normalizeOtlpAttributeValue = (
 // Regex to match keys with numeric array indices: prefix.N.remainder
 const INDEXED_KEY_REGEX = /^(.+?)\.(\d+)\.(.+)$/;
 
-type ArrayPatternMap = Map<string, Map<number, Map<string, NormalizedAttributes[string]>>>;
+type ArrayPatternMap = Map<
+  string,
+  Map<number, Map<string, NormalizedAttributes[string]>>
+>;
 
 /**
  * Scans all keys to find potential flattened array patterns.
@@ -297,7 +317,7 @@ type ArrayPatternMap = Map<string, Map<number, Map<string, NormalizedAttributes[
  *   }
  */
 const detectArrayPatterns = (
-  attrs: NormalizedAttributes
+  attrs: NormalizedAttributes,
 ): { patterns: ArrayPatternMap; matchedKeys: Set<string> } => {
   const patterns: ArrayPatternMap = new Map();
   const matchedKeys = new Set<string>();
@@ -332,13 +352,13 @@ const detectArrayPatterns = (
  * 2. Same set of relative keys across all items
  */
 const isValidArrayPattern = (
-  indexMap: Map<number, Map<string, NormalizedAttributes[string]>>
+  indexMap: Map<number, Map<string, NormalizedAttributes[string]>>,
 ): boolean => {
   const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
-  
+
   // Must start at 0
   if (indices.length === 0 || indices[0] !== 0) return false;
-  
+
   // Must be consecutive
   for (let i = 0; i < indices.length; i++) {
     if (indices[i] !== i) return false;
@@ -347,7 +367,7 @@ const isValidArrayPattern = (
   // All items must have the same set of relative keys
   const keySignatures = new Set<string>();
   for (const [, relativeMap] of indexMap) {
-    const keys = Array.from(relativeMap.keys()).sort().join('\0');
+    const keys = Array.from(relativeMap.keys()).sort().join("\0");
     keySignatures.add(keys);
   }
 
@@ -365,7 +385,7 @@ const isValidArrayPattern = (
  *   { message: { content: "hello", role: "user" } }
  */
 const unflattenObject = (
-  flatMap: Map<string, NormalizedAttributes[string]>
+  flatMap: Map<string, NormalizedAttributes[string]>,
 ): Record<string, unknown> => {
   const result: Record<string, unknown> = {};
 
@@ -400,10 +420,10 @@ const unflattenObject = (
  *   "llm.input_messages" => '[{"message":{"content":"hello","role":"user"}},{"message":{"content":"hi"}}]'
  */
 const reconstructFlattenedArrays = (
-  attrs: NormalizedAttributes
+  attrs: NormalizedAttributes,
 ): NormalizedAttributes => {
   const { patterns, matchedKeys } = detectArrayPatterns(attrs);
-  
+
   // If no patterns found, return original
   if (patterns.size === 0) return attrs;
 
@@ -448,7 +468,9 @@ const reconstructFlattenedArrays = (
   return result;
 };
 
-const normalizeOtlpAttributes = (attributes: OtlpKeyValue[]): NormalizedAttributes => {
+const normalizeOtlpAttributes = (
+  attributes: OtlpKeyValue[],
+): NormalizedAttributes => {
   const normalizedAttributes: NormalizedAttributes = {};
 
   for (const attr of attributes ?? []) {
@@ -477,7 +499,9 @@ const convertUnixNanoToUnixMs = (unixNano: number): number => {
  * @param spanFlags - The span flags.
  * @returns The trace flags info.
  */
-const parseTraceFlags = (spanFlags: number | undefined | null): TraceFlagsInfo => {
+const parseTraceFlags = (
+  spanFlags: number | undefined | null,
+): TraceFlagsInfo => {
   if (spanFlags === void 0 || spanFlags === null) {
     return {
       sampled: null,
@@ -510,7 +534,7 @@ const parseTraceFlags = (spanFlags: number | undefined | null): TraceFlagsInfo =
  * @returns The trace state info.
  */
 const parseTraceState = (
-  traceState: string | null | undefined
+  traceState: string | null | undefined,
 ): TraceStateInfo => {
   if (traceState === void 0 || traceState === null) {
     return {

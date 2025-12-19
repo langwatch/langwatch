@@ -33,5 +33,8 @@ export interface SpanRepository {
    * @param traceId - The trace ID
    * @returns Array of all spans for the trace, empty array if none found
    */
-  getSpansByTraceId(tenantId: string, traceId: string): Promise<NormalizedSpan[]>;
+  getSpansByTraceId(
+    tenantId: string,
+    traceId: string,
+  ): Promise<NormalizedSpan[]>;
 }

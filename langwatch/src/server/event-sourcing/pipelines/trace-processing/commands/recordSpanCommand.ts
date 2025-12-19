@@ -8,11 +8,13 @@ import {
   EventUtils,
 } from "../../../library";
 import type { RecordSpanCommandData } from "../schemas/commands";
-import {
-  recordSpanCommandDataSchema,
-} from "../schemas/commands";
+import { recordSpanCommandDataSchema } from "../schemas/commands";
 import type { SpanReceivedEvent } from "../schemas/events";
-import { RECORD_SPAN_COMMAND_TYPE, SPAN_RECEIVED_EVENT_TYPE,SPAN_RECEIVED_EVENT_VERSION_LATEST } from "../schemas/constants";
+import {
+  RECORD_SPAN_COMMAND_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_VERSION_LATEST,
+} from "../schemas/constants";
 import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 /**
@@ -24,18 +26,18 @@ export class RecordSpanCommand
   static readonly schema = defineCommandSchema(
     RECORD_SPAN_COMMAND_TYPE,
     recordSpanCommandDataSchema,
-    "Command to record a span in the trace processing pipeline"
+    "Command to record a span in the trace processing pipeline",
   );
 
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.record-span"
+    "langwatch.trace-processing.record-span",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:record-span"
+    "langwatch:trace-processing:record-span",
   );
 
   async handle(
-    command: Command<RecordSpanCommandData>
+    command: Command<RecordSpanCommandData>,
   ): Promise<SpanReceivedEvent[]> {
     return await this.tracer.withActiveSpan(
       "RecordSpanCommand.handle",
@@ -51,7 +53,7 @@ export class RecordSpanCommand
         const { tenantId: tenantIdStr, data: commandData } = command;
         const tenantId = createTenantId(tenantIdStr);
         const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-          commandData.span
+          commandData.span,
         );
 
         this.logger.info(
@@ -60,7 +62,7 @@ export class RecordSpanCommand
             traceId,
             spanId,
           },
-          "Handling record span command"
+          "Handling record span command",
         );
 
         const spanReceivedEvent = EventUtils.createEvent<SpanReceivedEvent>(
@@ -74,7 +76,7 @@ export class RecordSpanCommand
             resource: commandData.resource,
             instrumentationScope: commandData.instrumentationScope,
           },
-          { traceId, spanId }
+          { traceId, spanId },
         );
 
         this.logger.debug(
@@ -84,11 +86,11 @@ export class RecordSpanCommand
             spanId,
             eventId: spanReceivedEvent.id,
           },
-          "Emitting SpanReceivedEvent"
+          "Emitting SpanReceivedEvent",
         );
 
         return [spanReceivedEvent];
-      }
+      },
     );
   }
 
@@ -97,10 +99,10 @@ export class RecordSpanCommand
   }
 
   static getSpanAttributes(
-    payload: RecordSpanCommandData
+    payload: RecordSpanCommandData,
   ): Record<string, string | number | boolean> {
     const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-      payload.span
+      payload.span,
     );
 
     return {
@@ -111,7 +113,7 @@ export class RecordSpanCommand
 
   static makeJobId(payload: RecordSpanCommandData): string {
     const { traceId, spanId } = TraceRequestUtils.normalizeOtlpSpanIds(
-      payload.span
+      payload.span,
     );
 
     return `${payload.tenantId}:${traceId}:${spanId}`;
