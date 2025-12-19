@@ -1,6 +1,7 @@
 import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { Event, Projection } from "./domain/types";
 import type { ProjectionStore } from "./stores/projectionStore.types";
+import type { KillSwitchOptions } from "./pipeline/types";
 
 /**
  * Configuration options for projection processing behavior.
@@ -33,6 +34,12 @@ export interface ProjectionOptions {
    * Default: undefined (no batching limit)
    */
   maxBatchSize?: number;
+
+  /**
+   * Kill switch configuration for this projection.
+   * When the feature flag is true, the projection is disabled.
+   */
+  killSwitch?: KillSwitchOptions;
 }
 
 /**

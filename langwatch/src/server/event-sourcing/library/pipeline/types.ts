@@ -6,6 +6,18 @@ import type { Event, ParentLink, Projection } from "../domain/types";
 import type { EventHandlerOptions } from "../eventHandler.types";
 import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { ProjectionOptions } from "../projection.types";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+
+/**
+ * Kill switch options for event sourcing components.
+ * When the feature flag is true, the component is disabled.
+ */
+export interface KillSwitchOptions {
+  /** Optional custom feature flag key override */
+  customKey?: string;
+  /** Default value if feature flag service unavailable */
+  defaultValue?: boolean;
+}
 
 /**
  * Options for configuring a command handler in a static pipeline definition.
@@ -15,8 +27,12 @@ export interface CommandHandlerOptions<Payload = any> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
-  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
+  spanAttributes?: (
+    payload: Payload,
+  ) => Record<string, string | number | boolean>;
   lockTtlMs?: number;
+  /** Kill switch configuration for this command handler */
+  killSwitch?: KillSwitchOptions;
 }
 
 /**
@@ -47,7 +63,10 @@ export type NoCommands = never;
  */
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
   RegisteredCommands extends RegisteredCommand = NoCommands,
 > {
   /** Pipeline metadata for introspection and tooling */
@@ -81,7 +100,9 @@ export interface StaticPipelineDefinition<
   /** Parent links for navigating to related aggregates */
   parentLinks: Array<ParentLink<EventType>>;
 
+  /** Feature flag service for kill switches */
+  featureFlagService?: FeatureFlagServiceInterface;
+
   /** Type-level marker for registered commands (not used at runtime) */
   readonly _registeredCommands?: RegisteredCommands;
 }
-

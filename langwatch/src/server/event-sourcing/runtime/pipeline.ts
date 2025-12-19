@@ -5,7 +5,7 @@ import type {
   EventSourcingPipelineDefinition,
   PipelineMetadata,
   RegisteredPipeline,
-} from "./pipeline";
+} from "./pipeline/types";
 
 const pipelineLogger = createLogger("langwatch:event-sourcing:pipeline");
 
@@ -96,6 +96,7 @@ export class EventSourcingPipeline<
         handlerLockTtlMs: definition.handlerLockTtlMs,
         updateLockTtlMs: definition.updateLockTtlMs,
         commandLockTtlMs: definition.commandLockTtlMs,
+        featureFlagService: definition.featureFlagService,
       }),
       writable: false,
       enumerable: true,

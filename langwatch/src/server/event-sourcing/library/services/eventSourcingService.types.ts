@@ -11,6 +11,7 @@ import type { EventSourcedQueueProcessor } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
 import type { DistributedLock } from "../utils/distributedLock";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Default time-to-live for distributed locks used during projection updates.
@@ -170,4 +171,9 @@ export interface EventSourcingServiceOptions<
       ) => Record<string, string | number | boolean>;
     }): EventSourcedQueueProcessor<Payload>;
   };
+  /**
+   * Optional feature flag service for kill switches.
+   * When provided, enables automatic feature flag-based kill switches for components.
+   */
+  featureFlagService?: FeatureFlagServiceInterface;
 }

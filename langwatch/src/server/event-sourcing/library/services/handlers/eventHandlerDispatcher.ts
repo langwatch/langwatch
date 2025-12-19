@@ -19,6 +19,7 @@ import {
 } from "../errorHandling";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
+import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 
 /**
  * Dispatches events to registered event handlers.
@@ -42,6 +43,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
   private readonly queueManager: QueueProcessorManager<EventType>;
   private readonly distributedLock: DistributedLock;
   private readonly handlerLockTtlMs: number;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     aggregateType,
@@ -52,6 +54,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     queueManager,
     distributedLock,
     handlerLockTtlMs = 30000,
+    featureFlagService,
   }: {
     aggregateType: AggregateType;
     eventHandlers?: Map<string, EventHandlerDefinition<EventType>>;
@@ -61,6 +64,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     queueManager: QueueProcessorManager<EventType>;
     distributedLock: DistributedLock;
     handlerLockTtlMs?: number;
+    featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.eventHandlers = eventHandlers;
@@ -81,6 +85,58 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     }
     this.distributedLock = distributedLock;
     this.handlerLockTtlMs = handlerLockTtlMs;
+    this.featureFlagService = featureFlagService;
+  }
+
+  /**
+   * Generates a feature flag key for a component.
+   * Pattern: es:{pipeline_name}:{component_type}:{component_name}:killswitch
+   */
+  private generateFeatureFlagKey(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+  ): string {
+    return `es:${this.aggregateType}:${componentType}:${componentName}:killswitch`;
+  }
+
+  /**
+   * Checks if a component is disabled via feature flag kill switch.
+   * Returns true if the component should be disabled.
+   */
+  private async isComponentDisabled(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+    tenantId: string,
+    customKey?: string,
+  ): Promise<boolean> {
+    if (!this.featureFlagService) {
+      return false; // No feature flag service, component is enabled
+    }
+
+    const flagKey =
+      customKey ?? this.generateFeatureFlagKey(componentType, componentName);
+
+    try {
+      const isDisabled = await this.featureFlagService.isEnabled(
+        flagKey,
+        tenantId,
+        false,
+      );
+      if (isDisabled) {
+        this.logger.info(
+          { componentName, componentType, tenantId, flagKey },
+          "Component disabled via feature flag kill switch",
+        );
+      }
+      return isDisabled;
+    } catch (error) {
+      // Log error but don't fail - default to enabled
+      this.logger.warn(
+        { componentName, componentType, tenantId, flagKey, error },
+        "Error checking feature flag, defaulting to enabled",
+      );
+      return false;
+    }
   }
 
   /**
@@ -189,6 +245,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               continue;
             }
 
+            // Check kill switch - if enabled, skip event handler processing
+            const isDisabled = await this.isComponentDisabled(
+              "eventHandler",
+              handlerName,
+              event.tenantId,
+              handlerDef.options.killSwitch?.customKey,
+            );
+            if (isDisabled) {
+              continue; // Skip this handler
+            }
+
             // Get event types this handler is interested in
             const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
 
@@ -275,6 +342,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             const handlerDef = this.eventHandlers?.get(handlerName);
             if (!handlerDef) {
               continue;
+            }
+
+            // Check kill switch - if enabled, skip event handler processing
+            const isDisabled = await this.isComponentDisabled(
+              "eventHandler",
+              handlerName,
+              event.tenantId,
+              handlerDef.options.killSwitch?.customKey,
+            );
+            if (isDisabled) {
+              continue; // Skip this handler
             }
 
             const handlerEventTypes = this.getHandlerEventTypes(handlerDef);

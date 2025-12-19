@@ -14,6 +14,7 @@ import type { EventSourcingService } from "../../library/services/eventSourcingS
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { EventStore } from "../../library/stores/eventStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.
@@ -107,6 +108,11 @@ export interface EventSourcingPipelineDefinition<
    * Used by tools like deja-view to navigate between related aggregates.
    */
   parentLinks?: ParentLink<EventType>[];
+  /**
+   * Optional feature flag service for kill switches.
+   * When provided, enables automatic feature flag-based kill switches for components.
+   */
+  featureFlagService?: FeatureFlagServiceInterface;
 }
 
 export interface RegisteredPipeline<

@@ -23,7 +23,8 @@ import {
 } from "./testHelpers";
 
 describe("EventSourcingService - Sequential Ordering Flows", () => {
-  const { aggregateType, tenantId, eventVersion, context } = createTestContext();
+  const { aggregateType, tenantId, eventVersion, context } =
+    createTestContext();
 
   beforeEach(() => {
     setupTestEnvironment();

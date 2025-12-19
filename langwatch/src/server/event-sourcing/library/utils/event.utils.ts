@@ -34,10 +34,10 @@ function generateEventId(
   timestamp: number,
   tenantId: string,
   aggregateId: string,
-  aggregateType: string
+  aggregateType: string,
 ): string {
   return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${generate(
-    "event"
+    "event",
   ).toString()}`;
 }
 
@@ -76,14 +76,14 @@ function createEvent<TEvent extends Event>(
   data: TEvent["data"],
   metadata?: TEvent["metadata"],
   timestamp?: number,
-  options?: CreateEventOptions
+  options?: CreateEventOptions,
 ): TEvent;
 
 // Implementation
 function createEvent<
   Payload = unknown,
   Metadata extends EventMetadataBase = EventMetadataBase,
-  TEventType extends EventType = EventType
+  TEventType extends EventType = EventType,
 >(
   aggregateType: AggregateType,
   aggregateId: string,
@@ -93,7 +93,7 @@ function createEvent<
   data: Payload,
   metadata?: Metadata,
   timestamp?: number,
-  options?: CreateEventOptions
+  options?: CreateEventOptions,
 ): Event<Payload, Metadata> {
   const eventTimestamp = timestamp ?? Date.now();
 
@@ -112,7 +112,7 @@ function createEvent<
       eventTimestamp,
       String(tenantId),
       aggregateId,
-      aggregateType
+      aggregateType,
     ),
     version,
     aggregateId,
@@ -148,7 +148,7 @@ function getCurrentTraceparentFromActiveSpan(): string | undefined {
  * @returns Enriched metadata with processingTraceparent, or original metadata if no active span
  */
 function buildEventMetadataWithCurrentProcessingTraceparent<
-  Metadata extends EventMetadataBase = EventMetadataBase
+  Metadata extends EventMetadataBase = EventMetadataBase,
 >(metadata?: Metadata): Metadata | undefined {
   if (metadata && typeof metadata.processingTraceparent === "string") {
     return metadata;
@@ -189,7 +189,7 @@ function createProjection<Data = unknown>(
   aggregateId: string,
   tenantId: TenantId,
   data: Data,
-  version: string
+  version: string,
 ): Projection<Data> {
   return {
     id,
@@ -219,7 +219,7 @@ function eventBelongsToAggregate(event: Event, aggregateId: string): boolean {
  * @returns New array of events sorted by timestamp
  */
 function sortEventsByTimestamp<EventType extends Event>(
-  events: readonly EventType[]
+  events: readonly EventType[],
 ): EventType[] {
   return [...events].sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -235,12 +235,12 @@ function sortEventsByTimestamp<EventType extends Event>(
  */
 function createEventStream<
   TTenantId = TenantId,
-  EventType extends Event = Event
+  EventType extends Event = Event,
 >(
   aggregateId: string,
   tenantId: TTenantId,
   events: readonly EventType[],
-  ordering: EventOrderingStrategy<EventType> = "timestamp"
+  ordering: EventOrderingStrategy<EventType> = "timestamp",
 ): EventStream<TTenantId, EventType> {
   return new EventStream(aggregateId, tenantId, events, { ordering });
 }
@@ -254,7 +254,7 @@ function createEventStream<
  */
 function filterEventsByType(
   events: readonly Event[],
-  eventType: string
+  eventType: string,
 ): Event[] {
   return events.filter((event) => event.type === eventType);
 }
@@ -266,12 +266,12 @@ function filterEventsByType(
  * @returns The latest projection, or null if the array is empty
  */
 function getLatestProjection<ProjectionType extends Projection>(
-  projections: readonly ProjectionType[]
+  projections: readonly ProjectionType[],
 ): ProjectionType | null {
   if (projections.length === 0) return null;
 
   return projections.reduce((latest, current) =>
-    current.version > latest.version ? current : latest
+    current.version > latest.version ? current : latest,
   );
 }
 
@@ -285,7 +285,7 @@ function getLatestProjection<ProjectionType extends Projection>(
  */
 function buildProjectionMetadata<EventType extends Event = Event>(
   stream: EventStream<EventType["tenantId"], EventType>,
-  computedAtUnixMs: number = Date.now()
+  computedAtUnixMs: number = Date.now(),
 ): ProjectionMetadata {
   const metadata = stream.getMetadata();
   return {
@@ -350,19 +350,19 @@ function isValidProjection(projection: unknown): projection is Projection {
  */
 function validateTenantId(
   context: { tenantId?: string } | undefined,
-  operation: string
+  operation: string,
 ): void {
   if (!context) {
     throw new SecurityError(
       operation,
-      `${operation} requires a context with tenantId for tenant isolation`
+      `${operation} requires a context with tenantId for tenant isolation`,
     );
   }
 
   if (!context.tenantId) {
     throw new SecurityError(
       operation,
-      `${operation} requires a tenantId for tenant isolation`
+      `${operation} requires a tenantId for tenant isolation`,
     );
   }
 
