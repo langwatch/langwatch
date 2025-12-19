@@ -65,7 +65,7 @@ const PROGRESSIVE_DELAY_CONFIG = {
  */
 const WORKER_CONFIG = {
   /** Default concurrency for job processing */
-  defaultConcurrency: 5,
+  defaultConcurrency: 30,
 } as const;
 
 /**
@@ -73,7 +73,7 @@ const WORKER_CONFIG = {
  */
 const SHUTDOWN_CONFIG = {
   /** Maximum time to wait for graceful shutdown in milliseconds */
-  timeoutMs: 30000,
+  timeoutMs: 20000,
 } as const;
 
 export class EventSourcedQueueProcessorBullMq<Payload>
