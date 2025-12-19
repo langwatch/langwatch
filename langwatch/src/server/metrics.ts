@@ -86,7 +86,8 @@ type JobType =
   | "evaluation"
   | "track_event"
   | "topic_clustering"
-  | "usage_stats";
+  | "usage_stats"
+  | "event_sourcing";
 
 type JobStatus = "processing" | "completed" | "failed";
 
