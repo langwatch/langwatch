@@ -36,6 +36,12 @@ export interface ProjectionOptions {
   maxBatchSize?: number;
 
   /**
+   * Optional: Custom job ID factory for idempotency.
+   * Default: event.id (ensures serial processing per event)
+   */
+  makeJobId?: (event: Event) => string;
+
+  /**
    * Kill switch configuration for this projection.
    * When the feature flag is true, the projection is disabled.
    */

@@ -15,6 +15,8 @@ import { ConfigurationError, ValidationError } from "../errorHandling";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { DistributedLock } from "../../utils/distributedLock";
 
+const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
+
 /**
  * Kill switch options for event sourcing components.
  * When the feature flag is true, the component is disabled.
@@ -34,7 +36,7 @@ interface HandlerConfig<Payload> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   spanAttributes?: (
-    payload: Payload,
+    payload: Payload
   ) => Record<string, string | number | boolean>;
   concurrency?: number;
   lockTtlMs?: number;
@@ -50,7 +52,7 @@ interface CommandHandlerOptions<Payload> {
   delay?: number;
   concurrency?: number;
   spanAttributes?: (
-    payload: Payload,
+    payload: Payload
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
 }
@@ -63,13 +65,13 @@ function extractHandlerConfig<Payload>(
   HandlerClass: {
     getAggregateId: (payload: Payload) => string;
     getSpanAttributes?: (
-      payload: Payload,
+      payload: Payload
     ) => Record<string, string | number | boolean>;
     makeJobId?: (payload: Payload) => string;
     delay?: number;
     concurrency?: number;
   },
-  options?: CommandHandlerOptions<Payload>,
+  options?: CommandHandlerOptions<Payload>
 ): HandlerConfig<Payload> {
   return {
     getAggregateId:
@@ -90,7 +92,7 @@ function extractHandlerConfig<Payload>(
 function generateFeatureFlagKey(
   aggregateType: AggregateType,
   componentType: "projection" | "eventHandler" | "command",
-  componentName: string,
+  componentName: string
 ): string {
   return `es-${aggregateType}-${componentType}-${componentName}-killswitch`;
 }
@@ -105,7 +107,7 @@ async function isComponentDisabled(
   componentType: "projection" | "eventHandler" | "command",
   componentName: string,
   tenantId: string,
-  customKey?: string,
+  customKey?: string
 ): Promise<boolean> {
   if (!featureFlagService) {
     return false; // No feature flag service, component is enabled
@@ -119,11 +121,11 @@ async function isComponentDisabled(
     const isDisabled = await featureFlagService.isEnabled(
       flagKey,
       tenantId,
-      false,
+      false
     );
     if (isDisabled) {
       console.log(
-        `[KILL_SWITCH] Component disabled via feature flag: ${componentType}:${componentName} for tenant ${tenantId}`,
+        `[KILL_SWITCH] Component disabled via feature flag: ${componentType}:${componentName} for tenant ${tenantId}`
       );
     }
     return isDisabled;
@@ -131,7 +133,7 @@ async function isComponentDisabled(
     // Log error but don't fail - default to enabled
     console.warn(
       `[KILL_SWITCH] Error checking feature flag for ${componentType}:${componentName}:`,
-      error,
+      error
     );
     return false;
   }
@@ -148,7 +150,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   queueName: string,
   storeEventsFn: (
     events: EventType[],
-    context: EventStoreReadContext<EventType>,
+    context: EventStoreReadContext<EventType>
   ) => Promise<void>,
   factory: QueueProcessorFactory,
   aggregateType: AggregateType,
@@ -156,7 +158,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   distributedLock?: DistributedLock,
   commandLockTtlMs: number = 30000,
   featureFlagService?: FeatureFlagServiceInterface,
-  killSwitchOptions?: KillSwitchOptions,
+  killSwitchOptions?: KillSwitchOptions
 ): EventSourcedQueueProcessor<Payload> {
   const processor = factory.create<Payload>({
     name: queueName,
@@ -172,7 +174,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType, validationError: validation.error },
+          { commandType, validationError: validation.error }
         );
       }
 
@@ -186,7 +188,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         "command",
         commandName,
         tenantId,
-        killSwitchOptions?.customKey,
+        killSwitchOptions?.customKey
       );
       if (isDisabled) {
         // Return early without processing
@@ -197,7 +199,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         tenantId,
         aggregateId,
         commandType,
-        payload,
+        payload
       );
 
       // Handler returns events
@@ -209,7 +211,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
           "events",
           void 0,
-          { commandType, payload },
+          { commandType, payload }
         );
       }
 
@@ -218,7 +220,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
           "events",
           events,
-          { commandType, payload },
+          { commandType, payload }
         );
       }
 
@@ -230,7 +232,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
             "events",
             events,
-            { commandType, payload, index: i },
+            { commandType, payload, index: i }
           );
         }
 
@@ -241,13 +243,15 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             parseResult.success === false
               ? `Validation errors: ${parseResult.error.issues
                   .map(
-                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
+                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`
                   )
                   .join(", ")}`
               : "Unknown validation error";
 
           throw new ValidationError(
-            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(event)}`,
+            `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(
+              event
+            )}`,
             "events",
             event,
             {
@@ -258,7 +262,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
                 parseResult.success === false
                   ? parseResult.error.issues
                   : void 0,
-            },
+            }
           );
         }
       }
@@ -274,12 +278,13 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   return {
     async send(payload: Payload): Promise<void> {
       // Validate payload synchronously before queuing
-      if (!commandSchema.validate(payload)) {
+      const validation = commandSchema.validate(payload);
+      if (!validation.success) {
         throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType },
+          { commandType }
         );
       }
       // If validation passes, queue the job
@@ -298,7 +303,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
 export class QueueProcessorManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
   private readonly logger = createLogger(
-    "langwatch:event-sourcing:queue-processor-manager",
+    "langwatch:event-sourcing:queue-processor-manager"
   );
   private readonly queueProcessorFactory?: QueueProcessorFactory;
   private readonly distributedLock?: DistributedLock;
@@ -360,8 +365,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     handleEventCallback: (
       handlerName: string,
       event: EventType,
-      context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
+      context: EventStoreReadContext<EventType>
+    ) => Promise<void>
   ): void {
     if (!this.queueProcessorFactory) {
       return;
@@ -402,7 +407,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Initializes queue processors for all registered projections.
    * Each projection gets its own queue processor for async processing.
    *
-   * **Serial Processing**: Uses event ID as job ID to prevent deduplication (all events are queued).
+   * **Job ID Strategy**: Uses custom makeJobId if provided in projection options,
+   * otherwise defaults to event ID to prevent deduplication (all events are queued).
    * The distributed lock in `updateProjectionByName` ensures serial processing per aggregate.
    * When lock acquisition fails, BullMQ will retry the job with backoff.
    *
@@ -414,19 +420,24 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     processProjectionEventCallback: (
       projectionName: string,
       event: EventType,
-      context: EventStoreReadContext<EventType>,
-    ) => Promise<void>,
+      context: EventStoreReadContext<EventType>
+    ) => Promise<void>
   ): void {
     if (!this.queueProcessorFactory) {
       return;
     }
 
     for (const [projectionName] of Object.entries(projections)) {
+      const projectionDef = projections[projectionName];
+      if (!projectionDef) {
+        continue;
+      }
+
       const queueName = `${this.aggregateType}/projection/${projectionName}`;
 
-      // Use event ID directly as job ID - event IDs are unique, preventing deduplication
+      // Use custom makeJobId if provided, otherwise default to event ID
       // Distributed lock ensures serial processing per aggregate
-      const makeProjectionJobId = (event: EventType): string => {
+      const makeProjectionJobId = projectionDef.options?.makeJobId ?? ((event: EventType): string => {
         this.logger.debug(
           {
             projectionName,
@@ -435,10 +446,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
             aggregateId: String(event.aggregateId),
             eventType: event.type,
           },
-          "Created projection job ID from event ID",
+          "Created projection job ID from event ID"
         );
         return event.id;
-      };
+      });
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
@@ -464,7 +475,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Gets the handler queue processor for a given handler name.
    */
   getHandlerQueueProcessor(
-    handlerName: string,
+    handlerName: string
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.handlerQueueProcessors.get(handlerName);
   }
@@ -473,7 +484,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Gets the projection queue processor for a given projection name.
    */
   getProjectionQueueProcessor(
-    projectionName: string,
+    projectionName: string
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.projectionQueueProcessors.get(projectionName);
   }
@@ -514,9 +525,9 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     }>,
     storeEventsFn: (
       events: EventType[],
-      context: EventStoreReadContext<EventType>,
+      context: EventStoreReadContext<EventType>
     ) => Promise<void>,
-    pipelineName: string,
+    pipelineName: string
   ): void {
     if (!this.queueProcessorFactory) {
       return;
@@ -537,7 +548,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         throw new ConfigurationError(
           "QueueProcessorManager",
           `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
-          { commandName },
+          { commandName }
         );
       }
 
@@ -561,7 +572,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         this.distributedLock,
         effectiveLockTtlMs,
         this.featureFlagService,
-        registration.options?.killSwitch,
+        registration.options?.killSwitch
       );
 
       this.commandQueueProcessors.set(commandName, dispatcher);
@@ -572,7 +583,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Gets the command queue processor for a given command name.
    */
   getCommandQueueProcessor<Payload>(
-    commandName: string,
+    commandName: string
   ): EventSourcedQueueProcessor<Payload> | undefined {
     return this.commandQueueProcessors.get(commandName) as
       | EventSourcedQueueProcessor<Payload>
@@ -599,7 +610,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.handlerQueueProcessors.entries()) {
       this.logger.debug(
         { handlerName },
-        "Closing queue processor for event handler",
+        "Closing queue processor for event handler"
       );
       closePromises.push(queueProcessor.close());
     }
@@ -610,7 +621,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.projectionQueueProcessors.entries()) {
       this.logger.debug(
         { projectionName },
-        "Closing queue processor for projection",
+        "Closing queue processor for projection"
       );
       closePromises.push(queueProcessor.close());
     }
@@ -621,7 +632,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.commandQueueProcessors.entries()) {
       this.logger.debug(
         { commandName },
-        "Closing queue processor for command handler",
+        "Closing queue processor for command handler"
       );
       closePromises.push(queueProcessor.close());
     }
@@ -634,7 +645,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         projectionCount: this.projectionQueueProcessors.size,
         commandCount: this.commandQueueProcessors.size,
       },
-      "All queue processors closed",
+      "All queue processors closed"
     );
   }
 }
