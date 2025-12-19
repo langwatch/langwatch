@@ -8,7 +8,6 @@ import { TraceSummaryProjectionHandler } from "./projections";
 import type { TraceProcessingEvent } from "./schemas/events";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./schemas/constants";
 import { env } from "~/env.mjs";
-import { featureFlagService } from "~/server/featureFlag";
 
 /**
  * Trace processing pipeline definition (static, no runtime dependencies).

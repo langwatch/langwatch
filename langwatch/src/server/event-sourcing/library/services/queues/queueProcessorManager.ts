@@ -85,14 +85,14 @@ function extractHandlerConfig<Payload>(
 
 /**
  * Generates a feature flag key for a component.
- * Pattern: es:{pipeline_name}:{component_type}:{component_name}:killswitch
+ * Pattern: es-{pipeline_name}-{component_type}-{component_name}-killswitch
  */
 function generateFeatureFlagKey(
   aggregateType: AggregateType,
   componentType: "projection" | "eventHandler" | "command",
   componentName: string,
 ): string {
-  return `es:${aggregateType}:${componentType}:${componentName}:killswitch`;
+  return `es-${aggregateType}-${componentType}-${componentName}-killswitch`;
 }
 
 /**
