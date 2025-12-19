@@ -129,12 +129,7 @@ export class TraceDailyUsageEventHandler
   /**
    * Returns enriched span data for debugging tools.
    */
-  getDisplayData(event: SpanReceivedEvent) {
-    return this.spanNormalizationPipelineService.normalizeSpanReceived(
-      event.tenantId,
-      event.data.span,
-      event.data.resource,
-      event.data.instrumentationScope,
-    );
+  getDisplayData(_event: SpanReceivedEvent) {
+    return "No viewable data";
   }
 }

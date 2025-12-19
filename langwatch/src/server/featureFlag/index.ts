@@ -1,4 +1,4 @@
 export { FeatureFlagService, featureFlagService } from "./featureFlag.service";
-export { PostHogFeatureFlagService } from "./posthogFeatureFlag.service";
-export { MemoryFeatureFlagService } from "./memoryFeatureFlag.service";
+export { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
+export { FeatureFlagServiceMemory } from "./featureFlagService.memory";
 export type { FeatureFlagServiceInterface } from "./types";

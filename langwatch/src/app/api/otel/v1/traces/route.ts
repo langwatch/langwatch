@@ -16,7 +16,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { prisma } from "../../../../../server/db";
-import { TraceRequestCollectionService } from "../../../../../server/event-sourcing/pipelines/trace-processing/services";
+import { TraceRequestCollectionService } from "../../../../../server/traces/trace-request-collection.service";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
 import { createLogger } from "../../../../../utils/logger";

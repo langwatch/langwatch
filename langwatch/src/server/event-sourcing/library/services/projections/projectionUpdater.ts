@@ -32,7 +32,7 @@ import {
 import type { UpdateProjectionOptions } from "../eventSourcingService.types";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
-import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag/types";
 
 /**
  * Manages projection updates for event sourcing.
@@ -116,13 +116,13 @@ export class ProjectionUpdater<
 
   /**
    * Generates a feature flag key for a component.
-   * Pattern: es:{pipeline_name}:{component_type}:{component_name}:killswitch
+   * Pattern: es-{pipeline_name}-{component_type}-{component_name}-killswitch
    */
   private generateFeatureFlagKey(
     componentType: "projection" | "eventHandler" | "command",
     componentName: string,
   ): string {
-    return `es:${this.aggregateType}:${componentType}:${componentName}:killswitch`;
+    return `es-${this.aggregateType}-${componentType}-${componentName}-killswitch`;
   }
 
   /**

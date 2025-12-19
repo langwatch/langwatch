@@ -90,13 +90,13 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
 
   /**
    * Generates a feature flag key for a component.
-   * Pattern: es:{pipeline_name}:{component_type}:{component_name}:killswitch
+   * Pattern: es-{pipeline_name}-{component_type}-{component_name}-killswitch
    */
   private generateFeatureFlagKey(
     componentType: "projection" | "eventHandler" | "command",
     componentName: string,
   ): string {
-    return `es:${this.aggregateType}:${componentType}:${componentName}:killswitch`;
+    return `es-${this.aggregateType}-${componentType}-${componentName}-killswitch`;
   }
 
   /**

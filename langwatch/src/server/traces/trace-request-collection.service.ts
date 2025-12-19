@@ -1,13 +1,13 @@
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { createLogger } from "../../../../../utils/logger";
+import { createLogger } from "../../utils/logger";
 import {
   instrumentationScopeSchema,
   resourceSchema,
   spanSchema,
-} from "../schemas/otlp";
-import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+} from "../event-sourcing/pipelines/trace-processing/schemas/otlp";
+import { traceProcessingPipeline } from "../event-sourcing/runtime/eventSourcing";
 
 /**
  * Service for collecting trace requests into the trace processing pipeline.

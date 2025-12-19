@@ -1,4 +1,3 @@
-import "server-only";
 import { getPostHogInstance } from "../posthog";
 import { createLogger } from "~/utils/logger";
 import { getLangWatchTracer } from "langwatch";

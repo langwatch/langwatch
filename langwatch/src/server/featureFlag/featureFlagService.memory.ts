@@ -1,4 +1,3 @@
-import "server-only";
 import { createLogger } from "~/utils/logger";
 import { getLangWatchTracer } from "langwatch";
 import type { FeatureFlagServiceInterface } from "./types";
