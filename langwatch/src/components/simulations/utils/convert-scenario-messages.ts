@@ -32,7 +32,18 @@ export function convertScenarioMessagesToCopilotKit(
     }
   });
 
-  return convertedMessages;
+  // We only want the last message with a given trace id to show it,
+  // So we reverse the array and then remove duplicates in order
+  // and then reverse it again.
+  const seenTraceIds = new Set<string>();
+  return convertedMessages.toReversed().map((message) => {
+    if (!message.traceId) return message;
+    if (seenTraceIds.has(message.traceId)) {
+      message.traceId = undefined;
+    }
+    seenTraceIds.add(message.traceId!);
+    return message;
+  }).toReversed();
 }
 
 /**
