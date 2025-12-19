@@ -1,37 +1,45 @@
-import { AlertCircle, Check, Clock, X } from "react-feather";
+import { Icon, type IconProps } from "@chakra-ui/react";
+import { Check, Clock, XCircle } from "lucide-react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 
-interface ScenarioRunStatusIconProps {
+interface ScenarioRunStatusIconProps extends Omit<IconProps, "as" | "color"> {
   status?: ScenarioRunStatus;
-  size?: number;
+  color?: string;
 }
 
 export function ScenarioRunStatusIcon({
   status,
-  size = 12,
+  color,
+  boxSize,
+  ...iconProps
 }: ScenarioRunStatusIconProps) {
-  if (status === ScenarioRunStatus.SUCCESS) {
-    return <Check size={size} color="green" />;
-  }
+  let IconComponent = Clock;
+  let defaultColor = "green.400";
+  let defaultBoxSize = "16px";
 
-  if (
+  if (status === ScenarioRunStatus.SUCCESS) {
+    IconComponent = Check;
+    defaultColor = "green.400";
+  } else if (
     status === ScenarioRunStatus.FAILED ||
     status === ScenarioRunStatus.ERROR
   ) {
-    return <X size={size} color="red" />;
-  }
-
-  if (status === ScenarioRunStatus.CANCELLED) {
-    return <AlertCircle size={size} color="gray" />;
-  }
-
-  if (
+    IconComponent = XCircle;
+    defaultColor = "red.400";
+  } else if (
     status === ScenarioRunStatus.IN_PROGRESS ||
     status === ScenarioRunStatus.PENDING
   ) {
-    return <Clock size={size} color={status === ScenarioRunStatus.IN_PROGRESS ? "orange" : "gray"} />;
+    IconComponent = Clock;
+    defaultColor = status === ScenarioRunStatus.IN_PROGRESS ? "orange.400" : "gray.400";
   }
 
-  // Default fallback for undefined or unknown status
-  return <Clock size={size} color="gray" />;
+  return (
+    <Icon
+      as={IconComponent}
+      color={color ?? defaultColor}
+      boxSize={boxSize ?? defaultBoxSize}
+      {...iconProps}
+    />
+  );
 }
