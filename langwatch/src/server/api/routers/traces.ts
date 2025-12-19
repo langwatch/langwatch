@@ -3,12 +3,15 @@ import type {
   SearchTotalHits,
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
+import { on } from "events";
 import { type PrismaClient, PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import { sseService } from "~/server/services/sse.service";
+import { createLogger } from "~/utils/logger";
 
 import {
   createTRPCRouter,
@@ -47,6 +50,8 @@ export const getAllForProjectInput = tracesFilterInput.extend({
   updatedAt: z.number().optional(),
   scrollId: z.string().optional().nullable(),
 });
+
+const logger = createLogger("langwatch:traces:sse-subscription");
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -527,6 +532,29 @@ export const tracesRouter = createTRPCRouter({
         includeSpans: input.includeSpans,
         scrollId: input.scrollId,
       });
+    }),
+
+  onTraceUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = sseService.getTenantEmitter(projectId);
+
+      logger.info({ projectId }, "SSE subscription started");
+
+      try {
+        for await (const eventArgs of on(emitter, "trace_updated", {
+          signal: opts.signal,
+        })) {
+          logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
+          yield eventArgs[0];
+        }
+        logger.info({ projectId }, "SSE subscription ended normally");
+      } finally {
+        logger.debug({ projectId }, "SSE subscription cleanup");
+        sseService.cleanupTenantEmitter(projectId);
+      }
     }),
 });
 

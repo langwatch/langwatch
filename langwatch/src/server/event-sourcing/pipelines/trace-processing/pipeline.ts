@@ -2,6 +2,7 @@ import { definePipeline } from "../../library";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import {
   SpanStorageEventHandler,
+  ObservabilityPushEventHandler,
   TraceDailyUsageEventHandler,
 } from "./handlers";
 import { TraceSummaryProjectionHandler } from "./projections";
@@ -36,6 +37,11 @@ export const traceProcessingPipelineDefinition =
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
       delay: 5000,
       disabled: !env.IS_SAAS && false,
+    })
+    .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
+      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+      // dependsOn: ["spanStorage", "traceSummary"],
+      // delay: 200,
     })
     .withCommand("recordSpan", RecordSpanCommand)
     .build();

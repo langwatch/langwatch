@@ -72,7 +72,12 @@ export class StaticPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
   RegisteredProjections extends ProjectionTypeMap = ProjectionTypeMap,
   RegisteredCommands extends RegisteredCommand = NoCommands,
+  RegisteredHandlers extends string = never,
 > {
+  // Combined type for all available dependencies (projections + event handlers)
+  private get availableDependencies(): (keyof RegisteredProjections) | RegisteredHandlers {
+    return {} as any; // Type-only, runtime not needed
+  }
   private projections = new Map<
     string,
     {
@@ -84,7 +89,7 @@ export class StaticPipelineBuilderWithNameAndType<
     string,
     {
       HandlerClass: EventHandlerClass<EventType>;
-      options?: EventHandlerOptions<EventType, any>;
+      options?: EventHandlerOptions<EventType, string>;
     }
   >();
   private commands: Array<{
@@ -132,7 +137,7 @@ export class StaticPipelineBuilderWithNameAndType<
 
     this.projections.set(name, { HandlerClass, options });
 
-    return this as unknown as StaticPipelineBuilderWithNameAndType<
+    return this as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections & {
         [K in ProjectionName]: ExtractProjectionHandlerProjection<HandlerClass>;
@@ -187,8 +192,13 @@ export class StaticPipelineBuilderWithNameAndType<
   >(
     name: HandlerName,
     HandlerClass: HandlerClass,
-    options?: EventHandlerOptions<EventType, any>,
-  ): this {
+    options?: EventHandlerOptions<EventType, string>,
+  ): StaticPipelineBuilderWithNameAndType<
+    EventType,
+    RegisteredProjections,
+    RegisteredCommands,
+    RegisteredHandlers | HandlerName
+  > {
     if (this.eventHandlers.has(name)) {
       throw new ConfigurationError(
         "StaticPipelineBuilder",
@@ -198,7 +208,12 @@ export class StaticPipelineBuilderWithNameAndType<
     }
 
     this.eventHandlers.set(name, { HandlerClass, options });
-    return this;
+    return this as StaticPipelineBuilderWithNameAndType<
+      EventType,
+      RegisteredProjections,
+      RegisteredCommands,
+      RegisteredHandlers | HandlerName
+    >;
   }
 
   /**
@@ -231,7 +246,7 @@ export class StaticPipelineBuilderWithNameAndType<
     }
 
     this.commands.push({ name, HandlerClass, options });
-    return this as unknown as StaticPipelineBuilderWithNameAndType<
+    return this as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections,
       | RegisteredCommands
