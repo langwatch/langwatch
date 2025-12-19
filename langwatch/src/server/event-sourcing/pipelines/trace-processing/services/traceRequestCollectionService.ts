@@ -72,10 +72,6 @@ export class TraceRequestCollectionService {
             );
           }
 
-          this.logger.info({
-            traceRequest,
-          }, "Processing OTLP resource span");
-
           // Iterate through scopeSpans → spans
           for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
             const scope = scopeSpan?.scope;
