@@ -9,6 +9,7 @@ import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -688,8 +689,8 @@ export const getAllTracesForProject = async ({
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 
-  // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
-  const groups = groupTraces(input.groupBy, traces as TraceWithGuardrail[]);
+  const tracesWithGuardrails = transformTracesWithGuardrails(traces);
+  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
 
   return {
     groups,
@@ -850,3 +851,18 @@ const sortTracesByTimestampDesc = (traces: Trace[]) => {
     return dateBValue - dateAValue; // Descending order for valid dates
   });
 };
+
+/**
+ * Transform traces to include guardrail information
+ */
+function transformTracesWithGuardrails(
+  traces: Trace[],
+): TraceWithGuardrail[] {
+  return traces.map((trace) => {
+    return {
+      ...trace,
+      lastGuardrail: void 0,
+      annotations: void 0,
+    };
+  });
+}
