@@ -27,6 +27,7 @@
     "typecheck:legacy": "./node_modules/.bin/tsc --noEmit --project ./tsconfig.json",
     "typecheck": "./node_modules/.bin/tsgo --noEmit --project ./tsconfig.tsgo.json",
     "test:unit": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest",
+    "test:ci": "pnpm run test:unit",
     "test:integration": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.integration.config.ts",
     "test:stress": "NODE_ENV=test PINO_LOG_LEVEL=warn vitest -c vitest.stress.config.ts",
     "task": " tsx --tsconfig tsconfig.workers.json src/task.ts",

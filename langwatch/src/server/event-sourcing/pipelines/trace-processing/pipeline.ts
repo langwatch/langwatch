@@ -29,6 +29,9 @@ export const traceProcessingPipelineDefinition =
       // This reduces strain of computationally heavy trace summary projections being done
       // unnecessarily due to the burst-heavy nature of span collection.
       debounceMs: 1500,
+      // Reduce the amount of unnecessary projection rebuilds by using a job ID that is
+      // unique to the trace, not the span.
+      makeJobId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
     })
     .withEventHandler("spanStorage", SpanStorageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],

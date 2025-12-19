@@ -318,6 +318,85 @@ describe("QueueProcessorManager", () => {
       const jobId = createCall?.makeJobId?.(event);
       expect(jobId).toBe(event.id);
     });
+
+    it("uses custom makeJobId function when provided", () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const customMakeJobId = vi.fn((event: Event) => `custom-${event.aggregateId}`);
+
+      const projections = {
+        projection1: createMockProjectionDefinition("projection1", undefined, {
+          makeJobId: customMakeJobId,
+        }),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
+      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
+      expect(createCall?.makeJobId).toBe(customMakeJobId);
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+      const jobId = createCall?.makeJobId?.(event);
+      expect(jobId).toBe(`custom-${TEST_CONSTANTS.AGGREGATE_ID}`);
+      expect(customMakeJobId).toHaveBeenCalledWith(event);
+    });
+
+    it("falls back to event ID when makeJobId is not provided", () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const projections = {
+        projection1: createMockProjectionDefinition("projection1", undefined, {}),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
+      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
+      expect(createCall?.makeJobId).toBeDefined();
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+      const jobId = createCall?.makeJobId?.(event);
+      expect(jobId).toBe(event.id);
+    });
   });
 
   describe("initializeCommandQueues", () => {
