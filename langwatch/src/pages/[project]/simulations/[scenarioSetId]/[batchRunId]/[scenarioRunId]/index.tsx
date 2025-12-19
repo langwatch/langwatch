@@ -1,11 +1,10 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { ArrowLeft, Check, Clock, X } from "react-feather";
-
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ArrowLeft, Clock } from "react-feather";
 import {
   CustomCopilotKitChat,
   PreviousRunsList,
+  ScenarioRunHeader,
   SimulationConsole,
   SimulationLayout,
 } from "~/components/simulations";
@@ -121,37 +120,11 @@ export default function IndividualScenarioRunPage() {
                     transition="width 0.2s"
                     overflow="hidden"
                   >
-                    {/* Header with Back Button and Title */}
-                    <Box
-                      p={5}
-                      borderBottom="1px"
-                      borderColor="gray.200"
-                      w="100%"
-                    >
-                      <HStack justify="space-between" align="center">
-                        <VStack gap={4}>
-                          <VStack align="space-between" gap={0}>
-                            <HStack>
-                              {scenarioState?.status ===
-                              ScenarioRunStatus.SUCCESS ? (
-                                <Check size={12} color="green" />
-                              ) : scenarioState?.status ===
-                                ScenarioRunStatus.FAILED ? (
-                                <X size={12} color="red" />
-                              ) : (
-                                <Clock size={12} color="orange" />
-                              )}
-                              <Text fontSize="lg" fontWeight="semibold">
-                                {scenarioState?.name}
-                              </Text>
-                            </HStack>
-                            <Text fontSize="sm" color="gray.500" ml={5}>
-                              Scenario ID: {scenarioId}
-                            </Text>
-                          </VStack>
-                        </VStack>
-                      </HStack>
-                    </Box>
+                    <ScenarioRunHeader
+                      status={scenarioState?.status}
+                      name={scenarioState?.name}
+                      scenarioId={scenarioId}
+                    />
                     {/* Conversation Area - Scrollable */}
                     <Box w="100%" p={4} overflow="auto" maxHeight="100%">
                       <VStack>
