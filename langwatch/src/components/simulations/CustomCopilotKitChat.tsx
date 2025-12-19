@@ -75,6 +75,8 @@ function CustomCopilotKitChatInner({
     }
   }, [messages, setMessages]);
 
+  console.log(messages);
+
   return (
     <CopilotChat
       RenderTextMessage={({ message, AssistantMessage, UserMessage }) => {
