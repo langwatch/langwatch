@@ -63,7 +63,7 @@ export const useAutosaveEvaluationsV3 = () => {
       errors: {},
     },
     pendingSavedChanges: {},
-    ui: { selectedRows: new Set() },
+    ui: { selectedRows: new Set(), columnWidths: {} },
   });
 
   const stringifiedState = JSON.stringify(persistedState);

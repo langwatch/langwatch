@@ -47,6 +47,9 @@ export function EditableCell({ value, row, columnId, datasetId }: EditableCellPr
     }
   }, [isEditing, value]);
 
+  // Track the calculated textarea height
+  const [textareaHeight, setTextareaHeight] = useState<number | undefined>(undefined);
+
   // Position editor and focus when editing starts
   useLayoutEffect(() => {
     if (isEditing && cellRef.current) {
@@ -54,12 +57,19 @@ export function EditableCell({ value, row, columnId, datasetId }: EditableCellPr
       const td = cellRef.current.closest("td");
       if (td) {
         const rect = td.getBoundingClientRect();
+        // Account for padding (2 * 8px = 16px from the -8 offset on each side)
+        // and the footer hint bar height (~28px)
+        const footerHeight = 28;
+        const padding = 16;
+        // Make textarea at least 80px, but expand to fit cell content
+        const calculatedHeight = Math.max(80, rect.height + padding - footerHeight);
+        setTextareaHeight(calculatedHeight);
         setEditorStyle({
           position: "fixed",
           top: rect.top - 8,
           left: rect.left - 8,
           width: Math.max(rect.width, 250),
-          minHeight: rect.height,
+          minHeight: rect.height + padding,
           zIndex: 1000,
         });
       }
@@ -142,7 +152,7 @@ export function EditableCell({ value, row, columnId, datasetId }: EditableCellPr
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={handleBlur}
-              minHeight="80px"
+              minHeight={textareaHeight ? `${textareaHeight}px` : "80px"}
               resize="vertical"
               border="none"
               borderRadius="0"
