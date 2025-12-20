@@ -207,6 +207,16 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
   const [isOverflowing, setIsOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  // Track hover state for showing resize bar on compact cells
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Track custom height when dragging the resize bar
+  const [customHeight, setCustomHeight] = useState<number | null>(null);
+  const currentHeightRef = useRef<number | null>(null); // Track current height during drag
+  const isDraggingRef = useRef(false);
+  const dragStartYRef = useRef(0);
+  const dragStartHeightRef = useRef(0);
+
   useLayoutEffect(() => {
     if (contentRef.current && rowHeightMode === "compact" && !isCellExpanded) {
       const isContentOverflowing = contentRef.current.scrollHeight > COMPACT_MAX_HEIGHT;
@@ -216,15 +226,97 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
     }
   }, [displayValue.text, rowHeightMode, isCellExpanded]);
 
+  // Reset custom height when cell is collapsed
+  useEffect(() => {
+    if (!isCellExpanded) {
+      setCustomHeight(null);
+    }
+  }, [isCellExpanded]);
+
   // Determine if we should show clamped view
   const showClamped = rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
+
+  // Calculate the effective max height for expanded cells with custom height
+  const expandedMaxHeight = customHeight !== null ? `${customHeight}px` : undefined;
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation(); // Don't trigger cell selection
-      toggleCellExpanded(row, columnId);
+      // Only collapse if not dragging
+      if (!isDraggingRef.current) {
+        toggleCellExpanded(row, columnId);
+      }
     },
     [toggleCellExpanded, row, columnId]
+  );
+
+  // Track if we started dragging from compact state and if we've expanded during drag
+  const startedFromCompactRef = useRef(false);
+  const expandedDuringDragRef = useRef(false);
+
+  // Drag handlers for the resize bar
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      isDraggingRef.current = false; // Will be set to true on first move
+      dragStartYRef.current = e.clientY;
+      startedFromCompactRef.current = !isCellExpanded;
+      expandedDuringDragRef.current = false;
+
+      // Set the starting height based on current state
+      if (!isCellExpanded) {
+        dragStartHeightRef.current = COMPACT_MAX_HEIGHT;
+      } else if (contentRef.current) {
+        dragStartHeightRef.current = customHeight ?? contentRef.current.scrollHeight;
+      }
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        const deltaY = moveEvent.clientY - dragStartYRef.current;
+
+        // Only consider it a drag if moved more than 3px
+        if (Math.abs(deltaY) > 3) {
+          isDraggingRef.current = true;
+        }
+
+        if (isDraggingRef.current) {
+          const newHeight = Math.max(COMPACT_MAX_HEIGHT, dragStartHeightRef.current + deltaY);
+          currentHeightRef.current = newHeight;
+          setCustomHeight(newHeight);
+
+          // If we started from compact and haven't expanded yet, expand the cell
+          if (startedFromCompactRef.current && !expandedDuringDragRef.current) {
+            expandedDuringDragRef.current = true;
+            toggleCellExpanded(row, columnId);
+          }
+        }
+      };
+
+      const handleMouseUp = () => {
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+
+        // If dragged to minimum height, collapse the cell
+        if (isDraggingRef.current && currentHeightRef.current !== null && currentHeightRef.current <= COMPACT_MAX_HEIGHT) {
+          // Collapse if we expanded during drag, or if we were already expanded
+          if (expandedDuringDragRef.current || !startedFromCompactRef.current) {
+            toggleCellExpanded(row, columnId);
+          }
+          setCustomHeight(null);
+          currentHeightRef.current = null;
+        }
+
+        // Small delay to allow click handler to check isDraggingRef
+        setTimeout(() => {
+          isDraggingRef.current = false;
+        }, 50);
+      };
+
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+    },
+    [isCellExpanded, toggleCellExpanded, row, columnId, customHeight]
   );
 
   return (
@@ -240,12 +332,20 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         opacity={isEditing ? 0 : 1}
         fontFamily={displayValue.isJson ? "mono" : undefined}
         position="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         {/* Content container with optional max-height */}
         <Box
           ref={contentRef}
-          maxHeight={showClamped ? `${COMPACT_MAX_HEIGHT}px` : undefined}
-          overflow={showClamped ? "hidden" : undefined}
+          maxHeight={
+            showClamped
+              ? `${COMPACT_MAX_HEIGHT}px`
+              : rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight
+                ? expandedMaxHeight
+                : undefined
+          }
+          overflow={showClamped || (rowHeightMode === "compact" && isCellExpanded && expandedMaxHeight) ? "hidden" : undefined}
         >
           {displayValue.text}
           {displayValue.truncated && (
@@ -270,6 +370,38 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
               background: "linear-gradient(to bottom, transparent, var(--cell-bg, white))",
             }}
           />
+        )}
+
+        {/* Resize/collapse bar - shows on expanded cells OR on hover for compact cells with overflow */}
+        {rowHeightMode === "compact" && (isCellExpanded || (isHovered && isOverflowing)) && (
+          <Box
+            position="absolute"
+            bottom={"-8px"}
+            left={"-12px"}
+            right={"-12px"}
+            height="20px"
+            cursor="ns-resize"
+            onMouseDown={handleDragStart}
+            onClick={handleExpandClick}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            opacity={0.5}
+            transition="opacity 0.15s"
+            _hover={{ opacity: 1 }}
+            css={{
+              background: "var(--cell-bg, white)",
+            }}
+          >
+            <Box
+              width="40px"
+              height="4px"
+              borderRadius="full"
+              bg="gray.300"
+              _hover={{ bg: "gray.400" }}
+              transition="background 0.15s"
+            />
+          </Box>
         )}
       </Box>
 
