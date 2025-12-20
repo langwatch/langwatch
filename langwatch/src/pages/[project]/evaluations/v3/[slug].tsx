@@ -9,8 +9,10 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { AgentConfigPanel } from "~/evaluations-v3/components/AgentSection/AgentConfigOverlay";
+import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
 import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
+import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
 
 /**
@@ -23,10 +25,11 @@ export default function EvaluationsV3Page() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, reset, setExperimentSlug } = useEvaluationsV3Store((state) => ({
+  const { name, reset, setExperimentSlug, autosaveStatus } = useEvaluationsV3Store((state) => ({
     name: state.name,
     reset: state.reset,
     setExperimentSlug: state.setExperimentSlug,
+    autosaveStatus: state.ui.autosaveStatus,
   }));
 
   // Set the experiment slug when the page loads
@@ -65,7 +68,16 @@ export default function EvaluationsV3Page() {
         <HStack paddingX={6} paddingY={3} flexShrink={0}>
           <Heading size="md">{name || "New Evaluation"}</Heading>
           <Spacer />
-          <RowHeightToggle />
+          <HStack gap={2}>
+            <AutosaveStatus
+              evaluationState={autosaveStatus.evaluation}
+              datasetState={autosaveStatus.dataset}
+              evaluationError={autosaveStatus.evaluationError}
+              datasetError={autosaveStatus.datasetError}
+            />
+            <UndoRedo />
+            <RowHeightToggle />
+          </HStack>
         </HStack>
 
         {/* Main content - table container with config panel */}

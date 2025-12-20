@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -21,6 +21,7 @@ export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const lastAutosaveRef = useRef(0);
+  const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     experimentId,
@@ -33,6 +34,7 @@ export const useAutosaveEvaluationsV3 = () => {
     setExperimentId,
     setExperimentSlug,
     setName,
+    setAutosaveStatus,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       experimentId: state.experimentId,
@@ -45,6 +47,7 @@ export const useAutosaveEvaluationsV3 = () => {
       setExperimentId: state.setExperimentId,
       setExperimentSlug: state.setExperimentSlug,
       setName: state.setName,
+      setAutosaveStatus: state.setAutosaveStatus,
     }))
   );
 
@@ -63,7 +66,14 @@ export const useAutosaveEvaluationsV3 = () => {
       errors: {},
     },
     pendingSavedChanges: {},
-    ui: { selectedRows: new Set(), columnWidths: {}, rowHeightMode: "compact", expandedCells: new Set(), hiddenColumns: new Set() },
+    ui: {
+      selectedRows: new Set(),
+      columnWidths: {},
+      rowHeightMode: "compact",
+      expandedCells: new Set(),
+      hiddenColumns: new Set(),
+      autosaveStatus: { evaluation: "idle", dataset: "idle" },
+    },
   });
 
   const stringifiedState = JSON.stringify(persistedState);
@@ -85,7 +95,7 @@ export const useAutosaveEvaluationsV3 = () => {
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
       void router.replace(
-        `/${project.slug}/evaluations-v3/${experimentSlug}`,
+        `/${project.slug}/evaluations/v3/${experimentSlug}`,
         undefined,
         { shallow: true }
       );
@@ -96,11 +106,30 @@ export const useAutosaveEvaluationsV3 = () => {
   // Load existing experiment data into store
   useEffect(() => {
     if (existingExperiment.data?.wizardState) {
-      const loadedState = existingExperiment.data.wizardState;
       // The store actions will be used to set the loaded state
       // This is handled by the parent component/page
     }
   }, [existingExperiment.data]);
+
+  // Clear the saved timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (savedTimeoutRef.current) {
+        clearTimeout(savedTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Transition to "saved" then back to "idle" after delay
+  const markSaved = useCallback(() => {
+    setAutosaveStatus("evaluation", "saved");
+    if (savedTimeoutRef.current) {
+      clearTimeout(savedTimeoutRef.current);
+    }
+    savedTimeoutRef.current = setTimeout(() => {
+      setAutosaveStatus("evaluation", "idle");
+    }, 2000);
+  }, [setAutosaveStatus]);
 
   // Autosave effect
   useEffect(() => {
@@ -117,6 +146,8 @@ export const useAutosaveEvaluationsV3 = () => {
       !!existingExperiment.data?.id ||
       stringifiedState !== stringifiedInitialState
     ) {
+      setAutosaveStatus("evaluation", "saving");
+
       void (async () => {
         try {
           const updatedExperiment = await saveExperiment.mutateAsync({
@@ -132,8 +163,10 @@ export const useAutosaveEvaluationsV3 = () => {
           if (updatedExperiment.name && updatedExperiment.name !== name) {
             setName(updatedExperiment.name);
           }
+          markSaved();
         } catch (error) {
           console.error("Failed to autosave evaluations v3:", error);
+          setAutosaveStatus("evaluation", "error", error instanceof Error ? error.message : "Unknown error");
           toaster.create({
             title: "Failed to autosave evaluation",
             type: "error",

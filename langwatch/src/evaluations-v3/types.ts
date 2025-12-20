@@ -152,6 +152,15 @@ export type CellPosition = {
 
 export type RowHeightMode = "compact" | "expanded";
 
+export type AutosaveState = "idle" | "saving" | "saved" | "error";
+
+export type AutosaveStatus = {
+  evaluation: AutosaveState;
+  dataset: AutosaveState;
+  evaluationError?: string;
+  datasetError?: string;
+};
+
 export type UIState = {
   openOverlay?: OverlayType;
   overlayTargetId?: string; // which agent is being configured
@@ -172,6 +181,8 @@ export type UIState = {
   expandedCells: Set<string>;
   // Hidden columns by name (not persisted to dataset, just UI state)
   hiddenColumns: Set<string>;
+  // Autosave status for evaluation state and dataset records
+  autosaveStatus: AutosaveStatus;
 };
 
 // ============================================================================
@@ -313,6 +324,11 @@ export type EvaluationsV3Actions = {
   toggleCellExpanded: (row: number, columnId: string) => void;
   toggleColumnVisibility: (columnName: string) => void;
   setHiddenColumns: (columnNames: Set<string>) => void;
+  setAutosaveStatus: (
+    type: "evaluation" | "dataset",
+    state: AutosaveState,
+    error?: string
+  ) => void;
 
   // Reset
   reset: () => void;
@@ -361,6 +377,10 @@ export const createInitialUIState = (): UIState => ({
   rowHeightMode: "compact",
   expandedCells: new Set(),
   hiddenColumns: new Set(),
+  autosaveStatus: {
+    evaluation: "idle",
+    dataset: "idle",
+  },
 });
 
 export const createInitialState = (): EvaluationsV3State => ({
