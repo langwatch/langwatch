@@ -776,6 +776,35 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setRowHeightMode: (mode) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        rowHeightMode: mode,
+        // Clear individually expanded cells when switching modes
+        expandedCells: new Set(),
+      },
+    }));
+  },
+
+  toggleCellExpanded: (row, columnId) => {
+    set((state) => {
+      const key = `${row}-${columnId}`;
+      const newExpandedCells = new Set(state.ui.expandedCells);
+      if (newExpandedCells.has(key)) {
+        newExpandedCells.delete(key);
+      } else {
+        newExpandedCells.add(key);
+      }
+      return {
+        ui: {
+          ...state.ui,
+          expandedCells: newExpandedCells,
+        },
+      };
+    });
+  },
+
   // -------------------------------------------------------------------------
   // Reset
   // -------------------------------------------------------------------------

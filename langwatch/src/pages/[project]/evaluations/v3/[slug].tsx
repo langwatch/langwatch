@@ -10,6 +10,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 import { AgentConfigPanel } from "~/evaluations-v3/components/AgentSection/AgentConfigOverlay";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
+import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
 
 /**
@@ -64,7 +65,7 @@ export default function EvaluationsV3Page() {
         <HStack paddingX={6} paddingY={3} flexShrink={0}>
           <Heading size="md">{name || "New Evaluation"}</Heading>
           <Spacer />
-          {/* Toolbar buttons will go here */}
+          <RowHeightToggle />
         </HStack>
 
         {/* Main content - table container with config panel */}
