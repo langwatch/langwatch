@@ -77,7 +77,7 @@ export default function EvaluationsV3Page() {
           borderTopLeftRadius="xl"
           borderLeft="1px solid"
           borderTop="1px solid"
-          borderColor="gray.200"
+          borderColor="gray.350"
           bg="white"
         >
           <Box
