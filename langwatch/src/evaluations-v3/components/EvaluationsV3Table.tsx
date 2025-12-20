@@ -5,26 +5,25 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
-  type Cell,
 } from "@tanstack/react-table";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Code } from "react-feather";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
-import { LLMIcon } from "~/components/icons/LLMIcon";
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { AgentConfig, DatasetColumn, DatasetReference, EvaluatorConfig } from "../types";
+import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
+import { convertInlineToRowRecords } from "../utils/datasetConversion";
+import type { DatasetColumn, DatasetReference, SavedRecord } from "../types";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
-import { EditableCell } from "./DatasetSection/EditableCell";
+import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
 import { AgentCellContent, AgentHeader } from "./AgentSection/AgentCell";
 import {
   ColumnTypeIcon,
   SelectionToolbar,
   SuperHeader,
-  type DatasetHandlers,
 } from "./TableUI";
 
 // ============================================================================
@@ -37,14 +36,13 @@ type RowData = {
   agents: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
 };
 
-type ColumnType = "checkbox" | "dataset" | "agent";
-
 // ============================================================================
 // Main Component
 // ============================================================================
 
 export function EvaluationsV3Table() {
   const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
 
   const {
     datasets,
@@ -85,6 +83,127 @@ export function EvaluationsV3Table() {
   // State for edit dataset panel
   const [showEditDatasetPanel, setShowEditDatasetPanel] = useState(false);
 
+  // State to track pending dataset loads
+  const [pendingDatasetLoad, setPendingDatasetLoad] = useState<{
+    datasetId: string;
+    name: string;
+    columnTypes: { name: string; type: DatasetColumnType }[];
+  } | null>(null);
+
+  // Query to load dataset records when adding a saved dataset
+  const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
+    {
+      projectId: project?.id ?? "",
+      datasetId: pendingDatasetLoad?.datasetId ?? "",
+    },
+    {
+      enabled: !!project?.id && !!pendingDatasetLoad,
+    }
+  );
+
+  // Mutation to update saved dataset records
+  const updateSavedRecord = api.datasetRecord.update.useMutation();
+
+  // Get pending changes from store for syncing
+  const { pendingSavedChanges, clearPendingChange } = useEvaluationsV3Store((state) => ({
+    pendingSavedChanges: state.pendingSavedChanges,
+    clearPendingChange: state.clearPendingChange,
+  }));
+
+  // Effect to sync pending changes to DB (debounced)
+  const pendingChangesRef = useRef(pendingSavedChanges);
+  pendingChangesRef.current = pendingSavedChanges;
+  const datasetsRef = useRef(datasets);
+  datasetsRef.current = datasets;
+
+  useEffect(() => {
+    if (!project?.id) return;
+
+    // Find datasets and records that need syncing
+    const datasetsToSync = Object.keys(pendingSavedChanges);
+    if (datasetsToSync.length === 0) return;
+
+    // Debounce sync to avoid too many requests
+    const timeoutId = setTimeout(() => {
+      for (const dbDatasetId of datasetsToSync) {
+        const recordChanges = pendingChangesRef.current[dbDatasetId];
+        if (!recordChanges) continue;
+
+        // Find the dataset in our state to get the full record data
+        const dataset = datasetsRef.current.find(
+          (d) => d.type === "saved" && d.datasetId === dbDatasetId
+        );
+        if (!dataset?.savedRecords) continue;
+
+        for (const [recordId, changes] of Object.entries(recordChanges)) {
+          if (!changes || Object.keys(changes).length === 0) continue;
+
+          // Find the full record to send all columns (backend replaces entire entry)
+          const fullRecord = dataset.savedRecords.find((r) => r.id === recordId);
+          if (!fullRecord) continue;
+
+          // Build the full record data (excluding the 'id' field which is metadata)
+          const { id: _id, ...recordData } = fullRecord;
+
+          // Sync this record to DB with full data
+          updateSavedRecord.mutate(
+            {
+              projectId: project.id,
+              datasetId: dbDatasetId,
+              recordId,
+              updatedRecord: recordData,
+            },
+            {
+              onSuccess: () => {
+                clearPendingChange(dbDatasetId, recordId);
+              },
+              onError: (error) => {
+                console.error("Failed to sync saved record:", error);
+              },
+            }
+          );
+        }
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [pendingSavedChanges, project?.id, updateSavedRecord, clearPendingChange]);
+
+  // Effect to handle when saved dataset records finish loading
+  useEffect(() => {
+    if (pendingDatasetLoad && savedDatasetRecords.data && !savedDatasetRecords.isLoading) {
+      const { datasetId, name, columnTypes } = pendingDatasetLoad;
+
+      // Build columns
+      const columns: DatasetColumn[] = columnTypes.map((col, index) => ({
+        id: `${col.name}_${index}`,
+        name: col.name,
+        type: col.type,
+      }));
+
+      // Transform records to SavedRecord format
+      const savedRecords: SavedRecord[] = (savedDatasetRecords.data?.datasetRecords ?? []).map((record: { id: string; entry: unknown }) => ({
+        id: record.id,
+        ...Object.fromEntries(
+          columnTypes.map((col) => [col.name, (record.entry as Record<string, unknown>)?.[col.name] ?? ""])
+        ),
+      }));
+
+      const newDataset: DatasetReference = {
+        id: `saved_${datasetId}`,
+        name,
+        type: "saved",
+        datasetId,
+        columns,
+        savedRecords,
+      };
+
+      addDataset(newDataset);
+      setActiveDataset(newDataset.id);
+      setPendingDatasetLoad(null);
+    }
+  }, [pendingDatasetLoad, savedDatasetRecords.data, savedDatasetRecords.isLoading, addDataset, setActiveDataset]);
+
   // Get the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
@@ -105,69 +224,38 @@ export function EvaluationsV3Table() {
       onSelectExisting: () => {
         openDrawer("selectDataset", {
           onSelect: (dataset: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
-            // Add the selected dataset to the workbench
-            const columns: DatasetColumn[] = dataset.columnTypes.map((col, index) => ({
-              id: `${col.name}_${index}`,
-              name: col.name,
-              type: col.type,
-            }));
-            const newDataset: DatasetReference = {
-              id: `saved_${dataset.datasetId}`,
-              name: dataset.name,
-              type: "saved",
+            // Trigger loading of saved dataset records
+            setPendingDatasetLoad({
               datasetId: dataset.datasetId,
-              columns,
-            };
-            addDataset(newDataset);
-            setActiveDataset(newDataset.id);
+              name: dataset.name,
+              columnTypes: dataset.columnTypes,
+            });
           },
         });
       },
       onUploadCSV: () => {
         openDrawer("uploadCSV", {
           onSuccess: (params: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
-            // Add the uploaded dataset to the workbench
-            const columns: DatasetColumn[] = params.columnTypes.map((col, index) => ({
-              id: `${col.name}_${index}`,
-              name: col.name,
-              type: col.type,
-            }));
-            const newDataset: DatasetReference = {
-              id: `saved_${params.datasetId}`,
-              name: params.name,
-              type: "saved",
+            // Trigger loading of uploaded dataset records
+            setPendingDatasetLoad({
               datasetId: params.datasetId,
-              columns,
-            };
-            addDataset(newDataset);
-            setActiveDataset(newDataset.id);
+              name: params.name,
+              columnTypes: params.columnTypes,
+            });
           },
         });
       },
       onEditDataset: () => {
+        // TODO: Implement edit dataset panel (translucent overlay like agent config)
         setShowEditDatasetPanel(true);
+        console.warn("Edit dataset panel not yet implemented");
       },
       onSaveAsDataset: (dataset: DatasetReference) => {
         if (dataset.type !== "inline" || !dataset.inline) return;
 
-        // Convert inline dataset to the format AddOrEditDatasetDrawer expects
+        // Convert inline dataset to row-based format, filtering empty rows
         const columns = dataset.inline.columns;
-        const records = dataset.inline.records;
-
-        // Convert column-based records to row-based records
-        const rowCount = Math.max(
-          ...Object.values(records).map((arr) => arr.length),
-          0
-        );
-        const datasetRecords: Array<{ id: string } & Record<string, string>> = [];
-
-        for (let i = 0; i < rowCount; i++) {
-          const row: { id: string } & Record<string, string> = { id: `row_${i}` };
-          for (const col of columns) {
-            row[col.name] = records[col.id]?.[i] ?? "";
-          }
-          datasetRecords.push(row);
-        }
+        const datasetRecords = convertInlineToRowRecords(columns, dataset.inline.records);
 
         setDatasetToSave({
           name: dataset.name,
@@ -188,7 +276,8 @@ export function EvaluationsV3Table() {
 
   const tableRef = useRef<HTMLTableElement>(null);
   const rowCount = getRowCount(activeDatasetId);
-  const displayRowCount = Math.max(rowCount, 3);
+  // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
+  const displayRowCount = Math.max(rowCount + 1, 3);
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
@@ -196,154 +285,32 @@ export function EvaluationsV3Table() {
   // Get columns from active dataset
   const datasetColumns = activeDataset?.columns ?? [];
 
-  // Build list of ALL navigable column IDs with their types
-  const allColumns = useMemo(() => {
-    const cols: Array<{ id: string; type: ColumnType }> = [];
-
-    // Checkbox column
-    cols.push({ id: "__checkbox__", type: "checkbox" });
-
-    // Dataset columns
-    for (const col of datasetColumns) {
-      cols.push({ id: col.id, type: "dataset" });
-    }
-
-    // Agent columns
-    for (const agent of agents) {
-      cols.push({ id: `agent.${agent.id}`, type: "agent" });
-    }
-
-    return cols;
-  }, [datasetColumns, agents]);
-
-  // Keyboard navigation handler
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't handle if we're editing a cell
-      if (ui.editingCell) return;
-
-      const selectedCell = ui.selectedCell;
-      if (!selectedCell) return;
-
-      const currentColIndex = allColumns.findIndex(
-        (c) => c.id === selectedCell.columnId
-      );
-      if (currentColIndex === -1) return;
-
-      const currentCol = allColumns[currentColIndex];
-
-      switch (e.key) {
-        case "Enter":
-        case " ":
-          e.preventDefault();
-          if (currentCol?.type === "checkbox") {
-            toggleRowSelection(selectedCell.row);
-          } else if (currentCol?.type === "dataset") {
-            setEditingCell({
-              row: selectedCell.row,
-              columnId: selectedCell.columnId,
-            });
-          }
-          break;
-
-        case "ArrowUp":
-          e.preventDefault();
-          if (selectedCell.row > 0) {
-            setSelectedCell({
-              row: selectedCell.row - 1,
-              columnId: selectedCell.columnId,
-            });
-          }
-          break;
-
-        case "ArrowDown":
-          e.preventDefault();
-          if (selectedCell.row < displayRowCount - 1) {
-            setSelectedCell({
-              row: selectedCell.row + 1,
-              columnId: selectedCell.columnId,
-            });
-          }
-          break;
-
-        case "ArrowLeft":
-          e.preventDefault();
-          if (currentColIndex > 0) {
-            setSelectedCell({
-              row: selectedCell.row,
-              columnId: allColumns[currentColIndex - 1]!.id,
-            });
-          }
-          break;
-
-        case "ArrowRight":
-          e.preventDefault();
-          if (currentColIndex < allColumns.length - 1) {
-            setSelectedCell({
-              row: selectedCell.row,
-              columnId: allColumns[currentColIndex + 1]!.id,
-            });
-          }
-          break;
-
-        case "Tab":
-          e.preventDefault();
-          if (e.shiftKey) {
-            if (currentColIndex > 0) {
-              setSelectedCell({
-                row: selectedCell.row,
-                columnId: allColumns[currentColIndex - 1]!.id,
-              });
-            } else if (selectedCell.row > 0) {
-              setSelectedCell({
-                row: selectedCell.row - 1,
-                columnId: allColumns[allColumns.length - 1]!.id,
-              });
-            }
-          } else {
-            if (currentColIndex < allColumns.length - 1) {
-              setSelectedCell({
-                row: selectedCell.row,
-                columnId: allColumns[currentColIndex + 1]!.id,
-              });
-            } else if (selectedCell.row < displayRowCount - 1) {
-              setSelectedCell({
-                row: selectedCell.row + 1,
-                columnId: allColumns[0]!.id,
-              });
-            }
-          }
-          break;
-
-        case "Escape":
-          e.preventDefault();
-          setSelectedCell(undefined);
-          break;
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [
-    ui.editingCell,
-    ui.selectedCell,
-    allColumns,
+  // Keyboard navigation hook - handles arrow keys, Tab, Enter, Escape
+  useTableKeyboardNavigation({
+    datasetColumns,
+    agents,
     displayRowCount,
+    editingCell: ui.editingCell,
+    selectedCell: ui.selectedCell,
     setSelectedCell,
     setEditingCell,
     toggleRowSelection,
-  ]);
+  });
 
-  // Build row data from active dataset records
+  // Get getCellValue from store
+  const { getCellValue } = useEvaluationsV3Store((state) => ({
+    getCellValue: state.getCellValue,
+  }));
+
+  // Build row data from active dataset records (works for both inline and saved)
+  // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): RowData[] => {
-    const inlineData = activeDataset?.inline;
-
     return Array.from({ length: displayRowCount }, (_, index) => ({
       rowIndex: index,
       dataset: Object.fromEntries(
         datasetColumns.map((col) => [
           col.id,
-          inlineData?.records[col.id]?.[index] ?? "",
+          getCellValue(activeDatasetId, index, col.id),
         ])
       ),
       agents: Object.fromEntries(
@@ -361,7 +328,8 @@ export function EvaluationsV3Table() {
         ])
       ),
     }));
-  }, [activeDataset, datasetColumns, agents, results, displayRowCount]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
+  }, [activeDatasetId, activeDataset, datasetColumns, agents, results, displayRowCount, getCellValue]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -486,89 +454,6 @@ export function EvaluationsV3Table() {
   const datasetColSpan = 1 + datasetColumns.length;
   const agentsColSpan = Math.max(agents.length, 1);
 
-  // Helper to render cell with selection support
-  const renderCell = useCallback(
-    (cell: Cell<RowData, unknown>, rowIndex: number) => {
-      const meta = cell.column.columnDef.meta as
-        | { columnType: ColumnType; columnId: string }
-        | undefined;
-
-      if (!meta) {
-        return (
-          <td key={cell.id}>
-            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-          </td>
-        );
-      }
-
-      const isSelected =
-        ui.selectedCell?.row === rowIndex &&
-        ui.selectedCell?.columnId === meta.columnId;
-
-      const handleSelect = () => {
-        setSelectedCell({ row: rowIndex, columnId: meta.columnId });
-      };
-
-      const handleActivate = () => {
-        if (meta.columnType === "dataset") {
-          setSelectedCell({ row: rowIndex, columnId: meta.columnId });
-          setEditingCell({ row: rowIndex, columnId: meta.columnId });
-        } else if (meta.columnType === "checkbox") {
-          toggleRowSelection(rowIndex);
-        }
-      };
-
-      // For dataset cells, use the EditableCell component
-      if (meta.columnType === "dataset") {
-        return (
-          <td
-            key={cell.id}
-            onClick={handleSelect}
-            onDoubleClick={handleActivate}
-            style={{
-              outline: isSelected
-                ? "2px solid var(--chakra-colors-blue-500)"
-                : "none",
-              outlineOffset: "-1px",
-              position: isSelected ? "relative" : undefined,
-              zIndex: isSelected ? 5 : undefined,
-              userSelect: "none",
-            }}
-          >
-            <EditableCell
-              value={(cell.getValue() as string) ?? ""}
-              row={rowIndex}
-              columnId={meta.columnId}
-              datasetId={activeDatasetId}
-            />
-          </td>
-        );
-      }
-
-      // For other cells
-      return (
-        <td
-          key={cell.id}
-          onClick={handleSelect}
-          onDoubleClick={handleActivate}
-          style={{
-            outline: isSelected
-              ? "2px solid var(--chakra-colors-blue-500)"
-              : "none",
-            outlineOffset: "-1px",
-            position: isSelected ? "relative" : undefined,
-            zIndex: isSelected ? 5 : undefined,
-            userSelect: "none",
-            verticalAlign: "top",
-          }}
-        >
-          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-        </td>
-      );
-    },
-    [ui.selectedCell, activeDatasetId, setSelectedCell, setEditingCell, toggleRowSelection]
-  );
-
   return (
     <Box
       width="full"
@@ -643,7 +528,14 @@ export function EvaluationsV3Table() {
         <tbody>
           {table.getRowModel().rows.map((row) => (
             <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => renderCell(cell, row.index))}
+              {row.getVisibleCells().map((cell) => (
+                <TableCell
+                  key={cell.id}
+                  cell={cell}
+                  rowIndex={row.index}
+                  activeDatasetId={activeDatasetId}
+                />
+              ))}
               {agents.length === 0 && <td />}
             </tr>
           ))}

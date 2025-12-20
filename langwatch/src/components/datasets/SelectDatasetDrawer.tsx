@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   HStack,
   Input,
   Spinner,
@@ -41,7 +42,8 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect = props.onSelect ?? (complexProps.onSelect as SelectDatasetDrawerProps["onSelect"]);
-  const isOpen = props.open ?? true;
+  // Note: props.open can be a string (drawer name) from CurrentDrawer, convert to boolean
+  const isOpen = props.open !== false && props.open !== undefined;
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -86,17 +88,17 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
             </Text>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={4} align="stretch">
-            <Text color="gray.600" fontSize="sm">
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
+            <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an existing dataset to use for this evaluation.
             </Text>
 
-            {/* Search input */}
-            <Box position="relative">
+            {/* Search input - fixed at top */}
+            <Box position="relative" paddingX={6}>
               <Box
                 position="absolute"
-                left={3}
+                left={9}
                 top="50%"
                 transform="translateY(-50%)"
                 color="gray.400"
@@ -112,8 +114,15 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
               />
             </Box>
 
-            {/* Dataset list */}
-            <VStack gap={2} align="stretch" maxHeight="60vh" overflowY="auto">
+            {/* Dataset list - scrollable */}
+            <VStack
+              gap={2}
+              align="stretch"
+              flex={1}
+              overflowY="auto"
+              paddingX={6}
+              paddingBottom={4}
+            >
               {datasetsQuery.isLoading ? (
                 <HStack justify="center" paddingY={8}>
                   <Spinner size="md" />
@@ -138,6 +147,11 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
             </VStack>
           </VStack>
         </Drawer.Body>
+        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+        </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );

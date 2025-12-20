@@ -3,6 +3,7 @@ import {
   Button,
   HStack,
   IconButton,
+  Spacer,
   Text,
 } from "@chakra-ui/react";
 import { nanoid } from "nanoid";
@@ -13,9 +14,10 @@ import {
   Download,
   Edit2,
   Plus,
+  Settings2,
   Trash2,
   Upload,
-} from "react-feather";
+} from "lucide-react";
 
 import { Menu } from "~/components/ui/menu";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -96,14 +98,10 @@ export function DatasetTabs({
   };
 
   return (
-    <HStack gap={2} flexWrap="wrap" alignItems="center">
-      {/* Datasets label */}
-      <HStack gap={1} color="gray.600">
-        <Database size={14} />
-        <Text fontSize="sm" fontWeight="semibold">
-          Datasets
-        </Text>
-      </HStack>
+    <HStack gap={2} flexWrap="nowrap" alignItems="center" overflow="auto" width="full">
+      <Text fontWeight="semibold" fontSize="sm" color="gray.700" paddingRight={2}>
+        Datasets
+      </Text>
 
       {/* Dataset tabs */}
       {datasets.map((dataset) => (
@@ -134,7 +132,7 @@ export function DatasetTabs({
         <Menu.Content minWidth="200px">
           <Menu.Item value="select" onClick={onSelectExisting}>
             <HStack gap={2}>
-              <Database size={14} color="var(--chakra-colors-blue-500)" />
+              <Database size={14} />
               <Text>Select existing dataset</Text>
             </HStack>
           </Menu.Item>
@@ -153,6 +151,8 @@ export function DatasetTabs({
         </Menu.Content>
       </Menu.Root>
 
+      <Spacer />
+
       {/* Edit current dataset button */}
       <IconButton
         aria-label="Edit dataset columns"
@@ -162,7 +162,7 @@ export function DatasetTabs({
         _hover={{ color: "gray.700", bg: "gray.100" }}
         onClick={onEditDataset}
       >
-        <Edit2 size={14} />
+        <Settings2 size={14} />
       </IconButton>
     </HStack>
   );
@@ -260,7 +260,6 @@ function DatasetTab({
           <Menu.Item
             value="remove"
             onClick={onRemove}
-            color="red.500"
           >
             <HStack gap={2}>
               <Trash2 size={14} />

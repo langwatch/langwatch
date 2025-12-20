@@ -59,6 +59,7 @@ export const Drawer = {
   Content: DrawerContent,
   Header: DrawerHeader,
   Body: DrawerBody,
+  Footer: DrawerFooter,
   Backdrop: DrawerBackdrop,
   Description: DrawerDescription,
   Title: DrawerTitle,

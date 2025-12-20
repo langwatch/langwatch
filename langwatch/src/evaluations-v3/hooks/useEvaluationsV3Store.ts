@@ -154,37 +154,44 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   setCellValue: (datasetId, row, columnId, value) => {
-    set((state) => {
-      const dataset = state.datasets.find((d) => d.id === datasetId);
-      if (!dataset || dataset.type !== "inline" || !dataset.inline) {
-        return state;
-      }
+    const dataset = get().datasets.find((d) => d.id === datasetId);
+    if (!dataset) return;
 
-      const records = { ...dataset.inline.records };
-      const columnValues = [...(records[columnId] ?? [])];
+    // For saved datasets, use updateSavedRecordValue
+    if (dataset.type === "saved") {
+      get().updateSavedRecordValue(datasetId, row, columnId, value);
+      return;
+    }
 
-      // Ensure array is long enough
-      while (columnValues.length <= row) {
-        columnValues.push("");
-      }
+    // For inline datasets, update local records
+    if (dataset.type === "inline" && dataset.inline) {
+      set((state) => {
+        const records = { ...(state.datasets.find((d) => d.id === datasetId)?.inline?.records ?? {}) };
+        const columnValues = [...(records[columnId] ?? [])];
 
-      columnValues[row] = value;
-      records[columnId] = columnValues;
+        // Ensure array is long enough
+        while (columnValues.length <= row) {
+          columnValues.push("");
+        }
 
-      return {
-        datasets: state.datasets.map((d) =>
-          d.id === datasetId
-            ? {
-                ...d,
-                inline: {
-                  ...d.inline!,
-                  records,
-                },
-              }
-            : d
-        ),
-      };
-    });
+        columnValues[row] = value;
+        records[columnId] = columnValues;
+
+        return {
+          datasets: state.datasets.map((d) =>
+            d.id === datasetId
+              ? {
+                  ...d,
+                  inline: {
+                    ...d.inline!,
+                    records,
+                  },
+                }
+              : d
+          ),
+        };
+      });
+    }
   },
 
   addColumn: (datasetId, column) => {
@@ -304,12 +311,161 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   getRowCount: (datasetId) => {
     const state = get();
     const dataset = state.datasets.find((d) => d.id === datasetId);
-    if (!dataset || dataset.type !== "inline" || !dataset.inline) {
-      return 0;
+    if (!dataset) return 0;
+
+    // Handle inline datasets
+    if (dataset.type === "inline" && dataset.inline) {
+      const columnValues = Object.values(dataset.inline.records);
+      if (columnValues.length === 0) return 0;
+      return Math.max(...columnValues.map((v) => v.length));
     }
-    const columnValues = Object.values(dataset.inline.records);
-    if (columnValues.length === 0) return 0;
-    return Math.max(...columnValues.map((v) => v.length));
+
+    // Handle saved datasets with cached records
+    if (dataset.type === "saved" && dataset.savedRecords) {
+      return dataset.savedRecords.length;
+    }
+
+    return 0;
+  },
+
+  getCellValue: (datasetId, row, columnId) => {
+    const state = get();
+    const dataset = state.datasets.find((d) => d.id === datasetId);
+    if (!dataset) return "";
+
+    // Handle inline datasets
+    if (dataset.type === "inline" && dataset.inline) {
+      return dataset.inline.records[columnId]?.[row] ?? "";
+    }
+
+    // Handle saved datasets with cached records
+    if (dataset.type === "saved" && dataset.savedRecords) {
+      const record = dataset.savedRecords[row];
+      if (!record) return "";
+      // Use column name to get value (savedRecords use column names, not IDs)
+      const column = dataset.columns.find((c) => c.id === columnId);
+      if (!column) return "";
+      const value = record[column.name];
+      return typeof value === "string" ? value : String(value ?? "");
+    }
+
+    return "";
+  },
+
+  updateSavedRecordValue: (datasetId, rowIndex, columnId, value) => {
+    set((state) => {
+      const dataset = state.datasets.find((d) => d.id === datasetId);
+      if (!dataset || dataset.type !== "saved" || !dataset.datasetId) {
+        return state;
+      }
+
+      // Get column name from column id
+      const column = dataset.columns.find((c) => c.id === columnId);
+      if (!column) return state;
+
+      const existingRecords = dataset.savedRecords ?? [];
+      const record = existingRecords[rowIndex];
+
+      // If record doesn't exist, create a new one
+      if (!record) {
+        // Generate a temporary ID for the new record (will be replaced when synced to DB)
+        const newRecordId = `new_${Date.now()}_${rowIndex}`;
+        const newRecord = {
+          id: newRecordId,
+          // Initialize all columns with empty values
+          ...Object.fromEntries(dataset.columns.map((c) => [c.name, ""])),
+          [column.name]: value,
+        };
+
+        const updatedRecords = [...existingRecords];
+        // Ensure array is long enough
+        while (updatedRecords.length < rowIndex) {
+          updatedRecords.push({
+            id: `new_${Date.now()}_${updatedRecords.length}`,
+            ...Object.fromEntries(dataset.columns.map((c) => [c.name, ""])),
+          });
+        }
+        updatedRecords[rowIndex] = newRecord;
+
+        // Track as pending new record for DB sync
+        const pendingSavedChanges = { ...state.pendingSavedChanges };
+        const datasetChanges = pendingSavedChanges[dataset.datasetId] ?? {};
+        pendingSavedChanges[dataset.datasetId] = {
+          ...datasetChanges,
+          [newRecordId]: newRecord,
+        };
+
+        return {
+          datasets: state.datasets.map((d) =>
+            d.id === datasetId
+              ? { ...d, savedRecords: updatedRecords }
+              : d
+          ),
+          pendingSavedChanges,
+        };
+      }
+
+      // Update existing record
+      const updatedRecords = [...existingRecords];
+      updatedRecords[rowIndex] = {
+        ...record,
+        [column.name]: value,
+      };
+
+      // Track pending changes for DB sync
+      const pendingSavedChanges = { ...state.pendingSavedChanges };
+      const datasetChanges = pendingSavedChanges[dataset.datasetId] ?? {};
+      const recordChanges = datasetChanges[record.id] ?? {};
+
+      pendingSavedChanges[dataset.datasetId] = {
+        ...datasetChanges,
+        [record.id]: {
+          ...recordChanges,
+          [column.name]: value,
+        },
+      };
+
+      return {
+        datasets: state.datasets.map((d) =>
+          d.id === datasetId
+            ? { ...d, savedRecords: updatedRecords }
+            : d
+        ),
+        pendingSavedChanges,
+      };
+    });
+  },
+
+  clearPendingChange: (dbDatasetId, recordId) => {
+    set((state) => {
+      const pendingSavedChanges = { ...state.pendingSavedChanges };
+      const datasetChanges = { ...(pendingSavedChanges[dbDatasetId] ?? {}) };
+      delete datasetChanges[recordId];
+
+      if (Object.keys(datasetChanges).length === 0) {
+        delete pendingSavedChanges[dbDatasetId];
+      } else {
+        pendingSavedChanges[dbDatasetId] = datasetChanges;
+      }
+
+      return { pendingSavedChanges };
+    });
+  },
+
+  getSavedRecordInfo: (datasetId, rowIndex) => {
+    const state = get();
+    const dataset = state.datasets.find((d) => d.id === datasetId);
+    if (!dataset || dataset.type !== "saved" || !dataset.savedRecords || !dataset.datasetId) {
+      return null;
+    }
+
+    const record = dataset.savedRecords[rowIndex];
+    if (!record) return null;
+
+    return {
+      dbDatasetId: dataset.datasetId,
+      recordId: record.id,
+    };
   },
 
   // -------------------------------------------------------------------------

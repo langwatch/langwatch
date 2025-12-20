@@ -23,6 +23,14 @@ export type InlineDataset = {
 };
 
 /**
+ * A single saved record from the database.
+ * The `id` is the record ID from the DB, other fields are column values.
+ */
+export type SavedRecord = {
+  id: string;
+} & Record<string, unknown>;
+
+/**
  * A dataset reference in the workbench.
  * Can be either inline (data stored here) or saved (reference to DB).
  */
@@ -36,6 +44,8 @@ export type DatasetReference = {
   datasetId?: string;
   // Cached columns for mapping UI (always present)
   columns: DatasetColumn[];
+  // For saved datasets - cached records from DB (loaded when added to workbench)
+  savedRecords?: SavedRecord[];
 };
 
 // ============================================================================
@@ -179,6 +189,10 @@ export type EvaluationsV3State = {
   // Execution results (populated after run)
   results: EvaluationResults;
 
+  // Pending changes for saved datasets (datasetId -> recordId -> field changes)
+  // These are local changes that need to be synced to the DB
+  pendingSavedChanges: Record<string, Record<string, Record<string, unknown>>>;
+
   // UI state (not persisted)
   ui: UIState;
 };
@@ -200,13 +214,30 @@ export type EvaluationsV3Actions = {
   updateDataset: (datasetId: string, updates: Partial<DatasetReference>) => void;
   exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
 
-  // Inline dataset cell/column actions (scoped to a dataset)
+  // Dataset cell/column actions (works for both inline and saved)
   setCellValue: (
     datasetId: string,
     row: number,
     columnId: string,
     value: string
   ) => void;
+  getCellValue: (datasetId: string, row: number, columnId: string) => string;
+  getRowCount: (datasetId: string) => number;
+
+  // Saved dataset actions
+  updateSavedRecordValue: (
+    datasetId: string,
+    rowIndex: number,
+    columnId: string,
+    value: string
+  ) => void;
+  clearPendingChange: (dbDatasetId: string, recordId: string) => void;
+  getSavedRecordInfo: (datasetId: string, rowIndex: number) => {
+    dbDatasetId: string;
+    recordId: string;
+  } | null;
+
+  // Inline dataset column actions
   addColumn: (datasetId: string, column: DatasetColumn) => void;
   removeColumn: (datasetId: string, columnId: string) => void;
   renameColumn: (datasetId: string, columnId: string, newName: string) => void;
@@ -215,7 +246,6 @@ export type EvaluationsV3Actions = {
     columnId: string,
     type: DatasetColumnType
   ) => void;
-  getRowCount: (datasetId: string) => number;
 
   // Agent actions
   addAgent: (agent: AgentConfig) => void;
@@ -319,5 +349,6 @@ export const createInitialState = (): EvaluationsV3State => ({
   evaluators: [],
   agents: [],
   results: createInitialResults(),
+  pendingSavedChanges: {},
   ui: createInitialUIState(),
 });
