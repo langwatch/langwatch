@@ -62,6 +62,7 @@ export const useAutosaveEvaluationsV3 = () => {
       evaluatorResults: {},
       errors: {},
     },
+    pendingSavedChanges: {},
     ui: { selectedRows: new Set() },
   });
 
