@@ -752,6 +752,30 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setColumnWidth: (columnId, width) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        columnWidths: {
+          ...state.ui.columnWidths,
+          [columnId]: width,
+        },
+      },
+    }));
+  },
+
+  setColumnWidths: (widths) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        columnWidths: {
+          ...state.ui.columnWidths,
+          ...widths,
+        },
+      },
+    }));
+  },
+
   // -------------------------------------------------------------------------
   // Reset
   // -------------------------------------------------------------------------

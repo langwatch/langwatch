@@ -5,8 +5,9 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type ColumnSizingState,
 } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -62,6 +63,8 @@ export function EvaluationsV3Table() {
     setActiveDataset,
     removeDataset,
     updateDataset,
+    columnWidths,
+    setColumnWidths,
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
@@ -80,6 +83,8 @@ export function EvaluationsV3Table() {
     setActiveDataset: state.setActiveDataset,
     removeDataset: state.removeDataset,
     updateDataset: state.updateDataset,
+    columnWidths: state.ui.columnWidths,
+    setColumnWidths: state.setColumnWidths,
   }));
 
 
@@ -445,15 +450,46 @@ export function EvaluationsV3Table() {
     clearRowSelection,
   ]);
 
+  // Column sizing state - initialize from store
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => columnWidths);
+
+  // Sync column sizing changes to store (debounced to avoid excessive updates)
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const handleColumnSizingChange = useCallback(
+    (updater: ColumnSizingState | ((prev: ColumnSizingState) => ColumnSizingState)) => {
+      setColumnSizing((prev) => {
+        const newSizing = typeof updater === "function" ? updater(prev) : updater;
+        // Debounce sync to store
+        if (syncTimeoutRef.current) {
+          clearTimeout(syncTimeoutRef.current);
+        }
+        syncTimeoutRef.current = setTimeout(() => {
+          setColumnWidths(newSizing);
+        }, 100);
+        return newSizing;
+      });
+    },
+    [setColumnWidths]
+  );
+
   const table = useReactTable({
     data: rowData,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    columnResizeMode: "onChange",
+    enableColumnResizing: true,
+    state: {
+      columnSizing,
+    },
+    onColumnSizingChange: handleColumnSizingChange,
   });
 
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
   const agentsColSpan = Math.max(agents.length, 1);
+
+  // Height of the super header row (Dataset/Agents row)
+  const SUPER_HEADER_HEIGHT = 48;
 
   return (
     <Box
@@ -464,6 +500,20 @@ export function EvaluationsV3Table() {
           width: "100%",
           borderCollapse: "collapse",
         },
+        // Super header row (first row in thead)
+        "& thead tr:first-of-type th": {
+          position: "sticky",
+          top: 0,
+          zIndex: 11,
+          backgroundColor: "white",
+        },
+        // Column header row (second row in thead)
+        "& thead tr:nth-of-type(2) th": {
+          position: "sticky",
+          top: `${SUPER_HEADER_HEIGHT}px`,
+          zIndex: 10,
+          backgroundColor: "white",
+        },
         "& th": {
           borderBottom: "1px solid var(--chakra-colors-gray-200)",
           borderRight: "1px solid var(--chakra-colors-gray-100)",
@@ -472,9 +522,24 @@ export function EvaluationsV3Table() {
           backgroundColor: "white",
           fontWeight: "medium",
           fontSize: "13px",
-          position: "sticky",
+          position: "relative",
+        },
+        // Resize handle styles
+        "& .resizer": {
+          position: "absolute",
+          right: 0,
           top: 0,
-          zIndex: 10,
+          height: "100%",
+          width: "5px",
+          cursor: "col-resize",
+          userSelect: "none",
+          touchAction: "none",
+          opacity: 0,
+          background: "var(--chakra-colors-blue-400)",
+          transition: "opacity 0.15s",
+        },
+        "& th:hover .resizer, & .resizer.isResizing": {
+          opacity: 1,
         },
         "& td": {
           borderBottom: "1px solid var(--chakra-colors-gray-100)",
@@ -514,6 +579,14 @@ export function EvaluationsV3Table() {
                         header.column.columnDef.header,
                         header.getContext()
                       )}
+                  {/* Resize handle */}
+                  {header.column.getCanResize() && (
+                    <div
+                      onMouseDown={header.getResizeHandler()}
+                      onTouchStart={header.getResizeHandler()}
+                      className={`resizer ${header.column.getIsResizing() ? "isResizing" : ""}`}
+                    />
+                  )}
                 </th>
               ))}
               {agents.length === 0 && (

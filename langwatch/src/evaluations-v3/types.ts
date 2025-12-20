@@ -162,6 +162,8 @@ export type UIState = {
     evaluatorId: string;
     row: number;
   };
+  // Column widths for resizing (columnId -> width in pixels)
+  columnWidths: Record<string, number>;
 };
 
 // ============================================================================
@@ -296,6 +298,8 @@ export type EvaluationsV3Actions = {
   setExpandedEvaluator: (
     expanded: { agentId: string; evaluatorId: string; row: number } | undefined
   ) => void;
+  setColumnWidth: (columnId: string, width: number) => void;
+  setColumnWidths: (widths: Record<string, number>) => void;
 
   // Reset
   reset: () => void;
@@ -340,6 +344,7 @@ export const createInitialResults = (): EvaluationResults => ({
 
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),
+  columnWidths: {},
 });
 
 export const createInitialState = (): EvaluationsV3State => ({
