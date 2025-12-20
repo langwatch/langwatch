@@ -351,7 +351,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 </VStack>
               </VStack>
             </HorizontalFormControl>
-            {props.datasetToSave?.datasetRecords && (
+            {props.datasetToSave?.datasetRecords && !props.localOnly && (
               <VStack align="start" gap={4} paddingY={6}>
                 <HStack gap={2}>
                   <Heading size="md">Preview</Heading>
