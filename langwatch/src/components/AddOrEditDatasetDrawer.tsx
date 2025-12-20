@@ -43,6 +43,12 @@ export interface AddDatasetDrawerProps {
     name: string;
     columnTypes: DatasetColumns;
   }) => void;
+  /**
+   * When true, skip saving to DB and just call onSuccess with the form data.
+   * Useful for editing inline/in-memory datasets that shouldn't be persisted yet.
+   * The button will show "Apply" instead of "Save".
+   */
+  localOnly?: boolean;
 }
 
 type FormValues = {
@@ -153,6 +159,18 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
   const trpc = api.useContext();
   const onSubmit = (data: DatasetRecordForm) => {
+    // For localOnly mode, skip DB save and just call onSuccess
+    if (props.localOnly) {
+      props.onSuccess({
+        datasetId: props.datasetToSave?.datasetId ?? "",
+        name: data.name,
+        columnTypes: data.columnTypes,
+      });
+      reset();
+      onClose();
+      return;
+    }
+
     upsertDataset.mutate(
       {
         projectId: project?.id ?? "",
@@ -232,7 +250,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         <Drawer.Header>
           <HStack>
             <Text paddingTop={5} fontSize="2xl">
-              {props.datasetToSave?.datasetId
+              {props.datasetToSave?.datasetId || props.localOnly
                 ? "Edit Dataset"
                 : props.datasetToSave
                   ? "Save Dataset"
@@ -340,7 +358,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               minWidth="fit-content"
               loading={upsertDataset.isLoading}
             >
-              {props.datasetToSave ? "Save" : "Create Dataset"}
+              {props.localOnly
+                ? "Apply"
+                : props.datasetToSave
+                  ? "Save"
+                  : "Create Dataset"}
             </Button>
           </form>
         </Drawer.Body>

@@ -61,6 +61,7 @@ export function EvaluationsV3Table() {
     addDataset,
     setActiveDataset,
     removeDataset,
+    updateDataset,
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
@@ -78,10 +79,9 @@ export function EvaluationsV3Table() {
     addDataset: state.addDataset,
     setActiveDataset: state.setActiveDataset,
     removeDataset: state.removeDataset,
+    updateDataset: state.updateDataset,
   }));
 
-  // State for edit dataset panel
-  const [showEditDatasetPanel, setShowEditDatasetPanel] = useState(false);
 
   // State to track pending dataset loads
   const [pendingDatasetLoad, setPendingDatasetLoad] = useState<{
@@ -218,6 +218,9 @@ export function EvaluationsV3Table() {
     datasetRecords: Array<{ id: string } & Record<string, string>>;
   } | undefined>(undefined);
 
+  // State for editing dataset columns
+  const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
+
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
     () => ({
@@ -246,9 +249,7 @@ export function EvaluationsV3Table() {
         });
       },
       onEditDataset: () => {
-        // TODO: Implement edit dataset panel (translucent overlay like agent config)
-        setShowEditDatasetPanel(true);
-        console.warn("Edit dataset panel not yet implemented");
+        setEditDatasetDrawerOpen(true);
       },
       onSaveAsDataset: (dataset: DatasetReference) => {
         if (dataset.type !== "inline" || !dataset.inline) return;
@@ -584,6 +585,82 @@ export function EvaluationsV3Table() {
           }
           setSaveAsDatasetDrawerOpen(false);
           setDatasetToSave(undefined);
+        }}
+      />
+
+      {/* Edit dataset columns drawer */}
+      <AddOrEditDatasetDrawer
+        datasetToSave={
+          activeDataset
+            ? {
+                datasetId: activeDataset.type === "saved" ? activeDataset.datasetId : undefined,
+                name: activeDataset.name,
+                columnTypes: activeDataset.columns.map((col) => ({
+                  name: col.name,
+                  type: col.type,
+                })),
+                // For inline datasets, include records so column mapping works
+                ...(activeDataset.type === "inline" && activeDataset.inline
+                  ? {
+                      datasetRecords: convertInlineToRowRecords(
+                        activeDataset.inline.columns,
+                        activeDataset.inline.records
+                      ),
+                    }
+                  : {}),
+              }
+            : undefined
+        }
+        open={editDatasetDrawerOpen}
+        onClose={() => setEditDatasetDrawerOpen(false)}
+        localOnly={activeDataset?.type === "inline"}
+        onSuccess={(updatedDataset) => {
+          if (!activeDataset) return;
+
+          // Build new columns from the drawer result
+          const newColumns: DatasetColumn[] = updatedDataset.columnTypes.map((col, index) => ({
+            id: `${col.name}_${index}`,
+            name: col.name,
+            type: col.type as DatasetColumnType,
+          }));
+
+          if (activeDataset.type === "inline") {
+            // For inline datasets, update columns and map records
+            const oldRecords = activeDataset.inline?.records ?? {};
+            const newRecords: Record<string, string[]> = {};
+
+            // Map old records to new columns (by name matching)
+            const currentRowCount = getRowCount(activeDataset.id);
+            for (const newCol of newColumns) {
+              const oldCol = activeDataset.columns.find((c) => c.name === newCol.name);
+              const oldValues = oldCol ? oldRecords[oldCol.id] : undefined;
+              if (oldValues) {
+                newRecords[newCol.id] = oldValues;
+              } else {
+                // New column, initialize with empty values
+                newRecords[newCol.id] = Array(currentRowCount).fill("");
+              }
+            }
+
+            updateDataset(activeDataset.id, {
+              name: updatedDataset.name,
+              columns: newColumns,
+              inline: {
+                columns: newColumns,
+                records: newRecords,
+              },
+            });
+          } else {
+            // For saved datasets, just update our local reference
+            // The drawer already saved to DB
+            updateDataset(activeDataset.id, {
+              name: updatedDataset.name,
+              columns: newColumns,
+              datasetId: updatedDataset.datasetId,
+            });
+          }
+
+          setEditDatasetDrawerOpen(false);
         }}
       />
     </Box>
