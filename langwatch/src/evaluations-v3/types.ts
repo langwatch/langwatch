@@ -170,6 +170,8 @@ export type UIState = {
   rowHeightMode: RowHeightMode;
   // Cells that are individually expanded in compact mode (row-columnId keys)
   expandedCells: Set<string>;
+  // Hidden columns by name (not persisted to dataset, just UI state)
+  hiddenColumns: Set<string>;
 };
 
 // ============================================================================
@@ -308,6 +310,8 @@ export type EvaluationsV3Actions = {
   setColumnWidths: (widths: Record<string, number>) => void;
   setRowHeightMode: (mode: RowHeightMode) => void;
   toggleCellExpanded: (row: number, columnId: string) => void;
+  toggleColumnVisibility: (columnName: string) => void;
+  setHiddenColumns: (columnNames: Set<string>) => void;
 
   // Reset
   reset: () => void;
@@ -355,6 +359,7 @@ export const createInitialUIState = (): UIState => ({
   columnWidths: {},
   rowHeightMode: "compact",
   expandedCells: new Set(),
+  hiddenColumns: new Set(),
 });
 
 export const createInitialState = (): EvaluationsV3State => ({

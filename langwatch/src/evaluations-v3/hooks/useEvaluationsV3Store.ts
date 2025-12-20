@@ -805,6 +805,32 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
+  toggleColumnVisibility: (columnName) => {
+    set((state) => {
+      const newHiddenColumns = new Set(state.ui.hiddenColumns);
+      if (newHiddenColumns.has(columnName)) {
+        newHiddenColumns.delete(columnName);
+      } else {
+        newHiddenColumns.add(columnName);
+      }
+      return {
+        ui: {
+          ...state.ui,
+          hiddenColumns: newHiddenColumns,
+        },
+      };
+    });
+  },
+
+  setHiddenColumns: (columnNames) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        hiddenColumns: columnNames,
+      },
+    }));
+  },
+
   // -------------------------------------------------------------------------
   // Reset
   // -------------------------------------------------------------------------
