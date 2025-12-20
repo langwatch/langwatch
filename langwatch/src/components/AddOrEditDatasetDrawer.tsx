@@ -4,6 +4,7 @@ import {
   Field,
   Heading,
   HStack,
+  IconButton,
   Input,
   NativeSelect,
   Text,
@@ -11,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
-import { Trash2 } from "react-feather";
+import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
@@ -49,6 +50,14 @@ export interface AddDatasetDrawerProps {
    * The button will show "Apply" instead of "Save".
    */
   localOnly?: boolean;
+  /**
+   * Optional: Show visibility toggle (eye icon) for each column.
+   * Used in evaluations workbench to hide/show columns without affecting the dataset.
+   */
+  columnVisibility?: {
+    hiddenColumns: Set<string>;
+    onToggleVisibility: (columnName: string) => void;
+  };
 }
 
 type FormValues = {
@@ -286,37 +295,53 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             >
               <VStack align="start">
                 <VStack align="start" width="full">
-                  {fields.map((field, index) => (
-                    <HStack key={field.id} width="full" gap={2}>
-                      <Input
-                        {...register(`columnTypes.${index}.name`, {
-                          required: "Column name cannot be empty",
-                        })}
-                        placeholder="Column name"
-                      />
-                      <NativeSelect.Root>
-                        <NativeSelect.Field
-                          {...register(`columnTypes.${index}.type`)}
-                        >
-                          <option value="string">string</option>
-                          <option value="number">number</option>
-                          <option value="boolean">boolean</option>
-                          <option value="date">date</option>
-                          <option value="list">list</option>
-                          <option value="json">json</option>
-                          <option value="image">image (URL)</option>
-                          <option value="chat_messages">
-                            json chat messages (OpenAI format)
-                          </option>
-                          <option value="spans">json spans</option>
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Button size="sm" onClick={() => remove(index)}>
-                        <Trash2 size={32} />
-                      </Button>
-                    </HStack>
-                  ))}
+                  {fields.map((field, index) => {
+                    const columnName = watch(`columnTypes.${index}.name`);
+                    const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
+                    return (
+                      <HStack key={field.id} width="full" gap={2}>
+                        <Input
+                          {...register(`columnTypes.${index}.name`, {
+                            required: "Column name cannot be empty",
+                          })}
+                          placeholder="Column name"
+                        />
+                        <NativeSelect.Root>
+                          <NativeSelect.Field
+                            {...register(`columnTypes.${index}.type`)}
+                          >
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="boolean">boolean</option>
+                            <option value="date">date</option>
+                            <option value="list">list</option>
+                            <option value="json">json</option>
+                            <option value="image">image (URL)</option>
+                            <option value="chat_messages">
+                              json chat messages (OpenAI format)
+                            </option>
+                            <option value="spans">json spans</option>
+                          </NativeSelect.Field>
+                          <NativeSelect.Indicator />
+                        </NativeSelect.Root>
+                        {props.columnVisibility && (
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
+                            color={isHidden ? "gray.400" : "gray.600"}
+                            aria-label={isHidden ? "Show column" : "Hide column"}
+                            title={isHidden ? "Show column" : "Hide column"}
+                          >
+                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </IconButton>
+                        )}
+                        <Button size="sm" onClick={() => remove(index)}>
+                          <Trash2 size={32} />
+                        </Button>
+                      </HStack>
+                    );
+                  })}
                   <Field.ErrorText>
                     {errors.columnTypes?.message}
                   </Field.ErrorText>

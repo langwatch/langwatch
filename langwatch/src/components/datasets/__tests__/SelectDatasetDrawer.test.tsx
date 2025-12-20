@@ -47,6 +47,7 @@ const mockDatasets = [
     updatedAt: new Date("2025-01-15T10:00:00Z"),
     createdAt: new Date("2025-01-10T10:00:00Z"),
     projectId: "test-project-id",
+    _count: { datasetRecords: 42 },
   },
   {
     id: "dataset-2",
@@ -59,6 +60,7 @@ const mockDatasets = [
     updatedAt: new Date("2025-01-10T10:00:00Z"),
     createdAt: new Date("2025-01-05T10:00:00Z"),
     projectId: "test-project-id",
+    _count: { datasetRecords: 100 },
   },
 ];
 
@@ -133,6 +135,14 @@ describe("SelectDatasetDrawer", () => {
       await waitFor(() => {
         expect(screen.getByText("2 columns")).toBeInTheDocument();
         expect(screen.getByText("3 columns")).toBeInTheDocument();
+      });
+    });
+
+    it("shows entry count for datasets", async () => {
+      renderDrawer();
+      await waitFor(() => {
+        expect(screen.getByText("42 entries")).toBeInTheDocument();
+        expect(screen.getByText("100 entries")).toBeInTheDocument();
       });
     });
   });

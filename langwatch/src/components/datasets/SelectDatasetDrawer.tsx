@@ -139,6 +139,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
                     key={dataset.id}
                     name={dataset.name}
                     columnCount={(dataset.columnTypes as DatasetColumns).length}
+                    entryCount={dataset._count.datasetRecords}
                     updatedAt={dataset.updatedAt}
                     onClick={() => handleSelectDataset(dataset)}
                   />
@@ -164,11 +165,12 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
 type DatasetCardProps = {
   name: string;
   columnCount: number;
+  entryCount: number;
   updatedAt: Date;
   onClick: () => void;
 };
 
-function DatasetCard({ name, columnCount, updatedAt, onClick }: DatasetCardProps) {
+function DatasetCard({ name, columnCount, entryCount, updatedAt, onClick }: DatasetCardProps) {
   return (
     <Box
       as="button"
@@ -193,6 +195,8 @@ function DatasetCard({ name, columnCount, updatedAt, onClick }: DatasetCardProps
             {name}
           </Text>
           <HStack gap={2} fontSize="xs" color="gray.500">
+            <Text>{entryCount} entries</Text>
+            <Text>•</Text>
             <Text>{columnCount} columns</Text>
             <Text>•</Text>
             <Text>

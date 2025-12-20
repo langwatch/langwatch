@@ -65,6 +65,8 @@ export function EvaluationsV3Table() {
     updateDataset,
     columnWidths,
     setColumnWidths,
+    hiddenColumns,
+    toggleColumnVisibility,
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
@@ -85,6 +87,8 @@ export function EvaluationsV3Table() {
     updateDataset: state.updateDataset,
     columnWidths: state.ui.columnWidths,
     setColumnWidths: state.setColumnWidths,
+    hiddenColumns: state.ui.hiddenColumns,
+    toggleColumnVisibility: state.toggleColumnVisibility,
   }));
 
 
@@ -288,8 +292,12 @@ export function EvaluationsV3Table() {
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
 
-  // Get columns from active dataset
-  const datasetColumns = activeDataset?.columns ?? [];
+  // Get columns from active dataset, filtering out hidden columns
+  const allDatasetColumns = activeDataset?.columns ?? [];
+  const datasetColumns = useMemo(
+    () => allDatasetColumns.filter((col) => !hiddenColumns.has(col.name)),
+    [allDatasetColumns, hiddenColumns]
+  );
 
   // Keyboard navigation hook - handles arrow keys, Tab, Enter, Escape
   useTableKeyboardNavigation({
@@ -704,6 +712,10 @@ export function EvaluationsV3Table() {
         open={editDatasetDrawerOpen}
         onClose={() => setEditDatasetDrawerOpen(false)}
         localOnly={activeDataset?.type === "inline"}
+        columnVisibility={{
+          hiddenColumns,
+          onToggleVisibility: toggleColumnVisibility,
+        }}
         onSuccess={(updatedDataset) => {
           if (!activeDataset) return;
 
