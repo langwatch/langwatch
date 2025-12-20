@@ -27,7 +27,7 @@ import {
   Lock,
   Plus,
   Search,
-} from "react-feather";
+} from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -40,8 +40,9 @@ import { CurrentDrawer } from "./CurrentDrawer";
 import { HoverableBigText } from "./HoverableBigText";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { ChecklistIcon } from "./icons/Checklist";
+import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
-import { MainMenu, MENU_WIDTH } from "./MainMenu";
+import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { ProjectTechStackIcon } from "./TechStack";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
@@ -49,6 +50,7 @@ import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
+import { FullLogo } from "./icons/FullLogo";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -63,7 +65,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
             <Link
               href={projectRoutes[currentRoute.parent].path.replace(
                 "[project]",
-                project?.slug ?? "",
+                project?.slug ?? ""
               )}
             >
               {projectRoutes[currentRoute.parent].title}
@@ -95,15 +97,15 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-        ? 1
-        : 0;
+      ? 1
+      : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
       organization,
       team,
       projects: team.projects.sort(sortByName),
-    })),
+    }))
   );
 
   return (
@@ -136,8 +138,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                 {projectGroups
                   .filter((projectGroup) =>
                     projectGroup.team.members.some(
-                      (member) => member.userId === session?.user.id,
-                    ),
+                      (member) => member.userId === session?.user.id
+                    )
                   )
                   .map((projectGroup) => (
                     <Menu.ItemGroup
@@ -164,7 +166,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               const hasProjectInRoute =
                                 currentRoute?.path.includes("[project]");
                               const hasProjectInPath = currentPath.includes(
-                                project.slug,
+                                project.slug
                               );
 
                               if (hasProjectInRoute) {
@@ -175,7 +177,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               } else if (hasProjectInPath) {
                                 return currentPath.replace(
                                   project.slug,
-                                  project_.slug,
+                                  project_.slug
                                 );
                               } else {
                                 return `/${
@@ -223,7 +225,7 @@ export const AddProjectButton = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    },
+    }
   );
 
   return !usage.data ||
@@ -269,11 +271,17 @@ export const AddProjectButton = ({
   );
 };
 
+export type DashboardLayoutProps = {
+  publicPage?: boolean;
+  compactMenu?: boolean;
+} & StackProps;
+
 export const DashboardLayout = ({
   children,
   publicPage = false,
+  compactMenu = false,
   ...props
-}: { publicPage?: boolean } & StackProps) => {
+}: DashboardLayoutProps) => {
   const router = useRouter();
   const gray400 = useColorRawValue("gray.400");
 
@@ -287,7 +295,7 @@ export const DashboardLayout = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    },
+    }
   );
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
@@ -298,7 +306,7 @@ export const DashboardLayout = ({
 
   const integrationsLeft = useMemo(() => {
     return Object.entries(integrationChecks.data ?? {}).filter(
-      ([key, value]) => key !== "integrated" && !value,
+      ([key, value]) => key !== "integrated" && !value
     ).length;
   }, [integrationChecks.data]);
 
@@ -326,12 +334,13 @@ export const DashboardLayout = ({
     isDemoProject ||
     team?.members.some((member) => member.userId === user?.id);
 
+  const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
+
   return (
-    <HStack
+    <Box
       width="full"
       minHeight="100vh"
-      alignItems={"stretch"}
-      gap={0}
+      background="gray.100"
       overflowX={["auto", "auto", "clip"]}
     >
       <Head>
@@ -342,339 +351,369 @@ export const DashboardLayout = ({
             : ""}
         </title>
       </Head>
-      <MainMenu />
-      <VStack
-        width={`calc(100vw - ${MENU_WIDTH})`}
-        maxWidth={`calc(100vw - ${MENU_WIDTH})`}
-        gap={0}
+
+      {/* Header bar - spans full width with gray background */}
+      <HStack
+        position="sticky"
+        top={0}
+        zIndex={10}
+        width="full"
+        paddingX={4}
+        paddingY={3}
         background="gray.100"
-        {...props}
+        justifyContent="space-between"
+        gap={4}
       >
-        {publicEnv.data &&
-          (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
-            !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
-            <Alert.Root
-              status="warning"
-              width="full"
-              borderBottom="1px solid"
-              borderBottomColor="yellow.300"
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Text>
-                  Please check your environment variables, the following
-                  variables are not set which are required for evaluations and
-                  workflows:
-                </Text>
-                {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
-                  <Text>LANGWATCH_NLP_SERVICE</Text>
-                )}
-                {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
-                  <Text>LANGEVALS_ENDPOINT</Text>
-                )}
-              </Alert.Content>
-            </Alert.Root>
+        {/* Left side: Logo + Breadcrumbs */}
+        <HStack gap={4} flex={1}>
+          <Link href="/" paddingLeft={1}>
+            <FullLogo width={155 * 0.7} height={38 * 0.7} />
+          </Link>
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
           )}
-        {usage.data &&
-          usage.data.currentMonthMessagesCount >=
-            usage.data.activePlan.maxMessagesPerMonth && (
-            <Alert.Root
-              status="warning"
-              width="full"
-              borderBottom="1px solid"
-              borderBottomColor="yellow.300"
-            >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Text>
-                  You reached the limit of{" "}
-                  {numeral(usage.data.activePlan.maxMessagesPerMonth).format()}{" "}
-                  messages for this month, new messages will not be processed.{" "}
-                  <Link
-                    href="/settings/subscription"
-                    textDecoration="underline"
-                    _hover={{
-                      textDecoration: "none",
-                    }}
-                    onClick={() => {
-                      trackEvent("subscription_hook_click", {
-                        project_id: project?.id,
-                        hook: "new_messages_limit_reached",
-                      });
-                    }}
-                  >
-                    Click here
-                  </Link>{" "}
-                  to upgrade your plan.
-                </Text>
-              </Alert.Content>
-            </Alert.Root>
+          {!project && (
+            <Text paddingLeft={2}>
+              <Link href="/auth/signin" color="orange.600" fontWeight="600">
+                Sign in
+              </Link>{" "}
+              to LangWatch to monitor your projects
+            </Text>
           )}
-        {usage.data &&
-          usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
-            <Alert.Root
-              status="warning"
+          <Box display={["none", "none", "block"]}>
+            <Breadcrumbs currentRoute={currentRoute} />
+          </Box>
+        </HStack>
+
+        {/* Center: Search */}
+        {project && (
+          <form
+            action={`${project.slug}/messages`}
+            method="GET"
+            style={{ flex: 1, maxWidth: "500px" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (
+                router.query.view === "list" ||
+                router.query.view === "table"
+              ) {
+                void router.replace({ query: { ...router.query, query } });
+              } else {
+                void router.push(
+                  `/${project.slug}/messages?query=${encodeURIComponent(query)}`
+                );
+              }
+            }}
+          >
+            <InputGroup
+              startElement={<Search color={gray400} width={16} />}
               width="full"
-              borderBottom="1px solid"
-              borderBottomColor="yellow.300"
             >
-              <Alert.Indicator />
-              <Alert.Content>
-                <Text>
-                  You reached the limit of{" "}
-                  {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
-                  usage cost for this month, evaluations and guardrails will not
-                  be processed.{" "}
-                  <Link
-                    href="/settings/usage"
-                    textDecoration="underline"
-                    _hover={{
-                      textDecoration: "none",
-                    }}
-                    onClick={() => {
-                      trackEvent("subscription_hook_click", {
-                        project_id: project?.id,
-                        hook: "usage_cost_limit_reached",
-                      });
-                    }}
-                  >
-                    Go to settings
-                  </Link>{" "}
-                  to check your usage spending limit or upgrade your plan.
-                </Text>
-              </Alert.Content>
-            </Alert.Root>
-          )}
-        <HStack
-          position="relative"
-          zIndex={3}
-          width="full"
-          padding={4}
-          background="white"
-          borderBottomWidth="1px"
-          borderBottomColor="gray.300"
-          justifyContent="space-between"
-        >
-          <HStack gap={6} flex={1.5}>
-            {organizations && project && (
-              <ProjectSelector
-                organizations={organizations}
-                project={project}
-              />
-            )}
-            {!project && (
-              <Text paddingLeft={2}>
-                <Link href="/auth/signin" color="orange.600" fontWeight="600">
-                  Sign in
-                </Link>{" "}
-                to LangWatch to monitor your projects
-              </Text>
-            )}
-            <Box display={["none", "none", "block"]}>
-              <Breadcrumbs currentRoute={currentRoute} />
-            </Box>
-          </HStack>
-          {project && (
-            <form
-              action={`${project.slug}/messages`}
-              method="GET"
-              style={{ flex: 2, maxWidth: "600px" }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (
-                  router.query.view === "list" ||
-                  router.query.view === "table"
-                ) {
-                  void router.replace({ query: { ...router.query, query } });
-                } else {
-                  void router.push(
-                    `/${project.slug}/messages?query=${encodeURIComponent(
-                      query,
-                    )}`,
-                  );
-                }
-              }}
-            >
-              <InputGroup
+              <Input
+                name="query"
+                type="search"
+                placeholder="Search"
+                _placeholder={{ color: "gray.500" }}
+                fontSize="14px"
+                paddingY={1.5}
+                width="full"
+                height="auto"
+                backgroundColor="white"
                 borderColor="gray.300"
-                startElement={<Search color={gray400} width={16} />}
-                width="full"
-              >
-                <Input
-                  name="query"
-                  type="search"
-                  placeholder="Search"
-                  _placeholder={{ color: "gray.800" }}
-                  fontSize="14px"
-                  paddingY={1.5}
-                  width="full"
-                  height="auto"
-                  value={query ?? router.query.query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </InputGroup>
-            </form>
+                borderRadius="lg"
+                value={query ?? router.query.query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </InputGroup>
+          </form>
+        )}
+
+        {/* Right side: Usage, integrations, user */}
+        <HStack gap={2} flex={1} justifyContent="flex-end">
+          {usage.data && isSaaS && (
+            <Progress.Root
+              defaultValue={0}
+              max={usage.data?.activePlan.maxMessagesPerMonth}
+              value={Math.min(
+                usage.data?.currentMonthMessagesCount,
+                usage.data?.activePlan.maxMessagesPerMonth
+              )}
+              maxW="150px"
+              colorPalette="orange"
+              width="full"
+            >
+              <HStack>
+                <Link href="/settings/usage" width="150px">
+                  <Tooltip
+                    content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+                  >
+                    <HStack width="full" cursor="pointer">
+                      <Progress.Label fontSize="xs">
+                        <HStack gap={1} cursor="pointer">
+                          Usage
+                          <Info size="12" />
+                        </HStack>
+                      </Progress.Label>
+                      <Progress.Track
+                        flex="1"
+                        borderRadius="full"
+                        border="1px solid"
+                        borderColor="gray.300"
+                        backgroundColor="white"
+                      >
+                        <Progress.Range />
+                      </Progress.Track>
+                    </HStack>
+                  </Tooltip>
+                </Link>
+              </HStack>
+            </Progress.Root>
           )}
 
-          <HStack gap={2} flex={1}>
-            <Spacer />
-
-            {usage.data && isSaaS && (
-              <Progress.Root
-                defaultValue={0}
-                max={usage.data?.activePlan.maxMessagesPerMonth}
-                value={Math.min(
-                  usage.data?.currentMonthMessagesCount,
-                  usage.data?.activePlan.maxMessagesPerMonth,
-                )}
-                maxW="150px"
-                colorPalette="orange"
-                width="full"
-              >
-                <HStack>
-                  <Link href="/settings/usage" width="150px">
-                    <Tooltip
-                      content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
-                    >
-                      <HStack width="full" cursor="pointer">
-                        <Progress.Label fontSize="xs">
-                          <HStack gap={1} cursor="pointer">
-                            Usage
-                            <Info size="12" />
-                          </HStack>
-                        </Progress.Label>
-                        <Progress.Track
-                          flex="1"
-                          borderRadius="full"
-                          border="1px solid"
-                          borderColor="#eee"
-                        >
-                          <Progress.Range />
-                        </Progress.Track>
-                      </HStack>
-                    </Tooltip>
-                  </Link>
-                </HStack>
-              </Progress.Root>
-            )}
-
-            <HStack>
-              {integrationsLeft ? (
-                <Popover.Root positioning={{ placement: "bottom-end" }}>
-                  <Popover.Trigger asChild>
-                    <Button position="relative" variant="ghost">
-                      <ChecklistIcon
-                        style={{ maxWidth: "24px", maxHeight: "24px" }}
-                      />
-                      <Badge
-                        position="absolute"
-                        bottom="-4px"
-                        right="-2px"
-                        size="xs"
-                        color="white"
-                        backgroundColor="green.500"
-                        borderRadius="full"
-                        fontSize="12px"
-                        fontWeight="600"
-                      >
-                        {integrationsLeft}
-                      </Badge>
-                    </Button>
-                  </Popover.Trigger>
-                  <Popover.Content>
-                    <Popover.Body>
-                      <IntegrationChecks />
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Root>
-              ) : (
-                <Spacer />
-              )}
-              <Menu.Root>
-                <Menu.Trigger asChild>
-                  <Button
-                    variant="plain"
-                    {...(publicPage
-                      ? { onClick: () => void signIn("auth0") }
-                      : {})}
-                  >
-                    <Avatar.Root
-                      size="sm"
-                      backgroundColor="orange.400"
+          <HStack>
+            {integrationsLeft ? (
+              <Popover.Root positioning={{ placement: "bottom-end" }}>
+                <Popover.Trigger asChild>
+                  <Button position="relative" variant="ghost">
+                    <ChecklistIcon
+                      style={{ maxWidth: "24px", maxHeight: "24px" }}
+                    />
+                    <Badge
+                      position="absolute"
+                      bottom="-4px"
+                      right="-2px"
+                      size="xs"
                       color="white"
+                      backgroundColor="green.500"
+                      borderRadius="full"
+                      fontSize="12px"
+                      fontWeight="600"
                     >
-                      <Avatar.Fallback name={user?.name ?? undefined} />
-                    </Avatar.Root>
+                      {integrationsLeft}
+                    </Badge>
                   </Button>
-                </Menu.Trigger>
-                {session && (
-                  <Portal>
-                    <Menu.Content zIndex="popover">
-                      {dependencies.ExtraMenuItems && (
-                        <dependencies.ExtraMenuItems />
-                      )}
-                      <Menu.ItemGroup
-                        title={`${session.user.name} (${session.user.email})`}
+                </Popover.Trigger>
+                <Popover.Content>
+                  <Popover.Body>
+                    <IntegrationChecks />
+                  </Popover.Body>
+                </Popover.Content>
+              </Popover.Root>
+            ) : null}
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button
+                  variant="plain"
+                  {...(publicPage
+                    ? { onClick: () => void signIn("auth0") }
+                    : {})}
+                >
+                  <Avatar.Root
+                    size="sm"
+                    backgroundColor="orange.400"
+                    color="white"
+                  >
+                    <Avatar.Fallback name={user?.name ?? undefined} />
+                  </Avatar.Root>
+                </Button>
+              </Menu.Trigger>
+              {session && (
+                <Portal>
+                  <Menu.Content zIndex="popover">
+                    {dependencies.ExtraMenuItems && (
+                      <dependencies.ExtraMenuItems />
+                    )}
+                    <Menu.ItemGroup
+                      title={`${session.user.name} (${session.user.email})`}
+                    >
+                      <Menu.Item value="setup" asChild>
+                        <Link href={`/${project?.slug}/setup`}>
+                          API Key & Setup
+                        </Link>
+                      </Menu.Item>
+                      <Menu.Item value="settings" asChild>
+                        <Link href="/settings">Settings</Link>
+                      </Menu.Item>
+                      <Menu.Item
+                        value="logout"
+                        onClick={() =>
+                          void signOut({
+                            callbackUrl: window.location.origin,
+                          })
+                        }
                       >
-                        <Menu.Item value="setup" asChild>
-                          <Link href={`/${project?.slug}/setup`}>
-                            API Key & Setup
-                          </Link>
-                        </Menu.Item>
-                        <Menu.Item value="settings" asChild>
-                          <Link href="/settings">Settings</Link>
-                        </Menu.Item>
-                        <Menu.Item
-                          value="logout"
-                          onClick={() =>
-                            void signOut({
-                              callbackUrl: window.location.origin,
-                            })
-                          }
-                        >
-                          Logout
-                        </Menu.Item>
-                      </Menu.ItemGroup>
-                    </Menu.Content>
-                  </Portal>
-                )}
-              </Menu.Root>
-            </HStack>
+                        Logout
+                      </Menu.Item>
+                    </Menu.ItemGroup>
+                  </Menu.Content>
+                </Portal>
+              )}
+            </Menu.Root>
           </HStack>
         </HStack>
-        {publicEnv.data?.DEMO_PROJECT_SLUG &&
-          publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
-            <HStack width={"full"} backgroundColor={"orange.400"} padding={1}>
-              <Spacer />
-              <Text fontSize={"sm"}>
-                Viewing Demo Project - Go back to yours{" "}
-                <Link href={"/"} textDecoration={"underline"}>
-                  here
-                </Link>
-              </Text>
-              <Spacer />
-            </HStack>
-          )}
-        <CurrentDrawer />
-        {userIsPartOfTeam ? (
-          children
-        ) : (
-          <Alert.Root
-            status="warning"
+      </HStack>
+
+      {/* Main content area with sidebar */}
+      <HStack
+        width="full"
+        alignItems="stretch"
+        gap={0}
+        minHeight="calc(100vh - 60px)"
+      >
+        <MainMenu isCompact={compactMenu} />
+
+        <Box
+          width="full"
+          height="full"
+          background="white"
+          borderTopLeftRadius="xl"
+          display="flex"
+        >
+          <VStack
             width="full"
-            borderBottom="1px solid"
-            borderBottomColor="yellow.300"
+            maxWidth={`calc(100vw - ${menuWidth})`}
+            gap={0}
+            minHeight="calc(100vh - 60px)"
+            {...props}
           >
-            <Alert.Indicator />
-            <Alert.Content>
-              <Text>
-                You are not part of any team in this organization, please ask
-                your administrator to add you to a team.
-              </Text>
-            </Alert.Content>
-          </Alert.Root>
-        )}
-      </VStack>
-    </HStack>
+            {/* Alert banners */}
+            {publicEnv.data &&
+              (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
+                !publicEnv.data?.HAS_LANGEVALS_ENDPOINT) && (
+                <Alert.Root
+                  status="warning"
+                  width="full"
+                  borderBottom="1px solid"
+                  borderBottomColor="yellow.300"
+                  borderTopLeftRadius="2xl"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Text>
+                      Please check your environment variables, the following
+                      variables are not set which are required for evaluations
+                      and workflows:
+                    </Text>
+                    {!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE && (
+                      <Text>LANGWATCH_NLP_SERVICE</Text>
+                    )}
+                    {!publicEnv.data?.HAS_LANGEVALS_ENDPOINT && (
+                      <Text>LANGEVALS_ENDPOINT</Text>
+                    )}
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+            {usage.data &&
+              usage.data.currentMonthMessagesCount >=
+                usage.data.activePlan.maxMessagesPerMonth && (
+                <Alert.Root
+                  status="warning"
+                  width="full"
+                  borderBottom="1px solid"
+                  borderBottomColor="yellow.300"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Text>
+                      You reached the limit of{" "}
+                      {numeral(
+                        usage.data.activePlan.maxMessagesPerMonth
+                      ).format()}{" "}
+                      messages for this month, new messages will not be
+                      processed.{" "}
+                      <Link
+                        href="/settings/subscription"
+                        textDecoration="underline"
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                        onClick={() => {
+                          trackEvent("subscription_hook_click", {
+                            project_id: project?.id,
+                            hook: "new_messages_limit_reached",
+                          });
+                        }}
+                      >
+                        Click here
+                      </Link>{" "}
+                      to upgrade your plan.
+                    </Text>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+            {usage.data &&
+              usage.data.currentMonthCost > usage.data.maxMonthlyUsageLimit && (
+                <Alert.Root
+                  status="warning"
+                  width="full"
+                  borderBottom="1px solid"
+                  borderBottomColor="yellow.300"
+                >
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Text>
+                      You reached the limit of{" "}
+                      {numeral(usage.data.maxMonthlyUsageLimit).format("$0.00")}{" "}
+                      usage cost for this month, evaluations and guardrails will
+                      not be processed.{" "}
+                      <Link
+                        href="/settings/usage"
+                        textDecoration="underline"
+                        _hover={{
+                          textDecoration: "none",
+                        }}
+                        onClick={() => {
+                          trackEvent("subscription_hook_click", {
+                            project_id: project?.id,
+                            hook: "usage_cost_limit_reached",
+                          });
+                        }}
+                      >
+                        Go to settings
+                      </Link>{" "}
+                      to check your usage spending limit or upgrade your plan.
+                    </Text>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+
+            {publicEnv.data?.DEMO_PROJECT_SLUG &&
+              publicEnv.data.DEMO_PROJECT_SLUG === router.query.project && (
+                <HStack width="full" backgroundColor="orange.400" padding={1}>
+                  <Spacer />
+                  <Text fontSize="sm">
+                    Viewing Demo Project - Go back to yours{" "}
+                    <Link href="/" textDecoration="underline">
+                      here
+                    </Link>
+                  </Text>
+                  <Spacer />
+                </HStack>
+              )}
+
+            <CurrentDrawer />
+
+            {userIsPartOfTeam ? (
+              children
+            ) : (
+              <Alert.Root
+                status="warning"
+                width="full"
+                borderBottom="1px solid"
+                borderBottomColor="yellow.300"
+              >
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Text>
+                    You are not part of any team in this organization, please
+                    ask your administrator to add you to a team.
+                  </Text>
+                </Alert.Content>
+              </Alert.Root>
+            )}
+          </VStack>
+        </Box>
+      </HStack>
+    </Box>
   );
 };
