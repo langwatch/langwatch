@@ -3,18 +3,68 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type KeyboardEvent,
 } from "react";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import type { DatasetColumnType } from "~/server/datasets/types";
+
+// Max characters to display before truncating (for rendering performance)
+const MAX_DISPLAY_CHARS = 5000;
+
+// Column types that should be formatted as JSON
+const JSON_LIKE_TYPES: DatasetColumnType[] = [
+  "json",
+  "list",
+  "chat_messages",
+  "spans",
+  "rag_contexts",
+  "annotations",
+  "evaluations",
+];
+
+/**
+ * Try to parse and format a value as JSON.
+ * Returns the formatted JSON string if successful, or the original value if not.
+ */
+const tryFormatAsJson = (value: string): { formatted: string; isJson: boolean } => {
+  if (!value || typeof value !== "string") {
+    return { formatted: value, isJson: false };
+  }
+
+  const trimmed = value.trim();
+  // Quick check: only try to parse if it looks like JSON (starts with { or [)
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return { formatted: value, isJson: false };
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return { formatted: JSON.stringify(parsed, null, 2), isJson: true };
+  } catch {
+    return { formatted: value, isJson: false };
+  }
+};
+
+/**
+ * Truncate a string to a maximum length with an ellipsis indicator.
+ */
+const truncateValue = (value: string, maxLength: number): { text: string; truncated: boolean } => {
+  if (value.length <= maxLength) {
+    return { text: value, truncated: false };
+  }
+  return { text: value.slice(0, maxLength) + "…", truncated: true };
+};
 
 type EditableCellProps = {
   value: string;
   row: number;
   columnId: string;
   datasetId: string;
+  dataType?: DatasetColumnType;
 };
 
 /**
@@ -23,7 +73,7 @@ type EditableCellProps = {
  * Note: Selection outline is handled by the parent table on the <td> element.
  * This component only handles the edit mode textarea.
  */
-export function EditableCell({ value, row, columnId, datasetId }: EditableCellProps) {
+export function EditableCell({ value, row, columnId, datasetId, dataType }: EditableCellProps) {
   const { setCellValue, setEditingCell, ui, setSelectedCell } =
     useEvaluationsV3Store((state) => ({
       setCellValue: state.setCellValue,
@@ -121,6 +171,25 @@ export function EditableCell({ value, row, columnId, datasetId }: EditableCellPr
     }, 100);
   }, [handleSave]);
 
+  // Format and truncate display value
+  const displayValue = useMemo(() => {
+    const isJsonType = dataType && JSON_LIKE_TYPES.includes(dataType);
+
+    // For JSON-like types, try to format as JSON
+    const { formatted, isJson } = isJsonType
+      ? tryFormatAsJson(value)
+      : { formatted: value, isJson: false };
+
+    // Apply truncation
+    const { text, truncated } = truncateValue(formatted, MAX_DISPLAY_CHARS);
+
+    return {
+      text,
+      isJson: isJsonType && isJson,
+      truncated,
+    };
+  }, [value, dataType]);
+
   return (
     <>
       {/* Cell display - click/dblclick handled by parent td */}
@@ -132,8 +201,15 @@ export function EditableCell({ value, row, columnId, datasetId }: EditableCellPr
         whiteSpace="pre-wrap"
         wordBreak="break-word"
         opacity={isEditing ? 0 : 1}
+        fontFamily={displayValue.isJson ? "mono" : undefined}
+        color={displayValue.truncated ? undefined : undefined}
       >
-        {value}
+        {displayValue.text}
+        {displayValue.truncated && (
+          <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+            (truncated)
+          </Box>
+        )}
       </Box>
 
       {/* Expanded editor (positioned over cell via portal) */}

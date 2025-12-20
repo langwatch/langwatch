@@ -65,10 +65,13 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
   );
 };
 
+export const DialogBackdrop = function DialogBackdrop(props: ChakraDialog.BackdropProps) {
+  return <ChakraDialog.Backdrop {...props} zIndex="popover" />;
+};
+
 export const DialogFooter = ChakraDialog.Footer;
 export const DialogHeader = ChakraDialog.Header;
 export const DialogBody = ChakraDialog.Body;
-export const DialogBackdrop = ChakraDialog.Backdrop;
 export const DialogTitle = ChakraDialog.Title;
 export const DialogDescription = ChakraDialog.Description;
 export const DialogTrigger = ChakraDialog.Trigger;

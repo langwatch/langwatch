@@ -2,6 +2,7 @@ import { flexRender, type Cell } from "@tanstack/react-table";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { EditableCell } from "./EditableCell";
+import type { DatasetColumnType } from "~/server/datasets/types";
 
 // ============================================================================
 // Types
@@ -12,6 +13,7 @@ export type ColumnType = "checkbox" | "dataset" | "agent";
 type ColumnMeta = {
   columnType: ColumnType;
   columnId: string;
+  dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
 };
 
 type RowData = {
@@ -98,6 +100,7 @@ export const TableCell = ({ cell, rowIndex, activeDatasetId }: TableCellProps) =
           row={rowIndex}
           columnId={meta.columnId}
           datasetId={activeDatasetId}
+          dataType={meta.dataType}
         />
       </td>
     );
