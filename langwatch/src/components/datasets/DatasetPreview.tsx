@@ -19,7 +19,7 @@ export function DatasetPreview({
   onClick?: () => void;
 } & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {
   const columnDefs = useMemo(() => {
-    const headers: DatasetColumnDef[] = columns.slice(0, 3).map((column) => ({
+    const headers: DatasetColumnDef[] = columns.slice(0, 8).map((column) => ({
       headerName: column.name,
       field: column.name,
       type_: column.type,
