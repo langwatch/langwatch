@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   Box,
   Button,
@@ -6,7 +7,6 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
 import { useMemo } from "react";
 import {
   ChevronDown,
@@ -70,7 +70,7 @@ export function DatasetTabs({
   }, [datasets]);
 
   const handleAddNewDataset = () => {
-    const newId = `dataset_${nanoid(8)}`;
+    const newId = generate("dataset").toString();
     // Copy column structure from first dataset
     const columns = firstDatasetColumns.map((col) => ({ ...col }));
     const records: Record<string, string[]> = {};

@@ -962,6 +962,33 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   reset: () => {
     set(createInitialState());
   },
+
+  loadState: (wizardState: unknown) => {
+    if (!wizardState || typeof wizardState !== "object") return;
+
+    const state = wizardState as Record<string, unknown>;
+
+    set((current) => ({
+      ...current,
+      experimentId: (state.experimentId as string) ?? current.experimentId,
+      experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
+      name: (state.name as string) ?? current.name,
+      datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
+      activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
+      evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+      agents: (state.agents as typeof current.agents) ?? current.agents,
+    }));
+  },
+
+  setSavedDatasetRecords: (datasetId: string, records) => {
+    set((state) => ({
+      datasets: state.datasets.map((d) =>
+        d.id === datasetId && d.type === "saved"
+          ? { ...d, savedRecords: records }
+          : d
+      ),
+    }));
+  },
 });
 
 // ============================================================================

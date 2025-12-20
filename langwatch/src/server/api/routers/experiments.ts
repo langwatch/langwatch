@@ -11,6 +11,7 @@ import {
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -201,10 +202,27 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
-      const name = input.state.name || (await findNextDraftName(input.projectId));
-      const slug = slugify(name);
+      const isNewExperiment = !input.experimentId;
+      const experimentId = input.experimentId ?? generate("eval").toString();
 
-      const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
+      // For new experiments, use the ID as the slug (guaranteed unique)
+      // For existing experiments, keep the same slug to avoid breaking URLs
+      const name = input.state.name || (await findNextDraftName(input.projectId));
+
+      let slug: string;
+      if (isNewExperiment) {
+        // New experiment: prefer the slug from state (set by frontend redirect),
+        // otherwise use last 8 chars of the ID for a shorter, cleaner URL
+        slug = input.state.experimentSlug ?? experimentId.slice(-8);
+      } else {
+        // Existing experiment: fetch the current slug to keep it unchanged
+        const existing = await prisma.experiment.findUnique({
+          where: { id: experimentId, projectId: input.projectId },
+          select: { slug: true },
+        });
+        slug = existing?.slug ?? experimentId.slice(-8);
+      }
+
       // Convert to plain JSON for Prisma storage
       const wizardStateJson = JSON.parse(JSON.stringify(input.state));
       const experimentData = {

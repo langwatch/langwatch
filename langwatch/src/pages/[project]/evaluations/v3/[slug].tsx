@@ -12,8 +12,11 @@ import { AgentConfigPanel } from "~/evaluations-v3/components/AgentSection/Agent
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
 import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
+import { SavedDatasetLoaders } from "~/evaluations-v3/components/SavedDatasetLoaders";
 import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
+import { useAutosaveEvaluationsV3 } from "~/evaluations-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
 
 /**
  * Evaluations V3 Page
@@ -25,19 +28,18 @@ export default function EvaluationsV3Page() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, reset, setExperimentSlug, autosaveStatus } = useEvaluationsV3Store((state) => ({
+  const { name, datasets, reset, autosaveStatus } = useEvaluationsV3Store((state) => ({
     name: state.name,
+    datasets: state.datasets,
     reset: state.reset,
-    setExperimentSlug: state.setExperimentSlug,
     autosaveStatus: state.ui.autosaveStatus,
   }));
 
-  // Set the experiment slug when the page loads
-  useEffect(() => {
-    if (slug) {
-      setExperimentSlug(slug);
-    }
-  }, [slug, setExperimentSlug]);
+  // Enable autosave for evaluation state - this also handles loading existing experiments
+  const { isLoading: isLoadingExperiment } = useAutosaveEvaluationsV3();
+
+  // Track loading state for saved datasets
+  const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
 
   // Reset store when leaving the page
   useEffect(() => {
@@ -98,13 +100,19 @@ export default function EvaluationsV3Page() {
             inset={0}
             overflow="auto"
           >
-            <EvaluationsV3Table />
+            <EvaluationsV3Table
+              isLoadingExperiment={isLoadingExperiment}
+              isLoadingDatasets={isLoadingDatasets}
+            />
           </Box>
           <AgentConfigPanel />
         </Box>
       </VStack>
 
       <CurrentDrawer />
+
+      {/* Load saved dataset records - renders nothing, just triggers fetches */}
+      <SavedDatasetLoaders datasets={datasets} />
     </DashboardLayout>
   );
 }

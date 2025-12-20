@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Skeleton, Text } from "@chakra-ui/react";
 import { Database, Hash, List, MessageSquare, Plus, Type } from "lucide-react";
 
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
@@ -100,6 +100,7 @@ type SuperHeaderProps = {
   showWarning?: boolean;
   activeDataset?: DatasetReference;
   datasetHandlers?: DatasetHandlers;
+  isLoading?: boolean;
 };
 
 const superHeaderConfig: Record<
@@ -125,6 +126,7 @@ export function SuperHeader({
   showWarning,
   activeDataset,
   datasetHandlers,
+  isLoading,
 }: SuperHeaderProps) {
   const config = superHeaderConfig[type];
 
@@ -142,7 +144,14 @@ export function SuperHeader({
     >
       <HStack gap={2}>
         <ColorfulBlockIcon color={config.color} size="sm" icon={config.icon} />
-        {type === "dataset" && activeDataset && datasetHandlers ? (
+        {isLoading ? (
+          <>
+            <Text fontWeight="semibold" fontSize="sm" color="gray.700">
+              {config.title}
+            </Text>
+            <Skeleton height="20px" width="150px" />
+          </>
+        ) : type === "dataset" && activeDataset && datasetHandlers ? (
           <DatasetTabs
             onSelectExisting={datasetHandlers.onSelectExisting}
             onUploadCSV={datasetHandlers.onUploadCSV}
@@ -154,7 +163,7 @@ export function SuperHeader({
             {config.title}
           </Text>
         )}
-        {onAddClick && (
+        {!isLoading && onAddClick && (
           <Button
             size="xs"
             variant="ghost"

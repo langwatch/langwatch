@@ -42,7 +42,15 @@ type RowData = {
 // Main Component
 // ============================================================================
 
-export function EvaluationsV3Table() {
+type EvaluationsV3TableProps = {
+  isLoadingExperiment?: boolean;
+  isLoadingDatasets?: boolean;
+};
+
+export function EvaluationsV3Table({
+  isLoadingExperiment = false,
+  isLoadingDatasets = false,
+}: EvaluationsV3TableProps) {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
@@ -533,12 +541,14 @@ export function EvaluationsV3Table() {
               colSpan={datasetColSpan}
               activeDataset={activeDataset}
               datasetHandlers={datasetHandlers}
+              isLoading={isLoadingExperiment}
             />
             <SuperHeader
               type="agents"
               colSpan={agentsColSpan}
               onAddClick={() => openOverlay("agent")}
               showWarning={agents.length === 0}
+              isLoading={isLoadingExperiment}
             />
           </tr>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -583,6 +593,7 @@ export function EvaluationsV3Table() {
                   cell={cell}
                   rowIndex={row.index}
                   activeDatasetId={activeDatasetId}
+                  isLoading={isLoadingExperiment || isLoadingDatasets}
                 />
               ))}
               {agents.length === 0 && <td />}

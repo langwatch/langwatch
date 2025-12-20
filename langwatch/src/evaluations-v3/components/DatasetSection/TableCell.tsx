@@ -1,3 +1,4 @@
+import { Skeleton } from "@chakra-ui/react";
 import { flexRender, type Cell } from "@tanstack/react-table";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -26,6 +27,7 @@ type TableCellProps = {
   cell: Cell<RowData, unknown>;
   rowIndex: number;
   activeDatasetId: string;
+  isLoading?: boolean;
 };
 
 // ============================================================================
@@ -36,7 +38,7 @@ type TableCellProps = {
  * Renders a single table cell with selection and interaction support.
  * Handles click/double-click for selection/editing, and applies visual styles.
  */
-export const TableCell = ({ cell, rowIndex, activeDatasetId }: TableCellProps) => {
+export const TableCell = ({ cell, rowIndex, activeDatasetId, isLoading }: TableCellProps) => {
   const {
     selectedCell,
     setSelectedCell,
@@ -85,6 +87,15 @@ export const TableCell = ({ cell, rowIndex, activeDatasetId }: TableCellProps) =
     zIndex: isSelected ? 5 : undefined,
     userSelect: "none" as const,
   };
+
+  // Show skeleton when loading (except checkbox column)
+  if (isLoading && meta.columnType !== "checkbox") {
+    return (
+      <td key={cell.id} style={{ verticalAlign: "middle" }}>
+        <Skeleton height="16px" width="100%" />
+      </td>
+    );
+  }
 
   // For dataset cells, use the EditableCell component
   if (meta.columnType === "dataset") {

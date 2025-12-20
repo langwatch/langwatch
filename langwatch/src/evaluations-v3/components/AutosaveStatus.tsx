@@ -1,5 +1,5 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { AlertCircle, Check, Cloud } from "lucide-react";
+import { AlertCircle, Check, Cloud, RefreshCw } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
 import type { AutosaveState } from "../types";
 
@@ -37,7 +37,7 @@ export function AutosaveStatus({
     }
     if (isSaving) {
       return {
-        icon: <Spinner size="xs" />,
+        icon: <RefreshCw size={12} />,
         text: "Saving...",
         color: "gray.500",
       };

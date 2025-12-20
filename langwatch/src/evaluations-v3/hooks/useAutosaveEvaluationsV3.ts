@@ -22,6 +22,7 @@ export const useAutosaveEvaluationsV3 = () => {
   const router = useRouter();
   const lastAutosaveRef = useRef(0);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLoadedExistingRef = useRef(false);
 
   const {
     experimentId,
@@ -35,6 +36,7 @@ export const useAutosaveEvaluationsV3 = () => {
     setExperimentSlug,
     setName,
     setAutosaveStatus,
+    loadState,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       experimentId: state.experimentId,
@@ -48,6 +50,7 @@ export const useAutosaveEvaluationsV3 = () => {
       setExperimentSlug: state.setExperimentSlug,
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
+      loadState: state.loadState,
     }))
   );
 
@@ -82,13 +85,16 @@ export const useAutosaveEvaluationsV3 = () => {
 
   const routerSlug = router.query.slug as string | undefined;
 
+  // Only try to load existing experiment if we don't already have an experimentId loaded
+  const shouldLoadExisting = !!project && !!routerSlug && !experimentId && !hasLoadedExistingRef.current;
+
   // Load existing experiment if navigating to one
   const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
     {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
     },
-    { enabled: !!project && !!routerSlug && !experimentSlug }
+    { enabled: shouldLoadExisting }
   );
 
   // Update URL when experiment slug changes
@@ -103,13 +109,32 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
 
-  // Load existing experiment data into store
+  // Load existing experiment data into store OR set slug from URL for new experiments
   useEffect(() => {
-    if (existingExperiment.data?.wizardState) {
-      // The store actions will be used to set the loaded state
-      // This is handled by the parent component/page
+    if (existingExperiment.data && !hasLoadedExistingRef.current) {
+      hasLoadedExistingRef.current = true;
+
+      // Set experiment ID and slug first
+      setExperimentId(existingExperiment.data.id);
+      setExperimentSlug(existingExperiment.data.slug);
+
+      // Load the full wizard state if available
+      if (existingExperiment.data.wizardState && loadState) {
+        loadState(existingExperiment.data.wizardState);
+      }
+    } else if (
+      !existingExperiment.isLoading &&
+      !existingExperiment.data &&
+      routerSlug &&
+      !hasLoadedExistingRef.current &&
+      !experimentSlug
+    ) {
+      // No existing experiment found - this is a new one
+      // Set the slug from the URL so it's included in the first save
+      hasLoadedExistingRef.current = true;
+      setExperimentSlug(routerSlug);
     }
-  }, [existingExperiment.data]);
+  }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
 
   // Clear the saved timeout on unmount
   useEffect(() => {
@@ -134,16 +159,19 @@ export const useAutosaveEvaluationsV3 = () => {
   // Autosave effect
   useEffect(() => {
     if (!project) return;
-    if ((!!experimentSlug || !!routerSlug) && !existingExperiment.data && existingExperiment.isLoading) return;
+    // Only wait if we're actually trying to load an existing experiment
+    if (shouldLoadExisting && existingExperiment.isLoading) return;
+    // Don't save while we're loading an existing experiment
+    if (existingExperiment.isLoading) return;
     if (!name) return;
 
     const now = Date.now();
     if (now - lastAutosaveRef.current < 100) return;
     lastAutosaveRef.current = now;
 
-    // Only save if there are actual changes from initial state
+    // Only save if we have an existing experiment OR there are actual changes from initial state
     if (
-      !!existingExperiment.data?.id ||
+      !!experimentId ||
       stringifiedState !== stringifiedInitialState
     ) {
       setAutosaveStatus("evaluation", "saving");
@@ -152,7 +180,7 @@ export const useAutosaveEvaluationsV3 = () => {
         try {
           const updatedExperiment = await saveExperiment.mutateAsync({
             projectId: project.id,
-            experimentId: experimentId ?? existingExperiment.data?.id,
+            experimentId: experimentId,
             // Cast to any since the actual types are more complex than the schema
             // The schema is designed to be lenient for storage
             state: persistedState as Parameters<typeof saveExperiment.mutateAsync>[0]["state"],
@@ -185,7 +213,7 @@ export const useAutosaveEvaluationsV3 = () => {
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stringifiedState]);
+  }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
 
   return {
     isLoading: existingExperiment.isLoading,

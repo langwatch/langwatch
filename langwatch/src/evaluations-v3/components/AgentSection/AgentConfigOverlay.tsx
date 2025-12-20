@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import {
   Box,
   Button,
@@ -9,7 +10,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -146,7 +146,7 @@ export function AgentConfigPanel() {
 
   const handleSave = useCallback(() => {
     const agentConfig: AgentConfig = {
-      id: existingAgent?.id ?? `agent-${nanoid(8)}`,
+      id: existingAgent?.id ?? generate("agent").toString(),
       type: agentType,
       name: name || `${agentType === "llm" ? "LLM" : "Code"} Agent`,
       inputs: detectedInputs.map((id) => ({ identifier: id, type: "str" })),
