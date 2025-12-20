@@ -49,6 +49,9 @@ vi.mock("~/utils/api", () => ({
       update: {
         useMutation: () => ({ mutate: mockUpdateMutate }),
       },
+      deleteMany: {
+        useMutation: () => ({ mutate: vi.fn() }),
+      },
     },
   },
 }));
