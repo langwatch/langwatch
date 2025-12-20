@@ -15,6 +15,9 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 // Max characters to display before truncating (for rendering performance)
 const MAX_DISPLAY_CHARS = 5000;
 
+// Max height in pixels for compact mode before showing fade
+const COMPACT_MAX_HEIGHT = 100;
+
 // Column types that should be formatted as JSON
 const JSON_LIKE_TYPES: DatasetColumnType[] = [
   "json",
@@ -74,13 +77,23 @@ type EditableCellProps = {
  * This component only handles the edit mode textarea.
  */
 export function EditableCell({ value, row, columnId, datasetId, dataType }: EditableCellProps) {
-  const { setCellValue, setEditingCell, ui, setSelectedCell } =
-    useEvaluationsV3Store((state) => ({
-      setCellValue: state.setCellValue,
-      setEditingCell: state.setEditingCell,
-      ui: state.ui,
-      setSelectedCell: state.setSelectedCell,
-    }));
+  const {
+    setCellValue,
+    setEditingCell,
+    ui,
+    setSelectedCell,
+    toggleCellExpanded,
+  } = useEvaluationsV3Store((state) => ({
+    setCellValue: state.setCellValue,
+    setEditingCell: state.setEditingCell,
+    ui: state.ui,
+    setSelectedCell: state.setSelectedCell,
+    toggleCellExpanded: state.toggleCellExpanded,
+  }));
+
+  const rowHeightMode = ui.rowHeightMode;
+  const cellKey = `${row}-${columnId}`;
+  const isCellExpanded = ui.expandedCells.has(cellKey);
 
   const isEditing =
     ui.editingCell?.row === row && ui.editingCell?.columnId === columnId;
@@ -190,6 +203,30 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
     };
   }, [value, dataType]);
 
+  // Track if content overflows in compact mode
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (contentRef.current && rowHeightMode === "compact" && !isCellExpanded) {
+      const isContentOverflowing = contentRef.current.scrollHeight > COMPACT_MAX_HEIGHT;
+      setIsOverflowing(isContentOverflowing);
+    } else {
+      setIsOverflowing(false);
+    }
+  }, [displayValue.text, rowHeightMode, isCellExpanded]);
+
+  // Determine if we should show clamped view
+  const showClamped = rowHeightMode === "compact" && !isCellExpanded && isOverflowing;
+
+  const handleExpandClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation(); // Don't trigger cell selection
+      toggleCellExpanded(row, columnId);
+    },
+    [toggleCellExpanded, row, columnId]
+  );
+
   return (
     <>
       {/* Cell display - click/dblclick handled by parent td */}
@@ -197,17 +234,72 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
         ref={cellRef}
         data-testid={`cell-${row}-${columnId}`}
         minHeight="20px"
-        fontSize="13px"
+        fontSize={displayValue.isJson ? "12px" : "13px"}
         whiteSpace="pre-wrap"
         wordBreak="break-word"
         opacity={isEditing ? 0 : 1}
         fontFamily={displayValue.isJson ? "mono" : undefined}
-        color={displayValue.truncated ? undefined : undefined}
+        position="relative"
       >
-        {displayValue.text}
-        {displayValue.truncated && (
-          <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
-            (truncated)
+        {/* Content container with optional max-height */}
+        <Box
+          ref={contentRef}
+          maxHeight={showClamped ? `${COMPACT_MAX_HEIGHT}px` : undefined}
+          overflow={showClamped ? "hidden" : undefined}
+        >
+          {displayValue.text}
+          {displayValue.truncated && (
+            <Box as="span" color="gray.400" fontSize="11px" marginLeft={1}>
+              (truncated)
+            </Box>
+          )}
+        </Box>
+
+        {/* Fade overlay for clamped content */}
+        {showClamped && (
+          <Box
+            position="absolute"
+            bottom={0}
+            left={0}
+            right={0}
+            height="40px"
+            background="linear-gradient(to bottom, transparent, white)"
+            cursor="pointer"
+            onClick={handleExpandClick}
+            display="flex"
+            alignItems="flex-end"
+            justifyContent="center"
+            paddingBottom={1}
+            _hover={{
+              "& > span": {
+                color: "blue.500",
+              },
+            }}
+          >
+            <Box
+              as="span"
+              fontSize="10px"
+              color="gray.400"
+              fontWeight="medium"
+              transition="color 0.15s"
+            >
+              Click to expand
+            </Box>
+          </Box>
+        )}
+
+        {/* Collapse button for expanded cells in compact mode */}
+        {rowHeightMode === "compact" && isCellExpanded && (
+          <Box
+            marginTop={2}
+            fontSize="10px"
+            color="gray.400"
+            cursor="pointer"
+            onClick={handleExpandClick}
+            textAlign="center"
+            _hover={{ color: "blue.500" }}
+          >
+            Click to collapse
           </Box>
         )}
       </Box>

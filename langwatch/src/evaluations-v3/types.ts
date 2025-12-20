@@ -150,6 +150,8 @@ export type CellPosition = {
   columnId: string;
 };
 
+export type RowHeightMode = "compact" | "expanded";
+
 export type UIState = {
   openOverlay?: OverlayType;
   overlayTargetId?: string; // which agent is being configured
@@ -164,6 +166,10 @@ export type UIState = {
   };
   // Column widths for resizing (columnId -> width in pixels)
   columnWidths: Record<string, number>;
+  // Row height mode: compact shows limited height with fade, expanded shows all
+  rowHeightMode: RowHeightMode;
+  // Cells that are individually expanded in compact mode (row-columnId keys)
+  expandedCells: Set<string>;
 };
 
 // ============================================================================
@@ -300,6 +306,8 @@ export type EvaluationsV3Actions = {
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
+  setRowHeightMode: (mode: RowHeightMode) => void;
+  toggleCellExpanded: (row: number, columnId: string) => void;
 
   // Reset
   reset: () => void;
@@ -345,6 +353,8 @@ export const createInitialResults = (): EvaluationResults => ({
 export const createInitialUIState = (): UIState => ({
   selectedRows: new Set(),
   columnWidths: {},
+  rowHeightMode: "compact",
+  expandedCells: new Set(),
 });
 
 export const createInitialState = (): EvaluationsV3State => ({
