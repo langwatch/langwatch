@@ -56,7 +56,7 @@ Feature: Dataset management in evaluations workbench
     And I select "Select existing dataset" from the dropdown
     Then a drawer opens with title "Choose Dataset"
     And I see a search input to filter datasets
-    And I see a list of datasets with name, column count, and last edit date
+    And I see a list of datasets with entry count, column count, and last edit date
 
   Scenario: Search datasets in drawer
     Given the "Choose Dataset" drawer is open
@@ -154,6 +154,25 @@ Feature: Dataset management in evaluations workbench
     And I can edit the dataset name
     And I can add, remove, or rename columns
     And changes are applied to the current active dataset
+
+  Scenario: Toggle column visibility in edit panel
+    When I click the edit button in the dataset header
+    Then each column row shows an eye icon button
+    When I click the eye icon for column "metadata"
+    Then the "metadata" column is hidden from the table
+    And the eye icon changes to indicate hidden state
+
+  Scenario: Column visibility is UI-only state
+    Given the "metadata" column is hidden via the eye toggle
+    When I save the dataset
+    Then the column visibility state is NOT saved to the dataset
+    And the column visibility persists only in the evaluation UI state
+
+  Scenario: Show hidden column again
+    Given the "metadata" column is hidden
+    When I click the edit button in the dataset header
+    And I click the eye icon for column "metadata"
+    Then the "metadata" column reappears in the table
 
   # ============================================================================
   # Execution with active dataset

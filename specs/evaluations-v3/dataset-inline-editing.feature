@@ -72,7 +72,7 @@ Feature: Dataset inline editing
     Given the dataset has 3 rows
     When I click the checkbox for row 0
     Then row 0 is selected
-    And the row has a selected background style
+    And all cells in row 0 have a blue selection background
 
   Scenario: Select multiple rows with checkboxes
     Given the dataset has 3 rows
@@ -103,9 +103,33 @@ Feature: Dataset inline editing
     And I press Cmd+Shift+Z
     Then the cell at row 0, column "input" displays "modified"
 
-  Scenario: Delete selected rows
+  Scenario: Delete selected rows shows confirmation
     Given the dataset has 3 rows
     And rows 0 and 2 are selected via checkboxes
     When I click the "Delete" button in the selection toolbar
+    Then a confirmation dialog appears asking "Delete 2 rows?"
+
+  Scenario: Confirm row deletion
+    Given the dataset has 3 rows
+    And rows 0 and 2 are selected via checkboxes
+    And I click the "Delete" button in the selection toolbar
+    When I click "Delete" in the confirmation dialog
     Then rows 0 and 2 are removed from the dataset
     And the dataset now has 1 row
+    And the row selection is cleared
+
+  Scenario: Cancel row deletion
+    Given the dataset has 3 rows
+    And rows 0 and 2 are selected via checkboxes
+    And I click the "Delete" button in the selection toolbar
+    When I click "Cancel" in the confirmation dialog
+    Then all 3 rows remain in the dataset
+    And rows 0 and 2 are still selected
+
+  Scenario: Deleting all rows preserves one empty row
+    Given the dataset has 3 rows
+    And all 3 rows are selected via the header checkbox
+    When I click the "Delete" button in the selection toolbar
+    And I confirm the deletion
+    Then the dataset has 1 empty row
+    And I can continue adding data to the empty row
