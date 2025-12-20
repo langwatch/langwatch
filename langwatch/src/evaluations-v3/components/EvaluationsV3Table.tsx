@@ -560,9 +560,13 @@ export function EvaluationsV3Table() {
           padding: "8px 12px",
           fontSize: "13px",
           verticalAlign: "top",
+          // CSS variable for fade overlay gradient
+          "--cell-bg": "white",
         },
         "& tr:hover td": {
           backgroundColor: "var(--chakra-colors-gray-50)",
+          // Update CSS variable for fade overlay on hover
+          "--cell-bg": "var(--chakra-colors-gray-50)",
         },
       }}
     >

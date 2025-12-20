@@ -255,52 +255,21 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
           )}
         </Box>
 
-        {/* Fade overlay for clamped content */}
+        {/* Fade overlay for clamped content - extends to cell edges */}
         {showClamped && (
           <Box
             position="absolute"
-            bottom={0}
-            left={0}
-            right={0}
+            bottom={"-8px"}
+            left={"-12px"}
+            right={"-12px"}
             height="40px"
-            background="linear-gradient(to bottom, transparent, white)"
             cursor="pointer"
             onClick={handleExpandClick}
-            display="flex"
-            alignItems="flex-end"
-            justifyContent="center"
-            paddingBottom={1}
-            _hover={{
-              "& > span": {
-                color: "blue.500",
-              },
+            className="cell-fade-overlay"
+            css={{
+              background: "linear-gradient(to bottom, transparent, var(--cell-bg, white))",
             }}
-          >
-            <Box
-              as="span"
-              fontSize="10px"
-              color="gray.400"
-              fontWeight="medium"
-              transition="color 0.15s"
-            >
-              Click to expand
-            </Box>
-          </Box>
-        )}
-
-        {/* Collapse button for expanded cells in compact mode */}
-        {rowHeightMode === "compact" && isCellExpanded && (
-          <Box
-            marginTop={2}
-            fontSize="10px"
-            color="gray.400"
-            cursor="pointer"
-            onClick={handleExpandClick}
-            textAlign="center"
-            _hover={{ color: "blue.500" }}
-          >
-            Click to collapse
-          </Box>
+          />
         )}
       </Box>
 
