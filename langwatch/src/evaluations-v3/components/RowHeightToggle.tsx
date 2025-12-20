@@ -1,5 +1,5 @@
-import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { AlignJustify, Maximize2, SlidersHorizontal } from "lucide-react";
+import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal } from "lucide-react";
 
 import { Popover } from "~/components/ui/popover";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -15,12 +15,12 @@ const options: ToggleOption[] = [
   {
     value: "compact",
     label: "Compact",
-    icon: <AlignJustify size={18} />,
+    icon: <ListChevronsDownUp size={18} />,
   },
   {
     value: "expanded",
     label: "Expanded",
-    icon: <Maximize2 size={18} />,
+    icon: <ListChevronsUpDown size={18} />,
   },
 ];
 
@@ -56,34 +56,23 @@ export function RowHeightToggle() {
             {options.map((option) => {
               const isActive = rowHeightMode === option.value;
               return (
-                <Box
+                <Button
                   key={option.value}
-                  as="button"
+                  variant={isActive ? "surface" : "ghost"}
                   onClick={() => setRowHeightMode(option.value)}
-                  paddingX={4}
-                  paddingY={3}
                   display="flex"
                   flexDirection="column"
                   alignItems="center"
                   gap={1.5}
-                  fontSize="12px"
-                  fontWeight={isActive ? "medium" : "normal"}
-                  color={isActive ? "gray.800" : "gray.500"}
-                  bg={isActive ? "white" : "gray.50"}
-                  border="1px solid"
-                  borderColor={isActive ? "gray.300" : "gray.200"}
-                  borderRadius="md"
-                  cursor="pointer"
-                  transition="all 0.15s"
+                  paddingX={4}
+                  paddingY={3}
+                  height="auto"
                   minWidth="80px"
-                  _hover={{
-                    borderColor: "gray.300",
-                    bg: isActive ? "white" : "gray.100",
-                  }}
+                  fontSize="12px"
                 >
                   {option.icon}
                   <Text>{option.label}</Text>
-                </Box>
+                </Button>
               );
             })}
           </HStack>
