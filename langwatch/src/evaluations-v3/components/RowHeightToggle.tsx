@@ -1,6 +1,7 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { AlignJustify, Maximize2 } from "lucide-react";
+import { Box, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { AlignJustify, Maximize2, SlidersHorizontal } from "lucide-react";
 
+import { Popover } from "~/components/ui/popover";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { RowHeightMode } from "../types";
 
@@ -14,17 +15,17 @@ const options: ToggleOption[] = [
   {
     value: "compact",
     label: "Compact",
-    icon: <AlignJustify size={14} />,
+    icon: <AlignJustify size={18} />,
   },
   {
     value: "expanded",
     label: "Expanded",
-    icon: <Maximize2 size={14} />,
+    icon: <Maximize2 size={18} />,
   },
 ];
 
 /**
- * Toggle button to switch between compact and expanded row height modes.
+ * Popover with toggle options for row height mode.
  * Compact mode shows a limited height with fade effect.
  * Expanded mode shows all content (up to character limit).
  */
@@ -35,45 +36,59 @@ export function RowHeightToggle() {
   }));
 
   return (
-    <HStack
-      gap={0}
-      borderRadius="md"
-      border="1px solid"
-      borderColor="gray.200"
-      overflow="hidden"
-      bg="gray.50"
-    >
-      {options.map((option) => {
-        const isActive = rowHeightMode === option.value;
-        return (
-          <Box
-            key={option.value}
-            as="button"
-            onClick={() => setRowHeightMode(option.value)}
-            paddingX={3}
-            paddingY={1.5}
-            display="flex"
-            alignItems="center"
-            gap={1.5}
-            fontSize="13px"
-            fontWeight={isActive ? "medium" : "normal"}
-            color={isActive ? "gray.800" : "gray.500"}
-            bg={isActive ? "white" : "transparent"}
-            borderRight={option.value === "compact" ? "1px solid" : undefined}
-            borderColor="gray.200"
-            boxShadow={isActive ? "sm" : undefined}
-            cursor="pointer"
-            transition="all 0.15s"
-            _hover={{
-              color: isActive ? "gray.800" : "gray.700",
-              bg: isActive ? "white" : "gray.100",
-            }}
-          >
-            {option.icon}
-            <Text>{option.label}</Text>
-          </Box>
-        );
-      })}
-    </HStack>
+    <Popover.Root>
+      <Popover.Trigger asChild>
+        <IconButton
+          variant="ghost"
+          size="sm"
+          color="gray.500"
+          _hover={{ color: "gray.700", bg: "gray.100" }}
+        >
+          <SlidersHorizontal size={18} />
+        </IconButton>
+      </Popover.Trigger>
+      <Popover.Content width="auto" padding={3}>
+        <VStack align="stretch" gap={2}>
+          <Text fontSize="xs" fontWeight="medium" color="gray.500">
+            Row height
+          </Text>
+          <HStack gap={2}>
+            {options.map((option) => {
+              const isActive = rowHeightMode === option.value;
+              return (
+                <Box
+                  key={option.value}
+                  as="button"
+                  onClick={() => setRowHeightMode(option.value)}
+                  paddingX={4}
+                  paddingY={3}
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  gap={1.5}
+                  fontSize="12px"
+                  fontWeight={isActive ? "medium" : "normal"}
+                  color={isActive ? "gray.800" : "gray.500"}
+                  bg={isActive ? "white" : "gray.50"}
+                  border="1px solid"
+                  borderColor={isActive ? "gray.300" : "gray.200"}
+                  borderRadius="md"
+                  cursor="pointer"
+                  transition="all 0.15s"
+                  minWidth="80px"
+                  _hover={{
+                    borderColor: "gray.300",
+                    bg: isActive ? "white" : "gray.100",
+                  }}
+                >
+                  {option.icon}
+                  <Text>{option.label}</Text>
+                </Box>
+              );
+            })}
+          </HStack>
+        </VStack>
+      </Popover.Content>
+    </Popover.Root>
   );
 }
