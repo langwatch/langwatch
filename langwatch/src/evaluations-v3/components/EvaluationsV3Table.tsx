@@ -13,6 +13,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
@@ -44,6 +45,9 @@ type RowData = {
 export function EvaluationsV3Table() {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
+
+  // Sync saved dataset changes to DB
+  useDatasetSync();
 
   const {
     datasets,
@@ -111,110 +115,6 @@ export function EvaluationsV3Table() {
       enabled: !!project?.id && !!pendingDatasetLoad,
     }
   );
-
-  // Mutations for saved dataset records
-  const updateSavedRecord = api.datasetRecord.update.useMutation();
-  const deleteSavedRecords = api.datasetRecord.deleteMany.useMutation();
-
-  // Get pending changes from store for syncing
-  const { pendingSavedChanges, clearPendingChange } = useEvaluationsV3Store((state) => ({
-    pendingSavedChanges: state.pendingSavedChanges,
-    clearPendingChange: state.clearPendingChange,
-  }));
-
-  // Effect to sync pending changes to DB (debounced)
-  const pendingChangesRef = useRef(pendingSavedChanges);
-  pendingChangesRef.current = pendingSavedChanges;
-  const datasetsRef = useRef(datasets);
-  datasetsRef.current = datasets;
-
-  useEffect(() => {
-    if (!project?.id) return;
-
-    // Find datasets and records that need syncing
-    const datasetsToSync = Object.keys(pendingSavedChanges);
-    if (datasetsToSync.length === 0) return;
-
-    // Debounce sync to avoid too many requests
-    const timeoutId = setTimeout(() => {
-      for (const dbDatasetId of datasetsToSync) {
-        const recordChanges = pendingChangesRef.current[dbDatasetId];
-        if (!recordChanges) continue;
-
-        // Find the dataset in our state to get the full record data
-        const dataset = datasetsRef.current.find(
-          (d) => d.type === "saved" && d.datasetId === dbDatasetId
-        );
-
-        // Separate deletions from updates
-        const recordsToDelete: string[] = [];
-        const recordsToUpdate: Array<{ recordId: string; changes: Record<string, unknown> }> = [];
-
-        for (const [recordId, changes] of Object.entries(recordChanges)) {
-          if (!changes || Object.keys(changes).length === 0) continue;
-
-          if ("_delete" in changes && changes._delete === true) {
-            recordsToDelete.push(recordId);
-          } else {
-            recordsToUpdate.push({ recordId, changes });
-          }
-        }
-
-        // Handle deletions
-        if (recordsToDelete.length > 0) {
-          deleteSavedRecords.mutate(
-            {
-              projectId: project.id,
-              datasetId: dbDatasetId,
-              recordIds: recordsToDelete,
-            },
-            {
-              onSuccess: () => {
-                for (const recordId of recordsToDelete) {
-                  clearPendingChange(dbDatasetId, recordId);
-                }
-              },
-              onError: (error) => {
-                console.error("Failed to delete saved records:", error);
-              },
-            }
-          );
-        }
-
-        // Handle updates
-        if (dataset?.savedRecords) {
-          for (const { recordId } of recordsToUpdate) {
-            // Find the full record to send all columns (backend replaces entire entry)
-            const fullRecord = dataset.savedRecords.find((r) => r.id === recordId);
-            if (!fullRecord) continue;
-
-            // Build the full record data (excluding the 'id' field which is metadata)
-            const { id: _id, ...recordData } = fullRecord;
-
-            // Sync this record to DB with full data
-            updateSavedRecord.mutate(
-              {
-                projectId: project.id,
-                datasetId: dbDatasetId,
-                recordId,
-                updatedRecord: recordData,
-              },
-              {
-                onSuccess: () => {
-                  clearPendingChange(dbDatasetId, recordId);
-                },
-                onError: (error) => {
-                  console.error("Failed to sync saved record:", error);
-                },
-              }
-            );
-          }
-        }
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [pendingSavedChanges, project?.id, updateSavedRecord, deleteSavedRecords, clearPendingChange]);
 
   // Effect to handle when saved dataset records finish loading
   useEffect(() => {

@@ -942,6 +942,19 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setAutosaveStatus: (type, state, error) => {
+    set((currentState) => ({
+      ui: {
+        ...currentState.ui,
+        autosaveStatus: {
+          ...currentState.ui.autosaveStatus,
+          [type]: state,
+          [`${type}Error`]: error,
+        },
+      },
+    }));
+  },
+
   // -------------------------------------------------------------------------
   // Reset
   // -------------------------------------------------------------------------
@@ -956,8 +969,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 // ============================================================================
 
 /**
- * State subset that should be tracked for undo/redo.
- * Excludes UI state and results since they're transient.
+ * State subset used for equality comparison to determine if a new history entry should be created.
+ *
+ * IMPORTANT: We intentionally EXCLUDE selectedCell from equality comparison.
+ * This means navigation-only changes won't create new undo entries.
+ * However, when a content change DOES happen, the full state (including selectedCell)
+ * is saved, so undo will restore both the content AND the selection at that point.
  */
 type PartializedState = Pick<
   EvaluationsV3State,
@@ -965,8 +982,9 @@ type PartializedState = Pick<
 >;
 
 /**
- * Partialize state for undo/redo comparison.
- * We exclude UI state and results from undo/redo tracking since they're transient.
+ * Partialize state for equality comparison only.
+ * Used to determine if a new history entry should be created.
+ * Does NOT include selectedCell - navigation alone won't create undo entries.
  */
 const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   name: state.name,
@@ -978,6 +996,8 @@ const partializeState = (state: EvaluationsV3Store): PartializedState => ({
 
 /**
  * Create the store with temporal middleware for undo/redo support.
+ * Note: We use performUndo/performRedo which clear editingCell after undo/redo
+ * to prevent users from getting stuck in edit mode when undoing.
  */
 export const useEvaluationsV3Store = create<EvaluationsV3Store>()(
   temporal(storeImpl, {
@@ -1039,4 +1059,30 @@ export const useUndo = () => {
  */
 export const useRedo = () => {
   return useEvaluationsV3Store.temporal.getState().redo;
+};
+
+/**
+ * Perform undo and clear editingCell to prevent getting stuck in edit mode.
+ * Use this instead of temporal.getState().undo() directly.
+ */
+export const performUndo = () => {
+  const temporal = useEvaluationsV3Store.temporal.getState();
+  if (temporal.pastStates.length > 0) {
+    temporal.undo();
+    // Clear editingCell after undo - we want to restore content, not edit mode
+    useEvaluationsV3Store.getState().setEditingCell(undefined);
+  }
+};
+
+/**
+ * Perform redo and clear editingCell to prevent getting stuck in edit mode.
+ * Use this instead of temporal.getState().redo() directly.
+ */
+export const performRedo = () => {
+  const temporal = useEvaluationsV3Store.temporal.getState();
+  if (temporal.futureStates.length > 0) {
+    temporal.redo();
+    // Clear editingCell after redo - we want to restore content, not edit mode
+    useEvaluationsV3Store.getState().setEditingCell(undefined);
+  }
 };
