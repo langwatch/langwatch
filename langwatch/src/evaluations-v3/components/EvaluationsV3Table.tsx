@@ -400,6 +400,7 @@ export function EvaluationsV3Table() {
           meta: {
             columnType: "dataset" as ColumnType,
             columnId: column.id,
+            dataType: column.type,
           },
         }) as ColumnDef<RowData>
       );
@@ -489,7 +490,7 @@ export function EvaluationsV3Table() {
   const agentsColSpan = Math.max(agents.length, 1);
 
   // Height of the super header row (Dataset/Agents row)
-  const SUPER_HEADER_HEIGHT = 48;
+  const SUPER_HEADER_HEIGHT = 51;
 
   return (
     <Box
@@ -498,7 +499,8 @@ export function EvaluationsV3Table() {
       css={{
         "& table": {
           width: "100%",
-          borderCollapse: "collapse",
+          borderCollapse: "separate",
+          borderSpacing: "0",
         },
         // Super header row (first row in thead)
         "& thead tr:first-of-type th": {
@@ -524,21 +526,32 @@ export function EvaluationsV3Table() {
           fontSize: "13px",
           position: "relative",
         },
-        // Resize handle styles
+        // Resize handle styles - wider hit area, narrow visible indicator
         "& .resizer": {
           position: "absolute",
-          right: 0,
+          right: "-6px",
           top: 0,
           height: "100%",
-          width: "5px",
+          width: "12px",
           cursor: "col-resize",
           userSelect: "none",
           touchAction: "none",
-          opacity: 0,
-          background: "var(--chakra-colors-blue-400)",
-          transition: "opacity 0.15s",
+          zIndex: 1,
+          // Visible indicator is a pseudo-element
+          "&::after": {
+            content: '""',
+            position: "absolute",
+            right: "5px",
+            top: 0,
+            height: "100%",
+            width: "4px",
+            background: "var(--chakra-colors-blue-400)",
+            opacity: 0,
+            transition: "opacity 0.15s",
+          },
         },
-        "& th:hover .resizer, & .resizer.isResizing": {
+        // Only show indicator when hovering the resize area or actively resizing
+        "& .resizer:hover::after, & .resizer.isResizing::after": {
           opacity: 1,
         },
         "& td": {
