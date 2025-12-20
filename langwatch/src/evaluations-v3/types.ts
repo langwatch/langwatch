@@ -35,7 +35,7 @@ export type SavedRecord = {
  * Can be either inline (data stored here) or saved (reference to DB).
  */
 export type DatasetReference = {
-  id: string; // Unique ID in workbench (e.g., "test-data" or nanoid)
+  id: string; // Unique ID in workbench (e.g., "test-data" or ksuid)
   name: string; // Display name (tab label)
   type: "inline" | "saved";
   // For inline datasets - contains the actual data
@@ -332,6 +332,12 @@ export type EvaluationsV3Actions = {
 
   // Reset
   reset: () => void;
+
+  // Load state from saved experiment
+  loadState: (wizardState: unknown) => void;
+
+  // Update saved dataset records (used when loading from database)
+  setSavedDatasetRecords: (datasetId: string, records: SavedRecord[]) => void;
 };
 
 export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
