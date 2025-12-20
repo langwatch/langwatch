@@ -743,6 +743,117 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  deleteSelectedRows: (datasetId) => {
+    const state = get();
+    const selectedRows = state.ui.selectedRows;
+    if (selectedRows.size === 0) return;
+
+    const dataset = state.datasets.find((d) => d.id === datasetId);
+    if (!dataset) return;
+
+    // Sort indices in descending order to delete from end first
+    // This prevents index shifting issues
+    const sortedIndices = Array.from(selectedRows).sort((a, b) => b - a);
+
+    if (dataset.type === "inline" && dataset.inline) {
+      // For inline datasets, remove values from each column's array
+      set((currentState) => {
+        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
+        if (!currentDataset || currentDataset.type !== "inline" || !currentDataset.inline) {
+          return currentState;
+        }
+
+        const newRecords: Record<string, string[]> = {};
+
+        // For each column, filter out the selected row indices
+        for (const [columnId, values] of Object.entries(currentDataset.inline.records)) {
+          const newValues = values.filter((_, index) => !selectedRows.has(index));
+          newRecords[columnId] = newValues;
+        }
+
+        // Ensure we have at least one empty row (the "last empty white line")
+        const rowCount = Object.values(newRecords)[0]?.length ?? 0;
+        if (rowCount === 0) {
+          for (const columnId of Object.keys(newRecords)) {
+            newRecords[columnId] = [""];
+          }
+        }
+
+        return {
+          datasets: currentState.datasets.map((d) =>
+            d.id === datasetId
+              ? {
+                  ...d,
+                  inline: {
+                    ...d.inline!,
+                    records: newRecords,
+                  },
+                }
+              : d
+          ),
+          ui: {
+            ...currentState.ui,
+            selectedRows: new Set(),
+            // Clear editing/selection state to avoid referencing deleted rows
+            selectedCell: undefined,
+            editingCell: undefined,
+          },
+        };
+      });
+    } else if (dataset.type === "saved" && dataset.savedRecords) {
+      // For saved datasets, filter out the records and track which to delete from DB
+      set((currentState) => {
+        const currentDataset = currentState.datasets.find((d) => d.id === datasetId);
+        if (!currentDataset || currentDataset.type !== "saved" || !currentDataset.savedRecords) {
+          return currentState;
+        }
+
+        // Filter out selected records
+        const newRecords = currentDataset.savedRecords.filter(
+          (_, index) => !selectedRows.has(index)
+        );
+
+        // Track record IDs to delete (for existing records, not new ones)
+        const recordsToDelete = currentDataset.savedRecords
+          .filter((_, index) => selectedRows.has(index))
+          .map((record) => record.id)
+          .filter((id) => !id.startsWith("new_")); // Only delete persisted records
+
+        // Store pending deletions in pendingSavedChanges
+        const dbDatasetId = currentDataset.datasetId;
+        const pendingChanges = { ...currentState.pendingSavedChanges };
+
+        if (dbDatasetId && recordsToDelete.length > 0) {
+          // Mark records for deletion using nested structure: datasetId -> recordId -> { _delete: true }
+          if (!pendingChanges[dbDatasetId]) {
+            pendingChanges[dbDatasetId] = {};
+          }
+          for (const recordId of recordsToDelete) {
+            pendingChanges[dbDatasetId]![recordId] = { _delete: true };
+          }
+        }
+
+        return {
+          datasets: currentState.datasets.map((d) =>
+            d.id === datasetId
+              ? {
+                  ...d,
+                  savedRecords: newRecords,
+                }
+              : d
+          ),
+          pendingSavedChanges: pendingChanges,
+          ui: {
+            ...currentState.ui,
+            selectedRows: new Set(),
+            selectedCell: undefined,
+            editingCell: undefined,
+          },
+        };
+      });
+    }
+  },
+
   setExpandedEvaluator: (expanded) => {
     set((state) => ({
       ui: {

@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Database, Hash, List, MessageSquare, Plus, Type } from "react-feather";
+import { Database, Hash, List, MessageSquare, Plus, Type } from "lucide-react";
 
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { LLMIcon } from "~/components/icons/LLMIcon";
@@ -172,65 +172,3 @@ export function SuperHeader({
   );
 }
 
-// ============================================================================
-// Selection Toolbar
-// ============================================================================
-
-type SelectionToolbarProps = {
-  selectedCount: number;
-  onRun: () => void;
-  onDelete: () => void;
-  onClear: () => void;
-};
-
-export function SelectionToolbar({
-  selectedCount,
-  onRun,
-  onDelete,
-  onClear,
-}: SelectionToolbarProps) {
-  if (selectedCount === 0) return null;
-
-  return (
-    <HStack
-      position="fixed"
-      bottom={4}
-      left="50%"
-      transform="translateX(-50%)"
-      bg="gray.800"
-      color="white"
-      paddingX={4}
-      paddingY={2}
-      borderRadius="lg"
-      boxShadow="lg"
-      gap={3}
-      zIndex={100}
-    >
-      <Text fontSize="sm">{selectedCount} selected</Text>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onRun}
-      >
-        ▶ Run
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onDelete}
-      >
-        🗑 Delete
-      </Button>
-      <Button
-        size="sm"
-        variant="ghost"
-        colorPalette="whiteAlpha"
-        onClick={onClear}
-      >
-        ✕
-      </Button>
-    </HStack>
-  );
-}

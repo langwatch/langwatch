@@ -23,9 +23,9 @@ import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
 import { AgentCellContent, AgentHeader } from "./AgentSection/AgentCell";
 import {
   ColumnTypeIcon,
-  SelectionToolbar,
   SuperHeader,
 } from "./TableUI";
+import { SelectionToolbar } from "./SelectionToolbar";
 
 // ============================================================================
 // Types
@@ -58,6 +58,7 @@ export function EvaluationsV3Table() {
     toggleRowSelection,
     selectAllRows,
     clearRowSelection,
+    deleteSelectedRows,
     getRowCount,
     addDataset,
     setActiveDataset,
@@ -80,6 +81,7 @@ export function EvaluationsV3Table() {
     toggleRowSelection: state.toggleRowSelection,
     selectAllRows: state.selectAllRows,
     clearRowSelection: state.clearRowSelection,
+    deleteSelectedRows: state.deleteSelectedRows,
     getRowCount: state.getRowCount,
     addDataset: state.addDataset,
     setActiveDataset: state.setActiveDataset,
@@ -110,8 +112,9 @@ export function EvaluationsV3Table() {
     }
   );
 
-  // Mutation to update saved dataset records
+  // Mutations for saved dataset records
   const updateSavedRecord = api.datasetRecord.update.useMutation();
+  const deleteSavedRecords = api.datasetRecord.deleteMany.useMutation();
 
   // Get pending changes from store for syncing
   const { pendingSavedChanges, clearPendingChange } = useEvaluationsV3Store((state) => ({
@@ -142,41 +145,76 @@ export function EvaluationsV3Table() {
         const dataset = datasetsRef.current.find(
           (d) => d.type === "saved" && d.datasetId === dbDatasetId
         );
-        if (!dataset?.savedRecords) continue;
+
+        // Separate deletions from updates
+        const recordsToDelete: string[] = [];
+        const recordsToUpdate: Array<{ recordId: string; changes: Record<string, unknown> }> = [];
 
         for (const [recordId, changes] of Object.entries(recordChanges)) {
           if (!changes || Object.keys(changes).length === 0) continue;
 
-          // Find the full record to send all columns (backend replaces entire entry)
-          const fullRecord = dataset.savedRecords.find((r) => r.id === recordId);
-          if (!fullRecord) continue;
+          if ("_delete" in changes && changes._delete === true) {
+            recordsToDelete.push(recordId);
+          } else {
+            recordsToUpdate.push({ recordId, changes });
+          }
+        }
 
-          // Build the full record data (excluding the 'id' field which is metadata)
-          const { id: _id, ...recordData } = fullRecord;
-
-          // Sync this record to DB with full data
-          updateSavedRecord.mutate(
+        // Handle deletions
+        if (recordsToDelete.length > 0) {
+          deleteSavedRecords.mutate(
             {
               projectId: project.id,
               datasetId: dbDatasetId,
-              recordId,
-              updatedRecord: recordData,
+              recordIds: recordsToDelete,
             },
             {
               onSuccess: () => {
-                clearPendingChange(dbDatasetId, recordId);
+                for (const recordId of recordsToDelete) {
+                  clearPendingChange(dbDatasetId, recordId);
+                }
               },
               onError: (error) => {
-                console.error("Failed to sync saved record:", error);
+                console.error("Failed to delete saved records:", error);
               },
             }
           );
+        }
+
+        // Handle updates
+        if (dataset?.savedRecords) {
+          for (const { recordId } of recordsToUpdate) {
+            // Find the full record to send all columns (backend replaces entire entry)
+            const fullRecord = dataset.savedRecords.find((r) => r.id === recordId);
+            if (!fullRecord) continue;
+
+            // Build the full record data (excluding the 'id' field which is metadata)
+            const { id: _id, ...recordData } = fullRecord;
+
+            // Sync this record to DB with full data
+            updateSavedRecord.mutate(
+              {
+                projectId: project.id,
+                datasetId: dbDatasetId,
+                recordId,
+                updatedRecord: recordData,
+              },
+              {
+                onSuccess: () => {
+                  clearPendingChange(dbDatasetId, recordId);
+                },
+                onError: (error) => {
+                  console.error("Failed to sync saved record:", error);
+                },
+              }
+            );
+          }
         }
       }
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
-  }, [pendingSavedChanges, project?.id, updateSavedRecord, clearPendingChange]);
+  }, [pendingSavedChanges, project?.id, updateSavedRecord, deleteSavedRecords, clearPendingChange]);
 
   // Effect to handle when saved dataset records finish loading
   useEffect(() => {
@@ -576,6 +614,15 @@ export function EvaluationsV3Table() {
           // Update CSS variable for fade overlay on hover
           "--cell-bg": "var(--chakra-colors-gray-50)",
         },
+        // Selected row styling
+        "& tr[data-selected='true'] td": {
+          backgroundColor: "var(--chakra-colors-blue-50)",
+          "--cell-bg": "var(--chakra-colors-blue-50)",
+          "border-color": "var(--chakra-colors-blue-100)",
+        },
+        "& tr:has(+ tr[data-selected='true']) td": {
+          "border-bottom-color": "var(--chakra-colors-blue-100)",
+        }
       }}
     >
       <table ref={tableRef}>
@@ -626,7 +673,10 @@ export function EvaluationsV3Table() {
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
+            <tr
+              key={row.id}
+              data-selected={selectedRows.has(row.index) ? "true" : undefined}
+            >
               {row.getVisibleCells().map((cell) => (
                 <TableCell
                   key={cell.id}
@@ -644,9 +694,7 @@ export function EvaluationsV3Table() {
       <SelectionToolbar
         selectedCount={selectedRows.size}
         onRun={() => console.log("Run selected:", Array.from(selectedRows))}
-        onDelete={() =>
-          console.log("Delete selected:", Array.from(selectedRows))
-        }
+        onDelete={() => deleteSelectedRows(activeDatasetId)}
         onClear={clearRowSelection}
       />
 

@@ -303,6 +303,7 @@ export type EvaluationsV3Actions = {
   toggleRowSelection: (row: number) => void;
   selectAllRows: (rowCount: number) => void;
   clearRowSelection: () => void;
+  deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
     expanded: { agentId: string; evaluatorId: string; row: number } | undefined
   ) => void;
