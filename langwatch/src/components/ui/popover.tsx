@@ -15,7 +15,13 @@ export const PopoverContent = React.forwardRef<
   return (
     <Portal disabled={!portalled} container={portalRef}>
       <ChakraPopover.Positioner>
-        <ChakraPopover.Content ref={ref} {...rest} />
+        <ChakraPopover.Content
+          borderRadius="lg"
+          background="white/75"
+          backdropFilter="blur(8px)"
+          ref={ref}
+          {...rest}
+        />
       </ChakraPopover.Positioner>
     </Portal>
   );

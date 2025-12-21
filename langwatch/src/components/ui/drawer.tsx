@@ -21,7 +21,7 @@ export const DrawerContent = React.forwardRef<
           ref={ref}
           margin={2}
           borderRadius="lg"
-          background="rgba(255, 255, 255, 0.75)"
+          background="white/75"
           backdropFilter="blur(8px)"
           {...rest}
           asChild={false}

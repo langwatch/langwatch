@@ -145,6 +145,7 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
     return (
       <>
         <HStack
+          paddingX={4}
           borderBottomWidth={
             !!trace.metrics?.completion_tokens ||
             !!trace.metrics?.prompt_tokens ||
@@ -202,7 +203,14 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
           )}
         </HStack>
 
-        <HStack gap={3} marginY={8} wrap={"wrap"} width="full">
+        <HStack
+          gap={3}
+          paddingX={6}
+          marginTop={4}
+          marginBottom={8}
+          wrap={"wrap"}
+          width="full"
+        >
           {Object.entries({
             trace_id: trace.trace_id,
             ...trace.metadata,

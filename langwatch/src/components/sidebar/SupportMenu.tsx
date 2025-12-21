@@ -133,7 +133,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         </Tooltip>
 
         <Portal>
-          <Menu.Content onMouseLeave={() => setIsOpen(false)}>
+          <Menu.Content marginLeft={-1} onMouseLeave={() => setIsOpen(false)}>
             <Menu.Item value="github">
               <Link
                 isExternal

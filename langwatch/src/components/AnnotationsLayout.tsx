@@ -53,18 +53,16 @@ export default function AnnotationsLayout({
   const { openDrawer } = useDrawer();
 
   return (
-    <DashboardLayout background="gray.100">
+    <DashboardLayout>
       <HStack
         align="start"
         width="full"
         height="full"
-        background="gray.100"
         gap={0}
         position="relative"
       >
         <VStack
           align="start"
-          background="white"
           paddingY={5}
           borderRightWidth="1px"
           borderColor="gray.300"

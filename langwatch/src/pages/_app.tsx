@@ -80,33 +80,39 @@ export const system = createSystem(defaultConfig, {
       colors: {
         gray: {
           solid: { value: "{colors.gray.200}" },
+          hover: { value: "{colors.gray.300}" },
           contrast: { value: "{colors.gray.800}" },
           subtle: { value: "{colors.gray.200}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: "#ED8926" },
+          hover: { value: "{colors.orange.600}" },
           focusRing: { value: "rgb(49, 130, 206)" },
           subtle: { value: "{colors.orange.50}" },
           fg: { value: "{colors.orange.800}" },
         },
         green: {
           solid: { value: "{colors.green.500}" },
+          hover: { value: "{colors.green.600}" },
           subtle: { value: "{colors.green.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
           solid: { value: "{colors.blue.500}" },
+          hover: { value: "{colors.blue.600}" },
           subtle: { value: "{colors.blue.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
           solid: { value: "{colors.yellow.500}" },
+          hover: { value: "{colors.yellow.600}" },
           subtle: { value: "{colors.yellow.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
           solid: { value: "{colors.red.500}" },
+          hover: { value: "{colors.red.600}" },
           subtle: { value: "{colors.red.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
@@ -145,6 +151,11 @@ export const system = createSystem(defaultConfig, {
         },
         variants: {
           variant: {
+            solid: {
+              _hover: {
+                bg: "colorPalette.hover",
+              },
+            },
             outline: {
               borderColor: "gray.300",
               color: "gray.800",
@@ -157,6 +168,12 @@ export const system = createSystem(defaultConfig, {
             },
             ghost: {
               color: "gray.800",
+              _hover: {
+                backgroundColor: "gray.200",
+              },
+              _expanded: {
+                backgroundColor: "gray.200",
+              },
             },
           },
           size: {
