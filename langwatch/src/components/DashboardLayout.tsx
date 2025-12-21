@@ -1,7 +1,6 @@
 import {
   Alert,
   Avatar,
-  Badge,
   Box,
   Button,
   HStack,
@@ -18,7 +17,7 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -29,15 +28,12 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
-import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
-import { ChecklistIcon } from "./icons/Checklist";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
-import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
@@ -315,14 +311,6 @@ export const DashboardLayout = ({
 
   const [query, setQuery] = useState(router.query.query as string);
 
-  const integrationChecks = useIntegrationChecks();
-
-  const integrationsLeft = useMemo(() => {
-    return Object.entries(integrationChecks.data ?? {}).filter(
-      ([key, value]) => key !== "integrated" && !value,
-    ).length;
-  }, [integrationChecks.data]);
-
   if (typeof router.query.project === "string" && !isLoading && !project) {
     return <ErrorPage statusCode={404} />;
   }
@@ -468,43 +456,6 @@ export const DashboardLayout = ({
               </InputGroup>
             </form>
           )}
-
-          {integrationsLeft ? (
-            <Popover.Root positioning={{ placement: "bottom-end" }}>
-              <Popover.Trigger asChild>
-                <Button
-                  position="relative"
-                  variant="ghost"
-                  size="sm"
-                  padding={1}
-                  minWidth="auto"
-                >
-                  <ChecklistIcon
-                    style={{ maxWidth: "20px", maxHeight: "20px" }}
-                  />
-                  <Badge
-                    position="absolute"
-                    bottom="-2px"
-                    right="-2px"
-                    size="xs"
-                    color="white"
-                    backgroundColor="green.500"
-                    borderRadius="full"
-                    fontSize="10px"
-                    fontWeight="600"
-                    paddingX={1}
-                  >
-                    {integrationsLeft}
-                  </Badge>
-                </Button>
-              </Popover.Trigger>
-              <Popover.Content>
-                <Popover.Body>
-                  <IntegrationChecks />
-                </Popover.Body>
-              </Popover.Content>
-            </Popover.Root>
-          ) : null}
 
           <Menu.Root>
             <Menu.Trigger asChild>
