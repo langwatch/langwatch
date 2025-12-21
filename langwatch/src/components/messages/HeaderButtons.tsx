@@ -72,15 +72,13 @@ export function ToggleTableView() {
     <HStack
       background="gray.200"
       padding="3px"
-      borderRadius="6px"
-      border="1px solid"
-      borderColor="gray.350"
+      borderRadius="lg"
       gap={2}
       position="relative"
       marginRight={2}
     >
       <Box
-        background="gray.100"
+        background="white"
         position="absolute"
         height="32px"
         borderRadius="6px"

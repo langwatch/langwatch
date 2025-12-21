@@ -258,13 +258,13 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
+            <Heading>
               {props.datasetToSave?.datasetId || props.localOnly
                 ? "Edit Dataset"
                 : props.datasetToSave
                   ? "Save Dataset"
                   : "New Dataset"}
-            </Text>
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>

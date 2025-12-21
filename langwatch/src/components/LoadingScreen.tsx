@@ -17,6 +17,8 @@ export const LoadingScreen = () => {
     }, 50);
   }, []);
 
+  const fullLogo = <FullLogo width={155 * 1.2} height={38 * 1.2} />;
+
   return (
     <Box
       width="full"
@@ -36,12 +38,12 @@ export const LoadingScreen = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <FullLogo />
+              {fullLogo}
             </motion.div>
           )}
         </AnimatePresence>
       ) : (
-        <FullLogo />
+        fullLogo
       )}
     </Box>
   );

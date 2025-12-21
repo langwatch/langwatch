@@ -79,7 +79,7 @@ export const system = createSystem(defaultConfig, {
     semanticTokens: {
       colors: {
         gray: {
-          solid: { value: "{colors.gray.100}" },
+          solid: { value: "{colors.gray.200}" },
           contrast: { value: "{colors.gray.800}" },
           subtle: { value: "{colors.gray.200}" },
           focusRing: { value: "rgb(49, 130, 206)" },
@@ -114,10 +114,17 @@ export const system = createSystem(defaultConfig, {
     },
     recipes: {
       heading: defineRecipe({
+        base: {
+          fontWeight: "500",
+        },
         variants: {
           size: {
+            md: { textStyle: "md" },
             lg: { textStyle: "2xl" },
           },
+        },
+        defaultVariants: {
+          size: "md",
         },
       }),
       link: defineRecipe({
@@ -150,12 +157,6 @@ export const system = createSystem(defaultConfig, {
             },
             ghost: {
               color: "gray.800",
-              _hover: {
-                backgroundColor: "gray.50",
-              },
-              _expanded: {
-                backgroundColor: "gray.50",
-              },
             },
           },
           size: {
@@ -214,9 +215,14 @@ export const system = createSystem(defaultConfig, {
       }),
       input: defineRecipe({
         base: {
-          borderRadius: "l1",
+          borderRadius: "md",
         },
         variants: {
+          variant: {
+            outline: {
+              bg: "white/65",
+            },
+          },
           size: {
             xs: {
               "--input-height": "sizes.7",
@@ -456,13 +462,30 @@ export const system = createSystem(defaultConfig, {
         base: {
           trigger: {
             cursor: "pointer",
+            borderRadius: "md",
+            background: "white/65",
+          },
+        },
+      }),
+      nativeSelect: defineSlotRecipe({
+        slots: [],
+        variants: {
+          variant: {
+            outline: {
+              field: {
+                background: "white/65",
+              },
+            },
           },
         },
       }),
       drawer: defineSlotRecipe({
-        slots: ["content"],
+        slots: ["content", "header"],
         base: {
           content: { maxWidth: "70%" },
+          header: {
+            paddingY: 4
+          }
         },
         variants: {
           size: {

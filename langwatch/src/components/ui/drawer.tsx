@@ -17,7 +17,15 @@ export const DrawerContent = React.forwardRef<
   return (
     <Portal disabled={!portalled} container={portalRef}>
       <ChakraDrawer.Positioner padding={offset}>
-        <ChakraDrawer.Content ref={ref} {...rest} asChild={false}>
+        <ChakraDrawer.Content
+          ref={ref}
+          margin={2}
+          borderRadius="lg"
+          background="rgba(255, 255, 255, 0.75)"
+          backdropFilter="blur(8px)"
+          {...rest}
+          asChild={false}
+        >
           {children}
         </ChakraDrawer.Content>
       </ChakraDrawer.Positioner>
