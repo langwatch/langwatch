@@ -117,6 +117,16 @@ export const system = createSystem(defaultConfig, {
           focusRing: { value: "rgb(49, 130, 206)" },
         },
       },
+      shadows: {
+        "2xs": {
+          value:
+            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
+        },
+        xs: {
+          value:
+            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
+        },
+      },
     },
     recipes: {
       heading: defineRecipe({
@@ -157,10 +167,12 @@ export const system = createSystem(defaultConfig, {
               },
             },
             outline: {
+              boxShadow: "2xs",
               borderColor: "gray.300",
               color: "gray.800",
               _hover: {
                 backgroundColor: "gray.50",
+                boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
               },
               _expanded: {
                 backgroundColor: "gray.50",
@@ -193,6 +205,7 @@ export const system = createSystem(defaultConfig, {
               h: "8",
               minW: "8",
               px: "2.5",
+              fontSize: "13px",
               _icon: {
                 flexShrink: 1,
                 width: "auto",
@@ -232,7 +245,7 @@ export const system = createSystem(defaultConfig, {
       }),
       input: defineRecipe({
         base: {
-          borderRadius: "md",
+          borderRadius: "lg",
         },
         variants: {
           variant: {
@@ -246,6 +259,18 @@ export const system = createSystem(defaultConfig, {
             },
             sm: {
               "--input-height": "sizes.8",
+            },
+          },
+        },
+      }),
+      textarea: defineRecipe({
+        base: {
+          borderRadius: "md",
+        },
+        variants: {
+          variant: {
+            outline: {
+              bg: "white/65",
             },
           },
         },
@@ -462,7 +487,24 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       dialog: defineSlotRecipe({
-        slots: ["content"],
+        slots: ["content", "header"],
+        base: {
+          header: {
+            pt: "4",
+            pb: "3",
+          },
+          body: {
+            pt: "3",
+          },
+          content: {
+            "& button:not([data-variant=ghost]):not([data-part])": {
+              boxShadow: "md",
+            },
+            "& input, & textarea, & select": {
+              boxShadow: "xs",
+            },
+          }
+        },
         variants: {
           size: {
             "5xl": {
@@ -479,7 +521,7 @@ export const system = createSystem(defaultConfig, {
         base: {
           trigger: {
             cursor: "pointer",
-            borderRadius: "md",
+            borderRadius: "lg",
             background: "white/65",
           },
         },
@@ -490,6 +532,7 @@ export const system = createSystem(defaultConfig, {
           variant: {
             outline: {
               field: {
+                borderRadius: "lg",
                 background: "white/65",
               },
             },
@@ -499,10 +542,18 @@ export const system = createSystem(defaultConfig, {
       drawer: defineSlotRecipe({
         slots: ["content", "header"],
         base: {
-          content: { maxWidth: "70%" },
+          content: {
+            maxWidth: "70%",
+            "& button:not([data-variant=ghost]):not([data-part])": {
+              boxShadow: "md",
+            },
+            "& input, & textarea, & select": {
+              boxShadow: "xs",
+            },
+          },
           header: {
-            paddingY: 4
-          }
+            paddingY: 4,
+          },
         },
         variants: {
           size: {
@@ -520,6 +571,7 @@ export const system = createSystem(defaultConfig, {
         slots: ["root"],
         base: {
           root: {
+            borderRadius: "lg",
             "&[data-type=info]": {
               bg: "blue.solid",
               color: "blue.contrast",
@@ -545,8 +597,10 @@ export const system = createSystem(defaultConfig, {
 
       alert: defineSlotRecipe({
         slots: ["root"],
-        defaultVariants: {
-          variant: "surface",
+        base: {
+          root: {
+            borderRadius: "lg",
+          },
         },
       }),
     },

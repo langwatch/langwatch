@@ -1,4 +1,4 @@
-import { Box, Input, Spinner } from "@chakra-ui/react";
+import { Box, Button, Input, Spinner } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -313,23 +313,15 @@ export function CustomDashboardsSection({
           </Box>
         );
       })}
-      <Box
-        as="button"
-        display="flex"
-        alignItems="center"
-        paddingX={6}
-        paddingY={2}
+      <Button
+        size="sm"
         width="full"
-        gap={2}
-        color="gray.500"
-        cursor="pointer"
-        _hover={{ color: "gray.700", background: "gray.50" }}
+        variant="ghost"
         onClick={handleCreateDashboard}
         opacity={createDashboard.isPending ? 0.5 : 1}
       >
-        <Plus size={14} />
-        <Box fontSize="13px">Add Dashboard</Box>
-      </Box>
+        <Plus size={14} /> Add Dashboard
+      </Button>
     </>
   );
 }

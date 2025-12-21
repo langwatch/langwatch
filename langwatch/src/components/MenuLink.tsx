@@ -30,21 +30,12 @@ export const MenuLink = ({
     <Link
       asChild
       paddingX={paddingX}
-      paddingY={2}
+      paddingY={1}
       width="full"
       position="relative"
-      background={isSelectedAnnotation ? "gray.50" : "transparent"}
-      _hover={{ background: "gray.50" }}
-      _before={{
-        content: '""',
-        position: "absolute",
-        left: 0,
-        top: 0,
-        bottom: 0,
-        width: "4px",
-        background:
-          selected && !isSelectedAnnotation ? "orange.400" : "transparent",
-      }}
+      borderRadius="lg"
+      background={selected ? "gray.100" : "transparent"}
+      _hover={{ background: "gray.100" }}
     >
       <NextLink href={href}>
         <HStack width="full" gap={2}>

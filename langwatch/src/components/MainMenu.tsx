@@ -9,6 +9,7 @@ import {
   Settings,
   Table,
   TrendingUp,
+  Workflow,
 } from "lucide-react";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
@@ -120,7 +121,7 @@ export const MainMenu = React.memo(function MainMenu({
 
             <PageMenuLink
               path={projectRoutes.workflows.path}
-              icon={PuzzleIcon}
+              icon={Workflow}
               label={projectRoutes.workflows.title}
               project={project}
               isActive={router.pathname.includes("/workflows")}

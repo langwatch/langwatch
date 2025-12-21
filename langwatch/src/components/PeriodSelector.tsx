@@ -150,14 +150,17 @@ export function PeriodSelector({
       size="sm"
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" minWidth="fit-content" onClick={onOpen}>
-          <HStack gap={2}>
-            <Calendar size={16} />
-            <Text>{getDateRangeLabel()}</Text>
-            <Box>
-              <ChevronDown />
-            </Box>
-          </HStack>
+        <Button
+          variant="outline"
+          size="sm"
+          minWidth="fit-content"
+          onClick={onOpen}
+        >
+          <Calendar />
+          <Text>{getDateRangeLabel()}</Text>
+          <Box>
+            <ChevronDown />
+          </Box>
         </Button>
       </Popover.Trigger>
       <Popover.Content width="fit-content">

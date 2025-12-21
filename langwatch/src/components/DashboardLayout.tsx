@@ -19,13 +19,7 @@ import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
-import {
-  ChevronDown,
-  ChevronRight,
-  Lock,
-  Plus,
-  Search,
-} from "lucide-react";
+import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -63,7 +57,7 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
           <Link
             href={projectRoutes[currentRoute.parent].path.replace(
               "[project]",
-              project?.slug ?? ""
+              project?.slug ?? "",
             )}
           >
             {projectRoutes[currentRoute.parent].title}
@@ -82,7 +76,13 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
-const ProjectAvatar = ({ name, size = "xs" }: { name: string; size?: "xs" | "sm" }) => {
+const ProjectAvatar = ({
+  name,
+  size = "xs",
+}: {
+  name: string;
+  size?: "xs" | "sm";
+}) => {
   return (
     <Avatar.Root
       size={size}
@@ -122,7 +122,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
       organization,
       team,
       projects: team.projects.sort(sortByName),
-    }))
+    })),
   );
 
   return (
@@ -156,8 +156,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                 {projectGroups
                   .filter((projectGroup) =>
                     projectGroup.team.members.some(
-                      (member) => member.userId === session?.user.id
-                    )
+                      (member) => member.userId === session?.user.id,
+                    ),
                   )
                   .map((projectGroup) => (
                     <Menu.ItemGroup
@@ -184,7 +184,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               const hasProjectInRoute =
                                 currentRoute?.path.includes("[project]");
                               const hasProjectInPath = currentPath.includes(
-                                project.slug
+                                project.slug,
                               );
 
                               if (hasProjectInRoute) {
@@ -195,7 +195,7 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               } else if (hasProjectInPath) {
                                 return currentPath.replace(
                                   project.slug,
-                                  project_.slug
+                                  project_.slug,
                                 );
                               } else {
                                 return `/${
@@ -243,7 +243,7 @@ export const AddProjectButton = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   return !usage.data ||
@@ -313,7 +313,7 @@ export const DashboardLayout = ({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
   const publicEnv = usePublicEnv();
 
@@ -323,7 +323,7 @@ export const DashboardLayout = ({
 
   const integrationsLeft = useMemo(() => {
     return Object.entries(integrationChecks.data ?? {}).filter(
-      ([key, value]) => key !== "integrated" && !value
+      ([key, value]) => key !== "integrated" && !value,
     ).length;
   }, [integrationChecks.data]);
 
@@ -403,7 +403,10 @@ export const DashboardLayout = ({
           )}
           {organizations && project ? (
             <HStack gap={0} alignItems="center">
-              <ProjectSelector organizations={organizations} project={project} />
+              <ProjectSelector
+                organizations={organizations}
+                project={project}
+              />
               <Box display={["none", "none", "flex"]}>
                 <Breadcrumbs currentRoute={currentRoute} />
               </Box>
@@ -434,7 +437,9 @@ export const DashboardLayout = ({
                   void router.replace({ query: { ...router.query, query } });
                 } else {
                   void router.push(
-                    `/${project.slug}/messages?query=${encodeURIComponent(query)}`
+                    `/${project.slug}/messages?query=${encodeURIComponent(
+                      query,
+                    )}`,
                   );
                 }
               }}
@@ -514,9 +519,7 @@ export const DashboardLayout = ({
                 minWidth="auto"
                 height="auto"
                 borderRadius="full"
-                {...(publicPage
-                  ? { onClick: () => void signIn("auth0") }
-                  : {})}
+                {...(publicPage ? { onClick: () => void signIn("auth0") } : {})}
               >
                 <Avatar.Root
                   size="xs"
@@ -631,7 +634,7 @@ export const DashboardLayout = ({
                     <Text>
                       You reached the limit of{" "}
                       {numeral(
-                        usage.data.activePlan.maxMessagesPerMonth
+                        usage.data.activePlan.maxMessagesPerMonth,
                       ).format()}{" "}
                       messages for this month, new messages will not be
                       processed.{" "}
@@ -729,5 +732,24 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
     </Box>
+  );
+};
+
+export const DashboardLayoutHeader = ({
+  children,
+  withBorder = true,
+  ...props
+}: { children: React.ReactNode; withBorder?: boolean } & StackProps) => {
+  return (
+    <HStack
+      paddingX={6}
+      paddingY={2}
+      width="full"
+      borderBottom={withBorder ? "1px solid" : undefined}
+      borderBottomColor={withBorder ? "gray.100" : undefined}
+      {...props}
+    >
+      {children}
+    </HStack>
   );
 };

@@ -94,7 +94,8 @@ export function FilterToggleButton({
   return (
     <HStack gap={2}>
       <Button
-        variant="ghost"
+        size="sm"
+        variant="outline"
         backgroundColor={toggled ? "gray.200" : undefined}
         onClick={onClick}
         minWidth="fit-content"
@@ -118,7 +119,7 @@ export function FilterToggleButton({
               {Object.keys(nonEmptyFilters).length}
             </Box>
           )}
-          <Filter size={16} />
+          <Filter size={14} />
           <Text paddingLeft={2}>{children}</Text>
           {hasAnyFilters && onClear && (
             <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>

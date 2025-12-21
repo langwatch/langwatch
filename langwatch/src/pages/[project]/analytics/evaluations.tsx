@@ -207,8 +207,7 @@ function EvaluationsContent() {
   );
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="Evaluations" />
+    <GraphsLayout title="Evaluations">
       {checks.data && checks.data?.length === 0 && (
         <Alert.Root
           colorPalette="warning"

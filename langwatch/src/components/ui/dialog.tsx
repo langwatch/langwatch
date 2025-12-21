@@ -23,7 +23,7 @@ export const DialogContent = React.forwardRef<
 
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      {backdrop && <ChakraDialog.Backdrop />}
+      {backdrop && <ChakraDialog.Backdrop backdropFilter="blur(8px)" background="blackAlpha.400" />}
       <ChakraDialog.Positioner>
         <ChakraDialog.Content
           borderRadius="lg"

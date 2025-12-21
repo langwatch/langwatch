@@ -84,7 +84,7 @@ function IndexContent() {
   }
 
   return (
-    <GraphsLayout>
+    <GraphsLayout title="Analytics">
       {project && !project.firstMessage && (
         <Alert.Root status="warning" marginBottom={6}>
           <Alert.Indicator />
@@ -102,7 +102,6 @@ function IndexContent() {
           </Alert.Content>
         </Alert.Root>
       )}
-      <AnalyticsHeader title="Analytics" />
 
       <HStack align="start" width="full" gap={8}>
         <VStack align="start" width="full">

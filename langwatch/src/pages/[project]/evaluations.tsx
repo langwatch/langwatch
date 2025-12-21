@@ -26,7 +26,10 @@ import {
   LuTrash,
 } from "react-icons/lu";
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
-import { DashboardLayout } from "../../components/DashboardLayout";
+import {
+  DashboardLayout,
+  DashboardLayoutHeader,
+} from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
@@ -127,22 +130,15 @@ function EvaluationsV2() {
 
   return (
     <DashboardLayout>
-      <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
+      <DashboardLayoutHeader>
+        <Heading as="h1">Evaluations Dashboard</Heading>
+        <Spacer />
+        <HStack gap={2}>
+          <NewEvaluationButton />
+        </HStack>
+      </DashboardLayoutHeader>
+      <Container maxW={"calc(min(1440px, 100vw - 200px))"} paddingX={6} paddingTop={4}>
         <VStack width="fill" gap={4} align="stretch">
-          <HStack paddingTop={4}>
-            <VStack align="start" gap={1}>
-              <Heading as="h1">Evaluations Dashboard</Heading>
-              <Text color="gray.600">
-                Monitor real-time performance metrics and batch evaluation
-                results
-              </Text>
-            </VStack>
-            <Spacer />
-            <HStack gap={2}>
-              <NewEvaluationButton />
-            </HStack>
-          </HStack>
-
           {monitors.isLoading ? (
             <Box display="flex" justifyContent="center" py={8}>
               <Spinner />

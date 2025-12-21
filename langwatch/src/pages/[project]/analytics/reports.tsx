@@ -1,6 +1,7 @@
 import {
   Alert,
   Box,
+  Button,
   HStack,
   Skeleton,
   Text,
@@ -180,13 +181,10 @@ function ReportsContent() {
     : `/${project?.slug}/analytics/custom`;
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader
-        title={dashboardTitle}
-        isEditable
-        onTitleSave={handleTitleSave}
-      />
-
+    <GraphsLayout title={dashboardTitle} analyticsHeaderProps={{
+      isEditable: true,
+      onTitleSave: handleTitleSave,
+    }}>
       {/* Empty state */}
       {hasNoGraphs && (
         <Alert.Root
@@ -211,8 +209,10 @@ function ReportsContent() {
       {/* Add chart button */}
       <HStack width="full" paddingBottom={6}>
         {project ? (
-          <Link href={addChartUrl}>
-            <Plus /> Add chart
+          <Link href={addChartUrl} asChild>
+            <Button size="sm" variant="ghost">
+              <Plus /> Add chart
+            </Button>
           </Link>
         ) : null}
       </HStack>
