@@ -11,11 +11,10 @@ export default function SettingsLayout({
   const { project } = useOrganizationTeamProject();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout compactMenu>
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"
-          background="white"
           paddingY={4}
           borderRightWidth="1px"
           borderColor="gray.300"

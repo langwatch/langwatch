@@ -204,7 +204,7 @@ export function CustomDashboardsSection({
   }
 
   // Determine which dashboard is selected based on URL or default to first
-  const selectedDashboardId = currentDashboardId ?? dashboards[0]?.id;
+  const selectedDashboardId = currentDashboardId;
 
   return (
     <>
@@ -245,7 +245,7 @@ export function CustomDashboardsSection({
                 <MenuLink
                   href={`/${projectSlug}/analytics/reports?dashboard=${dashboard.id}`}
                   paddingX={6}
-                  isSelectedAnnotation={isSelected}
+                  isSelected={isSelected}
                 >
                   {dashboard.name}
                 </MenuLink>

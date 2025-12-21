@@ -134,6 +134,7 @@ export const system = createSystem(defaultConfig, {
       button: defineRecipe({
         base: {
           fontWeight: 600,
+          borderRadius: "lg",
         },
         variants: {
           variant: {

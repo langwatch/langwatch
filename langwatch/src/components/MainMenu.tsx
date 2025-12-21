@@ -20,6 +20,7 @@ import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
+import { UsageIndicator } from "./sidebar/UsageIndicator";
 
 export const MENU_WIDTH_EXPANDED = "200px";
 export const MENU_WIDTH_COMPACT = "56px";
@@ -168,7 +169,10 @@ export const MainMenu = React.memo(function MainMenu({
             )}
           </VStack>
 
-          <SupportMenu showLabel={showExpanded} />
+          <VStack width="full" gap={0.5} align="start">
+            <UsageIndicator showLabel={showExpanded} />
+            <SupportMenu showLabel={showExpanded} />
+          </VStack>
         </VStack>
       </Box>
     </Box>

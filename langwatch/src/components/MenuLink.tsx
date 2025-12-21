@@ -10,18 +10,20 @@ export const MenuLink = ({
   children,
   icon,
   menuEnd,
+  isSelected,
   isSelectedAnnotation,
 }: PropsWithChildren<{
   paddingX?: number;
   href: string;
   icon?: React.ReactNode;
   menuEnd?: React.ReactNode;
+  isSelected?: boolean;
   isSelectedAnnotation?: boolean;
   includePath?: string;
 }>) => {
   const pathname = usePathname();
   const selected =
-    isSelectedAnnotation ??
+    isSelected ?? isSelectedAnnotation ??
     (pathname === href || (includePath && pathname?.includes(includePath)));
 
   return (

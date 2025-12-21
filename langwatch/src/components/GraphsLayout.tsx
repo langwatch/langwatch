@@ -16,7 +16,6 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"
-          background="white"
           paddingY={4}
           borderRightWidth="1px"
           borderColor="gray.300"

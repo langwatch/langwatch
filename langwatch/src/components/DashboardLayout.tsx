@@ -7,7 +7,6 @@ import {
   HStack,
   Input,
   Portal,
-  Progress,
   Spacer,
   type StackProps,
   Text,
@@ -23,7 +22,6 @@ import React, { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  Info,
   Lock,
   Plus,
   Search,
@@ -37,13 +35,10 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
-import { HoverableBigText } from "./HoverableBigText";
 import { IntegrationChecks, useIntegrationChecks } from "./IntegrationChecks";
 import { ChecklistIcon } from "./icons/Checklist";
-import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
-import { ProjectTechStackIcon } from "./TechStack";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
@@ -51,33 +46,55 @@ import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
 import { FullLogo } from "./icons/FullLogo";
+import { LogoIcon } from "./icons/LogoIcon";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
 
+  if (!currentRoute) return null;
+
   return (
-    currentRoute && (
-      <HStack gap={2} fontSize="13px" color="gray.500">
-        <Link href="/">Dashboard</Link>
-        {currentRoute.parent && (
-          <>
-            <ChevronRight width="12" style={{ minWidth: "12px" }} />
-            <Link
-              href={projectRoutes[currentRoute.parent].path.replace(
-                "[project]",
-                project?.slug ?? ""
-              )}
-            >
-              {projectRoutes[currentRoute.parent].title}
-            </Link>
-          </>
-        )}
-        <ChevronRight width="12" style={{ minWidth: "12px" }} />
-        <HoverableBigText lineClamp={1} expandable={false}>
-          {currentRoute.title}
-        </HoverableBigText>
-      </HStack>
-    )
+    <HStack gap={2} fontSize="13px" color="gray.500" alignItems="center">
+      <ChevronRight width="12" style={{ minWidth: "12px" }} />
+      <Link href={`/${project?.slug ?? ""}`}>Dashboard</Link>
+      {currentRoute.parent && (
+        <>
+          <ChevronRight width="12" style={{ minWidth: "12px" }} />
+          <Link
+            href={projectRoutes[currentRoute.parent].path.replace(
+              "[project]",
+              project?.slug ?? ""
+            )}
+          >
+            {projectRoutes[currentRoute.parent].title}
+          </Link>
+        </>
+      )}
+      {currentRoute.title !== "Home" && (
+        <>
+          <ChevronRight width="12" style={{ minWidth: "12px" }} />
+          <Text color="gray.500" whiteSpace="nowrap">
+            {currentRoute.title}
+          </Text>
+        </>
+      )}
+    </HStack>
+  );
+};
+
+const ProjectAvatar = ({ name, size = "xs" }: { name: string; size?: "xs" | "sm" }) => {
+  return (
+    <Avatar.Root
+      size={size}
+      backgroundColor="orange.400"
+      color="white"
+      width={size === "xs" ? "20px" : "24px"}
+      height={size === "xs" ? "20px" : "24px"}
+    >
+      <Avatar.Fallback fontSize={size === "xs" ? "10px" : "12px"}>
+        {name.charAt(0).toUpperCase()}
+      </Avatar.Fallback>
+    </Avatar.Root>
   );
 };
 
@@ -112,21 +129,22 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
         <Button
-          variant="outline"
-          borderColor="gray.300"
+          variant="ghost"
           fontSize="13px"
-          paddingX={4}
+          paddingX={2}
           paddingY={1}
           height="auto"
           fontWeight="normal"
           minWidth="fit-content"
+          color="gray.700"
+          _hover={{
+            backgroundColor: "gray.200",
+          }}
         >
           <HStack gap={2}>
-            <ProjectTechStackIcon project={project} />
-            <Box>{project.name}</Box>
-            <Box>
-              <ChevronDown />
-            </Box>
+            <ProjectAvatar name={project.name} />
+            <Text>{project.name}</Text>
+            <ChevronDown size={14} />
           </HStack>
         </Button>
       </Menu.Trigger>
@@ -189,10 +207,10 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               textDecoration: "none",
                             }}
                           >
-                            <HStack width="26px" justify="center">
-                              <ProjectTechStackIcon project={project_} />
-                            </HStack>{" "}
-                            {project_.name}
+                            <HStack gap={2}>
+                              <ProjectAvatar name={project_.name} />
+                              <Text>{project_.name}</Text>
+                            </HStack>
                           </Link>
                         </Menu.Item>
                       ))}
@@ -298,7 +316,6 @@ export const DashboardLayout = ({
     }
   );
   const publicEnv = usePublicEnv();
-  const isSaaS = publicEnv.data?.IS_SAAS;
 
   const [query, setQuery] = useState(router.query.query as string);
 
@@ -364,15 +381,34 @@ export const DashboardLayout = ({
         justifyContent="space-between"
         gap={4}
       >
-        {/* Left side: Logo + Breadcrumbs */}
-        <HStack gap={4} flex={1}>
-          <Link href="/" paddingLeft={1}>
-            <FullLogo width={155 * 0.7} height={38 * 0.7} />
-          </Link>
-          {organizations && project && (
-            <ProjectSelector organizations={organizations} project={project} />
+        {/* Left side: Logo + Project + Breadcrumbs */}
+        <HStack gap={compactMenu ? 3 : 0} flex={1} alignItems="center">
+          {/* Logo container - fixed width for expanded menu, natural for compact */}
+          {compactMenu ? (
+            <Link href="/" display="flex" alignItems="center">
+              <LogoIcon width={25 * 0.7} height={32 * 0.7} />
+            </Link>
+          ) : (
+            <Box
+              width={MENU_WIDTH_EXPANDED}
+              minWidth={MENU_WIDTH_EXPANDED}
+              paddingLeft={2}
+              display="flex"
+              alignItems="center"
+            >
+              <Link href="/">
+                <FullLogo width={155 * 0.7} height={38 * 0.7} />
+              </Link>
+            </Box>
           )}
-          {!project && (
+          {organizations && project ? (
+            <HStack gap={0} alignItems="center">
+              <ProjectSelector organizations={organizations} project={project} />
+              <Box display={["none", "none", "flex"]}>
+                <Breadcrumbs currentRoute={currentRoute} />
+              </Box>
+            </HStack>
+          ) : (
             <Text paddingLeft={2}>
               <Link href="/auth/signin" color="orange.600" fontWeight="600">
                 Sign in
@@ -380,176 +416,154 @@ export const DashboardLayout = ({
               to LangWatch to monitor your projects
             </Text>
           )}
-          <Box display={["none", "none", "block"]}>
-            <Breadcrumbs currentRoute={currentRoute} />
-          </Box>
         </HStack>
 
-        {/* Center: Search */}
-        {project && (
-          <form
-            action={`${project.slug}/messages`}
-            method="GET"
-            style={{ flex: 1, maxWidth: "500px" }}
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (
-                router.query.view === "list" ||
-                router.query.view === "table"
-              ) {
-                void router.replace({ query: { ...router.query, query } });
-              } else {
-                void router.push(
-                  `/${project.slug}/messages?query=${encodeURIComponent(query)}`
-                );
-              }
-            }}
-          >
-            <InputGroup
-              startElement={<Search color={gray400} width={16} />}
-              width="full"
+        {/* Right side: Search, integrations, user */}
+        <HStack gap={2} justifyContent="flex-end">
+          {/* Search bar - compact, expands on focus */}
+          {project && (
+            <form
+              action={`${project.slug}/messages`}
+              method="GET"
+              onSubmit={(e: React.FormEvent) => {
+                e.preventDefault();
+                if (
+                  router.query.view === "list" ||
+                  router.query.view === "table"
+                ) {
+                  void router.replace({ query: { ...router.query, query } });
+                } else {
+                  void router.push(
+                    `/${project.slug}/messages?query=${encodeURIComponent(query)}`
+                  );
+                }
+              }}
             >
-              <Input
-                name="query"
-                type="search"
-                placeholder="Search"
-                _placeholder={{ color: "gray.500" }}
-                fontSize="14px"
-                paddingY={1.5}
-                width="full"
-                height="auto"
-                backgroundColor="white"
-                borderColor="gray.300"
-                borderRadius="lg"
-                value={query ?? router.query.query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </InputGroup>
-          </form>
-        )}
-
-        {/* Right side: Usage, integrations, user */}
-        <HStack gap={2} flex={1} justifyContent="flex-end">
-          {usage.data && isSaaS && (
-            <Progress.Root
-              defaultValue={0}
-              max={usage.data?.activePlan.maxMessagesPerMonth}
-              value={Math.min(
-                usage.data?.currentMonthMessagesCount,
-                usage.data?.activePlan.maxMessagesPerMonth
-              )}
-              maxW="150px"
-              colorPalette="orange"
-              width="full"
-            >
-              <HStack>
-                <Link href="/settings/usage" width="150px">
-                  <Tooltip
-                    content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
-                  >
-                    <HStack width="full" cursor="pointer">
-                      <Progress.Label fontSize="xs">
-                        <HStack gap={1} cursor="pointer">
-                          Usage
-                          <Info size="12" />
-                        </HStack>
-                      </Progress.Label>
-                      <Progress.Track
-                        flex="1"
-                        borderRadius="full"
-                        border="1px solid"
-                        borderColor="gray.300"
-                        backgroundColor="white"
-                      >
-                        <Progress.Range />
-                      </Progress.Track>
-                    </HStack>
-                  </Tooltip>
-                </Link>
-              </HStack>
-            </Progress.Root>
+              <InputGroup startElement={<Search color={gray400} size={14} />}>
+                <Input
+                  name="query"
+                  type="search"
+                  placeholder="Search"
+                  _placeholder={{ color: "gray.500" }}
+                  fontSize="13px"
+                  paddingY={1}
+                  paddingLeft={8}
+                  paddingRight={3}
+                  width="120px"
+                  height="32px"
+                  backgroundColor="gray.200"
+                  border="none"
+                  borderRadius="full"
+                  transition="all 0.2s ease-in-out"
+                  _focus={{
+                    width: "240px",
+                    backgroundColor: "white",
+                    boxShadow: "sm",
+                    outline: "none",
+                  }}
+                  value={query ?? router.query.query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </InputGroup>
+            </form>
           )}
 
-          <HStack>
-            {integrationsLeft ? (
-              <Popover.Root positioning={{ placement: "bottom-end" }}>
-                <Popover.Trigger asChild>
-                  <Button position="relative" variant="ghost">
-                    <ChecklistIcon
-                      style={{ maxWidth: "24px", maxHeight: "24px" }}
-                    />
-                    <Badge
-                      position="absolute"
-                      bottom="-4px"
-                      right="-2px"
-                      size="xs"
-                      color="white"
-                      backgroundColor="green.500"
-                      borderRadius="full"
-                      fontSize="12px"
-                      fontWeight="600"
-                    >
-                      {integrationsLeft}
-                    </Badge>
-                  </Button>
-                </Popover.Trigger>
-                <Popover.Content>
-                  <Popover.Body>
-                    <IntegrationChecks />
-                  </Popover.Body>
-                </Popover.Content>
-              </Popover.Root>
-            ) : null}
-            <Menu.Root>
-              <Menu.Trigger asChild>
+          {integrationsLeft ? (
+            <Popover.Root positioning={{ placement: "bottom-end" }}>
+              <Popover.Trigger asChild>
                 <Button
-                  variant="plain"
-                  {...(publicPage
-                    ? { onClick: () => void signIn("auth0") }
-                    : {})}
+                  position="relative"
+                  variant="ghost"
+                  size="sm"
+                  padding={1}
+                  minWidth="auto"
                 >
-                  <Avatar.Root
-                    size="sm"
-                    backgroundColor="orange.400"
+                  <ChecklistIcon
+                    style={{ maxWidth: "20px", maxHeight: "20px" }}
+                  />
+                  <Badge
+                    position="absolute"
+                    bottom="-2px"
+                    right="-2px"
+                    size="xs"
                     color="white"
+                    backgroundColor="green.500"
+                    borderRadius="full"
+                    fontSize="10px"
+                    fontWeight="600"
+                    paddingX={1}
                   >
-                    <Avatar.Fallback name={user?.name ?? undefined} />
-                  </Avatar.Root>
+                    {integrationsLeft}
+                  </Badge>
                 </Button>
-              </Menu.Trigger>
-              {session && (
-                <Portal>
-                  <Menu.Content zIndex="popover">
-                    {dependencies.ExtraMenuItems && (
-                      <dependencies.ExtraMenuItems />
-                    )}
-                    <Menu.ItemGroup
-                      title={`${session.user.name} (${session.user.email})`}
+              </Popover.Trigger>
+              <Popover.Content>
+                <Popover.Body>
+                  <IntegrationChecks />
+                </Popover.Body>
+              </Popover.Content>
+            </Popover.Root>
+          ) : null}
+
+          <Menu.Root>
+            <Menu.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="xs"
+                padding={0}
+                minWidth="auto"
+                height="auto"
+                borderRadius="full"
+                {...(publicPage
+                  ? { onClick: () => void signIn("auth0") }
+                  : {})}
+              >
+                <Avatar.Root
+                  size="xs"
+                  backgroundColor="orange.400"
+                  color="white"
+                  width="28px"
+                  height="28px"
+                >
+                  <Avatar.Fallback
+                    name={user?.name ?? undefined}
+                    fontSize="11px"
+                  />
+                </Avatar.Root>
+              </Button>
+            </Menu.Trigger>
+            {session && (
+              <Portal>
+                <Menu.Content zIndex="popover">
+                  {dependencies.ExtraMenuItems && (
+                    <dependencies.ExtraMenuItems />
+                  )}
+                  <Menu.ItemGroup
+                    title={`${session.user.name} (${session.user.email})`}
+                  >
+                    <Menu.Item value="setup" asChild>
+                      <Link href={`/${project?.slug}/setup`}>
+                        API Key & Setup
+                      </Link>
+                    </Menu.Item>
+                    <Menu.Item value="settings" asChild>
+                      <Link href="/settings">Settings</Link>
+                    </Menu.Item>
+                    <Menu.Item
+                      value="logout"
+                      onClick={() =>
+                        void signOut({
+                          callbackUrl: window.location.origin,
+                        })
+                      }
                     >
-                      <Menu.Item value="setup" asChild>
-                        <Link href={`/${project?.slug}/setup`}>
-                          API Key & Setup
-                        </Link>
-                      </Menu.Item>
-                      <Menu.Item value="settings" asChild>
-                        <Link href="/settings">Settings</Link>
-                      </Menu.Item>
-                      <Menu.Item
-                        value="logout"
-                        onClick={() =>
-                          void signOut({
-                            callbackUrl: window.location.origin,
-                          })
-                        }
-                      >
-                        Logout
-                      </Menu.Item>
-                    </Menu.ItemGroup>
-                  </Menu.Content>
-                </Portal>
-              )}
-            </Menu.Root>
-          </HStack>
+                      Logout
+                    </Menu.Item>
+                  </Menu.ItemGroup>
+                </Menu.Content>
+              </Portal>
+            )}
+          </Menu.Root>
         </HStack>
       </HStack>
 
