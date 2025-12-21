@@ -157,6 +157,4 @@ function TopicsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(TopicsContent);
+export default withPermissionGuard("analytics:view")(TopicsContent);

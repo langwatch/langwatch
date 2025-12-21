@@ -301,6 +301,4 @@ function UsersContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(UsersContent);
+export default withPermissionGuard("analytics:view")(UsersContent);

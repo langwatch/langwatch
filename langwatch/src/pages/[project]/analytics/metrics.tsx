@@ -306,6 +306,4 @@ function MetricsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(MetricsContent);
+export default withPermissionGuard("analytics:view")(MetricsContent);

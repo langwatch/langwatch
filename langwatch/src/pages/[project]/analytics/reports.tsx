@@ -241,6 +241,4 @@ function ReportsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(ReportsContent);
+export default withPermissionGuard("analytics:view")(ReportsContent);

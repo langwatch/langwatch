@@ -287,13 +287,22 @@ export const system = createSystem(defaultConfig, {
     slotRecipes: {
       card: defineSlotRecipe({
         slots: ["root"],
+        base: {
+          root: {
+            borderRadius: "xl",
+          },
+        },
         variants: {
           variant: {
             elevated: {
               root: {
                 border: "1px solid",
-                borderColor: "gray.300",
-                boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
+                borderColor: "gray.100",
+                boxShadow: "md",
+                transition: "all 0.2s ease-in-out",
+                _hover: {
+                  boxShadow: "lg",
+                },
               },
             },
           },

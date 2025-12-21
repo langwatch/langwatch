@@ -3,6 +3,7 @@ import type { Project } from "@prisma/client";
 import {
   BookText,
   CheckSquare,
+  Home,
   ListTree,
   Pencil,
   Play,
@@ -82,13 +83,21 @@ export const MainMenu = React.memo(function MainMenu({
           <VStack width="full" gap={0.5} align="start">
             <PageMenuLink
               path={projectRoutes.home.path}
-              icon={TrendingUp}
+              icon={Home}
               label={projectRoutes.home.title}
               project={project}
               isActive={
-                router.pathname === "/[project]" ||
-                router.pathname.includes("/analytics")
+                router.pathname === "/[project]" &&
+                !router.pathname.includes("/analytics")
               }
+              showLabel={showExpanded}
+            />
+            <PageMenuLink
+              path={projectRoutes.analytics.path}
+              icon={TrendingUp}
+              label={projectRoutes.analytics.title}
+              project={project}
+              isActive={router.pathname.includes("/analytics")}
               showLabel={showExpanded}
             />
             <PageMenuLink

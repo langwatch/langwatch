@@ -249,6 +249,4 @@ function EvaluationsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(EvaluationsContent);
+export default withPermissionGuard("analytics:view")(EvaluationsContent);
