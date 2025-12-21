@@ -75,7 +75,7 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
 export const DialogBackdrop = function DialogBackdrop(
   props: ChakraDialog.BackdropProps,
 ) {
-  return <ChakraDialog.Backdrop {...props} zIndex="popover" />;
+  return <ChakraDialog.Backdrop {...props} />;
 };
 
 export const DialogFooter = ChakraDialog.Footer;

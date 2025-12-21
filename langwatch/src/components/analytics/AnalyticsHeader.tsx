@@ -7,7 +7,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { Tooltip } from "../ui/tooltip";
-import { DashboardLayoutHeader } from "../DashboardLayout";
+import { PageLayout } from "../ui/layouts/PageLayout";
 
 export interface AnalyticsHeaderProps {
   title: string;
@@ -53,7 +53,7 @@ export function AnalyticsHeader({
   };
 
   return (
-    <DashboardLayoutHeader>
+    <PageLayout.Header>
       {isEditing ? (
         <Input
           ref={inputRef}
@@ -79,7 +79,7 @@ export function AnalyticsHeader({
           onClick={handleStartEdit}
           _hover={isEditable ? { "& .edit-icon": { opacity: 1 } } : undefined}
         >
-          <Heading as={"h1"}>{title}</Heading>
+          <PageLayout.Heading>{title}</PageLayout.Heading>
           {isEditable && (
             <Box
               className="edit-icon"
@@ -98,9 +98,8 @@ export function AnalyticsHeader({
         <FilterToggle />
         <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
         <Tooltip content="Show traces behind those metrics">
-          <Button
+          <PageLayout.HeaderButton
             variant="ghost"
-            size="sm"
             onClick={() => {
               void router.push(
                 {
@@ -116,9 +115,9 @@ export function AnalyticsHeader({
           >
             <LuListTree />
             Show Traces
-          </Button>
+          </PageLayout.HeaderButton>
         </Tooltip>
       </HStack>
-    </DashboardLayoutHeader>
+    </PageLayout.Header>
   );
 }

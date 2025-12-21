@@ -1,4 +1,4 @@
-import { Button, Field, HStack, Input, Text } from "@chakra-ui/react";
+import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
@@ -31,17 +31,10 @@ export function LLMModelCostDrawer({
       size={"xl"}
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              {id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}
-            </Text>
-          </HStack>
+          <Heading>{id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}</Heading>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           {llmModelCosts.data && (
@@ -79,11 +72,10 @@ function LLMModelCostForm({
   const currentLLMModelCost = id
     ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
     : cloneModel
-      ? llmModelCosts.find(
-          (llmModelCost) =>
-            !llmModelCost.id && llmModelCost.model === cloneModel,
-        )
-      : undefined;
+    ? llmModelCosts.find(
+        (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel,
+      )
+    : undefined;
 
   type LLMModelCostForm = {
     model: string;

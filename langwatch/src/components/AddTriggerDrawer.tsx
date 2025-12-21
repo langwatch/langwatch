@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   Stack,
@@ -313,17 +314,10 @@ export function TriggerDrawer() {
       onOpenChange={({ open }) => !open && closeDrawer()}
       placement="end"
     >
-      <Drawer.Backdrop />
       <Drawer.Content maxWidth="1200px">
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              Add Trigger
-            </Text>
-          </HStack>
+          <Drawer.CloseTrigger />
+          <Heading>Add Trigger</Heading>
         </Drawer.Header>
         <Drawer.Body>
           {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}

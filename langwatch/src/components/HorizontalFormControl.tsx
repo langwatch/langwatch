@@ -57,6 +57,7 @@ export function HorizontalFormControl({
           direction === "horizontal" ? ["column", "column", "row"] : "column"
         }
         align={align}
+        gap={4}
       >
         <VStack
           align="start"

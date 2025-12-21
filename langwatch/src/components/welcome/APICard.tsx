@@ -39,7 +39,7 @@ const APICard: React.FC = () => {
       align="stretch"
     >
       <Box mb={1}>
-        <Heading size="md" fontWeight="bold" textAlign="left">
+        <Heading size="md" textAlign="left">
           Connect to LangWatch
         </Heading>
         <Text fontSize="xs" color="gray.500" textAlign="left">

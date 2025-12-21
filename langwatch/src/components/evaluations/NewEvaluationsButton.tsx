@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AskIfUserWantsToContinueDraftDialog } from "./AskIfUserWantsToContinueDraftDialog";
+import { PageLayout } from "../ui/layouts/PageLayout";
 
 export function NewEvaluationButton() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -45,9 +46,9 @@ export function NewEvaluationButton() {
 
   return (
     <>
-      <Button colorPalette="orange" onClick={handleOnClick}>
-        <Plus size={16} /> New Evaluation
-      </Button>
+      <PageLayout.HeaderButton onClick={handleOnClick}>
+        <Plus /> New Evaluation
+      </PageLayout.HeaderButton>
       <AskIfUserWantsToContinueDraftDialog
         open={isDialogOpen}
         onOpenChange={({ open }) => setIsDialogOpen(open)}

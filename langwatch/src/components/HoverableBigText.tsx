@@ -24,7 +24,6 @@ export function ExpandedTextDialog({
       onOpenChange={({ open }) => onOpenChange(open)}
       size="5xl"
     >
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.Header
           background="gray.100"

@@ -78,7 +78,6 @@ export function GenerateApiSnippetDialog({
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
         size="xl"
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>

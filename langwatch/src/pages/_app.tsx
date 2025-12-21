@@ -275,6 +275,14 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
+      radio: defineRecipe({
+        base: {
+          backgroundColor: "white/65",
+          "& .dot": {
+            backgroundColor: "white/65",
+          },
+        },
+      }),
     },
     slotRecipes: {
       card: defineSlotRecipe({
@@ -307,6 +315,7 @@ export const system = createSystem(defaultConfig, {
           control: {
             borderWidth: "1px",
             cursor: "pointer",
+            backgroundColor: "white/65",
           },
           label: {
             fontWeight: "normal",
@@ -390,6 +399,9 @@ export const system = createSystem(defaultConfig, {
       table: defineSlotRecipe({
         slots: ["root"],
         base: {
+          root: {
+            borderRadius: "lg",
+          },
           columnHeader: {
             fontWeight: "bold",
             textStyle: "xs",
@@ -420,6 +432,12 @@ export const system = createSystem(defaultConfig, {
                 borderColor: "gray.100",
               },
             },
+            outline: {
+              header: {
+                background: "none",
+              },
+            },
+            ghost: {},
           },
           size: {
             xs: {
@@ -448,6 +466,9 @@ export const system = createSystem(defaultConfig, {
               },
             },
           },
+        },
+        defaultVariants: {
+          size: "sm",
         },
       }),
       switch: defineSlotRecipe({
@@ -503,7 +524,7 @@ export const system = createSystem(defaultConfig, {
             "& input, & textarea, & select": {
               boxShadow: "xs",
             },
-          }
+          },
         },
         variants: {
           size: {
@@ -544,12 +565,6 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             maxWidth: "70%",
-            "& button:not([data-variant=ghost]):not([data-part])": {
-              boxShadow: "md",
-            },
-            "& input, & textarea, & select": {
-              boxShadow: "xs",
-            },
           },
           header: {
             paddingY: 4,
@@ -594,12 +609,19 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
-
       alert: defineSlotRecipe({
         slots: ["root"],
         base: {
           root: {
             borderRadius: "lg",
+          },
+        },
+      }),
+      radioGroup: defineSlotRecipe({
+        slots: ["itemControl"],
+        base: {
+          itemControl: {
+            backgroundColor: "white/65",
           },
         },
       }),

@@ -19,6 +19,7 @@ import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
 import { Calendar, ChevronDown } from "react-feather";
 import { Popover } from "./ui/popover";
+import { LuCalendar } from "react-icons/lu";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -156,7 +157,7 @@ export function PeriodSelector({
           minWidth="fit-content"
           onClick={onOpen}
         >
-          <Calendar />
+          <LuCalendar />
           <Text>{getDateRangeLabel()}</Text>
           <Box>
             <ChevronDown />

@@ -220,6 +220,7 @@ export function TraceDetails(props: {
             <HStack>
               {hasPermission("annotations:manage") && (
                 <Button
+                  data-scope="header"
                   colorPalette="gray"
                   onClick={() => {
                     commentState.setCommentState({
@@ -245,7 +246,7 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button colorPalette="gray">Annotation Queue</Button>
+                      <Button data-scope="header" colorPalette="gray">Annotation Queue</Button>
                     </Popover.Trigger>
                     <Popover.Content
                       display={queueDrawerOpen.open ? "none" : "block"}
@@ -268,6 +269,7 @@ export function TraceDetails(props: {
               {hasPermission("datasets:manage") && (
                 <Button
                   type="submit"
+                  data-scope="header"
                   colorPalette="gray"
                   minWidth="fit-content"
                   onClick={() => {
@@ -284,7 +286,7 @@ export function TraceDetails(props: {
               )}
               {props.onToggleView && (
                 <>
-                  <Button colorPalette="gray">
+                  <Button data-scope="header" colorPalette="gray">
                     {props.traceView === "span" ? (
                       <Maximize2
                         size={16}

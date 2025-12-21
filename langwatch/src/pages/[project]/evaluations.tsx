@@ -26,10 +26,7 @@ import {
   LuTrash,
 } from "react-icons/lu";
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
-import {
-  DashboardLayout,
-  DashboardLayoutHeader,
-} from "../../components/DashboardLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
 import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
@@ -44,6 +41,7 @@ import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -130,14 +128,18 @@ function EvaluationsV2() {
 
   return (
     <DashboardLayout>
-      <DashboardLayoutHeader>
-        <Heading as="h1">Evaluations Dashboard</Heading>
+      <PageLayout.Header>
+        <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
           <NewEvaluationButton />
         </HStack>
-      </DashboardLayoutHeader>
-      <Container maxW={"calc(min(1440px, 100vw - 200px))"} paddingX={6} paddingTop={4}>
+      </PageLayout.Header>
+      <Container
+        maxW={"calc(min(1440px, 100vw - 200px))"}
+        paddingX={6}
+        paddingTop={4}
+      >
         <VStack width="fill" gap={4} align="stretch">
           {monitors.isLoading ? (
             <Box display="flex" justifyContent="center" py={8}>

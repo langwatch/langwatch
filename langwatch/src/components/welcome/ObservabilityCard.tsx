@@ -82,7 +82,7 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     aria-label={guide.label + " (opens in a new tab)"}
   >
     {guide.icon}
-    <Text fontWeight="medium" flex={1} textAlign="left">
+    <Text flex={1} textAlign="left">
       {guide.label}
     </Text>
     <Box as="span" color="gray.400" ml={1} display="flex" alignItems="center">
@@ -101,7 +101,7 @@ const ObservabilityCard: React.FC = () => {
         alignItems="flex-start"
         justifyContent="flex-start"
       >
-        <Heading size="md" fontWeight="bold" textAlign="left">
+        <Heading size="md" textAlign="left">
           Observability setup
         </Heading>
       </HStack>

@@ -7,6 +7,7 @@ import { dependencies } from "../../injection/dependencies.client";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { FilterField } from "../../server/filters/types";
 import { Tooltip } from "../ui/tooltip";
+import { LuFilter } from "react-icons/lu";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false },
@@ -119,7 +120,7 @@ export function FilterToggleButton({
               {Object.keys(nonEmptyFilters).length}
             </Box>
           )}
-          <Filter size={14} />
+          <LuFilter size={14} />
           <Text paddingLeft={2}>{children}</Text>
           {hasAnyFilters && onClear && (
             <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>

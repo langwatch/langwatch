@@ -41,6 +41,7 @@ import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -78,23 +79,18 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
 
 const ProjectAvatar = ({
   name,
-  size = "xs",
+  size = "2xs",
 }: {
   name: string;
-  size?: "xs" | "sm";
+  size?: "2xs" | "xs" | "sm";
 }) => {
   return (
-    <Avatar.Root
+    <RandomColorAvatar
       size={size}
-      backgroundColor="orange.400"
-      color="white"
-      width={size === "xs" ? "20px" : "24px"}
-      height={size === "xs" ? "20px" : "24px"}
-    >
-      <Avatar.Fallback fontSize={size === "xs" ? "10px" : "12px"}>
-        {name.charAt(0).toUpperCase()}
-      </Avatar.Fallback>
-    </Avatar.Root>
+      name={name.slice(0, 1)}
+      width={size === "2xs" ? "20px" : undefined}
+      height={size === "2xs" ? "20px" : undefined}
+    />
   );
 };
 
@@ -732,24 +728,5 @@ export const DashboardLayout = ({
         </Box>
       </HStack>
     </Box>
-  );
-};
-
-export const DashboardLayoutHeader = ({
-  children,
-  withBorder = true,
-  ...props
-}: { children: React.ReactNode; withBorder?: boolean } & StackProps) => {
-  return (
-    <HStack
-      paddingX={6}
-      paddingY={2}
-      width="full"
-      borderBottom={withBorder ? "1px solid" : undefined}
-      borderBottomColor={withBorder ? "gray.100" : undefined}
-      {...props}
-    >
-      {children}
-    </HStack>
   );
 };

@@ -17,17 +17,15 @@ import ObservabilityCard from "./ObservabilityCard";
 import ResourcesCard from "./ResourcesCard";
 
 const WelcomeLayout = () => {
-  const bg = useColorModeValue("gray.50", "gray.900");
-
   return (
-    <Box minH="100vh" bg={bg} py={{ base: 6, md: 12 }} px={2} w="full">
+    <Box minH="100vh" py={6} px={2} w="full">
       <Container maxW="container.lg" w="full" mx="auto">
         <VStack gap={{ base: 4, md: 8 }} align="start">
           <Box>
-            <Heading size={{ base: "md", md: "lg" }} fontWeight="extrabold">
+            <Heading>
               Get started with LangWatch
             </Heading>
-            <Text color="gray.500" fontSize={{ base: "sm", md: "md" }}>
+            <Text color="gray.500" fontSize="sm">
               Set up your project and start monitoring your AI applications
             </Text>
           </Box>

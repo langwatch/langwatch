@@ -36,6 +36,7 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { LuZap } from "react-icons/lu";
 
 export function QueryStringFieldsFilters({
   hideTriggerButton = false,
@@ -57,10 +58,11 @@ export function QueryStringFieldsFilters({
         hasPermission("triggers:manage") && !hideTriggerButton ? (
           <Tooltip content="Create a filter to add a trigger.">
             <Button
-              colorPalette="orange"
+              colorPalette="gray"
               onClick={() => openDrawer("trigger", undefined)}
               disabled={!hasAnyFilters}
             >
+              <LuZap />
               Add Trigger
             </Button>
           </Tooltip>
@@ -102,9 +104,9 @@ export function FieldsFilters({
   ]);
 
   return (
-    <VStack align="start" width="300px" gap={6}>
+    <VStack align="start" width="300px" gap={4}>
       <HStack width={"full"}>
-        <Heading size="md">Filters</Heading>
+        <Heading fontSize="sm">Filters</Heading>
 
         <Spacer />
 
@@ -163,12 +165,10 @@ function FieldsFilter({
       >
         <Popover.Trigger asChild>
           <Button
-            variant="outline"
-            size="md"
+            variant="subtle"
+            size="sm"
             width="100%"
-            background="white"
             fontWeight="normal"
-            _hover={{ background: "white" }}
           >
             <HStack width="full" gap={1}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>

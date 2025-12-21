@@ -8,16 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Workflow } from "lucide-react";
-import {
-  DashboardLayout,
-  DashboardLayoutHeader,
-} from "../../components/DashboardLayout";
+import { DashboardLayout } from "../../components/DashboardLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { CreateWorkflowButton } from "../../components/workflows/CreateWorkflowButton";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 function Workflows() {
   const { project } = useOrganizationTeamProject();
@@ -32,13 +30,11 @@ function Workflows() {
 
   return (
     <DashboardLayout>
-      <DashboardLayoutHeader>
-        <Heading as="h1">
-          Workflows
-        </Heading>
+      <PageLayout.Header>
+        <PageLayout.Heading>Workflows</PageLayout.Heading>
         <Spacer />
         <CreateWorkflowButton />
-      </DashboardLayoutHeader>
+      </PageLayout.Header>
 
       {showEmptyState ? (
         <Center flex={1} padding={6}>
