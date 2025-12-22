@@ -56,6 +56,7 @@ function Header({
   return (
     <HStack
       height="48px"
+      flexShrink={0}
       paddingX={6}
       width="full"
       borderBottom={withBorder ? "1px solid" : undefined}

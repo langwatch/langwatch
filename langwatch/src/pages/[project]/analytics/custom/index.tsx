@@ -390,7 +390,6 @@ export default function AnalyticsCustomGraph({
         onOpenChange={({ open }) => jsonModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Graph JSON</Dialog.Title>
@@ -408,7 +407,6 @@ export default function AnalyticsCustomGraph({
         onOpenChange={({ open }) => apiModal.setOpen(open)}
         size="lg"
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>JSON API</Dialog.Title>

@@ -87,13 +87,10 @@ export function RoleFormDialog({
 
   return (
     <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Backdrop zIndex={1000} />
       <Dialog.Content
         maxWidth="900px"
         maxHeight="90vh"
         overflowY="auto"
-        backdrop={false}
-        zIndex={1001}
       >
         <Dialog.Header>
           <Dialog.Title>{title}</Dialog.Title>

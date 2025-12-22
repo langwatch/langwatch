@@ -21,7 +21,6 @@ export function ScoreReasonModal({
 
   return (
     <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>

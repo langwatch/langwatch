@@ -342,7 +342,6 @@ and ListIcon is now like this:
         </List.Indicator>
 
 Also, there is no Modal anymore, modal is now called Dialog, and it looks like this:<Dialog.Root>
-  <Dialog.Backdrop /> // former Modal.Overlay
   <Dialog.Trigger />
   <Dialog.Content>
     <Dialog.CloseTrigger />
