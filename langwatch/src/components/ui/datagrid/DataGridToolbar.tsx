@@ -10,116 +10,104 @@ import { Checkbox } from "../checkbox";
 import { FilterBar } from "./FilterBar";
 import type { DataGridColumnDef, FilterState, SortingState } from "./types";
 
-interface DataGridToolbarProps<T> {
-  columns: DataGridColumnDef<T>[];
-  visibleColumns: Set<string>;
-  filters: FilterState[];
-  globalSearch: string;
-  sorting: SortingState | null;
-  groupBy: string | null;
-  isExporting: boolean;
-  isFetching?: boolean;
-  onRemoveFilter: (columnId: string, index: number) => void;
-  onClearFilters: () => void;
-  onResetFiltersAndSorting: () => void;
-  onGlobalSearchChange: (search: string) => void;
-  onToggleColumnVisibility: (columnId: string) => void;
-  onExport: () => void;
+interface DataGridToolbarProps {
+  children: ReactNode;
 }
 
 /**
  * Toolbar with filter bar, column visibility, and export controls
  */
-export function DataGridToolbar<T>({
-  columns,
-  visibleColumns,
-  filters,
-  globalSearch,
-  sorting,
-  groupBy,
-  isExporting,
-  isFetching,
-  onRemoveFilter,
-  onClearFilters,
-  onResetFiltersAndSorting,
-  onGlobalSearchChange,
-  onToggleColumnVisibility,
-  onExport,
+function DataGridToolbarRoot({
+  children,
 }: DataGridToolbarProps<T>) {
-  const hasFiltersOrSorting =
-    filters.length > 0 ||
-    globalSearch.length > 0 ||
-    sorting !== null ||
-    groupBy !== null;
   return (
     <Flex direction="row" align="center" justify="space-between" gap={4} px={3}>
-      {/* Filter Bar - takes available space */}
-      <Box flex={1}>
-        <FilterBar
-          columns={columns}
-          filters={filters}
-          globalSearch={globalSearch}
-          onRemoveFilter={onRemoveFilter}
-          onClearFilters={onClearFilters}
-          onGlobalSearchChange={onGlobalSearchChange}
-        />
-      </Box>
-
-      {/* Loading indicator */}
-      {isFetching && <Spinner size="sm" color="gray.500" />}
-
-      {/* Reset Filters & Sorting */}
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onResetFiltersAndSorting}
-        disabled={!hasFiltersOrSorting}
-      >
-        <RotateCcw size={14} />
-        <Text ml={1}>Reset</Text>
-      </Button>
-
-      {/* Right side controls */}
-      <HStack gap={2} flexShrink={0}>
-        {/* Column Visibility */}
-        <PopoverRoot>
-          <PopoverTrigger asChild>
-            <Button size="sm" variant="outline">
-              <Columns size={14} />
-              <Text ml={1}>Columns</Text>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent width="250px">
-            <PopoverBody>
-              <Flex direction="column" gap={2}>
-                <Text fontWeight="medium" fontSize="sm" mb={1}>
-                  Visible Columns
-                </Text>
-                {columns.map((column) => (
-                  <Checkbox
-                    key={column.id}
-                    checked={visibleColumns.has(column.id)}
-                    onCheckedChange={() => onToggleColumnVisibility(column.id)}
-                  >
-                    {column.header}
-                  </Checkbox>
-                ))}
-              </Flex>
-            </PopoverBody>
-          </PopoverContent>
-        </PopoverRoot>
-
-        {/* Export */}
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onExport}
-          loading={isExporting}
-        >
-          <Download size={14} />
-          <Text ml={1}>Export CSV</Text>
-        </Button>
-      </HStack>
+      {children}
     </Flex>
   );
 }
+
+function DataGridToolbarLoadingIndicator({
+  isLoading,
+}: {
+  isLoading: boolean;
+}) {
+  if (!isLoading) return null;
+  return (
+    <Spinner size="sm" color="gray.500" />
+  );
+}
+
+function DataGridToolbarResetFiltersAndSorting({
+  onResetFiltersAndSorting,
+}: {
+  onResetFiltersAndSorting: () => void;
+}) {
+  return (
+    <Button size="sm" variant="outline" onClick={onResetFiltersAndSorting}>
+      <RotateCcw size={14} />
+      <Text ml={1}>Reset</Text>
+    </Button>
+  );
+}
+
+function DataGridToolbarColumnVisibility({
+  columns,
+  visibleColumns,
+  onToggleColumnVisibility,
+}: {
+  columns: DataGridColumnDef<T>[];
+  visibleColumns: Record<string, boolean>;
+  onToggleColumnVisibility: (columnId: string) => void;
+}) {
+  return (
+    <PopoverRoot>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="outline">
+          <Columns size={14} />
+          <Text ml={1}>Columns</Text>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent width="250px">
+        <PopoverBody>
+          <Flex direction="column" gap={2}>
+            <Text fontWeight="medium" fontSize="sm" mb={1}>
+              Visible Columns
+            </Text>
+            {columns.map((column) => (
+              <Checkbox
+                key={column.id}
+                checked={visibleColumns[column.id]}
+                onCheckedChange={() => onToggleColumnVisibility(column.id)}
+              >
+                {column.header}
+              </Checkbox>
+            ))}
+          </Flex>
+        </PopoverBody>
+      </PopoverContent>
+    </PopoverRoot>
+  );
+}
+
+function DataGridToolbarExport({
+  onExport,
+}: {
+  onExport: () => void;
+}) {
+  return (
+    <Button size="sm" variant="outline" onClick={onExport}>
+      <Download size={14} />
+      <Text ml={1}>Export CSV</Text>
+    </Button>
+  );
+}
+
+export const DataGridToolbar = {
+  Root: DataGridToolbarRoot,
+  LoadingIndicator: DataGridToolbarLoadingIndicator,
+  ResetFiltersAndSorting: DataGridToolbarResetFiltersAndSorting,
+  ColumnVisibility: DataGridToolbarColumnVisibility,
+  Export: DataGridToolbarExport,
+  FilterBar
+};

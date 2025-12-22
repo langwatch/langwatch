@@ -6,23 +6,20 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { createTraceColumns } from "./traceColumns";
 import type { ScenarioRunRow, TraceRow } from "./types";
-
-interface ScenarioExpandedContentProps {
-  row: ScenarioRunRow;
-}
+import type { Row } from "@tanstack/react-table";
 
 /**
  * Expanded row content showing traces for a scenario run
  * Fetches actual trace data from Elasticsearch for accurate metrics
  */
-export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
+export function ScenarioExpandedContent({ row }: { row: Row<ScenarioRunRow> }) {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
   // Extract trace IDs from the row
   const traceIds = useMemo(
-    () => row.traces?.map((t) => t.traceId) ?? [],
-    [row.traces]
+    () => row.original.traces?.map((t) => t.traceId) ?? [],
+    [row.original.traces]
   );
 
   // Fetch actual trace data with spans from Elasticsearch
@@ -39,7 +36,7 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
   // Transform fetched traces to TraceRow format
   const traces: TraceRow[] = useMemo(() => {
     if (!fetchedTraces) {
-      return row.traces ?? [];
+      return row.original.traces ?? [];
     }
 
     return fetchedTraces.map((trace) => ({
@@ -60,7 +57,7 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
         (trace.metrics?.completion_tokens ?? 0),
       totalCost: trace.metrics?.total_cost ?? 0,
     }));
-  }, [fetchedTraces, row.traces]);
+  }, [fetchedTraces, row.original.traces]);
 
   // Create columns for the trace table
   const traceColumns = useMemo(() => createTraceColumns(), []);
@@ -75,8 +72,6 @@ export function ScenarioExpandedContent({ row }: ScenarioExpandedContentProps) {
   const handleRowClick = (trace: TraceRow) => {
     openDrawer("traceDetails", { traceId: trace.traceId });
   };
-
-  console.log({ traceIds });
 
   if (traceIds.length === 0) {
     return (

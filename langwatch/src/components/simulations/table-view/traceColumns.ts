@@ -9,91 +9,72 @@ import {
   TraceCostCell,
   TraceMetadataCell,
 } from "./cells/TraceCells";
+import { createColumnHelper } from "@tanstack/react-table";
+
+const columnHelper = createColumnHelper<TraceRow>();
 
 /**
  * Creates trace column definitions for the nested DataGrid in expanded rows
+ * Uses TanStack's columnHelper for type-safe column definitions
  */
 export function createTraceColumns(): DataGridColumnDef<TraceRow>[] {
   return [
-    {
+    columnHelper.display({
       id: "arrow",
       header: "",
-      accessorKey: "traceId",
+      size: 40,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceArrowCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 40,
-    },
-    {
-      id: "traceId",
+    }),
+    columnHelper.accessor("traceId", {
       header: "Trace ID",
-      accessorKey: "traceId",
+      size: 120,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceIdCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 120,
-    },
-    {
-      id: "timestamp",
+    }),
+    columnHelper.accessor("timestamp", {
       header: "Timestamp",
-      accessorKey: "timestamp",
+      size: 160,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceTimestampCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 160,
-    },
-    {
-      id: "input",
+    }),
+    columnHelper.accessor("input", {
       header: "Input",
-      accessorKey: "input",
+      size: 250,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceTextCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 250,
-    },
-    {
-      id: "output",
+    }),
+    columnHelper.accessor("output", {
       header: "Output",
-      accessorKey: "output",
+      size: 250,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceTextCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 250,
-    },
-    {
-      id: "totalTokens",
+    }),
+    columnHelper.accessor("totalTokens", {
       header: "Tokens",
-      accessorKey: "totalTokens",
+      size: 80,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceTokensCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 80,
-    },
-    {
-      id: "totalCost",
+    }),
+    columnHelper.accessor("totalCost", {
       header: "Cost",
-      accessorKey: "totalCost",
+      size: 80,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceCostCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 80,
-    },
-    {
-      id: "metadata",
+    }),
+    columnHelper.accessor("metadata", {
       header: "Metadata",
-      accessorKey: "metadata",
+      size: 200,
+      enableSorting: false,
+      enableColumnFilter: false,
       cell: TraceMetadataCell,
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 200,
-    },
+    }),
   ];
 }

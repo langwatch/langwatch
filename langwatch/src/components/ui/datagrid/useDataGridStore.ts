@@ -13,19 +13,12 @@ import { DataGridUrlParams } from "./datagrid-url-params.util";
 function createInitialState<T>(
   config: DataGridConfig<T>
 ): DataGridState<T> {
-  const visibleColumns = new Set(
-    config.columns
-      .filter((col) => col.defaultVisible !== false)
-      .map((col) => col.id)
-  );
+  // All columns visible by default
+  const visibleColumns = new Set(config.columns.map((col) => col.id!));
 
-  const pinnedLeft = config.columns
-    .filter((col) => col.pinned === "left")
-    .map((col) => col.id);
-
-  const pinnedRight = config.columns
-    .filter((col) => col.pinned === "right")
-    .map((col) => col.id);
+  // No pinned columns by default (TanStack handles pinning via state)
+  const pinnedLeft: string[] = [];
+  const pinnedRight: string[] = [];
 
   return {
     rows: [],
@@ -38,7 +31,7 @@ function createInitialState<T>(
     pinnedColumns: { left: pinnedLeft, right: pinnedRight },
     filters: config.defaultFilters ?? [],
     globalSearch: config.defaultGlobalSearch ?? "",
-    sorting: config.defaultSorting ?? null,
+    sorting: config.defaultSorting ?? [],
     groupBy: null,
     page: config.defaultPage ?? 1,
     pageSize: config.defaultPageSize ?? 20,
@@ -136,10 +129,8 @@ export function createDataGridStore<T>(config: DataGridConfig<T>) {
     );
   }
 
-  // Get non-hideable column IDs to ensure they're always visible
-  const nonHideableColumnIds = config.columns
-    .filter((col) => col.hideable === false)
-    .map((col) => col.id);
+  // No non-hideable columns (all columns can be hidden)
+  const nonHideableColumnIds: string[] = [];
 
   // Create persisted store with optional URL sync
   return create<DataGridStore<T>>()(
@@ -193,18 +184,16 @@ function createStoreActions<T>(
     setIsLoading: (isLoading) => set({ isLoading }),
     setError: (error) => set({ error }),
 
-    // Filter actions
+    // Filter actions (using TanStack ColumnFiltersState directly)
     setFilters: (filters) => set({ filters, page: 1 }),
-    addFilter: (filter) =>
+    addFilter: (columnId, value) =>
       set((state) => ({
-        filters: [...state.filters, filter],
+        filters: [...state.filters, { id: columnId, value }],
         page: 1,
       })),
     removeFilter: (columnId, index) =>
       set((state) => {
-        const columnFilters = state.filters.filter(
-          (f) => f.columnId === columnId
-        );
+        const columnFilters = state.filters.filter((f) => f.id === columnId);
         const filterToRemove = columnFilters[index];
         if (!filterToRemove) return state;
 
@@ -213,31 +202,43 @@ function createStoreActions<T>(
           page: 1,
         };
       }),
-    updateFilter: (index, filter) =>
+    updateFilter: (columnId, index, value) =>
       set((state) => {
+        const columnFilters = state.filters.filter((f) => f.id === columnId);
+        const filterToUpdate = columnFilters[index];
+        if (!filterToUpdate) return state;
+
         const newFilters = [...state.filters];
-        newFilters[index] = filter;
+        const globalIndex = state.filters.indexOf(filterToUpdate);
+        newFilters[globalIndex] = { id: columnId, value };
         return { filters: newFilters, page: 1 };
       }),
     clearFilters: () => set({ filters: [], globalSearch: "", page: 1 }),
-    resetFiltersAndSorting: () => set({ filters: [], globalSearch: "", sorting: null, groupBy: null, page: 1 }),
+    resetFiltersAndSorting: () => set({ filters: [], globalSearch: "", sorting: [], groupBy: null, page: 1 }),
     setGlobalSearch: (globalSearch) => set({ globalSearch, page: 1 }),
 
-    // Sort actions
+    // Sort actions (using TanStack SortingState - array format)
     setSorting: (sorting) => set({ sorting }),
     toggleSort: (columnId) =>
       set((state) => {
         const column = state.columns.find((c) => c.id === columnId);
-        if (!column?.sortable) return state;
+        if (!column?.enableSorting) return state;
 
-        if (state.sorting?.columnId === columnId) {
-          // Toggle direction or clear
-          if (state.sorting.order === "asc") {
-            return { sorting: { columnId, order: "desc" } };
+        const existingIndex = state.sorting.findIndex((s) => s.id === columnId);
+        if (existingIndex >= 0) {
+          const existing = state.sorting[existingIndex];
+          // Toggle direction or remove
+          if (existing.desc) {
+            // Remove from array
+            return { sorting: state.sorting.filter((_, i) => i !== existingIndex) };
           }
-          return { sorting: null };
+          // Change to desc
+          const newSorting = [...state.sorting];
+          newSorting[existingIndex] = { id: columnId, desc: true };
+          return { sorting: newSorting };
         }
-        return { sorting: { columnId, order: "asc" } };
+        // Add new sort (asc)
+        return { sorting: [...state.sorting, { id: columnId, desc: false }] };
       }),
 
     // Grouping actions
@@ -251,13 +252,6 @@ function createStoreActions<T>(
     setColumns: (columns) => set({ columns }),
     toggleColumnVisibility: (columnId) =>
       set((state) => {
-        // Check if column is hideable
-        const column = state.columns.find((c) => c.id === columnId);
-        if (column?.hideable === false) {
-          // Cannot hide this column
-          return state;
-        }
-
         const newVisibleColumns = new Set(state.visibleColumns);
         if (newVisibleColumns.has(columnId)) {
           newVisibleColumns.delete(columnId);

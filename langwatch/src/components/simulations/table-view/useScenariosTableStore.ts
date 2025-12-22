@@ -17,3 +17,4 @@ export function createScenariosTableStore(config: Omit<DataGridConfig<ScenarioRu
  * Type for the scenarios table store
  */
 export type ScenariosTableStore = ReturnType<typeof createScenariosTableStore>;
+

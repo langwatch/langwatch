@@ -11,14 +11,14 @@
  * - Uses native browser APIs (window.location, history.replaceState)
  */
 import qs from "qs";
-import type { FilterState, SortingState } from "./types";
+import type { SortingState, ColumnFiltersState, FilterOperator } from "./types";
 
 /**
  * State fields that can be synced to URL
  */
 interface URLSyncState {
-  filters: FilterState[];
-  sorting: SortingState | null;
+  filters: ColumnFiltersState;
+  sorting: SortingState;
   page: number;
   pageSize: number;
   globalSearch: string;
@@ -30,7 +30,7 @@ interface URLSyncState {
  */
 const DEFAULTS: URLSyncState = {
   filters: [],
-  sorting: null,
+  sorting: [],
   page: 1,
   pageSize: 20,
   globalSearch: "",
@@ -52,25 +52,27 @@ function parse(searchParams: string): Partial<URLSyncState> {
 
   const result: Partial<URLSyncState> = {};
 
-  // Parse filters array
+  // Parse filters array (convert to ColumnFiltersState format)
   if (parsed.filters && Array.isArray(parsed.filters)) {
     result.filters = parsed.filters
       .filter((f): f is qs.ParsedQs => typeof f === "object" && f !== null)
-      .map((f) => ({
-        columnId: String(f["columnId"] ?? ""),
-        operator: (f["operator"] as FilterState["operator"]) ?? "eq",
-        value: f["value"],
-      }))
-      .filter((f) => f.columnId);
+      .map((f) => {
+        const columnId = String(f["columnId"] ?? "");
+        const operator = (f["operator"] as FilterOperator) ?? "eq";
+        const value = f["value"];
+        // Store operator and value in the filter value
+        return {
+          id: columnId,
+          value: { operator, value },
+        };
+      })
+      .filter((f) => f.id);
   }
 
-  // Parse sorting (flat params)
+  // Parse sorting (flat params - convert to TanStack array format)
   if (parsed.sortBy && typeof parsed.sortBy === "string") {
-    const order =
-      parsed.sortOrder === "asc" || parsed.sortOrder === "desc"
-        ? parsed.sortOrder
-        : "desc";
-    result.sorting = { columnId: parsed.sortBy, order };
+    const desc = parsed.sortOrder === "desc";
+    result.sorting = [{ id: parsed.sortBy, desc }];
   }
 
   // Parse pagination
@@ -109,17 +111,30 @@ function serialize(state: Partial<URLSyncState>): string {
   const params: Record<string, unknown> = {};
 
   if (state.filters && state.filters.length > 0) {
-    params.filters = state.filters.map((f) => ({
-      columnId: f.columnId,
-      operator: f.operator,
-      value: f.value,
-    }));
+    params.filters = state.filters.map((f) => {
+      // Extract operator and value from filter value
+      const filterValue = f.value as { operator?: FilterOperator; value?: unknown } | unknown;
+      if (filterValue && typeof filterValue === "object" && "operator" in filterValue && "value" in filterValue) {
+        return {
+          columnId: f.id,
+          operator: filterValue.operator,
+          value: filterValue.value,
+        };
+      }
+      // Fallback for simple values
+      return {
+        columnId: f.id,
+        operator: "eq" as FilterOperator,
+        value: f.value,
+      };
+    });
   }
 
-  // Flat sortBy/sortOrder instead of nested
-  if (state.sorting) {
-    params.sortBy = state.sorting.columnId;
-    params.sortOrder = state.sorting.order;
+  // Flat sortBy/sortOrder instead of nested (convert from TanStack array)
+  if (state.sorting && state.sorting.length > 0) {
+    const firstSort = state.sorting[0];
+    params.sortBy = firstSort.id;
+    params.sortOrder = firstSort.desc ? "desc" : "asc";
   }
 
   if (state.page && state.page !== DEFAULTS.page) {

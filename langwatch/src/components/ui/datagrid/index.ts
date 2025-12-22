@@ -1,10 +1,10 @@
 // Types
 export type {
   FilterOperator,
-  FilterState,
   FilterType,
   DataGridColumnDef,
   SortingState,
+  ColumnFiltersState,
   DataGridURLParams,
   DataGridState,
   DataGridActions,

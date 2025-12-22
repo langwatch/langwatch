@@ -2,22 +2,20 @@ import { Flex, Text } from "@chakra-ui/react";
 import { ChevronDown, ChevronUp, ChevronsUpDown, Filter, Ungroup } from "lucide-react";
 import type { Header } from "@tanstack/react-table";
 import { ColumnPopover } from "./ColumnPopover";
-import type { DataGridColumnDef, FilterState, SortingState } from "./types";
+import type { DataGridColumnDef, SortingState, ColumnFiltersState } from "./types";
 
 interface ColumnHeaderProps<T> {
   header: Header<T, unknown>;
   column: DataGridColumnDef<T>;
-  sorting: SortingState | null;
-  filters: FilterState[];
+  sorting: SortingState;
+  filters: ColumnFiltersState;
   groupBy: string | null;
   onSort: (columnId: string, order: "asc" | "desc" | null) => void;
-  onAddFilter: (filter: FilterState) => void;
+  onAddFilter: (columnId: string, value: unknown) => void;
   onRemoveFilter: (columnId: string, index: number) => void;
   onGroupBy: (columnId: string | null) => void;
   onToggleVisibility: (columnId: string) => void;
   onPin: (columnId: string, position: "left" | "right" | false) => void;
-  enumOptions?: string[];
-  enumLabels?: Record<string, string>;
 }
 
 /**
@@ -35,34 +33,34 @@ export function ColumnHeader<T>({
   onGroupBy,
   onToggleVisibility,
   onPin,
-  enumOptions,
-  enumLabels,
 }: ColumnHeaderProps<T>) {
-  const isSorted = sorting?.columnId === column.id;
-  const sortOrder = isSorted ? sorting.order : null;
-  const hasFilters = filters.some((f) => f.columnId === column.id);
-  const isGrouped = groupBy === column.id;
+  const columnId = column.id!;
+  const sortEntry = sorting.find((s) => s.id === columnId);
+  const isSorted = !!sortEntry;
+  const sortOrder = isSorted ? (sortEntry.desc ? "desc" : "asc") : null;
+  const hasFilters = filters.some((f) => f.id === columnId);
+  const isGrouped = groupBy === columnId;
+
+  const headerText = typeof column.header === "string" ? column.header : "";
 
   return (
     <Flex align="center" gap={1}>
       <Text fontWeight="bold" fontSize="xs">
-        {column.header}
+        {headerText}
       </Text>
 
       {/* Sort indicator */}
-      {column.sortable && (
+      {column.enableSorting && (
         <Flex
           color={isSorted ? "blue.500" : "gray.400"}
-          cursor={column.sortable ? "pointer" : "default"}
+          cursor="pointer"
           onClick={() => {
-            if (column.sortable) {
-              if (!isSorted) {
-                onSort(column.id, "asc");
-              } else if (sortOrder === "asc") {
-                onSort(column.id, "desc");
-              } else {
-                onSort(column.id, null);
-              }
+            if (!isSorted) {
+              onSort(columnId, "asc");
+            } else if (sortOrder === "asc") {
+              onSort(columnId, "desc");
+            } else {
+              onSort(columnId, null);
             }
           }}
         >
@@ -97,7 +95,7 @@ export function ColumnHeader<T>({
       )}
 
       {/* Popover menu */}
-      {(column.sortable || column.filterable || column.groupable) && (
+      {(column.enableSorting || column.enableColumnFilter || column.enableGrouping) && (
         <ColumnPopover
           column={column}
           sorting={sorting}
@@ -109,8 +107,6 @@ export function ColumnHeader<T>({
           onGroupBy={onGroupBy}
           onToggleVisibility={onToggleVisibility}
           onPin={onPin}
-          enumOptions={enumOptions}
-          enumLabels={enumLabels}
         />
       )}
     </Flex>

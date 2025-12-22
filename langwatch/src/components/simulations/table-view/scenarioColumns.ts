@@ -1,120 +1,82 @@
 import type { DataGridColumnDef } from "~/components/ui/datagrid";
-import { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
+import { Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { ScenarioRunRow } from "./types";
 import { ScenarioSetCell } from "./cells/ScenarioSetCell";
+import { createColumnHelper } from "@tanstack/react-table";
+import { DurationCell,
+StatusCell, TimestampCell, VerdictCell, ActionsCell } from "./cells";
+
+const columnHelper = createColumnHelper<ScenarioRunRow>();
 
 /**
  * Creates scenario column definitions for the DataGrid
+ * Uses TanStack's columnHelper for type-safe column definitions
  * @param projectSlug - The project slug for generating links
  */
-export function createScenarioColumns(
-  projectSlug: string
-): DataGridColumnDef<ScenarioRunRow>[] {
+export function createScenarioColumns(): DataGridColumnDef<ScenarioRunRow>[] {
   return [
-    {
-      id: "status",
+    columnHelper.accessor("status", {
       header: "",
-      accessorKey: "status",
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      width: 40,
-    },
-    {
-      id: "name",
+      size: 40,
+      enableSorting: false,
+      enableColumnFilter: false,
+      cell: StatusCell,
+    }),
+    columnHelper.accessor("name", {
       header: "Scenario Name",
-      accessorKey: "name",
-      filterable: true,
-      filterType: "text",
-      sortable: true,
-      groupable: true,
-      defaultVisible: true,
-    },
-    {
-      id: "scenarioSetId",
+      enableSorting: true,
+      enableColumnFilter: true,
+      enableGrouping: true,
+    }),
+    columnHelper.accessor("scenarioSetId", {
       header: "Set Id",
-      accessorKey: "scenarioSetId",
+      enableSorting: true,
+      enableColumnFilter: true,
+      enableGrouping: true,
       cell: ScenarioSetCell,
-      linkTo: (row) => `/${projectSlug}/simulations/${row.scenarioSetId}`,
-      filterable: true,
-      filterType: "text",
-      sortable: true,
-      groupable: true,
-      defaultVisible: true,
-    },
-    {
-      id: "batchRunId",
+    }),
+    columnHelper.accessor("batchRunId", {
       header: "Batch Run",
-      accessorKey: "batchRunId",
-      linkTo: (row) =>
-        `/${projectSlug}/simulations/${row.scenarioSetId}/${row.batchRunId}`,
-      filterable: true,
-      filterType: "text",
-      sortable: true,
-      defaultVisible: false,
-    },
-    {
-      id: "verdict",
+      enableSorting: true,
+      enableColumnFilter: true,
+    }),
+    columnHelper.accessor("verdict", {
       header: "Verdict",
-      accessorKey: "verdict",
-      filterable: true,
-      filterType: "enum",
-      enumValues: Object.values(Verdict),
-      enumLabels: {
-        [Verdict.SUCCESS]: "Pass",
-        [Verdict.FAILURE]: "Fail",
-        [Verdict.INCONCLUSIVE]: "Inconclusive",
-      },
-      sortable: true,
-      groupable: true,
-      defaultVisible: true,
-    },
-    {
-      id: "timestamp",
+      enableSorting: true,
+      enableColumnFilter: true,
+      cell: VerdictCell,
+      enableGrouping: true,
+    }),
+    columnHelper.accessor("timestamp", {
       header: "Date",
-      accessorKey: "timestamp",
-      filterable: true,
-      filterType: "date",
-      sortable: true,
-      defaultSort: "desc",
-      defaultVisible: true,
-    },
-    {
-      id: "durationInMs",
+      enableSorting: true,
+      enableColumnFilter: true,
+      cell: TimestampCell,
+    }),
+    columnHelper.accessor("durationInMs", {
       header: "Duration",
-      accessorKey: "durationInMs",
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-    },
-    {
-      id: "scenarioId",
+      enableSorting: false,
+      enableColumnFilter: false,
+      cell: DurationCell,
+    }),
+    columnHelper.accessor("scenarioId", {
       header: "Scenario ID",
-      accessorKey: "scenarioId",
-      filterable: true,
-      filterType: "text",
-      sortable: true,
-      defaultVisible: false,
-    },
-    {
-      id: "scenarioRunId",
+      enableSorting: true,
+      enableColumnFilter: true,
+    }),
+    columnHelper.accessor("scenarioRunId", {
       header: "Run ID",
-      accessorKey: "scenarioRunId",
-      filterable: true,
-      filterType: "text",
-      sortable: false,
-      defaultVisible: false,
-    },
-    {
+      enableSorting: false,
+      enableColumnFilter: true,
+    }),
+    columnHelper.display({
       id: "actions",
       header: "",
-      accessorKey: "scenarioRunId", // Dummy accessor
-      filterable: false,
-      sortable: false,
-      defaultVisible: true,
-      hideable: false, // Always visible
-      width: 50,
-    },
+      size: 50,
+      enableSorting: false,
+      enableColumnFilter: false,
+      cell: ActionsCell,
+    }),
   ];
 }
 
@@ -125,13 +87,12 @@ export function createScenarioColumns(
 export function generateDynamicColumns(
   metadataKeys: string[]
 ): DataGridColumnDef<ScenarioRunRow>[] {
-  return metadataKeys.map((key) => ({
-    id: `metadata.${key}`,
-    header: key,
-    accessorKey: `metadata.${key}`,
-    filterable: true,
-    filterType: "text" as const,
-    sortable: true,
-    defaultVisible: false,
-  }));
+  return metadataKeys.map((key) =>
+    columnHelper.accessor(`metadata.${key}` as keyof ScenarioRunRow, {
+      id: `metadata.${key}`,
+      header: key,
+      enableSorting: true,
+      enableColumnFilter: true,
+    })
+  );
 }
