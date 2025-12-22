@@ -25,6 +25,7 @@ interface TraceMessageProps extends StackProps {
   traceId: string;
 }
 
+
 export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
   const { project } = useOrganizationTeamProject();
 
@@ -58,7 +59,7 @@ function TraceLoadingState({
   traceQuery: ReturnType<typeof api.traces.getById.useQuery>;
 } & StackProps) {
   return (
-    <HStack marginTop={-6} paddingBottom={4} gap={2} {...props}>
+    <HStack paddingBottom={4} gap={2} {...props}>
       <Spinner size="sm" />
       <Text fontSize="xs" color="gray.500">
         Loading trace...{" "}
@@ -79,7 +80,7 @@ function TraceErrorState({
   traceQuery: ReturnType<typeof api.traces.getById.useQuery>;
 } & StackProps) {
   return (
-    <Alert.Root status="warning" size="sm" marginY={4} {...props}>
+    <Alert.Root status="warning" size="sm" {...props}>
       <Alert.Content>
         <Alert.Description>
           <HStack
@@ -118,7 +119,7 @@ function TraceSuccessState({
   const { openDrawer, drawerOpen } = useDrawer();
 
   return (
-    <HStack marginTop={-6} paddingBottom={4} {...props}>
+    <HStack paddingBottom={4} {...props}>
       <Button
         colorPalette="gray"
         onClick={() => {

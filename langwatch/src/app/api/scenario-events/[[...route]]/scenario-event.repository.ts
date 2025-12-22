@@ -98,10 +98,22 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
+        sort: [
+          { timestamp: "desc" },
+          {
+            _script: {
+              type: "number",
+              script: {
+                source: "params._source.messages != null ? params._source.messages.length : 0",
+              },
+              order: "desc",
+            },
+          },
+        ],
         size: 1,
       },
     });
+
 
     const rawResult = response.hits.hits[0]?._source as
       | Record<string, unknown>
@@ -858,7 +870,18 @@ export class ScenarioEventRepository {
               latest_event: {
                 top_hits: {
                   size: 1,
-                  sort: [{ timestamp: "desc" }],
+                  sort: [
+                    { timestamp: "desc" },
+                    {
+                      _script: {
+                        type: "number",
+                        script: {
+                          source: "params._source.messages != null ? params._source.messages.length : 0",
+                        },
+                        order: "desc",
+                      },
+                    },
+                  ],
                 },
               },
             },
