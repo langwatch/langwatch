@@ -119,13 +119,20 @@ export const processTraceBasedTrigger = async (
     await addTriggersSent(triggerId, triggerData);
     const updatedAt = getLatestUpdatedAt(traces) ?? Date.now();
 
-    void updateAlert(triggerId, updatedAt, project.id);
+    try {
+      await updateAlert(triggerId, updatedAt, project.id);
+    } catch (error) {
+      console.error(
+        `Failed to update alert for trigger ${triggerId}:`,
+        error instanceof Error ? error.message : error,
+      );
+    }
 
     return {
       triggerId,
       updatedAt: updatedAt,
       status: "triggered",
-      totalFound: tracesToSend.length,
+      totalFound: triggerData.length,
     };
   }
 

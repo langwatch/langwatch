@@ -29,12 +29,14 @@ describe("handleAddToDataset", () => {
   });
 
   describe("when adding traces to dataset", () => {
-    it("fetches trigger, maps traces, and creates dataset records", async () => {
+    let context: TriggerContext;
+
+    beforeEach(() => {
       vi.mocked(mapTraceToDatasetEntry).mockReturnValue([
         { field1: "value1", field2: "value2" },
       ]);
 
-      const context: TriggerContext = {
+      context = {
         trigger: {
           id: "trigger-1",
           projectId: "project-1",
@@ -58,10 +60,16 @@ describe("handleAddToDataset", () => {
         ],
         projectSlug: "test-project",
       };
+    });
 
+    it("maps traces to dataset entries", async () => {
       await handleAddToDataset(context);
 
       expect(mapTraceToDatasetEntry).toHaveBeenCalled();
+    });
+
+    it("creates dataset records with mapped entries", async () => {
+      await handleAddToDataset(context);
 
       expect(createManyDatasetRecords).toHaveBeenCalledWith({
         datasetId: "dataset-1",
