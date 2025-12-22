@@ -9,6 +9,7 @@ import {
   Spacer,
   type StackProps,
   Text,
+  useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
@@ -289,9 +290,11 @@ export type DashboardLayoutProps = {
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  compactMenu = false,
+  compactMenu : compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
+  const isSmallScreen = useBreakpointValue({ base: true, lg: false });
+  const compactMenu = isSmallScreen ? true : compactMenuProp;
   const router = useRouter();
   const gray400 = useColorRawValue("gray.400");
 
