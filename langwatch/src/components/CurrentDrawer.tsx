@@ -13,7 +13,7 @@ import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { AlertDrawer } from "../pages/[project]/analytics/custom/AlertDrawer";
+import { AlertDrawer } from "./analytics/AlertDrawer";
 
 // Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
 export { useDrawer } from "../hooks/useDrawer";

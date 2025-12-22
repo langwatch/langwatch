@@ -12,22 +12,22 @@ import {
 import { Bell, CheckSquare, Trash } from "react-feather";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useMemo, useState, useEffect } from "react";
-import { Drawer, DrawerFooter } from "../../../../components/ui/drawer";
-import { Popover } from "../../../../components/ui/popover";
-import { Radio, RadioGroup } from "../../../../components/ui/radio";
-import { Tooltip } from "../../../../components/ui/tooltip";
-import { useDrawer } from "../../../../hooks/useDrawer";
-import { useFilterParams } from "../../../../hooks/useFilterParams";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { usePublicEnv } from "../../../../hooks/usePublicEnv";
-import { api } from "../../../../utils/api";
-import { toaster } from "../../../../components/ui/toaster";
-import type { CustomGraphFormData } from "./index";
+import { Drawer, DrawerFooter } from "../ui/drawer";
+import { Popover } from "../ui/popover";
+import { Radio, RadioGroup } from "../ui/radio";
+import { Tooltip } from "../ui/tooltip";
+import { useDrawer } from "../../hooks/useDrawer";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { api } from "../../utils/api";
+import { toaster } from "../ui/toaster";
+import type { CustomGraphFormData } from "../../pages/[project]/analytics/custom/index";
 import {
   customGraphFormToCustomGraphInput,
   customGraphInputToFormData,
-} from "./index";
-import type { CustomGraphInput } from "../../../../components/analytics/CustomGraph";
+} from "../../pages/[project]/analytics/custom/index";
+import type { CustomGraphInput } from "./CustomGraph";
 
 interface AlertDrawerProps {
   form?: UseFormReturn<CustomGraphFormData>;
