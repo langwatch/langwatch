@@ -9,7 +9,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Bell, CheckSquare, Trash } from "react-feather";
+import { Bell, Check, Trash } from "lucide-react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useMemo, useState, useEffect } from "react";
 import { Drawer, DrawerFooter } from "../ui/drawer";
@@ -74,7 +74,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
         alert: graphQuery.data.alert as CustomGraphFormData["alert"],
       });
     }
-  }, [graphQuery.data, providedForm, internalForm]);
+  }, [graphQuery.data, providedForm]);
 
   const updateGraphById = api.graphs.updateById.useMutation();
   const trpc = api.useContext();
@@ -133,7 +133,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
     if (members) {
       setSelectedMembers(members);
     }
-  }, [form, graphQuery.data]);
+  }, [graphQuery.data]);
 
   const handlePopoverChange = ({ open: isOpen }: { open: boolean }) => {
     if (isOpen) {
@@ -182,8 +182,8 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                       }
                     }}
                   >
-                    <CheckSquare
-                      width={18}
+                    <Check
+                      size={18}
                       color={selectedMembers.includes(email) ? "green" : "gray"}
                     />
                     <Text>{email}</Text>
@@ -303,7 +303,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
           <Drawer.Header>
             <Drawer.CloseTrigger onClick={closeDrawer} />
             <HStack gap={2}>
-              <Bell width={20} />
+              <Bell size={20} />
               <Drawer.Title>Configure Alert</Drawer.Title>
             </HStack>
           </Drawer.Header>
@@ -331,7 +331,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
         <Drawer.Header>
           <Drawer.CloseTrigger />
           <HStack gap={2}>
-            <Bell width={20} />
+            <Bell size={20} />
             <Drawer.Title>Configure Alert</Drawer.Title>
           </HStack>
         </Drawer.Header>
@@ -346,7 +346,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
               {seriesKeys.length > 1 ? (
                 <NativeSelect.Root>
                   <NativeSelect.Field
-                    {...form.control.register("alert.seriesName")}
+                    {...form.register("alert.seriesName")}
                     value={selectedSeriesName}
                   >
                     {seriesKeys.map((sk, index) => (
@@ -380,7 +380,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 <Field.Label>When value is</Field.Label>
                 <NativeSelect.Root>
                   <NativeSelect.Field
-                    {...form.control.register("alert.operator")}
+                    {...form.register("alert.operator")}
                     defaultValue="gt"
                   >
                     <option value="gt">Greater than</option>
@@ -398,7 +398,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 <Input
                   type="number"
                   step="any"
-                  {...form.control.register("alert.threshold", {
+                  {...form.register("alert.threshold", {
                     valueAsNumber: true,
                   })}
                   placeholder="0"
@@ -410,7 +410,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
               <Field.Label>Check over last</Field.Label>
               <NativeSelect.Root>
                 <NativeSelect.Field
-                  {...form.control.register("alert.timePeriod", {
+                  {...form.register("alert.timePeriod", {
                     valueAsNumber: true,
                   })}
                   defaultValue={60}
@@ -429,7 +429,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
               <Field.Label>Alert Type</Field.Label>
               <NativeSelect.Root>
                 <NativeSelect.Field
-                  {...form.control.register("alert.type")}
+                  {...form.register("alert.type")}
                   defaultValue="WARNING"
                 >
                   <option value="INFO">Info</option>
@@ -474,7 +474,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                     {alertAction === "SEND_SLACK_MESSAGE" && (
                       <Input
                         placeholder="Your Slack webhook URL"
-                        {...form.control.register(
+                        {...form.register(
                           "alert.actionParams.slackWebhook",
                         )}
                         marginLeft={7}
@@ -523,7 +523,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 onClick={handleRemoveAlert}
                 loading={updateGraphById.isLoading}
               >
-                <Trash width={16} />
+                <Trash size={16} />
                 Remove Alert
               </Button>
             )}

@@ -24,7 +24,6 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import {
   type Dispatch,
@@ -268,7 +267,7 @@ const defaultValues: CustomGraphFormData = {
   includePrevious: true,
 };
 
-function AnalyticsCustomGraphContent({
+export default function AnalyticsCustomGraph({
   customId,
   graph,
   name,
@@ -717,7 +716,7 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert,
+        alert: formData.alert?.enabled ? formData.alert : undefined,
       },
       {
         onSuccess: () => {
@@ -1460,7 +1459,9 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
   return (
     <MultiSelect
       {...field_}
-      menuPortalTarget={document.body}
+      menuPortalTarget={
+        typeof window !== "undefined" ? document.body : undefined
+      }
       isLoading={filterData.isLoading}
       onInputChange={(input) => {
         setQuery(input);
@@ -1567,8 +1568,3 @@ function GraphTypeField({
     />
   );
 }
-
-// Export as client-side only component to avoid SSR issues
-export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
-  ssr: false,
-});
