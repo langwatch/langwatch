@@ -294,6 +294,11 @@ export const system = createSystem(defaultConfig, {
         },
         variants: {
           variant: {
+            outline: {
+              root: {
+                boxShadow: "2xs",
+              },
+            },
             elevated: {
               root: {
                 border: "1px solid",

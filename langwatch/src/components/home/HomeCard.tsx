@@ -8,7 +8,7 @@ import type { ComponentProps } from "react";
  */
 export function HomeCard(props: ComponentProps<typeof Card.Root>) {
   return (
-    <Card.Root boxShadow="2xs" {...props}>
+    <Card.Root {...props}>
       <Card.Body padding={0} gap={2}>{props.children}</Card.Body>
     </Card.Root>
   );
