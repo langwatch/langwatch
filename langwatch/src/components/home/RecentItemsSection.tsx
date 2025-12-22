@@ -4,6 +4,7 @@ import {
   Grid,
   Heading,
   HStack,
+  Link as ChakraLink,
   Skeleton,
   Spacer,
   Tabs,
@@ -20,7 +21,7 @@ import {
   LuScroll,
   LuWorkflow,
 } from "react-icons/lu";
-import { useRouter } from "next/router";
+import NextLink from "next/link";
 import type { ReactNode } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RecentItem, RecentItemType } from "~/server/home/types";
@@ -111,50 +112,53 @@ export const groupItemsByType = (
 
 type RecentItemCardProps = {
   item: RecentItem;
-  onClick: () => void;
 };
 
 /**
  * Card for a single recent item
  */
-function RecentItemCard({ item, onClick }: RecentItemCardProps) {
+function RecentItemCard({ item }: RecentItemCardProps) {
   const timeAgo = formatTimeAgo(item.updatedAt.getTime());
   const color = getColorForType(item.type);
   const icon = getIconForType(item.type);
 
   return (
-    <HomeCard padding={3} onClick={onClick}>
-      <HStack gap={2} align="start" width="full">
-        <Box
-          padding={1.5}
-          borderRadius="md"
-          background={`${color.split(".")[0]}.50`}
-          color={color}
-        >
-          {icon}
-        </Box>
-        <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <Text fontSize="sm" lineClamp={1} title={item.name}>
-            {item.name}
-          </Text>
-          <HStack gap={2}>
-            <Text fontSize="xs" color="gray.500">
-              {getLabelForType(item.type)}
-            </Text>
-            {timeAgo && (
-              <>
-                <Text fontSize="xs" color="gray.400">
-                  •
-                </Text>
+    <ChakraLink asChild _hover={{ textDecoration: "none" }} height="full" width="full" display="block">
+      <NextLink href={item.href}>
+        <HomeCard padding={3} height="full">
+          <HStack gap={2} align="start" width="full">
+            <Box
+              padding={1.5}
+              borderRadius="md"
+              background={`${color.split(".")[0]}.50`}
+              color={color}
+            >
+              {icon}
+            </Box>
+            <VStack align="start" gap={0} flex={1} minWidth={0}>
+              <Text fontSize="sm" lineClamp={1} title={item.name}>
+                {item.name}
+              </Text>
+              <HStack gap={2}>
                 <Text fontSize="xs" color="gray.500">
-                  {timeAgo}
+                  {getLabelForType(item.type)}
                 </Text>
-              </>
-            )}
+                {timeAgo && (
+                  <>
+                    <Text fontSize="xs" color="gray.400">
+                      •
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {timeAgo}
+                    </Text>
+                  </>
+                )}
+              </HStack>
+            </VStack>
           </HStack>
-        </VStack>
-      </HStack>
-    </HomeCard>
+        </HomeCard>
+      </NextLink>
+    </ChakraLink>
   );
 }
 
@@ -211,12 +215,6 @@ function RecentItemsEmptyState() {
  * Grid of recent items
  */
 function RecentItemsGrid({ items }: { items: RecentItem[] }) {
-  const router = useRouter();
-
-  const handleItemClick = (item: RecentItem) => {
-    void router.push(item.href);
-  };
-
   return (
     <Grid
       templateColumns={{
@@ -227,11 +225,7 @@ function RecentItemsGrid({ items }: { items: RecentItem[] }) {
       gap={3}
     >
       {items.map((item) => (
-        <RecentItemCard
-          key={`${item.type}-${item.id}`}
-          item={item}
-          onClick={() => handleItemClick(item)}
-        />
+        <RecentItemCard key={`${item.type}-${item.id}`} item={item} />
       ))}
     </Grid>
   );
@@ -241,12 +235,7 @@ function RecentItemsGrid({ items }: { items: RecentItem[] }) {
  * Grouped view for "By type" tab
  */
 function GroupedItemsView({ items }: { items: RecentItem[] }) {
-  const router = useRouter();
   const grouped = groupItemsByType(items);
-
-  const handleItemClick = (item: RecentItem) => {
-    void router.push(item.href);
-  };
 
   return (
     <VStack gap={4} align="stretch">
@@ -270,11 +259,7 @@ function GroupedItemsView({ items }: { items: RecentItem[] }) {
             gap={3}
           >
             {typeItems.map((item) => (
-              <RecentItemCard
-                key={`${item.type}-${item.id}`}
-                item={item}
-                onClick={() => handleItemClick(item)}
-              />
+              <RecentItemCard key={`${item.type}-${item.id}`} item={item} />
             ))}
           </Grid>
         </VStack>
