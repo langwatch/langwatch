@@ -24,6 +24,7 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import {
   type Dispatch,
@@ -267,7 +268,7 @@ const defaultValues: CustomGraphFormData = {
   includePrevious: true,
 };
 
-export default function AnalyticsCustomGraph({
+function AnalyticsCustomGraphContent({
   customId,
   graph,
   name,
@@ -1566,3 +1567,8 @@ function GraphTypeField({
     />
   );
 }
+
+// Export as client-side only component to avoid SSR issues
+export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
+  ssr: false,
+});
