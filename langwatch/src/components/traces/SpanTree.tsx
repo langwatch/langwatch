@@ -323,6 +323,7 @@ export function SpanTree(props: SpanTreeProps) {
           align="start"
           width="full"
           gap={10}
+          paddingX={6}
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />

@@ -55,21 +55,16 @@ function SimulationsPageContent() {
 
   return (
     <DashboardLayout>
-      <PageLayout.Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        marginTop={8}
-      >
-        <PageLayout.Header>
-          {!isLoading &&
-            sortedScenarioSetsData &&
-            sortedScenarioSetsData.length > 0 && (
-              <HStack justify="space-between" align="center" w="full">
-                <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-              </HStack>
-            )}
-        </PageLayout.Header>
-
+      {!isLoading &&
+        sortedScenarioSetsData &&
+        sortedScenarioSetsData.length > 0 && (
+          <PageLayout.Header>
+            <HStack justify="space-between" align="center" w="full">
+              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
+            </HStack>
+          </PageLayout.Header>
+        )}
+      <PageLayout.Container maxW={"calc(100vw - 200px)"} padding={6}>
         {/* Show loading state */}
         {isLoading && (
           <VStack gap={4} align="center" py={8}>
@@ -97,7 +92,7 @@ function SimulationsPageContent() {
         {/* Render based on view mode */}
         {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
           <Grid
-            templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
             gap={6}
             width="full"
           >

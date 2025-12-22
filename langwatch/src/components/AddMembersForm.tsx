@@ -239,179 +239,173 @@ function MemberRow({
   };
 
   return (
-    <Box
-      borderWidth="1px"
-      borderRadius="md"
-      padding={4}
-      borderColor="gray.200"
-      width="100%"
-    >
-      <VStack align="stretch" gap={4}>
-        <HStack gap={4} align="start">
-          <Field.Root flex="1">
-            <Field.Label>Email</Field.Label>
-            <Input
-              placeholder="Enter email address"
-              {...register(`invites.${index}.email`, {
-                required: "Email is required",
-              })}
-            />
-            <Field.ErrorText>
-              {errors.invites?.[index]?.email?.message}
-            </Field.ErrorText>
-          </Field.Root>
-          <Field.Root flex="1">
-            <Field.Label>Org Role</Field.Label>
-            <Controller
-              control={control}
-              name={`invites.${index}.orgRole`}
-              render={({ field }) => (
-                <NativeSelect.Root>
-                  <NativeSelect.Field {...field}>
-                    {orgRoleOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              )}
-            />
-          </Field.Root>
-          <Box alignSelf="start" paddingTop={7}>
-            <Button
-              type="button"
-              size="sm"
-              colorPalette="red"
-              variant="ghost"
-              onClick={onRemove}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </Box>
-        </HStack>
-        {teamFields.length > 0 && (
-          <Box
-            paddingLeft={4}
-            paddingY={3}
-            paddingRight={3}
-            marginLeft={4}
-            backgroundColor="gray.100"
-            borderRadius="md"
-            borderWidth="1px"
-            borderColor="gray.300"
-          >
-            <VStack align="start" gap={2} width="100%">
-              <HStack justify="space-between" width="100%">
-                <Text fontSize="sm" fontWeight="medium" color="gray.700">
-                  Team Assignments
-                </Text>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleAddTeam}
-                  disabled={getAvailableTeamOptions().length === 0}
-                >
-                  <Plus size={14} /> Add team
-                </Button>
-              </HStack>
-              <Table.Root variant="line" size="sm" width="100%">
-                <Table.Header>
-                  <Table.Row backgroundColor="gray.100">
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Team
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Role
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader
-                      paddingLeft={0}
-                      paddingRight={0}
-                      paddingTop={0}
-                      width="60px"
-                    ></Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {teamFields.map((teamField, teamIndex) => (
-                    <Table.Row key={teamField.id} backgroundColor="gray.100">
-                      <Table.Cell paddingLeft={0}>
-                        <Controller
-                          control={control}
-                          name={`invites.${index}.teams.${teamIndex}.teamId`}
-                          rules={{ required: "Team is required" }}
-                          render={({ field }) => {
-                            const availableOptions =
-                              getAvailableTeamOptions(teamIndex);
-                            return (
-                              <NativeSelect.Root>
-                                <NativeSelect.Field
-                                  {...field}
-                                  backgroundColor="white"
-                                >
-                                  {availableOptions.length === 0 ? (
-                                    <option value="">No teams available</option>
-                                  ) : (
-                                    availableOptions.map((option) => (
-                                      <option
-                                        key={option.value}
-                                        value={option.value}
-                                      >
-                                        {option.label}
-                                      </option>
-                                    ))
-                                  )}
-                                </NativeSelect.Field>
-                                <NativeSelect.Indicator />
-                              </NativeSelect.Root>
-                            );
-                          }}
-                        />
-                      </Table.Cell>
-                      <Table.Cell paddingLeft={0}>
-                        <TeamRoleSelect
-                          index={index}
-                          teamIndex={teamIndex}
-                          control={control}
-                          organizationId={organizationId}
-                          setValue={setValue}
-                        />
-                      </Table.Cell>
-                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                        <Button
-                          type="button"
-                          size="sm"
-                          colorPalette="red"
-                          variant="ghost"
-                          onClick={() => removeTeam(teamIndex)}
-                        >
-                          <Trash2 size={16} />
-                        </Button>
-                      </Table.Cell>
-                    </Table.Row>
+    <VStack align="stretch" gap={4} width="full">
+      <HStack gap={4} align="start">
+        <Field.Root flex="1">
+          <Field.Label>Email</Field.Label>
+          <Input
+            placeholder="Enter email address"
+            {...register(`invites.${index}.email`, {
+              required: "Email is required",
+            })}
+          />
+          <Field.ErrorText>
+            {errors.invites?.[index]?.email?.message}
+          </Field.ErrorText>
+        </Field.Root>
+        <Field.Root flex="1">
+          <Field.Label>Org Role</Field.Label>
+          <Controller
+            control={control}
+            name={`invites.${index}.orgRole`}
+            render={({ field }) => (
+              <NativeSelect.Root>
+                <NativeSelect.Field {...field}>
+                  {orgRoleOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
-                </Table.Body>
-              </Table.Root>
-            </VStack>
-          </Box>
-        )}
-        {teamFields.length === 0 && (
-          <HStack gap={2} paddingLeft={4} marginLeft={4}>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            )}
+          />
+        </Field.Root>
+        <Box alignSelf="start" paddingTop={7}>
+          <Button
+            type="button"
+            size="sm"
+            colorPalette="red"
+            variant="ghost"
+            onClick={onRemove}
+          >
+            <Trash2 size={16} />
+          </Button>
+        </Box>
+      </HStack>
+      {teamFields.length > 0 && (
+        <VStack marginLeft={4} paddingRight={3} align="start" gap={2} width="100%">
+          <HStack
+            paddingLeft={4}
+            justify="space-between"
+            width="100%"
+          >
+            <Text fontSize="sm" fontWeight="medium" color="gray.700">
+              Team Assignments
+            </Text>
             <Button
               type="button"
               size="sm"
-              variant="outline"
+              variant="ghost"
+              data-variant="ghost"
               onClick={handleAddTeam}
               disabled={getAvailableTeamOptions().length === 0}
             >
               <Plus size={14} /> Add team
             </Button>
           </HStack>
-        )}
-      </VStack>
-    </Box>
+          <Box
+            paddingLeft={4}
+            paddingY={3}
+            backgroundColor="gray.300"
+            borderRadius="xl"
+            width="100%"
+          >
+            <Table.Root variant={"ghost" as any} width="100%">
+              <Table.Header>
+                <Table.Row backgroundColor="transparent">
+                  <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                    Team
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                    Role
+                  </Table.ColumnHeader>
+                  <Table.ColumnHeader
+                    paddingLeft={0}
+                    paddingRight={0}
+                    paddingTop={0}
+                    width="60px"
+                  ></Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {teamFields.map((teamField, teamIndex) => (
+                  <Table.Row key={teamField.id} backgroundColor="transparent">
+                    <Table.Cell paddingLeft={0}>
+                      <Controller
+                        control={control}
+                        name={`invites.${index}.teams.${teamIndex}.teamId`}
+                        rules={{ required: "Team is required" }}
+                        render={({ field }) => {
+                          const availableOptions =
+                            getAvailableTeamOptions(teamIndex);
+                          return (
+                            <NativeSelect.Root>
+                              <NativeSelect.Field
+                                {...field}
+                                backgroundColor="white"
+                              >
+                                {availableOptions.length === 0 ? (
+                                  <option value="">No teams available</option>
+                                ) : (
+                                  availableOptions.map((option) => (
+                                    <option
+                                      key={option.value}
+                                      value={option.value}
+                                    >
+                                      {option.label}
+                                    </option>
+                                  ))
+                                )}
+                              </NativeSelect.Field>
+                              <NativeSelect.Indicator />
+                            </NativeSelect.Root>
+                          );
+                        }}
+                      />
+                    </Table.Cell>
+                    <Table.Cell paddingLeft={0}>
+                      <TeamRoleSelect
+                        index={index}
+                        teamIndex={teamIndex}
+                        control={control}
+                        organizationId={organizationId}
+                        setValue={setValue}
+                      />
+                    </Table.Cell>
+                    <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        colorPalette="red"
+                        variant="ghost"
+                        onClick={() => removeTeam(teamIndex)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </Box>
+        </VStack>
+      )}
+      {teamFields.length === 0 && (
+        <HStack gap={2} paddingLeft={4} marginLeft={4}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleAddTeam}
+            disabled={getAvailableTeamOptions().length === 0}
+          >
+            <Plus size={14} /> Add team
+          </Button>
+        </HStack>
+      )}
+    </VStack>
   );
 }
 
@@ -472,7 +466,7 @@ function TeamRoleSelect({
         };
 
         return (
-          <NativeSelect.Root backgroundColor="white">
+          <NativeSelect.Root>
             <NativeSelect.Field {...field} onChange={handleChange}>
               {roleOptions.map((option) => (
                 <option key={option.value} value={option.value}>

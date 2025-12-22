@@ -82,7 +82,7 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
     aria-label={guide.label + " (opens in a new tab)"}
   >
     {guide.icon}
-    <Text fontWeight="medium" flex={1} textAlign="left">
+    <Text flex={1} textAlign="left">
       {guide.label}
     </Text>
     <Box as="span" color="gray.400" ml={1} display="flex" alignItems="center">
@@ -94,32 +94,20 @@ const GuideLink: React.FC<GuideLinkProps> = ({ guide, onClick }) => (
 const ObservabilityCard: React.FC = () => {
   const { project } = useOrganizationTeamProject();
   return (
-    <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
-      <HStack
-        mb={3}
-        gap={2}
-        alignItems="flex-start"
-        justifyContent="flex-start"
-      >
-        <Heading size="md" fontWeight="bold" textAlign="left">
-          Observability setup
-        </Heading>
-      </HStack>
-      <VStack gap={2} fontSize="sm" align="stretch">
-        {guides.map((guide) => (
-          <GuideLink
-            key={guide.href}
-            guide={guide}
-            onClick={() =>
-              trackEvent(guide.event, {
-                language: guide.language,
-                project_id: project?.id,
-              })
-            }
-          />
-        ))}
-      </VStack>
-    </Box>
+    <VStack gap={2} fontSize="sm" align="stretch" width="full">
+      {guides.map((guide) => (
+        <GuideLink
+          key={guide.href}
+          guide={guide}
+          onClick={() =>
+            trackEvent(guide.event, {
+              language: guide.language,
+              project_id: project?.id,
+            })
+          }
+        />
+      ))}
+    </VStack>
   );
 };
 

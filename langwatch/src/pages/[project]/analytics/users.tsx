@@ -183,8 +183,7 @@ function UsersContent() {
   const isNotQuickwit = !isQuickwit;
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="Users" />
+    <GraphsLayout title="Users">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">
@@ -302,6 +301,4 @@ function UsersContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(UsersContent);
+export default withPermissionGuard("analytics:view")(UsersContent);

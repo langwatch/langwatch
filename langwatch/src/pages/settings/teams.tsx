@@ -18,6 +18,7 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function Teams() {
   const { organization } = useOrganizationTeamProject();
@@ -71,18 +72,9 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
+      <VStack gap={6} width="full" align="start">
         <HStack width="full">
-          <Heading size="lg" as="h1">
-            Teams
-          </Heading>
+          <Heading>Teams</Heading>
           <Spacer />
           <Tooltip
             content={
@@ -96,76 +88,71 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
           >
             {hasTeamManagePermission ? (
               <Link href={`/settings/teams/new`} asChild>
-                <Button size="sm" colorPalette="orange">
+                <PageLayout.HeaderButton>
                   <Plus size={20} />
-                  <Text>Add new team</Text>
-                </Button>
+                  Add new team
+                </PageLayout.HeaderButton>
               </Link>
             ) : (
-              <Button size="sm" colorPalette="orange" disabled>
+              <PageLayout.HeaderButton disabled>
                 <Plus size={20} />
-                <Text>Add new team</Text>
-              </Button>
+                Add new team
+              </PageLayout.HeaderButton>
             )}
           </Tooltip>
         </HStack>
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={0} paddingX={0}>
-            <Table.Root variant="line" width="full">
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Members</Table.ColumnHeader>
-                  <Table.ColumnHeader>Projects</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"10PX"}>Actions</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {teams.map((team) => (
-                  <Table.Row key={team.id}>
-                    <Table.Cell>
-                      <Link
-                        href={`/settings/teams/${team.slug}`}
-                        _hover={{ textDecoration: "underline" }}
+        <Table.Root variant="line" width="full" size="md">
+          <Table.Header>
+            <Table.Row>
+              <Table.ColumnHeader>Name</Table.ColumnHeader>
+              <Table.ColumnHeader>Members</Table.ColumnHeader>
+              <Table.ColumnHeader>Projects</Table.ColumnHeader>
+              <Table.ColumnHeader w={"10PX"}>Actions</Table.ColumnHeader>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body>
+            {teams.map((team) => (
+              <Table.Row key={team.id}>
+                <Table.Cell>
+                  <Link
+                    href={`/settings/teams/${team.slug}`}
+                    _hover={{ textDecoration: "underline" }}
+                  >
+                    {team.name}
+                  </Link>
+                </Table.Cell>
+                <Table.Cell>
+                  {team.members.length}{" "}
+                  {team.members.length == 1 ? "member" : "members"}
+                </Table.Cell>
+                <Table.Cell>
+                  {team.projects.length}{" "}
+                  {team.projects.length == 1 ? "project" : "projects"}
+                </Table.Cell>
+                <Table.Cell align="right">
+                  <Menu.Root>
+                    <Menu.Trigger className="js-inner-menu">
+                      <MoreVertical size={18} />
+                    </Menu.Trigger>
+                    <Menu.Content className="js-inner-menu">
+                      <Menu.Item
+                        value="archive"
+                        color="red.500"
+                        onClick={() => onArchiveTeam(team.id)}
+                        disabled={
+                          !hasPermission("team:manage") || archiveTeam.isPending
+                        }
                       >
-                        {team.name}
-                      </Link>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {team.members.length}{" "}
-                      {team.members.length == 1 ? "member" : "members"}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {team.projects.length}{" "}
-                      {team.projects.length == 1 ? "project" : "projects"}
-                    </Table.Cell>
-                    <Table.Cell align="right">
-                      <Menu.Root>
-                        <Menu.Trigger className="js-inner-menu">
-                          <MoreVertical size={18} />
-                        </Menu.Trigger>
-                        <Menu.Content className="js-inner-menu">
-                          <Menu.Item
-                            value="archive"
-                            color="red.500"
-                            onClick={() => onArchiveTeam(team.id)}
-                            disabled={
-                              !hasPermission("team:manage") ||
-                              archiveTeam.isPending
-                            }
-                          >
-                            <Archive size={14} />
-                            Archive
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+                        <Archive size={14} />
+                        Archive
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                </Table.Cell>
+              </Table.Row>
+            ))}
+          </Table.Body>
+        </Table.Root>
       </VStack>
     </SettingsLayout>
   );

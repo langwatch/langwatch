@@ -198,8 +198,7 @@ function MetricsContent() {
   };
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="LLM Metrics" />
+    <GraphsLayout title="LLM Metrics">
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <GridItem colSpan={2} display="inline-grid">
@@ -307,6 +306,4 @@ function MetricsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(MetricsContent);
+export default withPermissionGuard("analytics:view")(MetricsContent);

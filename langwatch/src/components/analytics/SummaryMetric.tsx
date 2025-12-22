@@ -42,7 +42,7 @@ export function SummaryMetric({
       align="start"
       justifyContent="space-between"
       borderLeftWidth="1px"
-      borderLeftColor="gray.300"
+      borderLeftColor="gray.100"
       paddingX={4}
       _first={{ paddingLeft: 0, borderLeft: "none" }}
     >

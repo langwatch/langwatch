@@ -22,7 +22,7 @@ export function EmojiPickerModal({
 }) {
   return (
     <ConfigModal open={open} onClose={onClose} title="Workflow Icon" unstyled>
-      <PopoverContent marginRight={4}>
+      <PopoverContent marginRight={4} position="absolute" marginTop="72px">
         <EmojiPicker
           emojiStyle={EmojiStyle.NATIVE}
           skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}

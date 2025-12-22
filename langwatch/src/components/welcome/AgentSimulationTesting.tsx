@@ -131,7 +131,7 @@ const AgentSimulationTesting: React.FC = () => {
             <Icon color="orange.500" boxSize={4}>
               <LuBot />
             </Icon>
-            <Heading size="md" fontWeight="bold" textAlign="left">
+            <Heading size="md" textAlign="left">
               Introducing Scenario: Agentic Simulations
             </Heading>
             <Badge

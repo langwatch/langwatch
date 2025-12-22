@@ -34,8 +34,8 @@ function Container({
   return (
     <ChakraContainer
       maxW={`calc(100vw - ${sidebarWidth}px)`}
-      padding={6}
-      marginTop={8}
+      paddingX={6}
+      paddingY={3}
       {...props}
     >
       {children}
@@ -44,11 +44,25 @@ function Container({
 }
 
 // Header component
-interface HeaderProps extends ChakraStackProps {}
+interface HeaderProps extends ChakraStackProps {
+  withBorder?: boolean;
+}
 
-function Header({ children, ...props }: PropsWithChildren<HeaderProps>) {
+function Header({
+  children,
+  withBorder = true,
+  ...props
+}: PropsWithChildren<HeaderProps>) {
   return (
-    <HStack width="full" align="center" gap={6} paddingBottom={6} {...props}>
+    <HStack
+      height="48px"
+      paddingX={6}
+      width="full"
+      borderBottom={withBorder ? "1px solid" : undefined}
+      borderBottomColor={withBorder ? "gray.100" : undefined}
+      gap={2}
+      {...props}
+    >
       {children}
     </HStack>
   );
@@ -58,7 +72,7 @@ interface HeadingProps extends ChakraHeadingProps {}
 
 function Heading({ children, ...props }: PropsWithChildren<HeadingProps>) {
   return (
-    <ChakraHeading as="h1" size="lg" paddingTop={1} {...props}>
+    <ChakraHeading as="h1" {...props}>
       {children}
     </ChakraHeading>
   );
@@ -80,7 +94,7 @@ function HeaderButton({
   ...props
 }: PropsWithChildren<HeaderButtonProps>) {
   return (
-    <Button colorPalette="blue" minWidth="fit-content" {...props}>
+    <Button variant="outline" size="sm" {...props}>
       {children}
     </Button>
   );
