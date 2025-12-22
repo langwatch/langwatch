@@ -12,14 +12,14 @@ export default async function handler(
     return res.status(405).end();
   }
 
-  // let cronApiKey = req.headers.authorization;
-  // cronApiKey = cronApiKey?.startsWith("Bearer ")
-  //   ? cronApiKey.slice(7)
-  //   : cronApiKey;
+  let cronApiKey = req.headers.authorization;
+  cronApiKey = cronApiKey?.startsWith("Bearer ")
+    ? cronApiKey.slice(7)
+    : cronApiKey;
 
-  // if (cronApiKey !== process.env.CRON_API_KEY) {
-  //   return res.status(401).end();
-  // }
+  if (cronApiKey !== process.env.CRON_API_KEY) {
+    return res.status(401).end();
+  }
 
   let triggers: Trigger[];
   let projects: Project[];
