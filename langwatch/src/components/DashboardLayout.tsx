@@ -355,9 +355,6 @@ export const DashboardLayout = ({
 
       {/* Header bar - spans full width with gray background */}
       <HStack
-        position="sticky"
-        top={0}
-        zIndex={10}
         width="full"
         paddingX={4}
         paddingY={3}
@@ -531,15 +528,13 @@ export const DashboardLayout = ({
           height="full"
           background="white"
           borderTopLeftRadius="xl"
+          overflow="auto"
           display="flex"
+          minHeight="calc(100vh - 56px)"
+          maxHeight="calc(100vh - 56px)"
+          maxWidth={`calc(100vw - ${menuWidth})`}
         >
-          <VStack
-            width="full"
-            maxWidth={`calc(100vw - ${menuWidth})`}
-            gap={0}
-            minHeight="calc(100vh - 60px)"
-            {...props}
-          >
+          <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}
             {publicEnv.data &&
               (!publicEnv.data?.HAS_LANGWATCH_NLP_SERVICE ||
