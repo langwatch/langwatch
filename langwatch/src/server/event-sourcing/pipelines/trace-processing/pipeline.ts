@@ -31,7 +31,8 @@ export const traceProcessingPipelineDefinition =
       debounceMs: 1500,
       // Reduce the amount of unnecessary projection rebuilds by using a job ID that is
       // unique to the trace, not the span.
-      makeJobId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
+      makeJobId: (event) =>
+        `${event.tenantId}.${event.aggregateType}.${event.aggregateId}`,
     })
     .withEventHandler("spanStorage", SpanStorageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],

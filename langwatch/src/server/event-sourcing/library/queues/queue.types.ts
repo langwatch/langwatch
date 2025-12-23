@@ -12,11 +12,9 @@ export interface EventSourcedQueueDefinition<Payload> {
    */
   name: string;
   /**
-   * Optional job ID factory for idempotency.
-   * When the same jobId is used, BullMQ will automatically replace the existing job
-   * if it hasn't been processed yet. This is useful for batching/debouncing.
+   * Job ID factory.
    */
-  makeJobId?: (payload: Payload) => string;
+  makeJobId: (payload: Payload) => string;
   /**
    * Domain-specific processor that runs inside the worker.
    */
@@ -33,6 +31,13 @@ export interface EventSourcedQueueDefinition<Payload> {
    * (when combined with makeJobId). BullMQ will replace waiting jobs with the same jobId.
    */
   delay?: number;
+
+  /**
+   * Optional debounce time in milliseconds before processing the job.
+   * Useful for batching/debouncing where later jobs can override earlier ones
+   * (when combined with makeJobId). BullMQ will replace waiting jobs with the same jobId.
+   */
+  debounceMs?: number;
 
   /**
    * Optional function to extract span attributes from the payload.

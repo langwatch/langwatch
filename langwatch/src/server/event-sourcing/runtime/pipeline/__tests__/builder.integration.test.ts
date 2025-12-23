@@ -44,7 +44,10 @@ describe("PipelineBuilder Integration Tests", () => {
     it("builds pipeline with name, aggregateType, and service when minimal configuration provided", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const distributedLock = createMockDistributedLock();
-      const builder = new PipelineBuilder<TestEvent>({ eventStore, distributedLock })
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
         .withAggregateType("trace");
 
@@ -83,7 +86,10 @@ describe("PipelineBuilder Integration Tests", () => {
       );
 
       const distributedLock = createMockDistributedLock();
-      const builder = new PipelineBuilder<TestEvent>({ eventStore, distributedLock })
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
         .withAggregateType("trace")
         .withProjection("test-projection", HandlerClass);
@@ -121,7 +127,10 @@ describe("PipelineBuilder Integration Tests", () => {
       const context = { tenantId };
 
       const distributedLock = createMockDistributedLock();
-      const builder = new PipelineBuilder<TestEvent>({ eventStore, distributedLock })
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
         .withAggregateType("trace")
         .withEventPublisher(publisher);
@@ -147,7 +156,10 @@ describe("PipelineBuilder Integration Tests", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
 
       const distributedLock = createMockDistributedLock();
-      const builder = new PipelineBuilder<TestEvent>({ eventStore, distributedLock })
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
         .withAggregateType("trace")
         .withEventHandler("test-handler", HandlerClass);
@@ -266,7 +278,10 @@ describe("PipelineBuilder Integration Tests", () => {
       const context = { tenantId };
 
       const distributedLock = createMockDistributedLock();
-      const builder = new PipelineBuilder<TestEvent>({ eventStore, distributedLock })
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
         .withAggregateType("trace");
 

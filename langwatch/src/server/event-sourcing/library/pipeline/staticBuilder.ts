@@ -8,7 +8,7 @@ import type {
   ExtractProjectionHandlerProjection,
   ProjectionHandlerClass,
 } from "../domain/handlers/projectionHandlerClass";
-import type { Event, ParentLink, Projection } from "../domain/types";
+import type { Event, ParentLink, } from "../domain/types";
 import type { EventHandlerOptions } from "../eventHandler.types";
 import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { ProjectionOptions, ProjectionTypeMap } from "../projection.types";
@@ -74,27 +74,23 @@ export class StaticPipelineBuilderWithNameAndType<
   RegisteredCommands extends RegisteredCommand = NoCommands,
   RegisteredHandlers extends string = never,
 > {
-  // Combined type for all available dependencies (projections + event handlers)
-  private get availableDependencies(): (keyof RegisteredProjections) | RegisteredHandlers {
-    return {} as any; // Type-only, runtime not needed
-  }
   private projections = new Map<
     string,
     {
-      HandlerClass: ProjectionHandlerClass<EventType, any>;
+      handlerClass: ProjectionHandlerClass<EventType, any>;
       options?: ProjectionOptions;
     }
   >();
   private eventHandlers = new Map<
     string,
     {
-      HandlerClass: EventHandlerClass<EventType>;
+      handlerClass: EventHandlerClass<EventType>;
       options?: EventHandlerOptions<EventType, string>;
     }
   >();
   private commands: Array<{
     name: string;
-    HandlerClass: CommandHandlerClass<any, any, EventType>;
+    handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions;
   }> = [];
   private parentLinks: Array<ParentLink<EventType>> = [];
@@ -109,21 +105,21 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register a projection handler class with a unique name.
    *
    * @param name - Unique name for this projection within the pipeline
-   * @param HandlerClass - Projection handler class to register
+   * @param handlerClass - Projection handler class to register
    * @param options - Optional configuration for projection processing
    * @returns Builder instance for method chaining
    */
   withProjection<
-    HandlerClass extends ProjectionHandlerClass<EventType, any>,
+    handlerClass extends ProjectionHandlerClass<EventType, any>,
     ProjectionName extends string,
   >(
     name: ProjectionName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: ProjectionOptions,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections & {
-      [K in ProjectionName]: ExtractProjectionHandlerProjection<HandlerClass>;
+      [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
     },
     RegisteredCommands
   > {
@@ -135,12 +131,12 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
-    this.projections.set(name, { HandlerClass, options });
+    this.projections.set(name, { handlerClass: handlerClass, options });
 
-    return this as StaticPipelineBuilderWithNameAndType<
+    return this as unknown as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections & {
-        [K in ProjectionName]: ExtractProjectionHandlerProjection<HandlerClass>;
+        [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
       },
       RegisteredCommands
     >;
@@ -182,16 +178,16 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register an event handler class that reacts to individual events.
    *
    * @param name - Unique name for this handler within the pipeline
-   * @param HandlerClass - Event handler class to register
+   * @param handlerClass - Event handler class to register
    * @param options - Options for configuring the handler
    * @returns Builder instance for method chaining
    */
   withEventHandler<
-    HandlerClass extends EventHandlerClass<EventType>,
+    handlerClass extends EventHandlerClass<EventType>,
     HandlerName extends string,
   >(
     name: HandlerName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: EventHandlerOptions<EventType, string>,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
@@ -207,7 +203,7 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
-    this.eventHandlers.set(name, { HandlerClass, options });
+    this.eventHandlers.set(name, { handlerClass: handlerClass, options });
     return this as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections,
@@ -220,22 +216,22 @@ export class StaticPipelineBuilderWithNameAndType<
    * Register a command handler class.
    *
    * @param name - Unique name for this command handler within the pipeline
-   * @param HandlerClass - The command handler class to register
+   * @param handlerClass - The command handler class to register
    * @param options - Optional configuration
    * @returns Builder instance for method chaining
    */
   withCommand<
-    HandlerClass extends CommandHandlerClass<any, any, EventType>,
+    handlerClass extends CommandHandlerClass<any, any, EventType>,
     Name extends string,
   >(
     name: Name,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: CommandHandlerOptions,
   ): StaticPipelineBuilderWithNameAndType<
     EventType,
     RegisteredProjections,
     | RegisteredCommands
-    | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
+    | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> }
   > {
     if (this.commands.some((c) => c.name === name)) {
       throw new ConfigurationError(
@@ -245,12 +241,12 @@ export class StaticPipelineBuilderWithNameAndType<
       );
     }
 
-    this.commands.push({ name, HandlerClass, options });
+    this.commands.push({ name, handlerClass: handlerClass, options });
     return this as StaticPipelineBuilderWithNameAndType<
       EventType,
       RegisteredProjections,
       | RegisteredCommands
-      | { name: Name; payload: ExtractCommandHandlerPayload<HandlerClass> }
+      | { name: Name; payload: ExtractCommandHandlerPayload<handlerClass> }
     >;
   }
 
@@ -272,19 +268,19 @@ export class StaticPipelineBuilderWithNameAndType<
       projections: Array.from(this.projections.entries()).map(
         ([name, def]) => ({
           name,
-          handlerClassName: def.HandlerClass.name,
+          handlerClassName: def.handlerClass.name,
         }),
       ),
       eventHandlers: Array.from(this.eventHandlers.entries()).map(
         ([name, def]) => ({
           name,
-          handlerClassName: def.HandlerClass.name,
+          handlerClassName: def.handlerClass.name,
           eventTypes: def.options?.eventTypes as string[] | undefined,
         }),
       ),
       commands: this.commands.map((cmd) => ({
         name: cmd.name,
-        handlerClassName: cmd.HandlerClass.name,
+        handlerClassName: cmd.handlerClass.name,
       })),
     };
 

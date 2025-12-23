@@ -4,7 +4,7 @@ import { PipelineBuilder } from "../builder";
 
 vi.mock("langwatch", () => ({
   getLangWatchTracer: vi.fn(() => ({
-    withActiveSpan: vi.fn((name, options, fn) => {
+    withActiveSpan: vi.fn((_name,_optionss, fn) => {
       const mockSpan = {
         addEvent: vi.fn(),
         setAttributes: vi.fn(),
@@ -1112,7 +1112,7 @@ describe("PipelineBuilder", () => {
       const invalidPayload = { invalid: "data" };
 
       await expect(
-        pipeline.commands.testDispatcher!.send(
+        pipeline.commands.testDispatcher?.send(
           invalidPayload as unknown as TestCommandPayload,
         ),
       ).rejects.toThrow();
@@ -1140,7 +1140,7 @@ describe("PipelineBuilder", () => {
       const invalidPayload = { invalid: "data" };
 
       await expect(
-        pipeline.commands.testDispatcher!.send(
+        pipeline.commands.testDispatcher?.send(
           invalidPayload as unknown as TestCommandPayload,
         ),
       ).rejects.toThrow(
@@ -1178,7 +1178,7 @@ describe("PipelineBuilder", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(handleSpy).toHaveBeenCalled();
       const command = handleSpy.mock.calls[0]?.[0];
@@ -1219,7 +1219,7 @@ describe("PipelineBuilder", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(handleSpy).toHaveBeenCalled();
       const command = handleSpy.mock.calls[0]?.[0];
@@ -1259,7 +1259,7 @@ describe("PipelineBuilder", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(handleSpy).toHaveBeenCalledTimes(1);
       const command = handleSpy.mock.calls[0]?.[0];
@@ -1304,7 +1304,7 @@ describe("PipelineBuilder", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(storeEventsSpy).toHaveBeenCalledWith(events, {
         tenantId: createTenantId("tenant-1"),
@@ -1342,7 +1342,7 @@ describe("PipelineBuilder", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(storeEventsSpy).not.toHaveBeenCalled();
     });
@@ -1378,7 +1378,7 @@ describe("PipelineBuilder", () => {
       };
 
       await expect(
-        pipeline.commands.testDispatcher!.send(payload),
+        pipeline.commands.testDispatcher?.send(payload),
       ).rejects.toThrow("Handler error");
     });
   });

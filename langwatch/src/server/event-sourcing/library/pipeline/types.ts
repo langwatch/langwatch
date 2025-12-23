@@ -1,12 +1,11 @@
-import type { AggregateType } from "../domain/aggregateType";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
+import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { CommandHandlerClass } from "../commands/commandHandlerClass";
 import type { EventHandlerClass } from "../domain/handlers/eventHandlerClass";
 import type { ProjectionHandlerClass } from "../domain/handlers/projectionHandlerClass";
 import type { Event, ParentLink, Projection } from "../domain/types";
 import type { EventHandlerOptions } from "../eventHandler.types";
-import type { PipelineMetadata } from "../../runtime/pipeline/types";
 import type { ProjectionOptions } from "../projection.types";
-import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Kill switch options for event sourcing components.
@@ -27,7 +26,9 @@ export interface CommandHandlerOptions<Payload = any> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   concurrency?: number;
-  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
+  spanAttributes?: (
+    payload: Payload
+  ) => Record<string, string | number | boolean>;
   lockTtlMs?: number;
 }
 
@@ -59,8 +60,11 @@ export type NoCommands = never;
  */
 export interface StaticPipelineDefinition<
   EventType extends Event = Event,
-  ProjectionTypes extends Record<string, Projection> = Record<string, Projection>,
-  RegisteredCommands extends RegisteredCommand = NoCommands,
+  _ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
+  RegisteredCommands extends RegisteredCommand = NoCommands
 > {
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;
@@ -69,7 +73,7 @@ export interface StaticPipelineDefinition<
   projections: Map<
     string,
     {
-      HandlerClass: ProjectionHandlerClass<EventType, any>;
+      handlerClass: ProjectionHandlerClass<EventType, any>;
       options?: ProjectionOptions;
     }
   >;
@@ -78,7 +82,7 @@ export interface StaticPipelineDefinition<
   eventHandlers: Map<
     string,
     {
-      HandlerClass: EventHandlerClass<EventType>;
+      handlerClass: EventHandlerClass<EventType>;
       options?: EventHandlerOptions<EventType, any>;
     }
   >;
@@ -86,7 +90,7 @@ export interface StaticPipelineDefinition<
   /** Command handlers registered in this pipeline */
   commands: Array<{
     name: string;
-    HandlerClass: CommandHandlerClass<any, any, EventType>;
+    handlerClass: CommandHandlerClass<any, any, EventType>;
     options?: CommandHandlerOptions;
   }>;
 

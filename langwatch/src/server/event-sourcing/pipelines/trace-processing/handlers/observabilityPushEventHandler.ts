@@ -13,12 +13,14 @@ import { sseService } from "../../../../../server/services/sse.service";
  * This handler simply notifies that new trace data is available,
  * without parsing or processing the span data itself.
  */
-export class ObservabilityPushEventHandler implements EventHandler<SpanReceivedEvent> {
+export class ObservabilityPushEventHandler
+  implements EventHandler<SpanReceivedEvent>
+{
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.span-sse-handler"
+    "langwatch.trace-processing.span-sse-handler",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:span-sse-handler"
+    "langwatch:trace-processing:span-sse-handler",
   );
 
   /**
@@ -41,7 +43,7 @@ export class ObservabilityPushEventHandler implements EventHandler<SpanReceivedE
             tenantId: event.tenantId,
             eventId: event.id,
           },
-          "Broadcasting trace update notification"
+          "Broadcasting trace update notification",
         );
 
         try {
@@ -53,11 +55,12 @@ export class ObservabilityPushEventHandler implements EventHandler<SpanReceivedE
             {
               tenantId: event.tenantId,
             },
-            "Successfully broadcast trace update notification"
+            "Successfully broadcast trace update notification",
           );
         } catch (error) {
           span.addEvent("sse.broadcast.error", {
-            "error.message": error instanceof Error ? error.message : String(error),
+            "error.message":
+              error instanceof Error ? error.message : String(error),
           });
 
           this.logger.error(
@@ -65,11 +68,11 @@ export class ObservabilityPushEventHandler implements EventHandler<SpanReceivedE
               tenantId: event.tenantId,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to broadcast trace update notification"
+            "Failed to broadcast trace update notification",
           );
           // Don't throw - SSE failures shouldn't fail event processing
         }
-      }
+      },
     );
   }
 
