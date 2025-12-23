@@ -57,7 +57,10 @@ export function GraphCardHeader({
   // Create form instance from graph data for the alert drawer
   const form = useForm<CustomGraphFormData>({
     defaultValues: graph
-      ? customGraphInputToFormData(graph as CustomGraphInput)
+      ? {
+          ...customGraphInputToFormData(graph as CustomGraphInput),
+          title: name,
+        }
       : undefined,
   });
 

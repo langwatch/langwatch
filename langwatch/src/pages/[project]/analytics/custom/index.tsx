@@ -684,6 +684,16 @@ function CustomGraphForm({
     }
 
     const formData = form.getValues();
+
+    // Get the series label for the alert name
+    let alertName: string | undefined;
+    if (formData.alert?.enabled && formData.series.length > 0) {
+      const selectedSeries = formData.series[0];
+      alertName =
+        selectedSeries?.name ||
+        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
+    }
+
     addNewGraph.mutate(
       {
         projectId: project?.id ?? "",
@@ -692,6 +702,7 @@ function CustomGraphForm({
         filterParams: filterParams,
         alert: formData.alert?.enabled ? formData.alert : undefined,
         dashboardId: dashboardId,
+        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -710,6 +721,16 @@ function CustomGraphForm({
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
     const formData = form.getValues();
+
+    // Get the series label for the alert name
+    let alertName: string | undefined;
+    if (formData.alert?.enabled && formData.series.length > 0) {
+      const selectedSeries = formData.series[0];
+      alertName =
+        selectedSeries?.name ||
+        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
+    }
+
     updateGraphById.mutate(
       {
         projectId: project?.id ?? "",
@@ -718,6 +739,7 @@ function CustomGraphForm({
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
         alert: formData.alert?.enabled ? formData.alert : undefined,
+        alertName: alertName,
       },
       {
         onSuccess: () => {

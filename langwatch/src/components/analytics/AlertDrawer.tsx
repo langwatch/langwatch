@@ -71,6 +71,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
       );
       internalForm.reset({
         ...formData,
+        title: graphQuery.data.name,
         alert: graphQuery.data.alert as CustomGraphFormData["alert"],
       });
     }
@@ -134,6 +135,26 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
       setSelectedMembers(members);
     }
   }, [graphQuery.data]);
+
+  // Initialize alert fields with default values if not set
+  useEffect(() => {
+    if (!form) return;
+
+    // Only set defaults if there's no existing alert data
+    const currentAlert = form.watch("alert");
+    if (!currentAlert || !currentAlert.operator) {
+      form.setValue("alert.operator", "gt");
+    }
+    if (!currentAlert || !currentAlert.timePeriod) {
+      form.setValue("alert.timePeriod", 60);
+    }
+    if (!currentAlert || !currentAlert.type) {
+      form.setValue("alert.type", "WARNING");
+    }
+    if (!currentAlert || !currentAlert.action) {
+      form.setValue("alert.action", "SEND_SLACK_MESSAGE");
+    }
+  }, [form]);
 
   const handlePopoverChange = ({ open: isOpen }: { open: boolean }) => {
     if (isOpen) {
@@ -211,6 +232,12 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
     const formData = form.getValues();
 
+    // Get the series label for the alert name
+    const selectedSeries = seriesKeys.find(
+      (s) => s.key === formData.alert?.seriesName,
+    );
+    const seriesLabel = selectedSeries?.label ?? graphName ?? "Alert";
+
     // Restructure alert data to include seriesName in actionParams for backend
     const alertData = formData.alert
       ? {
@@ -230,6 +257,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
         alert: alertData,
+        alertName: seriesLabel,
       },
       {
         onSuccess: () => {
@@ -400,8 +428,10 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                   step="any"
                   {...form.register("alert.threshold", {
                     valueAsNumber: true,
+                    setValueAs: (v) => (isNaN(v) ? 0 : v),
                   })}
                   placeholder="0"
+                  defaultValue={0}
                 />
               </Field.Root>
             </HStack>
@@ -474,9 +504,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                     {alertAction === "SEND_SLACK_MESSAGE" && (
                       <Input
                         placeholder="Your Slack webhook URL"
-                        {...form.register(
-                          "alert.actionParams.slackWebhook",
-                        )}
+                        {...form.register("alert.actionParams.slackWebhook")}
                         marginLeft={7}
                         width="calc(100% - 28px)"
                       />

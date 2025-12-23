@@ -109,6 +109,7 @@ export const graphsRouter = createTRPCRouter({
         gridRow: z.number().min(0).optional(),
         colSpan: z.number().min(1).max(2).optional(),
         rowSpan: z.number().min(1).max(2).optional(),
+        alertName: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("analytics:create"))
@@ -142,9 +143,10 @@ export const graphsRouter = createTRPCRouter({
 
       // Create trigger if alert is enabled
       if (input.alert?.enabled && input.alert.action && input.alert.type) {
+        const triggerName = input.alertName ?? input.name;
         const triggerData = buildGraphAlertTriggerData(
           nanoid(),
-          input.name,
+          triggerName,
           input.projectId,
           input.alert.action,
           {
@@ -307,6 +309,7 @@ export const graphsRouter = createTRPCRouter({
           })
           .superRefine(alertSchemaRefinement)
           .optional(),
+        alertName: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("analytics:update"))
@@ -328,12 +331,13 @@ export const graphsRouter = createTRPCRouter({
       });
 
       if (input.alert?.enabled && input.alert.action && input.alert.type) {
+        const triggerName = input.alertName ?? input.name;
         if (existingTrigger) {
           // Update existing trigger
           await prisma.trigger.update({
             where: { id: existingTrigger.id, projectId: input.projectId },
             data: {
-              name: `Alert: ${input.name}`,
+              name: `Alert: ${triggerName}`,
               action: input.alert.action,
               actionParams: {
                 ...input.alert.actionParams,
@@ -350,7 +354,7 @@ export const graphsRouter = createTRPCRouter({
           // Create new trigger
           const triggerData = buildGraphAlertTriggerData(
             nanoid(),
-            input.name,
+            triggerName,
             input.projectId,
             input.alert.action,
             {
