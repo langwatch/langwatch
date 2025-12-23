@@ -235,7 +235,7 @@ export function OnboardingProgress() {
       width="full"
       padding={3}
       gap={2}
-      _hover={{ boxShadow: "md" }}
+      _hover={{ boxShadow: "xs" }}
     >
       {/* Header with progress */}
       <HStack justify="space-between" align="center" width="full">
@@ -254,7 +254,7 @@ export function OnboardingProgress() {
             colorPalette="orange"
             size="sm"
           >
-            <Progress.Track>
+            <Progress.Track borderRadius="full">
               <Progress.Range />
             </Progress.Track>
           </Progress.Root>

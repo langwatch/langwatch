@@ -97,6 +97,8 @@ export function PublishedPromptsList() {
                   },
                 });
               }}
+              paddingY={1}
+              paddingLeft={2}
             >
               <PublishedPromptContent
                 promptId={prompt.id}

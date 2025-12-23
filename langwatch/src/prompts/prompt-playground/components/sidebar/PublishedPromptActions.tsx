@@ -125,7 +125,7 @@ export function PublishedPromptActions({
           <Menu.Trigger asChild>
             <Button
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={(event) => event.stopPropagation()}
             >
               <LuEllipsisVertical size={14} />

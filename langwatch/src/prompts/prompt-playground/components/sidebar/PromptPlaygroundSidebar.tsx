@@ -11,10 +11,6 @@ export function PromptPlaygroundSidebar() {
   return (
     <Sidebar.Root>
       <Sidebar.Section>
-        <Sidebar.SectionHeader>
-          <Text>Prompts</Text>
-          <AddPromptButton />
-        </Sidebar.SectionHeader>
         <PublishedPromptsList />
       </Sidebar.Section>
     </Sidebar.Root>
