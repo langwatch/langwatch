@@ -198,7 +198,7 @@ function SidebarItem({
   icon,
   meta,
   variant = "default",
-  ...props,
+  ...props
 }: SidebarItemProps) {
   if (variant === "empty") {
     return (

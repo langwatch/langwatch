@@ -588,7 +588,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
  */
 export function useDraggableTabsBrowserStore<T>(
   selector: (state: DraggableTabsBrowserState) => T,
-): T | DraggableTabsBrowserState {
+): T {
   const { projectId } = useOrganizationTeamProject();
   const key = projectId ?? "__default__";
 
