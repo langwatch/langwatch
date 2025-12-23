@@ -24,6 +24,7 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
 import {
   type Dispatch,
@@ -35,7 +36,9 @@ import {
 import {
   AlignLeft,
   BarChart2,
+  Bell,
   Check,
+  CheckSquare,
   ChevronDown,
   GitBranch,
   Info,
@@ -60,6 +63,7 @@ import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
+import { Popover } from "~/components/ui/popover";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -144,6 +148,20 @@ export interface CustomGraphFormData {
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
+  alert?: {
+    enabled: boolean;
+    seriesName: string;
+    threshold: number;
+    operator: "gt" | "lt" | "gte" | "lte" | "eq";
+    timePeriod: number;
+    type: "CRITICAL" | "WARNING" | "INFO";
+    action: "SEND_EMAIL" | "SEND_SLACK_MESSAGE";
+    actionParams?: {
+      members?: string[];
+      slackWebhook?: string;
+    };
+    triggerId?: string;
+  };
 }
 
 export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
@@ -250,24 +268,30 @@ const defaultValues: CustomGraphFormData = {
   includePrevious: true,
 };
 
-export default function AnalyticsCustomGraph({
+function AnalyticsCustomGraphContent({
   customId,
   graph,
   name,
   filters,
+  alert,
 }: {
   customId?: string;
   graph?: CustomGraphInput;
   name?: string;
   filters?: Record<FilterField, string[] | Record<string, string[]>>;
+  alert?: CustomGraphFormData["alert"];
 }) {
   const jsonModal = useDisclosure();
   const apiModal = useDisclosure();
   const { filterParams, setFilters } = useFilterParams();
+  const { openDrawer } = useDrawer();
 
   let initialFormData: CustomGraphFormData | undefined;
   if (customId && graph) {
     initialFormData = customGraphInputToFormData(graph);
+    if (alert) {
+      initialFormData.alert = alert;
+    }
   }
 
   const form = useForm<CustomGraphFormData>({
@@ -281,7 +305,7 @@ export default function AnalyticsCustomGraph({
       setFilters(filters);
       hasSetFilters.current = true;
     }
-  }, [customId, filters]);
+  }, [customId, filters, setFilters]);
 
   useEffect(() => {
     if (name) {
@@ -361,18 +385,54 @@ export default function AnalyticsCustomGraph({
                     fontWeight="bold"
                     fontSize="16px"
                   />
-                  <Menu.Root>
-                    <Menu.Trigger asChild>
-                      <Button variant="ghost" paddingX={0}>
-                        <MoreVertical />
+                  <HStack gap={2}>
+                    {form.watch("alert.enabled") ? (
+                      <Tooltip
+                        content="Alert configured"
+                        positioning={{ placement: "top" }}
+                      >
+                        <Box
+                          padding={1}
+                          cursor="pointer"
+                          onClick={() =>
+                            openDrawer("customGraphAlert", {
+                              form,
+                              graphId: customId,
+                            })
+                          }
+                        >
+                          <Bell width={16} />
+                        </Box>
+                      </Tooltip>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        colorPalette="gray"
+                        size="sm"
+                        onClick={() =>
+                          openDrawer("customGraphAlert", {
+                            form,
+                            graphId: customId,
+                          })
+                        }
+                      >
+                        <Bell width={16} />
+                        Add alert
                       </Button>
-                    </Menu.Trigger>
-                    <Menu.Content>
-                      <Menu.Item value="api" onClick={apiModal.onOpen}>
-                        Show API
-                      </Menu.Item>
-                    </Menu.Content>
-                  </Menu.Root>
+                    )}
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button variant="ghost" paddingX={0}>
+                          <MoreVertical />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item value="api" onClick={apiModal.onOpen}>
+                          Show API
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
+                  </HStack>
                 </HStack>
               </Card.Header>
               <Card.Body>
@@ -441,7 +501,7 @@ EOF`}
   );
 }
 
-const customGraphInputToFormData = (
+export const customGraphInputToFormData = (
   graphInput: CustomGraphInput,
 ): CustomGraphFormData => {
   return {
@@ -477,7 +537,7 @@ const customGraphInputToFormData = (
   };
 };
 
-const customGraphFormToCustomGraphInput = (
+export const customGraphFormToCustomGraphInput = (
   formData: CustomGraphFormData,
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
@@ -578,6 +638,7 @@ function CustomGraphForm({
   filterParams: SharedFiltersInput;
 }) {
   const [expandedSeries, setExpandedSeries] = useState<string[]>(["0"]);
+  const { openDrawer } = useDrawer();
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
   const groupBy = form.watch("groupBy");
@@ -620,13 +681,26 @@ function CustomGraphForm({
       graphJson.height = 300;
     }
 
+    const formData = form.getValues();
+
+    // Get the series label for the alert name
+    let alertName: string | undefined;
+    if (formData.alert?.enabled && formData.series.length > 0) {
+      const selectedSeries = formData.series[0];
+      alertName =
+        selectedSeries?.name ||
+        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
+    }
+
     addNewGraph.mutate(
       {
         projectId: project?.id ?? "",
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
+        alert: formData.alert?.enabled ? formData.alert : undefined,
         dashboardId: dashboardId,
+        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -644,6 +718,17 @@ function CustomGraphForm({
   const updateGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
+    const formData = form.getValues();
+
+    // Get the series label for the alert name
+    let alertName: string | undefined;
+    if (formData.alert?.enabled && formData.series.length > 0) {
+      const selectedSeries = formData.series[0];
+      alertName =
+        selectedSeries?.name ||
+        `${selectedSeries?.metric} (${selectedSeries?.aggregation})`;
+    }
+
     updateGraphById.mutate(
       {
         projectId: project?.id ?? "",
@@ -651,6 +736,8 @@ function CustomGraphForm({
         graphId: customId ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
+        alert: formData.alert?.enabled ? formData.alert : undefined,
+        alertName: alertName,
       },
       {
         onSuccess: () => {
@@ -777,9 +864,7 @@ function CustomGraphForm({
           width="full"
           gap={3}
           templateColumns={
-            groupBy && getGroup(groupBy).requiresKey
-              ? "repeat(2, 1fr)"
-              : "1fr"
+            groupBy && getGroup(groupBy).requiresKey ? "repeat(2, 1fr)" : "1fr"
           }
         >
           <NativeSelect.Root>
@@ -1108,14 +1193,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? (metricAggregations[aggregation] ?? aggregation)
+      ? metricAggregations[aggregation] ?? aggregation
       : undefined;
     const pipeline_ = pipelineField
-      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
+      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
+        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(
@@ -1502,3 +1587,8 @@ function GraphTypeField({
     />
   );
 }
+
+// Export as client-side only component to avoid SSR issues with chakra-react-select
+export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
+  ssr: false,
+});

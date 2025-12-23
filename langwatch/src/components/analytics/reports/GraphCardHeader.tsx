@@ -1,19 +1,33 @@
-import { HStack, Spacer, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
 import { useMemo } from "react";
-import { BarChart2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { BarChart2, Bell } from "lucide-react";
 import type { FilterField } from "~/server/filters/types";
 import { GraphFilterIndicator } from "./GraphFilterIndicator";
 import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
+import {
+  customGraphInputToFormData,
+  type CustomGraphFormData,
+} from "~/pages/[project]/analytics/custom/index";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 
 interface GraphCardHeaderProps {
   graphId: string;
   name: string;
+  graph: unknown;
   projectSlug: string;
   colSpan: number;
   rowSpan: number;
   filters: unknown;
+  trigger?: {
+    id: string;
+    active: boolean;
+    alertType: string | null;
+  } | null;
   isDragging: boolean;
   dragAttributes: DraggableAttributes;
   dragListeners: SyntheticListenerMap | undefined;
@@ -25,10 +39,12 @@ interface GraphCardHeaderProps {
 export function GraphCardHeader({
   graphId,
   name,
+  graph,
   projectSlug,
   colSpan,
   rowSpan,
   filters,
+  trigger,
   isDragging,
   dragAttributes,
   dragListeners,
@@ -36,6 +52,18 @@ export function GraphCardHeader({
   onDelete,
   isDeleting,
 }: GraphCardHeaderProps) {
+  const { openDrawer } = useDrawer();
+
+  // Create form instance from graph data for the alert drawer
+  const form = useForm<CustomGraphFormData>({
+    defaultValues: graph
+      ? {
+          ...customGraphInputToFormData(graph as CustomGraphInput),
+          title: name,
+        }
+      : undefined,
+  });
+
   const hasFilters = useMemo(
     () =>
       !!(filters && typeof filters === "object" && Object.keys(filters).length > 0),
@@ -55,6 +83,45 @@ export function GraphCardHeader({
         {name}
       </Text>
       <Spacer />
+
+      {/* Alert button/icon */}
+      {trigger && trigger.active ? (
+        <Tooltip
+          content={`Alert configured (${trigger.alertType ?? "INFO"})`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <Box
+            padding={1}
+            cursor="pointer"
+            onClick={(e) => {
+              e.stopPropagation();
+              openDrawer("customGraphAlert", {
+                form,
+                graphId,
+              });
+            }}
+          >
+            <Bell width={18} color="black" />
+          </Box>
+        </Tooltip>
+      ) : (
+        <Button
+          variant="outline"
+          colorPalette="gray"
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            openDrawer("customGraphAlert", {
+              form,
+              graphId,
+            });
+          }}
+        >
+          <Bell width={16} />
+          Add alert
+        </Button>
+      )}
 
       {hasFilters && (
         <GraphFilterIndicator

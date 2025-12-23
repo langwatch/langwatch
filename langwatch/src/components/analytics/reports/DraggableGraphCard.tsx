@@ -18,6 +18,11 @@ interface GraphData {
   gridRow: number;
   colSpan: number;
   rowSpan: number;
+  trigger?: {
+    id: string;
+    active: boolean;
+    alertType: string | null;
+  } | null;
 }
 
 interface DraggableGraphCardProps {
@@ -68,10 +73,12 @@ export function DraggableGraphCard({
           <GraphCardHeader
             graphId={graph.id}
             name={graph.name}
+            graph={graph.graph}
             projectSlug={projectSlug}
             colSpan={graph.colSpan}
             rowSpan={graph.rowSpan}
             filters={graph.filters}
+            trigger={graph.trigger}
             isDragging={isDragging}
             dragAttributes={attributes}
             dragListeners={listeners}
