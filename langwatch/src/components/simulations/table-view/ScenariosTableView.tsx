@@ -106,6 +106,13 @@ export function ScenariosTableView() {
     getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    initialState: {
+      columnVisibility: {
+        batchRunId: false,
+        scenarioSetId: false,
+        scenarioRunId: false,
+      },
+    },
     // state: {
     //   sorting,
     //   columnVisibility,
