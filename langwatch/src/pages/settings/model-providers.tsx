@@ -60,90 +60,73 @@ export default function ModelsPage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-        paddingY={6}
-        paddingBottom={12}
-        paddingX={4}
-      >
-        <HStack width="full" marginTop={6}>
-          <Heading size="lg" as="h1">
-            Model Providers
-          </Heading>
+      <VStack gap={4} width="full" align="start">
+        <VStack align="start" gap={1} width="full">
+          <HStack width="full">
+            <Heading>Model Providers</Heading>
 
-          <Spacer />
-          {/* aggregate spinner removed; per-row loading shown inline */}
-          {organizations && project && (
-            <ProjectSelector organizations={organizations} project={project} />
+            <Spacer />
+            {/* aggregate spinner removed; per-row loading shown inline */}
+            {organizations && project && (
+              <ProjectSelector
+                organizations={organizations}
+                project={project}
+              />
+            )}
+          </HStack>
+        </VStack>
+
+        <VStack gap={0} width="full">
+          {isLoading &&
+            Array.from({
+              length: Object.keys(modelProvidersRegistry).length,
+            }).map((_, index) => (
+              <Box
+                key={index}
+                width="full"
+                borderBottomWidth="1px"
+                _last={{ border: "none" }}
+                paddingY={6}
+              >
+                <Skeleton width="full" height="28px" />
+              </Box>
+            ))}
+
+          {providers &&
+            hasModelProvidersManagePermission &&
+            Object.values(providers).map((provider, index) => (
+              <ModelProviderRow
+                key={index}
+                provider={provider}
+                refetch={refetch}
+              />
+            ))}
+          {!hasModelProvidersManagePermission && (
+            <PermissionAlert permission="project:manage" />
           )}
-        </HStack>
-        <Text>
-          Define which models are allowed to be used on LangWatch for this
-          project. <br />
-          You can also use your own API keys.
-        </Text>
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={4}>
-            <VStack gap={0} width="full">
-              {isLoading &&
-                Array.from({
-                  length: Object.keys(modelProvidersRegistry).length,
-                }).map((_, index) => (
-                  <Box
-                    key={index}
-                    width="full"
-                    borderBottomWidth="1px"
-                    _last={{ border: "none" }}
-                    paddingY={6}
-                  >
-                    <Skeleton width="full" height="28px" />
-                  </Box>
-                ))}
+        </VStack>
 
-              {providers &&
-                hasModelProvidersManagePermission &&
-                Object.values(providers).map((provider, index) => (
-                  <ModelProviderRow
-                    key={index}
-                    provider={provider}
-                    refetch={refetch}
-                  />
-                ))}
-              {!hasModelProvidersManagePermission && (
-                <PermissionAlert permission="project:manage" />
-              )}
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-
-        <VStack width="full" align="start" gap={6}>
+        <VStack width="full" align="start" gap={6} paddingTop={2}>
           <VStack gap={2} marginTop={2} align="start" width="full">
             <Heading size="md" as="h2">
               Default Models
             </Heading>
-            <Text>
+            <Text fontSize="sm" color="gray.500">
               Configure the default models used on workflows, evaluations and
               other LangWatch features.
             </Text>
           </VStack>
-          <Card.Root width="full">
-            <Card.Body width="full">
-              <VStack gap={0} width="full" align="stretch">
-                {!hasModelProvidersManagePermission ? (
-                  <PermissionAlert permission="project:manage" />
-                ) : (
-                  <>
-                    <DefaultModel />
-                    <TopicClusteringModel />
-                    <EmbeddingsModel />
-                  </>
-                )}
-              </VStack>
-            </Card.Body>
-          </Card.Root>
+          <VStack gap={0} width="full" align="stretch">
+            {!hasModelProvidersManagePermission ? (
+              <PermissionAlert permission="project:manage" />
+            ) : (
+              <>
+                <DefaultModel />
+                <TopicClusteringModel />
+                <EmbeddingsModel />
+              </>
+            )}
+          </VStack>
         </VStack>
       </VStack>
     </SettingsLayout>

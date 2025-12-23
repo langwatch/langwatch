@@ -41,6 +41,7 @@ import { toaster } from "../../components/ui/toaster";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -122,26 +123,24 @@ function EvaluationsV2() {
     BATCH_EVALUATION_V2: "API Batch Evaluation",
     BATCH_EVALUATION: "Batch Evaluation",
     DSPY: "DSPy Optimization",
+    EVALUATIONS_V3: "Evaluations V3",
   };
 
   return (
     <DashboardLayout>
-      <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
+      <PageLayout.Header>
+        <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
+        <Spacer />
+        <HStack gap={2}>
+          <NewEvaluationButton />
+        </HStack>
+      </PageLayout.Header>
+      <Container
+        maxW={"calc(min(1440px, 100vw - 200px))"}
+        paddingX={6}
+        paddingTop={4}
+      >
         <VStack width="fill" gap={4} align="stretch">
-          <HStack paddingTop={4}>
-            <VStack align="start" gap={1}>
-              <Heading as="h1">Evaluations Dashboard</Heading>
-              <Text color="gray.600">
-                Monitor real-time performance metrics and batch evaluation
-                results
-              </Text>
-            </VStack>
-            <Spacer />
-            <HStack gap={2}>
-              <NewEvaluationButton />
-            </HStack>
-          </HStack>
-
           {monitors.isLoading ? (
             <Box display="flex" justifyContent="center" py={8}>
               <Spinner />

@@ -22,22 +22,25 @@ import { api } from "../../../utils/api";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
 import { PushToCopiesDialog } from "./PushToCopiesDialog";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
     <VStack
       align="start"
       padding={4}
-      gap={4}
-      borderRadius={8}
+      gap={2}
+      borderRadius="xl"
       background="white"
       boxShadow="md"
-      height="200px"
+      height="142px"
       cursor="pointer"
       role="button"
       transition="all 0.2s ease-in-out"
+      border="1px solid"
+      borderColor="gray.100"
       _hover={{
-        boxShadow: "lg",
+        boxShadow: "xl",
         textDecoration: "none",
       }}
       {...props}
@@ -193,16 +196,18 @@ export function WorkflowCard({
   return (
     <>
       <WorkflowCardBase paddingX={0} {...props}>
-        <HStack gap={4} paddingX={4} width="full">
+        <HStack gap={4} paddingX={4} paddingBottom={2} width="full">
           <WorkflowIcon icon={icon} size={"lg"} />
-          <Heading as={"h2"} size="sm" fontWeight={600}>
-            {name}
-          </Heading>
+          {description && (
+            <Text color="gray.600" fontSize="sm" fontWeight={500}>
+              {name}
+            </Text>
+          )}
           <Spacer />
           {workflowId && (
             <Menu.Root>
               <Menu.Trigger className="js-inner-menu">
-                <MoreVertical size={24} />
+                <MoreVertical size={16} />
               </Menu.Trigger>
               <Menu.Content className="js-inner-menu">
                 {isCopiedWorkflow && (
@@ -211,8 +216,8 @@ export function WorkflowCard({
                       !hasWorkflowsUpdatePermission
                         ? "You need workflows:update permission to sync from source"
                         : sourceProjectPath
-                          ? `Copied from: ${sourceProjectPath}`
-                          : undefined
+                        ? `Copied from: ${sourceProjectPath}`
+                        : undefined
                     }
                     disabled={
                       !hasWorkflowsUpdatePermission && !sourceProjectPath
@@ -306,13 +311,19 @@ export function WorkflowCard({
             </Menu.Root>
           )}
         </HStack>
-        <Separator />
-        {description && (
-          <Text paddingX={4} color="gray.600" fontSize="14px">
-            {description}
-          </Text>
-        )}
         {children}
+        {!description && <Spacer />}
+        <Text
+          paddingX={4}
+          color="gray.600"
+          fontSize="sm"
+          fontWeight={!description ? 500 : undefined}
+        >
+          {description ?? name}
+        </Text>
+        <Text paddingX={4} color="gray.400" fontSize="12px">
+          {formatTimeAgo(workflow?.updatedAt?.getTime() ?? 0)}
+        </Text>
       </WorkflowCardBase>
 
       <DeleteConfirmationDialog

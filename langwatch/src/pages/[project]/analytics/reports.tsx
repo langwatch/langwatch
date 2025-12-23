@@ -1,4 +1,12 @@
-import { Alert, Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Plus } from "lucide-react";
 import { AnalyticsHeader } from "~/components/analytics/AnalyticsHeader";
@@ -179,13 +187,13 @@ function ReportsContent() {
     : `/${project?.slug}/analytics/custom`;
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader
-        title={dashboardTitle}
-        isEditable
-        onTitleSave={handleTitleSave}
-      />
-
+    <GraphsLayout
+      title={dashboardTitle}
+      analyticsHeaderProps={{
+        isEditable: true,
+        onTitleSave: handleTitleSave,
+      }}
+    >
       {/* Empty state */}
       {hasNoGraphs && (
         <Alert.Root
@@ -210,8 +218,10 @@ function ReportsContent() {
       {/* Add chart button */}
       <HStack width="full" paddingBottom={6}>
         {project ? (
-          <Link href={addChartUrl}>
-            <Plus /> Add chart
+          <Link href={addChartUrl} asChild>
+            <Button size="sm" variant="ghost">
+              <Plus /> Add chart
+            </Button>
           </Link>
         ) : null}
       </HStack>
@@ -240,6 +250,4 @@ function ReportsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(ReportsContent);
+export default withPermissionGuard("analytics:view")(ReportsContent);

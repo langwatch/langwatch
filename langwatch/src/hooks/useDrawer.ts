@@ -19,7 +19,8 @@ export type DrawerType =
   | "addOrEditDataset"
   | "editTriggerFilter"
   | "seriesFilters"
-  | "customGraphAlert";
+  | "customGraphAlert"
+  | "selectDataset";
 
 /** Generic callback type for drawer props - callers must narrow before use */
 type DrawerCallback = (...args: unknown[]) => void;
@@ -65,7 +66,9 @@ export function useDrawer() {
       .map(([k]) => k);
     if (badKeys.length > 0) {
       logger.warn(
-        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}`,
+        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(
+          ", ",
+        )}`,
       );
     }
 

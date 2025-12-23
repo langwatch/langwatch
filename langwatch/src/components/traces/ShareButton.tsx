@@ -55,7 +55,7 @@ export function ShareButton({
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button colorPalette="black" variant="outline">
+        <Button colorPalette="gray">
           {shareState.data?.id ? <Globe size={16} /> : <Share size={16} />}
           {shareState.data?.id ? "Public" : "Share"}
         </Button>

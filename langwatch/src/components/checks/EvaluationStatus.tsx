@@ -25,7 +25,7 @@ export const evaluationStatusColor = (
   const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
     scheduled: "yellow.600",
     in_progress: "yellow.600",
-    error: "red.800",
+    error: "red.600",
     skipped: "yellow.600",
     processed: evaluationPassed(check) === false ? "red.600" : "green.600",
   };

@@ -52,6 +52,7 @@ import {
   datasetValueToGridValue,
   HeaderCheckboxComponent,
 } from "./DatasetGrid";
+import { PageLayout } from "../ui/layouts/PageLayout";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -486,14 +487,14 @@ export function DatasetTable({
 
   return (
     <>
-      <HStack width="full" verticalAlign={"middle"} paddingBottom={6} gap={6}>
+      <PageLayout.Header>
         <HStack gap={2}>
           {insideWizard ? (
-            <Heading as="h3" size="md" fontWeight="600">
+            <PageLayout.Heading as="h3">
               {dataset?.name ?? DEFAULT_DATASET_NAME}
-            </Heading>
+            </PageLayout.Heading>
           ) : (
-            <Heading as="h1" size="lg">
+            <PageLayout.Heading as="h1">
               {title ? (
                 title
               ) : (
@@ -503,12 +504,12 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                        ? ""
-                        : DEFAULT_DATASET_NAME
+                      ? ""
+                      : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
-            </Heading>
+            </PageLayout.Heading>
           )}
           {canEditDatasetRecord && (
             <Button
@@ -520,17 +521,17 @@ export function DatasetTable({
               <Edit2 />
             </Button>
           )}
-        </HStack>
-        <Text fontSize={"14px"} color="gray.400">
-          {databaseDataset.data?.count ?? parentRowData?.length} records
-        </Text>
-        <Text fontSize={"14px"} color="gray.400">
-          {savingStatus === "saving"
-            ? "Saving..."
-            : savingStatus === "saved"
+          <Text fontSize={"14px"} color="gray.400">
+            {databaseDataset.data?.count ?? parentRowData?.length} records
+          </Text>
+          <Text fontSize={"14px"} color="gray.400">
+            {savingStatus === "saving"
+              ? "Saving..."
+              : savingStatus === "saved"
               ? "Saved"
               : ""}
-        </Text>
+          </Text>
+        </HStack>
         <Spacer />
         {!hideButtons && (
           <>
@@ -598,153 +599,155 @@ export function DatasetTable({
             )}
           </>
         )}
-      </HStack>
-      <Card.Root>
-        <Card.Body padding={0} position="relative">
-          <Box height={`calc(max(100vh - ${bottomSpace}, 500px))`}>
-            {databaseDataset.data?.truncated && (
-              <Alert.Root status="warning" variant="subtle">
-                <Alert.Indicator />
-                <Alert.Content>
-                  This dataset is too large to display all records. Displaying
-                  the first 5mb of data.
-                </Alert.Content>
-              </Alert.Root>
-            )}
-            <ErrorBoundary
-              fallback={
-                <Center width="full" height="full">
-                  Error rendering the dataset, please refresh the page
-                </Center>
-              }
+      </PageLayout.Header>
+      <PageLayout.Container>
+        <Card.Root>
+          <Card.Body padding={0} position="relative">
+            <Box height={`calc(max(100vh - ${bottomSpace}, 500px))`}>
+              {databaseDataset.data?.truncated && (
+                <Alert.Root status="warning" variant="subtle">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    This dataset is too large to display all records. Displaying
+                    the first 5mb of data.
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              <ErrorBoundary
+                fallback={
+                  <Center width="full" height="full">
+                    Error rendering the dataset, please refresh the page
+                  </Center>
+                }
+              >
+                <DatasetGrid
+                  columnDefs={columnDefs}
+                  rowData={localRowData}
+                  onCellValueChanged={onCellValueChanged}
+                  ref={parentGridRef ?? gridRef}
+                  domLayout="normal"
+                  {...(loadingOverlayComponent !== undefined
+                    ? { loadingOverlayComponent }
+                    : {})}
+                />
+              </ErrorBoundary>
+            </Box>
+          </Card.Body>
+        </Card.Root>
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              position="sticky"
+              left="0"
+              bottom={isEmbedded ? "32px" : 6}
+              marginTop={6}
+              marginLeft={insideWizard ? 0 : 6}
+              backgroundColor="#ffffff"
+              padding="8px"
+              paddingX="16px"
+              border="1px solid #ccc"
+              boxShadow="base"
+              borderRadius="md"
+              zIndex="100"
             >
-              <DatasetGrid
-                columnDefs={columnDefs}
-                rowData={localRowData}
-                onCellValueChanged={onCellValueChanged}
-                ref={parentGridRef ?? gridRef}
-                domLayout="normal"
-                {...(loadingOverlayComponent !== undefined
-                  ? { loadingOverlayComponent }
-                  : {})}
-              />
-            </ErrorBoundary>
-          </Box>
-        </Card.Body>
-      </Card.Root>
-      <Menu.Root>
-        <Menu.Trigger asChild>
-          <Button
-            position="sticky"
-            left="0"
-            bottom={isEmbedded ? "32px" : 6}
-            marginTop={6}
-            marginLeft={insideWizard ? 0 : 6}
+              <Plus />
+              Add new record
+              <ChevronDown width={16} height={16} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content zIndex="popover">
+            <Menu.Item
+              value="import-csv"
+              onClick={() => addRowsFromCSVModal.onOpen()}
+            >
+              <Upload height={16} width={16} /> Import from CSV
+            </Menu.Item>
+            <Menu.Item value="add-line" onClick={onAddNewRow}>
+              <Plus height={16} width={16} /> Add new line
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
+        <AddRowsFromCSVModal
+          isOpen={addRowsFromCSVModal.open}
+          onClose={addRowsFromCSVModal.onClose}
+          datasetId={datasetId}
+          columnTypes={columnTypes}
+          onUpdateDataset={(entries) => {
+            setParentRowData((currentEntries) => {
+              if (!currentEntries) return entries;
+              return [...currentEntries, ...entries];
+            });
+            setLocalRowData((currentEntries) => {
+              if (!currentEntries) return entries;
+              return [...currentEntries, ...entries];
+            });
+            addRowsFromCSVModal.onClose();
+          }}
+        />
+        {selectedEntryIds.size > 0 && (
+          <Box
+            position="fixed"
+            bottom={6}
+            left="50%"
+            transform="translateX(-50%)"
             backgroundColor="#ffffff"
             padding="8px"
             paddingX="16px"
             border="1px solid #ccc"
             boxShadow="base"
-            borderRadius="md"
-            zIndex="100"
+            borderRadius={"md"}
           >
-            <Plus />
-            Add new record
-            <ChevronDown width={16} height={16} />
-          </Button>
-        </Menu.Trigger>
-        <Menu.Content zIndex="popover">
-          <Menu.Item
-            value="import-csv"
-            onClick={() => addRowsFromCSVModal.onOpen()}
-          >
-            <Upload height={16} width={16} /> Import from CSV
-          </Menu.Item>
-          <Menu.Item value="add-line" onClick={onAddNewRow}>
-            <Plus height={16} width={16} /> Add new line
-          </Menu.Item>
-        </Menu.Content>
-      </Menu.Root>
-      <AddRowsFromCSVModal
-        isOpen={addRowsFromCSVModal.open}
-        onClose={addRowsFromCSVModal.onClose}
-        datasetId={datasetId}
-        columnTypes={columnTypes}
-        onUpdateDataset={(entries) => {
-          setParentRowData((currentEntries) => {
-            if (!currentEntries) return entries;
-            return [...currentEntries, ...entries];
-          });
-          setLocalRowData((currentEntries) => {
-            if (!currentEntries) return entries;
-            return [...currentEntries, ...entries];
-          });
-          addRowsFromCSVModal.onClose();
-        }}
-      />
-      {selectedEntryIds.size > 0 && (
-        <Box
-          position="fixed"
-          bottom={6}
-          left="50%"
-          transform="translateX(-50%)"
-          backgroundColor="#ffffff"
-          padding="8px"
-          paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="base"
-          borderRadius={"md"}
-        >
-          <HStack gap={3}>
-            <Text>{selectedEntryIds.size} entries selected</Text>
-            <Button
-              colorPalette="black"
-              minWidth="fit-content"
-              variant="outline"
-              onClick={() => void downloadCSV(true)}
-            >
-              Export <Upload style={{ marginLeft: "8px" }} />
-            </Button>
+            <HStack gap={3}>
+              <Text>{selectedEntryIds.size} entries selected</Text>
+              <Button
+                colorPalette="black"
+                minWidth="fit-content"
+                variant="outline"
+                onClick={() => void downloadCSV(true)}
+              >
+                Export <Upload style={{ marginLeft: "8px" }} />
+              </Button>
 
-            <Text>or</Text>
-            <Button
-              colorPalette="red"
-              type="submit"
-              variant="outline"
-              minWidth="fit-content"
-              onClick={onDelete}
-            >
-              Delete
-            </Button>
-          </HStack>
-        </Box>
-      )}
-      {editDataset.open && (
-        <AddOrEditDatasetDrawer
-          datasetToSave={{
-            datasetId,
-            name: dataset?.name ?? "",
-            datasetRecords: datasetId ? undefined : parentRowData,
-            columnTypes,
-          }}
-          open={editDataset.open}
-          onClose={editDataset.onClose}
-          onSuccess={(updatedDataset) => {
-            if (dataset?.datasetRecords) {
-              onUpdateDataset?.({
-                datasetId: updatedDataset.datasetId,
-                name: updatedDataset.name,
-                datasetRecords: dataset.datasetRecords,
-                columnTypes: updatedDataset.columnTypes,
-              });
-            }
-            setDatasetId(updatedDataset.datasetId);
-            setColumnTypes(updatedDataset.columnTypes);
-            void databaseDataset.refetch();
-            editDataset.onClose();
-          }}
-        />
-      )}
+              <Text>or</Text>
+              <Button
+                colorPalette="red"
+                type="submit"
+                variant="outline"
+                minWidth="fit-content"
+                onClick={onDelete}
+              >
+                Delete
+              </Button>
+            </HStack>
+          </Box>
+        )}
+        {editDataset.open && (
+          <AddOrEditDatasetDrawer
+            datasetToSave={{
+              datasetId,
+              name: dataset?.name ?? "",
+              datasetRecords: datasetId ? undefined : parentRowData,
+              columnTypes,
+            }}
+            open={editDataset.open}
+            onClose={editDataset.onClose}
+            onSuccess={(updatedDataset) => {
+              if (dataset?.datasetRecords) {
+                onUpdateDataset?.({
+                  datasetId: updatedDataset.datasetId,
+                  name: updatedDataset.name,
+                  datasetRecords: dataset.datasetRecords,
+                  columnTypes: updatedDataset.columnTypes,
+                });
+              }
+              setDatasetId(updatedDataset.datasetId);
+              setColumnTypes(updatedDataset.columnTypes);
+              void databaseDataset.refetch();
+              editDataset.onClose();
+            }}
+          />
+        )}
+      </PageLayout.Container>
     </>
   );
 }

@@ -127,7 +127,7 @@ const ResourcesCard: React.FC = () => {
     <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
       <VStack align="start" gap={4} w="full">
         <VStack gap={0} alignItems="flex-start" justifyContent="flex-start">
-          <Heading size="md" fontWeight="bold" textAlign="left">
+          <Heading size="md" textAlign="left">
             Resources
           </Heading>
           <Text fontSize="xs" color="gray.500" textAlign="left">

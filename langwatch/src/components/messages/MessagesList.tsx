@@ -1,10 +1,8 @@
 import {
   Alert,
   Box,
-  Button,
   Card,
   Container,
-  Heading,
   HStack,
   LinkBox,
   Separator,
@@ -16,20 +14,14 @@ import {
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Layers,
-  Maximize2,
-  RefreshCw,
-} from "react-feather";
+import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { ElasticSearchEvaluation, Trace } from "../../server/tracer/types";
+import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 import { api } from "../../utils/api";
 import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { FilterSidebar } from "../filters/FilterSidebar";
@@ -41,6 +33,8 @@ import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
+import { PageLayout } from "../ui/layouts/PageLayout";
+import { LuLayers, LuRefreshCw } from "react-icons/lu";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();
@@ -111,79 +105,69 @@ export function MessagesList() {
   }, [traceGroups]);
 
   return (
-    <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
-      <HStack width="full" align="top" paddingBottom={6}>
-        <HStack align="center" gap={6}>
-          <Heading as={"h1"} size="lg" paddingTop={1}>
-            Traces
-          </Heading>
-          <ToggleAnalytics />
-          <Tooltip content="Refresh">
-            <Button
-              variant="outline"
-              minWidth={0}
-              height="32px"
-              padding={2}
-              marginTop={2}
-              onClick={() => {
-                void traceGroups.refetch();
-                void evaluations.refetch();
-              }}
-            >
-              <RefreshCw
-                size="16"
-                className={
-                  traceGroups.isLoading || traceGroups.isRefetching
-                    ? "refresh-icon animation-spinning"
-                    : "refresh-icon"
-                }
-              />
-            </Button>
-          </Tooltip>
-        </HStack>
-        <Spacer />
-        <HStack gap="2px" marginBottom="-8px">
-          <ToggleTableView />
-          <GroupingSelector />
-          <PeriodSelector
-            period={{ startDate, endDate }}
-            setPeriod={setPeriod}
-          />
-          <FilterToggle defaultShowFilters={true} />
-        </HStack>
-      </HStack>
-      <HStack align="start" gap={8}>
-        <VStack gap={6} width="full">
-          {project && traceGroups.data && traceGroups.data.groups.length > 0 ? (
-            <ExpandableMessages
-              project={project}
-              traceGroups={traceGroups.data.groups}
-              checksMap={evaluations.data}
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Traces</PageLayout.Heading>
+        <Tooltip content="Refresh">
+          <PageLayout.HeaderButton
+            variant="ghost"
+            onClick={() => {
+              void traceGroups.refetch();
+              void evaluations.refetch();
+            }}
+          >
+            <LuRefreshCw
+              className={
+                traceGroups.isLoading || traceGroups.isRefetching
+                  ? "refresh-icon animation-spinning"
+                  : "refresh-icon"
+              }
             />
-          ) : traceGroups.data ? (
-            <Alert.Root status="info">
-              <Alert.Indicator />
-              <Alert.Content>No messages found</Alert.Content>
-            </Alert.Root>
-          ) : traceGroups.isError ? (
-            <Alert.Root status="error">
-              <Alert.Indicator />
-              <Alert.Content>
-                An error has occurred trying to load the messages
-              </Alert.Content>
-            </Alert.Root>
-          ) : (
-            <>
-              <MessageSkeleton />
-              <MessageSkeleton />
-              <MessageSkeleton />
-            </>
-          )}
-          <MessagesNavigationFooter {...navigationFooter} />
-        </VStack>
-        <FilterSidebar defaultShowFilters={true} />
-      </HStack>
-    </Container>
+          </PageLayout.HeaderButton>
+        </Tooltip>
+        <Spacer />
+        <ToggleTableView />
+        <GroupingSelector />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <FilterToggle defaultShowFilters={true} />
+        <ToggleAnalytics />
+      </PageLayout.Header>
+      <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
+        <HStack align="start" gap={8}>
+          <VStack gap={6} width="full">
+            {project &&
+            traceGroups.data &&
+            traceGroups.data.groups.length > 0 ? (
+              <ExpandableMessages
+                project={project}
+                traceGroups={traceGroups.data.groups}
+                checksMap={evaluations.data}
+              />
+            ) : traceGroups.data ? (
+              <Alert.Root status="info">
+                <Alert.Indicator />
+                <Alert.Content>No messages found</Alert.Content>
+              </Alert.Root>
+            ) : traceGroups.isError ? (
+              <Alert.Root status="error">
+                <Alert.Indicator />
+                <Alert.Content>
+                  An error has occurred trying to load the messages
+                </Alert.Content>
+              </Alert.Root>
+            ) : (
+              <>
+                <MessageSkeleton />
+                <MessageSkeleton />
+                <MessageSkeleton />
+              </>
+            )}
+            <MessagesNavigationFooter {...navigationFooter} />
+          </VStack>
+          <FilterSidebar defaultShowFilters={true} />
+        </HStack>
+      </Container>
+    </>
   );
 }
 
@@ -385,6 +369,8 @@ const ExpandableMessages = React.memo(
                             }
                           : {}
                       }
+                      boxShadow="lg"
+                      borderRadius="xl"
                     >
                       {!expanded && (
                         <Box position="absolute" right={6} top={6}>
@@ -480,15 +466,15 @@ function GroupingSelector() {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button variant="ghost" minWidth="fit-content">
+        <PageLayout.HeaderButton>
           <HStack gap={2}>
-            <Layers size={16} />
+            <LuLayers />
             <Box>{groups[groupBy]}</Box>
             <Box>
               <ChevronDown />
             </Box>
           </HStack>
-        </Button>
+        </PageLayout.HeaderButton>
       </Menu.Trigger>
       <Menu.Content>
         <Box paddingX={3} paddingY={2} fontWeight="medium" color="gray.500">

@@ -1,4 +1,4 @@
-import { Container, HStack, VStack } from "@chakra-ui/react";
+import { Container, Heading, HStack, VStack } from "@chakra-ui/react";
 import { type PropsWithChildren } from "react";
 import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -6,27 +6,35 @@ import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useFilterToggle } from "./filters/FilterToggle";
 import { SmallLabel } from "./SmallLabel";
+import { AnalyticsHeader } from "./analytics/AnalyticsHeader";
+import { type AnalyticsHeaderProps } from "./analytics/AnalyticsHeader";
 
-export default function GraphsLayout({ children }: PropsWithChildren) {
+export default function GraphsLayout({
+  children,
+  title,
+  analyticsHeaderProps,
+}: PropsWithChildren<{
+  title: string;
+  analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
+}>) {
   const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
 
   return (
     <DashboardLayout>
+      <AnalyticsHeader title={title} {...analyticsHeaderProps} />
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"
-          background="white"
+          paddingX={2}
           paddingY={4}
-          borderRightWidth="1px"
-          borderColor="gray.300"
           fontSize="14px"
           minWidth="180px"
           height="full"
           gap={1}
         >
           <MenuLink href={`/${project?.slug}`}>Overview</MenuLink>
-          <VStack align="start" width="full" gap={0}>
+          <VStack align="start" width="full" gap={1}>
             {/* TODO: reduce font size to 11 once the rest of the page also have a smaller fit */}
             <SmallLabel
               paddingX={4}
@@ -37,14 +45,14 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             >
               Engagement
             </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/users`} paddingX={6}>
+            <MenuLink href={`/${project?.slug}/analytics/users`}>
               Users
             </MenuLink>
-            <MenuLink href={`/${project?.slug}/analytics/topics`} paddingX={6}>
+            <MenuLink href={`/${project?.slug}/analytics/topics`}>
               Topics
             </MenuLink>
           </VStack>
-          <VStack align="start" width="full" gap={0}>
+          <VStack align="start" width="full" gap={1}>
             <SmallLabel
               paddingX={4}
               paddingTop={4}
@@ -54,17 +62,14 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             >
               Observability
             </SmallLabel>
-            <MenuLink href={`/${project?.slug}/analytics/metrics`} paddingX={6}>
+            <MenuLink href={`/${project?.slug}/analytics/metrics`}>
               LLM Metrics
             </MenuLink>
-            <MenuLink
-              href={`/${project?.slug}/analytics/evaluations`}
-              paddingX={6}
-            >
+            <MenuLink href={`/${project?.slug}/analytics/evaluations`}>
               Evaluations
             </MenuLink>
           </VStack>
-          <VStack align="start" width="full" gap={0}>
+          <VStack align="start" width="full" gap={1}>
             <SmallLabel
               paddingX={4}
               paddingTop={4}
@@ -79,7 +84,7 @@ export default function GraphsLayout({ children }: PropsWithChildren) {
             )}
           </VStack>
         </VStack>
-        <Container maxWidth={showFilters ? "1612" : "1200"} padding={6}>
+        <Container maxWidth={showFilters ? "1612" : "1200"} padding={4}>
           {children}
         </Container>
       </HStack>

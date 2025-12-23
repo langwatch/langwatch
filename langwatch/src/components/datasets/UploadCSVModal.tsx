@@ -75,7 +75,6 @@ export function UploadCSVModal({
         open={localIsOpen}
         onOpenChange={({ open }) => !open && onClose()}
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Upload CSV</Dialog.Title>

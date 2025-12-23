@@ -11,7 +11,7 @@ import { PromptPlaygroundChatProvider } from "./chat/PromptPlaygroundChatContext
  */
 export function PromptPlaygroundPageLayout() {
   return (
-    <DashboardLayout position="relative">
+    <DashboardLayout position="relative" compactMenu>
       <HStack width="full" height="full" gap={0} position="relative">
         <PromptConfigProvider>
           <PromptPlaygroundChatProvider>
@@ -28,7 +28,6 @@ export function PromptPlaygroundPageLayout() {
                 left={0}
                 width="full"
                 height="full"
-                bg="white"
               >
                 <PromptPlaygroundSidebar />
               </Box>

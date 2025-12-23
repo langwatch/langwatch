@@ -27,6 +27,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 /**
  * Role Management Settings Page
@@ -247,17 +248,10 @@ function RolesManagement({
   };
 
   return (
-    <VStack
-      align="start"
-      width="full"
-      paddingX={4}
-      paddingY={6}
-      gap={6}
-      maxWidth="1200px"
-    >
+    <VStack align="start" width="full" gap={6}>
       <HStack justify="space-between" width="full">
         <VStack align="start" gap={1}>
-          <Heading size="lg">Roles & Permissions</Heading>
+          <Heading as="h2">Roles & Permissions</Heading>
           <Text color="gray.600" fontSize="sm">
             Create custom roles and assign specific permissions to control
             access
@@ -267,13 +261,12 @@ function RolesManagement({
           content="You need organization:manage permissions to create roles."
           disabled={hasPermission("organization:manage")}
         >
-          <Button
-            colorPalette="orange"
+          <PageLayout.HeaderButton
             onClick={onOpen}
             disabled={!hasPermission("organization:manage")}
           >
             <Plus size={16} /> Create Role
-          </Button>
+          </PageLayout.HeaderButton>
         </Tooltip>
       </HStack>
 
@@ -282,7 +275,7 @@ function RolesManagement({
       {/* Default Roles */}
       <VStack align="start" width="full" gap={4}>
         <Box>
-          <Heading size="md">Default Roles</Heading>
+          <Heading as="h3">Default Roles</Heading>
           <Text color="gray.600" fontSize="sm">
             These are the built-in roles that cannot be modified or deleted.
           </Text>
@@ -335,7 +328,7 @@ function RolesManagement({
       {/* Custom Roles */}
       <VStack align="start" width="full" gap={4}>
         <Box>
-          <Heading size="md">Custom Roles</Heading>
+          <Heading as="h3">Custom Roles</Heading>
           <Text color="gray.600" fontSize="sm">
             Custom roles created for your organization with specific permission
             sets.

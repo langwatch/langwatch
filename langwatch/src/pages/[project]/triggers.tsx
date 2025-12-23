@@ -250,210 +250,179 @@ function Triggers() {
 
   return (
     <SettingsLayout>
-      <Container maxW={"calc(100vw - 200px)"} padding={6} marginTop={8}>
+      <Container maxWidth="1280px" padding={4}>
         <HStack width="full" align="top" gap={6} paddingBottom={6}>
-          <Heading size="lg" as="h1">
-            Triggers
-          </Heading>
+          <Heading>Triggers</Heading>
           <Spacer />
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
         </HStack>
-        <Card.Root width="full" padding={6}>
-          <Card.Body width="full" paddingY={0} paddingX={0}>
-            {triggers.data && triggers.data.length == 0 ? (
-              <NoDataInfoBlock
-                title="No triggers yet"
-                description="Set up triggers on your messages to get notified when certain conditions are met."
-                docsInfo={
-                  <Text>
-                    To learn more about triggers, please visit our{" "}
-                    <Link
-                      color="orange.400"
-                      href="https://docs.langwatch.ai/features/triggers"
-                      isExternal
-                    >
-                      documentation
-                    </Link>
-                    .
-                  </Text>
-                }
-                icon={<Bell />}
-              />
-            ) : (
-              <Table.Root variant="line" width="full">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>Name</Table.ColumnHeader>
-                    <Table.ColumnHeader>Action</Table.ColumnHeader>
-                    <Table.ColumnHeader>Destination</Table.ColumnHeader>
-                    <Table.ColumnHeader>Filters</Table.ColumnHeader>
-                    <Table.ColumnHeader>Last Triggered At</Table.ColumnHeader>
-                    <Table.ColumnHeader>Active</Table.ColumnHeader>
-                    <Table.ColumnHeader>Actions</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {triggers.isLoading ? (
-                    <Table.Row>
-                      <Table.Cell colSpan={5}>Loading...</Table.Cell>
-                    </Table.Row>
-                  ) : (
-                    triggers.data?.map((trigger) => {
-                      return (
-                        <Table.Row
-                          key={trigger.id}
-                          data-trigger-id={trigger.id}
-                        >
-                          <Table.Cell>{trigger.name}</Table.Cell>
-                          <Table.Cell>
-                            {triggerActionName(trigger.action)}
-                          </Table.Cell>
-                          <Table.Cell>
-                            {actionItems(
-                              trigger.action,
-                              trigger.actionParams as ActionParams,
-                            )}
-                          </Table.Cell>
+        {triggers.data && triggers.data.length == 0 ? (
+          <NoDataInfoBlock
+            title="No triggers yet"
+            description="Set up triggers on your messages to get notified when certain conditions are met."
+            docsInfo={
+              <Text>
+                To learn more about triggers, please visit our{" "}
+                <Link
+                  color="orange.400"
+                  href="https://docs.langwatch.ai/features/triggers"
+                  isExternal
+                >
+                  documentation
+                </Link>
+                .
+              </Text>
+            }
+            icon={<Bell />}
+          />
+        ) : (
+          <Table.Root variant="line" width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Name</Table.ColumnHeader>
+                <Table.ColumnHeader>Action</Table.ColumnHeader>
+                <Table.ColumnHeader>Destination</Table.ColumnHeader>
+                <Table.ColumnHeader>Filters</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">
+                  Last Triggered At
+                </Table.ColumnHeader>
+                <Table.ColumnHeader>Active</Table.ColumnHeader>
+                <Table.ColumnHeader>Actions</Table.ColumnHeader>
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {triggers.isLoading ? (
+                <Table.Row>
+                  <Table.Cell colSpan={5}>Loading...</Table.Cell>
+                </Table.Row>
+              ) : (
+                triggers.data?.map((trigger) => {
+                  return (
+                    <Table.Row key={trigger.id} data-trigger-id={trigger.id}>
+                      <Table.Cell>{trigger.name}</Table.Cell>
+                      <Table.Cell>
+                        {triggerActionName(trigger.action)}
+                      </Table.Cell>
+                      <Table.Cell>
+                        {actionItems(
+                          trigger.action,
+                          trigger.actionParams as ActionParams,
+                        )}
+                      </Table.Cell>
 
-                          <Table.Cell maxWidth="500px">
-                            <VStack gap={2}>
-                              {applyChecks(
-                                trigger.checks?.filter(
-                                  (check): check is Monitor => !!check,
-                                ) ?? [],
-                              )}
+                      <Table.Cell maxWidth="500px">
+                        <VStack gap={2}>
+                          {applyChecks(
+                            trigger.checks?.filter(
+                              (check): check is Monitor => !!check,
+                            ) ?? [],
+                          )}
 
-                              {trigger.filters &&
-                              typeof trigger.filters === "string" ? (
-                                <FilterDisplay
-                                  filters={trigger.filters}
-                                  hasBorder={true}
-                                />
-                              ) : null}
-                            </VStack>
-                          </Table.Cell>
-                          <Table.Cell whiteSpace="nowrap">
-                            {formatTimeAgo(trigger.lastRunAt)}
-                          </Table.Cell>
-                          <Table.Cell textAlign="center">
-                            <Switch
-                              checked={trigger.active}
-                              onChange={() => {
-                                handleToggleTrigger(
-                                  trigger.id,
-                                  !trigger.active,
-                                );
-                              }}
+                          {trigger.filters &&
+                          typeof trigger.filters === "string" ? (
+                            <FilterDisplay
+                              filters={trigger.filters}
+                              hasBorder={true}
                             />
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Menu.Root>
-                              <Menu.Trigger asChild>
-                                <Button
-                                  variant={"ghost"}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                  }}
-                                >
-                                  <MoreVertical />
-                                </Button>
-                              </Menu.Trigger>
-                              <Menu.Content>
-                                {trigger.action != "ADD_TO_DATASET" && (
-                                  <Menu.Item
-                                    value="customize"
-                                    onClick={() => {
-                                      setValue("triggerId", trigger.id);
-                                      setValue(
-                                        "customMessage",
-                                        trigger.message ?? "",
-                                      );
-                                      setValue(
-                                        "alertType",
-                                        trigger.alertType ?? "",
-                                      );
-                                      setValue("name", trigger.name ?? "");
-                                      onOpen();
-                                    }}
-                                  >
-                                    <Box
-                                      display="flex"
-                                      alignItems="center"
-                                      gap={2}
-                                    >
-                                      <Edit2 size={14} />
-                                      Customize Message
-                                    </Box>
-                                  </Menu.Item>
-                                )}
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (trigger.customGraphId) {
-                                      openDrawer("customGraphAlert", {
-                                        graphId: trigger.customGraphId,
-                                      });
-                                    } else {
-                                      openDrawer("editTriggerFilter", {
-                                        triggerId: trigger.id,
-                                      });
-                                    }
-                                  }}
-                                >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
-                                  >
-                                    {trigger.customGraphId ? (
-                                      <Bell size={14} />
-                                    ) : (
-                                      <Filter size={14} />
-                                    )}
-                                    {trigger.customGraphId
-                                      ? "Edit Alert"
-                                      : "Edit Filters"}
-                                  </Box>
-                                </Menu.Item>
-                                <Menu.Item
-                                  value="delete"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    deleteTrigger(trigger.id);
-                                  }}
-                                >
-                                  <Box
-                                    display="flex"
-                                    alignItems="center"
-                                    gap={2}
-                                    color="red.600"
-                                  >
-                                    <Trash size={14} />
-                                    Delete
-                                  </Box>
-                                </Menu.Item>
-                              </Menu.Content>
-                            </Menu.Root>
-                          </Table.Cell>
-                        </Table.Row>
-                      );
-                    })
-                  )}
-                </Table.Body>
-              </Table.Root>
-            )}
-          </Card.Body>
-        </Card.Root>
+                          ) : null}
+                        </VStack>
+                      </Table.Cell>
+                      <Table.Cell whiteSpace="nowrap">
+                        {formatTimeAgo(trigger.lastRunAt)}
+                      </Table.Cell>
+                      <Table.Cell textAlign="center">
+                        <Switch
+                          checked={trigger.active}
+                          onChange={() => {
+                            handleToggleTrigger(trigger.id, !trigger.active);
+                          }}
+                        />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button
+                              variant={"ghost"}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                              }}
+                            >
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            {trigger.action != "ADD_TO_DATASET" && (
+                              <Menu.Item
+                                value="customize"
+                                onClick={() => {
+                                  setValue("triggerId", trigger.id);
+                                  setValue(
+                                    "customMessage",
+                                    trigger.message ?? "",
+                                  );
+                                  setValue(
+                                    "alertType",
+                                    trigger.alertType ?? "",
+                                  );
+                                  setValue("name", trigger.name ?? "");
+                                  onOpen();
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Edit2 size={14} />
+                                  Customize Message
+                                </Box>
+                              </Menu.Item>
+                            )}
+                            <Menu.Item
+                              value="edit"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openDrawer("editTriggerFilter", {
+                                  triggerId: trigger.id,
+                                });
+                              }}
+                            >
+                              <Box display="flex" alignItems="center" gap={2}>
+                                <Filter size={14} />
+                                Edit Filters
+                              </Box>
+                            </Menu.Item>
+                            <Menu.Item
+                              value="delete"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                deleteTrigger(trigger.id);
+                              }}
+                            >
+                              <Box
+                                display="flex"
+                                alignItems="center"
+                                gap={2}
+                                color="red.600"
+                              >
+                                <Trash size={14} />
+                                Delete
+                              </Box>
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })
+              )}
+            </Table.Body>
+          </Table.Root>
+        )}
       </Container>
       <Drawer.Root
         open={open}
         onOpenChange={({ open }) => (open ? onOpen() : handleCloseModal())}
         size="lg"
       >
-        <Drawer.Backdrop />
         <Drawer.Content>
           <Drawer.Header>
             <Drawer.Title>Trigger Message</Drawer.Title>

@@ -24,6 +24,7 @@ import type {
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -54,81 +55,67 @@ function ProjectsList({
     <SettingsLayout>
       <VStack
         paddingX={4}
-        paddingY={6}
+        paddingY={2}
         gap={6}
         width="full"
-        maxWidth="920px"
         align="start"
+        maxWidth="1280px"
       >
-        <HStack width="full">
-          <Heading size="lg" as="h1">
-            Projects
-          </Heading>
-        </HStack>
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={0} paddingX={0}>
-            <Table.Root variant="line" width="full">
-              {organization.teams.map((team) => (
-                <React.Fragment key={team.id}>
-                  <Table.Header key={team.id}>
-                    <Table.Row>
-                      <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="right">
-                        {hasPermission("project:create") &&
-                          (!usage.data ||
-                          usage.data.projectsCount <
-                            usage.data.activePlan.maxProjects ||
-                          usage.data.activePlan.overrideAddingLimitations ? (
-                            <Link
-                              href={`/onboarding/${team.slug}/project`}
-                              asChild
+        <Table.Root variant="line" width="full" size="md">
+          {organization.teams.map((team) => (
+            <React.Fragment key={team.id}>
+              <Table.Header key={team.id}>
+                <Table.Row>
+                  <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">
+                    {hasPermission("project:create") &&
+                      (!usage.data ||
+                      usage.data.projectsCount <
+                        usage.data.activePlan.maxProjects ||
+                      usage.data.activePlan.overrideAddingLimitations ? (
+                        <Link href={`/onboarding/${team.slug}/project`} asChild>
+                          <PageLayout.HeaderButton>
+                            <Plus size={20} />
+                            <Text>Add new project</Text>
+                          </PageLayout.HeaderButton>
+                        </Link>
+                      ) : (
+                        <Tooltip
+                          content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Link
+                            href={`/settings/subscription`}
+                            _hover={{
+                              textDecoration: "none",
+                            }}
+                            onClick={() => {
+                              trackEvent("subscription_hook_click", {
+                                project_id: project?.id,
+                                hook: "new_project_limit_reached_2",
+                              });
+                            }}
+                          >
+                            <Button
+                              background="gray.50"
+                              _hover={{ background: "gray.50" }}
+                              color="gray.400"
                             >
-                              <Button size="sm" colorPalette="orange">
-                                <HStack gap={2}>
-                                  <Plus size={20} />
-                                  <Text>Add new project</Text>
-                                </HStack>
-                              </Button>
-                            </Link>
-                          ) : (
-                            <Tooltip
-                              content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
-                              positioning={{ placement: "top" }}
-                            >
-                              <Link
-                                href={`/settings/subscription`}
-                                _hover={{
-                                  textDecoration: "none",
-                                }}
-                                onClick={() => {
-                                  trackEvent("subscription_hook_click", {
-                                    project_id: project?.id,
-                                    hook: "new_project_limit_reached_2",
-                                  });
-                                }}
-                              >
-                                <Button
-                                  background="gray.50"
-                                  _hover={{ background: "gray.50" }}
-                                  color="gray.400"
-                                >
-                                  <HStack gap={2}>
-                                    <Plus size={20} />
-                                    <Text>Add new project</Text>
-                                  </HStack>
-                                </Button>
-                              </Link>
-                            </Tooltip>
-                          ))}
-                      </Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <TeamProjectsList team={team} />
-                </React.Fragment>
-              ))}
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+                              <HStack gap={2}>
+                                <Plus size={20} />
+                                <Text>Add new project</Text>
+                              </HStack>
+                            </Button>
+                          </Link>
+                        </Tooltip>
+                      ))}
+                  </Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <TeamProjectsList team={team} />
+            </React.Fragment>
+          ))}
+        </Table.Root>
       </VStack>
     </SettingsLayout>
   );

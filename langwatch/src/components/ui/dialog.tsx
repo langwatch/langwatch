@@ -23,9 +23,16 @@ export const DialogContent = React.forwardRef<
 
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      {backdrop && <ChakraDialog.Backdrop />}
+      {backdrop && <ChakraDialog.Backdrop backdropFilter="blur(8px)" background="blackAlpha.400" />}
       <ChakraDialog.Positioner>
-        <ChakraDialog.Content ref={ref} {...rest} asChild={false}>
+        <ChakraDialog.Content
+          borderRadius="lg"
+          background="white/75"
+          backdropFilter="blur(8px)"
+          ref={ref}
+          {...rest}
+          asChild={false}
+        >
           {children}
         </ChakraDialog.Content>
       </ChakraDialog.Positioner>
@@ -65,10 +72,15 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
   );
 };
 
+export const DialogBackdrop = function DialogBackdrop(
+  props: ChakraDialog.BackdropProps,
+) {
+  return <ChakraDialog.Backdrop {...props} />;
+};
+
 export const DialogFooter = ChakraDialog.Footer;
 export const DialogHeader = ChakraDialog.Header;
 export const DialogBody = ChakraDialog.Body;
-export const DialogBackdrop = ChakraDialog.Backdrop;
 export const DialogTitle = ChakraDialog.Title;
 export const DialogDescription = ChakraDialog.Description;
 export const DialogTrigger = ChakraDialog.Trigger;

@@ -641,7 +641,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
         <HStack width="full">
           <Spacer />
           <Select.Label>Include span types:</Select.Label>
-          <Select.Control width="120px" background="white">
+          <Select.Control width="120px" background="white/75">
             <Select.Trigger>
               <Select.ValueText placeholder="Select span types" />
             </Select.Trigger>

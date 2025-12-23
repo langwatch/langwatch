@@ -19,6 +19,7 @@ import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
 import { Calendar, ChevronDown } from "react-feather";
 import { Popover } from "./ui/popover";
+import { LuCalendar } from "react-icons/lu";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -150,14 +151,17 @@ export function PeriodSelector({
       size="sm"
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" minWidth="fit-content" onClick={onOpen}>
-          <HStack gap={2}>
-            <Calendar size={16} />
-            <Text>{getDateRangeLabel()}</Text>
-            <Box>
-              <ChevronDown />
-            </Box>
-          </HStack>
+        <Button
+          variant="outline"
+          size="sm"
+          minWidth="fit-content"
+          onClick={onOpen}
+        >
+          <LuCalendar />
+          <Text>{getDateRangeLabel()}</Text>
+          <Box>
+            <ChevronDown />
+          </Box>
         </Button>
       </Popover.Trigger>
       <Popover.Content width="fit-content">

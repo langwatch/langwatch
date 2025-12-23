@@ -124,7 +124,6 @@ const IntegrationCheckItem: React.FC<IntegrationCheckItemProps> = ({
     />
     <Text
       as="span"
-      fontWeight={done ? "medium" : "normal"}
       fontSize="sm"
       textDecoration={done ? "none" : "underline"}
       textUnderlineOffset="2px"
@@ -150,7 +149,7 @@ const IntegrationChecksCard: React.FC = () => {
         alignItems="flex-start"
         justifyContent="flex-start"
       >
-        <Heading size="md" fontWeight="bold" textAlign="left">
+        <Heading size="md" textAlign="left">
           Integration checks
         </Heading>
       </HStack>
@@ -163,7 +162,7 @@ const IntegrationChecksCard: React.FC = () => {
           >
             🎉
           </span>
-          <Text fontWeight="semibold" fontSize="sm" as="span">
+          <Text fontWeight="500" fontSize="sm" as="span">
             Create your new project
           </Text>
         </HStack>
