@@ -6,6 +6,7 @@ import { createColumnHelper } from "@tanstack/react-table";
 import { DurationCell,
 StatusCell, TimestampCell, VerdictCell, ActionsCell } from "./cells";
 import { ColumnHeader } from "~/components/ui/datagrid/ColumnHeader.v2";
+import { TracesListCell } from "./cells/TraceCells";
 
 const columnHelper = createColumnHelper<ScenarioRunRow>();
 
@@ -23,6 +24,7 @@ export function createScenarioColumns()  {
       enableColumnFilter: false,
       cell: StatusCell,
       enableHiding: false,
+      enableGrouping: false,
     }),
     columnHelper.accessor("name", {
       header: "Scenario Name",
@@ -41,45 +43,58 @@ export function createScenarioColumns()  {
       header: "Batch Run",
       enableSorting: true,
       enableColumnFilter: true,
+      enableGrouping: false,
     }),
     columnHelper.accessor("results.verdict", {
       header: "Verdict",
       enableSorting: true,
       enableColumnFilter: true,
       cell: VerdictCell,
-      enableGrouping: true,
+      enableGrouping: false,
     }),
     columnHelper.accessor("timestamp", {
       header: "Date",
       enableSorting: true,
       enableColumnFilter: true,
       cell: TimestampCell,
+      enableGrouping: false,
+      aggregatedCell: ''
     }),
     columnHelper.accessor("durationInMs", {
       header: "Duration",
-      enableSorting: false,
       enableColumnFilter: false,
       cell: DurationCell,
+      aggregatedCell: '',
     }),
     columnHelper.accessor("scenarioId", {
       header: "Scenario ID",
       enableSorting: true,
       enableColumnFilter: true,
+      enableGrouping: false,
     }),
     columnHelper.accessor("scenarioRunId", {
       header: "Run ID",
       enableSorting: false,
       enableColumnFilter: true,
+      enableGrouping: false,
     }),
-    columnHelper.display({
-      id: "actions",
-      header: "",
-      size: 50,
+    columnHelper.accessor("metadata.traces", {
+      header: "Traces",
       enableSorting: false,
       enableColumnFilter: false,
-      cell: ActionsCell,
-      enableHiding: false,
+      enableGrouping: false,
+      cell: TracesListCell,
     }),
+    // columnHelper.display({
+    //   id: "actions",
+    //   header: "",
+    //   size: 50,
+    //   enableSorting: false,
+    //   enableColumnFilter: false,
+    //   cell: ActionsCell,
+    //   enableHiding: false,
+    //   enableGrouping: false,
+    // }),
   ];
 }
 

@@ -22,7 +22,7 @@ export function DataGridTable<T>({
   renderExpandedContent,
 }: DataGridTableProps<T>) {
   return (
-    <Box overflowX="auto">
+    <Box overflowX="auto" bg="white" borderRadius="lg" shadow="sm">
       <Table.Root size="sm">
         <Table.Header>
           {table.getHeaderGroups().map((headerGroup) => (
@@ -67,20 +67,15 @@ export function DataGridTable<T>({
                     const isAggregated = cell.getIsAggregated();
                     const isPlaceholder = cell.getIsPlaceholder();
 
+
                     return (
                       <Table.Cell
                         key={cell.id}
+                        borderLeft={isGrouped  ? "2px solid orange" : "white"}
                         style={{
                           width: cell.column.getSize(),
                           minWidth: cell.column.columnDef.minSize,
                           maxWidth: cell.column.columnDef.maxSize,
-                          background: isGrouped
-                            ? "#0aff0082"
-                            : isAggregated
-                              ? "#ffa50078"
-                              : isPlaceholder
-                                ? "#ff000042"
-                                : "white",
                         }}
                       >
                         {isGrouped ? (
@@ -122,7 +117,7 @@ export function DataGridTable<T>({
                     );
                   })}
                 </Table.Row>
-                {/* {row.getIsExpanded() && renderExpandedContent && (
+                {row.getIsExpanded() && renderExpandedContent && (
                   <Table.Row>
                     <Table.Cell colSpan={row.getAllCells().length} style={{ padding: 0 }}>
                       <Box
@@ -136,7 +131,7 @@ export function DataGridTable<T>({
                       </Box>
                     </Table.Cell>
                   </Table.Row>
-                )} */}
+                )}
               </Fragment>
             ))
           )}

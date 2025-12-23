@@ -1,14 +1,10 @@
 import type { ReactNode } from "react";
-import { Box, Flex, Spinner, Text } from "@chakra-ui/react";
+import { Flex } from "@chakra-ui/react";
 import { DataGridToolbar } from "./DataGridToolbar";
 import { DataGridTable } from "./DataGridTable";
 import { DataGridPagination } from "./DataGridPagination";
-import type { Table } from "@tanstack/react-table";
-import { DataGridContext } from "./context";
 
 interface DataGridProps<TData> {
-  /** Table instance from useReactTable */
-  // table: Table<TData>;
   children: ReactNode;
 }
 
@@ -21,7 +17,7 @@ function DataGridRoot<TData>({
 }: DataGridProps<TData>) {
 
   return (
-    <Flex direction="column" h="full" bg="white" borderRadius="md" shadow="sm">
+    <Flex direction="column" h="full">
       {children}
     </Flex>
   );

@@ -1,7 +1,5 @@
 import { IconButton, Link } from "@chakra-ui/react";
-import NextLink from "next/link";
 import { useRouter } from "next/router";
-import { ExternalLink } from "lucide-react";
 import type { CellContext } from "@tanstack/react-table";
 import type { ScenarioRunRow } from "../types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -20,16 +18,15 @@ export function ActionsCell({ row }: CellContext<ScenarioRunRow, unknown>) {
 
   return (
     <Link asChild onClick={(e) => e.stopPropagation()}>
-      <NextLink href={runUrl} target="_blank">
-        <IconButton
-          aria-label="Open run details"
-          size="xs"
-          variant="ghost"
-          title="Open run details"
-        >
-          <ExternalLink size={14} />
-        </IconButton>
-      </NextLink>
+      <IconButton
+        aria-label="Open run details"
+        size="xs"
+        variant="outline"
+        title="Open run details"
+        onClick={(e) => e.stopPropagation()}
+      >
+        View
+      </IconButton>
     </Link>
   );
 }

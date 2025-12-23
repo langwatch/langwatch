@@ -1,4 +1,4 @@
-import { Flex, Text, Button } from "@chakra-ui/react";
+import { Flex, Text, Spacer } from "@chakra-ui/react";
 import {
   ChevronDown,
   ChevronUp,
@@ -19,12 +19,10 @@ interface ColumnHeaderProps<T> {
  * Column header with sort indicator and popover menu
  */
 export function ColumnHeader<T>({
-  title,
   table,
   column,
   header,
 }: ColumnHeaderProps<T>) {
-  const columnId = column.id;
   const isSorted = column.getIsSorted();
   const sortOrder = isSorted;
   const hasFilters = column.getIsFiltered();
@@ -40,6 +38,8 @@ export function ColumnHeader<T>({
       <Text fontWeight="bold" fontSize="xs">
         {headerText}
       </Text>
+
+      <Spacer />
 
       {/* Sort indicator */}
       {column.getCanSort() && (
@@ -61,28 +61,30 @@ export function ColumnHeader<T>({
       )}
 
       {/* Grouped indicator */}
-      <Flex
-      cursor="pointer"
-        color="blue.500"
-        title="Grouped by this column"
-        border="1px solid"
-        borderColor="blue.500"
-        borderRadius="sm"
-        onClick={column.getToggleGroupingHandler()}
-        opacity={isGrouped ? 1 : 0.5}
-      >
-        <Ungroup size={14} />
-      </Flex>
-
+      {/* {column.getCanGroup() && (
+        <Flex
+          cursor="pointer"
+          color="blue.500"
+          title="Grouped by this column"
+          border="1px solid"
+          borderColor="blue.500"
+          borderRadius="sm"
+          onClick={column.getToggleGroupingHandler()}
+          opacity={isGrouped ? 1 : 0.5}
+        >
+          <Ungroup size={14} />
+        </Flex>
+      )} */}
       {/* Filter indicator */}
-      {hasFilters && (
+      {/* {hasFilters && (
         <Flex color="blue.500" title="Has active filters">
           <Filter size={14} />
         </Flex>
-      )}
+      )} */}
+
 
       {/* Popover menu */}
-      {(column.getCanSort() ||
+      {/* {(column.getCanSort() ||
         column.getCanFilter() ||
         column.getCanGroup()) && (
         <ColumnPopover
@@ -119,7 +121,7 @@ export function ColumnHeader<T>({
             table.getColumn(columnId)?.pin(position || false);
           }}
         />
-      )}
+      )} */}
     </Flex>
   );
 }

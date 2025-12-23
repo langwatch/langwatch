@@ -138,3 +138,15 @@ export function TraceMetadataCell({
     </HoverableBigText>
   );
 }
+
+export function TracesListCell({ getValue }: CellContext<{ traces: { trace_id: string }[] }, unknown>) {
+  const traces = getValue() as { traces: { trace_id: string }[] };
+  return traces.map((trace) => (
+    <HStack key={trace.trace_id}>
+      <ArrowRight size={16} color="gray" />
+      <Text fontFamily="mono" fontSize="xs" cursor="pointer">
+        {truncate(trace.trace_id, 12)}
+      </Text>
+    </HStack>
+  ));
+}

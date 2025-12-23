@@ -16,10 +16,10 @@ export function ScenarioSetCell({ getValue, row }: CellContext<ScenarioRunRow, u
   const href = `/${projectSlug}/simulations/${row.original.scenarioSetId}`;
 
   return (
-    <Link asChild color="blue.500" _hover={{ textDecoration: "underline" }}>
+    <Link asChild color="blue.500" _hover={{ textDecoration: "underline" }} target="_blank">
       <NextLink href={href}>
         <HStack gap={1}>
-          <Text fontSize="sm" truncate maxW="150px">
+          <Text fontSize="xs" truncate maxW="150px" fontFamily="mono">
             {scenarioSetId}
           </Text>
           <ExternalLink size={12} />

@@ -1,4 +1,4 @@
-import { Button, Flex, Spinner, Text } from "@chakra-ui/react";
+import { Button, Flex, Spinner, Text, HStack, Input, type FlexProps } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Columns, Download, RotateCcw } from "lucide-react";
 import {
@@ -8,11 +8,11 @@ import {
   PopoverBody,
 } from "../popover";
 import { Checkbox } from "../checkbox";
-import { FilterBar } from "./FilterBar";
 import type { ReactNode } from "react";
+import { Search } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
 
-interface DataGridToolbarProps {
+interface DataGridToolbarProps extends FlexProps {
   children: ReactNode;
 }
 
@@ -21,9 +21,10 @@ interface DataGridToolbarProps {
  */
 function DataGridToolbarRoot({
   children,
+  ...props
 }: DataGridToolbarProps) {
   return (
-    <Flex direction="row" align="center" justify="space-between" gap={4} px={3}>
+    <Flex direction="row" align="center" justify="space-between" gap={4} px={3} paddingInline={0} {...props}>
       {children}
     </Flex>
   );
@@ -46,7 +47,7 @@ function DataGridToolbarResetFiltersAndSorting({
   onResetFiltersAndSorting: () => void;
 }) {
   return (
-    <Button size="sm" variant="outline" onClick={onResetFiltersAndSorting}>
+    <Button size="sm" onClick={onResetFiltersAndSorting}>
       <RotateCcw size={14} />
       <Text ml={1}>Reset</Text>
     </Button>
@@ -102,11 +103,35 @@ function DataGridToolbarExport({
   );
 }
 
+function DataGridToolbarSearch({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+      <HStack flex="0 0 auto" minW="200px" bg="white" borderRadius="lg" shadow="sm" overflow="hidden" px={2}>
+        <Search size={16} color="gray" />
+        <Input
+          border="none"
+          outline="none"
+          size="sm"
+          placeholder="Search..."
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          bg="white"
+          maxW="200px"
+        />
+      </HStack>
+  );
+}
+
 export const DataGridToolbar = {
   Root: DataGridToolbarRoot,
   LoadingIndicator: DataGridToolbarLoadingIndicator,
   ResetFiltersAndSorting: DataGridToolbarResetFiltersAndSorting,
   ColumnVisibility: DataGridToolbarColumnVisibility,
   Export: DataGridToolbarExport,
-  FilterBar
+  Search: DataGridToolbarSearch,
 };

@@ -7,7 +7,9 @@ import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/typ
  */
 export interface ScenarioRunRow extends ScenarioRunData {
   // Traces (for expandable rows)
-  traces: TraceRow[];
+  metadata: {
+    traces: TraceRow[];
+  };
 }
 
 /**

@@ -1,6 +1,8 @@
 import { ScenarioRunStatus } from "./enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
+import { TRACE_INDEX } from "~/server/elasticsearch";
+import { TracesRepository } from "~/server/traces/traces.repository";
 
 /**
  * Service responsible for managing scenario events and their associated data.
@@ -8,9 +10,11 @@ import type { ScenarioEvent, ScenarioRunData } from "./types";
  */
 export class ScenarioEventService {
   private eventRepository: ScenarioEventRepository;
+  private tracesRepository: TracesRepository;
 
   constructor() {
     this.eventRepository = new ScenarioEventRepository();
+    this.tracesRepository = new TracesRepository();
   }
 
   /**
@@ -248,7 +252,7 @@ export class ScenarioEventService {
     if (truncated) {
       throw new Error(
         `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
-          "Refine filters or use the paginated API.",
+          "Refine filters or use the paginated API."
       );
     }
 
@@ -395,7 +399,7 @@ export class ScenarioEventService {
           runStartedEvent?.timestamp && runFinishedEvent?.timestamp
             ? Math.max(
                 0,
-                runFinishedEvent.timestamp - runStartedEvent.timestamp,
+                runFinishedEvent.timestamp - runStartedEvent.timestamp
               )
             : 0,
       });
@@ -427,28 +431,98 @@ export class ScenarioEventService {
 
   async getAllScenarioRunsWithTraces({ projectId }: { projectId: string }) {
     // Get all scenario sets for the project
-    const scenarioSets = await this.eventRepository.getScenarioSetsDataForProject({
-      projectId,
-    });
+    const scenarioSets =
+      await this.eventRepository.getScenarioSetsDataForProject({
+        projectId,
+      });
 
-    const runIds = new Set<string>();
+    const runsWithMetadataPromises = [];
     for (const scenarioSet of scenarioSets) {
+      // Get run data
       const runs = await this.getAllRunDataForScenarioSet({
         projectId,
         scenarioSetId: scenarioSet.scenarioSetId,
       });
-      runs.forEach((run) => runIds.add(run.scenarioRunId));
+
+      // Get traces for each run in parallel
+      runsWithMetadataPromises.push(
+        ...runs.map((run) => {
+          const traceIdSet = new Set<string>();
+          run.messages.forEach((message) => {
+            if (message.trace_id) {
+              traceIdSet.add(message.trace_id);
+            }
+          });
+
+          return new Promise(async (resolve) => {
+            const traces = await this.tracesRepository.getTracesByIds({
+              projectId,
+              traceIds: Array.from(traceIdSet),
+              includes: ["trace_id", "metadata"],
+            });
+
+            return resolve({
+              ...run,
+              metadata: {
+                traces: traces.map((trace) => trace._source),
+              },
+            });
+          });
+        })
+      );
     }
 
-    const runs = await this.getScenarioRunDataBatch({
-      projectId,
-      scenarioRunIds: Array.from(runIds),
+    const runs = await Promise.all(runsWithMetadataPromises);
+
+    console.log(runs);
+
+    return runs;
+  }
+
+  /**
+   * Retrieves all raw scenario events for the supplied scenario run IDs, for the given project.
+   * Returns an array of all events (not just traces) for those runs.
+   */
+  async getEventsForScenarioRunIds({
+    projectId,
+    scenarioRunIds,
+  }: {
+    projectId: string;
+    scenarioRunIds: string[];
+  }) {
+    if (!scenarioRunIds.length) return [];
+
+    // Ideally, this logic should live in the repository for reuse and isolation.
+    // But as required, do the search here:
+    const client =
+      (await this.eventRepository["client"]) ??
+      (await (this.eventRepository as any).getClient());
+
+    // Import required ES_FIELDS/SCENARIO_EVENTS_INDEX if not already.
+    // @ts-expect-error: Access constants from the module
+    const { SCENARIO_EVENTS_INDEX, ES_FIELDS, transformFromElasticsearch } =
+      await import("./utils/elastic-search-transformers");
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: projectId } },
+              { terms: { [ES_FIELDS.scenarioRunId]: scenarioRunIds } },
+            ],
+          },
+        },
+        size: 10000, // Adjust if necessary based on expected volume
+        sort: [{ timestamp: "asc" }],
+      },
     });
 
-
-    return runs.map((run) => ({
-      ...run,
-      traces: []
-    }));
+    return response.hits.hits.map((hit: any) =>
+      transformFromElasticsearch
+        ? transformFromElasticsearch(hit._source)
+        : hit._source
+    );
   }
 }
