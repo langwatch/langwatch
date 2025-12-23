@@ -73,7 +73,11 @@ importers:
         version: 1.8.13(@types/react@19.0.10)(encoding@0.1.13)(graphql@16.11.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@copilotkit/runtime':
         specifier: ~1.8.13
+<<<<<<< HEAD
         version: 1.8.13(e1aacd1abdb46548b7768361a9f34461)
+=======
+        version: 1.8.13(7de8ce6cb416cdb967fd301e5439262b)
+>>>>>>> e44827b56 (fix lock)
       '@copilotkit/runtime-client-gql':
         specifier: 1.8.13
         version: 1.8.13(encoding@0.1.13)(graphql@16.11.0)(react@19.1.0)
@@ -797,8 +801,13 @@ packages:
       graphql:
         optional: true
 
+<<<<<<< HEAD
   '@acemir/cssom@0.9.29':
     resolution: {integrity: sha512-G90x0VW+9nW4dFajtjCoT+NM0scAfH9Mb08IcjgFHYbfiL/lU04dTF9JuVOi3/OH+DJCQdcIseSXkdCB9Ky6JA==}
+=======
+  '@acemir/cssom@0.9.30':
+    resolution: {integrity: sha512-9CnlMCI0LmCIq0olalQqdWrJHPzm0/tw3gzOA9zJSgvFX7Xau3D24mAGa4BtwxwY69nsuJW6kQqqCzf/mEcQgg==}
+>>>>>>> e44827b56 (fix lock)
 
   '@adobe/css-tools@4.4.4':
     resolution: {integrity: sha512-Elp+iwUx5rN5+Y8xLt5/GRoG20WGoDCQ/1Fb+1LiGtvwbDavuSk0jhD/eZdckHAuzcDzccnkv+rEjyWfRx18gg==}
@@ -1841,8 +1850,13 @@ packages:
     peerDependencies:
       '@csstools/css-tokenizer': ^3.0.4
 
+<<<<<<< HEAD
   '@csstools/css-syntax-patches-for-csstree@1.0.21':
     resolution: {integrity: sha512-plP8N8zKfEZ26figX4Nvajx8DuzfuRpLTqglQ5d0chfnt35Qt3X+m6ASZ+rG0D0kxe/upDVNwSIVJP5n4FuNfw==}
+=======
+  '@csstools/css-syntax-patches-for-csstree@1.0.22':
+    resolution: {integrity: sha512-qBcx6zYlhleiFfdtzkRgwNC7VVoAwfK76Vmsw5t+PbvtdknO9StgRk7ROvq9so1iqbdW4uLIDAsXRsTfUrIoOw==}
+>>>>>>> e44827b56 (fix lock)
     engines: {node: '>=18'}
 
   '@csstools/css-tokenizer@3.0.4':
@@ -11804,7 +11818,11 @@ snapshots:
     optionalDependencies:
       graphql: 16.11.0
 
+<<<<<<< HEAD
   '@acemir/cssom@0.9.29': {}
+=======
+  '@acemir/cssom@0.9.30': {}
+>>>>>>> e44827b56 (fix lock)
 
   '@adobe/css-tools@4.4.4': {}
 
@@ -14300,7 +14318,11 @@ snapshots:
       - encoding
       - graphql
 
+<<<<<<< HEAD
   '@copilotkit/runtime@1.8.13(e1aacd1abdb46548b7768361a9f34461)':
+=======
+  '@copilotkit/runtime@1.8.13(7de8ce6cb416cdb967fd301e5439262b)':
+>>>>>>> e44827b56 (fix lock)
     dependencies:
       '@ag-ui/client': 0.0.28
       '@ag-ui/core': 0.0.39
@@ -14309,11 +14331,19 @@ snapshots:
       '@anthropic-ai/sdk': 0.27.3(encoding@0.1.13)
       '@copilotkit/shared': 1.8.13(encoding@0.1.13)
       '@graphql-yoga/plugin-defer-stream': 3.13.5(graphql-yoga@5.13.5(graphql@16.11.0))(graphql@16.11.0)
+<<<<<<< HEAD
       '@langchain/community': 0.3.55(525e99195a7244c6e5a58e8dbac5c36e)
       '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76))
       '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(encoding@0.1.13)(zod@3.25.76)
       '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(react@19.1.0)
       '@langchain/openai': 0.4.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))
+=======
+      '@langchain/community': 0.3.55(0172d5b4cce2e33f21577ec32d07ccd2)
+      '@langchain/core': 0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76))
+      '@langchain/google-gauth': 0.1.8(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(encoding@0.1.13)(zod@3.25.76)
+      '@langchain/langgraph-sdk': 0.0.70(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(react@19.1.0)
+      '@langchain/openai': 0.4.9(@langchain/core@0.3.72(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.204.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@4.104.0(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)))(encoding@0.1.13)(ws@8.18.2(bufferutil@4.0.9))
+>>>>>>> e44827b56 (fix lock)
       class-transformer: 0.5.1
       class-validator: 0.14.2
       express: 4.21.2
@@ -14509,7 +14539,11 @@ snapshots:
     dependencies:
       '@csstools/css-tokenizer': 3.0.4
 
+<<<<<<< HEAD
   '@csstools/css-syntax-patches-for-csstree@1.0.21': {}
+=======
+  '@csstools/css-syntax-patches-for-csstree@1.0.22': {}
+>>>>>>> e44827b56 (fix lock)
 
   '@csstools/css-tokenizer@3.0.4': {}
 
@@ -15361,7 +15395,11 @@ snapshots:
 
   '@jsdevtools/ono@7.1.3': {}
 
+<<<<<<< HEAD
   '@langchain/community@0.3.55(525e99195a7244c6e5a58e8dbac5c36e)':
+=======
+  '@langchain/community@0.3.55(0172d5b4cce2e33f21577ec32d07ccd2)':
+>>>>>>> e44827b56 (fix lock)
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.52.0)(bufferutil@4.0.9)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76))(zod@3.25.76)
       '@ibm-cloud/watsonx-ai': 1.6.12
@@ -20262,7 +20300,11 @@ snapshots:
   cssstyle@5.3.5:
     dependencies:
       '@asamuzakjp/css-color': 4.1.1
+<<<<<<< HEAD
       '@csstools/css-syntax-patches-for-csstree': 1.0.21
+=======
+      '@csstools/css-syntax-patches-for-csstree': 1.0.22
+>>>>>>> e44827b56 (fix lock)
       css-tree: 3.1.0
 
   csstype@3.1.3: {}
@@ -21919,7 +21961,7 @@ snapshots:
       '@babel/parser': 7.26.8
       '@istanbuljs/schema': 0.1.3
       istanbul-lib-coverage: 3.2.2
-      semver: 7.7.2
+      semver: 7.7.3
     transitivePeerDependencies:
       - supports-color
 
@@ -22226,7 +22268,7 @@ snapshots:
       jest-util: 29.7.0
       natural-compare: 1.4.0
       pretty-format: 29.7.0
-      semver: 7.7.2
+      semver: 7.7.3
     transitivePeerDependencies:
       - supports-color
 
@@ -22309,7 +22351,11 @@ snapshots:
 
   jsdom@27.3.0(bufferutil@4.0.9):
     dependencies:
+<<<<<<< HEAD
       '@acemir/cssom': 0.9.29
+=======
+      '@acemir/cssom': 0.9.30
+>>>>>>> e44827b56 (fix lock)
       '@asamuzakjp/dom-selector': 6.7.6
       cssstyle: 5.3.5
       data-urls: 6.0.0
