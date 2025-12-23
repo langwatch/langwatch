@@ -7,9 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { Plus } from "lucide-react";
-import { AnalyticsHeader } from "~/components/analytics/AnalyticsHeader";
+import { useRouter } from "next/router";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
