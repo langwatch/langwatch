@@ -290,6 +290,7 @@ export const system = createSystem(defaultConfig, {
         base: {
           root: {
             borderRadius: "xl",
+            transition: "all 0.2s ease-in-out",
           },
         },
         variants: {
@@ -304,7 +305,6 @@ export const system = createSystem(defaultConfig, {
                 border: "1px solid",
                 borderColor: "gray.100",
                 boxShadow: "md",
-                transition: "all 0.2s ease-in-out",
                 _hover: {
                   boxShadow: "lg",
                 },

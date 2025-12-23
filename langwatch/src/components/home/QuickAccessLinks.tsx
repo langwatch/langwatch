@@ -1,23 +1,18 @@
 import {
   Box,
+  Link as ChakraLink,
   Grid,
   Heading,
   HStack,
-  Link as ChakraLink,
+  Icon,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
-import {
-  LuActivity,
-  LuBookOpen,
-  LuExternalLink,
-  LuGauge,
-  LuPlay,
-  LuScroll,
-} from "react-icons/lu";
+import { LuExternalLink } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { featureIcons } from "~/utils/featureIcons";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";
 
@@ -37,14 +32,19 @@ export const buildQuickAccessCards = (
   projectSlug: string,
   isIntegrated: boolean,
 ): QuickAccessCard[] => {
+  const tracesConfig = featureIcons.traces;
+  const simulationsConfig = featureIcons.simulations;
+  const promptsConfig = featureIcons.prompts;
+  const evaluationsConfig = featureIcons.evaluations;
+
   return [
     {
       title: "Observability",
       description: isIntegrated
         ? "View your traces and monitor performance"
         : "Set up tracing for your AI application",
-      icon: <LuActivity size={16} />,
-      color: "blue",
+      icon: <Icon as={tracesConfig.icon} width="16px" height="16px" display="block" />,
+      color: tracesConfig.color.split(".")[0] ?? "blue",
       href: isIntegrated
         ? `/${projectSlug}/messages`
         : `/${projectSlug}/messages`,
@@ -53,24 +53,24 @@ export const buildQuickAccessCards = (
     {
       title: "Agent Simulations",
       description: "Test your AI agents with simulated conversations",
-      icon: <LuPlay size={16} />,
-      color: "pink",
+      icon: <Icon as={simulationsConfig.icon} width="16px" height="16px" display="block" />,
+      color: simulationsConfig.color.split(".")[0] ?? "pink",
       href: `/${projectSlug}/simulations`,
       docsHref: "https://langwatch.ai/docs/agent-simulations/getting-started",
     },
     {
       title: "Prompt Management",
       description: "Version and manage your prompts",
-      icon: <LuScroll size={16} />,
-      color: "purple",
+      icon: <Icon as={promptsConfig.icon} width="16px" height="16px" display="block" />,
+      color: promptsConfig.color.split(".")[0] ?? "purple",
       href: `/${projectSlug}/prompts`,
       docsHref: "https://langwatch.ai/docs/prompt-management/overview",
     },
     {
       title: "Evaluations",
       description: "Evaluate your agent or set up real-time evaluations",
-      icon: <LuGauge size={16} />,
-      color: "orange",
+      icon: <Icon as={evaluationsConfig.icon} width="16px" height="16px" display="block" />,
+      color: evaluationsConfig.color.split(".")[0] ?? "orange",
       href: `/${projectSlug}/evaluations`,
       docsHref: "https://langwatch.ai/docs/llm-evaluation",
     },

@@ -52,6 +52,7 @@ function PromptBrowserTabView({
           e.stopPropagation();
         }}
         onClick={handleClose}
+        marginRight={-1}
       >
         <LuX width="18px" />
       </Box>

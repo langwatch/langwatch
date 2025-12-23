@@ -1,9 +1,10 @@
-import { HStack, type StackProps, Tabs, VStack } from "@chakra-ui/react";
+import { HStack, Tabs, VStack, type TabsRootProps } from "@chakra-ui/react";
 
 /**
  * Props for BrowserLikeTabsRoot component
  */
-interface BrowserLikeTabsRootProps extends StackProps {
+interface BrowserLikeTabsRootProps
+  extends Omit<TabsRootProps, "onValueChange"> {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
@@ -24,20 +25,20 @@ function BrowserLikeTabsRoot({
   value,
   defaultValue,
   onValueChange,
-  colorPalette = "orange",
   ...props
 }: BrowserLikeTabsRootProps) {
   return (
-    <VStack height="full" gap={0} align="stretch" width="full" {...props}>
+    <VStack height="full" gap={0} align="stretch" width="full">
       <Tabs.Root
         value={value}
         defaultValue={defaultValue}
         onValueChange={(change) => onValueChange?.(change.value)}
-        colorPalette={colorPalette}
         width="full"
         height="full"
         display="flex"
         flexDirection="column"
+        variant="enclosed"
+        {...props}
       >
         {children}
       </Tabs.Root>
@@ -100,16 +101,8 @@ function BrowserLikeTabsTrigger({
     <Tabs.Trigger
       value={value}
       minWidth="fit-content"
-      marginBottom="-1px"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
-      bg="gray.100"
-      color="gray.600"
-      _hover={{ bg: "white" }}
-      _selected={{
-        bg: "white",
-        color: "gray.800",
-      }}
     >
       {children}
     </Tabs.Trigger>

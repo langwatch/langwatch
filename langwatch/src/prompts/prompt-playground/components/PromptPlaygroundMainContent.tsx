@@ -15,13 +15,12 @@ export function PromptPlaygroundMainContent() {
    * doesn't mount and it won't load the span.
    */
   useLoadSpanIntoPromptPlayground();
-  const { windows } = useDraggableTabsBrowserStore();
-  const hasNoTabs =
-    windows.length === 0 || windows.every((w) => w.tabs.length === 0);
+  const hasNoTabs = useDraggableTabsBrowserStore(
+    ({ windows }) =>
+      windows.length === 0 || windows.every((w) => w.tabs.length === 0),
+  );
 
-  if (hasNoTabs) {
-    return <MainContentEmptyState />;
-  }
+  if (hasNoTabs) return <MainContentEmptyState />;
 
   return (
     <HStack width="full" height="full" gap={0} overflowX="scroll" bg="white">

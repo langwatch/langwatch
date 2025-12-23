@@ -1,98 +1,60 @@
 import {
   Box,
+  Link as ChakraLink,
   EmptyState,
   Grid,
   Heading,
   HStack,
+  Icon,
   Skeleton,
   Spacer,
   Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  LuCircleX,
-  LuBookOpen,
-  LuDatabase,
-  LuGauge,
-  LuMessageSquare,
-  LuPlay,
-  LuScroll,
-  LuWorkflow,
-} from "react-icons/lu";
-import { useRouter } from "next/router";
+import NextLink from "next/link";
 import type { ReactNode } from "react";
+import { LuBookOpen, LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { RecentItem, RecentItemType } from "~/server/home/types";
 import { api } from "~/utils/api";
+import {
+  featureIcons,
+  recentItemTypeToFeature,
+} from "~/utils/featureIcons";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { HomeCard } from "./HomeCard";
 
 /**
- * Get icon for entity type
+ * Get icon for entity type using shared featureIcons config
  */
 const getIconForType = (type: RecentItemType): ReactNode => {
-  const iconProps = { size: 14 };
-  switch (type) {
-    case "prompt":
-      return <LuScroll {...iconProps} />;
-    case "workflow":
-      return <LuWorkflow {...iconProps} />;
-    case "dataset":
-      return <LuDatabase {...iconProps} />;
-    case "evaluation":
-      return <LuGauge {...iconProps} />;
-    case "annotation":
-      return <LuMessageSquare {...iconProps} />;
-    case "simulation":
-      return <LuPlay {...iconProps} />;
-    default:
-      return <LuBookOpen {...iconProps} />;
+  const featureKey = recentItemTypeToFeature[type];
+  const config = featureKey ? featureIcons[featureKey] : null;
+  if (config) {
+    return <Icon as={config.icon} width="14px" height="14px" display="block" />;
   }
+  return <Icon as={featureIcons.home.icon} width="14px" height="14px" display="block" />;
 };
 
 /**
- * Get color for entity type
+ * Get color for entity type using shared featureIcons config
  */
 const getColorForType = (type: RecentItemType): string => {
-  switch (type) {
-    case "prompt":
-      return "purple.500";
-    case "workflow":
-      return "blue.500";
-    case "dataset":
-      return "green.500";
-    case "evaluation":
-      return "orange.500";
-    case "annotation":
-      return "cyan.500";
-    case "simulation":
-      return "pink.500";
-    default:
-      return "gray.500";
-  }
+  const featureKey = recentItemTypeToFeature[type];
+  const config = featureKey ? featureIcons[featureKey] : null;
+  return config?.color ?? "gray.500";
 };
 
 /**
- * Get label for entity type
+ * Get label for entity type using shared featureIcons config
  */
 const getLabelForType = (type: RecentItemType): string => {
-  switch (type) {
-    case "prompt":
-      return "Prompt";
-    case "workflow":
-      return "Workflow";
-    case "dataset":
-      return "Dataset";
-    case "evaluation":
-      return "Evaluation";
-    case "annotation":
-      return "Annotation";
-    case "simulation":
-      return "Simulation";
-    default:
-      return "Item";
-  }
+  const featureKey = recentItemTypeToFeature[type];
+  const config = featureKey ? featureIcons[featureKey] : null;
+  // Remove trailing 's' for singular form (e.g., "Prompts" -> "Prompt")
+  const label = config?.label ?? "Item";
+  return label.endsWith("s") ? label.slice(0, -1) : label;
 };
 
 /**
@@ -111,50 +73,59 @@ export const groupItemsByType = (
 
 type RecentItemCardProps = {
   item: RecentItem;
-  onClick: () => void;
 };
 
 /**
  * Card for a single recent item
  */
-function RecentItemCard({ item, onClick }: RecentItemCardProps) {
+function RecentItemCard({ item }: RecentItemCardProps) {
   const timeAgo = formatTimeAgo(item.updatedAt.getTime());
   const color = getColorForType(item.type);
   const icon = getIconForType(item.type);
 
   return (
-    <HomeCard padding={3} onClick={onClick}>
-      <HStack gap={2} align="start" width="full">
-        <Box
-          padding={1.5}
-          borderRadius="md"
-          background={`${color.split(".")[0]}.50`}
-          color={color}
-        >
-          {icon}
-        </Box>
-        <VStack align="start" gap={0} flex={1} minWidth={0}>
-          <Text fontSize="sm" lineClamp={1} title={item.name}>
-            {item.name}
-          </Text>
-          <HStack gap={2}>
-            <Text fontSize="xs" color="gray.500">
-              {getLabelForType(item.type)}
-            </Text>
-            {timeAgo && (
-              <>
-                <Text fontSize="xs" color="gray.400">
-                  •
-                </Text>
+    <ChakraLink
+      asChild
+      _hover={{ textDecoration: "none" }}
+      height="full"
+      width="full"
+      display="block"
+    >
+      <NextLink href={item.href}>
+        <HomeCard padding={3} height="full">
+          <HStack gap={2} align="start" width="full">
+            <Box
+              padding={1.5}
+              borderRadius="md"
+              background={`${color.split(".")[0]}.50`}
+              color={color}
+            >
+              {icon}
+            </Box>
+            <VStack align="start" gap={0} flex={1} minWidth={0}>
+              <Text fontSize="sm" lineClamp={1} title={item.name}>
+                {item.name}
+              </Text>
+              <HStack gap={2}>
                 <Text fontSize="xs" color="gray.500">
-                  {timeAgo}
+                  {getLabelForType(item.type)}
                 </Text>
-              </>
-            )}
+                {timeAgo && (
+                  <>
+                    <Text fontSize="xs" color="gray.400">
+                      •
+                    </Text>
+                    <Text fontSize="xs" color="gray.500">
+                      {timeAgo}
+                    </Text>
+                  </>
+                )}
+              </HStack>
+            </VStack>
           </HStack>
-        </VStack>
-      </HStack>
-    </HomeCard>
+        </HomeCard>
+      </NextLink>
+    </ChakraLink>
   );
 }
 
@@ -211,12 +182,6 @@ function RecentItemsEmptyState() {
  * Grid of recent items
  */
 function RecentItemsGrid({ items }: { items: RecentItem[] }) {
-  const router = useRouter();
-
-  const handleItemClick = (item: RecentItem) => {
-    void router.push(item.href);
-  };
-
   return (
     <Grid
       templateColumns={{
@@ -227,11 +192,7 @@ function RecentItemsGrid({ items }: { items: RecentItem[] }) {
       gap={3}
     >
       {items.map((item) => (
-        <RecentItemCard
-          key={`${item.type}-${item.id}`}
-          item={item}
-          onClick={() => handleItemClick(item)}
-        />
+        <RecentItemCard key={`${item.type}-${item.id}`} item={item} />
       ))}
     </Grid>
   );
@@ -241,12 +202,7 @@ function RecentItemsGrid({ items }: { items: RecentItem[] }) {
  * Grouped view for "By type" tab
  */
 function GroupedItemsView({ items }: { items: RecentItem[] }) {
-  const router = useRouter();
   const grouped = groupItemsByType(items);
-
-  const handleItemClick = (item: RecentItem) => {
-    void router.push(item.href);
-  };
 
   return (
     <VStack gap={4} align="stretch">
@@ -270,11 +226,7 @@ function GroupedItemsView({ items }: { items: RecentItem[] }) {
             gap={3}
           >
             {typeItems.map((item) => (
-              <RecentItemCard
-                key={`${item.type}-${item.id}`}
-                item={item}
-                onClick={() => handleItemClick(item)}
-              />
+              <RecentItemCard key={`${item.type}-${item.id}`} item={item} />
             ))}
           </Grid>
         </VStack>
@@ -317,8 +269,21 @@ export function RecentItemsSection() {
           <Heading>Jump right back</Heading>
           <Spacer />
           <Tabs.List border="none">
-            <Tabs.Trigger value="recents" fontSize="xs" paddingX={2} paddingY={0.5}>Recents</Tabs.Trigger>
-            <Tabs.Trigger value="by-type" whiteSpace="nowrap" fontSize="xs" paddingX={2} paddingY={0.5}>
+            <Tabs.Trigger
+              value="recents"
+              fontSize="xs"
+              paddingX={2}
+              paddingY={0.5}
+            >
+              Recents
+            </Tabs.Trigger>
+            <Tabs.Trigger
+              value="by-type"
+              whiteSpace="nowrap"
+              fontSize="xs"
+              paddingX={2}
+              paddingY={0.5}
+            >
               By type
             </Tabs.Trigger>
           </Tabs.List>

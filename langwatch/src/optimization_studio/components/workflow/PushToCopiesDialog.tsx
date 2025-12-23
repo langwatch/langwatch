@@ -99,7 +99,6 @@ export const PushToCopiesDialog = ({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
           <Dialog.Title>Push to Replicas</Dialog.Title>

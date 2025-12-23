@@ -11,7 +11,7 @@ import { useDraggableTabsBrowserStore } from "../prompt-playground-store/Draggab
  */
 export function useCreateDraftPrompt() {
   const { project } = useOrganizationTeamProject();
-  const { addTab } = useDraggableTabsBrowserStore();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
   /**
    * createDraftPrompt

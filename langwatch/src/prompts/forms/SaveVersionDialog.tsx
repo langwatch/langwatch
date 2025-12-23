@@ -59,8 +59,7 @@ export function SaveVersionDialog({
         }
       }}
     >
-      <Dialog.Backdrop />
-      <Dialog.Content backdrop={false}>
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Save Version</Dialog.Title>
         </Dialog.Header>

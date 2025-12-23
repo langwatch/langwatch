@@ -18,7 +18,23 @@ export function PromptPlaygroundBrowser() {
     setActiveTab,
     activeWindowId,
     setActiveWindow,
-  } = useDraggableTabsBrowserStore();
+  } = useDraggableTabsBrowserStore(
+    ({
+      windows,
+      splitTab,
+      moveTab,
+      setActiveTab,
+      activeWindowId,
+      setActiveWindow,
+    }) => ({
+      windows,
+      splitTab,
+      moveTab,
+      setActiveTab,
+      activeWindowId,
+      setActiveWindow,
+    }),
+  );
 
   /**
    * handleTabMove
@@ -70,11 +86,7 @@ export function PromptPlaygroundBrowser() {
             <HStack gap={0} overflow="hidden" height="full">
               {tabbedWindow.tabs.map((tab) => (
                 <TabIdProvider key={tab.id} tabId={tab.id}>
-                  <DraggableTabsBrowser.Tab
-                    id={tab.id}
-                    borderRight="1px solid var(--chakra-colors-gray-350)"
-                    height="full"
-                  >
+                  <DraggableTabsBrowser.Tab id={tab.id} height="full">
                     <DraggableTabsBrowser.Trigger value={tab.id}>
                       <PromptBrowserTab
                         dimmed={tabbedWindow.id !== activeWindowId}

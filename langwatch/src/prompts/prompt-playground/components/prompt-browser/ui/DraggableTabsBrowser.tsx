@@ -1,4 +1,10 @@
-import { Box, type BoxProps, HStack, type StackProps } from "@chakra-ui/react";
+import {
+  Box,
+  type BoxProps,
+  HStack,
+  type StackProps,
+  type TabsRootProps,
+} from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -215,7 +221,7 @@ function DragOverlayContent({
  * Single Responsibility: Manages a group of tabs with shared state and drop zone
  */
 interface DraggableTabsGroupProps
-  extends Omit<StackProps, "onClick" | "defaultValue"> {
+  extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
   groupId: string;
   activeTabId?: string;
   onTabChange?: (groupId: string, tabId: string) => void;
@@ -332,24 +338,16 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
     },
   });
 
-  const style: React.CSSProperties = {
-    ...rest.style,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging || isOver ? 0.5 : 1,
-  };
-
   return (
     <Box
       {...rest}
       ref={setNodeRef}
-      style={{
-        flex: 1,
-        display: "flex",
-        alignItems: "stretch",
-        ...style,
-        cursor: isDragging ? "grabbing" : "grab",
-      }}
+      flex={1}
+      alignItems="stretch"
+      cursor={isDragging ? "grabbing" : "grab"}
+      transform={CSS.Transform.toString(transform)}
+      transition={transition}
+      opacity={isDragging || isOver ? 0.5 : 1}
       {...attributes}
       {...listeners}
     >
