@@ -44,6 +44,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -84,6 +85,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
             projectionStore,
           ),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -129,6 +131,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
         eventPublisher,
         logger: logger as any,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -163,6 +166,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         aggregateType,
         eventStore,
         eventPublisher,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -202,6 +206,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
         eventPublisher,
         logger: logger as any,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -253,6 +258,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -287,6 +293,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         eventHandlers: {
           handler1: createMockEventHandlerDefinition("handler1", handler1),
           handler2: createMockEventHandlerDefinition("handler2", handler2),
@@ -317,6 +324,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -360,6 +368,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -415,6 +424,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           projection1: createMockProjectionDefinition(
             "projection1",
@@ -456,6 +466,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -495,6 +506,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -548,6 +560,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -583,6 +596,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
@@ -693,6 +707,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const events = [
@@ -712,6 +727,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         // No eventPublisher, eventHandlers, projections, etc.
       });
 
@@ -733,6 +749,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        distributedLock: createMockDistributedLock(),
         projections: {
           projection: createMockProjectionDefinition(
             "projection",
@@ -744,7 +761,7 @@ describe("EventSourcingService - Error Handling Flows", () => {
 
       await expect(
         service.updateProjectionByName(
-          "nonexistent",
+          "nonexistent" as any,
           TEST_CONSTANTS.AGGREGATE_ID,
           context,
         ),

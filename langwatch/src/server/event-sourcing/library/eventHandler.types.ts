@@ -4,13 +4,14 @@
 
 import type { EventHandler } from "./domain/handlers/eventHandler";
 import type { Event } from "./domain/types";
+import type { KillSwitchOptions } from "./pipeline/types";
 
 /**
  * Options for configuring an event handler.
  */
 export interface EventHandlerOptions<
   EventType extends Event = Event,
-  RegisteredHandlerNames extends string = string,
+  AvailableDependencies extends string = string,
 > {
   /**
    * Optional: Event types this handler is interested in.
@@ -27,6 +28,10 @@ export interface EventHandlerOptions<
    */
   delay?: number;
   /**
+   * Optional: Debounce time in milliseconds before processing the job.
+   */
+  debounceMs?: number;
+  /**
    * Optional: Concurrency limit for processing jobs.
    */
   concurrency?: number;
@@ -37,10 +42,22 @@ export interface EventHandlerOptions<
     event: EventType,
   ) => Record<string, string | number | boolean>;
   /**
-   * Optional: List of handler names this handler depends on.
-   * Handlers will be executed in dependency order (dependencies first).
+   * Optional: List of handler and projection names this handler depends on.
+   * Handlers will be executed after all dependencies complete.
+   * Can depend on both event handlers and projections.
    */
-  dependsOn?: RegisteredHandlerNames[];
+  dependsOn?: AvailableDependencies[];
+
+  /**
+   * Optional: Whether to disable the handler.
+   */
+  disabled?: boolean;
+
+  /**
+   * Kill switch configuration for this event handler.
+   * When the feature flag is true, the handler is disabled.
+   */
+  killSwitch?: KillSwitchOptions;
 }
 
 /**
@@ -49,7 +66,7 @@ export interface EventHandlerOptions<
  */
 export interface EventHandlerDefinition<
   EventType extends Event = Event,
-  RegisteredHandlerNames extends string = string,
+  AvailableDependencies extends string = string,
 > {
   /**
    * Unique name for this handler within the pipeline.
@@ -63,7 +80,7 @@ export interface EventHandlerDefinition<
   /**
    * Options for configuring the handler.
    */
-  options: EventHandlerOptions<EventType, RegisteredHandlerNames>;
+  options: EventHandlerOptions<EventType, AvailableDependencies>;
 }
 
 /**

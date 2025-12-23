@@ -2,9 +2,7 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   CloseButton,
-  Container,
   Heading,
   HStack,
   Icon,
@@ -27,6 +25,7 @@ import { LuChevronsUpDown, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
@@ -49,8 +48,7 @@ import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
 import { Dialog } from "../ui/dialog";
 import { Link } from "../ui/link";
-import { Popover } from "../ui/popover";
-import { RedactedField } from "../ui/RedactedField";
+import { Popover } from "../ui/popoverui/RedactedField";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
@@ -98,6 +96,7 @@ export function MessagesTable({
       query: getSingleQueryParam(router.query.query),
       groupBy: "none",
       pageOffset: navigationFooter.pageOffset,
+      scrollId: router.query.scrollId as string | null,
       pageSize: navigationFooter.pageSize,
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
@@ -107,10 +106,18 @@ export function MessagesTable({
 
   navigationFooter.useUpdateTotalHits(traceGroups);
 
+  // Subscribe to real-time trace updates
+  useTraceUpdateListener({
+    projectId: project?.id ?? "",
+    refetch: () => void traceGroups.refetch(),
+    enabled: Boolean(project?.id),
+    pageOffset: navigationFooter.pageOffset,
+  });
+
   const topics = api.topics.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled: project?.id !== undefined,
+      enabled: project?.id !== void 0,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
     },
@@ -485,7 +492,7 @@ export function MessagesTable({
       ),
       value: (trace: Trace) => {
         return trace.metrics?.first_token_ms
-          ? numeral(trace.metrics.first_token_ms / 1000).format("0.[0]") + "s"
+          ? `${numeral(trace.metrics.first_token_ms / 1000).format("0.[0]")}s`
           : "-";
       },
     },
@@ -513,7 +520,7 @@ export function MessagesTable({
       ),
       value: (trace: Trace) => {
         return trace.metrics?.total_time_ms
-          ? numeral(trace.metrics.total_time_ms / 1000).format("0.[0]") + "s"
+          ? `${numeral(trace.metrics.total_time_ms / 1000).format("0.[0]")}s`
           : "-";
       },
     },

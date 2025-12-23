@@ -25,6 +25,7 @@ import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
 import { QueueProcessorManager } from "./queues/queueProcessorManager";
 import { EventProcessorValidator } from "./validation/eventProcessorValidator";
+import type { FeatureFlagServiceInterface } from "~/server/featureFlag";
 
 /**
  * Main service that orchestrates event sourcing.
@@ -32,7 +33,10 @@ import { EventProcessorValidator } from "./validation/eventProcessorValidator";
  */
 export class EventSourcingService<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
 > {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.event-sourcing-service",
@@ -54,7 +58,11 @@ export class EventSourcingService<
   private readonly options: EventSourcingOptions<EventType>;
   private readonly queueManager: QueueProcessorManager<EventType>;
   private readonly handlerDispatcher: EventHandlerDispatcher<EventType>;
-  private readonly projectionUpdater: ProjectionUpdater<EventType>;
+  private readonly projectionUpdater: ProjectionUpdater<
+    EventType,
+    ProjectionTypes
+  >;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     pipelineName,
@@ -70,7 +78,8 @@ export class EventSourcingService<
     updateLockTtlMs = DEFAULT_UPDATE_LOCK_TTL_MS,
     handlerLockTtlMs = 30000,
     queueProcessorFactory,
-  }: EventSourcingServiceOptions<EventType, ProjectionType> & {
+    featureFlagService,
+  }: EventSourcingServiceOptions<EventType, ProjectionTypes> & {
     processorCheckpointStore?: ProcessorCheckpointStore;
   }) {
     this.pipelineName = pipelineName;
@@ -87,6 +96,7 @@ export class EventSourcingService<
     this.logger =
       logger ??
       createLogger("langwatch.trace-processing.event-sourcing-service");
+    this.featureFlagService = featureFlagService;
 
     // Warn in production if distributed lock is not provided
     if (process.env.NODE_ENV === "production" && !distributedLock) {
@@ -144,6 +154,7 @@ export class EventSourcingService<
     this.queueManager = new QueueProcessorManager<EventType>({
       aggregateType,
       queueProcessorFactory,
+      featureFlagService: this.featureFlagService,
     });
 
     this.handlerDispatcher = new EventHandlerDispatcher<EventType>({
@@ -155,9 +166,10 @@ export class EventSourcingService<
       queueManager: this.queueManager,
       distributedLock,
       handlerLockTtlMs,
+      featureFlagService: this.featureFlagService,
     });
 
-    this.projectionUpdater = new ProjectionUpdater<EventType>({
+    this.projectionUpdater = new ProjectionUpdater<EventType, ProjectionTypes>({
       aggregateType,
       eventStore,
       projections: this.projections,
@@ -168,6 +180,7 @@ export class EventSourcingService<
       validator,
       checkpointManager,
       queueManager: this.queueManager,
+      featureFlagService: this.featureFlagService,
     });
 
     // Initialize queue processors for event handlers if factory is provided
@@ -263,7 +276,7 @@ export class EventSourcingService<
         EventUtils.validateTenantId(context, "storeEvents");
 
         // Enrich events with trace context if missing (for debugging)
-        const enrichedEvents = events.map((event) => {
+        const enrichedEvents: EventType[] = events.map((event) => {
           const enrichedMetadata =
             EventUtils.buildEventMetadataWithCurrentProcessingTraceparent(
               event.metadata,
@@ -274,7 +287,7 @@ export class EventSourcingService<
           return {
             ...event,
             metadata: enrichedMetadata,
-          } as EventType;
+          };
         });
 
         span.addEvent("event_store.store.start");
@@ -360,15 +373,20 @@ export class EventSourcingService<
    * @param aggregateId - The aggregate to update projection for
    * @param context - Security context with required tenantId for event store access
    * @param options - Optional options including projection store context override
-   * @returns The updated projection
+   * @returns Object containing both the updated projection and the events that were processed
    * @throws {Error} If projection name not found, no events found, lock acquisition fails, or tenantId is invalid
    */
-  async updateProjectionByName<ProjectionName extends string>(
+  async updateProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
-  ): Promise<any> {
+  ): Promise<{
+    projection: ProjectionTypes[ProjectionName];
+    events: readonly EventType[];
+  }> {
     return await this.projectionUpdater.updateProjectionByName(
       projectionName,
       aggregateId,
@@ -386,12 +404,14 @@ export class EventSourcingService<
    * @returns The projection, or null if not found
    * @throws Error if projection name not found or not configured
    */
-  async getProjectionByName<ProjectionName extends string>(
+  async getProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
-  ): Promise<unknown> {
-    return await this.projectionUpdater.getProjectionByName(
+  ): Promise<ProjectionTypes[ProjectionName] | null> {
+    return this.projectionUpdater.getProjectionByName(
       projectionName,
       aggregateId,
       context,
@@ -407,7 +427,9 @@ export class EventSourcingService<
    * @returns True if the projection exists, false otherwise
    * @throws Error if projection name not found or not configured
    */
-  async hasProjectionByName<ProjectionName extends string>(
+  async hasProjectionByName<
+    ProjectionName extends keyof ProjectionTypes & string,
+  >(
     projectionName: ProjectionName,
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
@@ -455,12 +477,12 @@ export class EventSourcingService<
    * });
    * ```
    */
-  async replayEvents<ProjectionName extends string>(
+  async replayEvents<ProjectionName extends keyof ProjectionTypes & string>(
     _projectionName: ProjectionName,
     _aggregateId: string,
     _context: EventStoreReadContext<EventType>,
     _options?: ReplayEventsOptions<EventType>,
-  ): Promise<any> {
+  ): Promise<ProjectionTypes[ProjectionName]> {
     throw new ConfigurationError(
       "EventSourcingService",
       "Method not implemented",
