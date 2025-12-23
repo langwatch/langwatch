@@ -1,24 +1,12 @@
 import { Box, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import {
-  BookText,
-  CheckSquare,
-  Home,
-  ListTree,
-  Pencil,
-  Play,
-  Settings,
-  Table,
-  TrendingUp,
-  Workflow,
-} from "lucide-react";
 import { useRouter } from "next/router";
 import React, { useState } from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
+import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
-import { PuzzleIcon } from "./icons/PuzzleIcon";
 import { useTableView } from "./messages/HeaderButtons";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
@@ -83,7 +71,7 @@ export const MainMenu = React.memo(function MainMenu({
           <VStack width="full" gap={0.5} align="start">
             <PageMenuLink
               path={projectRoutes.home.path}
-              icon={Home}
+              icon={featureIcons.home.icon}
               label={projectRoutes.home.title}
               project={project}
               isActive={
@@ -94,7 +82,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
             <PageMenuLink
               path={projectRoutes.analytics.path}
-              icon={TrendingUp}
+              icon={featureIcons.analytics.icon}
               label={projectRoutes.analytics.title}
               project={project}
               isActive={router.pathname.includes("/analytics")}
@@ -102,7 +90,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
             <PageMenuLink
               path={projectRoutes.messages.path}
-              icon={ListTree}
+              icon={featureIcons.traces.icon}
               label={projectRoutes.messages.title}
               project={project}
               isActive={router.pathname.includes("/messages")}
@@ -110,7 +98,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
             <PageMenuLink
               path={projectRoutes.simulations.path}
-              icon={Play}
+              icon={featureIcons.simulations.icon}
               label={projectRoutes.simulations.title}
               project={project}
               isActive={router.pathname.includes("/simulations")}
@@ -118,7 +106,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
             <PageMenuLink
               path={projectRoutes.evaluations.path}
-              icon={CheckSquare}
+              icon={featureIcons.evaluations.icon}
               label={projectRoutes.evaluations.title}
               project={project}
               isActive={
@@ -130,7 +118,7 @@ export const MainMenu = React.memo(function MainMenu({
 
             <PageMenuLink
               path={projectRoutes.workflows.path}
-              icon={Workflow}
+              icon={featureIcons.workflows.icon}
               label={projectRoutes.workflows.title}
               project={project}
               isActive={router.pathname.includes("/workflows")}
@@ -139,7 +127,7 @@ export const MainMenu = React.memo(function MainMenu({
 
             <PageMenuLink
               path={projectRoutes.prompts.path}
-              icon={BookText}
+              icon={featureIcons.prompts.icon}
               label={projectRoutes.prompts.title}
               project={project}
               isActive={router.pathname.includes("/prompts")}
@@ -148,7 +136,7 @@ export const MainMenu = React.memo(function MainMenu({
 
             <PageMenuLink
               path={projectRoutes.datasets.path}
-              icon={Table}
+              icon={featureIcons.datasets.icon}
               label={projectRoutes.datasets.title}
               project={project}
               isActive={router.pathname.includes("/datasets")}
@@ -156,7 +144,7 @@ export const MainMenu = React.memo(function MainMenu({
             />
             <PageMenuLink
               path={projectRoutes.annotations.path}
-              icon={Pencil}
+              icon={featureIcons.annotations.icon}
               label={projectRoutes.annotations.title}
               project={project}
               badgeNumber={pendingItemsCount.data}
@@ -170,7 +158,7 @@ export const MainMenu = React.memo(function MainMenu({
               isPublicRoute) && (
               <PageMenuLink
                 path={projectRoutes.settings.path}
-                icon={Settings}
+                icon={featureIcons.settings.icon}
                 label={projectRoutes.settings.title}
                 project={project}
                 isActive={router.pathname.includes("/settings")}
