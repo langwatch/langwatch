@@ -23,8 +23,9 @@ export { useTabId } from "../ui/TabContext";
  */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
-  const { windows } = useDraggableTabsBrowserStore();
-  const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
+  const tab = useDraggableTabsBrowserStore(({ windows }) =>
+    windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
+  );
   const currentValues = tab?.data.form.currentValues;
   const initialConfigValues = useMemo(
     () => cloneDeep(currentValues),
@@ -53,7 +54,11 @@ function PromptBrowserWindowInner(props: {
   tabId: string;
 }) {
   const form = usePromptConfigForm(props);
-  const { updateTabData } = useDraggableTabsBrowserStore();
+  const { updateTabData } = useDraggableTabsBrowserStore(
+    ({ updateTabData }) => ({
+      updateTabData,
+    }),
+  );
 
   const updateTabDataDebounced = useMemo(
     () => debounce(updateTabData, 500),

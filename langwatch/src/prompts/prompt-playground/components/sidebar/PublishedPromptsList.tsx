@@ -26,7 +26,7 @@ export function getDisplayHandle(handle?: string | null): string {
  */
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
-  const { addTab } = useDraggableTabsBrowserStore();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { project } = useOrganizationTeamProject();
 
   /**

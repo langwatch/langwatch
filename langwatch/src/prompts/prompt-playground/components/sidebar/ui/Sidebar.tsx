@@ -136,7 +136,7 @@ function SidebarList({
 
   if (!title) {
     return (
-      <VStack gap={0} align="stretch" paddingX={2}>
+      <VStack gap={0.5} align="stretch" paddingX={2}>
         {children}
       </VStack>
     );

@@ -30,10 +30,12 @@ export function PromptTabbedSection() {
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
   const chatRef = useRef<PromptPlaygroundChatRef>(null);
+  const [activeTab, setActiveTab] = useState<PromptTab>(PromptTab.Conversation);
 
   return (
     <Tabs.Root
-      defaultValue={PromptTab.Conversation}
+      value={activeTab}
+      onValueChange={(change) => setActiveTab(change.value as PromptTab)}
       display="flex"
       flexDirection="column"
       flex={1}
@@ -103,16 +105,18 @@ export function PromptTabbedSection() {
             <VariablesForm inputs={inputs} onChange={setVariables} />
           </Box>
         </Tabs.Content>
-        <Tabs.Content
-          value={PromptTab.Settings}
-          flex={1}
-          width="full"
-          height="full"
-        >
-          <Box height="full" width="full" maxWidth="768px" margin="0 auto">
-            <SettingsTabContent />
-          </Box>
-        </Tabs.Content>
+        {activeTab === PromptTab.Settings && (
+          <Tabs.Content
+            value={PromptTab.Settings}
+            flex={1}
+            width="full"
+            height="full"
+          >
+            <Box height="full" width="full" maxWidth="768px" margin="0 auto">
+              <SettingsTabContent />
+            </Box>
+          </Tabs.Content>
+        )}
       </HStack>
     </Tabs.Root>
   );
