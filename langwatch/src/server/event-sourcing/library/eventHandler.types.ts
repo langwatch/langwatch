@@ -28,6 +28,10 @@ export interface EventHandlerOptions<
    */
   delay?: number;
   /**
+   * Optional: Debounce time in milliseconds before processing the job.
+   */
+  debounceMs?: number;
+  /**
    * Optional: Concurrency limit for processing jobs.
    */
   concurrency?: number;

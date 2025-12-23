@@ -1,6 +1,6 @@
 import type { createLogger } from "../../../../utils/logger";
 import type { AggregateType } from "../domain/aggregateType";
-import type { Event, EventOrderingStrategy, Projection } from "../domain/types";
+import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { EventHandlerDefinitions } from "../eventHandler.types";
 import type {
   ProjectionDefinitions,
@@ -67,7 +67,7 @@ export interface ReplayEventsOptions<_EventType extends Event = Event> {
  */
 export interface EventSourcingServiceOptions<
   EventType extends Event = Event,
-  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap,
+  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap
 > {
   /**
    * The pipeline name for this service.
@@ -163,11 +163,11 @@ export interface EventSourcingServiceOptions<
     create<Payload>(definition: {
       name: string;
       process: (payload: Payload) => Promise<void>;
-      makeJobId?: (payload: Payload) => string;
+      makeJobId: (payload: Payload) => string;
       delay?: number;
       options?: { concurrency?: number };
       spanAttributes?: (
-        payload: Payload,
+        payload: Payload
       ) => Record<string, string | number | boolean>;
     }): EventSourcedQueueProcessor<Payload>;
   };

@@ -188,12 +188,12 @@ export class EventSourcing {
         const projections = new Map();
         for (const [
           name,
-          { HandlerClass, options },
+          { handlerClass, options },
         ] of definition.projections) {
           projections.set(name, {
             name,
-            store: HandlerClass.store,
-            handler: new HandlerClass(),
+            store: handlerClass.store,
+            handler: new handlerClass(),
             options,
           });
         }
@@ -201,7 +201,7 @@ export class EventSourcing {
         const eventHandlers = new Map();
         for (const [
           name,
-          { HandlerClass, options },
+          { handlerClass: HandlerClass, options },
         ] of definition.eventHandlers) {
           eventHandlers.set(name, {
             name,
@@ -227,8 +227,8 @@ export class EventSourcing {
           name: definition.metadata.name,
           aggregateType: definition.metadata.aggregateType,
           eventStore,
-          projections: projectionsObject as any,
-          eventHandlers: eventHandlersObject as any,
+          projections: projectionsObject,
+          eventHandlers: eventHandlersObject,
           queueProcessorFactory: this.runtime.queueProcessorFactory,
           distributedLock: this.runtime.distributedLock,
           processorCheckpointStore: this.runtime.checkpointStore,
@@ -254,7 +254,7 @@ export class EventSourcing {
           queueManager.initializeCommandQueues(
             definition.commands.map((cmd) => ({
               name: cmd.name,
-              HandlerClass: cmd.HandlerClass,
+              HandlerClass: cmd.handlerClass,
               options: cmd.options,
             })),
             storeEventsFn,

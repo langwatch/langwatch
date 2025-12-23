@@ -186,7 +186,7 @@ export class PipelineBuilderWithNameAndType<
    * This method can be called multiple times to register multiple projections.
    *
    * @param name - Unique name for this projection within the pipeline
-   * @param HandlerClass - Projection handler class to register (must have static `store` property)
+   * @param handlerClass - Projection handler class to register (must have static `store` property)
    * @param options - Optional configuration for projection processing behavior (debouncing, batching)
    * @returns The same builder instance for method chaining
    * @throws Error if projection name already exists or if handler class doesn't have static store property
@@ -201,18 +201,18 @@ export class PipelineBuilderWithNameAndType<
    * ```
    */
   withProjection<
-    HandlerClass extends ProjectionHandlerClass<EventType, any>,
+    handlerClass extends ProjectionHandlerClass<EventType, any>,
     ProjectionName extends string,
   >(
     name: ProjectionName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: ProjectionOptions,
   ): PipelineBuilderWithNameAndType<
     EventType,
     RegisteredHandlerNames,
     RegisteredCommandHandlers,
     RegisteredProjections & {
-      [K in ProjectionName]: ExtractProjectionHandlerProjection<HandlerClass>;
+      [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
     }
   > {
     if (this.projections.has(name)) {
@@ -224,7 +224,7 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Extract store from static property
-    if (!HandlerClass.store) {
+    if (!handlerClass.store) {
       throw new ConfigurationError(
         "PipelineBuilder",
         `Projection handler class must have a static "store" property.`,
@@ -233,14 +233,14 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Instantiate handler
-    const handler = new HandlerClass();
+    const handler = new handlerClass();
 
     const projectionDef: ProjectionDefinition<
       EventType,
-      ExtractProjectionHandlerProjection<HandlerClass>
+      ExtractProjectionHandlerProjection<handlerClass>
     > = {
       name,
-      store: HandlerClass.store,
+      store: handlerClass.store,
       handler,
       options,
     };
@@ -252,7 +252,7 @@ export class PipelineBuilderWithNameAndType<
       RegisteredHandlerNames,
       RegisteredCommandHandlers,
       RegisteredProjections & {
-        [K in ProjectionName]: ExtractProjectionHandlerProjection<HandlerClass>;
+        [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
       }
     >;
   }
@@ -317,7 +317,7 @@ export class PipelineBuilderWithNameAndType<
    * Handlers are dispatched asynchronously via queues after events are stored.
    *
    * @param name - Unique name for this handler within the pipeline
-   * @param HandlerClass - Event handler class to register
+   * @param handlerClass - Event handler class to register
    * @param options - Options for configuring the handler (event types, idempotency, etc.)
    * @returns A new builder instance with the handler name added to the registered names type
    * @throws Error if handler name already exists
@@ -332,11 +332,11 @@ export class PipelineBuilderWithNameAndType<
    * ```
    */
   withEventHandler<
-    HandlerClass extends EventHandlerClass<EventType>,
+    handlerClass extends EventHandlerClass<EventType>,
     HandlerName extends string,
   >(
     name: HandlerName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: EventHandlerOptions<EventType, RegisteredHandlerNames>,
   ): PipelineBuilderWithNameAndType<
     EventType,
@@ -353,7 +353,7 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Instantiate handler
-    const handler = new HandlerClass();
+    const handler = new handlerClass();
 
     // Merge event types from static method and options (options take precedence)
     const mergedOptions: EventHandlerOptions<
@@ -362,7 +362,7 @@ export class PipelineBuilderWithNameAndType<
     > = {
       ...options,
       eventTypes:
-        options?.eventTypes ?? HandlerClass.getEventTypes?.() ?? void 0,
+        options?.eventTypes ?? handlerClass.getEventTypes?.() ?? void 0,
     };
 
     const handlerDef: EventHandlerDefinition<
@@ -389,7 +389,7 @@ export class PipelineBuilderWithNameAndType<
    * The class bundles schema, handler implementation, and all configuration methods.
    *
    * @param name - Unique name for this command handler within the pipeline
-   * @param HandlerClass - The command handler class to register
+   * @param handlerClass - The command handler class to register
    * @param options - Optional configuration that can override static methods (delay, concurrency, etc.)
    * @returns A new builder instance with the command handler tracked in the type system
    *
@@ -400,19 +400,19 @@ export class PipelineBuilderWithNameAndType<
    * ```
    */
   withCommand<
-    HandlerClass extends CommandHandlerClass<any, any, EventType>,
+    handlerClass extends CommandHandlerClass<any, any, EventType>,
     Name extends string,
   >(
     name: Name,
-    HandlerClass: HandlerClass,
-    options?: CommandHandlerOptions<ExtractCommandHandlerPayload<HandlerClass>>,
+    handlerClass: handlerClass,
+    options?: CommandHandlerOptions<ExtractCommandHandlerPayload<handlerClass>>,
   ): PipelineBuilderWithNameAndType<
     EventType,
     RegisteredHandlerNames,
     | RegisteredCommandHandlers
     | {
         name: Name;
-        payload: ExtractCommandHandlerPayload<HandlerClass>;
+        payload: ExtractCommandHandlerPayload<handlerClass>;
       },
     RegisteredProjections
   > {
@@ -426,7 +426,7 @@ export class PipelineBuilderWithNameAndType<
     }
 
     this.commandHandlers.push({
-      HandlerClass,
+      HandlerClass: handlerClass,
       name,
       options,
     });
@@ -437,7 +437,7 @@ export class PipelineBuilderWithNameAndType<
       | RegisteredCommandHandlers
       | {
           name: Name;
-          payload: ExtractCommandHandlerPayload<HandlerClass>;
+          payload: ExtractCommandHandlerPayload<handlerClass>;
         },
       RegisteredProjections
     >;

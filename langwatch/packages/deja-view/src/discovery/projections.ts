@@ -32,7 +32,7 @@ export async function discoverProjections(): Promise<DiscoveredProjection[]> {
         pipelineName,
         projectionName,
         filePath: path.join(pipelineDir, "projections"), // Approximate path to projections directory
-        HandlerClass: projectionDef.HandlerClass,
+        HandlerClass: projectionDef.handlerClass,
       });
     }
   }

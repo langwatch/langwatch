@@ -82,12 +82,13 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly queueName: string;
   private readonly jobName: string;
-  private readonly makeJobId?: (payload: Payload) => string;
+  private readonly makeJobId: (payload: Payload) => string;
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly queue: Queue<Payload, unknown, string>;
   private readonly worker: Worker<Payload>;
   private readonly delay?: number;
+  private readonly debounceMs: number | undefined;
   private readonly redisConnection: IORedis | Cluster;
   private shutdownRequested = false;
 
@@ -95,7 +96,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     definition: EventSourcedQueueDefinition<Payload>,
     redisConnection?: IORedis | Cluster,
   ) {
-    const { name, makeJobId, process, options, delay, spanAttributes } =
+    const { name, makeJobId, process, options, delay, spanAttributes, debounceMs } =
       definition;
 
     // Use provided connection if available, otherwise fall back to global connection
@@ -112,7 +113,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     this.spanAttributes = spanAttributes;
     this.delay = delay;
-
+    this.debounceMs = debounceMs ?? void 0
     this.queueName = name;
     this.jobName = "queue";
     this.makeJobId = makeJobId;
@@ -234,7 +235,19 @@ export class EventSourcedQueueProcessorBullMq<Payload>
           job.attemptsMade,
         );
 
-        await this.requeueWithDelay(job, progressiveDelayMs, previousSequence);
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            jobId: job.id,
+            delayMs: progressiveDelayMs,
+            attemptsMade: job.attemptsMade,
+            previousSequenceNumber: previousSequence,
+          },
+          "Re-queuing job with delay due to ordering (previous event not yet processed)",
+        );
+
+        await job.moveToDelayed(progressiveDelayMs / 1000, job.token);
+        // await this.requeueWithDelay(job, progressiveDelayMs, previousSequence);
         return;
       }
 
@@ -293,52 +306,6 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     );
   }
 
-  /**
-   * Re-queues a job with a progressive delay for ordering errors.
-   * This is expected behavior when events arrive close together.
-   */
-  private async requeueWithDelay(
-    job: Job<Payload>,
-    progressiveDelayMs: number,
-    previousSequence: number | null,
-  ): Promise<void> {
-    const requeueJobId = `${job.id}:retry:${Date.now()}`;
-
-    this.logger.debug(
-      {
-        queueName: this.queueName,
-        jobId: job.id,
-        requeueJobId,
-        delayMs: progressiveDelayMs,
-        attemptsMade: job.attemptsMade,
-        previousSequenceNumber: previousSequence,
-      },
-      "Re-queuing job with delay due to ordering (previous event not yet processed)",
-    );
-
-    await this.queue.add(
-      // @ts-expect-error - jobName typing
-      this.jobName,
-      job.data,
-      {
-        jobId: requeueJobId,
-        delay: progressiveDelayMs,
-        attempts: job.opts?.attempts ?? JOB_RETRY_CONFIG.maxAttempts,
-        backoff: job.opts?.backoff ?? {
-          type: "fixed" as const,
-          delay: JOB_RETRY_CONFIG.backoffDelayMs,
-        },
-        removeOnComplete: job.opts?.removeOnComplete ?? {
-          age: JOB_RETRY_CONFIG.removeOnCompleteAgeSec,
-          count: JOB_RETRY_CONFIG.removeOnCompleteCount,
-        },
-        removeOnFail: job.opts?.removeOnFail ?? {
-          age: JOB_RETRY_CONFIG.removeOnFailAgeSec,
-        },
-      },
-    );
-  }
-
   async send(payload: Payload): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
@@ -348,12 +315,20 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       );
     }
 
-    const jobId = this.makeJobId ? this.makeJobId(payload) : void 0;
+    const jobId = this.makeJobId(payload);
+    // Sanitize jobId for BullMQ (replace colons with dots)
+    const sanitizedJobId = jobId.replaceAll(":", ".");
+    const _sanitizedEventId = payload.id.replaceAll(":", ".");
     const opts: JobsOptions = {
-      ...(jobId ? { jobId } : {}),
+      ...(sanitizedJobId ? { jobId: sanitizedJobId } : {}),
       ...(this.delay !== void 0 ? { delay: this.delay } : {}),
-      // When jobId is provided and a job with the same ID exists, BullMQ will
-      // automatically replace it if it's still waiting. This enables batching/debouncing.
+      ...(this.debounceMs !== void 0 ? {
+        deduplication: {
+          id: sanitizedJobId,
+          ttl: 200,
+          replace: true,
+        },
+      } : {}),
     };
 
     const customAttributes = this.spanAttributes
@@ -372,6 +347,20 @@ export class EventSourcedQueueProcessorBullMq<Payload>
   }
 
   /**
+   * Pauses the worker from accepting new jobs while allowing current jobs to complete.
+   * Called during graceful shutdown.
+   */
+  async pause(): Promise<void> {
+    if (this.worker) {
+      await this.worker.pause();
+      this.logger.info(
+        { queueName: this.queueName },
+        "Queue worker paused - no longer accepting new jobs",
+      );
+    }
+  }
+
+  /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Times out after SHUTDOWN_CONFIG.timeoutMs to prevent indefinite hangs.
    * Should be called during application shutdown.
@@ -381,7 +370,14 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     this.logger.info({ queueName: this.queueName }, "Closing queue processor");
 
     const closeWithTimeout = async (): Promise<void> => {
-      // Close worker first to stop accepting new jobs
+      // Pause worker first to stop accepting new jobs and wait for current jobs to complete
+      if (this.worker) {
+        await this.worker.pause();
+        this.logger.debug({ queueName: this.queueName }, "Worker paused");
+      }
+
+      // Close worker - this waits for all active jobs to complete before closing
+      // Do NOT pass force=true as that would force immediate close without waiting
       if (this.worker) {
         await this.worker.close();
         this.logger.debug({ queueName: this.queueName }, "Worker closed");

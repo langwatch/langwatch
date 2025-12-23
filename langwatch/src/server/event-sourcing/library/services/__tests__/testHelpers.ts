@@ -9,7 +9,10 @@ import type { TenantId } from "../../domain/tenantId";
 import { createTenantId } from "../../domain/tenantId";
 import type { Event, Projection } from "../../domain/types";
 import type { EventHandlerDefinition } from "../../eventHandler.types";
-import type { ProjectionDefinition, ProjectionOptions } from "../../projection.types";
+import type {
+  ProjectionDefinition,
+  ProjectionOptions,
+} from "../../projection.types";
 import type { EventPublisher } from "../../publishing/eventPublisher.types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type {
