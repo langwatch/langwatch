@@ -15,16 +15,16 @@ export class TraceDailyUsageRepositoryPostgres
   implements TraceDailyUsageRepository
 {
   private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.trace-daily-usage-repository"
+    "langwatch.trace-processing.trace-daily-usage-repository",
   );
   private readonly logger = createLogger(
-    "langwatch:trace-processing:trace-daily-usage-repository"
+    "langwatch:trace-processing:trace-daily-usage-repository",
   );
 
   async ensureTraceCounted(
     tenantId: string,
     traceId: string,
-    date: Date
+    date: Date,
   ): Promise<boolean> {
     const dateStartOfDay = formatISO(startOfDay(date));
     return await this.tracer.withActiveSpan(
@@ -47,7 +47,7 @@ export class TraceDailyUsageRepositoryPostgres
                 data: [
                   {
                     id: generate(
-                      KSUID_RESOURCES.PROJECT_USAGE_PROCESSED
+                      KSUID_RESOURCES.PROJECT_USAGE_PROCESSED,
                     ).toString(),
                     projectId: tenantId,
                     aggregateId: traceId,
@@ -96,7 +96,7 @@ export class TraceDailyUsageRepositoryPostgres
               date: dateStartOfDay,
               wasCounted: result,
             },
-            "Ensured trace counted for daily usage"
+            "Ensured trace counted for daily usage",
           );
 
           return result;
@@ -108,11 +108,11 @@ export class TraceDailyUsageRepositoryPostgres
               date: dateStartOfDay,
               error: error instanceof Error ? error.message : String(error),
             },
-            "Failed to ensure trace counted"
+            "Failed to ensure trace counted",
           );
           throw error;
         }
-      }
+      },
     );
   }
 
@@ -137,7 +137,7 @@ export class TraceDailyUsageRepositoryPostgres
             },
           },
         });
-      }
+      },
     );
   }
 }

@@ -8,9 +8,7 @@ import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
 import {
-  createMockEventHandler,
   createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
   createMockProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
@@ -334,7 +332,9 @@ describe("QueueProcessorManager", () => {
         queueProcessorFactory: queueFactory as any,
       });
 
-      const customMakeJobId = vi.fn((event: Event) => `custom-${event.aggregateId}`);
+      const customMakeJobId = vi.fn(
+        (event: Event) => `custom-${event.aggregateId}`,
+      );
 
       const projections = {
         projection1: createMockProjectionDefinition("projection1", undefined, {
@@ -377,7 +377,11 @@ describe("QueueProcessorManager", () => {
       });
 
       const projections = {
-        projection1: createMockProjectionDefinition("projection1", undefined, {}),
+        projection1: createMockProjectionDefinition(
+          "projection1",
+          undefined,
+          {},
+        ),
       };
       const processProjectionEventCallback = vi.fn();
 

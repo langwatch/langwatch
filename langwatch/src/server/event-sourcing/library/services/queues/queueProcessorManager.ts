@@ -15,8 +15,6 @@ import { ConfigurationError, ValidationError } from "../errorHandling";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { DistributedLock } from "../../utils/distributedLock";
 
-const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
-
 /**
  * Kill switch options for event sourcing components.
  * When the feature flag is true, the component is disabled.
@@ -36,7 +34,7 @@ interface HandlerConfig<Payload> {
   makeJobId?: (payload: Payload) => string;
   delay?: number;
   spanAttributes?: (
-    payload: Payload
+    payload: Payload,
   ) => Record<string, string | number | boolean>;
   concurrency?: number;
   lockTtlMs?: number;
@@ -52,7 +50,7 @@ interface CommandHandlerOptions<Payload> {
   delay?: number;
   concurrency?: number;
   spanAttributes?: (
-    payload: Payload
+    payload: Payload,
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
 }
@@ -62,26 +60,26 @@ interface CommandHandlerOptions<Payload> {
  * Options take precedence over static methods.
  */
 function extractHandlerConfig<Payload>(
-  HandlerClass: {
+  handlerClass: {
     getAggregateId: (payload: Payload) => string;
     getSpanAttributes?: (
-      payload: Payload
+      payload: Payload,
     ) => Record<string, string | number | boolean>;
     makeJobId?: (payload: Payload) => string;
     delay?: number;
     concurrency?: number;
   },
-  options?: CommandHandlerOptions<Payload>
+  options?: CommandHandlerOptions<Payload>,
 ): HandlerConfig<Payload> {
   return {
     getAggregateId:
-      options?.getAggregateId ?? HandlerClass.getAggregateId.bind(HandlerClass),
-    makeJobId: options?.makeJobId ?? HandlerClass.makeJobId?.bind(HandlerClass),
-    delay: options?.delay ?? HandlerClass.delay,
+      options?.getAggregateId ?? handlerClass.getAggregateId.bind(handlerClass),
+    makeJobId: options?.makeJobId ?? handlerClass.makeJobId?.bind(handlerClass),
+    delay: options?.delay ?? handlerClass.delay,
     spanAttributes:
       options?.spanAttributes ??
-      HandlerClass.getSpanAttributes?.bind(HandlerClass),
-    concurrency: options?.concurrency ?? HandlerClass.concurrency,
+      handlerClass.getSpanAttributes?.bind(handlerClass),
+    concurrency: options?.concurrency ?? handlerClass.concurrency,
   };
 }
 
@@ -92,7 +90,7 @@ function extractHandlerConfig<Payload>(
 function generateFeatureFlagKey(
   aggregateType: AggregateType,
   componentType: "projection" | "eventHandler" | "command",
-  componentName: string
+  componentName: string,
 ): string {
   return `es-${aggregateType}-${componentType}-${componentName}-killswitch`;
 }
@@ -107,7 +105,7 @@ async function isComponentDisabled(
   componentType: "projection" | "eventHandler" | "command",
   componentName: string,
   tenantId: string,
-  customKey?: string
+  customKey?: string,
 ): Promise<boolean> {
   if (!featureFlagService) {
     return false; // No feature flag service, component is enabled
@@ -121,11 +119,11 @@ async function isComponentDisabled(
     const isDisabled = await featureFlagService.isEnabled(
       flagKey,
       tenantId,
-      false
+      false,
     );
     if (isDisabled) {
       console.log(
-        `[KILL_SWITCH] Component disabled via feature flag: ${componentType}:${componentName} for tenant ${tenantId}`
+        `[KILL_SWITCH] Component disabled via feature flag: ${componentType}:${componentName} for tenant ${tenantId}`,
       );
     }
     return isDisabled;
@@ -133,7 +131,7 @@ async function isComponentDisabled(
     // Log error but don't fail - default to enabled
     console.warn(
       `[KILL_SWITCH] Error checking feature flag for ${componentType}:${componentName}:`,
-      error
+      error,
     );
     return false;
   }
@@ -150,15 +148,15 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   queueName: string,
   storeEventsFn: (
     events: EventType[],
-    context: EventStoreReadContext<EventType>
+    context: EventStoreReadContext<EventType>,
   ) => Promise<void>,
   factory: QueueProcessorFactory,
   aggregateType: AggregateType,
   commandName: string,
-  distributedLock?: DistributedLock,
-  commandLockTtlMs: number = 30000,
+  _distributedLock?: DistributedLock,
+  _commandLockTtlMs: number = 30000,
   featureFlagService?: FeatureFlagServiceInterface,
-  killSwitchOptions?: KillSwitchOptions
+  killSwitchOptions?: KillSwitchOptions,
 ): EventSourcedQueueProcessor<Payload> {
   const processor = factory.create<Payload>({
     name: queueName,
@@ -174,7 +172,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType, validationError: validation.error }
+          { commandType, validationError: validation.error },
         );
       }
 
@@ -188,7 +186,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         "command",
         commandName,
         tenantId,
-        killSwitchOptions?.customKey
+        killSwitchOptions?.customKey,
       );
       if (isDisabled) {
         // Return early without processing
@@ -199,7 +197,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
         tenantId,
         aggregateId,
         commandType,
-        payload
+        payload,
       );
 
       // Handler returns events
@@ -211,7 +209,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Command handler for "${commandType}" returned undefined. Handler must return an array of events.`,
           "events",
           void 0,
-          { commandType, payload }
+          { commandType, payload },
         );
       }
 
@@ -220,7 +218,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Command handler for "${commandType}" returned a non-array value. Handler must return an array of events, but got: ${typeof events}`,
           "events",
           events,
-          { commandType, payload }
+          { commandType, payload },
         );
       }
 
@@ -232,7 +230,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             `Command handler for "${commandType}" returned an array with undefined at index ${i}. All events must be defined.`,
             "events",
             events,
-            { commandType, payload, index: i }
+            { commandType, payload, index: i },
           );
         }
 
@@ -243,14 +241,14 @@ function createCommandDispatcher<Payload, EventType extends Event>(
             parseResult.success === false
               ? `Validation errors: ${parseResult.error.issues
                   .map(
-                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`
+                    (issue: any) => `${issue.path.join(".")}: ${issue.message}`,
                   )
                   .join(", ")}`
               : "Unknown validation error";
 
           throw new ValidationError(
             `Command handler for "${commandType}" returned an invalid event at index ${i}. Event must have id, aggregateId, timestamp, type, and data. ${validationError}. Got: ${JSON.stringify(
-              event
+              event,
             )}`,
             "events",
             event,
@@ -262,7 +260,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
                 parseResult.success === false
                   ? parseResult.error.issues
                   : void 0,
-            }
+            },
           );
         }
       }
@@ -284,7 +282,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
           `Invalid payload for command type "${commandType}". Validation failed.`,
           "payload",
           payload,
-          { commandType }
+          { commandType },
         );
       }
       // If validation passes, queue the job
@@ -303,7 +301,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
 export class QueueProcessorManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
   private readonly logger = createLogger(
-    "langwatch:event-sourcing:queue-processor-manager"
+    "langwatch:event-sourcing:queue-processor-manager",
   );
   private readonly queueProcessorFactory?: QueueProcessorFactory;
   private readonly distributedLock?: DistributedLock;
@@ -365,8 +363,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     handleEventCallback: (
       handlerName: string,
       event: EventType,
-      context: EventStoreReadContext<EventType>
-    ) => Promise<void>
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     if (!this.queueProcessorFactory) {
       return;
@@ -388,6 +386,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         makeJobId:
           handlerDef.options.makeJobId ?? this.createDefaultJobId.bind(this),
         delay: handlerDef.options.delay,
+        debounceMs: handlerDef.options.debounceMs,
         options: handlerDef.options.concurrency
           ? { concurrency: handlerDef.options.concurrency }
           : void 0,
@@ -420,8 +419,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     processProjectionEventCallback: (
       projectionName: string,
       event: EventType,
-      context: EventStoreReadContext<EventType>
-    ) => Promise<void>
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     if (!this.queueProcessorFactory) {
       return;
@@ -437,23 +436,26 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       // Use custom makeJobId if provided, otherwise default to event ID
       // Distributed lock ensures serial processing per aggregate
-      const makeProjectionJobId = projectionDef.options?.makeJobId ?? ((event: EventType): string => {
-        this.logger.debug(
-          {
-            projectionName,
-            eventId: event.id,
-            tenantId: event.tenantId,
-            aggregateId: String(event.aggregateId),
-            eventType: event.type,
-          },
-          "Created projection job ID from event ID"
-        );
-        return event.id;
-      });
+      const makeProjectionJobId =
+        projectionDef.options?.makeJobId ??
+        ((event: EventType): string => {
+          this.logger.debug(
+            {
+              projectionName,
+              eventId: event.id,
+              tenantId: event.tenantId,
+              aggregateId: String(event.aggregateId),
+              eventType: event.type,
+            },
+            "Created projection job ID from event ID",
+          );
+          return event.id;
+        });
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
         makeJobId: makeProjectionJobId,
+        debounceMs: projectionDef.options?.debounceMs,
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
@@ -472,10 +474,80 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
+   * Initializes queue processors for all registered command handlers.
+   * Each command handler gets its own queue processor for async processing.
+   *
+   * @param commandRegistrations - Array of command handler registrations
+   * @param storeEventsFn - Callback to store events after command processing
+   * @param pipelineName - Name of the pipeline (used for queue naming)
+   */
+  initializeCommandQueues<Payload>(
+    commandRegistrations: Array<{
+      name: string;
+      HandlerClass: CommandHandlerClass<any, any, EventType>;
+      options?: CommandHandlerOptions<Payload>;
+    }>,
+    storeEventsFn: (
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+    pipelineName: string,
+  ): void {
+    if (!this.queueProcessorFactory) {
+      return;
+    }
+
+    for (const registration of commandRegistrations) {
+      const handlerClass = registration.HandlerClass;
+      const schema = handlerClass.schema;
+      const commandType = schema.type;
+      const handlerInstance = new handlerClass();
+      const config = extractHandlerConfig(handlerClass, registration.options);
+
+      // Use static dispatcherName if available, otherwise use the registration name
+      const commandName = handlerClass.dispatcherName ?? registration.name;
+
+      // Validate uniqueness
+      if (this.commandQueueProcessors.has(commandName)) {
+        throw new ConfigurationError(
+          "QueueProcessorManager",
+          `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
+          { commandName },
+        );
+      }
+
+      // Create queue name
+      const queueName = `${pipelineName}/command/${commandName}`;
+
+      // Use per-command lockTtlMs if provided, otherwise use default
+      const effectiveLockTtlMs = config.lockTtlMs ?? this.commandLockTtlMs;
+
+      // Create and register dispatcher
+      const dispatcher = createCommandDispatcher(
+        commandType,
+        schema,
+        handlerInstance,
+        config,
+        queueName,
+        storeEventsFn,
+        this.queueProcessorFactory,
+        this.aggregateType,
+        commandName,
+        this.distributedLock,
+        effectiveLockTtlMs,
+        this.featureFlagService,
+        registration.options?.killSwitch,
+      );
+
+      this.commandQueueProcessors.set(commandName, dispatcher);
+    }
+  }
+
+  /**
    * Gets the handler queue processor for a given handler name.
    */
   getHandlerQueueProcessor(
-    handlerName: string
+    handlerName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.handlerQueueProcessors.get(handlerName);
   }
@@ -484,7 +556,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Gets the projection queue processor for a given projection name.
    */
   getProjectionQueueProcessor(
-    projectionName: string
+    projectionName: string,
   ): EventSourcedQueueProcessor<EventType> | undefined {
     return this.projectionQueueProcessors.get(projectionName);
   }
@@ -510,80 +582,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
-   * Initializes queue processors for all registered command handlers.
-   * Each command handler gets its own queue processor for async processing.
-   *
-   * @param commandRegistrations - Array of command handler registrations
-   * @param storeEventsFn - Callback to store events after command processing
-   * @param pipelineName - Name of the pipeline (used for queue naming)
-   */
-  initializeCommandQueues<Payload>(
-    commandRegistrations: Array<{
-      name: string;
-      HandlerClass: CommandHandlerClass<any, any, EventType>;
-      options?: CommandHandlerOptions<Payload>;
-    }>,
-    storeEventsFn: (
-      events: EventType[],
-      context: EventStoreReadContext<EventType>
-    ) => Promise<void>,
-    pipelineName: string
-  ): void {
-    if (!this.queueProcessorFactory) {
-      return;
-    }
-
-    for (const registration of commandRegistrations) {
-      const HandlerClass = registration.HandlerClass;
-      const schema = HandlerClass.schema;
-      const commandType = schema.type;
-      const handlerInstance = new HandlerClass();
-      const config = extractHandlerConfig(HandlerClass, registration.options);
-
-      // Use static dispatcherName if available, otherwise use the registration name
-      const commandName = HandlerClass.dispatcherName ?? registration.name;
-
-      // Validate uniqueness
-      if (this.commandQueueProcessors.has(commandName)) {
-        throw new ConfigurationError(
-          "QueueProcessorManager",
-          `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
-          { commandName }
-        );
-      }
-
-      // Create queue name
-      const queueName = `${pipelineName}/command/${commandName}`;
-
-      // Use per-command lockTtlMs if provided, otherwise use default
-      const effectiveLockTtlMs = config.lockTtlMs ?? this.commandLockTtlMs;
-
-      // Create and register dispatcher
-      const dispatcher = createCommandDispatcher(
-        commandType,
-        schema,
-        handlerInstance,
-        config,
-        queueName,
-        storeEventsFn,
-        this.queueProcessorFactory,
-        this.aggregateType,
-        commandName,
-        this.distributedLock,
-        effectiveLockTtlMs,
-        this.featureFlagService,
-        registration.options?.killSwitch
-      );
-
-      this.commandQueueProcessors.set(commandName, dispatcher);
-    }
-  }
-
-  /**
    * Gets the command queue processor for a given command name.
    */
   getCommandQueueProcessor<Payload>(
-    commandName: string
+    commandName: string,
   ): EventSourcedQueueProcessor<Payload> | undefined {
     return this.commandQueueProcessors.get(commandName) as
       | EventSourcedQueueProcessor<Payload>
@@ -610,7 +612,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.handlerQueueProcessors.entries()) {
       this.logger.debug(
         { handlerName },
-        "Closing queue processor for event handler"
+        "Closing queue processor for event handler",
       );
       closePromises.push(queueProcessor.close());
     }
@@ -621,7 +623,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.projectionQueueProcessors.entries()) {
       this.logger.debug(
         { projectionName },
-        "Closing queue processor for projection"
+        "Closing queue processor for projection",
       );
       closePromises.push(queueProcessor.close());
     }
@@ -632,7 +634,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     ] of this.commandQueueProcessors.entries()) {
       this.logger.debug(
         { commandName },
-        "Closing queue processor for command handler"
+        "Closing queue processor for command handler",
       );
       closePromises.push(queueProcessor.close());
     }
@@ -645,7 +647,7 @@ export class QueueProcessorManager<EventType extends Event = Event> {
         projectionCount: this.projectionQueueProcessors.size,
         commandCount: this.commandQueueProcessors.size,
       },
-      "All queue processors closed"
+      "All queue processors closed",
     );
   }
 }
