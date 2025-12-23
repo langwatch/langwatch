@@ -1,4 +1,4 @@
-import { HStack, useDisclosure } from "@chakra-ui/react";
+import { Button, HStack, useDisclosure } from "@chakra-ui/react";
 import React from "react";
 import { ChevronDown } from "react-feather";
 import { Controller, useFormContext } from "react-hook-form";
@@ -29,21 +29,17 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini() {
           const llmErrors = formState.errors.version?.configData?.llm;
           return (
             <>
-              <HStack
+              <Button
                 key="llm-model-display"
-                border="1px solid"
-                borderColor={open ? "blue.200" : "gray.200"}
-                bg={open ? "blue.50" : "white"}
-                borderRadius="sm"
-                padding="1"
-                cursor="pointer"
+                variant="outline"
                 position="relative"
+                onClick={onToggle}
+                fontWeight="normal"
+                _active={{ bg: "gray.50" }}
               >
-                <HStack onClick={onToggle} width="full">
-                  <LLMModelDisplay model={field.value?.model ?? ""} />
-                  <ChevronDown size={16} />
-                </HStack>
-              </HStack>
+                <LLMModelDisplay model={field.value?.model ?? ""} />
+                <ChevronDown size={16} />
+              </Button>
               <LLMConfigModal
                 key="llm-config-modal"
                 open={open}

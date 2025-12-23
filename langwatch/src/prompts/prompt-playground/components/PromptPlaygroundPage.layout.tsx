@@ -1,4 +1,4 @@
-import { Box, HStack, Spacer } from "@chakra-ui/react";
+import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PromptPlaygroundMainContent } from "~/prompts/prompt-playground/components/PromptPlaygroundMainContent";
 import { PromptPlaygroundSidebar } from "~/prompts/prompt-playground/components/sidebar/PromptPlaygroundSidebar";
@@ -16,29 +16,19 @@ export function PromptPlaygroundPageLayout() {
     <DashboardLayout position="relative" compactMenu>
       <PromptConfigProvider>
         <PromptPlaygroundChatProvider>
-          <PageLayout.Header>
-            <PageLayout.Heading>Prompts</PageLayout.Heading>
-            <Spacer />
-            <AddPromptButton />
-          </PageLayout.Header>
           <HStack width="full" height="full" gap={0} position="relative">
-            <HStack
+            <VStack
               position="relative"
               top={0}
               left={0}
-              width="300px"
+              width="250px"
               height="full"
             >
-              <Box
-                position="absolute"
-                top={0}
-                left={0}
-                width="full"
-                height="full"
-              >
-                <PromptPlaygroundSidebar />
-              </Box>
-            </HStack>
+              <PageLayout.Header withBorder={false}>
+                <PageLayout.Heading>Prompts</PageLayout.Heading>
+              </PageLayout.Header>
+              <PromptPlaygroundSidebar />
+            </VStack>
             <PromptPlaygroundMainContent />
           </HStack>
         </PromptPlaygroundChatProvider>

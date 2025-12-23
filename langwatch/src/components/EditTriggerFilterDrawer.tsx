@@ -118,7 +118,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
       size="lg"
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
           <HStack>

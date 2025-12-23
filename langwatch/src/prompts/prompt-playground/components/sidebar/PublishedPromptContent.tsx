@@ -1,7 +1,8 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { PublishedPromptActions } from "./PublishedPromptActions";
 import { getDisplayHandle } from "./PublishedPromptsList";
+import { OrganizationBadge } from "~/prompts/components/ui/OrganizationBadge";
 
 interface PublishedPromptContentProps {
   promptId: string;
@@ -20,6 +21,11 @@ export function PublishedPromptContent({
 }: PublishedPromptContentProps) {
   return (
     <HStack justify="space-between" width="full" className="group">
+      {prompt?.scope === "ORGANIZATION" && (
+        <Box marginLeft="-12px">
+          <OrganizationBadge />
+        </Box>
+      )}
       <Text
         overflow="hidden"
         textOverflow="ellipsis"

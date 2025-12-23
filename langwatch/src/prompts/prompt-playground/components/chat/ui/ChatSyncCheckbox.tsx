@@ -29,12 +29,13 @@ export function ChatSyncCheckbox({
       opacity={visible ? 1 : 0}
       transition="opacity 0.2s"
       pointerEvents={visible ? "auto" : "none"}
+      marginBottom={-1}
       {...boxProps}
     >
       <Checkbox
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        size="sm"
+        size="xs"
         colorPalette="orange"
       >
         <Box fontSize="xs" color="gray.600">

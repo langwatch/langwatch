@@ -178,7 +178,7 @@ function DraggableTabsBrowserRoot({
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
       >
-        <HStack width="full" gap={0} height="full">
+        <HStack width="full" gap={2} padding={2} height="full">
           {children}
           <DragOverlay>
             {activeDrag ? <DragOverlayContent activeDrag={activeDrag} /> : null}
@@ -271,7 +271,7 @@ function DraggableTabsGroup({
  *
  * Single Responsibility: Provides the droppable area for tabs and renders the tab bar
  */
-interface DraggableTabsTabBarProps {
+interface DraggableTabsTabBarProps extends StackProps {
   children: React.ReactNode;
   tabIds: string[];
 }
@@ -282,9 +282,9 @@ interface DraggableTabsTabBarProps {
  * @param children - Tab trigger components
  * @param tabIds - Array of tab IDs for sortable context
  */
-function DraggableTabsTabBar({ children, tabIds }: DraggableTabsTabBarProps) {
+function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBarProps) {
   return (
-    <BrowserLikeTabs.Bar>
+    <BrowserLikeTabs.Bar {...props}>
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}

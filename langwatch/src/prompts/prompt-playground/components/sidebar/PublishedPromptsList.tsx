@@ -49,7 +49,7 @@ export function PublishedPromptsList() {
 
   const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
 
-  if (!publishedPrompts || publishedPrompts.length === 0) {
+  if (publishedPrompts?.length === 0) {
     return <SidebarEmptyState />;
   }
 

@@ -5,9 +5,10 @@ import { LuChevronDown } from "react-icons/lu";
 /**
  * Props for the SidebarRoot component
  */
-interface SidebarRootProps {
+interface SidebarRootProps extends BoxProps {
   /** The content to render inside the sidebar */
   children: React.ReactNode;
+  /** The props to pass to the Box component */
 }
 
 /**
@@ -16,16 +17,15 @@ interface SidebarRootProps {
  * @param props - The component props
  * @returns A styled navigation container with vertical scrolling
  */
-function SidebarRoot({ children }: SidebarRootProps) {
+function SidebarRoot({ children, ...props }: SidebarRootProps) {
   return (
     <Box
       as="nav"
       width="full"
       height="100%"
-      borderRight="1px solid"
-      borderColor="gray.200"
       overflowY="auto"
-      paddingY="2"
+      paddingBottom="2"
+      {...props}
     >
       <VStack gap={0} align="stretch">
         {children}

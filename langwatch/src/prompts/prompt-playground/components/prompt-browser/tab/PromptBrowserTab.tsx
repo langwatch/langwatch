@@ -1,6 +1,5 @@
 import { Box, Circle, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { LuX } from "react-icons/lu";
-import { OrganizationBadge } from "~/prompts/components/ui/OrganizationBadge";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { withController } from "~/utils/withControllerHOC";
 import { usePromptBrowserTabController } from "./usePromptBrowserTabController";
@@ -40,7 +39,6 @@ function PromptBrowserTabView({
         ) : meta.versionNumber != null ? (
           <VersionBadge version={meta.versionNumber ?? 0} />
         ) : null}
-        {meta.scope === "ORGANIZATION" && <OrganizationBadge />}
       </HStack>
       <Box
         role="button"

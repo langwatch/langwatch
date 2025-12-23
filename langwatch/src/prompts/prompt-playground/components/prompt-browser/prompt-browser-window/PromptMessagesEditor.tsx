@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, Card } from "@chakra-ui/react";
 import { useMemo } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
@@ -19,12 +19,10 @@ export function PromptMessagesEditor() {
     return inputs.map((input) => input.identifier);
   }, [inputs]);
   return (
-    <Box width="full" bg="gray.100" paddingY={1} paddingX={2} borderRadius="md">
-      <PromptMessagesField
-        messageFields={messageFields}
-        availableFields={availableMentions}
-        otherNodesFields={{}}
-      />
-    </Box>
+    <PromptMessagesField
+      messageFields={messageFields}
+      availableFields={availableMentions}
+      otherNodesFields={{}}
+    />
   );
 }

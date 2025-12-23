@@ -126,7 +126,7 @@ export function PromptTextArea({
         css={{
           "& textarea": {
             border: "1px solid #E2E8F0",
-            borderRadius: 6,
+            borderRadius: "0.75rem",
             padding: "8px 10px",
             backgroundClip: "padding-box",
           },
@@ -205,7 +205,8 @@ export function PromptTextArea({
           inputRef={textareaRef}
           customSuggestionsContainer={(children) => (
             <Box
-              background="white"
+              background="white/75"
+              backdropFilter="blur(8px)"
               border="1px solid #e2e8f0"
               borderRadius={4}
               padding="4px"

@@ -16,7 +16,7 @@ export function SavePromptButton() {
     <Button
       onClick={handleSaveVersion}
       disabled={!hasUnsavedChanges}
-      variant="outline"
+      colorPalette="blue"
     >
       {hasUnsavedChanges ? "Save" : "Saved"}
     </Button>

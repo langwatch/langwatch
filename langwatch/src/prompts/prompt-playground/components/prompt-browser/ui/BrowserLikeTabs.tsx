@@ -1,4 +1,4 @@
-import { HStack, Tabs, VStack, type TabsRootProps } from "@chakra-ui/react";
+import { HStack, Tabs, VStack, type StackProps, type TabsRootProps } from "@chakra-ui/react";
 
 /**
  * Props for BrowserLikeTabsRoot component
@@ -49,7 +49,7 @@ function BrowserLikeTabsRoot({
 /**
  * Props for BrowserLikeTabsBar component
  */
-interface BrowserLikeTabsBarProps {
+interface BrowserLikeTabsBarProps extends StackProps {
   children: React.ReactNode;
 }
 
@@ -58,9 +58,9 @@ interface BrowserLikeTabsBarProps {
  * Single Responsibility: Renders the tab bar container.
  * @param children - Tab list and additional controls
  */
-function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
+function BrowserLikeTabsBar({ children, ...props }: BrowserLikeTabsBarProps) {
   return (
-    <HStack gap={0} width="full" bg="gray.100">
+    <HStack gap={0} width="full" {...props}>
       {children}
     </HStack>
   );
@@ -73,7 +73,7 @@ function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
  */
 function BrowserLikeTabsList({ children }: { children: React.ReactNode }) {
   return (
-    <Tabs.List width="full" gap={0} height="full">
+    <Tabs.List width="full" gap={0} height="full" paddingY={0} background="none">
       {children}
     </Tabs.List>
   );

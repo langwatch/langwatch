@@ -57,7 +57,7 @@ export function HorizontalFormControl({
           direction === "horizontal" ? ["column", "column", "row"] : "column"
         }
         align={align}
-        gap={4}
+        gap={direction === "horizontal" ? 4 : 2}
       >
         <VStack
           align="start"
@@ -78,7 +78,7 @@ export function HorizontalFormControl({
               width: "full",
             })}
           >
-            <HStack gap={2}>
+            <HStack gap={2} width="full">
               {label}
               {tooltip && (
                 <Tooltip content={tooltip} positioning={{ placement: "top" }}>

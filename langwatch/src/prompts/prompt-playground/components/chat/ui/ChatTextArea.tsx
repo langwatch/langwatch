@@ -26,12 +26,11 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
         disabled={inProgress}
         resize="none"
         rows={1}
-        minHeight="40px"
-        maxHeight="200px"
-        paddingY={3}
+        minHeight="60px"
+        maxHeight="300px"
+        autoresize
         border="none"
         outline="none"
-        _focus={{ boxShadow: "none" }}
         _disabled={{ opacity: 0.6, cursor: "not-allowed" }}
       />
     );

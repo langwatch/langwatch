@@ -264,6 +264,9 @@ export function RecentItemsSection() {
         size="sm"
         border="none"
         width="full"
+        gap={3}
+        display="flex"
+        flexDirection="column"
       >
         <HStack width="full">
           <Heading>Jump right back</Heading>
@@ -314,10 +317,10 @@ export function RecentItemsSection() {
         )}
         {!isLoading && !error && recentItems && recentItems.length > 0 && (
           <>
-            <Tabs.Content value="recents" paddingTop={3}>
+            <Tabs.Content value="recents" paddingTop={0}>
               <RecentItemsGrid items={recentItems} />
             </Tabs.Content>
-            <Tabs.Content value="by-type" paddingTop={3}>
+            <Tabs.Content value="by-type" paddingTop={0}>
               <GroupedItemsView items={recentItems} />
             </Tabs.Content>
           </>
