@@ -1,8 +1,8 @@
 import { VStack } from "@chakra-ui/react";
 import React from "react";
-import { FieldsFilters } from "./FieldsFilters";
-import { TopicsSelector } from "./TopicsSelector";
+import { QueryStringFieldsFilters } from "./FieldsFilters";
 import { useFilterToggle } from "./FilterToggle";
+import { TopicsSelector } from "./TopicsSelector";
 
 export const FilterSidebar = React.memo(function FilterSidebar({
   defaultShowFilters = false,
@@ -19,12 +19,12 @@ export const FilterSidebar = React.memo(function FilterSidebar({
         align="start"
         minWidth="380"
         maxWidth="380"
-        gap={12}
+        gap={8}
         paddingTop={2}
         paddingBottom={"120px"}
       >
         {!hideTopics && <TopicsSelector />}
-        <FieldsFilters />
+        <QueryStringFieldsFilters />
       </VStack>
     )
   );

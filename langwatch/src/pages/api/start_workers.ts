@@ -5,7 +5,7 @@ export const maxDuration = 300; // This is also used by Vercel directly for the 
 
 export default async function handler(
   _req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   try {
     const maxRuntimeMs = (maxDuration - 60) * 1000; // Runs for a minute less than the max duration

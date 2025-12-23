@@ -1,7 +1,7 @@
-import { SimulationCard } from "./SimulationCard";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
-import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
+import { SimulationCard } from "./SimulationCard";
 
 // TODO: move this to hook wrapper
 export function SimulationChatViewer({
@@ -17,7 +17,7 @@ export function SimulationChatViewer({
     },
     {
       enabled: !!project,
-    }
+    },
   );
 
   return (
@@ -30,7 +30,11 @@ export function SimulationChatViewer({
       }
       status={data?.status}
     >
-      <CustomCopilotKitChat messages={data?.messages ?? []} smallerView />
+      <CustomCopilotKitChat
+        messages={data?.messages ?? []}
+        smallerView
+        hideInput
+      />
     </SimulationCard>
   );
 }

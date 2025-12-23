@@ -2,9 +2,9 @@ import { Heading, RadioCard, Text, VStack } from "@chakra-ui/react";
 import { Activity, Edit3 } from "react-feather";
 import { LuBadgeCheck, LuListChecks, LuShield } from "react-icons/lu";
 import {
+  type State,
   TASK_TYPES,
   useEvaluationWizardStore,
-  type State,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { ColorfulBlockIcon } from "../../../../optimization_studio/components/ColorfulBlockIcons";
 import { StepButton } from "../components/StepButton";

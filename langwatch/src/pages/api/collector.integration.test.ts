@@ -1,26 +1,29 @@
-import { type Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
 import { nanoid } from "nanoid";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
 import type { CollectorJob } from "../../server/background/types";
 import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
 import {
-  TRACE_INDEX,
   esClient,
+  TRACE_INDEX,
   traceIndexId,
 } from "../../server/elasticsearch";
-import {
-  type CollectorRESTParams,
-  type ElasticSearchTrace,
-  type LLMSpan,
-  type RAGSpan,
+import type {
+  CollectorRESTParams,
+  ElasticSearchTrace,
+  LLMSpan,
+  RAGSpan,
 } from "../../server/tracer/types";
-import { getTestProject, waitForResult } from "../../utils/testUtils";
+import {
+  createNextApiMocks,
+  getTestProject,
+  waitForResult,
+} from "../../utils/testUtils";
 import handler from "./collector";
-import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
-import { createNextApiMocks } from "../../utils/testUtils";
 
 const sampleSpan: LLMSpan = {
   type: "llm",

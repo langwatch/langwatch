@@ -1,6 +1,6 @@
-import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { Role } from "@copilotkit/runtime-client-gql";
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { convertScenarioMessagesToCopilotKit } from "../convert-scenario-messages";
 
 describe("convertScenarioMessagesToCopilotKit", () => {

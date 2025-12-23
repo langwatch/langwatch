@@ -1,23 +1,24 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../../server/db";
-
-import { createLogger } from "../../../utils/logger";
-
 import { CostReferenceType, CostType } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import type { JsonArray } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
+import type { Edge, Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
+import { fromZodError, type ZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
 import {
   getCurrentMonthCost,
   maxMonthlyUsageLimit,
 } from "../../../server/api/routers/limits";
+import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
 import {
-  runEvaluation,
   type DataForEvaluation,
+  runEvaluation,
 } from "../../../server/background/workers/evaluationsWorker";
-import { rAGChunkSchema } from "../../../server/tracer/types.generated";
+import { prisma } from "../../../server/db";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluationResult,
@@ -25,12 +26,8 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "../../../server/evaluations/evaluators.generated";
-import { extractChunkTextualContent } from "../../../server/background/workers/collector/rag";
-import { getCustomEvaluators } from "../../../server/api/routers/evaluations";
-import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
-
-import type { JsonArray } from "@prisma/client/runtime/library";
-import type { Edge, Node } from "@xyflow/react";
+import { rAGChunkSchema } from "../../../server/tracer/types.generated";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:guardrail:evaluate");
 
@@ -60,7 +57,7 @@ const defaultEvaluatorInputSchema = z.object({
       z.object({
         input: z.string().optional().nullable(),
         output: z.string().optional().nullable(),
-      })
+      }),
     )
     .optional()
     .nullable(),
@@ -70,7 +67,7 @@ type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -102,15 +99,18 @@ export default async function handler(
   try {
     params = batchEvaluationInputSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation params received');
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid evaluation params received",
+    );
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
 
   const maxMonthlyUsage = await maxMonthlyUsageLimit(
-    project.team.organizationId
+    project.team.organizationId,
   );
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
 
@@ -145,7 +145,7 @@ export default async function handler(
 
   const evaluator = await getEvaluatorIncludingCustom(
     project.id,
-    checkType as EvaluatorTypes
+    checkType as EvaluatorTypes,
   );
   if (!evaluator) {
     return res.status(400).json({
@@ -159,7 +159,7 @@ export default async function handler(
   try {
     data = getEvaluatorDataForParams(
       checkType,
-      params.data as Record<string, any>
+      params.data as Record<string, any>,
     );
     if (
       !evaluationRequiredFields.every((field: string) => {
@@ -172,8 +172,11 @@ export default async function handler(
       });
     }
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid evaluation data received');
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid evaluation data received",
+    );
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -261,7 +264,7 @@ export default async function handler(
 
 export const getEvaluatorDataForParams = (
   checkType: string,
-  params: Record<string, any>
+  params: Record<string, any>,
 ): DataForEvaluation => {
   if (checkType.startsWith("custom/")) {
     return {
@@ -311,7 +314,7 @@ export const getEvaluatorDataForParams = (
         conversation?.map((message) => ({
           input: message.input ?? undefined,
           output: message.output ?? undefined,
-        })) ?? []
+        })) ?? [],
       ),
     },
   };
@@ -319,7 +322,7 @@ export const getEvaluatorDataForParams = (
 
 export const getEvaluatorIncludingCustom = async (
   projectId: string,
-  checkType: EvaluatorTypes
+  checkType: EvaluatorTypes,
 ): Promise<
   EvaluatorDefinition<keyof typeof AVAILABLE_EVALUATORS> | undefined
 > => {
@@ -335,7 +338,7 @@ export const getEvaluatorIncludingCustom = async (
           JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
             ?.edges as Edge[],
           JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[]
+            ?.nodes as JsonArray as unknown[] as Node[],
         );
         const requiredFields = inputs.map((input) => input.identifier);
 
@@ -346,7 +349,7 @@ export const getEvaluatorIncludingCustom = async (
             requiredFields: requiredFields,
           },
         ];
-      })
+      }),
     ),
   };
 

@@ -1,21 +1,17 @@
-import {
-  type PrismaClient,
-  type Dataset,
-  type DatasetRecord,
-} from "@prisma/client";
+import type { Dataset, DatasetRecord, PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { captureException } from "~/utils/posthogErrorCapture";
 import {
-  newDatasetEntriesSchema,
   type DatasetRecordEntry,
+  newDatasetEntriesSchema,
 } from "../../datasets/types";
 import { prisma } from "../../db";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { StorageService } from "../../storage";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-import { StorageService } from "../../storage";
-import * as Sentry from "@sentry/nextjs";
 const storageService = new StorageService();
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -26,10 +22,10 @@ export const datasetRecordRouter = createTRPCRouter({
           projectId: z.string(),
           datasetId: z.string(),
         }),
-        newDatasetEntriesSchema
-      )
+        newDatasetEntriesSchema,
+      ),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:create"))
     .mutation(async ({ ctx, input }) => {
       const dataset = await ctx.prisma.dataset.findFirst({
         where: {
@@ -58,9 +54,9 @@ export const datasetRecordRouter = createTRPCRouter({
         datasetId: z.string(),
         recordId: z.string(),
         updatedRecord: z.record(z.string(), z.any()),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:update"))
     .mutation(async ({ ctx, input }) => {
       const { recordId, updatedRecord } = input;
 
@@ -88,7 +84,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input }) => {
       return getFullDataset({
         datasetId: input.datasetId,
@@ -97,7 +93,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   download: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .mutation(async ({ input }) => {
       return getFullDataset({
         datasetId: input.datasetId,
@@ -107,7 +103,7 @@ export const datasetRecordRouter = createTRPCRouter({
     }),
   getHead: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -125,7 +121,7 @@ export const datasetRecordRouter = createTRPCRouter({
       if (dataset.useS3) {
         const { records, count } = await storageService.getObject(
           input.projectId,
-          dataset.id
+          dataset.id,
         );
         const total = count;
         (dataset as any).datasetRecords = records.slice(0, 5);
@@ -155,9 +151,9 @@ export const datasetRecordRouter = createTRPCRouter({
         projectId: z.string(),
         datasetId: z.string(),
         recordIds: z.array(z.string()),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:delete"))
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 
@@ -204,7 +200,7 @@ const deleteManyDatasetRecords = async ({
     try {
       const { records: fetchedRecords } = await storageService.getObject(
         projectId,
-        datasetId
+        datasetId,
       );
       records = fetchedRecords;
     } catch (error) {
@@ -214,7 +210,7 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      Sentry.captureException(error);
+      captureException(error);
       throw error;
     }
 
@@ -232,7 +228,7 @@ const deleteManyDatasetRecords = async ({
     await storageService.putObject(
       projectId,
       datasetId,
-      JSON.stringify(records)
+      JSON.stringify(records),
     );
 
     await prisma.dataset.update({
@@ -280,7 +276,7 @@ const updateDatasetRecord = async ({
     const { records } = await storageService.getObject(projectId, datasetId);
 
     const recordIndex = records.findIndex(
-      (record: any) => record.id === recordId
+      (record: any) => record.id === recordId,
     );
     if (recordIndex === -1) {
       // Create a new record
@@ -306,7 +302,7 @@ const updateDatasetRecord = async ({
     await storageService.putObject(
       projectId,
       datasetId,
-      JSON.stringify(records)
+      JSON.stringify(records),
     );
 
     await prisma.dataset.update({
@@ -345,7 +341,7 @@ const updateDatasetRecord = async ({
 const createDatasetRecords = (
   entries: DatasetRecordEntry[],
   { datasetId, projectId }: { datasetId: string; projectId: string },
-  useS3 = false
+  useS3 = false,
 ) => {
   return entries.map((entry, index) => {
     const id = entry.id ?? nanoid();
@@ -400,19 +396,19 @@ export const createManyDatasetRecords = async ({
         datasetId,
         projectId,
       },
-      true
+      true,
     );
 
     let existingRecords: any[] = [];
     try {
       const { records: fetchedRecords } = await storageService.getObject(
         projectId,
-        datasetId
+        datasetId,
       );
       existingRecords = fetchedRecords;
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") {
-        Sentry.captureException(error);
+        captureException(error);
         throw error;
       }
     }
@@ -423,7 +419,7 @@ export const createManyDatasetRecords = async ({
     await storageService.putObject(
       projectId,
       datasetId,
-      JSON.stringify(allRecords)
+      JSON.stringify(allRecords),
     );
 
     await prisma.dataset.update({
@@ -483,14 +479,14 @@ export const getFullDataset = async ({
     try {
       const { records: recordsFromStorage } = await storageService.getObject(
         projectId,
-        datasetId
+        datasetId,
       );
       records = recordsFromStorage;
 
       while (!truncated) {
         const batch = records.slice(
           currentPage * BATCH_SIZE,
-          (currentPage + 1) * BATCH_SIZE
+          (currentPage + 1) * BATCH_SIZE,
         );
 
         if (batch.length === 0) break;
@@ -516,7 +512,7 @@ export const getFullDataset = async ({
         truncated,
       };
     } catch (error) {
-      Sentry.captureException(error);
+      captureException(error);
       throw error;
     }
   } else {
@@ -533,10 +529,10 @@ export const getFullDataset = async ({
         entrySelection === "last"
           ? Math.max(count - 1, 0)
           : entrySelection === "random"
-          ? Math.floor(Math.random() * count)
-          : typeof entrySelection === "number"
-          ? Math.max(0, Math.min(entrySelection, count - 1) - 1)
-          : 0;
+            ? Math.floor(Math.random() * count)
+            : typeof entrySelection === "number"
+              ? Math.max(0, Math.min(entrySelection, count - 1) - 1)
+              : 0;
 
       return {
         ...dataset,

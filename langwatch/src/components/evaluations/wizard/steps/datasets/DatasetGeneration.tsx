@@ -1,26 +1,26 @@
-import { Input, Button, Text, HStack, VStack, Spinner } from "@chakra-ui/react";
-import { LuSparkles, LuBot, LuChevronRight } from "react-icons/lu";
-import { toaster } from "../../../../ui/toaster";
 import { useChat } from "@ai-sdk/react";
-import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useShallow } from "zustand/react/shallow";
-import { api } from "../../../../../utils/api";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
+import { DefaultChatTransport } from "ai";
+import { nanoid } from "nanoid";
 import Parse from "papaparse";
-import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuBot, LuChevronRight, LuSparkles } from "react-icons/lu";
+import { useShallow } from "zustand/react/shallow";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
+import { api } from "../../../../../utils/api";
+import { DEFAULT_MODEL } from "../../../../../utils/constants";
+import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
-import { nanoid } from "nanoid";
-import { DefaultChatTransport } from "ai";
-import * as Sentry from "@sentry/nextjs";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "../../../../ModelSelector";
-import { DEFAULT_MODEL } from "../../../../../utils/constants";
-import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
+import { toaster } from "../../../../ui/toaster";
+import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
 export function DatasetGeneration() {
   const { project } = useOrganizationTeamProject();
@@ -28,7 +28,7 @@ export function DatasetGeneration() {
     useShallow((state) => ({
       datasetId: state.getDatasetId(),
       datasetGridRef: state.datasetGridRef,
-    }))
+    })),
   );
 
   // Check if the default model is enabled
@@ -36,7 +36,7 @@ export function DatasetGeneration() {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,
-    "chat"
+    "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -45,7 +45,7 @@ export function DatasetGeneration() {
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   const columnTypes = useMemo(() => {
@@ -141,7 +141,7 @@ export function DatasetGeneration() {
 
                 columnNames = ["id", ...dataColumns];
               }
-            } catch (error) {
+            } catch {
               toaster.create({
                 title: "Error",
                 description: "Failed to get grid columns via fallback",
@@ -166,7 +166,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           if (!rowData.id) {
             rowData.id = nanoid();
@@ -210,7 +210,7 @@ export function DatasetGeneration() {
 
                 columnNames = ["id", ...dataColumns];
               }
-            } catch (error) {
+            } catch {
               toaster.create({
                 title: "Error",
                 description: "Failed to get grid columns via fallback",
@@ -224,7 +224,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           rowData.id = id;
 
@@ -357,7 +357,7 @@ export function DatasetGeneration() {
                 void databaseDataset.refetch();
                 reject(error);
               },
-            }
+            },
           );
         });
 
@@ -382,7 +382,7 @@ export function DatasetGeneration() {
       // Start processing if not already processing
       if (!isProcessing.current) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
+          captureException(error, {
             tags: {
               datasetId: datasetId,
             },
@@ -391,7 +391,7 @@ export function DatasetGeneration() {
         });
       }
     },
-    [datasetId, processQueue]
+    [datasetId, processQueue],
   );
 
   const deleteRecord = useCallback(
@@ -418,10 +418,10 @@ export function DatasetGeneration() {
             });
             void databaseDataset.refetch();
           },
-        }
+        },
       );
     },
-    [databaseDataset, datasetId, project?.id, deleteDatasetRecord]
+    [databaseDataset, datasetId, project?.id, deleteDatasetRecord],
   );
 
   // Cleanup effect to process remaining queue items
@@ -432,10 +432,12 @@ export function DatasetGeneration() {
     return () => {
       if (queue?.length > 0 && !processing) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
-            tags: {
-              datasetId: datasetId,
-            },
+          captureException(error, {
+            ...(datasetId && {
+              tags: {
+                datasetId: datasetId,
+              },
+            }),
           });
           console.error("Error processing queue during cleanup:", error);
         });
@@ -448,10 +450,12 @@ export function DatasetGeneration() {
     if (updateQueue.current?.length > 0 && !isProcessing.current) {
       processQueue().catch((error) => {
         console.error("Error processing queue during dataset change:", error);
-        Sentry.captureException(error, {
-          tags: {
-            datasetId: datasetId,
-          },
+        captureException(error, {
+          ...(datasetId && {
+            tags: {
+              datasetId: datasetId,
+            },
+          }),
         });
         console.error("Error processing queue during cleanup:", error);
       });
@@ -483,7 +487,7 @@ export function DatasetGeneration() {
             dataset: datasetCsv,
             projectId: project?.id,
           },
-        }
+        },
       );
       setInput("");
     }

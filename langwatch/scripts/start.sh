@@ -7,28 +7,28 @@ if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
 fi
 
-START_APP_COMMAND="npm run start:app"
+START_APP_COMMAND="pnpm run start:app"
 
 START_WORKERS_COMMAND=""
 # if REDIS_URL or REDIS_CLUSTER_ENDPOINTS is available on .env or set in the environment, start the workers
 if grep -Eq "^(REDIS_URL|REDIS_CLUSTER_ENDPOINTS)=\"?[[:alnum:]]" .env \
    || [ -n "$REDIS_URL" ] \
    || [ -n "$REDIS_CLUSTER_ENDPOINTS" ]; then
-  START_WORKERS_COMMAND="npm run start:workers && exit 1"
+  START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
 START_QUICKWIT_COMMAND=""
 if grep -q "^ELASTICSEARCH_NODE_URL=\"\?quickwit://" .env || ([ -n "$ELASTICSEARCH_NODE_URL" ] && [[ "$ELASTICSEARCH_NODE_URL" =~ ^quickwit:// ]]); then
-  START_QUICKWIT_COMMAND="npm run start:quickwit"
-  START_APP_COMMAND="./scripts/wait-for-quickwit.sh && npm run start:prepare:db && npm run start:app"
+  START_QUICKWIT_COMMAND="pnpm run start:quickwit"
+  START_APP_COMMAND="./scripts/wait-for-quickwit.sh && pnpm run start:prepare:db && pnpm run start:app"
   RUNTIME_ENV="$RUNTIME_ENV RUST_LOG=error"
 
   if [ ! -d "quickwit" ]; then
     echo "Quickwit was not found, installing it..."
-    npm run setup:quickwit
+    pnpm run setup:quickwit
   fi
 else
- npm run start:prepare:db
+ pnpm run start:prepare:db
 fi
 
 COMMANDS=()

@@ -1,27 +1,24 @@
-import {
-  type PrismaClient,
-  type LlmPromptConfig,
-  type LlmPromptConfigVersion,
-  type Prisma,
+import type {
+  LlmPromptConfig,
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-
+import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "../../../utils/logger";
 import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
-
 import {
-  parseLlmConfigVersion,
-  type LatestConfigVersionSchema,
   getSchemaValidator,
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
+  parseLlmConfigVersion,
 } from "./llm-config-version-schema";
 import {
-  LlmConfigVersionsRepository,
   type CreateLlmConfigVersionParams,
+  LlmConfigVersionsRepository,
 } from "./llm-config-versions.repository";
-
-import { DEFAULT_MODEL } from "~/utils/constants";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
@@ -45,6 +42,9 @@ export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
   latestVersion: LatestConfigVersionSchema & {
     author?: { name: string } | null;
   };
+  _count?: {
+    copiedPrompts?: number;
+  } | null;
 }
 
 /**
@@ -56,7 +56,7 @@ export class LlmConfigRepository {
 
   constructor(
     private readonly prisma: PrismaClient,
-    versions = new LlmConfigVersionsRepository(prisma)
+    versions = new LlmConfigVersionsRepository(prisma),
   ) {
     this.versions = versions;
   }
@@ -89,6 +89,11 @@ export class LlmConfigRepository {
           },
           take: 1,
         },
+        _count: {
+          select: {
+            copiedPrompts: true,
+          },
+        },
       },
     });
 
@@ -100,7 +105,7 @@ export class LlmConfigRepository {
           config.handle = this.removeHandlePrefixes(
             config.handle,
             projectId,
-            organizationId
+            organizationId,
           );
 
           if (!config.versions?.[0]) {
@@ -114,7 +119,7 @@ export class LlmConfigRepository {
         } catch (error) {
           logger.error(
             { error, configId: config.id },
-            "Error parsing LLM config version"
+            "Error parsing LLM config version",
           );
           return null;
         }
@@ -240,14 +245,14 @@ export class LlmConfigRepository {
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
       throw new NotFoundError(
-        `Prompt config has no versions. ID: ${idOrHandle}`
+        `Prompt config has no versions. ID: ${idOrHandle}`,
       );
     }
 
     config.handle = this.removeHandlePrefixes(
       config.handle,
       projectId,
-      organizationId
+      organizationId,
     );
 
     try {
@@ -259,7 +264,7 @@ export class LlmConfigRepository {
       throw new Error(
         `Failed to parse LLM config version: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
     }
   }
@@ -273,7 +278,7 @@ export class LlmConfigRepository {
     data: Partial<CreateLlmConfigParams>,
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<LlmPromptConfig> {
     const { tx } = options ?? {};
     const client = tx ?? this.prisma;
@@ -291,7 +296,7 @@ export class LlmConfigRepository {
 
     if (!organizationId) {
       throw new NotFoundError(
-        `Organization not found. Project ID: ${projectId}`
+        `Organization not found. Project ID: ${projectId}`,
       );
     }
 
@@ -335,7 +340,7 @@ export class LlmConfigRepository {
     updatedConfig.handle = this.removeHandlePrefixes(
       updatedConfig.handle,
       projectId,
-      existingConfig.organizationId
+      existingConfig.organizationId,
     );
 
     return updatedConfig;
@@ -343,11 +348,14 @@ export class LlmConfigRepository {
 
   /**
    * Delete an LLM config and all its versions
+   *
+   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
+   * otherwise it will throw.
    */
   async deleteConfig(
     idOrHandle: string,
     projectId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<{ success: boolean }> {
     const config = await this.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
@@ -359,6 +367,14 @@ export class LlmConfigRepository {
       throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
     }
 
+    const isProjectMatch = config.projectId === projectId;
+    if (!isProjectMatch) {
+      throw new Error(
+        `Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${projectId}`,
+      );
+    }
+
+    // This will error if the projectId !== config.projectId
     await this.prisma.llmPromptConfig.delete({
       where: { id: config.id, projectId },
     });
@@ -440,7 +456,6 @@ export class LlmConfigRepository {
 
         newVersionData = {
           configData,
-          version: 0,
           schemaVersion: LATEST_SCHEMA_VERSION,
           commitMessage: "Initial version",
         };
@@ -454,7 +469,7 @@ export class LlmConfigRepository {
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...newVersionData,
-          version: 0,
+          version: 1,
           configData: newVersionData.configData as Prisma.InputJsonValue,
           id: this.versions.generateVersionId(),
           configId: newConfig.id,
@@ -473,7 +488,7 @@ export class LlmConfigRepository {
       updatedConfig.handle = this.removeHandlePrefixes(
         updatedConfig.handle,
         configData.projectId,
-        configData.organizationId
+        configData.organizationId,
       );
 
       return {
@@ -506,7 +521,7 @@ export class LlmConfigRepository {
           handle: string;
           scope: "ORGANIZATION";
           organizationId: string;
-        }
+        },
   ): string {
     const { handle, scope } = args;
 
@@ -520,7 +535,7 @@ export class LlmConfigRepository {
   removeHandlePrefixes(
     handle: string | null,
     projectId: string,
-    organizationId: string
+    organizationId: string,
   ): string | null {
     if (!handle) {
       return null;
@@ -605,7 +620,7 @@ export class LlmConfigRepository {
    */
   compareConfigContent(
     config1: unknown,
-    config2: unknown
+    config2: unknown,
   ): { isEqual: boolean; differences?: string[] } {
     try {
       // Get the configData schema for normalization
@@ -625,12 +640,12 @@ export class LlmConfigRepository {
         const differences: string[] = [];
         if (!parseResult1.success) {
           differences.push(
-            "config1 validation failed: " + parseResult1.error.message
+            "config1 validation failed: " + parseResult1.error.message,
           );
         }
         if (!parseResult2.success) {
           differences.push(
-            "config2 validation failed: " + parseResult2.error.message
+            "config2 validation failed: " + parseResult2.error.message,
           );
         }
         return { isEqual: false, differences };
@@ -643,12 +658,12 @@ export class LlmConfigRepository {
       const json1 = JSON.stringify(
         normalized1,
         Object.keys(normalized1).sort(),
-        2
+        2,
       );
       const json2 = JSON.stringify(
         normalized2,
         Object.keys(normalized2).sort(),
-        2
+        2,
       );
 
       const isEqual = json1 === json2;
@@ -660,7 +675,7 @@ export class LlmConfigRepository {
         // TODO: move this to a more git diff kinda of approach
         if (normalized1.model !== normalized2.model) {
           differences.push(
-            `model: ${normalized1.model} → ${normalized2.model}`
+            `model: ${normalized1.model} → ${normalized2.model}`,
           );
         }
         if (normalized1.prompt !== normalized2.prompt) {
@@ -686,12 +701,12 @@ export class LlmConfigRepository {
         }
         if (normalized1.temperature !== normalized2.temperature) {
           differences.push(
-            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`
+            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`,
           );
         }
         if (normalized1.max_tokens !== normalized2.max_tokens) {
           differences.push(
-            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`
+            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`,
           );
         }
 
@@ -720,7 +735,7 @@ export class LlmConfigRepository {
    * Build a default version base for a config
    */
   private buildDefaultVersionConfigData(
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",

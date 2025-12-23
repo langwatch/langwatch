@@ -10,14 +10,14 @@ import {
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
+import { Dialog } from "../../../components/ui/dialog";
+import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
+import { DEFAULT_MODEL } from "../../../utils/constants";
+import { trackEvent } from "../../../utils/tracking";
 import type { Workflow } from "../../types/dsl";
 import { EmojiPickerModal } from "../properties/modals/EmojiPickerModal";
-import { trackEvent } from "../../../utils/tracking";
-import { toaster } from "../../../components/ui/toaster";
-import { Dialog } from "../../../components/ui/dialog";
-import { DEFAULT_MODEL } from "../../../utils/constants";
 
 type FormData = {
   name: string;
@@ -164,7 +164,7 @@ export const NewWorkflowForm = ({
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩"
       ? template.icon
-      : getRandomWorkflowIcon()
+      : getRandomWorkflowIcon(),
   );
 
   const {
@@ -212,17 +212,16 @@ export const NewWorkflowForm = ({
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
-        }
+        },
       );
 
       trackEvent("workflow_create", { project_id: project?.id });
 
       onClose();
       void router.push(
-        `/${project.slug}/studio/${createdWorkflow.workflow.id}`
+        `/${project.slug}/studio/${createdWorkflow.workflow.id}`,
       );
     } catch (error) {
       console.error("Error creating workflow:", error);
@@ -258,7 +257,7 @@ export const NewWorkflowForm = ({
             />
             <Field.Label>Name and Icon</Field.Label>
             <HStack>
-              <Button onClick={emojiPicker.onOpen} fontSize="18px">
+              <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
                 {icon}
               </Button>
               <Input

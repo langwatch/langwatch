@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -6,11 +7,10 @@ import { prisma } from "../../server/db";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import type { LLMConfig, ServerWorkflow, Workflow } from "../types/dsl";
 import type { StudioClientEvent } from "../types/events";
-import crypto from "crypto";
 
 export const addEnvs = async (
   event: StudioClientEvent,
-  projectId: string
+  projectId: string,
 ): Promise<StudioClientEvent> => {
   if (!("workflow" in event.payload)) {
     return event;
@@ -72,11 +72,11 @@ export const addEnvs = async (
               };
             }
             return p;
-          }) ?? []
+          }) ?? [],
         );
 
         return { ...node, data: { ...node.data, parameters } };
-      })
+      }),
     ),
   };
 
@@ -118,15 +118,34 @@ const addLiteLLMParams = async ({
   }
   if (!modelProvider.enabled) {
     throw new Error(
-      `${provider} model provider is disabled, go to settings to enable it`
+      `${provider} model provider is disabled, go to settings to enable it`,
     );
   }
   if (customKeysOnly && !modelProvider.customKeys) {
     throw new Error(`Custom API key required for ${provider}`);
   }
 
+  // Normalize to snake_case format (DSPy expects max_tokens not maxTokens)
+  const normalizedLLM: LLMConfig = {
+    model: llm.model,
+  };
+
+  if (llm.temperature !== undefined) {
+    normalizedLLM.temperature = llm.temperature;
+  }
+
+  // Handle both camelCase (maxTokens) and snake_case (max_tokens)
+  const maxTokens = (llm as any).maxTokens ?? llm.max_tokens;
+  if (maxTokens !== undefined) {
+    normalizedLLM.max_tokens = maxTokens;
+  }
+
+  if (llm.litellm_params !== undefined) {
+    normalizedLLM.litellm_params = llm.litellm_params;
+  }
+
   return {
-    ...llm,
+    ...normalizedLLM,
     litellm_params: await prepareLitellmParams({
       model: llm.model,
       modelProvider,

@@ -1,16 +1,13 @@
-import { Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { useDisclosure } from "@chakra-ui/react";
+import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
-import { ChevronDownIcon, CheckIcon } from "lucide-react";
-import React, { useEffect, useState, createContext, useContext } from "react";
+import { CheckIcon, ChevronDownIcon } from "lucide-react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
-import type { Snippet, Target } from "../prompt-configs/types";
-
+import type { Snippet, Target } from "~/prompts/types";
+import { uppercaseFirstLetter } from "~/utils/stringCasing";
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";
 import { Menu } from "./ui/menu";
-
-import { uppercaseFirstLetter } from "~/utils/stringCasing";
 
 // Add context for dialog state
 const ApiSnippetDialogContext = createContext<{
@@ -49,7 +46,7 @@ export function GenerateApiSnippetDialog({
   const [selectedTarget, setSelectedTarget] =
     useState<Target>("python_python3");
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
-    snippets[0]
+    snippets[0],
   );
 
   const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -60,7 +57,7 @@ export function GenerateApiSnippetDialog({
   useEffect(() => {
     if (!selectedTarget) return;
     const snippet = snippets.find(
-      (snippet) => snippet.target === selectedTarget
+      (snippet) => snippet.target === selectedTarget,
     );
     if (snippet) {
       setSelectedSnippet(snippet);
@@ -81,43 +78,24 @@ export function GenerateApiSnippetDialog({
         onOpenChange={({ open }) => (open ? onOpen() : onClose())}
         size="xl"
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
-            <HStack justifyContent="space-between" width="100%">
-              <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+            <HStack
+              justifyContent="space-between"
+              width="100%"
+              alignItems="flex-start"
+            >
+              <VStack alignItems="flex-start" gap={2}>
+                <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+                <Dialog.Description>{description}</Dialog.Description>
+              </VStack>
               <LanguageMenu
                 selectedTarget={selectedTarget}
                 setSelectedTarget={setSelectedTarget}
                 targets={targets}
               />
             </HStack>
-            <Dialog.Description>
-              <VStack alignItems="flex-start" gap={2}>
-                {description}
-                <HStack>
-                  <Text
-                    fontSize="sm"
-                    color="green.500"
-                    backgroundColor="gray.100"
-                    paddingX={2}
-                    paddingY={1}
-                    borderRadius={5}
-                  >
-                    {selectedSnippet.method}
-                  </Text>
-                  <Text
-                    fontSize="sm"
-                    color="gray.500"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                  >
-                    {selectedSnippet.path}
-                  </Text>
-                </HStack>
-              </VStack>
-            </Dialog.Description>
           </Dialog.Header>
           <Dialog.Body>
             <RenderCode

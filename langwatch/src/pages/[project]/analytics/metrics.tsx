@@ -2,38 +2,24 @@ import {
   Box,
   Card,
   GridItem,
-  HStack,
   Heading,
+  HStack,
   SimpleGrid,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY; // 1440
-
-const userCount = {
-  graphId: "custom",
-  graphType: "summary",
-  series: [
-    {
-      name: "",
-      colorSet: "blueTones",
-      metric: "metadata.user_id",
-      aggregation: "cardinality",
-    },
-  ],
-  includePrevious: true,
-  timeScale: ONE_DAY,
-  height: 550,
-};
 
 const LLMMetrics = {
   graphId: "custom",
@@ -192,10 +178,27 @@ const averageTokensPerMessage = {
   height: 300,
 };
 
-export default function Users() {
+function MetricsContent() {
+  const { hasPermission } = useOrganizationTeamProject();
+  const canViewCost = hasPermission("cost:view");
+
+  // Filter out cost metrics if user doesn't have cost:view permission
+  const LLMMetricsFiltered = {
+    ...LLMMetrics,
+    series: LLMMetrics.series.filter(
+      (s) => canViewCost || !s.metric?.includes("total_cost"),
+    ),
+  };
+
+  const LLMSummaryFiltered = {
+    ...LLMSummary,
+    series: LLMSummary.series.filter(
+      (s) => canViewCost || !s.metric?.includes("total_cost"),
+    ),
+  };
+
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="LLM Metrics" />
+    <GraphsLayout title="LLM Metrics">
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width={"100%"}>
           <GridItem colSpan={2} display="inline-grid">
@@ -207,7 +210,7 @@ export default function Users() {
                 </HStack>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={LLMMetrics as CustomGraphInput} />
+                <CustomGraph input={LLMMetricsFiltered as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -220,7 +223,7 @@ export default function Users() {
                 </HStack>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={LLMSummary as CustomGraphInput} />
+                <CustomGraph input={LLMSummaryFiltered as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -264,19 +267,21 @@ export default function Users() {
               </Card.Body>
             </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Cost Per Message</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={totalCostPerModel as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          {canViewCost && (
+            <GridItem colSpan={2} display="inline-grid">
+              <Card.Root>
+                <Card.Header>
+                  <HStack gap={2}>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Cost Per Message</Heading>
+                  </HStack>
+                </Card.Header>
+                <Card.Body>
+                  <CustomGraph input={totalCostPerModel as CustomGraphInput} />
+                </Card.Body>
+              </Card.Root>
+            </GridItem>
+          )}
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root>
               <Card.Header>
@@ -300,3 +305,5 @@ export default function Users() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view")(MetricsContent);

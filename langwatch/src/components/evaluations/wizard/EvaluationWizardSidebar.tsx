@@ -69,7 +69,7 @@ export const WizardSidebar = memo(function WizardSidebar({
         evaluatorNode: state.getFirstEvaluatorNode(),
         entryNodeDatasetId: state.entryNodeDatasetId,
       };
-    })
+    }),
   );
 
   const [showSpinner, setShowSpinner] = useState(false);
@@ -79,7 +79,7 @@ export const WizardSidebar = memo(function WizardSidebar({
       () => {
         setShowSpinner(isLoading);
       },
-      isLoading ? 400 : 0
+      isLoading ? 400 : 0,
     );
   }, [isLoading]);
 
@@ -91,7 +91,7 @@ export const WizardSidebar = memo(function WizardSidebar({
         ([entry]) => {
           setIsSticky(!!entry && entry.intersectionRatio < 1);
         },
-        { threshold: [1] }
+        { threshold: [1] },
       );
 
       const current = stickyRef.current;
@@ -316,7 +316,6 @@ export const WizardSidebar = memo(function WizardSidebar({
                               description:
                                 "Incoming messages will now be evaluated",
                               type: "success",
-                              placement: "top-end",
                               meta: {
                                 closable: true,
                               },
@@ -327,13 +326,12 @@ export const WizardSidebar = memo(function WizardSidebar({
                               title: "Error creating monitor",
                               description: "Please try again",
                               type: "error",
-                              placement: "top-end",
                               meta: {
                                 closable: true,
                               },
                             });
                           },
-                        }
+                        },
                       );
                     }}
                   >

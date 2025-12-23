@@ -1,14 +1,14 @@
 import { EmptyState, Grid, RadioCard } from "@chakra-ui/react";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
+import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
+import { Link } from "../../../../ui/link";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
 import { useEvaluatorCategories } from "./CategorySelectionAccordion";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
-import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
-import { Link } from "../../../../ui/link";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 
 export const EvaluatorSelectionAccordion = ({
   setAccordeonValue,
@@ -24,7 +24,7 @@ export const EvaluatorSelectionAccordion = ({
   const availableEvaluators = useAvailableEvaluators();
 
   const handleEvaluatorSelect = (
-    evaluatorType: EvaluatorTypes | `custom/${string}`
+    evaluatorType: EvaluatorTypes | `custom/${string}`,
   ) => {
     if (!availableEvaluators) return;
     // This initializes the evaluator node without any properties
@@ -32,7 +32,7 @@ export const EvaluatorSelectionAccordion = ({
       {
         evaluator: evaluatorType,
       },
-      availableEvaluators
+      availableEvaluators,
     );
     const nextStep =
       wizardState.task == "real_time" &&
@@ -66,8 +66,12 @@ export const EvaluatorSelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={getFirstEvaluatorNode()?.data.evaluator}
-        onValueChange={(e: { value: EvaluatorTypes | `custom/${string}` }) => {
-          handleEvaluatorSelect(e.value);
+        onValueChange={(e) => {
+          if (e.value) {
+            handleEvaluatorSelect(
+              e.value as EvaluatorTypes | `custom/${string}`,
+            );
+          }
         }}
         paddingTop={2}
         paddingBottom={5}
@@ -89,9 +93,9 @@ export const EvaluatorSelectionAccordion = ({
                   handleEvaluatorSelect(evaluator.id);
                 }
               }}
-              opacity={evaluator.future ?? evaluator.disabled ? 0.5 : 1}
+              opacity={(evaluator.future ?? evaluator.disabled) ? 0.5 : 1}
               cursor={
-                evaluator.future ?? evaluator.disabled
+                (evaluator.future ?? evaluator.disabled)
                   ? "not-allowed"
                   : "pointer"
               }

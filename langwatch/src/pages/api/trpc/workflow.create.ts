@@ -12,7 +12,7 @@ export const config = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   req.query.trpc = "workflow.create";
   return trpc(req, res);

@@ -1,11 +1,11 @@
 import { tool } from "ai";
-import { z } from "zod";
 import Parse from "papaparse";
+import { z } from "zod";
 
 export const tools = (dataset: string) => {
   const parsedDataset = Parse.parse(dataset, { header: true });
   const columnNames = parsedDataset.meta.fields?.filter(
-    (field) => field !== "id"
+    (field) => field !== "id",
   );
 
   const addRow = tool({
@@ -14,8 +14,8 @@ export const tools = (dataset: string) => {
     inputSchema: z.object({
       row: z.object(
         Object.fromEntries(
-          columnNames?.map((column) => [column, z.string()]) ?? []
-        )
+          columnNames?.map((column) => [column, z.string()]) ?? [],
+        ),
       ),
     }),
   });
@@ -27,8 +27,8 @@ export const tools = (dataset: string) => {
       id: z.string(),
       row: z.object(
         Object.fromEntries(
-          columnNames?.map((column) => [column, z.string()]) ?? []
-        )
+          columnNames?.map((column) => [column, z.string()]) ?? [],
+        ),
       ),
     }),
   });

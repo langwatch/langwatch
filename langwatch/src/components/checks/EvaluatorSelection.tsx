@@ -3,29 +3,29 @@ import {
   Box,
   Grid,
   GridItem,
-  HStack,
   Heading,
+  HStack,
   Tabs,
   Tag,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import NextLink from "next/link";
-import { Shield, Plus } from "react-feather";
+import { useRouter } from "next/router";
+import { Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
+import { api } from "../../utils/api";
 import { isFeatureEnabled } from "../../utils/featureFlags";
 import { titleCase } from "../../utils/stringCasing";
-import type { CheckConfigFormData } from "./CheckConfigForm";
-import { api } from "../../utils/api";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import { useRouter } from "next/router";
+import type { CheckConfigFormData } from "./CheckConfigForm";
 
 type Category = EvaluatorDefinition<any>["category"];
 
@@ -65,20 +65,20 @@ export function EvaluatorSelection({
 
   const availableEvaluators_ = api.evaluations.availableEvaluators.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const availableCustomEvaluators =
     api.evaluations.availableCustomEvaluators.useQuery(
       { projectId: project?.id ?? "" },
-      { enabled: !!project }
+      { enabled: !!project },
     );
 
   const availableEvaluators = [
     ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS)
       .filter(
         ([key, _evaluator]) =>
-          !key.startsWith("example/") && !key.startsWith("legacy/")
+          !key.startsWith("example/") && !key.startsWith("legacy/"),
       )
       .sort(([key, _evaluator], [key2, _evaluator2]) => {
         const index = sortingOrder.indexOf(key);
@@ -125,7 +125,7 @@ export function EvaluatorSelection({
         Array.isArray(entry) &&
         typeof entry[1] === "object" &&
         "category" in entry[1] &&
-        entry[1].category === category
+        entry[1].category === category,
     );
   }
 
@@ -261,7 +261,7 @@ export function EvaluatorSelection({
                       <Text>
                         {evaluator.description.replace(
                           "Google DLP PII detects",
-                          "Detects"
+                          "Detects",
                         )}
                       </Text>
                       <HStack wrap="wrap">
@@ -288,7 +288,7 @@ export function EvaluatorSelection({
                           </Link>
                         )}
                         {evaluator.requiredFields.includes(
-                          "expected_output"
+                          "expected_output",
                         ) && (
                           <Link
                             asChild
@@ -314,7 +314,7 @@ export function EvaluatorSelection({
                           </Link>
                         )}
                         {evaluator.requiredFields.includes(
-                          "expected_contexts"
+                          "expected_contexts",
                         ) && (
                           <Link
                             asChild
@@ -374,7 +374,7 @@ export function EvaluatorSelection({
               )}
             </Grid>
           </Tabs.Content>
-        )
+        ),
       )}
     </Tabs.Root>
   );

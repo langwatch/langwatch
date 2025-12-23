@@ -1,12 +1,12 @@
 import { Box, Center, HStack, Text } from "@chakra-ui/react";
-import { useMemo, type ComponentProps } from "react";
+import { type ComponentProps, useMemo } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
-import { DatasetGrid, type DatasetColumnDef } from "./DatasetGrid";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import { ErrorBoundary } from "react-error-boundary";
+import { type DatasetColumnDef, DatasetGrid } from "./DatasetGrid";
 
 export function DatasetPreview({
   rows,
@@ -19,7 +19,7 @@ export function DatasetPreview({
   onClick?: () => void;
 } & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {
   const columnDefs = useMemo(() => {
-    const headers: DatasetColumnDef[] = columns.slice(0, 3).map((column) => ({
+    const headers: DatasetColumnDef[] = columns.slice(0, 8).map((column) => ({
       headerName: column.name,
       field: column.name,
       type_: column.type,
@@ -94,11 +94,25 @@ export function DatasetPreview({
         </Center>
       )}
       <ErrorBoundary
-        fallback={
-          <Center width="full" height="full">
-            Error rendering the dataset, please refresh the page
-          </Center>
-        }
+        fallbackRender={({ error }) => {
+          return (
+            <Center width="full" height="full" padding={4}>
+              <Box textAlign="center">
+                <Text fontWeight="bold" marginBottom={2}>
+                  Error rendering the dataset, please refresh the page
+                </Text>
+                {process.env.NODE_ENV === "development" && (
+                  <Text fontSize="sm" color="red.600">
+                    {error.message}
+                  </Text>
+                )}
+              </Box>
+            </Center>
+          );
+        }}
+        onError={(error) => {
+          console.error("DatasetPreview Error", error);
+        }}
       >
         <DatasetGrid columnDefs={columnDefs} rowData={rows} />
       </ErrorBoundary>

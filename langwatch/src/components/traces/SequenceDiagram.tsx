@@ -1,9 +1,9 @@
 import {
   Box,
+  createListCollection,
   HStack,
   Spacer,
   VStack,
-  createListCollection,
 } from "@chakra-ui/react";
 import { intervalToDuration } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -90,7 +90,8 @@ const getParticipantName = (span: Span): string | null => {
   if (span.type === "tool") {
     return null;
   }
-  return span.name ?? null;
+  // Sanitize all other participant names to avoid Mermaid syntax errors
+  return span.name ? span.name.replace(/[^a-zA-Z0-9]/g, "_") : null;
 };
 
 /**
@@ -155,7 +156,7 @@ const getSpanDuration = (span: Span): number => {
  */
 export const generateMermaidSyntax = (
   spans: Span[],
-  includedSpanTypes?: SpanTypes[]
+  includedSpanTypes?: SpanTypes[],
 ): string => {
   // Filter spans based on included types (default to all types except 'span')
   const typesToInclude = includedSpanTypes ?? defaultSelectedSpanTypes;
@@ -165,7 +166,7 @@ export const generateMermaidSyntax = (
 
   // Helper function to find the next included descendant(s) of a span
   const findIncludedDescendants = (
-    span: SpanWithChildren
+    span: SpanWithChildren,
   ): SpanWithChildren[] => {
     const descendants: SpanWithChildren[] = [];
 
@@ -188,12 +189,12 @@ export const generateMermaidSyntax = (
 
   // Only collect participants from included spans
   const includedSpans = spans.filter((span) =>
-    typesToInclude.includes(span.type)
+    typesToInclude.includes(span.type),
   );
 
   // Sort included spans by start time to maintain chronological order
   const sortedSpans = [...includedSpans].sort(
-    (a, b) => a.timestamps.started_at - b.timestamps.started_at
+    (a, b) => a.timestamps.started_at - b.timestamps.started_at,
   );
 
   // Collect all participants first
@@ -242,7 +243,7 @@ export const generateMermaidSyntax = (
       // Handle tool spans as self-calls to their parent LLM
       if (span.type === "tool" && parentParticipant && span.name) {
         messages.push(
-          `    ${parentParticipant}->>${parentParticipant}: tool: ${span.name}`
+          `    ${parentParticipant}->>${parentParticipant}: tool: ${span.name}`,
         );
         // Process tool's children (like agents called by the tool)
         span.children
@@ -286,7 +287,7 @@ export const generateMermaidSyntax = (
 
         // Create the call message
         messages.push(
-          `    ${parentParticipant}->>${currentParticipant}: ${label}`
+          `    ${parentParticipant}->>${currentParticipant}: ${label}`,
         );
 
         // Activate the target participant
@@ -309,7 +310,7 @@ export const generateMermaidSyntax = (
       ) {
         // Create a return message with invisible character
         messages.push(
-          `    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`
+          `    ${currentParticipant}-->>${parentParticipant}: ${INVISIBLE_RETURN}`,
         );
 
         // Deactivate the current participant
@@ -330,7 +331,7 @@ export const generateMermaidSyntax = (
   // Find root spans from all spans (no parent or parent not in spans)
   const allSpanMap = new Map(spans.map((span) => [span.span_id, span]));
   const rootSpans = spans.filter(
-    (s) => !s.parent_id || !allSpanMap.has(s.parent_id)
+    (s) => !s.parent_id || !allSpanMap.has(s.parent_id),
   );
 
   // Process each root span
@@ -386,12 +387,35 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
           startOnLoad: false,
           theme: "base",
           themeVariables: {
-            primaryColor: "#ffffff",
-            primaryTextColor: "#000000",
-            primaryBorderColor: "#cccccc",
-            lineColor: "#666666",
-            secondaryColor: "#f8f9fa",
-            tertiaryColor: "#ffffff",
+            // Modern color scheme
+            primaryColor: "#F7FAFC", // Light light gray background for boxes
+            primaryTextColor: "#1A202C", // Dark text
+            primaryBorderColor: "#E2E8F0", // Light gray border
+            lineColor: "#4A5568", // Darker gray for lines
+            secondaryColor: "#F7FAFC", // Light light gray
+            tertiaryColor: "#EDF2F7",
+            // Actor (agent) styling - light light gray
+            actorBkg: "#F7FAFC",
+            actorBorder: "#D2D8E0",
+            actorTextColor: "#2D3748",
+            // Participant (LLM) styling - light light gray
+            participantBkg: "#F7FAFC",
+            participantBorder: "#E2E8F0",
+            participantTextColor: "#2D3748",
+            // Labels
+            labelTextColor: "#2D3748",
+            labelBoxBkgColor: "#FFFFFF",
+            labelBoxBorderColor: "#E2E8F0",
+            // Signal (message) colors
+            signalColor: "#2D3748",
+            signalTextColor: "#2D3748",
+            // Activation boxes - light blue
+            activationBkgColor: "#DBEAFE",
+            activationBorderColor: "#60A5FA",
+            // Font
+            fontFamily:
+              '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+            fontSize: "14px",
           },
           sequence: {
             diagramMarginX: 50,
@@ -403,8 +427,8 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
             boxTextMargin: 5,
             noteMargin: 10,
             messageMargin: 35,
-            mirrorActors: false,
-            bottomMarginAdj: 1,
+            mirrorActors: true,
+            bottomMarginAdj: 16,
             useMaxWidth: true,
             rightAngles: false,
             showSequenceNumbers: false,
@@ -433,7 +457,7 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
             <div style="padding: 20px; text-align: center; color: #666;">
               <p>Error rendering sequence diagram</p>
               <pre style="font-size: 12px; margin-top: 10px;">${String(
-                error
+                error,
               )}</pre>
             </div>
           `;
@@ -488,9 +512,24 @@ const SequenceDiagram = ({
 
   return (
     <VStack align="start" width="full" gap={4}>
-      <MermaidRenderer syntax={mermaidSyntax} />
+      <Box
+        width="full"
+        background="white"
+        borderRadius="md"
+        padding={4}
+        boxShadow="sm"
+      >
+        <MermaidRenderer syntax={mermaidSyntax} />
+      </Box>
 
-      <Box as="details" width="full">
+      <Box
+        as="details"
+        width="full"
+        background="white"
+        borderRadius="md"
+        padding={4}
+        boxShadow="sm"
+      >
         <Box as="summary" cursor="pointer" color="gray.500" fontSize="sm">
           Show Mermaid Syntax
         </Box>
@@ -499,6 +538,7 @@ const SequenceDiagram = ({
           fontSize="xs"
           background="gray.50"
           padding={4}
+          marginTop={4}
           borderRadius="md"
           overflow="auto"
         >
@@ -514,6 +554,26 @@ type SequenceDiagramProps = {
 };
 
 /**
+ * Count unique participants in spans for given span types
+ * Single Responsibility: Calculate number of participants that would be rendered
+ */
+const countParticipants = (
+  spans: Span[],
+  includedTypes: SpanTypes[],
+): number => {
+  const participants = new Set<string>();
+  spans
+    .filter((span) => includedTypes.includes(span.type))
+    .forEach((span) => {
+      const participantName = getParticipantName(span);
+      if (participantName) {
+        participants.add(participantName);
+      }
+    });
+  return participants.size;
+};
+
+/**
  * SequenceDiagramContainer component that handles data fetching
  * Single Responsibility: Manage data fetching and state for the sequence diagram
  */
@@ -521,7 +581,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
   const { traceId, trace } = useTraceDetailsState(props.traceId);
   const { project } = useOrganizationTeamProject();
   const [selectedSpanTypes, setSelectedSpanTypes] = useState<SpanTypes[]>(
-    defaultSelectedSpanTypes
+    defaultSelectedSpanTypes,
   );
 
   const [keepRefetching, setKeepRefetching] = useState(false);
@@ -531,8 +591,24 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: false,
       refetchInterval: keepRefetching ? 1_000 : undefined,
-    }
+    },
   );
+
+  // Auto-include "span" types if there are too few participants
+  useEffect(() => {
+    if (!spans.data || spans.data.length === 0) return;
+
+    // Count participants with default selection (without "span")
+    const participantCount = countParticipants(
+      spans.data,
+      defaultSelectedSpanTypes,
+    );
+
+    // If 2 or fewer participants, automatically include "span" type
+    if (participantCount <= 2 && !selectedSpanTypes.includes("span")) {
+      setSelectedSpanTypes([...defaultSelectedSpanTypes, "span"]);
+    }
+  }, [spans.data]);
 
   useEffect(() => {
     if ((trace.data?.timestamps.inserted_at ?? 0) < Date.now() - 10 * 1000) {
@@ -551,7 +627,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
   }
 
   return (
-    <VStack align="start" width="full" gap={4}>
+    <VStack align="start" width="full" gap={4} paddingX={4}>
       <Select.Root
         multiple
         collection={spanTypesCollection}
@@ -565,7 +641,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
         <HStack width="full">
           <Spacer />
           <Select.Label>Include span types:</Select.Label>
-          <Select.Control width="120px">
+          <Select.Control width="120px" background="white/75">
             <Select.Trigger>
               <Select.ValueText placeholder="Select span types" />
             </Select.Trigger>

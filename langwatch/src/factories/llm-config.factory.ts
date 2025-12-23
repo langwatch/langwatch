@@ -1,7 +1,7 @@
 import {
-  PromptScope,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
+  PromptScope,
 } from "@prisma/client";
 import { Factory } from "fishery";
 import { nanoid } from "nanoid";
@@ -9,8 +9,8 @@ import type { z } from "zod";
 
 import {
   LATEST_SCHEMA_VERSION,
-  type SchemaVersion,
   parseLlmConfigVersion,
+  type SchemaVersion,
   type schemaValidators,
 } from "~/server/prompt-config";
 
@@ -34,6 +34,7 @@ export const llmPromptConfigFactory = Factory.define<
   deletedAt: null,
   handle: `test-handle-${sequence}`,
   scope: PromptScope.PROJECT,
+  copiedFromPromptId: null,
 }));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =

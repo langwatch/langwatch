@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { api } from "../../../../utils/api";
 import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../utils/api";
+import { useEvaluationWizardStore } from "./evaluation-wizard-store/useEvaluationWizardStore";
 
 export const useInitialLoadExperiment = () => {
   const { project } = useOrganizationTeamProject();
@@ -31,8 +31,8 @@ export const useInitialLoadExperiment = () => {
         setExperimentSlug,
         setExperimentId,
         skipNextAutosave,
-      })
-    )
+      }),
+    ),
   );
 
   const [initialLoadExperimentSlug_, setInitialLoadExperimentSlug] = useState<
@@ -41,8 +41,8 @@ export const useInitialLoadExperiment = () => {
   const initialLoadExperimentSlug = initialLoadExperimentSlug_
     ? initialLoadExperimentSlug_
     : !experimentSlug
-    ? (router.query.slug as string)
-    : undefined;
+      ? (router.query.slug as string)
+      : undefined;
 
   const [randomSeed] = useState<number | undefined>(Math.random());
   const initialLoadExperiment =
@@ -58,7 +58,7 @@ export const useInitialLoadExperiment = () => {
         refetchOnWindowFocus: false,
         refetchOnReconnect: false,
         staleTime: Infinity,
-      }
+      },
     );
 
   useEffect(() => {

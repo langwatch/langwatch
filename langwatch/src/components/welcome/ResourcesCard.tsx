@@ -1,16 +1,9 @@
-import {
-  Box,
-  Heading,
-  VStack,
-  Circle,
-  Text,
-  Button,
-} from "@chakra-ui/react";
-import { LuBot, LuBookOpen, LuUsers, LuExternalLink } from "react-icons/lu";
+import { Box, Button, Circle, Heading, Text, VStack } from "@chakra-ui/react";
+import type React from "react";
 import { FaDiscord } from "react-icons/fa6";
+import { LuBookOpen, LuBot, LuExternalLink, LuUsers } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { trackEvent } from "../../utils/tracking";
-import React from "react";
 
 interface Resource {
   icon: React.ReactNode;
@@ -27,7 +20,8 @@ const resources: Resource[] = [
   {
     icon: <LuBot size={14} color="orange" />,
     label: "Demo Account",
-    description: "View a real-world example of how LangWatch works with a sample chatbot",
+    description:
+      "View a real-world example of how LangWatch works with a sample chatbot",
     href: "https://app.langwatch.ai/demo",
     event: "demo_account_click",
     buttonText: "View Demo",
@@ -47,7 +41,8 @@ const resources: Resource[] = [
   {
     icon: <FaDiscord size={14} color="#5865F2" />,
     label: "Community",
-    description: "Join our community to share experiences, get help, and stay updated with the latest features",
+    description:
+      "Join our community to share experiences, get help, and stay updated with the latest features",
     href: "https://discord.gg/langwatch",
     event: "community_click",
     buttonText: "Join Discord",
@@ -61,7 +56,10 @@ interface ResourceButtonProps {
   onClick: () => void;
 }
 
-const ResourceButton: React.FC<ResourceButtonProps> = ({ resource, onClick }) => (
+const ResourceButton: React.FC<ResourceButtonProps> = ({
+  resource,
+  onClick,
+}) => (
   <Button
     asChild
     variant="outline"
@@ -79,7 +77,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({ resource, onClick }) =>
     onClick={onClick}
     _hover={{ textDecoration: "none" }}
     transition="all 0.2s"
-    aria-label={resource.buttonText + ' (opens in a new tab)'}
+    aria-label={resource.buttonText + " (opens in a new tab)"}
     title={resource.buttonText}
   >
     <a
@@ -87,14 +85,32 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({ resource, onClick }) =>
       target="_blank"
       rel="noopener noreferrer"
       style={{ display: "flex", alignItems: "center", width: "100%" }}
-      aria-label={resource.buttonText + ' (opens in a new tab)'}
+      aria-label={resource.buttonText + " (opens in a new tab)"}
     >
       <Circle size="26px" bg={resource.bg} flexShrink={0}>
         {resource.icon}
       </Circle>
-      <Box flex={1} display="flex" flexDirection="column" alignItems="flex-start" minW={0} ml={2}>
-        <Text fontWeight="medium" textAlign="left">{resource.buttonText}</Text>
-        <Text color="gray.500" fontSize="xs" mt={0.25} textAlign="left" maxW="100%" overflow="hidden" whiteSpace="nowrap" textOverflow="ellipsis">
+      <Box
+        flex={1}
+        display="flex"
+        flexDirection="column"
+        alignItems="flex-start"
+        minW={0}
+        ml={2}
+      >
+        <Text fontWeight="medium" textAlign="left">
+          {resource.buttonText}
+        </Text>
+        <Text
+          color="gray.500"
+          fontSize="xs"
+          mt={0.25}
+          textAlign="left"
+          maxW="100%"
+          overflow="hidden"
+          whiteSpace="nowrap"
+          textOverflow="ellipsis"
+        >
           {resource.description}
         </Text>
       </Box>
@@ -111,7 +127,7 @@ const ResourcesCard: React.FC = () => {
     <Box minH="120px" boxShadow="sm" borderRadius="xl" bg="white" p={4}>
       <VStack align="start" gap={4} w="full">
         <VStack gap={0} alignItems="flex-start" justifyContent="flex-start">
-          <Heading size="md" fontWeight="bold" textAlign="left">
+          <Heading size="md" textAlign="left">
             Resources
           </Heading>
           <Text fontSize="xs" color="gray.500" textAlign="left">
@@ -123,7 +139,9 @@ const ResourcesCard: React.FC = () => {
             <ResourceButton
               key={resource.href}
               resource={resource}
-              onClick={() => trackEvent(resource.event, { project_id: project?.id })}
+              onClick={() =>
+                trackEvent(resource.event, { project_id: project?.id })
+              }
             />
           ))}
         </VStack>

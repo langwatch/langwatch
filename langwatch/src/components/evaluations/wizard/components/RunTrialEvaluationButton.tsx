@@ -1,12 +1,12 @@
 import { Button, type ButtonProps } from "@chakra-ui/react";
-import { useRunEvalution } from "../../../../optimization_studio/hooks/useRunEvalution";
-import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 import { LuCirclePlay } from "react-icons/lu";
-import { useEvaluationWizardStore } from "../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { useModelProviderKeys } from "../../../../optimization_studio/hooks/useModelProviderKeys";
-import { Tooltip } from "../../../ui/tooltip";
+import { useRunEvalution } from "../../../../optimization_studio/hooks/useRunEvalution";
 import { toaster } from "../../../ui/toaster";
+import { Tooltip } from "../../../ui/tooltip";
+import { useEvaluationWizardStore } from "../hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useStepCompletedValue } from "../hooks/useStepCompletedValue";
 
 /**
  * This is a stateful component is used to run a trial evaluation.
@@ -22,7 +22,7 @@ export function RunEvaluationButton({
     useShallow((state) => ({
       getDSL: state.getDSL,
       setWizardState: state.setWizardState,
-    }))
+    })),
   );
   const { runEvaluation, isLoading } = useRunEvalution();
 
@@ -35,8 +35,8 @@ export function RunEvaluationButton({
       ? "Select a dataset to run a trial evaluation"
       : "Complete all the previous steps to run the evaluation"
     : hasProvidersWithoutCustomKeys
-    ? "Add your API keys to run the evaluation"
-    : undefined;
+      ? "Add your API keys to run the evaluation"
+      : undefined;
 
   return (
     <Tooltip

@@ -1,12 +1,12 @@
 import {
   Box,
   Heading,
-  Skeleton,
-  VStack,
-  Text,
   HStack,
-  type SystemStyleObject,
+  Skeleton,
   Spacer,
+  type SystemStyleObject,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
 import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
@@ -42,7 +42,7 @@ export function SummaryMetric({
       align="start"
       justifyContent="space-between"
       borderLeftWidth="1px"
-      borderLeftColor="gray.300"
+      borderLeftColor="gray.100"
       paddingX={4}
       _first={{ paddingLeft: 0, borderLeft: "none" }}
     >
@@ -144,8 +144,8 @@ function MetricChange({
         change * increaseReversal == 0
           ? "gray.500"
           : change * increaseReversal > 0
-          ? "green.500"
-          : "red.500"
+            ? "green.500"
+            : "red.500"
       }
     >
       {change == 0 ? null : change > 0 ? (

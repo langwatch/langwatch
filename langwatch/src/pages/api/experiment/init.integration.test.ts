@@ -1,5 +1,5 @@
 import type { Project } from "@prisma/client";
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createMocks } from "node-mocks-http";
 import { beforeAll, describe, expect, test } from "vitest";
 import { prisma } from "../../../server/db";

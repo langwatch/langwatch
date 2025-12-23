@@ -1,20 +1,23 @@
 import {
-  Box,
-  Heading,
-  VStack,
-  Text,
-  Spinner,
   Alert,
-  HStack,
+  Box,
   Code,
+  Heading,
+  HStack,
+  Separator,
   Spacer,
+  Spinner,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import type React from "react";
+import { LuCheckCheck, LuExternalLink } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { CopyInput } from "../CopyInput";
 import { trackEvent } from "../../utils/tracking";
+import { CopyInput } from "../CopyInput";
 import { useIntegrationChecks } from "../IntegrationChecks";
-import { LuCheckCheck } from "react-icons/lu";
-import React from "react";
+import ObservabilityCard from "./ObservabilityCard";
+import { Link } from "../ui/link";
 
 const getLangWatchEndpoint = () => {
   if (typeof window === "undefined") return "";
@@ -39,7 +42,7 @@ const APICard: React.FC = () => {
       align="stretch"
     >
       <Box mb={1}>
-        <Heading size="md" fontWeight="bold" textAlign="left">
+        <Heading size="md" textAlign="left">
           Connect to LangWatch
         </Heading>
         <Text fontSize="xs" color="gray.500" textAlign="left">
@@ -141,6 +144,24 @@ const APICard: React.FC = () => {
           </Alert.Root>
         )}
       </Box>
+      <Separator marginY={4} />
+      <ObservabilityCard />
+      <Alert.Root status="info" borderRadius="md">
+        <Alert.Indicator />
+        <Alert.Title>
+          Having issues getting started? Check out our
+          <Link
+            href="https://docs.langwatch.ai/support"
+            isExternal
+            ml={1}
+            textDecoration="underline"
+            textDecorationStyle={"dashed"}
+          >
+            Troubleshooting & Support guide
+            <LuExternalLink />
+          </Link>
+        </Alert.Title>
+      </Alert.Root>
     </VStack>
   );
 };

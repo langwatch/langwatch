@@ -1,7 +1,14 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
-
-import { createLogger } from "../../../../utils/logger";
+import { ExperimentType, type Project } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { type ZodError, z } from "zod";
+import { fromZodError } from "zod-validation-error";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { prisma } from "../../../../server/db";
+import {
+  BATCH_EVALUATION_INDEX,
+  batchEvaluationId,
+  esClient,
+} from "../../../../server/elasticsearch";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationRESTParams,
@@ -10,18 +17,10 @@ import {
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
 } from "../../../../server/experiments/types.generated";
-import { z, type ZodError } from "zod";
-import * as Sentry from "@sentry/nextjs";
-import { fromZodError } from "zod-validation-error";
-import { findOrCreateExperiment } from "../../experiment/init";
-import { ExperimentType, type Project } from "@prisma/client";
-import {
-  BATCH_EVALUATION_INDEX,
-  batchEvaluationId,
-  esClient,
-} from "../../../../server/elasticsearch";
 import { getPayloadSizeHistogram } from "../../../../server/metrics";
+import { createLogger } from "../../../../utils/logger";
 import { safeTruncate } from "../../../../utils/truncate";
+import { findOrCreateExperiment } from "../../experiment/init";
 
 const logger = createLogger("langwatch:evaluations:batch:log_results");
 
@@ -35,7 +34,7 @@ export const config = {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -71,7 +70,7 @@ export default async function handler(
   }
 
   getPayloadSizeHistogram("log_results").observe(
-    JSON.stringify(req.body).length
+    JSON.stringify(req.body).length,
   );
 
   // TODO: check for plan limits here?
@@ -80,9 +79,12 @@ export default async function handler(
   try {
     params = eSBatchEvaluationRESTParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid log_results data received');
-    // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid log_results data received",
+    );
+    // TODO: should it be a warning instead of exception? here and all over our APIs
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
@@ -98,11 +100,14 @@ export default async function handler(
     params.timestamps?.created_at &&
     params.timestamps.created_at.toString().length === 10
   ) {
-    logger.error({
-      runId: params.run_id,
-      experimentSlug: params.experiment_slug,
-      experimentId: params.experiment_id,
-    }, 'timestamps not in milliseconds for batch evaluation run');
+    logger.error(
+      {
+        runId: params.run_id,
+        experimentSlug: params.experiment_slug,
+        experimentId: params.experiment_id,
+      },
+      "timestamps not in milliseconds for batch evaluation run",
+    );
     return res.status(400).json({
       error:
         "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -113,16 +118,22 @@ export default async function handler(
     await processBatchEvaluation(project, params);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      logger.error({ error, body: params, projectId: project.id }, 'failed to validate data for batch evaluation');
-      Sentry.captureException(error, {
+      logger.error(
+        { error, body: params, projectId: project.id },
+        "failed to validate data for batch evaluation",
+      );
+      captureException(error, {
         extra: { projectId: project.id, param: params },
       });
 
       const validationError = fromZodError(error);
       return res.status(400).json({ error: validationError.message });
     } else {
-      logger.error({ error, body: params, projectId: project.id }, 'internal server error processing batch evaluation');
-      Sentry.captureException(error, {
+      logger.error(
+        { error, body: params, projectId: project.id },
+        "internal server error processing batch evaluation",
+      );
+      captureException(error, {
         extra: { projectId: project.id, param: params },
       });
 
@@ -135,7 +146,7 @@ export default async function handler(
 
 const processBatchEvaluation = async (
   project: Project,
-  param: ESBatchEvaluationRESTParams
+  param: ESBatchEvaluationRESTParams,
 ) => {
   const { run_id, experiment_id, experiment_slug } = param;
 

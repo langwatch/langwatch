@@ -1,23 +1,23 @@
 import {
   Box,
   Button,
+  type ButtonProps,
   Center,
   HStack,
   Spacer,
   Spinner,
   Text,
   VStack,
-  type ButtonProps,
 } from "@chakra-ui/react";
 
 import {
   Handle,
-  NodeToolbar,
-  Position,
   type Node,
   type NodeProps,
+  NodeToolbar,
+  Position,
 } from "@xyflow/react";
-import React, { forwardRef, useMemo, type Ref } from "react";
+import React, { forwardRef, type Ref, useMemo } from "react";
 import { useDragLayer } from "react-dnd";
 import {
   Check,
@@ -31,21 +31,21 @@ import {
 import { PulseLoader } from "react-spinners";
 import { useDebounceValue } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
+import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
+import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { useComponentExecution } from "../../hooks/useComponentExecution";
 import { useWorkflowExecution } from "../../hooks/useWorkflowExecution";
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import {
-  type Component,
-  type ComponentType,
-  type Field,
-  type LLMConfig,
+import type {
+  Component,
+  ComponentType,
+  Field,
+  LLMConfig,
 } from "../../types/dsl";
 import { checkIsEvaluator } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { LLMModelDisplay } from "../../../components/llmPromptConfigs/LLMModelDisplay";
-import { useWizardContext } from "../../../components/evaluations/wizard/hooks/useWizardContext";
 
 export function getNodeDisplayName(node: { id: string; data: Component }) {
   return node.data.name ?? node.data.cls ?? node.id;
@@ -201,7 +201,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
     backgroundColor?: string;
     behave_as?: "evaluator" | undefined;
   },
-  ref: Ref<HTMLDivElement>
+  ref: Ref<HTMLDivElement>,
 ) {
   const {
     node,
@@ -231,8 +231,8 @@ export const ComponentNode = forwardRef(function ComponentNode(
         setNodes,
         deleteNode,
         duplicateNode,
-      })
-    )
+      }),
+    ),
   );
   const isHovered = hoveredNodeId === props.id;
 
@@ -250,7 +250,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       isDragging &&
       item?.node?.type === "prompting_technique" &&
       props.type !== "signature",
-    [isDragging, item, props.type]
+    [isDragging, item, props.type],
   );
 
   const llmParams =
@@ -271,7 +271,9 @@ export const ComponentNode = forwardRef(function ComponentNode(
       align="start"
       color="gray.600"
       fontSize="11px"
-      minWidth={120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"}
+      minWidth={
+        120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"
+      }
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
@@ -416,7 +418,7 @@ export function ComponentExecutionButton({
 
   const [isWaitingLong] = useDebounceValue(
     node?.data.execution_state?.status === "waiting",
-    600
+    600,
   );
 
   const { propertiesExpanded, setPropertiesExpanded, setSelectedNode } =
@@ -425,7 +427,7 @@ export function ComponentExecutionButton({
         propertiesExpanded,
         setPropertiesExpanded,
         setSelectedNode,
-      })
+      }),
     );
 
   const shouldOpenExecutionResults =

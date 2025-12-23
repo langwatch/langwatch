@@ -1,11 +1,9 @@
-import { TRPCError } from "@trpc/server";
-import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-
 import { openai } from "@ai-sdk/openai";
+import { TRPCError } from "@trpc/server";
 import { generateText } from "ai";
-
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { z } from "zod";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const translateRouter = createTRPCRouter({
   translate: protectedProcedure
@@ -13,9 +11,9 @@ export const translateRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         textToTranslate: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
       try {
         const response: { text: string } = await generateText({
@@ -24,7 +22,7 @@ export const translateRouter = createTRPCRouter({
         });
         const { text } = response;
         return { translation: text };
-      } catch (error) {
+      } catch {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Failed to get translation from OpenAI",

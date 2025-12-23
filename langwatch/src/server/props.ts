@@ -1,9 +1,6 @@
-import {
-  type GetServerSidePropsContext,
-  type GetServerSidePropsResult,
-} from "next";
-import { type Session } from "next-auth";
-import { type ParsedUrlQuery } from "querystring";
+import type { GetServerSidePropsContext, GetServerSidePropsResult } from "next";
+import type { Session } from "next-auth";
+import type { ParsedUrlQuery } from "querystring";
 import { getServerAuthSession } from "./auth";
 
 export function withSignedInUser<
@@ -11,11 +8,11 @@ export function withSignedInUser<
   U extends Record<string, any>,
 >(
   fn: (
-    context: GetServerSidePropsContext<T>
-  ) => Promise<GetServerSidePropsResult<U>>
+    context: GetServerSidePropsContext<T>,
+  ) => Promise<GetServerSidePropsResult<U>>,
 ) {
   return async (
-    context: GetServerSidePropsContext<T>
+    context: GetServerSidePropsContext<T>,
   ): Promise<GetServerSidePropsResult<U & { session: Session }>> => {
     const session = await getServerAuthSession(context);
 

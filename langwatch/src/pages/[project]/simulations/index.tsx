@@ -1,14 +1,15 @@
 import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import React, { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { SetCard } from "~/components/simulations";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
-import React, { useEffect, useMemo, useState } from "react";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
-export default function SimulationsPage() {
+function SimulationsPageContent() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const [refetchInterval, setRefetchInterval] = useState(4000);
@@ -36,7 +37,7 @@ export default function SimulationsPage() {
     {
       refetchInterval,
       enabled: !!project,
-    }
+    },
   );
 
   const sortedScenarioSetsData = useMemo(() => {
@@ -54,21 +55,16 @@ export default function SimulationsPage() {
 
   return (
     <DashboardLayout>
-      <PageLayout.Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        marginTop={8}
-      >
-        <PageLayout.Header>
-          {!isLoading &&
-            sortedScenarioSetsData &&
-            sortedScenarioSetsData.length > 0 && (
+      {!isLoading &&
+        sortedScenarioSetsData &&
+        sortedScenarioSetsData.length > 0 && (
+          <PageLayout.Header>
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
             </HStack>
-          )}
-        </PageLayout.Header>
-
+          </PageLayout.Header>
+        )}
+      <PageLayout.Container maxW={"calc(100vw - 200px)"} padding={6}>
         {/* Show loading state */}
         {isLoading && (
           <VStack gap={4} align="center" py={8}>
@@ -96,7 +92,7 @@ export default function SimulationsPage() {
         {/* Render based on view mode */}
         {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
           <Grid
-            templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
             gap={6}
             width="full"
           >
@@ -113,3 +109,7 @@ export default function SimulationsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("scenarios:view", {
+  layoutComponent: DashboardLayout,
+})(SimulationsPageContent);

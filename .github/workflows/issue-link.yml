@@ -1,0 +1,21 @@
+name: 'Issue Links'
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  issue-links:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: tkt-actions/add-issue-links@v1.9.1
+        with:
+          repo-token: '${{ secrets.GITHUB_TOKEN }}'
+          branch-prefix: 'issue'
+          link-style: 'body'
+          position: 'body'
+          header: '# Related Issue'
+          resolve: true
+          assign-pr-creator-to-issue: 'true'

@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.3.3](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.2...mcp-server@v0.3.3) (2025-12-18)
+
+
+### Miscellaneous
+
+* trigger release ([#1011](https://github.com/langwatch/langwatch/issues/1011)) ([6173f53](https://github.com/langwatch/langwatch/commit/6173f53b041d9ee7e6b930270224954ba3c6621e))
+
+## [0.3.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.1...mcp-server@v0.3.2) (2025-12-17)
+
+
+### Bug Fixes
+
+* update mcp docs urls to the new langwatch.ai/docs and /scenario instead of the previous subdomains ([5b1ce07](https://github.com/langwatch/langwatch/commit/5b1ce073adf580fb7f897da98e1cdd6a1e25135e))
+
+## [0.3.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.0...mcp-server@v0.3.1) (2025-11-15)
+
+
+### Bug Fixes
+
+* sometimes the initial forward slash / is not sent by the llm ([2d63409](https://github.com/langwatch/langwatch/commit/2d63409e59e714b1a05c951edb8582c9fc39479f))
+
+## [0.3.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.2...mcp-server@v0.3.0) (2025-11-15)
+
+
+### Features
+
+* remove the need of passing a langwatch api key for using the mcp ([#817](https://github.com/langwatch/langwatch/issues/817)) ([66e49b5](https://github.com/langwatch/langwatch/commit/66e49b5c640d0c220aa08e198fb4dbf24681d567))
+
+## [0.2.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.1...mcp-server@v0.2.2) (2025-11-13)
+
+
+### Bug Fixes
+
+* fix fetching llms txt for first request ([#813](https://github.com/langwatch/langwatch/issues/813)) ([cd8de19](https://github.com/langwatch/langwatch/commit/cd8de19b2a06556cd3b89b6cc868db7aac563efc))
+
+## [0.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.0...mcp-server@v0.2.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* force fetching of only md files ([c8a9baf](https://github.com/langwatch/langwatch/commit/c8a9baf12f375dd48970e0882cd69a029c6d338f))
+
+## [0.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.1.0...mcp-server@v0.2.0) (2025-11-07)
+
+
+### Features
+
+* add scenario docs fetching to mcp ([e630206](https://github.com/langwatch/langwatch/commit/e63020622ca192bf5801d4dbdd2744fb755075ed))
+
 ## [0.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.0.5...mcp-server@v0.1.0) (2025-09-19)
 
 

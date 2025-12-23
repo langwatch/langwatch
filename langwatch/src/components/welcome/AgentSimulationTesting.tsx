@@ -1,8 +1,23 @@
-import { Box, Heading, VStack, Text, HStack, Badge, Icon, Button, Circle, Link as ChakraLink } from "@chakra-ui/react";
-import { LuBot, LuBookOpen, LuExternalLink, LuBotMessageSquare } from "react-icons/lu";
+import {
+  Badge,
+  Box,
+  Button,
+  Circle,
+  Heading,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { motion } from "motion/react";
+import type React from "react";
+import {
+  LuBookOpen,
+  LuBot,
+  LuBotMessageSquare,
+  LuExternalLink,
+} from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import React from "react";
-import { motion } from "framer-motion";
 
 const MotionBox = motion(Box);
 
@@ -15,7 +30,14 @@ interface SimulationButtonProps {
   external?: boolean;
 }
 
-const SimulationButton: React.FC<SimulationButtonProps> = ({ href, color, icon, label, description, external }) => (
+const SimulationButton: React.FC<SimulationButtonProps> = ({
+  href,
+  color,
+  icon,
+  label,
+  description,
+  external,
+}) => (
   <Button
     asChild
     variant="outline"
@@ -31,21 +53,44 @@ const SimulationButton: React.FC<SimulationButtonProps> = ({ href, color, icon, 
     w="full"
     minH="48px"
     gap={3}
-    aria-label={label + (external ? ' (opens in a new tab)' : '')}
+    aria-label={label + (external ? " (opens in a new tab)" : "")}
   >
     <a
       href={href}
       target={external ? "_blank" : undefined}
       rel={external ? "noopener noreferrer" : undefined}
       style={{ display: "flex", alignItems: "center", width: "100%" }}
-      aria-label={label + (external ? ' (opens in a new tab)' : '')}
+      aria-label={label + (external ? " (opens in a new tab)" : "")}
     >
-      <Circle size="26px" bg={`${color}.100`} color={`${color}.500`} flexShrink={0}>
+      <Circle
+        size="26px"
+        bg={`${color}.100`}
+        color={`${color}.500`}
+        flexShrink={0}
+      >
         {icon}
       </Circle>
-      <Box flex={1} display="flex" flexDirection="column" alignItems="flex-start" minW={0} ml={2}>
-        <Text fontWeight="medium" textAlign="left">{label}</Text>
-        <Text color="gray.500" fontSize="xs" mt={0.25} textAlign="left" maxW="100%" overflow="hidden" whiteSpace="nowrap" textOverflow="ellipsis">
+      <Box
+        flex={1}
+        display="flex"
+        flexDirection="column"
+        alignItems="flex-start"
+        minW={0}
+        ml={2}
+      >
+        <Text fontWeight="medium" textAlign="left">
+          {label}
+        </Text>
+        <Text
+          color="gray.500"
+          fontSize="xs"
+          mt={0.25}
+          textAlign="left"
+          maxW="100%"
+          overflow="hidden"
+          whiteSpace="nowrap"
+          textOverflow="ellipsis"
+        >
           {description}
         </Text>
       </Box>
@@ -78,16 +123,23 @@ const AgentSimulationTesting: React.FC = () => {
             radial-gradient(ellipse 60% 80% at 20% 30%, rgba(255,229,180,0.35) 0%, transparent 85%),
             radial-gradient(ellipse 50% 60% at 60% 20%, rgba(224,215,255,0.48) 0%, transparent 85%),
             radial-gradient(ellipse 80% 100% at 50% 80%, rgba(255,255,255,0.85) 0%, transparent 90%)
-          `
+          `,
         }}
       >
         <VStack mb={1} align="start">
           <HStack gap={2}>
-            <Icon color="orange.500" boxSize={4}><LuBot /></Icon>
-            <Heading size="md" fontWeight="bold" textAlign="left">
+            <Icon color="orange.500" boxSize={4}>
+              <LuBot />
+            </Icon>
+            <Heading size="md" textAlign="left">
               Introducing Scenario: Agentic Simulations
             </Heading>
-            <Badge size="md" colorPalette="orange" variant="subtle" borderRadius="2xl">
+            <Badge
+              size="md"
+              colorPalette="orange"
+              variant="subtle"
+              borderRadius="2xl"
+            >
               New
             </Badge>
           </HStack>

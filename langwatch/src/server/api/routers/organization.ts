@@ -1,13 +1,16 @@
 import {
-  OrganizationUserRole,
+  type CustomRole,
   type Organization,
   type OrganizationUser,
+  OrganizationUserRole,
+  type Prisma,
   type Project,
   type Team,
   type TeamUser,
-  type User,
   TeamUserRole,
+  type User,
 } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -15,29 +18,23 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
-
+import { decrypt, encrypt } from "~/utils/encryption";
+import { slugify } from "~/utils/slugify";
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
-import {
-  OrganizationRoleGroup,
-  TeamRoleGroup,
-  checkUserPermissionForOrganization,
-  checkUserPermissionForTeam,
-  skipPermissionCheck,
-} from "../permission";
-
+import { skipPermissionCheck } from "../permission";
+import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
-
-import { decrypt, encrypt } from "~/utils/encryption";
-import { slugify } from "~/utils/slugify";
 
 export type TeamWithProjects = Team & {
   projects: Project[];
 };
 
 export type TeamWithProjectsAndMembers = TeamWithProjects & {
-  members: TeamUser[];
+  members: (TeamUser & {
+    assignedRole?: CustomRole | null;
+  })[];
 };
 
 export type OrganizationFeature = {
@@ -53,6 +50,7 @@ export type FullyLoadedOrganization = Organization & {
 
 export type TeamMemberWithUser = TeamUser & {
   user: User;
+  assignedRole?: CustomRole | null;
 };
 
 export type TeamMemberWithTeam = TeamUser & {
@@ -83,7 +81,7 @@ export const organizationRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
@@ -92,7 +90,7 @@ export const organizationRouter = createTRPCRouter({
 
       const orgName = input.orgName
         ? input.orgName
-        : ctx.session.user.name ?? "My Organization";
+        : (ctx.session.user.name ?? "My Organization");
       const orgNanoId = nanoid();
       const orgId = `organization_${orgNanoId}`;
       const orgSlug =
@@ -149,7 +147,7 @@ export const organizationRouter = createTRPCRouter({
           });
 
           return { organization, team };
-        }
+        },
       );
 
       // Add usage stats job for the new organization
@@ -170,11 +168,7 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const { userId, organizationId } = input;
       const prisma = ctx.prisma;
@@ -203,7 +197,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         isDemo: z.boolean().optional(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
@@ -241,14 +235,22 @@ export const organizationRouter = createTRPCRouter({
             ],
           },
           include: {
-            members: true,
+            members: {
+              where: {
+                userId: userId,
+              },
+            },
             features: true,
             teams: {
               where: {
                 archivedAt: null,
               },
               include: {
-                members: true,
+                members: {
+                  include: {
+                    assignedRole: true,
+                  },
+                },
                 projects: {
                   where: {
                     archivedAt: null,
@@ -261,7 +263,7 @@ export const organizationRouter = createTRPCRouter({
 
       for (const organization of organizations) {
         for (const project of organization.teams.flatMap(
-          (team) => team.projects
+          (team) => team.projects,
         )) {
           if (project.s3AccessKeyId) {
             project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
@@ -278,16 +280,24 @@ export const organizationRouter = createTRPCRouter({
         }
       }
       for (const organization of organizations) {
+        // For demo mode, just filter members (permission checks handle demo projects separately)
+        const isDemoOrg =
+          isDemo &&
+          organization.teams.some((team) =>
+            team.projects.some((project) => project.id === demoProjectId),
+          );
+
+        // Filter members to only include demo user and current user
         organization.members = organization.members.filter(
           (member) =>
-            member.userId === userId || member.userId === demoProjectUserId
+            member.userId === userId || member.userId === demoProjectUserId,
         );
         if (organization.s3AccessKeyId) {
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
         if (organization.s3SecretAccessKey) {
           organization.s3SecretAccessKey = decrypt(
-            organization.s3SecretAccessKey
+            organization.s3SecretAccessKey,
           );
         }
         if (organization.s3Endpoint) {
@@ -295,12 +305,12 @@ export const organizationRouter = createTRPCRouter({
         }
         if (organization.elasticsearchNodeUrl) {
           organization.elasticsearchNodeUrl = decrypt(
-            organization.elasticsearchNodeUrl
+            organization.elasticsearchNodeUrl,
           );
         }
         if (organization.elasticsearchApiKey) {
           organization.elasticsearchApiKey = decrypt(
-            organization.elasticsearchApiKey
+            organization.elasticsearchApiKey,
           );
         }
 
@@ -308,29 +318,31 @@ export const organizationRouter = createTRPCRouter({
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
 
+        // For demo orgs, skip the isExternal filtering since we'll add virtual members
         organization.teams = organization.teams.filter((team) => {
           team.members = team.members.filter(
             (member) =>
-              member.userId === userId || member.userId === demoProjectUserId
+              member.userId === userId || member.userId === demoProjectUserId,
           );
+          if (isDemoOrg) return true;
           return isExternal
             ? team.members.some((member) => member.userId === userId)
             : true;
         });
 
-        if (
-          isDemo &&
-          organization.teams.some((team) =>
-            team.projects.some((project) => project.id === demoProjectId)
-          )
-        ) {
+        if (isDemoOrg) {
           organization.teams = organization.teams.flatMap((team) => {
             if (team.projects.some((project) => project.id === demoProjectId)) {
               team.projects = team.projects.filter(
-                (project) => project.id === demoProjectId
+                (project) => project.id === demoProjectId,
               );
+
+              // Filter members to only include demo user and current user
+              // Permission checks handle demo projects separately
               team.members = team.members.filter(
-                (member) => member.userId === demoProjectUserId
+                (member) =>
+                  member.userId === demoProjectUserId ||
+                  member.userId === userId,
               );
               return [team];
             } else {
@@ -375,14 +387,10 @@ export const organizationRouter = createTRPCRouter({
           {
             message:
               "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
-          }
-        )
+          },
+        ),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -436,13 +444,9 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -463,7 +467,10 @@ export const organizationRouter = createTRPCRouter({
                 include: {
                   teamMemberships: {
                     where: { team: { archivedAt: null } },
-                    include: { team: true },
+                    include: {
+                      team: true,
+                      assignedRole: true,
+                    },
                   },
                 },
               },
@@ -481,6 +488,64 @@ export const organizationRouter = createTRPCRouter({
 
       return organization;
     }),
+
+  getMemberById: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      // Check that the current user has access to this organization
+      const currentUserMembership = await prisma.organizationUser.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          userId: ctx.session.user.id,
+        },
+      });
+
+      if (!currentUserMembership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      // Get the requested member
+      const member = await prisma.organizationUser.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          userId: input.userId,
+        },
+        include: {
+          user: {
+            include: {
+              teamMemberships: {
+                where: { team: { archivedAt: null } },
+                include: {
+                  team: true,
+                  assignedRole: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!member) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found",
+        });
+      }
+
+      return member;
+    }),
+
   createInvites: protectedProcedure
     .input(
       z.object({
@@ -488,17 +553,30 @@ export const organizationRouter = createTRPCRouter({
         invites: z.array(
           z.object({
             email: z.string().email(),
-            teamIds: z.string(),
+            teamIds: z.string().optional(), // Keep for backward compatibility
+            teams: z
+              .array(
+                z.object({
+                  teamId: z.string(),
+                  role: z.union([
+                    z.nativeEnum(TeamUserRole),
+                    z
+                      .string()
+                      .regex(
+                        /^custom:[a-zA-Z0-9_-]+$/,
+                        "Custom role must be in format 'custom:{roleId}'",
+                      ),
+                  ]),
+                  customRoleId: z.string().optional(),
+                }),
+              )
+              .optional(),
             role: z.nativeEnum(OrganizationUserRole),
-          })
+          }),
         ),
-      })
+      }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -521,7 +599,7 @@ export const organizationRouter = createTRPCRouter({
       const subscriptionLimits =
         await dependencies.subscriptionHandler.getActivePlan(
           input.organizationId,
-          ctx.session.user
+          ctx.session.user,
         );
 
       if (
@@ -536,23 +614,102 @@ export const organizationRouter = createTRPCRouter({
 
       const invites = await Promise.all(
         input.invites.map(async (invite) => {
-          if (!invite.email.trim() || !invite.teamIds.trim()) {
-            return null;
-          }
+          // Support both new teams array and legacy teamIds string
+          let teamAssignments: Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }> = [];
+          let teamIdsString = "";
 
-          // Filter out team IDs that do not belong to the organization
-          const validTeamIds = (
-            await prisma.team.findMany({
+          if (invite.teams && invite.teams.length > 0) {
+            // New format: teams array with roles
+            const teamIds = invite.teams.map((t) => t.teamId);
+
+            // Filter out team IDs that do not belong to the organization
+            const validTeams = await prisma.team.findMany({
               where: {
-                id: { in: invite.teamIds.split(",") },
+                id: { in: teamIds },
                 organizationId: input.organizationId,
               },
               select: { id: true },
-            })
-          ).map((team) => team.id);
+            });
 
-          // If no valid team IDs are found, skip this invite
-          if (validTeamIds.length === 0) {
+            const validTeamIds = validTeams.map((team) => team.id);
+
+            // If no valid team IDs are found, skip this invite
+            if (validTeamIds.length === 0) {
+              return null;
+            }
+
+            // Build teamAssignments with only valid teams
+            teamAssignments = invite.teams
+              .filter((t) => validTeamIds.includes(t.teamId))
+              .map((t) => {
+                const isCustomRole =
+                  typeof t.role === "string" && t.role.startsWith("custom:");
+                return {
+                  teamId: t.teamId,
+                  role: isCustomRole
+                    ? TeamUserRole.CUSTOM
+                    : (t.role as TeamUserRole),
+                  customRoleId:
+                    isCustomRole && t.customRoleId ? t.customRoleId : undefined,
+                };
+              })
+              .filter((t) => {
+                // Validate custom roles have customRoleId
+                if (t.role === TeamUserRole.CUSTOM && !t.customRoleId) {
+                  return false;
+                }
+                return true;
+              });
+
+            teamIdsString = validTeamIds.join(",");
+          } else if (invite.teamIds?.trim()) {
+            // Legacy format: comma-separated teamIds string
+            const teamIdArray = invite.teamIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            // Filter out team IDs that do not belong to the organization
+            const validTeams = await prisma.team.findMany({
+              where: {
+                id: { in: teamIdArray },
+                organizationId: input.organizationId,
+              },
+              select: { id: true },
+            });
+
+            const validTeamIds = validTeams.map((team) => team.id);
+
+            // If no valid team IDs are found, skip this invite
+            if (validTeamIds.length === 0) {
+              return null;
+            }
+
+            // For legacy format, use organization role mapping (backward compatibility)
+            const organizationToTeamRoleMap: {
+              [K in OrganizationUserRole]: TeamUserRole;
+            } = {
+              [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+              [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+              [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+            };
+
+            teamAssignments = validTeamIds.map((teamId) => ({
+              teamId,
+              role: organizationToTeamRoleMap[invite.role],
+            }));
+
+            teamIdsString = validTeamIds.join(",");
+          } else {
+            // No teams provided
+            return null;
+          }
+
+          if (!invite.email.trim()) {
             return null;
           }
 
@@ -577,7 +734,9 @@ export const organizationRouter = createTRPCRouter({
               inviteCode: inviteCode,
               expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
               organizationId: input.organizationId,
-              teamIds: validTeamIds.join(","),
+              teamIds: teamIdsString,
+              teamAssignments:
+                teamAssignments.length > 0 ? teamAssignments : undefined,
               role: invite.role,
             },
           });
@@ -594,7 +753,7 @@ export const organizationRouter = createTRPCRouter({
             invite: savedInvite,
             noEmailProvider: !env.SENDGRID_API_KEY,
           };
-        })
+        }),
       );
 
       // Filter out any null values (skipped invites)
@@ -602,11 +761,7 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await prisma.organizationInvite.delete({
@@ -617,13 +772,9 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -641,7 +792,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         inviteCode: z.string(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
@@ -693,34 +844,96 @@ export const organizationRouter = createTRPCRouter({
           skipDuplicates: true,
         });
 
-        const organizationToTeamRoleMap: {
-          [K in OrganizationUserRole]: TeamUserRole;
-        } = {
-          [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-          [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-          [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
-        };
+        // Use teamAssignments if available (new format), otherwise fall back to legacy teamIds
+        let teamMembershipData: Array<{
+          userId: string;
+          teamId: string;
+          role: TeamUserRole;
+          customRoleId?: string;
+        }> = [];
 
-        const dedupedTeamIds = Array.from(
-          new Set(
-            invite.teamIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean)
-          )
-        );
+        if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+          // New format: use per-team roles from teamAssignments
+          const assignments = invite.teamAssignments as Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }>;
+          teamMembershipData = assignments.map((assignment) => ({
+            userId: session.user.id,
+            teamId: assignment.teamId,
+            role: assignment.role,
+            customRoleId: assignment.customRoleId,
+          }));
+        } else {
+          // Legacy format: use organization role mapping
+          const organizationToTeamRoleMap: {
+            [K in OrganizationUserRole]: TeamUserRole;
+          } = {
+            [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+            [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+            [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+          };
 
-        if (dedupedTeamIds.length > 0) {
-          const teamMembershipData = dedupedTeamIds.map((teamId) => ({
+          const dedupedTeamIds = Array.from(
+            new Set(
+              invite.teamIds
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
+          );
+
+          teamMembershipData = dedupedTeamIds.map((teamId) => ({
             userId: session.user.id,
             teamId,
             role: organizationToTeamRoleMap[invite.role],
           }));
+        }
 
-          await prisma.teamUser.createMany({
-            data: teamMembershipData,
-            skipDuplicates: true, // safe under concurrency and preserves existing roles
-          });
+        if (teamMembershipData.length > 0) {
+          // Handle custom roles separately since createMany doesn't support assignedRoleId
+          const builtInRoles = teamMembershipData.filter(
+            (data) => data.role !== TeamUserRole.CUSTOM,
+          );
+          const customRoles = teamMembershipData.filter(
+            (data) => data.role === TeamUserRole.CUSTOM && data.customRoleId,
+          );
+
+          // Create team memberships with built-in roles
+          if (builtInRoles.length > 0) {
+            await prisma.teamUser.createMany({
+              data: builtInRoles.map(
+                ({ customRoleId: _customRoleId, ...data }) => data,
+              ),
+              skipDuplicates: true,
+            });
+          }
+
+          // Create team memberships with custom roles (requires individual creates for assignedRoleId)
+          for (const customRole of customRoles) {
+            try {
+              await prisma.teamUser.create({
+                data: {
+                  userId: customRole.userId,
+                  teamId: customRole.teamId,
+                  role: TeamUserRole.CUSTOM,
+                  assignedRoleId: customRole.customRoleId!,
+                },
+              });
+            } catch (error: unknown) {
+              // Ignore unique constraint violations (concurrent inserts)
+              if (
+                error instanceof PrismaClientKnownRequestError &&
+                error.code === "P2002"
+              ) {
+                // Swallow the error - record already exists
+                continue;
+              }
+              // Rethrow other errors
+              throw error;
+            }
+          }
         }
 
         await prisma.organizationInvite.update({
@@ -738,27 +951,247 @@ export const organizationRouter = createTRPCRouter({
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
-      z.object({
-        teamId: z.string(),
-        userId: z.string(),
-        role: z.nativeEnum(TeamUserRole),
-      })
+      z
+        .object({
+          teamId: z.string(),
+          userId: z.string(),
+          role: z.union([
+            z.nativeEnum(TeamUserRole),
+            z
+              .string()
+              .regex(
+                /^custom:[a-zA-Z0-9_-]+$/,
+                "Custom role must be in format 'custom:{roleId}'",
+              ),
+          ]),
+          customRoleId: z.string().optional(),
+        })
+        .superRefine((data, ctx) => {
+          const isCustomRole = data.role.startsWith("custom:");
+
+          if (isCustomRole) {
+            if (!data.customRoleId || data.customRoleId.trim() === "") {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "customRoleId is required when using a custom role",
+                path: ["customRoleId"],
+              });
+            }
+          } else {
+            if (data.customRoleId !== undefined) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "customRoleId must not be provided when using a built-in role",
+                path: ["customRoleId"],
+              });
+            }
+          }
+        }),
     )
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      await prisma.teamUser.update({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        },
-        data: {
-          role: input.role,
-        },
-      });
+      // Check if this is a custom role
+      const isCustomRole = input.role.startsWith("custom:");
+
+      if (isCustomRole && input.customRoleId) {
+        const customRoleId = input.customRoleId; // Store in a const for TypeScript
+
+        // Atomic transaction with admin validation
+        await prisma.$transaction(async (tx) => {
+          // Ensure the custom role belongs to the team's organization
+          const team = await tx.team.findUnique({
+            where: { id: input.teamId },
+            select: { organizationId: true },
+          });
+          if (!team) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Team not found",
+            });
+          }
+          const role = await tx.customRole.findUnique({
+            where: { id: input.customRoleId },
+            select: { organizationId: true },
+          });
+          if (!role || role.organizationId !== team.organizationId) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Role does not belong to team's organization",
+            });
+          }
+          // Lock and validate admin count within transaction
+          const adminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (adminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "No admin found for this team",
+            });
+          }
+
+          // Lock the target user's membership row to prevent concurrent modifications
+          const targetUserMembership = await tx.teamUser.findUnique({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            select: { role: true },
+          });
+
+          if (!targetUserMembership) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "User is not a member of this team",
+            });
+          }
+
+          const isTargetUserAdmin =
+            targetUserMembership.role === TeamUserRole.ADMIN;
+          const wouldDemoteAdmin = isTargetUserAdmin; // Custom roles always demote from ADMIN
+
+          if (adminCount === 1 && wouldDemoteAdmin) {
+            // Optional: Check for self-demotion
+            if (input.userId === ctx.session.user.id) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message:
+                  "You cannot demote yourself from the last admin position in this team",
+              });
+            }
+
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Cannot remove or demote the last admin from this team",
+            });
+          }
+
+          // Perform the updates
+          await tx.teamUser.update({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            data: {
+              role: TeamUserRole.CUSTOM, // Use CUSTOM role for custom role assignments
+              assignedRoleId: customRoleId,
+            },
+          });
+
+          // Post-update validation: ensure we still have at least one admin
+          const finalAdminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (finalAdminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Operation would result in no admins for this team",
+            });
+          }
+        });
+      } else {
+        // It's a built-in role - update it and remove any custom roles
+        await prisma.$transaction(async (tx) => {
+          // Lock and validate admin count within transaction
+          const adminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (adminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "No admin found for this team",
+            });
+          }
+
+          // Lock the target user's membership row to prevent concurrent modifications
+          const targetUserMembership = await tx.teamUser.findUnique({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            select: { role: true },
+          });
+
+          if (!targetUserMembership) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "User is not a member of this team",
+            });
+          }
+
+          const isTargetUserAdmin =
+            targetUserMembership.role === TeamUserRole.ADMIN;
+          const wouldDemoteAdmin =
+            isTargetUserAdmin &&
+            (input.role as TeamUserRole) !== TeamUserRole.ADMIN;
+
+          if (adminCount === 1 && wouldDemoteAdmin) {
+            // Optional: Check for self-demotion
+            if (input.userId === ctx.session.user.id) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message:
+                  "You cannot demote yourself from the last admin position in this team",
+              });
+            }
+
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Cannot remove or demote the last admin from this team",
+            });
+          }
+
+          // Perform the updates
+          await tx.teamUser.update({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            data: {
+              role: input.role as TeamUserRole,
+              assignedRoleId: null, // Clear custom role assignment
+            },
+          });
+
+          // Post-update validation: ensure we still have at least one admin
+          const finalAdminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (finalAdminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Operation would result in no admins for this team",
+            });
+          }
+        });
+      }
 
       return { success: true };
     }),
@@ -766,13 +1199,9 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -794,53 +1223,246 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
         organizationId: z.string(),
         role: z.nativeEnum(OrganizationUserRole),
-      })
+      }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      if (input.role !== OrganizationUserRole.ADMIN) {
-        const currentMember = await prisma.organizationUser.findUnique({
+      return await prisma.$transaction(async (tx) => {
+        if (input.role !== OrganizationUserRole.ADMIN) {
+          // Lock the target user's membership row to prevent concurrent modifications
+          const currentMember = await tx.organizationUser.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: input.userId,
+                organizationId: input.organizationId,
+              },
+            },
+          });
+
+          if (currentMember?.role === OrganizationUserRole.ADMIN) {
+            const adminCount = await tx.organizationUser.count({
+              where: {
+                organizationId: input.organizationId,
+                role: OrganizationUserRole.ADMIN,
+              },
+            });
+
+            if (adminCount <= 1) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Cannot remove the last admin from an organization",
+              });
+            }
+          }
+        }
+
+        await tx.organizationUser.update({
           where: {
             userId_organizationId: {
               userId: input.userId,
               organizationId: input.organizationId,
             },
           },
+          data: { role: input.role },
         });
 
-        if (currentMember?.role === OrganizationUserRole.ADMIN) {
-          const adminCount = await prisma.organizationUser.count({
-            where: {
-              organizationId: input.organizationId,
-              role: OrganizationUserRole.ADMIN,
-            },
-          });
+        // Post-update validation: ensure we still have at least one admin
+        const finalAdminCount = await tx.organizationUser.count({
+          where: {
+            organizationId: input.organizationId,
+            role: OrganizationUserRole.ADMIN,
+          },
+        });
 
-          if (adminCount <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Cannot remove the last admin from an organization",
-            });
-          }
+        if (finalAdminCount === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Operation would result in no admins for this organization",
+          });
         }
+
+        return { success: true };
+      });
+    }),
+
+  getAuditLogs: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        projectId: z.string().optional(),
+        userId: z.string().optional(), // For searching by user
+        pageOffset: z.number().min(0).default(0),
+        pageSize: z.number().min(1).max(10000).default(25), // Increased max for exports
+        action: z.string().optional(), // For filtering by action type
+        startDate: z.number().optional(), // Start date timestamp (milliseconds)
+        endDate: z.number().optional(), // End date timestamp (milliseconds)
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      // Get all user IDs that belong to this organization
+      // This helps us filter logs with null organizationId to only show logs from org members
+      const orgUserIds = await ctx.prisma.organizationUser.findMany({
+        where: {
+          organizationId: input.organizationId,
+        },
+        select: {
+          userId: true,
+        },
+      });
+      const orgUserIdsList = orgUserIds.map((ou) => ou.userId);
+
+      // Build base conditions for organizationId
+      const orgIdConditions: Prisma.AuditLogWhereInput[] = [
+        { organizationId: input.organizationId },
+      ];
+
+      // Only include null organizationId logs if:
+      // 1. The user list is not empty
+      // 2. The log has a projectId (so we can determine it belongs to this org via the project)
+      // We exclude logs where both organizationId and projectId are null
+      if (orgUserIdsList.length > 0) {
+        orgIdConditions.push({
+          organizationId: null,
+          userId: {
+            in: orgUserIdsList,
+          },
+          projectId: {
+            not: null,
+          },
+        });
       }
 
-      await prisma.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
-            organizationId: input.organizationId,
-          },
+      // Build the where clause
+      const where: Prisma.AuditLogWhereInput = {};
+
+      // Build AND conditions
+      const andConditions: Prisma.AuditLogWhereInput[] = [
+        {
+          OR: orgIdConditions,
         },
-        data: { role: input.role },
+      ];
+
+      // Add userId filter if provided
+      if (input.userId) {
+        andConditions.push({ userId: input.userId });
+      }
+
+      // Add action filter if provided
+      if (input.action) {
+        andConditions.push({
+          action: {
+            contains: input.action,
+            mode: "insensitive" as const,
+          },
+        });
+      }
+
+      // Add projectId filter if provided
+      if (input.projectId) {
+        // When project is selected, show logs for that project OR organization-level (null projectId)
+        andConditions.push({
+          OR: [{ projectId: input.projectId }, { projectId: null }],
+        });
+      }
+
+      // Add date range filter if provided
+      if (input.startDate !== undefined || input.endDate !== undefined) {
+        const dateFilter: {
+          gte?: Date;
+          lte?: Date;
+        } = {};
+        if (input.startDate !== undefined) {
+          dateFilter.gte = new Date(input.startDate);
+        }
+        if (input.endDate !== undefined) {
+          dateFilter.lte = new Date(input.endDate);
+        }
+        andConditions.push({
+          createdAt: dateFilter,
+        });
+      }
+
+      // If we have multiple conditions, use AND; otherwise use the single condition
+      if (andConditions.length > 1) {
+        where.AND = andConditions;
+      } else {
+        Object.assign(where, andConditions[0]);
+      }
+
+      // Get total count for pagination
+      const totalCount = await ctx.prisma.auditLog.count({
+        where,
       });
 
-      return { success: true };
+      // Get paginated audit logs
+      const auditLogs = await ctx.prisma.auditLog.findMany({
+        where,
+        take: input.pageSize,
+        skip: input.pageOffset,
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      // Get unique user IDs from audit logs
+      const userIds = [...new Set(auditLogs.map((log) => log.userId))];
+
+      // Get unique project IDs from audit logs
+      const projectIds = [
+        ...new Set(
+          auditLogs
+            .map((log) => log.projectId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+
+      // Fetch users in a single query
+      const users = await ctx.prisma.user.findMany({
+        where: {
+          id: {
+            in: userIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      });
+
+      // Fetch projects in a single query
+      const projects = await ctx.prisma.project.findMany({
+        where: {
+          id: {
+            in: projectIds,
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+
+      // Create maps for O(1) lookup
+      const userMap = new Map(users.map((user) => [user.id, user]));
+      const projectMap = new Map(
+        projects.map((project) => [project.id, project]),
+      );
+
+      // Enrich audit logs with user and project data
+      const enrichedAuditLogs = auditLogs.map((log) => ({
+        ...log,
+        user: userMap.get(log.userId) ?? null,
+        project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
+      }));
+
+      return {
+        auditLogs: enrichedAuditLogs,
+        totalCount,
+      };
     }),
 });

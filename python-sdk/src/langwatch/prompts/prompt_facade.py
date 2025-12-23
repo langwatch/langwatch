@@ -8,7 +8,8 @@ or when API is unavailable.
 
 Follows the facade pattern to coordinate between LocalPromptLoader and PromptApiService.
 """
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
+import time
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
@@ -16,9 +17,13 @@ from langwatch.generated.langwatch_rest_api_client.client import (
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .prompt import Prompt
+from .types import FetchPolicy
 from .prompt_api_service import PromptApiService
 from .local_loader import LocalPromptLoader
 from .types import MessageDict, InputDict, OutputDict
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 class PromptsFacade:
@@ -34,6 +39,7 @@ class PromptsFacade:
         """Initialize the prompt service facade with dependencies."""
         self._api_service = PromptApiService(rest_api_client)
         self._local_loader = LocalPromptLoader()
+        self._cache: Dict[str, Dict[str, Any]] = {}
 
     @classmethod
     def from_global(cls) -> "PromptsFacade":
@@ -46,13 +52,43 @@ class PromptsFacade:
             )
         return cls(instance.rest_api_client)
 
-    def get(self, prompt_id: str, version_number: Optional[int] = None) -> Prompt:
+    def get(
+        self,
+        prompt_id: str,
+        version_number: Optional[int] = None,
+        fetch_policy: Optional[FetchPolicy] = None,
+        cache_ttl_minutes: Optional[int] = None,
+    ) -> Prompt:
         """
-        Retrieve a prompt by its ID with guaranteed availability.
+        Retrieve a prompt by its ID with configurable fetch policy.
 
-        Tries local files first, then falls back to API.
-        You can optionally specify a version number to get a specific version of the prompt.
+        Args:
+            prompt_id: The prompt ID to retrieve
+            version_number: Optional specific version number to retrieve
+            fetch_policy: How to fetch the prompt. Defaults to MATERIALIZED_FIRST.
+            cache_ttl_minutes: Cache TTL in minutes (only used with CACHE_TTL policy). Defaults to 5.
+
+        Raises:
+            ValueError: If the prompt is not found (404 error).
+            RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
+        fetch_policy = fetch_policy or FetchPolicy.MATERIALIZED_FIRST
+
+        if fetch_policy == FetchPolicy.MATERIALIZED_ONLY:
+            return self._get_materialized_only(prompt_id)
+        elif fetch_policy == FetchPolicy.ALWAYS_FETCH:
+            return self._get_always_fetch(prompt_id, version_number)
+        elif fetch_policy == FetchPolicy.CACHE_TTL:
+            return self._get_cache_ttl(
+                prompt_id, version_number, cache_ttl_minutes or 5
+            )
+        else:  # MATERIALIZED_FIRST (default)
+            return self._get_materialized_first(prompt_id, version_number)
+
+    def _get_materialized_first(
+        self, prompt_id: str, version_number: Optional[int] = None
+    ) -> Prompt:
+        """Get prompt using MATERIALIZED_FIRST policy (local first, API fallback)."""
         # Try to load from local files first
         local_data = self._local_loader.load_prompt(prompt_id)
         if local_data is not None:
@@ -61,6 +97,64 @@ class PromptsFacade:
         # Fall back to API if not found locally
         api_data = self._api_service.get(prompt_id, version_number)
         return Prompt(api_data)
+
+    def _get_materialized_only(self, prompt_id: str) -> Prompt:
+        """Get prompt using MATERIALIZED_ONLY policy (local only, no API calls)."""
+        local_data = self._local_loader.load_prompt(prompt_id)
+        if local_data is not None:
+            return Prompt(local_data)
+
+        raise ValueError(f"Prompt '{prompt_id}' not found in materialized files")
+
+    def _get_always_fetch(
+        self, prompt_id: str, version_number: Optional[int] = None
+    ) -> Prompt:
+        """Get prompt using ALWAYS_FETCH policy (API first, local fallback)."""
+        try:
+            api_data = self._api_service.get(prompt_id, version_number)
+            return Prompt(api_data)
+        except Exception:
+            # Fall back to local if API fails
+            local_data = self._local_loader.load_prompt(prompt_id)
+            if local_data is not None:
+                return Prompt(local_data)
+            raise ValueError(f"Prompt '{prompt_id}' not found locally or on server")
+
+    def _get_cache_ttl(
+        self,
+        prompt_id: str,
+        version_number: Optional[int] = None,
+        cache_ttl_minutes: int = 5,
+    ) -> Prompt:
+        """Get prompt using CACHE_TTL policy (cache with TTL, fallback to local)."""
+        cache_key = f"{prompt_id}::version:{version_number or ''}"
+        ttl_ms = cache_ttl_minutes * 60 * 1000
+        now = time.time() * 1000  # Convert to milliseconds
+
+        cached = self._cache.get(cache_key)
+        if cached and now - cached["timestamp"] < ttl_ms:
+            return Prompt(cached["data"])
+
+        try:
+            api_data = self._api_service.get(prompt_id, version_number)
+            self._cache[cache_key] = {"data": api_data, "timestamp": now}
+            return Prompt(api_data)
+        except Exception:
+            logger.warning(
+                f"Failed to fetch prompt '{prompt_id}' from API, falling back to local",
+                exc_info=True,
+                stack_info=True,
+                extra={
+                    "prompt_id": prompt_id,
+                    "version_number": version_number,
+                    "cache_ttl_minutes": cache_ttl_minutes,
+                },
+            )
+            # Fall back to local if API fails
+            local_data = self._local_loader.load_prompt(prompt_id)
+            if local_data is not None:
+                return Prompt(local_data)
+            raise ValueError(f"Prompt '{prompt_id}' not found locally or on server")
 
     def create(
         self,

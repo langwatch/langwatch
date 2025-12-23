@@ -3,24 +3,24 @@
  * Allows users to select a dataset and map trace data to dataset columns.
  */
 
-import { Link } from "./ui/link";
-import { Button, useDisclosure, VStack, HStack, Text } from "@chakra-ui/react";
-import { Drawer } from "./ui/drawer";
-import { toaster } from "./ui/toaster";
-import { useEffect, useRef, useState, useMemo, useLayoutEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type SubmitHandler, useForm } from "react-hook-form";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { createLogger } from "~/utils/logger";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../server/datasets/types";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { useDrawer } from "./CurrentDrawer";
 import { DatasetMappingPreview } from "./datasets/DatasetMappingPreview";
 import { DatasetSelector } from "./datasets/DatasetSelector";
-import { useLocalStorageSelectedDataSetId } from "~/hooks/useLocalStorageSelectedDataSetId";
-import { createLogger } from "~/utils/logger";
+import { Drawer } from "./ui/drawer";
+import { Link } from "./ui/link";
+import { toaster } from "./ui/toaster";
 
 const logger = createLogger("AddDatasetRecordDrawer");
 
@@ -74,11 +74,11 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
   // Fetch all datasets for the project
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false }
+    { enabled: !!project, refetchOnWindowFocus: false },
   );
 
   const selectedDataset = datasets.data?.find(
-    (dataset) => dataset.id === datasetId
+    (dataset) => dataset.id === datasetId,
   );
 
   // Combine trace IDs from props into a single array
@@ -90,7 +90,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           : [props.selectedTraceIds]),
         props?.traceId ?? "",
       ].filter(Boolean) as string[],
-    [props.selectedTraceIds, props.traceId]
+    [props.selectedTraceIds, props.traceId],
   );
 
   // Fetch traces with spans data
@@ -102,7 +102,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   /**
@@ -133,7 +133,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
   // State for editable row data
   const [editableRowData, setEditableRowData] = useState<DatasetRecordEntry[]>(
-    []
+    [],
   );
   const rowsToAdd = editableRowData.filter((row) => row.selected);
   const columnTypes = selectedDataset?.columnTypes as
@@ -159,12 +159,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               if (column?.type !== "string") {
                 try {
                   entry = JSON.parse(value as string);
-                } catch {}
+                } catch {
+                  /* this is just a safe json parse fallback */
+                }
               }
 
               return [key, entry];
-            })
-        ) as DatasetRecordEntry
+            }),
+        ) as DatasetRecordEntry,
     );
 
     // Create dataset records
@@ -195,7 +197,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -207,15 +208,14 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
 
     // We do this here since if we do it before, or attempt to do keep the
     // datasetId in sync, it will force a re-render and the drawers will close.
-    setLocalStorageDatasetId(_data.datasetId);
+    await setLocalStorageDatasetId(_data.datasetId);
   };
 
   // State for row data from dataset
@@ -241,7 +241,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
     setAtBottom(
       (scrollRef.current.scrollTop ?? 0) >=
         (scrollRef.current.scrollHeight ?? 0) -
-          (scrollRef.current.clientHeight ?? 0)
+          (scrollRef.current.clientHeight ?? 0),
     );
   }, [rowDataFromDataset]);
 
@@ -265,7 +265,7 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
           setAtBottom(
             (scrollRef.current?.scrollTop ?? 0) >=
               (scrollRef.current?.scrollHeight ?? 0) -
-                (scrollRef.current?.clientHeight ?? 0)
+                (scrollRef.current?.clientHeight ?? 0),
           )
         }
       >

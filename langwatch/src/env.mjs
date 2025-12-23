@@ -13,6 +13,7 @@ export const env = createEnv({
    */
   server: {
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
+    CLICKHOUSE_URL: z.string().url().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_PROVIDER: z.string().optional(),
@@ -23,8 +24,8 @@ export const env = createEnv({
         // Since NextAuth.js automatically uses the VERCEL_URL if present.
         (str) => process.env.VERCEL_URL ?? str,
         // VERCEL_URL doesn't include `https` so it cant be validated as a URL
-        process.env.VERCEL ? z.string().min(1) : z.string().url()
-      )
+        process.env.VERCEL ? z.string().min(1) : z.string().url(),
+      ),
     ),
     AUTH0_CLIENT_ID: z.string().optional(),
     AUTH0_CLIENT_SECRET: z.string().optional(),
@@ -49,7 +50,6 @@ export const env = createEnv({
     IS_QUICKWIT: z.boolean().optional(),
     USE_AWS_SES: z.string().optional(),
     AWS_REGION: z.string().optional(),
-    SENTRY_DSN: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
     S3_KEY_SALT: z.string().optional(),
     IS_SAAS: z.boolean().optional(),
@@ -60,9 +60,9 @@ export const env = createEnv({
     S3_BUCKET_NAME: z.string().optional(),
     DATASET_STORAGE_LOCAL: z.boolean().optional(),
     CREDENTIALS_SECRET: z.string().optional(),
-    AZURE_CLIENT_ID: z.string().optional(),
-    AZURE_CLIENT_SECRET: z.string().optional(),
-    AZURE_TENANT_ID: z.string().optional(),
+    AZURE_AD_CLIENT_ID: z.string().optional(),
+    AZURE_AD_CLIENT_SECRET: z.string().optional(),
+    AZURE_AD_TENANT_ID: z.string().optional(),
 
     // Cognito
     COGNITO_CLIENT_ID: z.string().optional(),
@@ -93,6 +93,13 @@ export const env = createEnv({
 
     // Observability
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+
+    // Event Sourcing
+    ENABLE_EVENT_SOURCING: z.boolean().optional(),
+    ENABLE_CLICKHOUSE: z.boolean().optional(),
+
+    // ClickHouse Migration Configuration
+    CLICKHOUSE_REPLICATED: z.string().optional(),
   },
 
   /**
@@ -110,6 +117,7 @@ export const env = createEnv({
    */
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
+    CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
     NODE_ENV: process.env.NODE_ENV,
     BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
@@ -146,7 +154,6 @@ export const env = createEnv({
       process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
     USE_AWS_SES: process.env.USE_AWS_SES,
     AWS_REGION: process.env.AWS_REGION,
-    SENTRY_DSN: process.env.SENTRY_DSN,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
     S3_KEY_SALT: process.env.S3_KEY_SALT,
     IS_SAAS:
@@ -163,9 +170,9 @@ export const env = createEnv({
       process.env.DATASET_STORAGE_LOCAL === "1" ||
       process.env.DATASET_STORAGE_LOCAL?.toLowerCase() === "true",
     CREDENTIALS_SECRET: process.env.CREDENTIALS_SECRET,
-    AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
-    AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
-    AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+    AZURE_AD_CLIENT_ID: process.env.AZURE_AD_CLIENT_ID,
+    AZURE_AD_CLIENT_SECRET: process.env.AZURE_AD_CLIENT_SECRET,
+    AZURE_AD_TENANT_ID: process.env.AZURE_AD_TENANT_ID,
     COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
     COGNITO_ISSUER: process.env.COGNITO_ISSUER,
     COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
@@ -185,6 +192,13 @@ export const env = createEnv({
     OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
     OKTA_ISSUER: process.env.OKTA_ISSUER,
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    ENABLE_EVENT_SOURCING:
+      process.env.ENABLE_EVENT_SOURCING === "true" ||
+      process.env.ENABLE_EVENT_SOURCING?.toLowerCase() === "true",
+    ENABLE_CLICKHOUSE:
+      process.env.ENABLE_CLICKHOUSE === "true" ||
+      process.env.ENABLE_CLICKHOUSE?.toLowerCase() === "true",
+    CLICKHOUSE_REPLICATED: process.env.CLICKHOUSE_REPLICATED,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

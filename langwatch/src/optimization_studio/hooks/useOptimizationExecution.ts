@@ -1,10 +1,10 @@
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
-import type { StudioClientEvent } from "../types/events";
-import { useWorkflowStore } from "./useWorkflowStore";
-import type { OPTIMIZERS } from "../types/optimizers";
 import { toaster } from "~/components/ui/toaster";
+import type { StudioClientEvent } from "../types/events";
+import type { OPTIMIZERS } from "../types/optimizers";
 import { usePostEvent } from "./usePostEvent";
+import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useOptimizationExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -108,7 +108,7 @@ export const useOptimizationExecution = () => {
       setOptimizationState,
       getWorkflow,
       postEvent,
-    ]
+    ],
   );
 
   const stopOptimizationExecution = useCallback(
@@ -140,7 +140,7 @@ export const useOptimizationExecution = () => {
         });
       }, 10_000);
     },
-    [socketAvailable, setOptimizationState, postEvent, getWorkflow]
+    [socketAvailable, setOptimizationState, postEvent, getWorkflow],
   );
 
   return {

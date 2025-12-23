@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { CostType } from "@prisma/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { getTestProject } from "../../utils/testUtils";
+import { prisma } from "../db";
+import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
+import type { Trace } from "../tracer/types";
 import {
   clusterTopicsForProject,
   fetchTopicsBatchClustering,
 } from "./topicClustering";
-import { TRACE_INDEX, esClient, traceIndexId } from "../elasticsearch";
-import type { Trace } from "../tracer/types";
-import { CostType } from "@prisma/client";
-import { prisma } from "../db";
 import type { TopicClusteringTrace } from "./types";
-import { getTestProject } from "../../utils/testUtils";
 
 describe.skip("Topic Clustering Integration Test", () => {
   let testProjectId: string;

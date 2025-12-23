@@ -1,15 +1,18 @@
-import * as Sentry from "@sentry/nextjs";
 import { type Job, Worker } from "bullmq";
+import { env } from "~/env.mjs";
 import type { UsageStatsJob } from "~/server/background/types";
+import { collectUsageStats } from "~/server/collectUsageStats";
 import { createLogger } from "../../../utils/logger";
-import { connection } from "../../redis";
-import { USAGE_STATS_QUEUE_NAME } from "../queues/usageStatsQueue";
+import {
+  captureException,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import {
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
 } from "../../metrics";
-import { collectUsageStats } from "~/server/collectUsageStats";
-import { env } from "~/env.mjs";
+import { connection } from "../../redis";
+import { USAGE_STATS_QUEUE_NAME } from "../queues/usageStatsQueue";
 
 const logger = createLogger("langwatch:workers:usageStatsWorker");
 
@@ -25,8 +28,6 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
 
   try {
     const stats = await collectUsageStats(job.data.instance_id);
-
-    logger.info({ stats }, "usage stats collected");
 
     const installMethod = process.env.INSTALL_METHOD || "self-hosted"; // Default to self-hosted if not specified
 
@@ -51,10 +52,10 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
   } catch (error) {
     getJobProcessingCounter("usage_stats", "failed").inc();
     logger.error({ jobId: job.id, error }, "failed to process usage stats job");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "usageStats");
-      scope.setExtra("job", job.data);
-      Sentry.captureException(error);
+    await withScope(async (scope) => {
+      scope.setTag?.("worker", "usageStats");
+      scope.setExtra?.("job", job.data);
+      captureException(error);
     });
   }
 }
@@ -76,20 +77,20 @@ export const startUsageStatsWorker = () => {
     {
       connection,
       concurrency: 1, // Only one job at a time since it's a daily task
-    }
+    },
   );
 
   usageStatsWorker.on("ready", () => {
     logger.info("usage stats worker active, waiting for jobs!");
   });
 
-  usageStatsWorker.on("failed", (job, err) => {
+  usageStatsWorker.on("failed", async (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
     getJobProcessingCounter("usage_stats", "failed").inc();
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "usageStats");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    await withScope((scope) => {
+      scope.setTag?.("worker", "usageStats");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 

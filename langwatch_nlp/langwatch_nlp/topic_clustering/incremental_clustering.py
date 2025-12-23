@@ -27,6 +27,9 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 from langwatch_nlp.topic_clustering.utils import fill_embeddings
+from langwatch_nlp.logger import get_logger
+
+logger = get_logger("topic_clustering.incremental")
 
 
 U = TypeVar("U", Topic, Subtopic)
@@ -136,14 +139,19 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
 ) -> tuple[list[Topic], list[Subtopic], list[TraceTopicMap], Money]:
     cost = Money(amount=0, currency="USD")
 
+    logger.info("Checking for unassigned traces that need new topics...")
     new_traces_to_assign = [
         trace
         for trace in traces
         if not assign_trace_to_topic(trace, topics, subtopics)["topic_id"]
     ]
+    logger.info(f"Found {len(new_traces_to_assign)} unassigned traces")
 
     new_topics, new_subtopics, new_traces_to_assign = ([], [], [])
     if len(new_traces_to_assign) > MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC:
+        logger.info(
+            f"Creating new topics from {len(new_traces_to_assign)} unassigned traces (threshold: {MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC})..."
+        )
         new_topics, new_subtopics, new_traces_to_assign, cost_ = (
             maybe_create_new_topics(
                 model,
@@ -155,6 +163,9 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
             )
         )
         cost["amount"] += cost_["amount"]
+        logger.info(
+            f"Created {len(new_topics)} new topics with {len(new_subtopics)} subtopics"
+        )
 
     new_traces_to_assign_to_subtopics_map: dict[str, list[TraceWithEmbeddings]] = {}
     for trace in traces:
@@ -165,9 +176,25 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
                 new_traces_to_assign_to_subtopics_map[topic_id] = []
             new_traces_to_assign_to_subtopics_map[topic_id].append(trace)
 
-    for topic_id, traces_ in new_traces_to_assign_to_subtopics_map.items():
+    topics_needing_subtopics = [
+        (topic_id, len(traces_))
+        for topic_id, traces_ in new_traces_to_assign_to_subtopics_map.items()
+        if len(traces_) >= MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_SUBTOPIC
+    ]
+    if topics_needing_subtopics:
+        logger.info(
+            f"Checking {len(topics_needing_subtopics)} existing topics for new subtopics..."
+        )
+
+    for idx, (topic_id, traces_) in enumerate(
+        new_traces_to_assign_to_subtopics_map.items()
+    ):
         if len(traces_) < MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_SUBTOPIC:
             continue
+
+        logger.info(
+            f"Processing topic {idx + 1}/{len(topics_needing_subtopics)}: creating subtopics from {len(traces_)} traces..."
+        )
 
         subtopics_ = [t for t in subtopics if t["parent_id"] == topic_id]
         _, new_subtopics_, new_traces_to_assign_, cost_ = maybe_create_new_topics(
@@ -193,6 +220,9 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
 
         new_subtopics += new_subtopics__
         new_traces_to_assign += new_traces_to_assign_
+        logger.info(
+            f"Topic {idx + 1}/{len(topics_needing_subtopics)}: created {len(new_subtopics__)} new subtopics"
+        )
 
     return new_topics, new_subtopics, new_traces_to_assign, cost
 
@@ -211,14 +241,24 @@ def setup_endpoints(app: FastAPI):
     def topics_incremental_clustering(
         params: IncrementalClusteringParams,
     ) -> TopicClusteringResponse:
+        logger.info(
+            f"Starting incremental clustering for {len(params.traces)} traces "
+            f"({len(params.topics)} existing topics, {len(params.subtopics)} existing subtopics)"
+        )
+
         model = params.litellm_params["model"]
         if model.startswith("azure/") and params.deployment_name:
             model = f"azure/{params.deployment_name}"
 
+        logger.info("Step 1/3: Generating embeddings for new traces...")
         traces_with_embeddings = fill_embeddings(
             params.traces, params.embeddings_litellm_params
         )
+        logger.info(
+            f"Step 1/3: Embeddings complete - {len(traces_with_embeddings)} traces with valid embeddings"
+        )
 
+        logger.info("Step 2/3: Assigning traces to existing topics and subtopics...")
         traces_to_assign = []
         for trace in traces_with_embeddings:
             trace_topic_map = assign_trace_to_topic(
@@ -226,7 +266,13 @@ def setup_endpoints(app: FastAPI):
             )
             if trace_topic_map["topic_id"]:
                 traces_to_assign.append(trace_topic_map)
+        logger.info(
+            f"Step 2/3: Assigned {len(traces_to_assign)} traces to existing topics"
+        )
 
+        logger.info(
+            "Step 3/3: Creating new topics/subtopics from unassigned traces..."
+        )
         new_topics, new_subtopics, traces_from_new_topics_to_assign, cost = (
             maybe_create_new_topics_and_subtopics_from_unassigned_traces(
                 model=params.litellm_params["model"],
@@ -236,6 +282,12 @@ def setup_endpoints(app: FastAPI):
                 topics=params.topics,
                 subtopics=params.subtopics,
             )
+        )
+
+        total_traces = len(traces_to_assign) + len(traces_from_new_topics_to_assign)
+        logger.info(
+            f"Incremental clustering complete - {len(new_topics)} new topics, "
+            f"{len(new_subtopics)} new subtopics, {total_traces} total trace assignments"
         )
 
         return {

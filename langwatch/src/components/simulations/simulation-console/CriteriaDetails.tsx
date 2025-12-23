@@ -1,8 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
-
-import { CONSOLE_COLORS, REASONING_VERDICT_COLOR_MAP } from "./constants";
-
 import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { CONSOLE_COLORS, REASONING_VERDICT_COLOR_MAP } from "./constants";
 
 interface CriteriaDetailsProps {
   results?: ScenarioResults | null;

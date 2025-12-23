@@ -7,28 +7,27 @@
  * need to use are documented accordingly near the end.
  */
 
+import type { inferParser } from "@trpc/server";
 import {
   initTRPC,
-  TRPCError,
   type ProcedureBuilder,
   type ProcedureParams,
   type Simplify,
+  TRPCError,
 } from "@trpc/server";
-import * as Sentry from "@sentry/node";
-import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
-import type { inferParser } from "@trpc/server";
-import type { NextApiRequest, NextApiResponse } from "next";
-import { type Session } from "next-auth";
-import superjson from "superjson";
-import { ZodError } from "zod";
-
+import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
+import type { NextApiRequest, NextApiResponse } from "next";
+import type { Session } from "next-auth";
+import superjson from "superjson";
+import { ZodError } from "zod";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { type PermissionMiddleware } from "./permission";
-import { auditLog } from "../auditLog";
 import { createLogger } from "../../utils/logger";
+import { captureException } from "../../utils/posthogErrorCapture";
+import { auditLog } from "../auditLog";
+import type { PermissionMiddleware } from "./permission";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -171,7 +170,7 @@ const auditLogTRPCErrors = t.middleware(
     }
 
     return result;
-  }
+  },
 );
 
 const auditLogMutations = t.middleware(
@@ -197,7 +196,7 @@ const auditLogMutations = t.middleware(
     });
 
     return result;
-  }
+  },
 );
 
 export const loggerMiddleware = t.middleware(
@@ -226,14 +225,14 @@ export const loggerMiddleware = t.middleware(
       if (error) {
         logData.error = error instanceof Error ? error : JSON.stringify(error);
 
-        Sentry.captureException(error);
+        captureException(error);
 
         logger.error(logData, "trpc error");
       } else {
         logger.info(logData, "trpc call");
       }
     }
-  }
+  },
 );
 
 /**
@@ -260,7 +259,7 @@ type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
 interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
   // Copy-paste from @trpc core internals procedureBuilder
   input: <$Parser extends Parser>(
-    schema: $Parser
+    schema: $Parser,
   ) => PendingPermissionProcedureBuilder<{
     _config: TParams["_config"];
     _meta: TParams["_meta"];
@@ -278,12 +277,12 @@ interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
     _output_out: TParams["_output_out"];
   }>;
   use: (
-    middleware: PermissionMiddleware<TParams["_input_out"]>
+    middleware: PermissionMiddleware<TParams["_input_out"]>,
   ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
 }
 
 const permissionProcedureBuilder = <TParams extends ProcedureParams>(
-  procedure: ProcedureBuilder<TParams>
+  procedure: ProcedureBuilder<TParams>,
 ): PendingPermissionProcedureBuilder<TParams> => {
   return {
     input: (input) => {
@@ -300,7 +299,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
 };
 
 export const protectedProcedure = permissionProcedureBuilder(
-  authProtectedProcedure
+  authProtectedProcedure,
 );
 
 /**

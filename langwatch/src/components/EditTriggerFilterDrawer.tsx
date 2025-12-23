@@ -1,13 +1,13 @@
 import { Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useDrawer } from "~/components/CurrentDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "~/hooks/useFilterParams";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import { FieldsFilters } from "./filters/FieldsFilters";
+import { QueryStringFieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
@@ -41,12 +41,12 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             }
             return acc;
           },
-          {} as Record<FilterField, string[] | Record<string, string[]>>
+          {} as Record<FilterField, string[] | Record<string, string[]>>,
         );
 
         setFilters(filtersToSet);
       },
-    }
+    },
   );
 
   const { closeDrawer } = useDrawer();
@@ -60,7 +60,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
         title: "Error",
         description: "Please add at least one filter",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -76,8 +75,8 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
           Object.entries(filterParams.filters).filter(([_, value]) =>
             Array.isArray(value)
               ? value.length > 0
-              : Object.keys(value as Record<string, string[]>).length > 0
-          )
+              : Object.keys(value as Record<string, string[]>).length > 0,
+          ),
         ),
       },
       {
@@ -86,7 +85,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             title: "Trigger Updated",
             description: `You have successfully updated the trigger`,
             type: "success",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -104,13 +102,12 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             title: "Error",
             description: "Error updating trigger",
             type: "error",
-            placement: "top-end",
             meta: {
               closable: true,
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -139,7 +136,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             helper="Add or remove filters to the trigger."
             minWidth="calc(50% - 16px)"
           >
-            <FieldsFilters />
+            <QueryStringFieldsFilters hideTriggerButton />
           </HorizontalFormControl>
 
           <HStack justifyContent="flex-end" marginY={5}>

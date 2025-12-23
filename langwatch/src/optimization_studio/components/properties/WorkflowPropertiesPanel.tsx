@@ -1,25 +1,24 @@
-import { useCallback } from "react";
 import {
   Box,
   HStack,
   Input,
+  NativeSelect,
   Spacer,
   Text,
   Textarea,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
-import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
-import { WorkflowIcon } from "../ColorfulBlockIcons";
-import { EmojiPickerModal } from "./modals/EmojiPickerModal";
-import { useEffect, useState } from "react";
 import { useUpdateNodeInternals } from "@xyflow/react";
-import { evaluatorInputs } from "./EndPropertiesPanel";
-import type { End, WorkflowTypes } from "../../types/dsl";
+import { useCallback, useEffect, useState } from "react";
 import { Switch } from "../../../components/ui/switch";
-import { NativeSelect } from "@chakra-ui/react";
-import { useDisclosure } from "@chakra-ui/react";
+import { useWorkflowStore } from "../../hooks/useWorkflowStore";
+import type { End, WorkflowTypes } from "../../types/dsl";
+import { WorkflowIcon } from "../ColorfulBlockIcons";
+import { BasePropertiesPanel, PropertyField } from "./BasePropertiesPanel";
+import { evaluatorInputs } from "./EndPropertiesPanel";
+import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
+import { EmojiPickerModal } from "./modals/EmojiPickerModal";
 
 export const WorkflowPropertiesPanel = () => {
   const { getWorkflow, setWorkflow, setNode } = useWorkflowStore(
@@ -27,7 +26,7 @@ export const WorkflowPropertiesPanel = () => {
       getWorkflow,
       setWorkflow,
       setNode,
-    })
+    }),
   );
 
   const workflow = getWorkflow();
@@ -43,14 +42,14 @@ export const WorkflowPropertiesPanel = () => {
   const endNode = workflow.nodes.find((n) => n.type === "end");
 
   const [isEvaluator, setIsEvaluator] = useState(
-    () => endNode?.data.behave_as === "evaluator"
+    () => endNode?.data.behave_as === "evaluator",
   );
 
   const setWorkflowType = (workflowType: WorkflowTypes) => {
     setWorkflow({ workflow_type: workflowType });
   };
 
-  const updateNode = useCallback((workflowType: WorkflowTypes) => {
+  const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;
 
     if (workflowType === "evaluator") {
@@ -77,7 +76,7 @@ export const WorkflowPropertiesPanel = () => {
       updateNodeInternals(endNode.id);
       setIsEvaluator(false);
     }
-  }, [endNode, setNode, updateNodeInternals]);
+  };
 
   useEffect(() => {
     if (
@@ -86,8 +85,8 @@ export const WorkflowPropertiesPanel = () => {
     ) {
       updateNode(workflow.workflow_type);
     }
-  }, [workflow.workflow_type, isEvaluator, updateNode]);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflow.workflow_type, isEvaluator]);
 
   return (
     <BasePropertiesPanel

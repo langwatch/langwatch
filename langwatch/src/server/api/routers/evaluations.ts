@@ -1,20 +1,20 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { prisma } from "~/server/db";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { prisma } from "~/server/db";
+import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
 
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async () => {
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
@@ -22,16 +22,16 @@ export const evaluationsRouter = createTRPCRouter({
           {
             ...evaluator,
             missingEnvVars: evaluator.envVars.filter(
-              (envVar) => !process.env[envVar]
+              (envVar) => !process.env[envVar],
             ),
           },
-        ])
+        ]),
       );
     }),
 
   availableCustomEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input }) => {
       const customEvaluators = await getCustomEvaluators({
         projectId: input.projectId,
@@ -49,11 +49,13 @@ export const evaluationsRouter = createTRPCRouter({
         traceId: z.string(),
         settings: z.object({}).passthrough(),
         mappings: mappingStateSchema,
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
       const result = await runEvaluationForTrace({
         projectId: input.projectId,
@@ -86,7 +88,7 @@ export const getCustomEvaluators = async ({
   return workflows.map((workflow) => ({
     ...workflow,
     versions: workflow.versions.filter(
-      (version) => version.id === workflow.publishedId
+      (version) => version.id === workflow.publishedId,
     ),
   }));
 };

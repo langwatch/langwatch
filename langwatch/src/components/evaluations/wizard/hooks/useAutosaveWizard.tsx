@@ -1,16 +1,16 @@
+import { useRouter } from "next/router";
 import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
+import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
+import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
+import { api } from "../../../../utils/api";
+import { toaster } from "../../../ui/toaster";
 import {
   initialState,
   useEvaluationWizardStore,
 } from "./evaluation-wizard-store/useEvaluationWizardStore";
-import { api } from "../../../../utils/api";
-import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
-import { useRouter } from "next/router";
-import { useShallow } from "zustand/react/shallow";
-import { getWorkflow } from "../../../../optimization_studio/hooks/useWorkflowStore";
-import * as Sentry from "@sentry/nextjs";
-import { toaster } from "../../../ui/toaster";
-import { getRandomWorkflowIcon } from "../../../../optimization_studio/components/workflow/NewWorkflowForm";
 
 const stringifiedInitialState = JSON.stringify({
   wizardState: initialState.wizardState,
@@ -59,8 +59,8 @@ const useAutosaveWizard = () => {
         setWizardState,
         skipNextAutosave,
         setWorkflow: workflowStore.setWorkflow,
-      })
-    )
+      }),
+    ),
   );
 
   const stringifiedState = JSON.stringify({
@@ -75,7 +75,7 @@ const useAutosaveWizard = () => {
       projectId: project?.id ?? "",
       experimentSlug: experimentSlug ?? "",
     },
-    { enabled: !!project && !!experimentSlug }
+    { enabled: !!project && !!experimentSlug },
   );
 
   useEffect(() => {
@@ -87,7 +87,7 @@ const useAutosaveWizard = () => {
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
       void router.replace(
-        `/${project.slug}/evaluations/wizard/${experimentSlug}`
+        `/${project.slug}/evaluations/wizard/${experimentSlug}`,
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,9 +139,8 @@ const useAutosaveWizard = () => {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               context: "Failed to autosave evaluation",
               projectId: project.id,

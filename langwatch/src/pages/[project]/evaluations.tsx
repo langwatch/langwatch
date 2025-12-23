@@ -15,7 +15,8 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
-import { MoreVertical } from "react-feather";
+import { useState } from "react";
+import { Copy, MoreVertical } from "react-feather";
 import {
   LuCircleCheckBig,
   LuCircleX,
@@ -24,8 +25,10 @@ import {
   LuSquareCheckBig,
   LuTrash,
 } from "react-icons/lu";
+import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { MonitorsSection } from "../../components/evaluations/MonitorsSection";
+import { CopyEvaluationDialog } from "../../components/evaluations/CopyEvaluationDialog";
 import type { TASK_TYPES } from "../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import {
   formatEvaluationSummary,
@@ -35,23 +38,28 @@ import { OverflownTextWithTooltip } from "../../components/OverflownText";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
-import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 import { useEvaluationsPagination } from "../../hooks/useEvaluationsPagination";
 import { EvaluationsPaginationFooter } from "../../components/evaluations/EvaluationsPaginationFooter";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
-export default function EvaluationsV2() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+function EvaluationsV2() {
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const pagination = useEvaluationsPagination();
+  const [copyDialogState, setCopyDialogState] = useState<{
+    open: boolean;
+    experimentId: string;
+    evaluationName: string;
+  } | null>(null);
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
@@ -65,7 +73,7 @@ export default function EvaluationsV2() {
       onSuccess: (data) => {
         pagination.updateTotalCount(data.totalCount);
       },
-    }
+    },
   );
 
   const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
@@ -76,7 +84,6 @@ export default function EvaluationsV2() {
         toaster.create({
           title: "Experiment deleted",
           type: "success",
-          placement: "top-end",
           meta: {
             closable: true,
           },
@@ -88,22 +95,21 @@ export default function EvaluationsV2() {
           description:
             "Please try again. If the problem persists, contact support.",
           type: "error",
-          placement: "top-end",
           meta: {
             closable: true,
           },
         });
       },
-    }
+    },
   );
 
   const handleDeleteExperiment = (
     experimentId: string,
-    experimentName: string
+    experimentName: string,
   ) => {
     if (
       confirm(
-        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`
+        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`,
       )
     ) {
       deleteExperimentMutation.mutate({
@@ -127,26 +133,24 @@ export default function EvaluationsV2() {
     BATCH_EVALUATION_V2: "API Batch Evaluation",
     BATCH_EVALUATION: "Batch Evaluation",
     DSPY: "DSPy Optimization",
+    EVALUATIONS_V3: "Evaluations V3",
   };
 
   return (
     <DashboardLayout>
-      <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
+      <PageLayout.Header>
+        <PageLayout.Heading>Evaluations Dashboard</PageLayout.Heading>
+        <Spacer />
+        <HStack gap={2}>
+          <NewEvaluationButton />
+        </HStack>
+      </PageLayout.Header>
+      <Container
+        maxW={"calc(min(1440px, 100vw - 200px))"}
+        paddingX={6}
+        paddingTop={4}
+      >
         <VStack width="fill" gap={4} align="stretch">
-          <HStack paddingTop={4}>
-            <VStack align="start" gap={1}>
-              <Heading as="h1">Evaluations Dashboard</Heading>
-              <Text color="gray.600">
-                Monitor real-time performance metrics and batch evaluation
-                results
-              </Text>
-            </VStack>
-            <Spacer />
-            <HStack gap={2}>
-              <NewEvaluationButton />
-            </HStack>
-          </HStack>
-
           {monitors.isLoading ? (
             <Box display="flex" justifyContent="center" py={8}>
               <Spinner />
@@ -177,22 +181,19 @@ export default function EvaluationsV2() {
                         </EmptyState.Indicator>
                         <EmptyState.Title>No evaluations yet</EmptyState.Title>
                         <EmptyState.Description>
-                          {project &&
-                            hasTeamPermission(
-                              TeamRoleGroup.GUARDRAILS_MANAGE
-                            ) && (
-                              <>
-                                {" "}
-                                Click on{" "}
-                                <Link
-                                  textDecoration="underline"
-                                  href={`/${project.slug}/evaluations/wizard`}
-                                >
-                                  New Evaluation
-                                </Link>{" "}
-                                to get started.
-                              </>
-                            )}
+                          {project && hasPermission("evaluations:manage") && (
+                            <>
+                              {" "}
+                              Click on{" "}
+                              <Link
+                                textDecoration="underline"
+                                href={`/${project.slug}/evaluations/wizard`}
+                              >
+                                New Evaluation
+                              </Link>{" "}
+                              to get started.
+                            </>
+                          )}
                         </EmptyState.Description>
                       </EmptyState.Content>
                     </EmptyState.Root>
@@ -302,7 +303,7 @@ export default function EvaluationsV2() {
                                             {formatEvaluationSummary(
                                               experiment.runsSummary
                                                 .primaryMetric,
-                                              true
+                                              true,
                                             )}
                                           </Text>
                                         </>
@@ -320,7 +321,7 @@ export default function EvaluationsV2() {
                                           {getFinishedAt(
                                             experiment.runsSummary.latestRun
                                               .timestamps,
-                                            new Date().getTime()
+                                            new Date().getTime(),
                                           ) ? (
                                             <HStack color="green.500">
                                               <LuCircleCheckBig size={16} />
@@ -343,7 +344,7 @@ export default function EvaluationsV2() {
                                     </Table.Cell>
                                     <Table.Cell whiteSpace="nowrap">
                                       {new Date(
-                                        experiment.updatedAt
+                                        experiment.updatedAt,
                                       ).toLocaleString()}
                                     </Table.Cell>
                                     <Table.Cell>
@@ -367,13 +368,33 @@ export default function EvaluationsV2() {
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 void router.push(
-                                                  `/${project?.slug}/evaluations/wizard/${experiment.slug}`
+                                                  `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
                                                 );
                                               }}
                                             >
                                               <LuPencil size={16} />
                                               Edit
                                             </Menu.Item>
+                                            {hasPermission(
+                                              "evaluations:manage",
+                                            ) && (
+                                              <Menu.Item
+                                                value="replicate"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setCopyDialogState({
+                                                    open: true,
+                                                    experimentId: experiment.id,
+                                                    evaluationName:
+                                                      experiment.name ??
+                                                      experiment.slug,
+                                                  });
+                                                }}
+                                              >
+                                                <Copy size={16} />
+                                                Replicate to another project
+                                              </Menu.Item>
+                                            )}
                                             <Menu.Item
                                               value="delete"
                                               color="red.500"
@@ -382,7 +403,7 @@ export default function EvaluationsV2() {
                                                 handleDeleteExperiment(
                                                   experiment.id,
                                                   experiment.name ??
-                                                    experiment.slug
+                                                    experiment.slug,
                                                 );
                                               }}
                                             >
@@ -394,7 +415,7 @@ export default function EvaluationsV2() {
                                       </Box>
                                     </Table.Cell>
                                   </Table.Row>
-                                )
+                                ),
                               )
                             : null}
                         </Table.Body>
@@ -413,6 +434,18 @@ export default function EvaluationsV2() {
           )}
         </VStack>
       </Container>
+      {copyDialogState && (
+        <CopyEvaluationDialog
+          open={copyDialogState.open}
+          onClose={() => setCopyDialogState(null)}
+          experimentId={copyDialogState.experimentId}
+          evaluationName={copyDialogState.evaluationName}
+        />
+      )}
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("evaluations:view", {
+  layoutComponent: DashboardLayout,
+})(EvaluationsV2);

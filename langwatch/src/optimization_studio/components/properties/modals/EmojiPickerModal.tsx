@@ -1,11 +1,14 @@
-import dynamic from "next/dynamic";
-import { ConfigModal } from "./ConfigModal";
 import { PopoverContent } from "@chakra-ui/react";
 import { EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
+import dynamic from "next/dynamic";
+import { ConfigModal } from "./ConfigModal";
 
 const EmojiPicker = dynamic(
-  () => import("emoji-picker-react").then(mod => mod.default),
-  { ssr: false, loading: () => <div style={{ padding: 16 }}>Loading emoji picker...</div> }
+  () => import("emoji-picker-react").then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => <div style={{ padding: 16 }}>Loading emoji picker...</div>,
+  },
 );
 
 export function EmojiPickerModal({
@@ -19,7 +22,7 @@ export function EmojiPickerModal({
 }) {
   return (
     <ConfigModal open={open} onClose={onClose} title="Workflow Icon" unstyled>
-      <PopoverContent marginRight={4}>
+      <PopoverContent marginRight={4} position="absolute" marginTop="72px">
         <EmojiPicker
           emojiStyle={EmojiStyle.NATIVE}
           skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}

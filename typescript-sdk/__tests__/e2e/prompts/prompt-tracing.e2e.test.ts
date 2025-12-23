@@ -15,8 +15,8 @@ describe("Prompt tracing", () => {
   beforeAll(async () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
-      apiKey: "test-key",
-      endpoint: "https://app.langwatch.test",
+      apiKey: process.env.LANGWATCH_API_KEY,
+      endpoint: process.env.LANGWATCH_ENDPOINT
     });
   });
 
@@ -88,7 +88,7 @@ describe("Prompt tracing", () => {
     beforeEach(async () => {
       // Test template compilation
       const prompt = await langwatch.prompts.get("prompt_123");
-      prompt!.compile({
+      prompt.compile({
         name: "Alice",
         topic: "weather",
       });

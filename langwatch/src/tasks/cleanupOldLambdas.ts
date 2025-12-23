@@ -1,15 +1,15 @@
 import {
-  LambdaClient,
-  ListFunctionsCommand,
-  DeleteFunctionCommand,
-  GetFunctionCommand,
-} from "@aws-sdk/client-lambda";
-import {
   CloudWatchLogsClient,
-  DescribeLogStreamsCommand,
   DeleteLogGroupCommand,
   DescribeLogGroupsCommand,
+  DescribeLogStreamsCommand,
 } from "@aws-sdk/client-cloudwatch-logs";
+import {
+  DeleteFunctionCommand,
+  GetFunctionCommand,
+  LambdaClient,
+  ListFunctionsCommand,
+} from "@aws-sdk/client-lambda";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:cleanup-old-lambdas");
@@ -27,7 +27,7 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   const configStr = process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
   if (!configStr) {
     throw new Error(
-      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required"
+      "LANGWATCH_NLP_LAMBDA_CONFIG environment variable is required",
     );
   }
 
@@ -60,7 +60,7 @@ const createAWSClients = () => {
 
 const getLastEventTime = async (
   logsClient: CloudWatchLogsClient,
-  functionName: string
+  functionName: string,
 ): Promise<Date | null> => {
   const logGroupName = `/aws/lambda/${functionName}`;
 
@@ -73,7 +73,7 @@ const getLastEventTime = async (
 
     const response = await logsClient.send(command);
 
-    if (response.logStreams && response.logStreams[0]?.lastEventTimestamp) {
+    if (response.logStreams?.[0]?.lastEventTimestamp) {
       return new Date(response.logStreams[0].lastEventTimestamp);
     }
 
@@ -89,7 +89,7 @@ const getLastEventTime = async (
 
 const deleteLambdaFunction = async (
   lambdaClient: LambdaClient,
-  functionName: string
+  functionName: string,
 ): Promise<void> => {
   try {
     const command = new DeleteFunctionCommand({
@@ -109,7 +109,7 @@ const deleteLambdaFunction = async (
 
 const deleteLogGroup = async (
   logsClient: CloudWatchLogsClient,
-  functionName: string
+  functionName: string,
 ): Promise<void> => {
   const logGroupName = `/aws/lambda/${functionName}`;
 
@@ -131,11 +131,11 @@ const deleteLogGroup = async (
 
 const checkLambdaExists = async (
   lambdaClient: LambdaClient,
-  functionName: string
+  functionName: string,
 ): Promise<boolean> => {
   try {
     await lambdaClient.send(
-      new GetFunctionCommand({ FunctionName: functionName })
+      new GetFunctionCommand({ FunctionName: functionName }),
     );
     return true;
   } catch (error: any) {
@@ -159,7 +159,9 @@ const getAllLambdaFunctions = async (lambda: LambdaClient): Promise<any[]> => {
 
     if (response.Functions) {
       allFunctions.push(...response.Functions);
-      logger.info(`Retrieved ${response.Functions.length} functions (total so far: ${allFunctions.length})`);
+      logger.info(
+        `Retrieved ${response.Functions.length} functions (total so far: ${allFunctions.length})`,
+      );
     }
 
     marker = response.NextMarker;
@@ -183,16 +185,20 @@ export default async function execute() {
 
     // Get all Lambda functions with pagination support
     const allFunctions = await getAllLambdaFunctions(lambda);
-    logger.info(`Retrieved total of ${allFunctions.length} Lambda functions from account`);
+    logger.info(
+      `Retrieved total of ${allFunctions.length} Lambda functions from account`,
+    );
 
     if (allFunctions.length === 0) {
       logger.info("No Lambda functions found");
     } else {
-      const nlpLambdas = allFunctions.filter(
-        (func) => func.FunctionName?.startsWith("langwatch_nlp-")
+      const nlpLambdas = allFunctions.filter((func) =>
+        func.FunctionName?.startsWith("langwatch_nlp-"),
       );
 
-      logger.info(`Found ${nlpLambdas.length} langwatch_nlp- Lambda functions out of ${allFunctions.length} total`);
+      logger.info(
+        `Found ${nlpLambdas.length} langwatch_nlp- Lambda functions out of ${allFunctions.length} total`,
+      );
 
       for (const func of nlpLambdas) {
         if (!func.FunctionName) continue;
@@ -204,7 +210,7 @@ export default async function execute() {
 
         if (!lastEventTime) {
           logger.warn(
-            `No last event time found for ${func.FunctionName}, skipping deletion`
+            `No last event time found for ${func.FunctionName}, skipping deletion`,
           );
           continue;
         }
@@ -212,30 +218,30 @@ export default async function execute() {
         logger.info(
           `Last event time for ${
             func.FunctionName
-          }: ${lastEventTime.toISOString()}`
+          }: ${lastEventTime.toISOString()}`,
         );
 
         // Delete Lambda function if older than 7 days
         if (lastEventTime < sevenDaysAgo) {
           logger.info(
-            `Function ${func.FunctionName} is older than 7 days, deleting Lambda...`
+            `Function ${func.FunctionName} is older than 7 days, deleting Lambda...`,
           );
           await deleteLambdaFunction(lambda, func.FunctionName);
         } else {
           logger.info(
-            `Function ${func.FunctionName} is recent, keeping Lambda`
+            `Function ${func.FunctionName} is recent, keeping Lambda`,
           );
         }
 
         // Delete log group if older than 365 days
         if (lastEventTime < oneYearAgo) {
           logger.info(
-            `Log group for ${func.FunctionName} is older than 365 days, deleting logs...`
+            `Log group for ${func.FunctionName} is older than 365 days, deleting logs...`,
           );
           await deleteLogGroup(logs, func.FunctionName);
         } else {
           logger.info(
-            `Log group for ${func.FunctionName} is recent enough, keeping logs`
+            `Log group for ${func.FunctionName} is recent enough, keeping logs`,
           );
         }
       }
@@ -253,7 +259,7 @@ export default async function execute() {
       logger.info("No langwatch_nlp log groups found");
     } else {
       logger.info(
-        `Found ${logGroupsResponse.logGroups.length} langwatch_nlp log groups`
+        `Found ${logGroupsResponse.logGroups.length} langwatch_nlp log groups`,
       );
 
       for (const logGroup of logGroupsResponse.logGroups) {
@@ -269,13 +275,13 @@ export default async function execute() {
 
         if (lambdaExists) {
           logger.info(
-            `Lambda function ${functionName} still exists, skipping log group`
+            `Lambda function ${functionName} still exists, skipping log group`,
           );
           continue;
         }
 
         logger.info(
-          `Lambda function ${functionName} no longer exists, checking log group age`
+          `Lambda function ${functionName} no longer exists, checking log group age`,
         );
 
         // Get last event time for this orphaned log group
@@ -283,7 +289,7 @@ export default async function execute() {
 
         if (!lastEventTime) {
           logger.warn(
-            `No last event time found for orphaned log group ${logGroup.logGroupName}, skipping deletion`
+            `No last event time found for orphaned log group ${logGroup.logGroupName}, skipping deletion`,
           );
           continue;
         }
@@ -291,18 +297,18 @@ export default async function execute() {
         logger.info(
           `Last event time for orphaned log group ${
             logGroup.logGroupName
-          }: ${lastEventTime.toISOString()}`
+          }: ${lastEventTime.toISOString()}`,
         );
 
         // Delete orphaned log group if older than 365 days
         if (lastEventTime < oneYearAgo) {
           logger.info(
-            `Orphaned log group ${logGroup.logGroupName} is older than 365 days, deleting...`
+            `Orphaned log group ${logGroup.logGroupName} is older than 365 days, deleting...`,
           );
           await deleteLogGroup(logs, functionName);
         } else {
           logger.info(
-            `Orphaned log group ${logGroup.logGroupName} is recent enough, keeping it`
+            `Orphaned log group ${logGroup.logGroupName} is recent enough, keeping it`,
           );
         }
       }

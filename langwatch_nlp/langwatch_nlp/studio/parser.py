@@ -26,6 +26,7 @@ import dspy
 
 from langwatch_nlp.studio.utils import (
     SerializableWithStringFallback,
+    get_corrected_llm_params,
     normalize_name_to_class_name,
     normalize_to_variable_name,
     snake_case_to_pascal_case,
@@ -99,6 +100,12 @@ def parse_workflow(
         for field in inputs
     )
 
+    corrected_default_llm_params = (
+        get_corrected_llm_params(workflow.default_llm)
+        if workflow.default_llm
+        else None
+    )
+
     module = render_template(
         "workflow.py.jinja",
         format=format,
@@ -110,6 +117,7 @@ def parse_workflow(
         use_kwargs=use_kwargs,
         handle_errors=handle_errors,
         do_not_trace=do_not_trace,
+        corrected_default_llm_params=corrected_default_llm_params,
     )
 
     return "WorkflowModule", module, inputs
@@ -153,6 +161,10 @@ def parse_component(
                 node.data.name or "Anonymous", node.data.outputs or []
             )
 
+            corrected_llm_params = (
+                get_corrected_llm_params(llm_config) if llm_config else None
+            )
+
             return (
                 render_template(
                     "llm.py.jinja",
@@ -165,6 +177,7 @@ def parse_component(
                     parameters=parameters,
                     prompting_technique=prompting_technique,
                     llm_config=llm_config,
+                    corrected_llm_params=corrected_llm_params,
                     demonstrations=demonstrations_dict,
                     json_schema_types=json_schema_types,
                 ),
@@ -467,10 +480,23 @@ def workflow_inputs(workflow: Workflow) -> List[Field]:
     return [field for field in (entry_node.data.outputs or [])]
 
 
+def has_llm_node_using_default_llm(workflow: Workflow) -> bool:
+    for node in workflow.nodes:
+        if node.type != "signature" or not node.data.parameters:
+            continue
+        llm_param = next((p for p in node.data.parameters if p.type == "llm"), None)
+        if not llm_param or not llm_param.value:
+            return True
+    return False
+
+
 def normalized_workflow(workflow: Workflow) -> Workflow:
     workflow = copy.deepcopy(workflow)
     for node in workflow.nodes:
         normalized_node(node, mutate=True)
+
+    if not has_llm_node_using_default_llm(workflow):
+        workflow.default_llm = None
 
     for edge in workflow.edges:
         edge.source = normalize_to_variable_name(edge.source)

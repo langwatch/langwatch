@@ -1,10 +1,12 @@
 import { Box, Button, HStack } from "@chakra-ui/react";
-import { Tooltip } from "../../components/ui/tooltip";
 import { useRouter } from "next/router";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { List, Table, TrendingUp } from "react-feather";
 import { useEffect, useState } from "react";
+import { List, Table } from "react-feather";
 import { useLocalStorage } from "usehooks-ts";
+import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { PageLayout } from "../ui/layouts/PageLayout";
+import { LuTrendingUp } from "react-icons/lu";
 
 export function useTableView() {
   const router = useRouter();
@@ -24,7 +26,7 @@ export function useTableView() {
         },
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
     setLocalStorageTableView(view);
   };
@@ -59,8 +61,8 @@ export function ToggleTableView() {
     width: "108px",
   };
   const sliderOnRight = {
-    left: "116px",
-    width: "118px",
+    left: "113px",
+    width: "112px",
   };
 
   const sliderProps =
@@ -72,17 +74,15 @@ export function ToggleTableView() {
     <HStack
       background="gray.200"
       padding="3px"
-      borderRadius="6px"
-      border="1px solid"
-      borderColor="gray.350"
+      paddingY={0}
+      borderRadius="lg"
       gap={2}
       position="relative"
-      marginRight={2}
     >
       <Box
-        background="gray.100"
+        background="white"
         position="absolute"
-        height="32px"
+        height="26px"
         borderRadius="6px"
         transition="all 0.3s ease-out"
         {...sliderProps}
@@ -125,12 +125,8 @@ export function ToggleAnalytics() {
 
   return (
     <Tooltip content="Show analytics for those messages">
-      <Button
-        variant="outline"
-        minWidth={0}
-        height="32px"
-        padding={2}
-        marginTop={2}
+      <PageLayout.HeaderButton
+        variant="ghost"
         onClick={() => {
           void router.push(
             {
@@ -140,12 +136,13 @@ export function ToggleAnalytics() {
               },
             },
             undefined,
-            { shallow: true }
+            { shallow: true },
           );
         }}
       >
-        <TrendingUp />
-      </Button>
+        <LuTrendingUp />
+        Show Graphs
+      </PageLayout.HeaderButton>
     </Tooltip>
   );
 }

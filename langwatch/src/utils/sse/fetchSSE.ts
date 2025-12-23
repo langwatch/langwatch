@@ -58,7 +58,7 @@ export async function fetchSSE<T>({
     timeoutId = setTimeout(() => {
       cleanup();
       const error = new FetchSSETimeoutError(
-        `Connection timed out with timeout ${timeout}ms waiting for the next event`
+        `Connection timed out with timeout ${timeout}ms waiting for the next event`,
       );
       logger.error(error);
       if (onError) {
@@ -96,7 +96,7 @@ export async function fetchSSE<T>({
         const error = new Error(
           response.status >= 500
             ? `Server error: ${response.status} ${response.statusText}`
-            : response.statusText
+            : response.statusText,
         );
 
         if (onError) {

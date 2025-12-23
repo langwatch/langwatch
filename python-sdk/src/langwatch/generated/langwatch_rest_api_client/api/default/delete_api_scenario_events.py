@@ -8,6 +8,7 @@ from ...client import AuthenticatedClient, Client
 from ...models.delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
 from ...models.delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
 from ...models.delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
+from ...models.delete_api_scenario_events_response_422 import DeleteApiScenarioEventsResponse422
 from ...models.delete_api_scenario_events_response_500 import DeleteApiScenarioEventsResponse500
 from ...types import Response
 
@@ -28,6 +29,7 @@ def _parse_response(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -43,6 +45,10 @@ def _parse_response(
         response_401 = DeleteApiScenarioEventsResponse401.from_dict(response.json())
 
         return response_401
+    if response.status_code == 422:
+        response_422 = DeleteApiScenarioEventsResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = DeleteApiScenarioEventsResponse500.from_dict(response.json())
 
@@ -60,6 +66,7 @@ def _build_response(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -79,6 +86,7 @@ def sync_detailed(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -89,7 +97,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse500]]
+        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs()
@@ -109,6 +117,7 @@ def sync(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -119,7 +128,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse500]
+        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]
     """
 
     return sync_detailed(
@@ -135,6 +144,7 @@ async def asyncio_detailed(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -145,7 +155,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse500]]
+        Response[Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs()
@@ -163,6 +173,7 @@ async def asyncio(
         DeleteApiScenarioEventsResponse200,
         DeleteApiScenarioEventsResponse400,
         DeleteApiScenarioEventsResponse401,
+        DeleteApiScenarioEventsResponse422,
         DeleteApiScenarioEventsResponse500,
     ]
 ]:
@@ -173,7 +184,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse500]
+        Union[DeleteApiScenarioEventsResponse200, DeleteApiScenarioEventsResponse400, DeleteApiScenarioEventsResponse401, DeleteApiScenarioEventsResponse422, DeleteApiScenarioEventsResponse500]
     """
 
     return (

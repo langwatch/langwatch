@@ -1,23 +1,22 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import { TRPCError } from "@trpc/server";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import { prisma } from "../../server/db"; // Adjust the import based on your setup
 
 import {
-  timeseriesSeriesInput,
   type TimeseriesInputType,
+  timeseriesSeriesInput,
 } from "../../server/analytics/registry";
-
-import { sharedFiltersInputSchema } from "../../server/analytics/types";
 import { timeseries } from "../../server/analytics/timeseries";
-import { TRPCError } from "@trpc/server";
+import { sharedFiltersInputSchema } from "../../server/analytics/types";
+import { prisma } from "../../server/db"; // Adjust the import based on your setup
 
 import { createLogger } from "../../utils/logger";
 
-const logger = createLogger("langwatch:analytics");
+const _logger = createLogger("langwatch:analytics");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests

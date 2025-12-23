@@ -1,10 +1,10 @@
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import { PaginationFooter } from "../ui/PaginationFooter";
-
+import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
+import { useRouter } from "next/router";
+import { useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight } from "react-feather";
 import type { AppRouter } from "../../server/api/root";
 
 export const useMessagesNavigationFooter = () => {
@@ -45,7 +45,7 @@ export const useMessagesNavigationFooter = () => {
     traceGroups: UseTRPCQueryResult<
       inferRouterOutputs<AppRouter>["traces"]["getAllForProject"],
       TRPCClientErrorLike<AppRouter>
-    >
+    >,
   ) => {
     useEffect(() => {
       if (traceGroups.isFetched && traceGroups.data?.totalHits !== undefined) {
@@ -70,7 +70,7 @@ export const useMessagesNavigationFooter = () => {
           query: { ...router.query, pageOffset: "0", pageSize: "25" },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,16 +105,60 @@ export function MessagesNavigationFooter({
   changePageSize: (size: number) => void;
 }) {
   return (
-    <PaginationFooter
-      totalCount={totalHits}
-      pageOffset={pageOffset}
-      pageSize={pageSize}
-      nextPage={nextPage}
-      prevPage={prevPage}
-      changePageSize={changePageSize}
-      padding={6}
-      pageSizeOptions={[10, 25, 50, 100, 250]}
-      label="Items per page "
-    />
+    <HStack padding={6} gap={2}>
+      <Field.Root>
+        <HStack gap={3}>
+          <Field.Label flexShrink={0}>Items per page </Field.Label>
+
+          <NativeSelect.Root size="sm">
+            <NativeSelect.Field
+              defaultValue="25"
+              onChange={(e) => changePageSize(parseInt(e.target.value))}
+              borderColor="black"
+              borderRadius="lg"
+              value={pageSize.toString()}
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </HStack>
+      </Field.Root>
+
+      <HStack gap={3} paddingRight={3}>
+        <Text flexShrink={0}>
+          {" "}
+          {`${pageOffset + 1}`} -{" "}
+          {`${
+            pageOffset + pageSize > totalHits
+              ? totalHits
+              : pageOffset + pageSize
+          }`}{" "}
+          of {`${totalHits}`} items
+        </Text>
+        <HStack gap={0}>
+          <Button
+            variant="ghost"
+            padding={0}
+            onClick={prevPage}
+            disabled={pageOffset === 0}
+          >
+            <ChevronLeft />
+          </Button>
+          <Button
+            variant="ghost"
+            padding={0}
+            disabled={pageOffset + pageSize >= totalHits}
+            onClick={nextPage}
+          >
+            <ChevronRight />
+          </Button>
+        </HStack>
+      </HStack>
+    </HStack>
   );
 }

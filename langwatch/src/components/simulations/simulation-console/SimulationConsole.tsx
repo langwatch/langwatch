@@ -1,15 +1,13 @@
-import { Box, Code, Text, VStack, HStack } from "@chakra-ui/react";
+import { Box, Code, HStack, Text, VStack } from "@chakra-ui/react";
 import React from "react";
-
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
 import { ConsoleHeader } from "./ConsoleHeader";
-import { CONSOLE_COLORS } from "./constants";
 import { CriteriaDetails } from "./CriteriaDetails";
+import { CONSOLE_COLORS } from "./constants";
 import { ErrorDetails } from "./ErrorDetails";
 import { MetricsSummary } from "./MetricsSummary";
 import { StatusDisplay } from "./StatusDisplay";
-
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
 
 /**
  * Main simulation console component

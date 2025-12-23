@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { llmConfigSchema, type LLMConfig } from "./dsl";
+import { type LLMConfig, llmConfigSchema } from "./dsl";
 
 export const optimizerParamsSchema = z.object({
   llm: llmConfigSchema.optional().nullable(),

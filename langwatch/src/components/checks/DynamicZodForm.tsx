@@ -13,11 +13,13 @@ import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import {
   Controller,
+  type FieldErrors,
   useFieldArray,
   useFormContext,
-  type FieldErrors,
 } from "react-hook-form";
-import { z, type ZodType } from "zod";
+import { type ZodType, z } from "zod";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
 import type {
   EvaluatorDefinition,
@@ -25,6 +27,7 @@ import type {
   EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import {
@@ -33,12 +36,9 @@ import {
   useModelSelectionOptions,
 } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
-import { Tooltip } from "../ui/tooltip";
 import { Switch } from "../ui/switch";
+import { Tooltip } from "../ui/tooltip";
 import type { CheckConfigFormData } from "./CheckConfigForm";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
-import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 
 // Simple component to handle model disabled check
 const ModelSelectorWithWarning = ({
@@ -55,7 +55,7 @@ const ModelSelectorWithWarning = ({
   const { modelOption } = useModelSelectionOptions(
     selectorOptions,
     field.value,
-    fieldName === "model" ? "chat" : "embedding"
+    fieldName === "model" ? "chat" : "embedding",
   );
   const isModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -97,7 +97,7 @@ const ArrayField = <T extends EvaluatorTypes>({
   renderField: <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
     fieldName: string,
-    evaluator: EvaluatorDefinition<T> | undefined
+    evaluator: EvaluatorDefinition<T> | undefined,
   ) => React.JSX.Element | null;
 }) => {
   const { control } = useFormContext();
@@ -121,7 +121,7 @@ const ArrayField = <T extends EvaluatorTypes>({
             }
 
             return [];
-          })
+          }),
         )
       : {};
   }, [arraySchema.element]);
@@ -174,7 +174,7 @@ const ArrayField = <T extends EvaluatorTypes>({
               {renderField(
                 arraySchema.element,
                 `${fieldName}.${index}`,
-                evaluator
+                evaluator,
               )}
             </Box>
           </HStack>
@@ -204,13 +204,13 @@ const DynamicZodForm = ({
   onlyFields?: string[];
   skipFields?: string[];
 }) => {
-  const { control, register, watch } = useFormContext();
+  const { control, register } = useFormContext();
   const { project } = useOrganizationTeamProject();
 
   const renderField = <T extends EvaluatorTypes>(
     fieldSchema: ZodType,
     fieldName: string,
-    evaluator: EvaluatorDefinition<T> | undefined
+    evaluator: EvaluatorDefinition<T> | undefined,
   ): React.JSX.Element | null => {
     const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
     let defaultValue =
@@ -228,7 +228,7 @@ const DynamicZodForm = ({
     const fieldSchema_ =
       fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
-    const fieldKey = fieldName.split(".").reverse()[0] ?? "";
+    const fieldKey = fieldName.split(".").toReversed()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       return renderField(fieldSchema_._def.innerType, fieldName, evaluator);
@@ -272,7 +272,7 @@ const DynamicZodForm = ({
               fontWeight={variant === "studio" ? 400 : undefined}
               fontSize={variant === "studio" ? "13px" : undefined}
             >
-              {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
+              {camelCaseToTitleCase(fieldName.split(".").toReversed()[0] ?? "")}
             </Field.Label>
           </HStack>
         </Field.Root>
@@ -287,8 +287,8 @@ const DynamicZodForm = ({
         fieldSchema_ instanceof z.ZodUnion
           ? fieldSchema_.options
           : fieldSchema_ instanceof z.ZodLiteral
-          ? [{ value: fieldSchema_.value }]
-          : allModelOptions.map((option) => ({ value: option }));
+            ? [{ value: fieldSchema_.value }]
+            : allModelOptions.map((option) => ({ value: option }));
       if (
         (fieldName === "model" || fieldName === "embeddings_model") &&
         evaluator?.name !== "OpenAI Moderation"
@@ -326,7 +326,7 @@ const DynamicZodForm = ({
                 {...field}
                 onChange={(e) => {
                   const literalValues = options.map(
-                    (option: any) => option.value
+                    (option: any) => option.value,
                   );
 
                   if (e.target.value === "") {
@@ -396,7 +396,7 @@ const DynamicZodForm = ({
               {renderField(
                 fieldSchema_.shape[key],
                 `${fieldName}.${key}`,
-                evaluator
+                evaluator,
               )}
             </VStack>
           ))}
@@ -409,11 +409,11 @@ const DynamicZodForm = ({
 
   const renderSchema = <T extends EvaluatorTypes>(
     schema: ZodType<Evaluators[T]["settings"]>,
-    basePath = ""
+    basePath = "",
   ) => {
     if (schema instanceof z.ZodObject) {
       const evaluatorDefinition = getEvaluatorDefinitions(
-        evaluatorType
+        evaluatorType,
       ) as EvaluatorDefinition<T>;
 
       return Object.keys(schema.shape)
@@ -453,7 +453,7 @@ const DynamicZodForm = ({
                   {renderField(
                     field,
                     basePath ? `${basePath}.${key}` : key,
-                    evaluatorDefinition
+                    evaluatorDefinition,
                   )}
                 </Field.Root>
               </VStack>
@@ -472,7 +472,7 @@ const DynamicZodForm = ({
                 {renderField(
                   field,
                   basePath ? `${basePath}.${key}` : key,
-                  evaluatorDefinition
+                  evaluatorDefinition,
                 )}
               </HorizontalFormControl>
             </React.Fragment>

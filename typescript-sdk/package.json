@@ -1,6 +1,6 @@
 {
     "name": "langwatch",
-    "version": "0.7.2",
+    "version": "0.10.0",
     "description": "LangWatch TypeScript/JavaScript SDK. Interact with the full LangWatch API and use the LangWatch OpenTelemetry SDK to instrument your application. For more information, see https://docs.langwatch.ai/integration/typescript/guide",
     "main": "dist/index.js",
     "module": "dist/index.mjs",
@@ -51,12 +51,15 @@
         "cli": "node dist/cli/index.js",
         "lint": "eslint .",
         "test": "vitest",
+        "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
-        "prebuild": "pnpm i && pnpm run prepare",
+        "test:seed": "dotenv -e .env.test -- bash -c 'cd ../langwatch && pnpm prisma:seed'",
+        "prebuild": "pnpm run prepare",
         "build": "tsc --noEmit && tsup",
+        "tarball": "pnpm build && pnpm pack",
         "typecheck": "tsc --noEmit",
         "prepublish": "pnpm run build",
-        "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+        "generate:openapi-types": "pnpx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
         "generate:server-types": "./copy-types.sh"
     },
     "devDependencies": {

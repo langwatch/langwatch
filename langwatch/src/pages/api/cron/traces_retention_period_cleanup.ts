@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
-import { migrateToColdStorage } from "../../../tasks/cold/moveTracesToColdStorage";
 import { prisma } from "../../../server/db";
 import { COLD_STORAGE_AGE_DAYS } from "../../../server/elasticsearch";
+import { cleanupOrphanedTraces } from "../../../tasks/cold/cleanupOrphanedHotTraces";
+import { migrateToColdStorage } from "../../../tasks/cold/moveTracesToColdStorage";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   let cronApiKey = req.headers.authorization;
   cronApiKey = cronApiKey?.startsWith("Bearer ")
@@ -35,9 +36,13 @@ export default async function handler(
           })
         )?.team?.organizationId
       : undefined;
+    const cleanedUpOrphanedTraces = await cleanupOrphanedTraces(
+      COLD_STORAGE_AGE_DAYS,
+      organizationId,
+    );
     const movedToColdStorage = await migrateToColdStorage(
       COLD_STORAGE_AGE_DAYS,
-      organizationId
+      organizationId,
     );
     const totalDeleted = await deleteTracesRetentionPolicy(projectId);
 
@@ -45,6 +50,7 @@ export default async function handler(
       message: "Traces retention period maintenance completed successfully",
       totalDeleted,
       movedToColdStorage: movedToColdStorage?.migrated,
+      cleanedUpOrphanedTraces: cleanedUpOrphanedTraces?.deleted,
     });
   } catch (error: any) {
     res.status(500).json({

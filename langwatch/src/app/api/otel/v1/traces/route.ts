@@ -1,21 +1,25 @@
-import { NextResponse, type NextRequest } from "next/server";
-import {
-  type IExportTraceServiceRequest,
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type {
+  IExportTraceServiceRequest,
   // @ts-ignore
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
-import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
+import { getLangWatchTracer } from "langwatch";
+import { type NextRequest, NextResponse } from "next/server";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { dependencies } from "../../../../../injection/dependencies.server";
+import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
+import { prisma } from "../../../../../server/db";
+import { spanIngestionService } from "../../../../../server/event-sourcing/pipelines/span-ingestion/services/spanIngestionService";
+import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
+import { TraceUsageService } from "../../../../../server/traces/trace-usage.service";
 import { createLogger } from "../../../../../utils/logger";
-import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
@@ -23,9 +27,17 @@ const logger = createLogger("langwatch:otel:v1:traces");
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
+
 async function handleTracesRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
-    "handleTracesRequest",
+    "TracesV1.handleTracesRequest",
     { kind: SpanKind.SERVER },
     async (span) => {
       const xAuthToken = req.headers.get("x-auth-token");
@@ -49,7 +61,7 @@ async function handleTracesRequest(req: NextRequest) {
             message:
               "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
           },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -68,8 +80,64 @@ async function handleTracesRequest(req: NextRequest) {
 
         return NextResponse.json(
           { message: "Invalid auth token." },
-          { status: 401 }
+          { status: 401 },
         );
+      }
+
+      try {
+        const traceUsageService = TraceUsageService.create();
+        const limitResult = await traceUsageService.checkLimit({
+          teamId: project.teamId,
+        });
+
+        if (limitResult.exceeded) {
+          if (dependencies.planLimits) {
+            try {
+              const activePlan =
+                await dependencies.subscriptionHandler.getActivePlan(
+                  project.team.organizationId,
+                );
+              await dependencies.planLimits(
+                project.team.organizationId,
+                activePlan.name ?? "free",
+              );
+            } catch (error) {
+              logger.error(
+                { error, projectId: project.id },
+                "Error sending plan limit notification",
+              );
+            }
+          }
+          logger.info(
+            {
+              projectId: project.id,
+              currentMonthMessagesCount: limitResult.count,
+              activePlanName: limitResult.planName,
+              maxMessagesPerMonth: limitResult.maxMessagesPerMonth,
+            },
+            "Project has reached plan limit",
+          );
+
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Plan limit reached.",
+          });
+
+          return NextResponse.json(
+            {
+              message: `ERR_PLAN_LIMIT: ${limitResult.message}`,
+            },
+            { status: 429 },
+          );
+        }
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error checking trace limit",
+        );
+        captureException(new Error("Error checking trace limit"), {
+          extra: { projectId: project.id, error },
+        });
       }
 
       span.setAttribute("langwatch.project.id", project.id);
@@ -86,7 +154,7 @@ async function handleTracesRequest(req: NextRequest) {
         try {
           const json = JSON.parse(Buffer.from(body).toString("utf-8"));
           traceRequest = traceRequestType.decode(
-            new Uint8Array(traceRequestType.encode(json).finish())
+            new Uint8Array(traceRequestType.encode(json).finish()),
           );
           if (
             !traceRequest.resourceSpans ||
@@ -100,9 +168,9 @@ async function handleTracesRequest(req: NextRequest) {
               error: jsonError,
               traceRequest: Buffer.from(body).toString("base64"),
             },
-            "error parsing traces"
+            "error parsing traces",
           );
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               projectId: project.id,
               traceRequest: Buffer.from(body).toString("base64"),
@@ -112,16 +180,17 @@ async function handleTracesRequest(req: NextRequest) {
 
           return NextResponse.json(
             { error: "Failed to parse traces" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
 
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
+      const clickHouseTasks: Promise<void>[] = [];
 
       const promises = await tracer.withActiveSpan(
-        "check which traces have already been collected",
+        "TracesV1.duplicateTracesCheck",
         { kind: SpanKind.INTERNAL },
         async () => {
           const promises: Promise<void>[] = [];
@@ -132,17 +201,41 @@ async function handleTracesRequest(req: NextRequest) {
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
-              project.id
+              project.id,
             );
             if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
               continue;
             }
-    
+
             logger.info(
-              { traceId: traceForCollection.traceId },
-              "collecting traces"
+              {
+                traceId: traceForCollection.traceId,
+                traceRequestSizeMb: parseFloat(
+                  (
+                    Buffer.from(JSON.stringify(traceRequest)).length /
+                    (1024 * 1024)
+                  ).toFixed(3),
+                ),
+                traceRequestSpansCount:
+                  traceRequest.resourceSpans?.reduce(
+                    (acc, resourceSpan) =>
+                      acc + (resourceSpan?.scopeSpans?.length ?? 0),
+                    0,
+                  ) ?? 0,
+              },
+              "collecting traces",
             );
-    
+
+            if (project.featureClickHouse) {
+              clickHouseTasks.push(
+                spanIngestionService.ingestSpanCollection(
+                  project.id,
+                  traceForCollection,
+                  traceRequest,
+                ),
+              );
+            }
+
             promises.push(
               scheduleTraceCollectionWithFallback({
                 ...traceForCollection,
@@ -152,30 +245,47 @@ async function handleTracesRequest(req: NextRequest) {
                 expectedOutput: void 0,
                 evaluations: void 0,
                 collectedAt: Date.now(),
-              })
+              }),
             );
           }
 
           return promises;
-        }
+        },
       );
 
       if (promises.length === 0) {
+        if (clickHouseTasks.length > 0) {
+          try {
+            await Promise.allSettled(clickHouseTasks);
+          } catch {
+            /* ignore, errors non-blocking and caught by tracing layer */
+          }
+        }
         return NextResponse.json({ message: "No changes" });
       }
 
       await tracer.withActiveSpan(
-        "push pending traces to collector queue",
+        "TracesV1.enqueueTraces",
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);
-        }
+        },
       );
 
+      if (clickHouseTasks.length > 0) {
+        try {
+          await Promise.allSettled(clickHouseTasks);
+        } catch {
+          /* ignore, errors non-blocking and caught by tracing layer */
+        }
+      }
+
       return NextResponse.json({ message: "Trace received successfully." });
-    }
+    },
   );
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterLogger(handleTracesRequest);
+export const POST = withAppRouterTracer("langwatch.otel.v1.traces")(
+  withAppRouterLogger(handleTracesRequest),
+);

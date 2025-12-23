@@ -1,14 +1,14 @@
-import { TriggerAction, type Project, type Trigger } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
-import { type NextApiRequest, type NextApiResponse } from "next";
-import { getAllTracesForProject } from "~/server/api/routers/traces";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
-import { prisma } from "../../../server/db";
+import { type Project, type Trigger, TriggerAction } from "@prisma/client";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { type Trace } from "~/server/tracer/types";
 import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord";
+import { getAllTracesForProject } from "~/server/api/routers/traces";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
+import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
+import type { Trace } from "~/server/tracer/types";
+import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
+import { captureException } from "~/utils/posthogErrorCapture";
+import { prisma } from "../../../server/db";
 import {
   mapTraceToDatasetEntry,
   type TRACE_EXPANSIONS,
@@ -42,7 +42,7 @@ interface TriggerData {
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "GET") {
     return res.status(405).end();
@@ -114,13 +114,13 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
   const getTracesToSend = async (traces: TraceGroups, triggerId: string) => {
     const traceIds = traces.groups.flatMap((group) =>
-      group.map((trace) => trace.trace_id)
+      group.map((trace) => trace.trace_id),
     );
 
     const triggersSent = await triggerSentForMany(
       triggerId,
       traceIds,
-      input.projectId
+      input.projectId,
     );
 
     const tracesToSend = traces.groups.filter((group) => {
@@ -142,7 +142,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
         traceId: trace.trace_id,
         projectId: input.projectId,
         fullTrace: trace,
-      }))
+      })),
     );
 
     const project = projects.find((project) => project.id === input.projectId);
@@ -164,7 +164,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await sendTriggerEmail(triggerInfo);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -186,7 +186,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await sendSlackWebhook(triggerInfo);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -206,7 +206,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await createQueueItems(triggerData, annotators ?? [], createdByUserId);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -238,7 +238,8 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
             trace,
             mapping as TraceMapping,
             expansions,
-            undefined
+            undefined,
+            undefined,
           );
 
           for (const entry of mappedEntries) {
@@ -248,7 +249,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
                 typeof value === "string"
                   ? value.replace(/\u0000/g, "")
                   : value,
-              ])
+              ]),
             );
             entries.push({
               id: `${now}-${index}`,
@@ -271,7 +272,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           projectSlug: project!.slug,
         };
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -304,7 +305,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 const updateAlert = async (
   triggerId: string,
   updatedAt: number,
-  projectId: string
+  projectId: string,
 ) => {
   await prisma.trigger.update({
     where: { id: triggerId, projectId },
@@ -314,7 +315,7 @@ const updateAlert = async (
 
 const addTriggersSent = async (
   triggerId: string,
-  triggerData: TriggerData[]
+  triggerData: TriggerData[],
 ) => {
   await prisma.triggerSent.createMany({
     data: triggerData.map((data) => ({
@@ -329,7 +330,7 @@ const addTriggersSent = async (
 const triggerSentForMany = async (
   triggerId: string,
   traceIds: string[],
-  projectId: string
+  projectId: string,
 ) => {
   const triggerSent = await prisma.triggerSent.findMany({
     where: {
@@ -348,7 +349,7 @@ interface TraceGroups {
 export const getLatestUpdatedAt = (traces: TraceGroups) => {
   const updatedTimes = traces.groups
     .flatMap((group: any) =>
-      group.map((item: any) => item.timestamps.updated_at)
+      group.map((item: any) => item.timestamps.updated_at),
     )
     .sort((a: number, b: number) => b - a);
 
@@ -358,7 +359,7 @@ export const getLatestUpdatedAt = (traces: TraceGroups) => {
 const createQueueItems = async (
   triggerData: TriggerData[],
   annotators: { id: string; name: string }[],
-  createdByUserId?: string
+  createdByUserId?: string,
 ) => {
   await Promise.all(
     triggerData.map((data) =>
@@ -368,7 +369,7 @@ const createQueueItems = async (
         annotators: annotators.map((annotator) => annotator.id),
         userId: createdByUserId ?? "",
         prisma: prisma,
-      })
-    )
+      }),
+    ),
   );
 };

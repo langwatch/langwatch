@@ -48,7 +48,7 @@ const runStartedMapping: ElasticSearchMappingFrom<
 > = {
   metadata: {
     properties: {
-      name: { type: "text" },
+      name: { type: "text", fields: { keyword: { type: "keyword" } } },
       description: { type: "text" },
     },
   },

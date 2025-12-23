@@ -1,14 +1,14 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { prisma } from "../../../../server/db";
-import type { CollectorRESTParams } from "../../../../server/tracer/types";
-import { nanoid } from "nanoid";
-import { env } from "../../../../env.mjs";
 import type {
   ESpanKind,
   IExportTraceServiceRequest,
 } from "@opentelemetry/otlp-transformer";
-import type { DeepPartial } from "../../../../utils/types";
 import crypto from "crypto";
+import { nanoid } from "nanoid";
+import { type NextRequest, NextResponse } from "next/server";
+import { env } from "../../../../env.mjs";
+import { prisma } from "../../../../server/db";
+import type { CollectorRESTParams } from "../../../../server/tracer/types";
+import type { DeepPartial } from "../../../../utils/types";
 
 export async function GET(req: NextRequest) {
   const xAuthToken = req.headers.get("x-auth-token");
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         message:
           "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
       },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   if (!project) {
     return NextResponse.json(
       { message: "Invalid auth token." },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -89,11 +89,11 @@ export async function GET(req: NextRequest) {
               {
                 traceId: Buffer.from(
                   crypto.randomBytes(16).toString("hex"),
-                  "hex"
+                  "hex",
                 ).toString("base64"),
                 spanId: Buffer.from(
                   crypto.randomBytes(8).toString("hex"),
-                  "hex"
+                  "hex",
                 ).toString("base64"),
                 name: "Health check",
                 kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
@@ -150,14 +150,14 @@ export async function GET(req: NextRequest) {
   if (!restCollectorResponse.ok) {
     return NextResponse.json(
       { message: "Failed to send trace to LangWatch using REST" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   if (!otelCollectorResponse.ok) {
     return NextResponse.json(
       { message: "Failed to send trace to LangWatch using OTLP" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 

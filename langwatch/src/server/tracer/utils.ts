@@ -1,29 +1,29 @@
+import { unflatten } from "flat";
 import {
   flattenSpanTree,
   organizeSpansIntoTree,
   typedValueToText,
 } from "../background/workers/collector/common";
 import { extractRAGTextualContext } from "../background/workers/collector/rag";
-import {
-  type ElasticSearchEvent,
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
-  type Event,
-  type Span,
-  type SpanInputOutput,
-  type ElasticSearchEvaluation,
-  type Evaluation,
-  type RAGChunk,
+import type {
+  ElasticSearchEvaluation,
+  ElasticSearchEvent,
+  ElasticSearchInputOutput,
+  ElasticSearchSpan,
+  Evaluation,
+  Event,
+  RAGChunk,
+  Span,
+  SpanInputOutput,
 } from "./types";
-import { unflatten } from "flat";
 
 export const getRAGChunks = (
-  spans: (ElasticSearchSpan | Span)[]
+  spans: (ElasticSearchSpan | Span)[],
 ): RAGChunk[] => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
-    "inside-out"
-  ).reverse();
+    "inside-out",
+  ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
     | undefined;
@@ -35,12 +35,12 @@ export const getRAGChunks = (
 };
 
 export const getRAGInfo = (
-  spans: (ElasticSearchSpan | Span)[]
+  spans: (ElasticSearchSpan | Span)[],
 ): { input: string; output: string; contexts: string[] } => {
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
-    "inside-out"
-  ).reverse();
+    "inside-out",
+  ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
     | undefined;
@@ -61,11 +61,11 @@ export const getRAGInfo = (
 
   let input = typedValueToText(
     elasticSearchToTypedValue(lastRagSpan.input),
-    true
+    true,
   );
   let output = typedValueToText(
     elasticSearchToTypedValue(lastRagSpan.output),
-    true
+    true,
   );
 
   try {
@@ -73,20 +73,24 @@ export const getRAGInfo = (
     if (typeof input !== "string") {
       input = JSON.stringify(input);
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   try {
     output = JSON.parse(output);
     if (typeof output !== "string") {
       output = JSON.stringify(output);
     }
-  } catch (e) {}
+  } catch {
+    /* this is just a safe json parse fallback */
+  }
 
   return { input, output, contexts };
 };
 
 export const elasticSearchToTypedValue = (
-  typed: ElasticSearchInputOutput
+  typed: ElasticSearchInputOutput,
 ): SpanInputOutput => {
   try {
     return {
@@ -94,7 +98,7 @@ export const elasticSearchToTypedValue = (
       value:
         typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
     } as any;
-  } catch (e) {
+  } catch {
     return {
       type: "raw",
       value: typed.value,
@@ -103,7 +107,7 @@ export const elasticSearchToTypedValue = (
 };
 
 export const elasticSearchEvaluationsToEvaluations = (
-  elasticSearchEvaluations: ElasticSearchEvaluation[]
+  elasticSearchEvaluations: ElasticSearchEvaluation[],
 ): Evaluation[] => {
   return elasticSearchEvaluations.map((evaluation) => {
     return evaluation;
@@ -111,7 +115,7 @@ export const elasticSearchEvaluationsToEvaluations = (
 };
 
 export const elasticSearchEventsToEvents = (
-  elasticSearchEvents: ElasticSearchEvent[]
+  elasticSearchEvents: ElasticSearchEvent[],
 ): Event[] => {
   return elasticSearchEvents.map(elasticSearchEventToEvent);
 };
@@ -120,10 +124,10 @@ export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
   return {
     ...event,
     metrics: Object.fromEntries(
-      event.metrics.map((metric) => [metric.key, metric.value])
+      event.metrics.map((metric) => [metric.key, metric.value]),
     ),
     event_details: Object.fromEntries(
-      event.event_details.map((detail) => [detail.key, detail.value])
+      event.event_details.map((detail) => [detail.key, detail.value]),
     ),
   };
 };
@@ -190,7 +194,7 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
 export const setNestedProperty = (
   obj: Record<string, any>,
   path: string,
-  value: any
+  value: any,
 ): void => {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const unflattened = unflatten({ [path]: value }) as Record<string, any>;
@@ -202,7 +206,10 @@ export const setNestedProperty = (
       obj[key] = unflattened[key];
     } else {
       // Deep merge if both are objects
-      if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
+      if (
+        typeof obj[key] === "object" &&
+        typeof unflattened[key] === "object"
+      ) {
         obj[key] = { ...obj[key], ...unflattened[key] };
       } else {
         obj[key] = unflattened[key];

@@ -6,7 +6,10 @@ describe("RAG", () => {
   it("extracts textual only data from RAG content context", () => {
     const contexts: RAGChunk[] = [
       { document_id: "1", content: "foo" },
-      { document_id: "2", content: { title: "bar", content: "baz", score: 0.87 } },
+      {
+        document_id: "2",
+        content: { title: "bar", content: "baz", score: 0.87 },
+      },
       {
         document_id: "3",
         content: {
@@ -16,15 +19,18 @@ describe("RAG", () => {
         },
       },
       { document_id: "4", content: ["qwe", "qwert"] },
-      { document_id: "2", content: { title: null, content: "baz", score: 0.87 } },
+      {
+        document_id: "2",
+        content: { title: null, content: "baz", score: 0.87 },
+      },
     ];
 
     expect(extractRAGTextualContext(contexts)).toEqual([
       "foo",
-      "{\"title\":\"bar\",\"content\":\"baz\",\"score\":0.87}",
+      '{"title":"bar","content":"baz","score":0.87}',
       JSON.stringify(contexts[2]?.content),
       "qwe\nqwert",
-      "{\"title\":null,\"content\":\"baz\",\"score\":0.87}",
+      '{"title":null,"content":"baz","score":0.87}',
     ]);
   });
 
@@ -49,10 +55,7 @@ describe("RAG", () => {
       },
     ]);
 
-    contexts = [
-      { document_id: "1", content: "foo" },
-      { content: "bar" },
-    ];
+    contexts = [{ document_id: "1", content: "foo" }, { content: "bar" }];
 
     expect(maybeAddIdsToContextList(contexts)).toEqual(contexts);
   });

@@ -1,4 +1,4 @@
-import { Text, HStack, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import React, { type ReactNode } from "react";
 
 // Define the component types for type safety
@@ -74,5 +74,5 @@ export const DatasetGenerationTemplate = Object.assign(
     Header,
     Description,
     Content,
-  }
+  },
 );

@@ -1,24 +1,33 @@
-import { type IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
-import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import * as Sentry from "@sentry/nextjs";
 import crypto from "node:crypto";
-import { NextResponse, type NextRequest } from "next/server";
-import { prisma } from "../../../../../server/db";
-import { createLogger } from "../../../../../utils/logger";
-import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import type { IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
+import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
+import { getLangWatchTracer } from "langwatch";
+import { type NextRequest, NextResponse } from "next/server";
 import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
+import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
+import { prisma } from "../../../../../server/db";
+import { createLogger } from "../../../../../utils/logger";
 
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
 const logger = createLogger("langwatch:otel:v1:metrics");
 
 const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics
   .v1.ExportMetricsServiceRequest;
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
 
 async function handleMetricsRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
@@ -46,7 +55,7 @@ async function handleMetricsRequest(req: NextRequest) {
             message:
               "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
           },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -65,7 +74,7 @@ async function handleMetricsRequest(req: NextRequest) {
 
         return NextResponse.json(
           { message: "Invalid auth token." },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -83,7 +92,7 @@ async function handleMetricsRequest(req: NextRequest) {
         try {
           const json = JSON.parse(Buffer.from(body).toString("utf-8"));
           metricsRequest = metricsRequestType.decode(
-            new Uint8Array(metricsRequestType.encode(json).finish())
+            new Uint8Array(metricsRequestType.encode(json).finish()),
           );
         } catch (jsonError) {
           span.setStatus({
@@ -93,7 +102,7 @@ async function handleMetricsRequest(req: NextRequest) {
           span.recordException(
             jsonError instanceof Error
               ? jsonError
-              : new Error(String(jsonError))
+              : new Error(String(jsonError)),
           );
 
           logger.error(
@@ -101,10 +110,10 @@ async function handleMetricsRequest(req: NextRequest) {
               error: jsonError,
               metricsRequest: Buffer.from(body).toString("base64"),
             },
-            "error parsing metrics"
+            "error parsing metrics",
           );
 
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               projectId: project.id,
               metricsRequest: Buffer.from(body).toString("base64"),
@@ -114,7 +123,7 @@ async function handleMetricsRequest(req: NextRequest) {
 
           return NextResponse.json(
             { error: "Failed to parse metrics" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -134,7 +143,7 @@ async function handleMetricsRequest(req: NextRequest) {
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
-              project.id
+              project.id,
             );
             if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
               continue;
@@ -142,7 +151,7 @@ async function handleMetricsRequest(req: NextRequest) {
 
             logger.info(
               { traceId: traceForCollection.traceId },
-              "collecting traces from metrics"
+              "collecting traces from metrics",
             );
 
             promises.push(
@@ -154,11 +163,11 @@ async function handleMetricsRequest(req: NextRequest) {
                 expectedOutput: void 0,
                 evaluations: void 0,
                 collectedAt: Date.now(),
-              })
+              }),
             );
           }
           return promises;
-        }
+        },
       );
 
       if (promises.length === 0) {
@@ -170,13 +179,15 @@ async function handleMetricsRequest(req: NextRequest) {
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);
-        }
+        },
       );
 
       return NextResponse.json({ message: "OK" }, { status: 200 });
-    }
+    },
   );
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterLogger(handleMetricsRequest);
+export const POST = withAppRouterTracer("langwatch.otel.v1.metrics")(
+  withAppRouterLogger(handleMetricsRequest),
+);

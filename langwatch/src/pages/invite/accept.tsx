@@ -1,13 +1,13 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
-import { signOut } from "next-auth/react";
 import { useRouter } from "next/router";
+import { signOut } from "next-auth/react";
 import { useEffect } from "react";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
-import * as Sentry from "@sentry/nextjs";
 
 export default function Accept() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function Accept() {
         onSuccess: (data) => {
           // Invalidate queries to refresh user's organization data
           void queryClient.organization.getAll.invalidate().catch((error) => {
-            Sentry.captureException(error, {
+            captureException(error, {
               tags: {
                 inviteCode,
               },
@@ -41,19 +41,18 @@ export default function Accept() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
             duration: 5000,
           });
 
           void router.push(`/${data.project?.slug ?? ""}`).catch((error) => {
-            Sentry.captureException(error, {
+            captureException(error, {
               tags: {
                 inviteCode,
               },
             });
           });
         },
-      }
+      },
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

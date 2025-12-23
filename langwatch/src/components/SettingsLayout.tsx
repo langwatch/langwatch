@@ -1,8 +1,9 @@
-import { HStack, VStack } from "@chakra-ui/react";
-import { type PropsWithChildren } from "react";
+import { Container, HStack, VStack } from "@chakra-ui/react";
+import type { PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PageLayout } from "./ui/layouts/PageLayout";
 
 export default function SettingsLayout({
   children,
@@ -11,18 +12,19 @@ export default function SettingsLayout({
   const { project } = useOrganizationTeamProject();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout compactMenu>
+      <PageLayout.Header>
+        <PageLayout.Heading>Settings</PageLayout.Heading>
+      </PageLayout.Header>
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"
-          background="white"
+          paddingX={2}
           paddingY={4}
-          borderRightWidth="1px"
-          borderColor="gray.300"
           fontSize="14px"
           minWidth="200px"
           height="full"
-          gap={0}
+          gap={1}
           display={isSubscription ? "none" : "flex"}
         >
           <MenuLink href="/settings">General Settings</MenuLink>
@@ -32,7 +34,12 @@ export default function SettingsLayout({
           <MenuLink href={`/${project?.slug}/triggers`}>Triggers</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
-          <MenuLink href="/settings/members">Members</MenuLink>
+          <MenuLink href="/settings/members" includePath="members">
+            Members
+          </MenuLink>
+          <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
+          <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
+
           <MenuLink href="/settings/annotation-scores">
             Annotation Scores
           </MenuLink>
@@ -43,7 +50,9 @@ export default function SettingsLayout({
           <MenuLink href="/settings/usage">Usage & Billing</MenuLink>
           <MenuLink href="/settings/subscription">Subscription</MenuLink>
         </VStack>
-        {children}
+        <Container maxWidth="1280px" padding={4} paddingBottom={16}>
+          {children}
+        </Container>
       </HStack>
     </DashboardLayout>
   );

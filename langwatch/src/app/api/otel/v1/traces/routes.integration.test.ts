@@ -1,9 +1,10 @@
-import { NextRequest } from "next/server";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { POST } from "./route";
-
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import type { Project } from "@prisma/client";
+import type { Worker } from "bullmq";
+import * as crypto from "crypto";
+import { NextRequest } from "next/server";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
 import type { CollectorJob } from "../../../../../server/background/types";
 import { startCollectorWorker } from "../../../../../server/background/workers/collectorWorker";
 import {
@@ -11,11 +12,9 @@ import {
   TRACE_INDEX,
   traceIndexId,
 } from "../../../../../server/elasticsearch";
-import { getTestProject, waitForResult } from "../../../../../utils/testUtils";
-import type { Worker } from "bullmq";
-import * as crypto from "crypto";
 import type { ElasticSearchTrace } from "../../../../../server/tracer/types";
-import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
+import { getTestProject, waitForResult } from "../../../../../utils/testUtils";
+import { POST } from "./route";
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
@@ -207,7 +206,7 @@ describe("opentelemetry traces receiver", () => {
           "Content-Type": "application/x-protobuf",
           Authorization: `Bearer ${project?.apiKey}`,
         },
-      })
+      }),
     );
 
     expect(response.status).toBe(200);
@@ -219,7 +218,7 @@ describe("opentelemetry traces receiver", () => {
           traceId,
           projectId: project?.id ?? "",
         }),
-      })
+      }),
     );
 
     expect(indexedTrace).toEqual({
@@ -334,7 +333,7 @@ describe("opentelemetry traces receiver", () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${project?.apiKey}`,
         },
-      })
+      }),
     );
 
     expect(response.status).toBe(200);

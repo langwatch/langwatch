@@ -1,21 +1,22 @@
-import { useEffect, useState, useRef, useCallback } from "react";
 import {
-  Button,
-  Separator,
-  Grid,
-  HStack,
-  Text,
   Box,
+  Button,
+  Grid,
+  Heading,
+  HStack,
+  Separator,
+  Text,
   VStack,
 } from "@chakra-ui/react";
-import { Dialog } from "../../../components/ui/dialog";
-import { WorkflowCard } from "./WorkflowCard";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, File, Upload } from "react-feather";
-import { NewWorkflowForm } from "./NewWorkflowForm";
-import type { Workflow } from "../../types/dsl";
-import { TEMPLATES } from "../../templates/registry";
+import { Dialog } from "../../../components/ui/dialog";
 import { toaster } from "../../../components/ui/toaster";
+import { TEMPLATES } from "../../templates/registry";
+import type { Workflow } from "../../types/dsl";
 import { workflowJsonSchema } from "../../types/dsl";
+import { NewWorkflowForm } from "./NewWorkflowForm";
+import { WorkflowCard } from "./WorkflowCard";
 
 /** Maximum allowed file size for workflow imports (5MB) */
 const MAX_WORKFLOW_FILE_SIZE = 5 * 1024 * 1024;
@@ -47,7 +48,7 @@ function useFileDrop(onFileSelect: (file: File) => void) {
       const file = e.dataTransfer.files[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect]
+    [onFileSelect],
   );
 
   const handleClick = useCallback(() => {
@@ -59,7 +60,7 @@ function useFileDrop(onFileSelect: (file: File) => void) {
       const file = e.target.files?.[0];
       if (file) onFileSelect(file);
     },
-    [onFileSelect]
+    [onFileSelect],
   );
 
   return {
@@ -127,7 +128,7 @@ export const NewWorkflowModal = ({
       };
       reader.readAsText(file);
     },
-    [setStep]
+    [setStep],
   );
 
   const {
@@ -144,15 +145,15 @@ export const NewWorkflowModal = ({
     <Dialog.Root
       open={open}
       onOpenChange={({ open }) => !open && onClose()}
-      size="6xl"
+      size="xl"
     >
-      <Dialog.Backdrop />
       <Dialog.Content paddingX={0}>
         <Dialog.Header>
           <HStack gap={2}>
             {step.step === "create" && (
               <Button
                 variant="ghost"
+                data-variant="ghost"
                 onClick={() => setStep({ step: "select" })}
                 size="sm"
                 paddingX={0}
@@ -163,13 +164,13 @@ export const NewWorkflowModal = ({
                 <ChevronLeft />
               </Button>
             )}
-            <Text>Create new workflow</Text>
+            <Heading>Create new workflow</Heading>
           </HStack>
         </Dialog.Header>
         <Separator />
         <Dialog.CloseTrigger />
         {step.step === "select" ? (
-          <Dialog.Body background="gray.200" paddingY={6} marginBottom={6}>
+          <Dialog.Body paddingY={6} marginBottom={6}>
             <Grid
               width="full"
               templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
@@ -207,7 +208,7 @@ export const NewWorkflowModal = ({
               <Box
                 as="div"
                 borderWidth="2px"
-                borderRadius="md"
+                borderRadius="lg"
                 borderStyle="dashed"
                 cursor="pointer"
                 backgroundColor="white"
@@ -219,7 +220,8 @@ export const NewWorkflowModal = ({
                 borderColor={isDragging ? "blue.500" : "gray.200"}
                 transition="all 0.2s"
                 _hover={{ borderColor: "blue.300" }}
-                p={4}
+                paddingX={4}
+                paddingY={3}
               >
                 <input
                   ref={fileInputRef}
@@ -228,11 +230,11 @@ export const NewWorkflowModal = ({
                   style={{ display: "none" }}
                   onChange={handleFileInputChange}
                 />
-                <VStack align="center" gap={2} paddingY={4}>
-                  <Box p={2}>
+                <VStack align="center" gap={2}>
+                  <HStack p={2}>
                     <Upload color="#666" size={16} />
-                  </Box>
-                  <Text fontWeight="bold">From Export</Text>
+                    <Text fontWeight="bold">From Export</Text>
+                  </HStack>
                   <Text fontSize="sm" color="gray.600" textAlign="center">
                     Import a workflow from an exported JSON file
                   </Text>

@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useState } from "react";
-import { useWorkflowStore } from "./useWorkflowStore";
-import type { StudioClientEvent } from "../types/events";
 import type { Node } from "@xyflow/react";
-import type { BaseComponent, Component, Field } from "../types/dsl";
 import { nanoid } from "nanoid";
+import { useCallback, useEffect, useState } from "react";
 import { toaster } from "../../components/ui/toaster";
+import { generateOtelTraceId } from "../../utils/trace";
+import type { BaseComponent, Component, Field } from "../types/dsl";
+import type { StudioClientEvent } from "../types/events";
 import { useAlertOnComponent } from "./useAlertOnComponent";
 import { usePostEvent } from "./usePostEvent";
-import { generateOtelTraceId } from "../../utils/trace";
+import { useWorkflowStore } from "./useWorkflowStore";
 
 export const useComponentExecution = () => {
   const { postEvent, socketStatus } = usePostEvent();
@@ -61,7 +61,6 @@ export const useComponentExecution = () => {
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       return false;
     }
@@ -129,7 +128,7 @@ export const useComponentExecution = () => {
       setSelectedNode,
       setPropertiesExpanded,
       setTriggerValidation,
-    ]
+    ],
   );
 
   const stopComponentExecution = useCallback(
@@ -168,7 +167,7 @@ export const useComponentExecution = () => {
         });
       }, 2_000);
     },
-    [socketAvailable, postEvent, setComponentExecutionState]
+    [socketAvailable, postEvent, setComponentExecutionState],
   );
 
   return {
@@ -185,7 +184,7 @@ export function getInputsForExecution({
   inputs?: Record<string, string>;
 }): { missingFields: Field[]; inputs: Record<string, string> } {
   const allFields = new Set(
-    node.data.inputs?.map((field) => field.identifier) ?? []
+    node.data.inputs?.map((field) => field.identifier) ?? [],
   );
   const requiredFields =
     node.data.inputs?.filter((field) => !field.optional) ?? [];
@@ -196,7 +195,7 @@ export function getInputsForExecution({
       }
       return acc;
     },
-    {} as Record<string, any>
+    {} as Record<string, any>,
   );
 
   const inputs_ = Object.fromEntries(
@@ -204,14 +203,14 @@ export function getInputsForExecution({
       ...defaultValues,
       ...(node?.data.execution_state?.inputs ?? {}),
       ...(inputs ?? {}),
-    }).filter(([key]) => allFields.has(key))
+    }).filter(([key]) => allFields.has(key)),
   );
 
   const missingFields = requiredFields.filter(
     (field) =>
       !(field.identifier in inputs_) ||
       inputs_[field.identifier] === undefined ||
-      inputs_[field.identifier] === ""
+      inputs_[field.identifier] === "",
   );
 
   return { missingFields, inputs: inputs_ };

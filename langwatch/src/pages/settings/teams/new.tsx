@@ -1,18 +1,18 @@
+import { TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useCallback } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
-import { TeamUserRole } from "@prisma/client";
+import { type SubmitHandler, useForm } from "react-hook-form";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
   type TeamFormData,
 } from "../../../components/settings/TeamForm";
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
+import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import type { FullyLoadedOrganization } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
-import { toaster } from "../../../components/ui/toaster";
 
 export default function NewTeamPage() {
   const { organization } = useOrganizationTeamProject();
@@ -51,6 +51,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
           members: data.members.map((member) => ({
             userId: member.userId?.value ?? "",
             role: member.role.value,
+            customRoleId: member.role.customRoleId,
           })),
         },
         {
@@ -68,7 +69,8 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
           onError: () => {
             toaster.create({
               title: "Failed to create team",
-              description: "Please try again",
+              description:
+                "Please check your permissions if you have team:create permissions to create a team",
               type: "error",
               duration: 5000,
               meta: {
@@ -76,10 +78,10 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
               },
             });
           },
-        }
+        },
       );
     },
-    [createTeam, organization.id, router]
+    [createTeam, organization.id, router],
   );
 
   return (

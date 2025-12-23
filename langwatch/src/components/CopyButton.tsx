@@ -6,6 +6,7 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
   return (
     <Button
       variant="ghost"
+      data-variant="ghost"
       size="sm"
       cursor="pointer"
       onClick={(event) => {
@@ -20,7 +21,6 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           return;
         }
@@ -34,7 +34,6 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         })();
       }}

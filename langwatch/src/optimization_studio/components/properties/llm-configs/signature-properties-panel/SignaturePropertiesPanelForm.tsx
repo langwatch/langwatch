@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
-import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import debounce from "lodash/debounce";
+import { type Node, useUpdateNodeInternals } from "@xyflow/react";
+import debounce from "lodash.debounce";
 import { useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -8,26 +8,22 @@ import { useShallow } from "zustand/react/shallow";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
-import {
-  usePromptConfigForm,
-  type PromptConfigFormValues,
-} from "~/prompt-configs";
-import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
-import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
+import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
+import type { PromptTextAreaOnAddMention } from "~/prompts/components/ui/PromptTextArea";
+import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
-} from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
+} from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
+import { PromptField } from "~/prompts/forms/fields/PromptField";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
-  versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-} from "~/prompt-configs/utils/llmPromptConfigUtils";
+  versionedPromptToPromptConfigFormValues,
+} from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
@@ -65,7 +61,7 @@ export function SignaturePropertiesPanelForm({
       setNode: state.setNode,
       getWorkflow: state.getWorkflow,
       setNodeParameter: state.setNodeParameter,
-    }))
+    })),
   );
 
   const { isInsideWizard } = useWizardContext();
@@ -74,7 +70,7 @@ export function SignaturePropertiesPanelForm({
   const initialConfigValues = useMemo(
     () =>
       safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
-    [node.data]
+    [node.data],
   );
 
   /**
@@ -100,7 +96,7 @@ export function SignaturePropertiesPanelForm({
           },
         });
       }, 1000), // Lower than this slows down the UI significantly, since this will trigger a workspace/experiment save
-    [node.id, setNode, node.data.name]
+    [node.id, setNode, node.data.name],
   );
 
   const formProps = usePromptConfigForm({
@@ -172,23 +168,23 @@ export function SignaturePropertiesPanelForm({
       toVisit.push(
         ...edges
           .filter((edge) => edge.source === currentNode)
-          .map((edge) => edge.target)
+          .map((edge) => edge.target),
       );
     }
 
     return Object.fromEntries(
       nodes
         .filter(
-          (node) => !dependentNodes.includes(node.id) && node.id !== "end"
+          (node) => !dependentNodes.includes(node.id) && node.id !== "end",
         )
         .map((node) => [
           node.id,
           node.data.outputs
             ?.map((output) => output.identifier)
             .filter(
-              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`)
+              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`),
             ) ?? [],
-        ])
+        ]),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edges, nodes, node.id, JSON.stringify(node.data.outputs)]);
@@ -198,7 +194,7 @@ export function SignaturePropertiesPanelForm({
   const onAddEdge = (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => {
     const newHandle = edgeConnectToNewHandle(id, handle, node.id);
     updateNodeInternals(node.id);
@@ -216,7 +212,7 @@ export function SignaturePropertiesPanelForm({
   const onAddPromptEdge = (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);
 
@@ -231,11 +227,11 @@ export function SignaturePropertiesPanelForm({
     id: string,
     handle: string,
     content: PromptTextAreaOnAddMention,
-    idx: number
+    idx: number,
   ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);
     const messagesParam = node.data.parameters?.find(
-      (param) => param.identifier === "messages"
+      (param) => param.identifier === "messages",
     );
     if (!messagesParam) return;
 
@@ -243,7 +239,7 @@ export function SignaturePropertiesPanelForm({
       identifier: "messages",
       type: "chat_messages",
       value: (messagesParam.value as any[]).map((field, i) =>
-        i === idx ? { ...field, content: newPrompt } : field
+        i === idx ? { ...field, content: newPrompt } : field,
       ),
     });
   };

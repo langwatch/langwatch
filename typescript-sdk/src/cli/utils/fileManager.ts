@@ -5,6 +5,7 @@ import chalk from "chalk";
 import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
+import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -12,16 +13,40 @@ export class FileManager {
   private static readonly PROMPTS_DIR = "prompts";
   private static readonly MATERIALIZED_DIR = ".materialized";
 
+  private static _projectRoot: string | undefined;
+
+  private static findProjectRoot(): string {
+    if (this._projectRoot) {
+      return this._projectRoot;
+    }
+
+    let currentDir = process.cwd();
+    const root = path.parse(currentDir).root;
+
+    while (currentDir !== root) {
+      const configPath = path.join(currentDir, this.PROMPTS_CONFIG_FILE);
+      if (fs.existsSync(configPath)) {
+        this._projectRoot = currentDir;
+        return currentDir;
+      }
+      currentDir = path.dirname(currentDir);
+    }
+
+    // Fallback to cwd if no prompts.json found
+    this._projectRoot = process.cwd();
+    return this._projectRoot;
+  }
+
   static getPromptsConfigPath(): string {
-    return path.join(process.cwd(), this.PROMPTS_CONFIG_FILE);
+    return path.join(this.findProjectRoot(), this.PROMPTS_CONFIG_FILE);
   }
 
   static getPromptsLockPath(): string {
-    return path.join(process.cwd(), this.PROMPTS_LOCK_FILE);
+    return path.join(this.findProjectRoot(), this.PROMPTS_LOCK_FILE);
   }
 
   static getPromptsDir(): string {
-    return path.join(process.cwd(), this.PROMPTS_DIR);
+    return path.join(this.findProjectRoot(), this.PROMPTS_DIR);
   }
 
   static getMaterializedDir(): string {
@@ -117,7 +142,7 @@ export class FileManager {
     const fullPath = path.resolve(filePath);
 
     if (!fs.existsSync(fullPath)) {
-      throw new Error(`Local prompt file not found: ${filePath}`);
+      throw new PromptFileNotFoundError(filePath);
     }
 
     try {
@@ -259,7 +284,7 @@ export class FileManager {
   }
 
   static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
-    const relativePath = path.relative(process.cwd(), materializedPath);
+    const relativePath = path.relative(this.findProjectRoot(), materializedPath);
 
     lock.prompts[name] = {
       version: prompt.version,
@@ -275,7 +300,7 @@ export class FileManager {
   }
 
   static addToGitignore(entry: string): { added: boolean; existed: boolean } {
-    const gitignorePath = path.join(process.cwd(), ".gitignore");
+    const gitignorePath = path.join(this.findProjectRoot(), ".gitignore");
 
     // Check if .gitignore exists
     if (!fs.existsSync(gitignorePath)) {

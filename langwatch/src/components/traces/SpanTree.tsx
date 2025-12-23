@@ -22,9 +22,7 @@ import {
 
 type SpanWithChildren = Span & { children: SpanWithChildren[] };
 
-function buildTree(
-  spans: Span[]
-): Record<string, SpanWithChildren> {
+function buildTree(spans: Span[]): Record<string, SpanWithChildren> {
   const lookup: Record<string, SpanWithChildren> = {};
 
   spans.forEach((span) => {
@@ -129,7 +127,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               },
             },
             undefined,
-            { shallow: true }
+            { shallow: true },
           );
         }}
       >
@@ -154,7 +152,7 @@ const SpanNode: React.FC<SpanNodeProps> = ({ span, level }) => {
               lineClamp={1}
               expandable={false}
             >
-              {span.name ?? ('model' in span ? span.model : "(unnamed)")}
+              {span.name ?? ("model" in span ? span.model : "(unnamed)")}
             </HoverableBigText>
             {evaluationResult && (
               <IconWrapper
@@ -235,10 +233,10 @@ const TreeRenderer: React.FC<{ spans: Span[] }> = ({ spans }) => {
       acc[span.span_id] = span;
       return acc;
     },
-    {} as Record<string, Span>
+    {} as Record<string, Span>,
   );
   const rootSpans = spans.filter(
-    (s) => !s.parent_id || !spansById[s.parent_id]
+    (s) => !s.parent_id || !spansById[s.parent_id],
   );
 
   return (
@@ -274,7 +272,7 @@ export function SpanTree(props: SpanTreeProps) {
       enabled: !!project && !!traceId,
       refetchOnWindowFocus: false,
       refetchInterval: keepRefetching ? 1_000 : undefined,
-    }
+    },
   );
 
   useEffect(() => {
@@ -309,7 +307,7 @@ export function SpanTree(props: SpanTreeProps) {
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
   }, [project, router, span?.span_id, spanId, spans.data, traceId]);
@@ -325,6 +323,7 @@ export function SpanTree(props: SpanTreeProps) {
           align="start"
           width="full"
           gap={10}
+          paddingX={6}
           flexDirection={{ base: "column", xl: "row" }}
         >
           <TreeRenderer spans={spans.data} />

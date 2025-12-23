@@ -20,12 +20,12 @@ export function CheckStatusIcon({
 }
 
 export const evaluationStatusColor = (
-  check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">
+  check: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">,
 ) => {
   const colorMap: Record<ElasticSearchEvaluation["status"], string> = {
     scheduled: "yellow.600",
     in_progress: "yellow.600",
-    error: "red.800",
+    error: "red.600",
     skipped: "yellow.600",
     processed: evaluationPassed(check) === false ? "red.600" : "green.600",
   };
@@ -34,7 +34,7 @@ export const evaluationStatusColor = (
 };
 
 export const evaluationPassed = (
-  evaluation: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">
+  evaluation: Pick<ElasticSearchEvaluation, "status" | "passed" | "score">,
 ) => {
   if (evaluation.status !== "processed") {
     return undefined;

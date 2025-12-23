@@ -1,3 +1,4 @@
+import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import {
   Badge,
   Box,
@@ -10,33 +11,32 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { Dataset } from "@prisma/client";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 import { Edit2 } from "react-feather";
+import { useDebouncedCallback } from "use-debounce";
+import type { Trace } from "~/server/tracer/types";
+import { Checkbox } from "../../components/ui/checkbox";
+import { Switch } from "../../components/ui/switch";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   DatasetColumns,
   DatasetRecordEntry,
 } from "../../server/datasets/types";
-import {
-  DatasetGrid,
-  HeaderCheckboxComponent,
-  type DatasetColumnDef,
-} from "./DatasetGrid";
-
-import type { CustomCellRendererProps } from "@ag-grid-community/react";
-import type { Dataset } from "@prisma/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Checkbox } from "../../components/ui/checkbox";
-import { Switch } from "../../components/ui/switch";
-import { api } from "../../utils/api";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MappingState } from "../../server/tracer/tracesMapping";
-import { TracesMapping } from "../traces/TracesMapping";
+import { api } from "../../utils/api";
 import {
   ThreadMapping,
   type ThreadMappingState,
 } from "../traces/ThreadMapping";
-import { ErrorBoundary } from "react-error-boundary";
-import type { Trace } from "~/server/tracer/types";
-import { useDebouncedCallback } from "use-debounce";
+import { TracesMapping } from "../traces/TracesMapping";
+import {
+  type DatasetColumnDef,
+  DatasetGrid,
+  HeaderCheckboxComponent,
+} from "./DatasetGrid";
+
 interface DatasetMappingPreviewProps {
   traces: Trace[]; // Replace 'any' with your trace type
   columnTypes: DatasetColumns;
@@ -63,8 +63,7 @@ export function DatasetMappingPreview({
   setDatasetTriggerMapping,
 }: DatasetMappingPreviewProps) {
   const [isThreadMapping, setIsThreadMapping] = useState(false);
-  const [threadMappingState, setThreadMappingState] =
-    useState<ThreadMappingState>();
+  const [, setThreadMappingState] = useState<ThreadMappingState>();
 
   const { project } = useOrganizationTeamProject();
 
@@ -85,7 +84,7 @@ export function DatasetMappingPreview({
     {
       enabled: !!project && isThreadMapping && threadIds.length > 0,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   // Use thread traces when thread mapping is enabled, otherwise use provided traces
@@ -112,8 +111,8 @@ export function DatasetMappingPreview({
       minWidth: ["trace_id", "total_cost"].includes(name)
         ? 120
         : ["timestamp"].includes(name)
-        ? 160
-        : 200,
+          ? 160
+          : 200,
     }));
 
     // Add row number column
@@ -157,10 +156,15 @@ export function DatasetMappingPreview({
           onSuccess: () => {
             void trpc.dataset.getAll.invalidate();
           },
-        }
+        },
       );
     },
-    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+    [
+      selectedDataset.id,
+      project?.id,
+      trpc.dataset.getAll,
+      updateStoredMapping_,
+    ],
   );
 
   const updateStoredThreadMapping = useCallback(
@@ -177,10 +181,15 @@ export function DatasetMappingPreview({
           onSuccess: () => {
             void trpc.dataset.getAll.invalidate();
           },
-        }
+        },
       );
     },
-    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+    [
+      selectedDataset.id,
+      project?.id,
+      trpc.dataset.getAll,
+      updateStoredMapping_,
+    ],
   );
 
   const debouncedUpdateThreadMapping = useDebouncedCallback(
@@ -188,7 +197,7 @@ export function DatasetMappingPreview({
       setThreadMappingState(newThreadMapping);
       updateStoredThreadMapping(newThreadMapping);
     },
-    400
+    400,
   );
 
   // Clear thread mapping state and cancel pending updates when dataset changes
@@ -297,6 +306,9 @@ export function DatasetMappingPreview({
                   Error rendering the dataset, please refresh the page
                 </Center>
               }
+              onError={(error) => {
+                console.error(error);
+              }}
             >
               <DatasetGrid
                 columnDefs={columnDefs}
@@ -307,7 +319,7 @@ export function DatasetMappingPreview({
                   data: DatasetRecordEntry;
                 }) => {
                   onRowDataChange(
-                    rowData.map((row) => (row.id === data.id ? data : row))
+                    rowData.map((row) => (row.id === data.id ? data : row)),
                   );
                 }}
               />

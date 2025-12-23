@@ -1,19 +1,17 @@
-import {
-  type Prisma,
-  type PrismaClient,
-  type LlmPromptConfigVersion,
+import type {
+  LlmPromptConfigVersion,
+  Prisma,
+  PrismaClient,
 } from "@prisma/client";
-import { type z } from "zod";
-
-import { type SchemaVersion } from "./enums";
+import type { z } from "zod";
+import type { messageSchema } from "~/prompts/schemas/field-schemas";
+import type { SchemaVersion } from "./enums";
 import { SystemPromptConflictError } from "./errors";
 import {
-  type LatestConfigVersionSchema,
   getVersionValidator,
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
-
-import { type messageSchema } from "~/prompt-configs/schemas/field-schemas";
 
 /**
  * Service for managing prompt version operations.

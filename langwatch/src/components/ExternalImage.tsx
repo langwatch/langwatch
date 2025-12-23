@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
 import { Box, Image, Text } from "@chakra-ui/react";
+import { useEffect, useState } from "react";
 import { Tooltip } from "../components/ui/tooltip";
 
 export const getImageUrl = (str: unknown): string | null => {
@@ -13,7 +13,7 @@ export const getImageUrl = (str: unknown): string | null => {
   // Check for markdown image format ![alt](url)
   const markdownImageRegex = /^\!\[.*?\]\((.*?)\)$/;
   const markdownMatch = str_.match(markdownImageRegex);
-  if (markdownMatch && markdownMatch[1]) {
+  if (markdownMatch?.[1]) {
     // Extract the URL from markdown format and validate it recursively
     return markdownMatch[1] ?? null;
   }

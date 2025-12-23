@@ -1,13 +1,13 @@
 import { Avatar, HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { type PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { Check, Edit, Inbox, Plus, Users } from "react-feather";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
-import { useDrawer } from "./CurrentDrawer";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 export default function AnnotationsLayout({
@@ -21,17 +21,17 @@ export default function AnnotationsLayout({
   // Use optimized count endpoints instead of fetching full data
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const assignedItemsCount = api.annotation.getAssignedItemsCount.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const queueItemsCounts = api.annotation.getQueueItemsCounts.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const menuItems = {
@@ -53,18 +53,16 @@ export default function AnnotationsLayout({
   const { openDrawer } = useDrawer();
 
   return (
-    <DashboardLayout background="gray.100">
+    <DashboardLayout>
       <HStack
         align="start"
         width="full"
         height="full"
-        background="gray.100"
         gap={0}
         position="relative"
       >
         <VStack
           align="start"
-          background="white"
           paddingY={5}
           borderRightWidth="1px"
           borderColor="gray.300"

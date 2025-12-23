@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useCallback } from "react";
 import type { CustomCellEditorProps } from "@ag-grid-community/react";
 import { Textarea } from "@chakra-ui/react";
+import React, { useCallback, useEffect, useRef } from "react";
 
 export function MultilineCellEditor(props: CustomCellEditorProps) {
   const { value, onValueChange } = props;
@@ -8,7 +8,7 @@ export function MultilineCellEditor(props: CustomCellEditorProps) {
     (val: string) => {
       onValueChange(val === "" ? null : val);
     },
-    [onValueChange]
+    [onValueChange],
   );
 
   useEffect(() => {

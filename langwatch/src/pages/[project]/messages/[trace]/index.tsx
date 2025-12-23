@@ -3,15 +3,14 @@ import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
+import { Conversation } from "../../../../components/messages/Conversation";
 import { useTraceDetailsState } from "../../../../hooks/useTraceDetailsState";
 import { isNotFound } from "../../../../utils/trpcError";
-
-import { Conversation } from "../../../../components/messages/Conversation";
 
 export default function TraceDetails() {
   const router = useRouter();
   const { traceId, trace } = useTraceDetailsState(
-    (router.query.trace as string) ?? ""
+    (router.query.trace as string) ?? "",
   );
 
   const [threadId, setThreadId] = useState<string | undefined>(undefined);

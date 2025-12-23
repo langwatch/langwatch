@@ -38,7 +38,7 @@ export type FilterDefinition = {
   query: (
     values: string[],
     key: string | undefined,
-    subkey: string | undefined
+    subkey: string | undefined,
   ) => QueryDslQueryContainer;
   single?: boolean;
   type?: "numeric";
@@ -52,10 +52,10 @@ export type FilterDefinition = {
     aggregation: (
       query: string | undefined,
       key: string | undefined,
-      subkey: string | undefined
+      subkey: string | undefined,
     ) => Record<string, AggregationsAggregationContainer>;
     extract: (
-      result: Record<string, any>
+      result: Record<string, any>,
     ) => { field: string; label: string; count: number }[];
   };
 };

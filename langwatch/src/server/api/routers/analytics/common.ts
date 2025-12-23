@@ -3,8 +3,9 @@ import type {
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 import { addDays, differenceInCalendarDays } from "date-fns";
-import { type z } from "zod";
-import { type sharedFiltersInputSchema } from "../../../analytics/types";
+import type { z } from "zod";
+import type { FilterParam } from "../../../../hooks/useFilterParams";
+import type { sharedFiltersInputSchema } from "../../../analytics/types";
 import { availableFilters } from "../../../filters/registry";
 import type { FilterField } from "../../../filters/types";
 
@@ -13,7 +14,7 @@ const getDaysDifference = (startDate: Date, endDate: Date) =>
 
 export const currentVsPreviousDates = (
   input: z.infer<typeof sharedFiltersInputSchema>,
-  period?: number | string
+  period?: number | string,
 ) => {
   const startDate = new Date(input.startDate);
   const endDate = new Date(input.endDate);
@@ -26,7 +27,7 @@ export const currentVsPreviousDates = (
 
   const daysDifference = Math.max(
     periodInDays,
-    getDaysDifference(startDate, endDate)
+    getDaysDifference(startDate, endDate),
   );
   const previousPeriodStartDate = addDays(startDate, -daysDifference);
 
@@ -39,6 +40,7 @@ export const generateTracesPivotQueryConditions = ({
   endDate,
   filters,
   query,
+  negateFilters,
 }: z.infer<typeof sharedFiltersInputSchema> & {
   filterForAnnotatedTraces?: boolean;
 }): {
@@ -51,16 +53,7 @@ export const generateTracesPivotQueryConditions = ({
   const endDate_ =
     endDate < now && now - endDate < 1000 * 60 * 60 * 2 ? now : endDate;
 
-  let filterConditions: QueryDslQueryContainer[] = [];
-
-  for (const [field, params] of Object.entries(filters)) {
-    if (params.length == 0) {
-      continue;
-    }
-
-    const col = collectConditions(field as FilterField, params);
-    filterConditions = filterConditions.concat(col);
-  }
+  const filterConditions = generateFilterConditions(filters);
 
   return {
     pivotIndexConditions: {
@@ -77,13 +70,34 @@ export const generateTracesPivotQueryConditions = ({
               },
             },
           },
-          ...filterConditions,
+          ...(negateFilters ? [] : [...filterConditions]),
         ],
+        ...(negateFilters
+          ? {
+              must_not: [...filterConditions],
+            }
+          : {}),
       } as QueryDslBoolQuery,
     },
     isAnyFilterPresent: filterConditions.length > 0,
     endDateUsedForQuery: endDate_,
   };
+};
+
+export const generateFilterConditions = (
+  filters: Partial<Record<FilterField, FilterParam>>,
+) => {
+  let filterConditions: QueryDslQueryContainer[] = [];
+  for (const [field, params] of Object.entries(filters)) {
+    if (params.length == 0) {
+      continue;
+    }
+
+    const col = collectConditions(field as FilterField, params);
+    filterConditions = filterConditions.concat(col);
+  }
+
+  return filterConditions;
 };
 
 const collectConditions = (
@@ -92,7 +106,7 @@ const collectConditions = (
     | string[]
     | Record<string, string[]>
     | Record<string, Record<string, string[]>>,
-  keys: string[] = []
+  keys: string[] = [],
 ): QueryDslQueryContainer[] => {
   const key = keys[0];
   const subkey = keys[1];
@@ -107,8 +121,8 @@ const collectConditions = (
         availableFilters[filter.requiresKey.filter].query(
           [key],
           undefined,
-          undefined
-        )
+          undefined,
+        ),
       );
     }
 
@@ -117,8 +131,8 @@ const collectConditions = (
         availableFilters[filter.requiresSubkey.filter].query(
           [subkey],
           key,
-          undefined
-        )
+          undefined,
+        ),
       );
     }
 

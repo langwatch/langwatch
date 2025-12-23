@@ -1,12 +1,12 @@
+import promBundle from "express-prom-bundle";
 import { createServer, type IncomingMessage } from "http";
-import { parse } from "url";
 import next from "next";
 import path from "path";
-import type { Duplex } from "stream";
 import { register } from "prom-client";
-import promBundle from "express-prom-bundle";
-import { createLogger } from "./utils/logger";
+import type { Duplex } from "stream";
+import { parse } from "url";
 import { initializeBackgroundWorkers } from "./server/background/init";
+import { createLogger } from "./utils/logger";
 
 const logger = createLogger("langwatch:start");
 
@@ -112,7 +112,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     } catch (err) {
       logger.error(
         { url: req.url, error: err },
-        "error occurred handling request"
+        "error occurred handling request",
       );
       res.statusCode = 500;
       res.end("internal server error");
@@ -152,6 +152,15 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   });
 
   server.listen(port, () => {
+    const asciiArt = `
+
+██╗      █████╗ ███╗   ██╗ ██████╗ ██╗    ██╗ █████╗ ████████╗ ██████╗██╗  ██╗
+██║     ██╔══██╗████╗  ██║██╔════╝ ██║    ██║██╔══██╗╚══██╔══╝██╔════╝██║  ██║
+██║     ███████║██╔██╗ ██║██║  ███╗██║ █╗ ██║███████║   ██║   ██║     ███████║
+██║     ██╔══██║██║╚██╗██║██║   ██║██║███╗██║██╔══██║   ██║   ██║     ██╔══██║
+███████╗██║  ██║██║ ╚████║╚██████╔╝╚███╔███╔╝██║  ██║   ██║   ╚██████╗██║  ██║
+╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝  ╚══╝╚══╝ ╚═╝  ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
+`;
     logger.info(
       {
         hostname,
@@ -160,7 +169,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
           hostname === "0.0.0.0" ? "localhost" : hostname
         }:${port}`,
       },
-      "LangWatch is ready 🎉"
+      asciiArt,
     );
 
     // Initialize background workers
@@ -187,7 +196,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
   process.on("unhandledRejection", (reason, promise) => {
     logger.fatal(
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected"
+      "unhandled rejection detected",
     );
   });
 };

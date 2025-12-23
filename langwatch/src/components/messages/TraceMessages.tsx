@@ -10,36 +10,32 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { useEffect, useState, type PropsWithChildren } from "react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import type { Trace } from "../../server/tracer/types";
-
+import React, { type PropsWithChildren, useEffect, useState } from "react";
 import { CornerDownRight } from "react-feather";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
+import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
 import { Annotations } from "../../components/Annotations";
-import { useDrawer } from "../../components/CurrentDrawer";
+import { Markdown } from "../../components/Markdown";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
   getSlicedExpectedOutput,
   MessageCardJsonOutput,
 } from "../../components/messages/MessageCard";
-import { getExtractedInput } from "../../utils/traceExtraction";
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { Trace } from "../../server/tracer/types";
+import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { isJson } from "../../utils/isJson";
 import { isPythonRepr } from "../../utils/parsePythonInsideJson";
-
-import { Markdown } from "../../components/Markdown";
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
-import { api } from "../../utils/api";
+import { getExtractedInput } from "../../utils/traceExtraction";
 import { SmallLabel } from "../SmallLabel";
+import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import {
   MessageHoverActions,
   useTranslationState,
 } from "./MessageHoverActions";
-
-import { AnnotationExpectedOutputs } from "../../components/AnnotationExpectedOutputs";
-import { RedactedField } from "../ui/RedactedField";
-import { stringifyIfObject } from "~/utils/stringifyIfObject";
 
 export const TraceMessages = React.forwardRef(function TraceMessages(
   {
@@ -53,7 +49,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     index: "only" | "first" | "last" | "other";
     loadingMore?: boolean;
   },
-  ref
+  ref,
 ) {
   const { project } = useOrganizationTeamProject();
 
@@ -65,7 +61,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     action,
     conversationHasSomeComments,
     setConversationHasSomeComments,
-    expectedOutputAction,
   } = useAnnotationCommentStore();
 
   const translationState = useTranslationState();
@@ -75,7 +70,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
       projectId: project?.id ?? "",
       traceId: trace.trace_id,
     },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const showAnnotations = action == "new" || conversationHasSomeComments;
@@ -90,8 +85,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
       setConversationHasSomeComments(false);
     };
   }, [annotations.data]);
-
-  const commentState = useAnnotationCommentStore();
 
   return (
     <VStack ref={ref as any} align="start" width="full" gap={0}>
@@ -115,24 +108,26 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           paddingY={4}
           borderX="1px solid"
           borderTop={
-            highlighted ??
+            highlighted ||
             (!loadingMore && (index === "first" || index === "only"))
               ? "1px solid"
               : "none"
           }
-          borderRadius={
-            loadingMore
-              ? "0"
-              : index === "only"
-              ? "4px"
+          {...(loadingMore
+            ? { borderRadius: "0" }
+            : index === "only"
+              ? { borderRadius: "lg" }
               : index === "first"
-              ? "4px 4px 0 0"
-              : index === "last"
-              ? "0 0 4px 4px"
-              : "0"
+                ? { borderTopRadius: "lg" }
+                : index === "last"
+                  ? { borderBottomRadius: "lg" }
+                  : { borderRadius: "0" })}
+          borderBottom={
+            highlighted || index === "last" || index === "only"
+              ? "1px solid"
+              : "none"
           }
-          borderBottom={highlighted ?? index === "last" ? "1px solid" : "none"}
-          borderColor={highlighted ? "blue.200" : "gray.200"}
+          borderColor={highlighted ? "blue.200" : "gray.300"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}
           onMouseLeave={() => setShowTools(false)}

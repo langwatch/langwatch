@@ -1,33 +1,34 @@
+import {
+  type PrismaClient,
+  type Project,
+  ProjectSensitiveDataVisibilityLevel,
+  TeamUserRole,
+} from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { slugify } from "~/utils/slugify";
+import { customAlphabet, nanoid } from "nanoid";
+import type { Session } from "next-auth";
 import { z } from "zod";
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { encrypt } from "~/utils/encryption";
+import { slugify } from "~/utils/slugify";
 import { env } from "../../../env.mjs";
-import { customAlphabet, nanoid } from "nanoid";
+import { dependencies } from "../../../injection/dependencies.server";
 import {
-  OrganizationRoleGroup,
-  TeamRoleGroup,
-  backendHasTeamProjectPermission,
   checkUserPermissionForOrganization,
-  checkUserPermissionForProject,
-  checkUserPermissionForTeam,
+  OrganizationRoleGroup,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../permission";
-import { getOrganizationProjectsCount } from "./limits";
-import { dependencies } from "../../../injection/dependencies.server";
 import {
-  ProjectSensitiveDataVisibilityLevel,
-  type Project,
-  type PrismaClient,
-  TeamUserRole,
-} from "@prisma/client";
-import { encrypt } from "~/utils/encryption";
-import type { Session } from "next-auth";
+  checkProjectPermission,
+  checkTeamPermission,
+  hasProjectPermission,
+} from "../rbac";
+import { getOrganizationProjectsCount } from "./limits";
 import { revokeAllTraceShares } from "./share";
 
 export const projectRouter = createTRPCRouter({
@@ -83,17 +84,19 @@ export const projectRouter = createTRPCRouter({
         name: z.string(),
         language: z.string(),
         framework: z.string(),
-      })
+      }),
     )
     .use(skipPermissionCheckProjectCreation)
     .use(({ ctx, input, next }) => {
       if (input.teamId) {
-        return checkUserPermissionForTeam(
-          TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS
-        )({ ctx, input: { ...input, teamId: input.teamId }, next });
+        return checkTeamPermission("organization:manage")({
+          ctx,
+          input: { ...input, teamId: input.teamId },
+          next,
+        });
       } else if (input.newTeamName) {
         return checkUserPermissionForOrganization(
-          OrganizationRoleGroup.ORGANIZATION_MANAGE
+          OrganizationRoleGroup.ORGANIZATION_MANAGE,
         )({ ctx, input, next });
       } else {
         throw new TRPCError({
@@ -122,11 +125,11 @@ export const projectRouter = createTRPCRouter({
       }
 
       const projectCount = await getOrganizationProjectsCount(
-        input.organizationId
+        input.organizationId,
       );
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         input.organizationId,
-        ctx.session.user
+        ctx.session.user,
       );
 
       if (
@@ -213,7 +216,7 @@ export const projectRouter = createTRPCRouter({
     }),
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -262,9 +265,9 @@ export const projectRouter = createTRPCRouter({
             (hasEndpoint && hasAccessKey && hasSecretKey) ||
             (!hasEndpoint && !hasAccessKey && !hasSecretKey)
           );
-        })
+        }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .use(checkCapturedDataVisibilityPermission)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -335,9 +338,9 @@ export const projectRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         embeddingsModel: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -365,9 +368,9 @@ export const projectRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         topicClusteringModel: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -395,9 +398,9 @@ export const projectRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         defaultModel: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -424,9 +427,9 @@ export const projectRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(
       async ({
         input,
@@ -470,26 +473,26 @@ export const projectRouter = createTRPCRouter({
 
         const isUserPrivileged = teamsWithAccess.some(
           (teamUser: { role: TeamUserRole }) =>
-            teamUser.role === TeamUserRole.ADMIN
+            teamUser.role === TeamUserRole.ADMIN,
         );
 
         return {
           isRedacted: {
             input: !canAccessSensitiveData(
               project.capturedInputVisibility,
-              isUserPrivileged
+              isUserPrivileged,
             ),
             output: !canAccessSensitiveData(
               project.capturedOutputVisibility,
-              isUserPrivileged
+              isUserPrivileged,
             ),
           },
         };
-      }
+      },
     ),
   archiveById: protectedProcedure
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       if (input.projectToArchiveId === input.projectId) {
@@ -498,10 +501,10 @@ export const projectRouter = createTRPCRouter({
           message: "You cannot archive the current project",
         });
       }
-      const canDeleteTarget = await backendHasTeamProjectPermission(
+      const canDeleteTarget = await hasProjectPermission(
         ctx,
-        { projectId: input.projectToArchiveId },
-        TeamRoleGroup.SETUP_PROJECT
+        input.projectToArchiveId,
+        "project:delete",
       );
       if (!canDeleteTarget) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -516,7 +519,7 @@ export const projectRouter = createTRPCRouter({
 
   triggerTopicClustering: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
       const { scheduleTopicClusteringForProject } = await import(
@@ -567,11 +570,7 @@ async function checkCapturedDataVisibilityPermission({
     (input.capturedInputVisibility !== void 0 ||
       input.capturedOutputVisibility !== void 0 ||
       input.traceSharingEnabled !== void 0) &&
-    !(await backendHasTeamProjectPermission(
-      ctx,
-      { projectId: input.projectId },
-      TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
-    ))
+    !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",
@@ -584,7 +583,7 @@ async function checkCapturedDataVisibilityPermission({
 
 const canAccessSensitiveData = (
   visibility: ProjectSensitiveDataVisibilityLevel,
-  userIsPrivileged: boolean
+  userIsPrivileged: boolean,
 ): boolean => {
   switch (visibility) {
     case ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:

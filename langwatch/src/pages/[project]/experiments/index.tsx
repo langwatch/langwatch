@@ -2,22 +2,21 @@ import {
   Button,
   Card,
   Container,
-  HStack,
   Heading,
+  HStack,
   Skeleton,
   Spacer,
+  Table,
   Text,
 } from "@chakra-ui/react";
 import router from "next/router";
 import { Play } from "react-feather";
-
-import { useDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { Link } from "~/components/ui/link";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { Link } from "~/components/ui/link";
-import { Table } from "@chakra-ui/react";
 
 export default function Experiments() {
   const { project } = useOrganizationTeamProject();
@@ -27,7 +26,7 @@ export default function Experiments() {
     { projectId: project?.id ?? "" },
     {
       enabled: !!project,
-    }
+    },
   );
 
   return (
@@ -93,22 +92,26 @@ export default function Experiments() {
                         </Table.Row>
                       ))
                     : experiments.data
-                    ? experiments.data?.map((experiment, i) => (
-                        <Table.Row
-                          cursor="pointer"
-                          onClick={() => {
-                            void router.push({
-                              pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                            });
-                          }}
-                          key={i}
-                        >
-                          <Table.Cell>{experiment.name ?? experiment.slug}</Table.Cell>
-                          <Table.Cell>{experiment.type}</Table.Cell>
-                          <Table.Cell>{experiment.createdAt.toLocaleString()}</Table.Cell>
-                        </Table.Row>
-                      ))
-                    : null}
+                      ? experiments.data?.map((experiment, i) => (
+                          <Table.Row
+                            cursor="pointer"
+                            onClick={() => {
+                              void router.push({
+                                pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                              });
+                            }}
+                            key={i}
+                          >
+                            <Table.Cell>
+                              {experiment.name ?? experiment.slug}
+                            </Table.Cell>
+                            <Table.Cell>{experiment.type}</Table.Cell>
+                            <Table.Cell>
+                              {experiment.createdAt.toLocaleString()}
+                            </Table.Cell>
+                          </Table.Row>
+                        ))
+                      : null}
                 </Table.Body>
               </Table.Root>
             )}

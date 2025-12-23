@@ -1,4 +1,4 @@
-import { Button, Input, VStack, Text, Code } from "@chakra-ui/react";
+import { Button, Code, Input, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { Dialog } from "../ui/dialog";
 
@@ -29,7 +29,6 @@ export function DeleteConfirmationDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>

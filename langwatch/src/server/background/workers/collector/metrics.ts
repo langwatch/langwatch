@@ -1,12 +1,12 @@
+import { createLogger } from "../../../../utils/logger";
 import { getLLMModelCosts } from "../../../modelProviders/llmModelCost";
-import { type LLMSpan, type Span, type Trace } from "../../../tracer/types";
+import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import {
   estimateCost,
   matchingLLMModelCost,
   tokenizeAndEstimateCost,
 } from "./cost";
-import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:collector:metrics");
 
@@ -156,7 +156,7 @@ export const addGuardrailCosts = (spans: Span[]) => {
     ) {
       if (span.output.value.cost.currency !== "USD") {
         logger.warn(
-          `Guardrail cost is in ${span.output.value.cost.currency}, not USD, which is not supported yet`
+          `Guardrail cost is in ${span.output.value.cost.currency}, not USD, which is not supported yet`,
         );
       }
       if (!span.metrics) {

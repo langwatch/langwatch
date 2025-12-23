@@ -1,16 +1,22 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
+import { getComplexProps } from "../hooks/useDrawer";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
+import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+
+// Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
+export { useDrawer } from "../hooks/useDrawer";
 
 type DrawerProps = {
   open: string;
@@ -27,14 +33,13 @@ const drawers = {
   uploadCSV: UploadCSVModal,
   addOrEditDataset: AddOrEditDatasetDrawer,
   editTriggerFilter: EditTriggerFilterDrawer,
+  seriesFilters: SeriesFiltersDrawer,
+  selectDataset: SelectDatasetDrawer,
 } satisfies Record<string, React.FC<any>>;
-
-// workaround to pass complexProps to drawers
-let complexProps = {} as Record<string, (...args: any[]) => void>;
 
 export function CurrentDrawer() {
   const router = useRouter();
-
+  const complexProps = getComplexProps();
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
     allowDots: true,
@@ -56,88 +61,16 @@ export function CurrentDrawer() {
             qs.stringify(
               Object.fromEntries(
                 Object.entries(router.query).filter(
-                  ([key]) => !key.startsWith("drawer.")
-                )
-              )
+                  ([key]) => !key.startsWith("drawer."),
+                ),
+              ),
             ),
           undefined,
-          { shallow: true }
+          { shallow: true },
         );
       }}
     >
       <CurrentDrawer {...queryDrawer} {...complexProps} />
     </ErrorBoundary>
   ) : null;
-}
-
-export function useDrawer() {
-  const router = useRouter();
-
-  const openDrawer = <T extends keyof typeof drawers>(
-    drawer: T,
-    props?: Parameters<(typeof drawers)[T]>[0],
-    { replace }: { replace?: boolean } = {}
-  ) => {
-    complexProps = Object.fromEntries(
-      Object.entries(props ?? {}).filter(
-        ([_key, value]) =>
-          typeof value === "function" || typeof value === "object"
-      )
-    );
-
-    void router[replace ? "replace" : "push"](
-      "?" +
-        qs.stringify(
-          {
-            ...Object.fromEntries(
-              Object.entries(router.query).filter(
-                ([key, value]) =>
-                  !key.startsWith("drawer.") &&
-                  typeof value !== "function" &&
-                  typeof value !== "object"
-              )
-            ),
-            drawer: {
-              open: drawer,
-              ...props,
-            },
-          },
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          }
-        ),
-      undefined,
-      { shallow: true }
-    );
-  };
-
-  const closeDrawer = () => {
-    void router.push(
-      "?" +
-        qs.stringify(
-          Object.fromEntries(
-            Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer.") && key !== "span" // remove span key as well left by trace details
-            )
-          ),
-          {
-            allowDots: true,
-            arrayFormat: "comma",
-            // @ts-ignore of course it exists
-            allowEmptyArrays: true,
-          }
-        ),
-      undefined,
-      { shallow: true }
-    );
-  };
-
-  const drawerOpen = (drawer: keyof typeof drawers) => {
-    return router.query["drawer.open"] === drawer;
-  };
-
-  return { openDrawer, closeDrawer, drawerOpen };
 }

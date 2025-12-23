@@ -410,7 +410,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                         ? {
                             script: {
                               source: `if (${nullChecks}) { return params._source.${metadataKey(
-                                key
+                                key,
                               )}; } else { return null; }`,
                             },
                           }
@@ -745,7 +745,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
             })
             .filter(
               (option: any) =>
-                option?.label !== undefined && option?.label !== null
+                option?.label !== undefined && option?.label !== null,
             ) ?? []
         );
       },
@@ -772,7 +772,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               {
                 terms: {
                   "evaluations.passed": values.map(
-                    (value) => value === "true" || value === "1"
+                    (value) => value === "true" || value === "1",
                   ),
                 },
               },
@@ -957,7 +957,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !["succeeded", "failed"].includes(bucket.key)
+              (bucket: any) => !["succeeded", "failed"].includes(bucket.key),
             )
             .map((bucket: any) => ({
               field: bucket.key,
@@ -1032,7 +1032,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.child?.child?.buckets
             ?.filter(
-              (bucket: any) => !["succeeded", "failed"].includes(bucket.key)
+              (bucket: any) => !["succeeded", "failed"].includes(bucket.key),
             )
             .map((bucket: any) => ({
               field: bucket.key,
@@ -1178,7 +1178,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               field: bucket.key,
               label: bucket.key,
               count: bucket.doc_count,
-            })
+            }),
           ) ?? []
         );
       },
@@ -1269,14 +1269,14 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return [
           {
             field: Math.ceil(
-              result.unique_values?.child?.child?.child?.child?.min
+              result.unique_values?.child?.child?.child?.child?.min,
             ).toString(),
             label: "min",
             count: 0,
           },
           {
             field: Math.ceil(
-              result.unique_values?.child?.child?.child?.child?.max
+              result.unique_values?.child?.child?.child?.child?.max,
             ).toString(),
             label: "max",
             count: 0,
@@ -1356,7 +1356,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               field: bucket.key,
               label: bucket.key,
               count: bucket.doc_count,
-            })
+            }),
           ) ?? []
         );
       },

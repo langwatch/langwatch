@@ -10,6 +10,7 @@ export class ApiHelpers {
       if (prompt.handle?.startsWith(PROMPT_NAME_PREFIX)) {
         return this.langwatch.prompts.delete(prompt.handle);
       }
+      return Promise.resolve();
     });
     await Promise.all(promises);
   };

@@ -1,7 +1,7 @@
 import {
-  Separator,
-  HStack,
   Heading,
+  HStack,
+  Separator,
   Skeleton,
   Text,
   VStack,
@@ -9,12 +9,12 @@ import {
 import { useRouter } from "next/router";
 import React, { useEffect, useRef, useState } from "react";
 import { HelpCircle } from "react-feather";
-import { api } from "../../utils/api";
 import { useFilterParams } from "../../hooks/useFilterParams";
-import { OverflownTextWithTooltip } from "../OverflownText";
+import { api } from "../../utils/api";
 import { Delayed } from "../Delayed";
-import { Tooltip } from "../ui/tooltip";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { Checkbox } from "../ui/checkbox";
+import { Tooltip } from "../ui/tooltip";
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
@@ -50,7 +50,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     {
       ...queryOpts,
       keepPreviousData: true,
-    }
+    },
   );
 
   const handleTopicChange = (topicId: string, checked: boolean) => {
@@ -61,11 +61,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     let newSubtopics = selectedSubtopics;
     if (!checked) {
       const subtopics = topicCountsQuery.data?.subtopicCounts.filter(
-        (subtopic) => subtopic.parentId === topicId
+        (subtopic) => subtopic.parentId === topicId,
       );
       if (subtopics) {
         newSubtopics = selectedSubtopics.filter(
-          (t) => !subtopics.map((s) => s.id).includes(t)
+          (t) => !subtopics.map((s) => s.id).includes(t),
         );
       }
     }
@@ -85,7 +85,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         },
       },
       undefined,
-      { shallow: true }
+      { shallow: true },
     );
   };
 
@@ -104,7 +104,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }, 0);
 
@@ -119,7 +119,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       const currentHeight = topicSelectorRef.current.clientHeight;
 
       setMinHeight((minHeight) =>
-        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight
+        currentHeight > (minHeight ?? 0) ? currentHeight : minHeight,
       );
     }
   }, [topicCountsQuery.data]);
@@ -128,12 +128,12 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     <VStack
       align="start"
       width="full"
-      gap={6}
+      gap={4}
       ref={topicSelectorRef}
       minHeight={`${minHeight}px`}
     >
       {showTitle && (
-        <Heading as="h2" size="md">
+        <Heading fontSize="sm" as="h2">
           Topics
         </Heading>
       )}
@@ -167,11 +167,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                       onChange={(e) =>
                         handleTopicChange(topic.id, e.target.checked)
                       }
+                      size="sm"
                     >
                       <OverflownTextWithTooltip
                         lineClamp={1}
                         wordBreak="break-all"
-                        fontSize="15px"
                         maxWidth="300px"
                       >
                         {topic.name}
@@ -194,7 +194,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           paddingX={2}
                           paddingLeft={8}
                           fontWeight="normal"
-                          fontSize="15px"
                         >
                           <Checkbox
                             borderColor="gray.400"
@@ -204,7 +203,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                             onChange={(e) =>
                               handleSubtopicChange(
                                 subtopic.id,
-                                e.target.checked
+                                e.target.checked,
                               )
                             }
                           >
@@ -225,10 +224,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           </Text>
                         </HStack>
                       ))}
-                  <Separator
-                    borderColor="gray.200"
-                    _last={{ display: "none" }}
-                  />
                 </React.Fragment>
               ))
           ) : (

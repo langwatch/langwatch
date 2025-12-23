@@ -1,4 +1,4 @@
-import { HStack, Badge, Text } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 
 import { Tooltip } from "~/components/ui/tooltip";

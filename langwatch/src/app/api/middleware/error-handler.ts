@@ -1,9 +1,11 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { NotFoundError } from "~/server/prompt-config/errors";
+import { NotFoundError as PromptNotFoundError } from "~/server/prompt-config/errors";
 
 import { createLogger } from "~/utils/logger";
+import { HttpError, NotFoundError } from "../shared/errors";
+import { errorSchema } from "../shared/schemas";
 
 const logger = createLogger("langwatch:api:errors");
 
@@ -23,7 +25,7 @@ export const handleError = async (
     code?: string;
     name?: string;
   },
-  c: Context
+  c: Context,
 ) => {
   const projectId = c.get("project")?.id;
   const path = c.req.path;
@@ -39,7 +41,7 @@ export const handleError = async (
       routeParams,
       error,
     },
-    `API Error: ${error.message || String(error)}`
+    `API Error: ${error.message || String(error)}`,
   );
 
   // Check if it's a "not found" error
@@ -51,21 +53,34 @@ export const handleError = async (
     error.name === "NotFoundError";
 
   if (isNotFoundError) {
-    return c.json({ error: error.message }, 404);
+    const notFoundError = new NotFoundError(error.message);
+    return c.json(errorSchema.parse(notFoundError), notFoundError.status);
+  }
+
+  // Handle HttpError instances (can be parsed directly)
+  if (error instanceof HttpError) {
+    return c.json(errorSchema.parse(error), error.status);
   }
 
   if (error.status) {
-    return c.json({ error: error.message }, error.status);
+    return c.json(
+      errorSchema.parse({
+        error: error.message || "An error occurred",
+        message: error.message,
+      }),
+      error.status,
+    );
   }
 
   // Otherwise treat as server error
   return c.json(
-    {
+    errorSchema.parse({
       error: "Internal server error",
-      ...(process.env.NODE_ENV === "development" && {
-        message: error.message,
-      }),
-    },
-    500
+      message:
+        process.env.NODE_ENV === "development"
+          ? error.message
+          : "Internal server error",
+    }),
+    500,
   );
 };

@@ -6,7 +6,6 @@ import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   type ConfigData,
-  Prompt,
   PromptsApiService,
   PromptsError,
   type SyncAction,
@@ -299,15 +298,14 @@ export const syncCommand = async (): Promise<void> => {
               };
             } else {
               // User chose local - force push
-              const syncResult = await promptsApiService.update(promptName, {
-                ...localConfig,
-                commitMessage: `Synced from local file: ${path.basename(
-                  filePath
-                )}`,
+              const formattedConfig = PromptConverter.fromLocalToApiFormat(localConfig);
+              const updatedPrompt = await promptsApiService.update(promptName, {
+                ...formattedConfig,
+                commitMessage: `Updated via CLI: synced from local file`
               });
               lock.prompts[promptName] = {
-                version: syncResult.version,
-                versionId: syncResult.versionId,
+                version: updatedPrompt.version,
+                versionId: updatedPrompt.versionId,
                 materialized: filePath,
               };
             }

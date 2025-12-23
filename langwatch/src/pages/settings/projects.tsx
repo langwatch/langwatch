@@ -1,31 +1,32 @@
 import {
+  Box,
   Button,
   Card,
-  HStack,
   Heading,
+  HStack,
   Table,
   Text,
   VStack,
-  Box,
 } from "@chakra-ui/react";
 import React from "react";
-import { Menu } from "../../components/ui/menu";
 import { Archive, MoreVertical, Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { toaster } from "../../components/ui/toaster";
+import { Tooltip } from "../../components/ui/tooltip";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
   TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
-import { Link } from "../../components/ui/link";
-import { Tooltip } from "../../components/ui/tooltip";
-import { toaster } from "../../components/ui/toaster";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
-export default function Projects() {
+function Projects() {
   const { organization } = useOrganizationTeamProject();
 
   if (!organization) return null;
@@ -39,7 +40,7 @@ function ProjectsList({
   organization: FullyLoadedOrganization;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
@@ -47,95 +48,82 @@ function ProjectsList({
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   return (
     <SettingsLayout>
       <VStack
         paddingX={4}
-        paddingY={6}
+        paddingY={2}
         gap={6}
         width="full"
-        maxWidth="920px"
         align="start"
+        maxWidth="1280px"
       >
-        <HStack width="full">
-          <Heading size="lg" as="h1">
-            Projects
-          </Heading>
-        </HStack>
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={0} paddingX={0}>
-            <Table.Root variant="line" width="full">
-              {organization.teams.map((team) => (
-                <React.Fragment key={team.id}>
-                  <Table.Header key={team.id}>
-                    <Table.Row>
-                      <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                      <Table.ColumnHeader textAlign="right">
-                        {hasTeamPermission(
-                          TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
-                          team
-                        ) &&
-                          (!usage.data ||
-                          usage.data.projectsCount <
-                            usage.data.activePlan.maxProjects ||
-                          usage.data.activePlan.overrideAddingLimitations ? (
-                            <Link
-                              href={`/onboarding/${team.slug}/project`}
-                              asChild
+        <Table.Root variant="line" width="full" size="md">
+          {organization.teams.map((team) => (
+            <React.Fragment key={team.id}>
+              <Table.Header key={team.id}>
+                <Table.Row>
+                  <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
+                  <Table.ColumnHeader textAlign="right">
+                    {hasPermission("project:create") &&
+                      (!usage.data ||
+                      usage.data.projectsCount <
+                        usage.data.activePlan.maxProjects ||
+                      usage.data.activePlan.overrideAddingLimitations ? (
+                        <Link href={`/onboarding/${team.slug}/project`} asChild>
+                          <PageLayout.HeaderButton>
+                            <Plus size={20} />
+                            <Text>Add new project</Text>
+                          </PageLayout.HeaderButton>
+                        </Link>
+                      ) : (
+                        <Tooltip
+                          content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
+                          positioning={{ placement: "top" }}
+                        >
+                          <Link
+                            href={`/settings/subscription`}
+                            _hover={{
+                              textDecoration: "none",
+                            }}
+                            onClick={() => {
+                              trackEvent("subscription_hook_click", {
+                                project_id: project?.id,
+                                hook: "new_project_limit_reached_2",
+                              });
+                            }}
+                          >
+                            <Button
+                              background="gray.50"
+                              _hover={{ background: "gray.50" }}
+                              color="gray.400"
                             >
-                              <Button size="sm" colorPalette="orange">
-                                <HStack gap={2}>
-                                  <Plus size={20} />
-                                  <Text>Add new project</Text>
-                                </HStack>
-                              </Button>
-                            </Link>
-                          ) : (
-                            <Tooltip
-                              content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
-                              positioning={{ placement: "top" }}
-                            >
-                              <Link
-                                href={`/settings/subscription`}
-                                _hover={{
-                                  textDecoration: "none",
-                                }}
-                                onClick={() => {
-                                  trackEvent("subscription_hook_click", {
-                                    project_id: project?.id,
-                                    hook: "new_project_limit_reached_2",
-                                  });
-                                }}
-                              >
-                                <Button
-                                  background="gray.50"
-                                  _hover={{ background: "gray.50" }}
-                                  color="gray.400"
-                                >
-                                  <HStack gap={2}>
-                                    <Plus size={20} />
-                                    <Text>Add new project</Text>
-                                  </HStack>
-                                </Button>
-                              </Link>
-                            </Tooltip>
-                          ))}
-                      </Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <TeamProjectsList team={team} />
-                </React.Fragment>
-              ))}
-            </Table.Root>
-          </Card.Body>
-        </Card.Root>
+                              <HStack gap={2}>
+                                <Plus size={20} />
+                                <Text>Add new project</Text>
+                              </HStack>
+                            </Button>
+                          </Link>
+                        </Tooltip>
+                      ))}
+                  </Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <TeamProjectsList team={team} />
+            </React.Fragment>
+          ))}
+        </Table.Root>
       </VStack>
     </SettingsLayout>
   );
 }
+
+export default withPermissionGuard("project:view", {
+  layoutComponent: SettingsLayout,
+})(Projects);
 
 export function TeamProjectsList({
   team,
@@ -143,7 +131,7 @@ export function TeamProjectsList({
   team: TeamWithProjectsAndMembers;
 }) {
   const queryClient = api.useContext();
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const archiveProject = api.project.archiveById.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -158,7 +146,7 @@ export function TeamProjectsList({
     if (!project) return;
     if (
       confirm(
-        "Are you sure you want to archive this project? This action cannot be undone."
+        "Are you sure you want to archive this project? This action cannot be undone.",
       )
     ) {
       archiveProject.mutate({
@@ -184,7 +172,7 @@ export function TeamProjectsList({
           </Table.Cell>
           <Table.Cell textAlign="right">
             {teamProject.id !== project?.id &&
-              hasTeamPermission(TeamRoleGroup.ARCHIVE_PROJECT, team) && (
+              hasPermission("project:delete") && (
                 <Menu.Root>
                   <Menu.Trigger className="js-inner-menu">
                     <MoreVertical size={18} />

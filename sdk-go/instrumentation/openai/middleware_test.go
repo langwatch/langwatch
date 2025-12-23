@@ -187,7 +187,7 @@ func TestMiddlewareIntegration(t *testing.T) {
 	completionModelID := openai.ChatModelGPT4oMini
 	completionReqBody := `{"model":"` + string(completionModelID) + `","messages":[{"role":"user","content":"ping"}],"max_tokens":5,"temperature":0.7,"top_p":0.9,"frequency_penalty":0.1,"presence_penalty":0.2}`
 	completionRespBody := `{"id":"cmpl-xyz","object":"chat.completion","created":1700000000,"model":"gpt-test-resp","choices":[{"index":0,"message":{"role":"assistant","content":"pong"},"finish_reason":"stop"}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3},"system_fingerprint":"fp_test_value"}`
-	streamReqBody := `{"model":"gpt-5","messages":[{"role":"user","content":"count"}],"stream":true}`
+	streamReqBody := `{"model":"gpt-4o-mini","messages":[{"role":"user","content":"count"}],"stream":true}`
 	streamRespBody := `data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","system_fingerprint":"fp_stream_test","choices":[{"index":0,"delta":{"content":"one"},"finish_reason":null}]}
 
 data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"model":"gpt-stream-resp","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
@@ -195,7 +195,7 @@ data: {"id":"cmpl-str","object":"chat.completion.chunk","created":1700000100,"mo
 data: [DONE]
 
 `
-	errorReqBody := `{"model":"gpt-5","messages":[]}`
+	errorReqBody := `{"model":"gpt-4o-mini","messages":[]}`
 
 	tests := []struct {
 		name               string

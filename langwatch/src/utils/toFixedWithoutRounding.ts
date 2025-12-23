@@ -1,6 +1,6 @@
 export function toFixedWithoutRounding(
   number: number | undefined,
-  decimalPlaces: number
+  decimalPlaces: number,
 ) {
   if (!number) return undefined;
 

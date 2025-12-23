@@ -9,17 +9,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
+import numeral from "numeral";
 import Parse from "papaparse";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Download, ExternalLink, MoreVertical } from "react-feather";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { api } from "../../../utils/api";
-import {
-  BatchEvaluationV2EvaluationResult,
-  evaluationResultsTableData,
-} from "./BatchEvaluationV2EvaluationResult";
+import { BatchEvaluationV2EvaluationResult } from "./BatchEvaluationV2EvaluationResult";
+import { getEvaluationColumns } from "./utils";
 
 export const useBatchEvaluationResults = ({
   project,
@@ -34,10 +33,10 @@ export const useBatchEvaluationResults = ({
 }) => {
   const [keepRefetching, setKeepRefetching] = useState(true);
 
-  const refetchingStartedAt = useMemo(
-    () => Date.now(),
-    [project.id, experiment.id, runId]
-  );
+  const refetchingStartedAtRef = useRef<number>(Date.now());
+  useEffect(() => {
+    refetchingStartedAtRef.current = Date.now();
+  }, [project.id, experiment.id, runId]);
 
   const run = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     {
@@ -50,7 +49,7 @@ export const useBatchEvaluationResults = ({
       refetchInterval: keepRefetching ? 1000 : false,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   useEffect(() => {
@@ -68,20 +67,20 @@ export const useBatchEvaluationResults = ({
       acc[item.index] = item;
       return acc;
     },
-    {} as Record<number, ESBatchEvaluation["dataset"][number]>
+    {} as Record<number, ESBatchEvaluation["dataset"][number]>,
   );
 
   const datasetColumns = new Set(
     Object.values(datasetByIndex ?? {}).flatMap((item) =>
-      Object.keys(item.entry ?? {})
-    )
+      Object.keys(item.entry ?? {}),
+    ),
   );
 
   // Retrocompatibility with old evaluations
   const isItJustEndNode = !Object.values(datasetByIndex ?? {}).every((value) =>
     Object.values(value?.predicted ?? {}).every(
-      (v) => typeof v === "object" && !Array.isArray(v)
-    )
+      (v) => typeof v === "object" && !Array.isArray(v),
+    ),
   );
   let entriesPredictions = Object.values(datasetByIndex ?? {})
     .map((value) => value.predicted!)
@@ -105,7 +104,7 @@ export const useBatchEvaluationResults = ({
   }
 
   const hasErrors = Object.values(datasetByIndex ?? {}).some(
-    (value) => value.error
+    (value) => value.error,
   );
   if (Object.keys(predictedColumns).length === 0 && hasErrors) {
     predictedColumns = {
@@ -121,13 +120,13 @@ export const useBatchEvaluationResults = ({
       acc[evaluation.evaluator]!.push(evaluation);
       return acc;
     },
-    {} as Record<string, ESBatchEvaluation["evaluations"]>
+    {} as Record<string, ESBatchEvaluation["evaluations"]>,
   );
 
   resultsByEvaluator = Object.fromEntries(
     Object.entries(resultsByEvaluator ?? {}).sort((a, b) =>
-      a[0].localeCompare(b[0])
-    )
+      a[0].localeCompare(b[0]),
+    ),
   );
 
   if (
@@ -141,7 +140,7 @@ export const useBatchEvaluationResults = ({
 
   return {
     run:
-      run.error && refetchingStartedAt > Date.now() - 5_000
+      run.error && refetchingStartedAtRef.current > Date.now() - 5_000
         ? { ...run, data: undefined, error: undefined, isLoading: true }
         : run,
     datasetByIndex,
@@ -186,7 +185,6 @@ export const useBatchEvaluationDownloadCSV = ({
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       console.error(error);
     }
@@ -199,50 +197,108 @@ export const useBatchEvaluationDownloadCSV = ({
       throw new Error("Results not loaded yet");
     }
 
-    const tableData = evaluationResultsTableData(
-      resultsByEvaluator,
-      datasetByIndex,
-      datasetColumns,
-      predictedColumns
+    const evaluationColumns = Object.fromEntries(
+      Object.entries(resultsByEvaluator).map(([ev, res]) => [
+        ev,
+        getEvaluationColumns(res),
+      ]),
     );
 
+    const totalRows = Math.max(
+      ...Object.values(datasetByIndex).map((d) => d.index + 1),
+    );
+
+    const datasetHeaderList = Array.from(datasetColumns);
+    const predictedHeaderList = Object.entries(predictedColumns).flatMap(
+      ([node, columns]) => Array.from(columns).map((c) => `${node}.${c}`),
+    );
+    const evaluationHeaderTuples = Object.entries(evaluationColumns);
+
     const csvHeaders = [
-      ...Array.from(tableData.headers.datasetColumns),
-      ...Object.entries(tableData.headers.predictedColumns).flatMap(
-        ([node, columns]) =>
-          Array.from(columns).map((c) =>
-            tableData.headers.datasetColumns.has(c)
-              ? `${node}.${c}`
-              : `${node}.${c}`
-          )
-      ),
-      tableData.headers.cost,
-      tableData.headers.duration,
-      ...Object.entries(tableData.headers.evaluationColumns).flatMap(
+      ...datasetHeaderList,
+      ...predictedHeaderList,
+      "Cost",
+      "Duration",
+      ...evaluationHeaderTuples.flatMap(
         ([
           evaluator,
           { evaluationInputsColumns, evaluationResultsColumns },
         ]) => [
           ...Array.from(evaluationInputsColumns).map(
-            (c) => `${evaluator} ${c}`
+            (c) => `${evaluator} ${c}`,
           ),
           ...Array.from(evaluationResultsColumns).map(
-            (c) => `${evaluator} ${c}`
+            (c) => `${evaluator} ${c}`,
           ),
-        ]
+        ],
       ),
     ].map((h) => h.toLowerCase().replaceAll(" ", "_"));
 
-    const csvData = tableData.rows.map((row) => [
-      ...row.datasetColumns.map((cell) => cell.value()),
-      ...row.predictedColumns.map((cell) => cell.value()),
-      row.cost.value(),
-      row.duration.value(),
-      ...Object.entries(row.evaluationsColumns).flatMap(([_, item]) => [
-        ...item.evaluationInputs.map((cell) => cell.value()),
-        ...item.evaluationResults.map((cell) => cell.value()),
-      ]),
-    ]);
+    const stringify = (value: any) =>
+      typeof value === "object" ? JSON.stringify(value) : (value ?? "");
+
+    const csvData: string[][] = Array.from({ length: totalRows }).map(
+      (_, index) => {
+        const datasetEntry = datasetByIndex[index];
+        const row: string[] = [];
+        // Dataset values
+        for (const col of datasetHeaderList) {
+          row.push(String(stringify(datasetEntry?.entry?.[col] ?? "")));
+        }
+        // Predicted values
+        for (const key of predictedHeaderList) {
+          const [node, col] = key.split(".") as [string, string];
+          let value = (datasetEntry?.predicted as any)?.[node]?.[col];
+          if (value === undefined && node === "end") {
+            value = (datasetEntry?.predicted as any)?.[col];
+          }
+          row.push(String(stringify(value ?? "")));
+        }
+        // Cost and Duration (dataset values only to match previous behavior)
+        row.push(datasetEntry?.cost != null ? String(datasetEntry.cost) : "");
+        row.push(
+          datasetEntry?.duration != null ? String(datasetEntry.duration) : "",
+        );
+        // Evaluation inputs/results per evaluator
+        for (const [
+          evaluator,
+          { evaluationInputsColumns, evaluationResultsColumns },
+        ] of evaluationHeaderTuples) {
+          const evaluation = resultsByEvaluator[evaluator]?.find(
+            (r) => r.index === index,
+          );
+          for (const col of Array.from(evaluationInputsColumns)) {
+            const v = evaluation?.inputs?.[col];
+            row.push(
+              String(typeof v === "object" ? JSON.stringify(v) : (v ?? "")),
+            );
+          }
+          for (const col of Array.from(evaluationResultsColumns)) {
+            if (col !== "details" && evaluation?.status === "error") {
+              row.push("Error");
+              continue;
+            }
+            if (col !== "details" && evaluation?.status === "skipped") {
+              row.push("Skipped");
+              continue;
+            }
+            const v = (evaluation as any)?.[col];
+            if (col === "details") {
+              row.push(v != null ? String(v) : "");
+            } else if (v === false) {
+              row.push("false");
+            } else if (v === true) {
+              row.push("true");
+            } else if (!isNaN(Number(v))) {
+              row.push(numeral(Number(v)).format("0.[00]"));
+            } else {
+              row.push(v != null ? String(v) : "");
+            }
+          }
+        }
+        return row;
+      },
+    );
 
     const csvBlob = Parse.unparse({
       fields: csvHeaders,
@@ -293,15 +349,13 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       isFinished,
     });
 
-    const [hasScrolled, setHasScrolled] = useState(false);
-
     const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV(
       {
         project,
         experiment,
         runId,
         isFinished,
-      }
+      },
     );
 
     const [tabIndex, setTabIndex] = useState(0);
@@ -339,7 +393,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               minWidth="full"
               minHeight="0"
               overflowY="auto"
-              onScroll={() => setHasScrolled(true)}
             >
               {/* @ts-ignore */}
               <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
@@ -458,7 +511,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                   onClick={() =>
                     void window.open(
                       `/${project.slug}/experiments/${experiment.slug}?runId=${runId}`,
-                      "_blank"
+                      "_blank",
                     )
                   }
                 >
@@ -495,14 +548,13 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                   predictedColumns={predictedColumns}
                   isFinished={isFinished}
                   size={size}
-                  hasScrolled={hasScrolled}
                   workflowId={experiment.workflowId}
                 />
               </Tabs.Content>
             ) : null;
-          }
+          },
         )}
       </Tabs.Root>
     );
-  }
+  },
 );

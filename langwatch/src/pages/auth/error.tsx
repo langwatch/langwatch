@@ -8,9 +8,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { type Session } from "next-auth";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import type { Session } from "next-auth";
 import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";

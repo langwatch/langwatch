@@ -10,13 +10,12 @@ import type {
 export const getFirstInputAsText = (spans: Span[]): string => {
   const topmostSpans = flattenSpanTree(
     organizeSpansIntoTree(spans),
-    "outside-in"
+    "outside-in",
   );
 
   const topmostInputs = topmostSpans.filter(
     (span) =>
-      span.input &&
-      span.input.value &&
+      span.input?.value &&
       span.type !== "evaluation" &&
       span.type !== "guardrail" &&
       (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
@@ -24,7 +23,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
       !(
         span.params?.scope?.name == "openinference.instrumentation.agno" &&
         span.type == "agent"
-      )
+      ),
   );
 
   let input = topmostInputs[0]?.input;
@@ -37,7 +36,7 @@ export const getFirstInputAsText = (spans: Span[]): string => {
     input = {
       type: "json",
       value: Object.values(
-        (topmostSpans[0]?.input?.value as any)?.data
+        (topmostSpans[0]?.input?.value as any)?.data,
       )[0] as any,
     };
   }
@@ -85,8 +84,7 @@ export const isEmptyJson = (value: TypedValueJson["value"]): boolean => {
 
 export const getLastOutputAsText = (spans: Span[]): string => {
   const nonEmptySpan = (span: Span) =>
-    span.output &&
-    span.output.value &&
+    span.output?.value &&
     span.type !== "evaluation" &&
     span.type !== "guardrail" &&
     (span.output.type !== "json" || !isEmptyJson(span.output.value));
@@ -96,10 +94,10 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // doesn't finish last because of some background process span being captured
   const topLevelNodes = flattenSpanTree(
     organizeSpansIntoTree(spans),
-    "inside-out"
+    "inside-out",
   )
     .filter(nonEmptySpan)
-    .reverse();
+    .toReversed();
   const singleTopLevelNode =
     topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
 
@@ -110,14 +108,14 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // If the top-level node has no output, then for getting the best text that represents the output,
   // we try to find the last span to finish, this is likely the one that came up with the final answer
   const spansInFinishOrderDesc = spans
-    .sort((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
+    .toSorted((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
     .filter(nonEmptySpan);
 
   const outputs = spansInFinishOrderDesc[0]?.output;
   if (!outputs) {
     const topmostSpan = flattenSpanTree(
       organizeSpansIntoTree(spans),
-      "outside-in"
+      "outside-in",
     ).filter((span) => !span.parent_id)[0];
     if (topmostSpan?.params?.http?.status_code) {
       return topmostSpan.params.http.status_code.toString();
@@ -135,7 +133,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
 // TODO: test
 export const typedValueToText = (
   typed: SpanInputOutput,
-  last = false
+  last = false,
 ): string => {
   const stringified = (value_: any) => {
     if (typeof value_ === "string") {
@@ -143,7 +141,7 @@ export const typedValueToText = (
     }
     try {
       return JSON.stringify(value_);
-    } catch (e) {
+    } catch {
       return value_.toString();
     }
   };
@@ -157,10 +155,10 @@ export const typedValueToText = (
         ? typeof lastMessage.content === "string"
           ? lastMessage.content
           : Array.isArray(lastMessage.content)
-          ? lastMessage.content
-              .map((c) => ("text" in c ? c.text : JSON.stringify(c)))
-              .join("")
-          : JSON.stringify(lastMessage)
+            ? lastMessage.content
+                .map((c) => ("text" in c ? c.text : JSON.stringify(c)))
+                .join("")
+            : JSON.stringify(lastMessage)
         : "";
     } else {
       return typed.value
@@ -336,7 +334,7 @@ export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
 
   // Sort based on started_at timestamp, so that all siblings are in started_at order
   const sortedSpans = [...spans].sort(
-    (a, b) => a.timestamps.started_at - b.timestamps.started_at
+    (a, b) => a.timestamps.started_at - b.timestamps.started_at,
   );
 
   // Initialize each span with an empty children array
@@ -353,13 +351,13 @@ export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
 
   // Extract top-level spans (those without a parent_id or with a non-existent parent_id)
   return Array.from(spanMap.values()).filter(
-    (span) => !span.parent_id || !spanMap.has(span.parent_id)
+    (span) => !span.parent_id || !spanMap.has(span.parent_id),
   );
 };
 
 export const flattenSpanTree = (
   spans: SpanWithChildren[],
-  mode: "inside-out" | "outside-in"
+  mode: "inside-out" | "outside-in",
 ): Span[] => {
   const result: Span[] = [];
 

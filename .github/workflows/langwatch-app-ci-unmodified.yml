@@ -16,6 +16,11 @@ jobs:
     steps:
       - run: echo "no modifications, skipping typecheck"
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no modifications, skipping lint"
+
   build:
     runs-on: ubuntu-latest
     steps:

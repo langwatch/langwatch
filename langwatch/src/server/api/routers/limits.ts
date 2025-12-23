@@ -1,47 +1,34 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  OrganizationRoleGroup,
-  checkUserPermissionForOrganization,
-} from "../permission";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
-import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
-
-export const getProjectIdsForOrganization = async (
-  organizationId: string
-): Promise<string[]> => {
-  return (
-    await prisma.project.findMany({
-      where: {
-        team: { organizationId },
-      },
-      select: { id: true },
-    })
-  ).map((project) => project.id);
-};
+import { prisma } from "../../db";
+import { UsageLimitService } from "../../notifications/usage-limit.service";
+import { TraceUsageService } from "../../traces/trace-usage.service";
+import { getCurrentMonthStart } from "../../utils/dateUtils";
+import {
+  checkUserPermissionForOrganization,
+  OrganizationRoleGroup,
+} from "../permission";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 export const limitsRouter = createTRPCRouter({
   getUsage: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_USAGE,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const projectIds = await getProjectIdsForOrganization(organizationId);
-
-      const projectsCount = projectIds.length;
+      const traceUsageService = TraceUsageService.create();
+      const projectsCount = await getOrganizationProjectsCount(organizationId);
       const currentMonthMessagesCount =
-        await getCurrentMonthMessagesCount(projectIds);
-      const currentMonthCost = await getCurrentMonthCostForProjects(projectIds);
+        await traceUsageService.getCurrentMonthCount({ organizationId });
+      const currentMonthCost = await getCurrentMonthCost(organizationId);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,
-        ctx.session.user
+        ctx.session.user,
       );
       const maxMonthlyUsageLimit_ = await maxMonthlyUsageLimit(organizationId);
 
@@ -53,11 +40,34 @@ export const limitsRouter = createTRPCRouter({
         maxMonthlyUsageLimit: maxMonthlyUsageLimit_,
       };
     }),
-});
+  checkAndSendUsageLimitNotification: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        currentMonthMessagesCount: z.number(),
+        maxMonthlyUsageLimit: z.number(),
+      }),
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_USAGE,
+      ),
+    )
+    .mutation(async ({ input }) => {
+      const service = UsageLimitService.create(prisma);
+      const notification = await service.checkAndSendWarning({
+        organizationId: input.organizationId,
+        currentMonthMessagesCount: input.currentMonthMessagesCount,
+        maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
+      });
 
-const getCurrentMonth = () => {
-  return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-};
+      return {
+        sent: notification !== null,
+        notificationId: notification?.id,
+        sentAt: notification?.sentAt,
+      };
+    }),
+});
 
 export const getOrganizationProjectsCount = async (organizationId: string) => {
   return await prisma.project.count({
@@ -65,69 +75,6 @@ export const getOrganizationProjectsCount = async (organizationId: string) => {
       team: { organizationId },
     },
   });
-};
-
-type CacheEntry = {
-  count: number;
-  lastUpdated: number;
-};
-
-const ONE_HOUR = 60 * 60 * 1000;
-const messageCountCache = new Map<string, CacheEntry>();
-
-export const getCurrentMonthMessagesCount = async (
-  projectIds: string[],
-  organizationId?: string
-) => {
-  const cacheKey = organizationId
-    ? `org:${organizationId}`
-    : `projects:${projectIds.sort().join(",")}`;
-
-  const now = Date.now();
-  const cachedResult = messageCountCache.get(cacheKey);
-
-  // Return cached result if valid
-  if (cachedResult && now - cachedResult.lastUpdated < ONE_HOUR) {
-    return cachedResult.count;
-  }
-
-  let projectIdsToUse = projectIds;
-  if (organizationId) {
-    projectIdsToUse = await getProjectIdsForOrganization(organizationId);
-  }
-
-  const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
-  const messagesCount = await client.count({
-    index: TRACE_INDEX.alias,
-    body: {
-      query: {
-        bool: {
-          must: [
-            {
-              terms: {
-                project_id: projectIds,
-              },
-            },
-            {
-              range: {
-                "timestamps.inserted_at": {
-                  gte: getCurrentMonth().getTime(),
-                },
-              },
-            },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
-      },
-    },
-  });
-
-  // Store result in cache
-  messageCountCache.set(cacheKey, {
-    count: messagesCount.count,
-    lastUpdated: now,
-  });
-
-  return messagesCount.count;
 };
 
 export const getCurrentMonthCost = async (organizationId: string) => {
@@ -152,7 +99,7 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
             in: projectIds,
           },
           createdAt: {
-            gte: getCurrentMonth(),
+            gte: getCurrentMonthStart(),
           },
         },
         _sum: {
@@ -163,28 +110,16 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   );
 };
 
-export const maxMonthlyUsageLimit = async (organizationId: string) => {
-  const activePlan =
-    await dependencies.subscriptionHandler.getActivePlan(organizationId);
-  if (activePlan.name === "Open Source") {
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
-
-    return organization?.usageSpendingMaxLimit ?? Infinity;
-  }
-  if (activePlan.evaluationsCredit < 10) {
-    return activePlan.evaluationsCredit;
-  }
-
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-  });
-
-  // TODO: improve this logic to be based on subscription history
-  const maxLimitAccordingToSubscription = activePlan.prices.USD;
-  const maxLimitAccordingToUser =
-    organization?.usageSpendingMaxLimit ?? maxLimitAccordingToSubscription;
-
-  return Math.min(maxLimitAccordingToSubscription, maxLimitAccordingToUser);
+/**
+ * Get the maximum monthly usage limit for the organization.
+ * FIXME: This was recently changed to return Infinity,
+ * but still takes the organizationId as a parameter.
+ *
+ * Either we remove the organizationId parameter from all the calls to this function,
+ * or we use to get the plan and return it correctly.
+ *
+ * @returns The maximum monthly usage limit for the organization.
+ */
+export const maxMonthlyUsageLimit = async (_organizationId: string) => {
+  return Infinity;
 };

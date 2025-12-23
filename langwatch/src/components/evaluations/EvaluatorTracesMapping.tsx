@@ -3,12 +3,12 @@ import { api } from "../../utils/api";
 import { TracesMapping } from "../traces/TracesMapping";
 
 export function EvaluatorTracesMapping(
-  props: Omit<React.ComponentProps<typeof TracesMapping>, "traces">
+  props: Omit<React.ComponentProps<typeof TracesMapping>, "traces">,
 ) {
   const { filterParams, queryOpts } = useFilterParams();
   const recentTraces = api.traces.getSampleTracesDataset.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   if (props.traceMapping && !props.traceMapping?.mapping) {

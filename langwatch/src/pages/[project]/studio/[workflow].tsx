@@ -1,3 +1,4 @@
+import ErrorPage from "next/error";
 import { useEffect } from "react";
 import OptimizationStudio from "../../../optimization_studio/components/OptimizationStudio";
 import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkflow";
@@ -6,7 +7,6 @@ import {
   useWorkflowStore,
 } from "../../../optimization_studio/hooks/useWorkflowStore";
 import type { Workflow } from "../../../optimization_studio/types/dsl";
-import ErrorPage from "next/error";
 import { api } from "../../../utils/api";
 
 export default function Studio() {
@@ -17,7 +17,7 @@ export default function Studio() {
       reset,
       setWorkflow,
       setPreviousWorkflow,
-    })
+    }),
   );
   const { clear } = _useWorkflowStore.temporal.getState();
 

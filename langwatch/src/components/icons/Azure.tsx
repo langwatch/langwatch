@@ -1,9 +1,6 @@
 export function Azure() {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 96 96"
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96">
       <defs>
         <linearGradient
           id="e399c19f-b68f-429d-b176-18c2117ff73c"

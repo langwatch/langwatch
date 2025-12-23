@@ -92,7 +92,7 @@ export type RotatingColorSet = keyof typeof rotatingColors;
 
 export const getColorForString = (
   set: RotatingColorSet,
-  str: string
+  str: string,
 ): { background: string; color: string } => {
   const key = set + str;
   if (colorMap[key]) {

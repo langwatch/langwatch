@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
@@ -88,11 +88,11 @@ describe("PromptService", () => {
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
         mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion
+          mockLatestVersion,
         );
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
         mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma)
+          cb(mockPrisma),
         );
 
         await promptService.updatePrompt({
@@ -105,7 +105,7 @@ describe("PromptService", () => {
           "test-prompt",
           "project-1",
           { handle: "updated-prompt", scope: undefined },
-          { tx: mockPrisma }
+          { tx: mockPrisma },
         );
       });
 
@@ -119,11 +119,11 @@ describe("PromptService", () => {
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
         mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion
+          mockLatestVersion,
         );
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
         mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma)
+          cb(mockPrisma),
         );
 
         await promptService.updatePrompt({
@@ -136,15 +136,18 @@ describe("PromptService", () => {
           "test-prompt",
           "project-1",
           { handle: undefined, scope: "ORGANIZATION" },
-          { tx: mockPrisma }
+          { tx: mockPrisma },
         );
       });
 
       it("should create new version with provided version data", async () => {
+        const projectId = "project-1";
+        const configId = "config-1";
         const updateData = {
           prompt: "Updated prompt",
           model: "gpt-3.5-turbo",
           temperature: 0.8,
+          messages: [],
           inputs: [
             { identifier: "name", type: "str" as const },
             { identifier: "age", type: "float" as const },
@@ -155,28 +158,31 @@ describe("PromptService", () => {
 
         mockRepository.updateConfig.mockResolvedValue(mockConfig);
         mockRepository.versions.getLatestVersion.mockResolvedValue(
-          mockLatestVersion
+          mockLatestVersion,
         );
         mockVersionService.createVersion.mockResolvedValue(mockUpdatedVersion);
         mockPrisma.$transaction.mockImplementation(async (cb: any) =>
-          cb(mockPrisma)
+          cb(mockPrisma),
         );
 
         await promptService.updatePrompt({
-          idOrHandle: "test-prompt",
-          projectId: "project-1",
+          idOrHandle: configId,
+          projectId,
           data: updateData,
         });
+
+        // Extract only configData fields (exclude commitMessage, handle, scope)
+        const { commitMessage, ...configDataUpdates } = updateData;
 
         expect(mockVersionService.createVersion).toHaveBeenCalledWith({
           db: mockPrisma,
           data: {
-            configId: "config-1",
-            projectId: "project-1",
-            commitMessage: "Updated prompt configuration",
+            configId,
+            projectId,
+            commitMessage,
             configData: {
               ...mockLatestVersion.configData,
-              ...updateData,
+              ...configDataUpdates,
             },
             schemaVersion: "1.0",
             version: 2,

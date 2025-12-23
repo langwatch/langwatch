@@ -1,4 +1,4 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   const originalExists = esClient.indices.exists.bind(esClient.indices);
@@ -64,9 +64,8 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
                 }
               }
               return sortItem;
-            }
+            },
           );
-
         } else if (
           typeof modifiedParams.sort === "object" &&
           modifiedParams.sort !== null
@@ -145,7 +144,7 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   };
 
   const originalIndicesPutMapping = esClient.indices.putMapping.bind(
-    esClient.indices
+    esClient.indices,
   );
   // @ts-ignore
   esClient.indices.putMapping = async (params: any) => {
@@ -164,7 +163,7 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   };
 
   const originalIndicesPutAlias = esClient.indices.putAlias.bind(
-    esClient.indices
+    esClient.indices,
   );
   // @ts-ignore
   esClient.indices.putAlias = async (params: any) => {
@@ -182,7 +181,7 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   };
 
   const originalIndicesGetAlias = esClient.indices.getAlias.bind(
-    esClient.indices
+    esClient.indices,
   );
   // @ts-ignore
   esClient.indices.getAlias = async (params: any) => {
@@ -196,5 +195,12 @@ export const patchForOpensearchCompatibility = (esClient: ElasticClient) => {
   esClient.bulk = async (params: any) => {
     // @ts-ignore
     return (await originalBulk(params)).body;
+  };
+
+  const originalCount = esClient.count.bind(esClient);
+  // @ts-ignore
+  esClient.count = async (params: any) => {
+    // @ts-ignore
+    return (await originalCount(params)).body;
   };
 };

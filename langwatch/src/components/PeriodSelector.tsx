@@ -5,8 +5,8 @@ import {
   HStack,
   Input,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 import {
   addDays,
@@ -19,6 +19,7 @@ import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
 import { Calendar, ChevronDown } from "react-feather";
 import { Popover } from "./ui/popover";
+import { LuCalendar } from "react-icons/lu";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -38,9 +39,9 @@ export const usePeriodSelector = (defaultNDays = 30) => {
         now.getFullYear(),
         now.getMonth(),
         now.getDate(),
-        now.getHours()
+        now.getHours(),
       ),
-    [now]
+    [now],
   );
 
   const startDate = useMemo(
@@ -49,7 +50,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
       isValidDateString(router.query.startDate)
         ? new Date(router.query.startDate)
         : addDays(thisHour, -(defaultNDays - 1)),
-    [defaultNDays, router.query.startDate, thisHour]
+    [defaultNDays, router.query.startDate, thisHour],
   );
   const endDate = useMemo(
     () =>
@@ -58,7 +59,7 @@ export const usePeriodSelector = (defaultNDays = 30) => {
         ? new Date(router.query.endDate)
         : now,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [router.query.endDate, thisHour]
+    [router.query.endDate, thisHour],
   );
 
   const daysDifference = getDaysDifference(startDate, endDate);
@@ -84,10 +85,10 @@ export const usePeriodSelector = (defaultNDays = 30) => {
           },
         },
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     },
-    [router]
+    [router],
   );
 
   return {
@@ -132,13 +133,13 @@ export function PeriodSelector({
   const getDateRangeLabel = () => {
     const quickSelect = quickSelectors.find(
       (selector) =>
-        selector.days === daysDifference && daysDifferenceFromToday <= 1
+        selector.days === daysDifference && daysDifferenceFromToday <= 1,
     );
     return quickSelect
       ? quickSelect.label
       : `${format(new Date(startDate), "MMM d")} - ${format(
           new Date(endDate),
-          "MMM d"
+          "MMM d",
         )}`;
   };
 
@@ -150,14 +151,17 @@ export function PeriodSelector({
       size="sm"
     >
       <Popover.Trigger asChild>
-        <Button variant="ghost" minWidth="fit-content" onClick={onOpen}>
-          <HStack gap={2}>
-            <Calendar size={16} />
-            <Text>{getDateRangeLabel()}</Text>
-            <Box>
-              <ChevronDown />
-            </Box>
-          </HStack>
+        <Button
+          variant="outline"
+          size="sm"
+          minWidth="fit-content"
+          onClick={onOpen}
+        >
+          <LuCalendar />
+          <Text>{getDateRangeLabel()}</Text>
+          <Box>
+            <ChevronDown />
+          </Box>
         </Button>
       </Popover.Trigger>
       <Popover.Content width="fit-content">

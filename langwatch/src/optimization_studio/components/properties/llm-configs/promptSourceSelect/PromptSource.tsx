@@ -1,12 +1,10 @@
 import { useDisclosure } from "@chakra-ui/react";
-
-import { PromptList } from "./ui/PromptList";
-import { PromptSelectionButton } from "./ui/PromptSelectButton";
-import { PromptSourceDialog } from "./ui/PromptSourceDialog";
-
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { PromptList } from "./ui/PromptList";
+import { PromptSelectionButton } from "./ui/PromptSelectButton";
+import { PromptSourceDialog } from "./ui/PromptSourceDialog";
 
 interface PromptSourceProps {
   selectedPromptId?: string;
@@ -35,7 +33,7 @@ const usePrompSourceController = ({
             type: "error",
           });
         },
-      }
+      },
     );
 
   // Handle prompt selection

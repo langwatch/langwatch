@@ -1,4 +1,4 @@
-import type { Node, Edge } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { camelCaseToSnakeCase } from "../../utils/stringCasing";
 
 export const nameToId = (name: string) => {
@@ -32,7 +32,7 @@ export const findLowestAvailableName = (nodesIds: string[], prefix: string) => {
 
 export const getEntryInputs = (
   edges: Edge[],
-  nodes: Node[]
+  nodes: Node[],
 ): (Edge & { optional?: boolean })[] => {
   const entryEdges = edges.filter((edge: Edge) => edge.source === "entry");
   const evaluators = nodes.filter(checkIsEvaluator);
@@ -40,7 +40,7 @@ export const getEntryInputs = (
   const entryInputs = entryEdges
     .filter(
       (edge: Edge, index, self) =>
-        self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index
+        self.findIndex((e) => e.sourceHandle === edge.sourceHandle) === index,
     )
     .map((edge: Edge) => {
       if (
@@ -69,7 +69,7 @@ export const getInputsOutputs = (edges: Edge[], nodes: Node[]) => {
   });
 
   const outputs = nodes.find(
-    (node: Node) => node.type === "end" || node.id === "end"
+    (node: Node) => node.type === "end" || node.id === "end",
   )?.data.inputs;
 
   return { inputs, outputs };

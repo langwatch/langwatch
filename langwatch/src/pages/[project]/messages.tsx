@@ -1,15 +1,16 @@
+import { useEffect, useState } from "react";
 import { MessagesTable } from "~/components/messages/MessagesTable";
 import { DashboardLayout } from "../../components/DashboardLayout";
-import WelcomeLayout from "../../components/welcome/WelcomeLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { MessagesList } from "../../components/messages/MessagesList";
 import { useTableView } from "../../components/messages/HeaderButtons";
-import { api } from "../../utils/api";
-import { useEffect, useState } from "react";
-import { useFilterParams } from "../../hooks/useFilterParams";
+import { MessagesList } from "../../components/messages/MessagesList";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import WelcomeLayout from "../../components/welcome/WelcomeLayout";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
+import { useFilterParams } from "../../hooks/useFilterParams";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
-export default function MessagesOrIntegrationGuide() {
+function MessagesOrIntegrationGuideContent() {
   const { project } = useOrganizationTeamProject();
 
   const { isTableView } = useTableView();
@@ -23,7 +24,7 @@ export default function MessagesOrIntegrationGuide() {
       filters: {},
       pageSize: 1,
     },
-    { enabled: !!project && waitingForFirstMessage }
+    { enabled: !!project && waitingForFirstMessage },
   );
 
   // Preload field redaction status to avoid cascading loading states
@@ -64,3 +65,7 @@ export default function MessagesOrIntegrationGuide() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("traces:view", {
+  layoutComponent: DashboardLayout,
+})(MessagesOrIntegrationGuideContent);

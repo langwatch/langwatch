@@ -1,43 +1,45 @@
 import {
+  Alert,
+  Badge,
   Button,
   Card,
+  createListCollection,
   Field,
   Heading,
+  HStack,
   Input,
   Spacer,
   Spinner,
   Text,
-  createListCollection,
-  Alert,
-  Badge,
+  VStack,
 } from "@chakra-ui/react";
 import {
   PIIRedactionLevel,
-  ProjectSensitiveDataVisibilityLevel,
   type Project,
+  ProjectSensitiveDataVisibilityLevel,
 } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { Lock } from "react-feather";
+import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
+import { Tooltip } from "~/components/ui/tooltip";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import {
   ProjectTechStackIcon,
   TechStackSelector,
 } from "../components/TechStack";
+import { Dialog } from "../components/ui/dialog";
+import { Select } from "../components/ui/select";
+import { Switch } from "../components/ui/switch";
+import { toaster } from "../components/ui/toaster";
+import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { OrganizationRoleGroup, TeamRoleGroup } from "../server/api/permission";
+import { usePublicEnv } from "../hooks/usePublicEnv";
+import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
-import { usePublicEnv } from "../hooks/usePublicEnv";
-import { HStack, VStack } from "@chakra-ui/react";
-import { toaster } from "../components/ui/toaster";
-import { Select } from "../components/ui/select";
-import { Tooltip } from "~/components/ui/tooltip";
-import { Switch } from "../components/ui/switch";
-import { Dialog } from "../components/ui/dialog";
-import { Lock } from "react-feather";
 
 type OrganizationFormData = {
   name: string;
@@ -49,13 +51,17 @@ type OrganizationFormData = {
   s3Bucket: string;
 };
 
-export default function Settings() {
+function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
   if (!organization || !project) return null;
 
   return <SettingsForm organization={organization} project={project} />;
 }
+
+export default withPermissionGuard("organization:view", {
+  layoutComponent: SettingsLayout,
+})(Settings);
 
 function SettingsForm({
   organization,
@@ -64,7 +70,7 @@ function SettingsForm({
   organization: FullyLoadedOrganization;
   project: Project;
 }) {
-  const { hasOrganizationPermission, hasTeamPermission } =
+  const { hasOrganizationPermission, hasPermission } =
     useOrganizationTeamProject();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
@@ -82,7 +88,7 @@ function SettingsForm({
   const apiContext = api.useContext();
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
-    data: OrganizationFormData
+    data: OrganizationFormData,
   ) => {
     if (isEqual(data, defaultValues)) return;
 
@@ -109,7 +115,6 @@ function SettingsForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -121,167 +126,155 @@ function SettingsForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
   };
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
+      <VStack gap={6} width="full" align="start">
         <HStack width="full">
-          <Heading size="lg" as="h1">
-            Organization Settings
-          </Heading>
+          <Heading as="h2">Organization Settings</Heading>
           <Spacer />
           {updateOrganization.isLoading && <Spinner />}
         </HStack>
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={2} paddingBottom={4}>
-            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <VStack gap={0}>
+        {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+        <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
+          <VStack gap={0}>
+            <VStack gap={0} width="full">
+              <HorizontalFormControl
+                label="Name"
+                helper="The name of your organization"
+                invalid={!!getFieldState("name").error}
+              >
+                {hasOrganizationPermission(
+                  OrganizationRoleGroup.ORGANIZATION_MANAGE,
+                ) ? (
+                  <>
+                    <Input
+                      width="full"
+                      type="text"
+                      {...register("name", {
+                        required: true,
+                        validate: (value) => {
+                          if (!value.trim()) return false;
+                        },
+                      })}
+                    />
+                    <Field.ErrorText>Name is required</Field.ErrorText>
+                  </>
+                ) : (
+                  <Text>{organization.name}</Text>
+                )}
+              </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Slug"
+                helper="The unique ID of your organization"
+              >
+                {hasOrganizationPermission(
+                  OrganizationRoleGroup.ORGANIZATION_MANAGE,
+                ) ? (
+                  <Input
+                    width="full"
+                    disabled
+                    type="text"
+                    value={organization.slug}
+                  />
+                ) : (
+                  <Text>{organization.slug}</Text>
+                )}
+              </HorizontalFormControl>
+
+              {organization.useCustomS3 && (
                 <HorizontalFormControl
-                  label="Name"
-                  helper="The name of your organization"
-                  invalid={!!getFieldState("name").error}
+                  label="S3 Storage"
+                  helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
                 >
                   {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
                   ) ? (
-                    <>
+                    <VStack width="full" align="start" gap={3}>
                       <Input
                         width="full"
                         type="text"
-                        {...register("name", {
-                          required: true,
-                          validate: (value) => {
-                            if (!value.trim()) return false;
-                          },
-                        })}
+                        placeholder="S3 Endpoint"
+                        {...register("s3Endpoint")}
                       />
-                      <Field.ErrorText>Name is required</Field.ErrorText>
-                    </>
+                      <Input
+                        width="full"
+                        type="text"
+                        placeholder="Access Key ID"
+                        {...register("s3AccessKeyId")}
+                      />
+                      <Input
+                        width="full"
+                        type="password"
+                        placeholder="Secret Access Key"
+                        {...register("s3SecretAccessKey")}
+                      />
+                      <Input
+                        width="full"
+                        type="text"
+                        placeholder="S3 Bucket Name"
+                        {...register("s3Bucket")}
+                      />
+                    </VStack>
                   ) : (
-                    <Text>{organization.name}</Text>
+                    <Text>
+                      S3 storage configuration is only visible to organization
+                      managers
+                    </Text>
                   )}
                 </HorizontalFormControl>
+              )}
+
+              {organization.useCustomElasticsearch && (
                 <HorizontalFormControl
-                  label="Slug"
-                  helper="The unique ID of your organization"
+                  label="Elasticsearch"
+                  helper="Configure your Elasticsearch instance for advanced search capabilities"
                 >
                   {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
                   ) ? (
-                    <Input
-                      width="full"
-                      disabled
-                      type="text"
-                      value={organization.slug}
-                    />
+                    <VStack width="full" align="start" gap={3}>
+                      <Input
+                        width="full"
+                        type="text"
+                        placeholder="Elasticsearch Node URL"
+                        {...register("elasticsearchNodeUrl")}
+                      />
+                      <Input
+                        width="full"
+                        type="password"
+                        placeholder="Elasticsearch API Key"
+                        {...register("elasticsearchApiKey")}
+                      />
+                    </VStack>
                   ) : (
-                    <Text>{organization.slug}</Text>
+                    <Text>
+                      Elasticsearch configuration is only visible to
+                      organization managers
+                    </Text>
                   )}
                 </HorizontalFormControl>
+              )}
+            </VStack>
 
-                {organization.useCustomS3 && (
-                  <HorizontalFormControl
-                    label="S3 Storage"
-                    helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
-                  >
-                    {hasOrganizationPermission(
-                      OrganizationRoleGroup.ORGANIZATION_MANAGE
-                    ) ? (
-                      <VStack width="full" align="start" gap={3}>
-                        <Input
-                          width="full"
-                          type="text"
-                          placeholder="S3 Endpoint"
-                          {...register("s3Endpoint")}
-                        />
-                        <Input
-                          width="full"
-                          type="text"
-                          placeholder="Access Key ID"
-                          {...register("s3AccessKeyId")}
-                        />
-                        <Input
-                          width="full"
-                          type="password"
-                          placeholder="Secret Access Key"
-                          {...register("s3SecretAccessKey")}
-                        />
-                        <Input
-                          width="full"
-                          type="text"
-                          placeholder="S3 Bucket Name"
-                          {...register("s3Bucket")}
-                        />
-                      </VStack>
-                    ) : (
-                      <Text>
-                        S3 storage configuration is only visible to organization
-                        managers
-                      </Text>
-                    )}
-                  </HorizontalFormControl>
-                )}
+            <HStack width="full" justify="flex-end" paddingTop={4}>
+              <Button
+                type="submit"
+                colorPalette="blue"
+                loading={updateOrganization.isLoading}
+              >
+                Save Changes
+              </Button>
+            </HStack>
+          </VStack>
+        </form>
 
-                {organization.useCustomElasticsearch && (
-                  <HorizontalFormControl
-                    label="Elasticsearch"
-                    helper="Configure your Elasticsearch instance for advanced search capabilities"
-                  >
-                    {hasOrganizationPermission(
-                      OrganizationRoleGroup.ORGANIZATION_MANAGE
-                    ) ? (
-                      <VStack width="full" align="start" gap={3}>
-                        <Input
-                          width="full"
-                          type="text"
-                          placeholder="Elasticsearch Node URL"
-                          {...register("elasticsearchNodeUrl")}
-                        />
-                        <Input
-                          width="full"
-                          type="password"
-                          placeholder="Elasticsearch API Key"
-                          {...register("elasticsearchApiKey")}
-                        />
-                      </VStack>
-                    ) : (
-                      <Text>
-                        Elasticsearch configuration is only visible to
-                        organization managers
-                      </Text>
-                    )}
-                  </HorizontalFormControl>
-                )}
-
-                <HStack width="full" justify="flex-end" paddingTop={4}>
-                  <Button
-                    type="submit"
-                    colorPalette="blue"
-                    loading={updateOrganization.isLoading}
-                  >
-                    Save Changes
-                  </Button>
-                </HStack>
-              </VStack>
-            </form>
-          </Card.Body>
-        </Card.Root>
-
-        {hasTeamPermission(TeamRoleGroup.SETUP_PROJECT) && (
+        {hasPermission("project:update") && (
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
@@ -375,12 +368,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     ],
   });
 
-  const { hasTeamPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
-  const userIsAdmin = hasTeamPermission(
-    TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
-  );
+  const userIsAdmin = hasPermission("project:manage");
 
   const defaultValues = {
     name: project.name,
@@ -466,7 +457,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -478,306 +468,297 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
   };
 
   return (
     <>
       <HStack width="full" marginTop={6}>
-        <Heading size="lg" as="h1">
-          Project-level Settings
-        </Heading>
+        <Heading as="h2">Project-level Settings</Heading>
         <Spacer />
         {updateProject.isLoading && <Spinner />}
         {organizations && (
           <ProjectSelector organizations={organizations} project={project} />
         )}
       </HStack>
-      <Card.Root width="full">
-        <Card.Body width="full" paddingY={2} paddingBottom={4}>
-          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <HorizontalFormControl
-              label="Name"
-              helper="The name of the project"
-              invalid={!!formState.errors.name}
-            >
-              <Input
-                width="full"
-                type="text"
-                {...register("name", {
-                  required: true,
-                  validate: (value) => {
-                    if (!value.trim()) return false;
-                  },
-                })}
-              />
-              <Field.ErrorText>Name is required</Field.ErrorText>
-            </HorizontalFormControl>
-            <HorizontalFormControl
-              label="Tech Stack"
-              helper="The project language and framework"
-              invalid={
-                !!formState.errors.language || !!formState.errors.framework
-              }
-            >
-              {changeLanguageFramework ? (
-                <TechStackSelector form={form} />
-              ) : (
-                <HStack>
-                  <ProjectTechStackIcon project={project} />
-                  <Text>
-                    {project.language} / {project.framework}
-                  </Text>
-                  <Button
-                    variant="ghost"
-                    textDecoration="underline"
-                    onClick={() => setChangeLanguageFramework(true)}
-                  >
-                    (change)
-                  </Button>
-                </HStack>
-              )}
-            </HorizontalFormControl>
-            <HorizontalFormControl
-              label="PII Redaction Level"
-              helper="The level of redaction for PII"
-              invalid={!!formState.errors.piiRedactionLevel}
-            >
-              <Controller
-                control={control}
-                name="piiRedactionLevel"
-                rules={{ required: "PII Redaction Level is required" }}
-                render={({ field }) => (
-                  <Select.Root
-                    collection={piiRedactionLevelCollection}
-                    {...field}
-                    onChange={undefined}
-                    value={[field.value]}
-                    onValueChange={(e) => {
-                      field.onChange(e.value[0]);
-                    }}
-                  >
-                    <Select.Trigger width="full">
-                      <Select.ValueText placeholder="Select PII redaction level" />
-                    </Select.Trigger>
-                    <Select.Content width="300px">
-                      {piiRedactionLevelCollection.items.map((option) => (
-                        <Select.Item key={option.value} item={option}>
-                          <VStack align="start" gap={0}>
-                            <Text>{option.label}</Text>
-                            <Text fontSize="13px" color="gray.500">
-                              {option.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                )}
-              />
-            </HorizontalFormControl>
-
-            <HorizontalFormControl
-              label="Show Captured Input Data"
-              helper={
-                <VStack align="start" gap={1}>
-                  <Text>Manage who can see input data on traces and spans</Text>
-                  {!userIsAdmin && (
-                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                      <Tooltip content="Contact your admin to change this setting">
-                        <HStack>
-                          <Lock size={10} />
-                          <Text>Admin only</Text>
-                        </HStack>
-                      </Tooltip>
-                    </Badge>
-                  )}
-                </VStack>
-              }
-              invalid={!!formState.errors.capturedInputVisibility}
-            >
-              <Controller
-                control={control}
-                name="capturedInputVisibility"
-                rules={{
-                  required: userIsAdmin
-                    ? "Captured input visibility is required"
-                    : undefined,
-                }}
-                render={({ field }) => (
-                  <Select.Root
-                    collection={capturedInputVisibilityCollection}
-                    {...field}
-                    onChange={undefined}
-                    value={[field.value]}
-                    onValueChange={(e) => {
-                      field.onChange(e.value[0]);
-                    }}
-                    disabled={!userIsAdmin}
-                  >
-                    <Select.Trigger width="full">
-                      <Select.ValueText placeholder="Select captured input visibility" />
-                    </Select.Trigger>
-                    <Select.Content width="300px">
-                      {capturedInputVisibilityCollection.items.map((option) => (
-                        <Select.Item key={option.value} item={option}>
-                          <VStack align="start" gap={0}>
-                            <Text>{option.label}</Text>
-                            <Text fontSize="13px" color="gray.500">
-                              {option.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      ))}
-                    </Select.Content>
-                  </Select.Root>
-                )}
-              />
-            </HorizontalFormControl>
-            <HorizontalFormControl
-              label="Show Captured Output Data"
-              helper={
-                <VStack align="start" gap={1}>
-                  <Text>
-                    Manage who can see output data on traces and spans
-                  </Text>
-                  {!userIsAdmin && (
-                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                      <Tooltip content="Contact your admin to change this setting">
-                        <HStack>
-                          <Lock size={10} />
-                          <Text>Admin only</Text>
-                        </HStack>
-                      </Tooltip>
-                    </Badge>
-                  )}
-                </VStack>
-              }
-              invalid={!!formState.errors.capturedOutputVisibility}
-            >
-              <Controller
-                control={control}
-                name="capturedOutputVisibility"
-                rules={{
-                  required: userIsAdmin
-                    ? "Captured output visibility is required"
-                    : undefined,
-                }}
-                render={({ field }) => (
-                  <Select.Root
-                    collection={capturedOutputVisibilityCollection}
-                    {...field}
-                    onChange={undefined}
-                    value={[field.value]}
-                    onValueChange={(e) => {
-                      field.onChange(e.value[0]);
-                    }}
-                    disabled={!userIsAdmin}
-                  >
-                    <Select.Trigger width="full">
-                      <Select.ValueText placeholder="Select captured output visibility" />
-                    </Select.Trigger>
-                    <Select.Content width="300px">
-                      {capturedOutputVisibilityCollection.items.map(
-                        (option) => (
-                          <Select.Item key={option.value} item={option}>
-                            <VStack align="start" gap={0}>
-                              <Text>{option.label}</Text>
-                              <Text fontSize="13px" color="gray.500">
-                                {option.description}
-                              </Text>
-                            </VStack>
-                          </Select.Item>
-                        )
-                      )}
-                    </Select.Content>
-                  </Select.Root>
-                )}
-              />
-            </HorizontalFormControl>
-
-            <HorizontalFormControl
-              label="Trace Sharing"
-              helper={
-                <VStack align="start" gap={1}>
-                  <Text>Allow users to share traces with public links</Text>
-                  {!userIsAdmin && (
-                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
-                      <Tooltip content="Contact your admin to change this setting">
-                        <HStack>
-                          <Lock size={10} />
-                          <Text>Admin only</Text>
-                        </HStack>
-                      </Tooltip>
-                    </Badge>
-                  )}
-                </VStack>
-              }
-              invalid={!!formState.errors.traceSharingEnabled}
-            >
-              <Controller
-                control={control}
-                name="traceSharingEnabled"
-                render={({ field }) => (
-                  <Switch
-                    checked={field.value}
-                    onChange={(e) => handleTraceSharingChange(e.target.checked)}
-                    disabled={!userIsAdmin}
-                  />
-                )}
-              />
-            </HorizontalFormControl>
-
-            {organization?.useCustomS3 && (
-              <HorizontalFormControl
-                label="S3 Storage"
-                helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
-              >
-                <VStack width="full" align="start" gap={3}>
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="S3 Endpoint"
-                    {...register("s3Endpoint")}
-                  />
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="Access Key ID"
-                    {...register("s3AccessKeyId")}
-                  />
-                  <Input
-                    width="full"
-                    type="password"
-                    placeholder="Secret Access Key"
-                    {...register("s3SecretAccessKey")}
-                  />
-                  <Input
-                    width="full"
-                    type="text"
-                    placeholder="S3 Bucket Name"
-                    {...register("s3Bucket")}
-                  />
-                </VStack>
-              </HorizontalFormControl>
+      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+      <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
+        <VStack gap={0} width="full">
+          <HorizontalFormControl
+            label="Name"
+            helper="The name of the project"
+            invalid={!!formState.errors.name}
+          >
+            <Input
+              width="full"
+              type="text"
+              {...register("name", {
+                required: true,
+                validate: (value) => {
+                  if (!value.trim()) return false;
+                },
+              })}
+            />
+            <Field.ErrorText>Name is required</Field.ErrorText>
+          </HorizontalFormControl>
+          <HorizontalFormControl
+            label="Tech Stack"
+            helper="The project language and framework"
+            invalid={
+              !!formState.errors.language || !!formState.errors.framework
+            }
+          >
+            {changeLanguageFramework ? (
+              <TechStackSelector form={form} />
+            ) : (
+              <HStack>
+                <ProjectTechStackIcon project={project} />
+                <Text>
+                  {project.language} / {project.framework}
+                </Text>
+                <Button
+                  variant="ghost"
+                  textDecoration="underline"
+                  onClick={() => setChangeLanguageFramework(true)}
+                >
+                  (change)
+                </Button>
+              </HStack>
             )}
-            <HStack width="full" justify="flex-end" paddingTop={4}>
-              <Button
-                type="submit"
-                colorPalette="blue"
-                loading={updateProject.isLoading}
-              >
-                Save Changes
-              </Button>
-            </HStack>
-          </form>
-        </Card.Body>
-      </Card.Root>
+          </HorizontalFormControl>
+          <HorizontalFormControl
+            label="PII Redaction Level"
+            helper="The level of redaction for PII"
+            invalid={!!formState.errors.piiRedactionLevel}
+          >
+            <Controller
+              control={control}
+              name="piiRedactionLevel"
+              rules={{ required: "PII Redaction Level is required" }}
+              render={({ field }) => (
+                <Select.Root
+                  collection={piiRedactionLevelCollection}
+                  {...field}
+                  onChange={undefined}
+                  value={[field.value]}
+                  onValueChange={(e) => {
+                    field.onChange(e.value[0]);
+                  }}
+                >
+                  <Select.Trigger width="full">
+                    <Select.ValueText placeholder="Select PII redaction level" />
+                  </Select.Trigger>
+                  <Select.Content width="300px">
+                    {piiRedactionLevelCollection.items.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        <VStack align="start" gap={0}>
+                          <Text>{option.label}</Text>
+                          <Text fontSize="13px" color="gray.500">
+                            {option.description}
+                          </Text>
+                        </VStack>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
+          </HorizontalFormControl>
+
+          <HorizontalFormControl
+            label="Show Captured Input Data"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>Manage who can see input data on traces and spans</Text>
+                {!userIsAdmin && (
+                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                    <Tooltip content="Contact your admin to change this setting">
+                      <HStack>
+                        <Lock size={10} />
+                        <Text>Admin only</Text>
+                      </HStack>
+                    </Tooltip>
+                  </Badge>
+                )}
+              </VStack>
+            }
+            invalid={!!formState.errors.capturedInputVisibility}
+          >
+            <Controller
+              control={control}
+              name="capturedInputVisibility"
+              rules={{
+                required: userIsAdmin
+                  ? "Captured input visibility is required"
+                  : undefined,
+              }}
+              render={({ field }) => (
+                <Select.Root
+                  collection={capturedInputVisibilityCollection}
+                  {...field}
+                  onChange={undefined}
+                  value={[field.value]}
+                  onValueChange={(e) => {
+                    field.onChange(e.value[0]);
+                  }}
+                  disabled={!userIsAdmin}
+                >
+                  <Select.Trigger width="full">
+                    <Select.ValueText placeholder="Select captured input visibility" />
+                  </Select.Trigger>
+                  <Select.Content width="300px">
+                    {capturedInputVisibilityCollection.items.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        <VStack align="start" gap={0}>
+                          <Text>{option.label}</Text>
+                          <Text fontSize="13px" color="gray.500">
+                            {option.description}
+                          </Text>
+                        </VStack>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
+          </HorizontalFormControl>
+          <HorizontalFormControl
+            label="Show Captured Output Data"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>Manage who can see output data on traces and spans</Text>
+                {!userIsAdmin && (
+                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                    <Tooltip content="Contact your admin to change this setting">
+                      <HStack>
+                        <Lock size={10} />
+                        <Text>Admin only</Text>
+                      </HStack>
+                    </Tooltip>
+                  </Badge>
+                )}
+              </VStack>
+            }
+            invalid={!!formState.errors.capturedOutputVisibility}
+          >
+            <Controller
+              control={control}
+              name="capturedOutputVisibility"
+              rules={{
+                required: userIsAdmin
+                  ? "Captured output visibility is required"
+                  : undefined,
+              }}
+              render={({ field }) => (
+                <Select.Root
+                  collection={capturedOutputVisibilityCollection}
+                  {...field}
+                  onChange={undefined}
+                  value={[field.value]}
+                  onValueChange={(e) => {
+                    field.onChange(e.value[0]);
+                  }}
+                  disabled={!userIsAdmin}
+                >
+                  <Select.Trigger width="full">
+                    <Select.ValueText placeholder="Select captured output visibility" />
+                  </Select.Trigger>
+                  <Select.Content width="300px">
+                    {capturedOutputVisibilityCollection.items.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        <VStack align="start" gap={0}>
+                          <Text>{option.label}</Text>
+                          <Text fontSize="13px" color="gray.500">
+                            {option.description}
+                          </Text>
+                        </VStack>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
+          </HorizontalFormControl>
+
+          <HorizontalFormControl
+            label="Trace Sharing"
+            helper={
+              <VStack align="start" gap={1}>
+                <Text>Allow users to share traces with public links</Text>
+                {!userIsAdmin && (
+                  <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                    <Tooltip content="Contact your admin to change this setting">
+                      <HStack>
+                        <Lock size={10} />
+                        <Text>Admin only</Text>
+                      </HStack>
+                    </Tooltip>
+                  </Badge>
+                )}
+              </VStack>
+            }
+            invalid={!!formState.errors.traceSharingEnabled}
+          >
+            <Controller
+              control={control}
+              name="traceSharingEnabled"
+              render={({ field }) => (
+                <Switch
+                  checked={field.value}
+                  onChange={(e) => handleTraceSharingChange(e.target.checked)}
+                  disabled={!userIsAdmin}
+                />
+              )}
+            />
+          </HorizontalFormControl>
+
+          {organization?.useCustomS3 && (
+            <HorizontalFormControl
+              label="S3 Storage"
+              helper="Configure project-specific S3 storage settings for datasets. If left empty, organization-level settings will be used."
+            >
+              <VStack width="full" align="start" gap={3}>
+                <Input
+                  width="full"
+                  type="text"
+                  placeholder="S3 Endpoint"
+                  {...register("s3Endpoint")}
+                />
+                <Input
+                  width="full"
+                  type="text"
+                  placeholder="Access Key ID"
+                  {...register("s3AccessKeyId")}
+                />
+                <Input
+                  width="full"
+                  type="password"
+                  placeholder="Secret Access Key"
+                  {...register("s3SecretAccessKey")}
+                />
+                <Input
+                  width="full"
+                  type="text"
+                  placeholder="S3 Bucket Name"
+                  {...register("s3Bucket")}
+                />
+              </VStack>
+            </HorizontalFormControl>
+          )}
+        </VStack>
+        <HStack width="full" justify="flex-end" paddingTop={4}>
+          <Button
+            type="submit"
+            colorPalette="blue"
+            loading={updateProject.isLoading}
+          >
+            Save Changes
+          </Button>
+        </HStack>
+      </form>
 
       {/* Trace Sharing Disable Confirmation Dialog */}
       <Dialog.Root

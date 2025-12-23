@@ -1,18 +1,12 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { Experiment, ExperimentType, Project } from "@prisma/client";
+import { nanoid } from "nanoid";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";
-
-import { createLogger } from "../../../utils/logger";
-
-import {
-  type Experiment,
-  type ExperimentType,
-  type Project,
-} from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
-import { nanoid } from "nanoid";
-import { z } from "zod";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
+import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:dspy:init");
 
@@ -37,7 +31,7 @@ const dspyInitParamsSchema = z
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -63,9 +57,12 @@ export default async function handler(
   try {
     params = dspyInitParamsSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid init data received');
+    logger.error(
+      { error, body: req.body, projectId: project.id },
+      "invalid init data received",
+    );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
-    Sentry.captureException(error, { extra: { projectId: project.id } });
+    captureException(error, { extra: { projectId: project.id } });
 
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });

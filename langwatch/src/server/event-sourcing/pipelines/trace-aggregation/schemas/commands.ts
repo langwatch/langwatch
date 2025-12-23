@@ -1,0 +1,24 @@
+import { z } from "zod";
+
+export type { TraceAggregationSummaryCommandType } from "./typeIdentifiers";
+export {
+  TRACE_AGGREGATION_COMMAND_TYPES,
+  TRACE_AGGREGATION_SUMMARY_TRIGGER_COMMAND_TYPE,
+} from "./typeIdentifiers";
+
+/**
+ * Zod schema for TriggerTraceAggregationCommandData.
+ * Matches the TriggerTraceAggregationCommandData interface structure.
+ */
+export const triggerTraceAggregationCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+});
+
+/**
+ * Type inferred from the triggerTraceAggregationCommandDataSchema Zod schema.
+ */
+export type TriggerTraceAggregationCommandData = z.infer<
+  typeof triggerTraceAggregationCommandDataSchema
+>;

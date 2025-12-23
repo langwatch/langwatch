@@ -3,18 +3,18 @@ import type {
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { TRACE_INDEX, esClient } from "../../../elasticsearch";
-import {
-  type ElasticSearchEvent,
-  type ElasticSearchTrace,
+import { esClient, TRACE_INDEX } from "../../../elasticsearch";
+import type {
+  ElasticSearchEvent,
+  ElasticSearchTrace,
 } from "../../../tracer/types";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
+import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
 
 export const feedbacks = protectedProcedure
   .input(sharedFiltersInputSchema)
-  .use(checkUserPermissionForProject(TeamRoleGroup.COST_VIEW))
+  .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
@@ -66,9 +66,8 @@ export const feedbacks = protectedProcedure
 
     const events: ElasticSearchEvent[] = result.hits.hits
       .flatMap((hit) => hit._source!.events ?? [])
-      .filter(
-        (event) =>
-          event.event_details?.some((detail) => detail.key === "feedback")
+      .filter((event) =>
+        event.event_details?.some((detail) => detail.key === "feedback"),
       )
       .map((event: any) => ({
         ...event,

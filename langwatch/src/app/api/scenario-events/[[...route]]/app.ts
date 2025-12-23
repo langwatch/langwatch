@@ -1,20 +1,18 @@
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
-import { validator as zValidator, resolver } from "hono-openapi/zod";
-
+import { resolver, validator as zValidator } from "hono-openapi/zod";
+import z from "zod";
+import { createLogger } from "~/utils/logger";
 import {
   authMiddleware,
+  blockTraceUsageExceededMiddleware,
   handleError,
   loggerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
-
 import { ScenarioEventService } from "./scenario-event.service";
-import { scenarioEventSchema, responseSchemas } from "./schemas";
-
-import { createLogger } from "~/utils/logger";
-import z from "zod";
+import { responseSchemas, scenarioEventSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -31,6 +29,7 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
+app.use("/*", blockTraceUsageExceededMiddleware);
 app.onError(handleError);
 
 // POST /api/scenario-events - Create a new scenario event
@@ -73,7 +72,7 @@ app.post(
 
     if (!base) {
       logger.error(
-        "BASE_HOST is not set, but required for scenario event url payload"
+        "BASE_HOST is not set, but required for scenario event url payload",
       );
 
       return c.json({ success: false }, 500);
@@ -82,7 +81,7 @@ app.post(
     const url = `${base}${path}`;
 
     return c.json({ success: true, url }, 201);
-  }
+  },
 );
 
 // DELETE /api/scenario-events - Delete all events for a project
@@ -109,7 +108,7 @@ export const route = app.delete(
     });
 
     return c.json({ success: true }, 200);
-  }
+  },
 );
 
 export type ScenarioEventsAppType = typeof route;

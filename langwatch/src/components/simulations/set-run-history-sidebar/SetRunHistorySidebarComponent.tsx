@@ -1,25 +1,25 @@
-import React, { useState } from "react";
 import {
-  Box,
-  Text,
   Accordion,
-  VStack,
-  Skeleton,
-  Flex,
-  EmptyState,
-  Spinner,
-  HStack,
+  Box,
   Button,
+  EmptyState,
+  Flex,
+  HStack,
   Icon,
+  Skeleton,
+  Spinner,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
+import React, { useState } from "react";
 import { ChevronLeft, ChevronRight } from "react-feather";
 import { useColorModeValue } from "../../ui/color-mode";
-import { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarController";
 import { RunAccordionItem } from "./RunAccordionItem";
+import type { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarController";
 
 // Main sidebar component
 export const SetRunHistorySidebarComponent = (
-  props: ReturnType<typeof useSetRunHistorySidebarController>
+  props: ReturnType<typeof useSetRunHistorySidebarController>,
 ) => {
   const [openIndex, setOpenIndex] = useState<string[]>(["0"]);
   const { runs, onRunClick, isLoading, scenarioSetId, pagination } = props;

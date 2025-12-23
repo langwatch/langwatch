@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
-import { motion, AnimatePresence } from "framer-motion";
-import { FullLogo } from "./icons/FullLogo";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
+import { FullLogo } from "./icons/FullLogo";
 
 let logoVisibleOnce = false;
 
@@ -17,12 +17,14 @@ export const LoadingScreen = () => {
     }, 50);
   }, []);
 
+  const fullLogo = <FullLogo width={155 * 1.2} height={38 * 1.2} />;
+
   return (
     <Box
       width="full"
       height="full"
       minHeight="100vh"
-      backgroundColor="gray.300"
+      backgroundColor="bg.emphasized"
       paddingBottom={16}
       display="flex"
       alignItems="center"
@@ -36,12 +38,12 @@ export const LoadingScreen = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <FullLogo />
+              {fullLogo}
             </motion.div>
           )}
         </AnimatePresence>
       ) : (
-        <FullLogo />
+        fullLogo
       )}
     </Box>
   );

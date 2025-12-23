@@ -1,4 +1,5 @@
 import { Grid, RadioCard } from "@chakra-ui/react";
+import { useMemo } from "react";
 import {
   LuBrain,
   LuCode,
@@ -9,17 +10,16 @@ import {
 } from "react-icons/lu";
 import {
   type EVALUATOR_CATEGORIES,
-  useEvaluationWizardStore,
   type EvaluatorCategory as EvaluationCategory,
+  useEvaluationWizardStore,
 } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "../../../../../server/evaluations/evaluators.generated";
+import { api } from "../../../../../utils/api";
+import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
 import { Tooltip } from "../../../../ui/tooltip";
 import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
-import { api } from "../../../../../utils/api";
-import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useMemo } from "react";
-import { PuzzleIcon } from "../../../../icons/PuzzleIcon";
 
 type EvaluationCategoryConfig = {
   id: (typeof EVALUATOR_CATEGORIES)[number];
@@ -44,7 +44,7 @@ export const useEvaluatorCategories = (): EvaluationCategoryConfig[] => {
   const availableCustomEvaluators =
     api.evaluations.availableCustomEvaluators.useQuery(
       { projectId: project?.id ?? "" },
-      { enabled: !!project }
+      { enabled: !!project },
     );
 
   return useMemo(
@@ -172,12 +172,12 @@ export const useEvaluatorCategories = (): EvaluationCategoryConfig[] => {
               id: `custom/${evaluator.id}`,
               name: evaluator.name,
               description: evaluator.description,
-            })
+            }),
           ),
           realtime: true,
         },
       ] satisfies EvaluationCategoryConfig[],
-    [availableCustomEvaluators.data]
+    [availableCustomEvaluators.data],
   );
 };
 
@@ -211,9 +211,11 @@ export const CategorySelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={wizardState.evaluatorCategory}
-        onValueChange={(e: { value: string }) =>
-          handleCategorySelect(e.value as EvaluationCategory)
-        }
+        onValueChange={(e) => {
+          if (e.value) {
+            handleCategorySelect(e.value as EvaluationCategory);
+          }
+        }}
         paddingTop={2}
         paddingBottom={5}
         paddingX="1px"

@@ -6,9 +6,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Popover } from "../../../../components/ui/popover";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "react-feather";
+import { Popover } from "../../../../components/ui/popover";
 
 export function ConfigModal({
   open,
@@ -41,6 +41,7 @@ export function ConfigModal({
         // To fix issue of popover reopening immediately on the trigger button
         setTimeout(onClose, 300);
       }}
+      positioning={{ placement: "bottom" }}
     >
       <PopoverTrigger
         position="absolute"
@@ -59,7 +60,7 @@ export function ConfigModal({
           bg="white"
           minWidth="600px"
           gap={0}
-          boxShadow="0px 0px 10px rgba(0, 0, 0, 0.1)"
+          boxShadow="0px 0px 20px rgba(0, 0, 0, 0.1)"
         >
           <HStack
             width="full"

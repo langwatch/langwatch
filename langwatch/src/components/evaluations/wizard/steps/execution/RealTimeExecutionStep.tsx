@@ -1,5 +1,3 @@
-import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
-
 import {
   Accordion,
   HStack,
@@ -21,19 +19,20 @@ import { LuActivity, LuCode, LuShield } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
+import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 import type { CheckPreconditions } from "../../../../../server/evaluations/types";
+import { checkPreconditionsSchema } from "../../../../../server/evaluations/types.generated";
 import type { CheckConfigFormData } from "../../../../checks/CheckConfigForm";
 import { PreconditionsField } from "../../../../checks/PreconditionsField";
 import { HorizontalFormControl } from "../../../../HorizontalFormControl";
 import { Tooltip } from "../../../../ui/tooltip";
-import { StepAccordion } from "../../components/StepAccordion";
 import { ExecutionStepAccordion } from "../../components/ExecutionStepAccordion";
+import { StepAccordion } from "../../components/StepAccordion";
 import { StepRadio } from "../../components/StepButton";
 import {
   EXECUTION_METHODS,
   useEvaluationWizardStore,
 } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { useAnimatedFocusElementById } from "../../../../../hooks/useAnimatedFocusElementById";
 
 export function RealTimeExecutionStep() {
   const { executionMethod, setWizardState, realTimeExecution } =
@@ -42,7 +41,7 @@ export function RealTimeExecutionStep() {
         executionMethod: wizardState.executionMethod,
         realTimeExecution: wizardState.realTimeExecution,
         setWizardState,
-      }))
+      })),
     );
 
   const [accordeonValue, setAccordeonValue] = useState(["execution-method"]);
@@ -53,7 +52,7 @@ export function RealTimeExecutionStep() {
     executionMethod:
       | "realtime_on_message"
       | "realtime_guardrail"
-      | "realtime_manually"
+      | "realtime_manually",
   ) => {
     setWizardState({
       executionMethod,
@@ -77,7 +76,7 @@ export function RealTimeExecutionStep() {
         z.object({
           sample: z.number().min(0.01).max(1),
           preconditions: checkPreconditionsSchema,
-        })
+        }),
       )(data, ...args);
     },
   });
@@ -101,7 +100,7 @@ export function RealTimeExecutionStep() {
         setSkipSubmit(false);
       }, 500);
     },
-    [appendPrecondition_, setSkipSubmit]
+    [appendPrecondition_, setSkipSubmit],
   );
 
   const preconditions = form.watch("preconditions");
@@ -128,7 +127,7 @@ export function RealTimeExecutionStep() {
         },
       });
     },
-    [executionMethod, setWizardState]
+    [executionMethod, setWizardState],
   );
 
   const debouncedSubmit = useDebounceCallback(() => {

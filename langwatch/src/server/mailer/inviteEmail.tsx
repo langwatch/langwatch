@@ -1,11 +1,11 @@
-import { render } from "@react-email/render";
-import { Html } from "@react-email/html";
+import type { Organization } from "@prisma/client";
 import { Button } from "@react-email/button";
 import { Container } from "@react-email/container";
 import { Heading } from "@react-email/heading";
+import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
+import { render } from "@react-email/render";
 import { env } from "../../env.mjs";
-import type { Organization } from "@prisma/client";
 import { sendEmail } from "./emailSender";
 
 export const sendInviteEmail = async ({
@@ -36,9 +36,9 @@ export const sendInviteEmail = async ({
         />
         <Heading as="h1">LangWatch Invite</Heading>
         <p>
-          You have been invited to join {organization.name} Organization on
-          LangWatch. Please click the button below to create your account or
-          login with the email <b>{email}</b>:
+          You have been invited to join the <strong>{organization.name}</strong>
+          Organization on LangWatch. Please click the button below to create
+          your account or login with the email <b>{email}</b>:
         </p>
         <Button
           href={acceptInviteUrl}
@@ -50,11 +50,11 @@ export const sendInviteEmail = async ({
             borderRadius: "6px",
           }}
         >
-          Open Dashboard
+          Accept Invite
         </Button>
         <p>If this is a mistake, you can safely ignore this email</p>
       </Container>
-    </Html>
+    </Html>,
   );
 
   await sendEmail({

@@ -25,6 +25,7 @@ model Account {
     refresh_token     String?  @db.Text
     access_token      String?  @db.Text
     expires_at        Int?
+    ext_expires_in    Int?
     token_type        String?
     scope             String?
     id_token          String?  @db.Text
@@ -84,6 +85,7 @@ enum TeamUserRole {
     ADMIN
     MEMBER
     VIEWER
+    CUSTOM
 }
 
 enum OrganizationUserRole {
@@ -93,17 +95,20 @@ enum OrganizationUserRole {
 }
 
 model TeamUser {
-    userId    String
-    teamId    String
-    role      TeamUserRole
-    user      User         @relation(fields: [userId], references: [id])
-    team      Team         @relation(fields: [teamId], references: [id])
-    createdAt DateTime     @default(now())
-    updatedAt DateTime     @default(now()) @updatedAt
+    userId         String
+    teamId         String
+    role           TeamUserRole
+    assignedRoleId String?
+    assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
+    user           User         @relation(fields: [userId], references: [id])
+    team           Team         @relation(fields: [teamId], references: [id])
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
 
     @@id([userId, teamId])
     @@index([teamId])
     @@index([userId])
+    @@index([assignedRoleId])
 }
 
 model OrganizationUser {
@@ -160,8 +165,10 @@ model Organization {
     ssoDomain              String?
     ssoProvider            String?
 
-    promoCode String?
-    features  OrganizationFeature[]
+    promoCode     String?
+    features      OrganizationFeature[]
+    CustomRoles   CustomRole[]
+    notifications Notification[]
 
     @@index([ssoDomain])
     @@index([ssoProvider])
@@ -199,6 +206,7 @@ model Project {
     datasets                 Dataset[]
     datasetRecords           DatasetRecord[]
     customGraphs             CustomGraph[]
+    dashboards               Dashboard[]
     batchEvaluations         BatchEvaluation[]
     piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
     capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
@@ -225,6 +233,8 @@ model Project {
     llmPromptConfigs         LlmPromptConfig[]
     analytics                Analytics[]
     archivedAt               DateTime?
+    notifications            Notification[]
+    featureClickHouse        Boolean                             @default(false)
 
     @@index([teamId])
 }
@@ -235,17 +245,18 @@ enum INVITE_STATUS {
 }
 
 model OrganizationInvite {
-    id             String               @id @default(nanoid())
-    email          String
-    inviteCode     String               @unique
-    expiration     DateTime
-    status         INVITE_STATUS        @default(PENDING)
-    organizationId String
-    organization   Organization         @relation(fields: [organizationId], references: [id])
-    teamIds        String
-    role           OrganizationUserRole
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+    id              String               @id @default(nanoid())
+    email           String
+    inviteCode      String               @unique
+    expiration      DateTime
+    status          INVITE_STATUS        @default(PENDING)
+    organizationId  String
+    organization    Organization         @relation(fields: [organizationId], references: [id])
+    teamIds         String
+    teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+    role            OrganizationUserRole
+    createdAt       DateTime             @default(now())
+    updatedAt       DateTime             @default(now()) @updatedAt
 
     @@index([organizationId])
 }
@@ -366,6 +377,21 @@ model DatasetRecord {
     @@index([createdAt])
 }
 
+model Dashboard {
+    id        String        @id @default(nanoid())
+    projectId String
+    project   Project       @relation(fields: [projectId], references: [id])
+    name      String
+    order     Int           @default(0)
+    createdAt DateTime      @default(now())
+    updatedAt DateTime      @default(now()) @updatedAt
+    graphs    CustomGraph[]
+
+    @@index([projectId])
+    @@index([projectId, order])
+    @@map("Dashboard")
+}
+
 model CustomGraph {
     id        String   @id @default(nanoid())
     projectId String
@@ -376,8 +402,18 @@ model CustomGraph {
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now()) @updatedAt
 
-    @@unique([id])
+    // Report page relationship
+    dashboardId String?
+    dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+
+    // Grid positioning (2-column grid)
+    gridColumn Int @default(0)
+    gridRow    Int @default(0)
+    colSpan    Int @default(1)
+    rowSpan    Int @default(1)
+
     @@index([projectId])
+    @@index([dashboardId])
 }
 
 model BatchEvaluation {
@@ -443,6 +479,7 @@ enum ExperimentType {
     DSPY
     BATCH_EVALUATION
     BATCH_EVALUATION_V2
+    EVALUATIONS_V3
 }
 
 model Experiment {
@@ -493,6 +530,7 @@ model ModelProvider {
     provider               String
     enabled                Boolean
     customKeys             Json?
+    extraHeaders           Json?
     customModels           Json?
     customEmbeddingsModels Json?
     deploymentMapping      Json?
@@ -643,31 +681,35 @@ model CustomLLMModelCost {
 }
 
 model Workflow {
-    id               String            @id @default(nanoid())
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    name             String
-    icon             String
-    description      String
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    latestVersionId  String?
-    latestVersion    WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    currentVersionId String?
-    currentVersion   WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    versions         WorkflowVersion[] @relation("Versions")
-    publishedId      String?
-    publishedById    String?
-    publishedBy      User?             @relation(fields: [publishedById], references: [id])
-    archivedAt       DateTime?
-    experiments      Experiment[]
-    isEvaluator      Boolean           @default(false)
-    isComponent      Boolean           @default(false)
+    id                   String            @id @default(nanoid())
+    projectId            String
+    project              Project           @relation(fields: [projectId], references: [id])
+    name                 String
+    icon                 String
+    description          String
+    createdAt            DateTime          @default(now())
+    updatedAt            DateTime          @default(now()) @updatedAt
+    latestVersionId      String?
+    latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    currentVersionId     String?
+    currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    versions             WorkflowVersion[] @relation("Versions")
+    publishedId          String?
+    publishedById        String?
+    publishedBy          User?             @relation(fields: [publishedById], references: [id])
+    archivedAt           DateTime?
+    experiments          Experiment[]
+    isEvaluator          Boolean           @default(false)
+    isComponent          Boolean           @default(false)
+    copiedFromWorkflowId String?
+    copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
 
     @@index([projectId])
     @@index([publishedById])
     @@index([latestVersionId])
     @@index([currentVersionId])
+    @@index([copiedFromWorkflowId])
 }
 
 model WorkflowVersion {
@@ -750,12 +792,18 @@ model LlmPromptConfig {
     organizationId String
     scope          PromptScope @default(PROJECT)
 
+    // Copy tracking
+    copiedFromPromptId String?
+    copiedFrom         LlmPromptConfig?  @relation("PromptCopies", fields: [copiedFromPromptId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedPrompts      LlmPromptConfig[] @relation("PromptCopies")
+
     // Relation to all versions - latest is determined by query
     versions LlmPromptConfigVersion[] @relation("Versions")
 
     @@unique([handle], map: "LlmPromptConfig_handle_key")
     @@index([projectId])
     @@index([organizationId], map: "LlmPromptConfig_organizationId_idx")
+    @@index([copiedFromPromptId])
 }
 
 model LlmPromptConfigVersion {
@@ -795,4 +843,43 @@ model Analytics {
 
     @@index([createdAt, key, projectId, numericValue])
     @@index([projectId])
+}
+
+model CustomRole {
+    id             String       @id @default(nanoid())
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    name           String
+    description    String?
+    permissions    Json // Array of Permission strings
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+    assignedUsers  TeamUser[]
+
+    @@unique([organizationId, name])
+    @@index([organizationId])
+}
+
+model Notification {
+    id String @id @default(nanoid())
+
+    // Optional context - notifications can be at user, organization, or project level
+    organizationId String?
+    organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    projectId      String?
+    project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Flexible metadata to store notification-specific data
+    // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
+    metadata Json
+
+    // Timestamps
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+    sentAt    DateTime // When email was actually sent
+
+    @@index([organizationId])
+    @@index([projectId])
+    @@index([createdAt])
+    @@index([sentAt])
 }

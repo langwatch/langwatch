@@ -89,3 +89,35 @@ def test_prompts_get_falls_back_to_api_when_no_local_file(
 
     finally:
         os.chdir(original_cwd)
+
+
+def test_prompts_get_throws_when_not_found(empty_dir: Path, clean_langwatch):
+    """
+    GIVEN no local prompt file exists AND the API returns 404
+    WHEN I call langwatch.prompts.get()
+    THEN it should raise a ValueError (404 not found error)
+    """
+    import pytest
+
+    original_cwd = Path.cwd()
+    try:
+        os.chdir(empty_dir)
+
+        # Mock the API to return 404
+        mock_response = Mock()
+        mock_response.status_code = 404
+        mock_response.json.return_value = {"error": "Prompt not found"}
+
+        with patch("httpx.Client.request") as mock_request:
+            mock_request.return_value = mock_response
+
+            # Verify that calling get() with a non-existent prompt raises an error
+            with pytest.raises(ValueError) as exc_info:
+                langwatch.prompts.get("non-existent-prompt")
+
+            # Verify error message contains useful information
+            assert "non-existent-prompt" in str(exc_info.value)
+            assert "not found" in str(exc_info.value).lower()
+
+    finally:
+        os.chdir(original_cwd)

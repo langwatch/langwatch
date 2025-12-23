@@ -2,18 +2,19 @@ import {
   Box,
   Button,
   Field,
-  HStack,
   Heading,
+  HStack,
+  IconButton,
   Input,
   NativeSelect,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
-import { Trash2 } from "react-feather";
-import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
-import { slugify } from "~/utils/slugify";
+import { useEffect, useState } from "react";
+import { Eye, EyeOff, Trash2 } from "react-feather";
+import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -25,12 +26,13 @@ import type {
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
-import { useDrawer } from "./CurrentDrawer";
-import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetPreview } from "./datasets/DatasetPreview";
+import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
+import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
+import { HorizontalFormControl } from "./HorizontalFormControl";
 
-interface AddDatasetDrawerProps {
+export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
     datasetRecords?: InMemoryDataset["datasetRecords"];
@@ -42,6 +44,20 @@ interface AddDatasetDrawerProps {
     name: string;
     columnTypes: DatasetColumns;
   }) => void;
+  /**
+   * When true, skip saving to DB and just call onSuccess with the form data.
+   * Useful for editing inline/in-memory datasets that shouldn't be persisted yet.
+   * The button will show "Apply" instead of "Save".
+   */
+  localOnly?: boolean;
+  /**
+   * Optional: Show visibility toggle (eye icon) for each column.
+   * Used in evaluations workbench to hide/show columns without affecting the dataset.
+   */
+  columnVisibility?: {
+    hiddenColumns: Set<string>;
+    onToggleVisibility: (columnName: string) => void;
+  };
 }
 
 type FormValues = {
@@ -86,7 +102,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
       const result = await zodResolver(datasetRecordFormSchema)(
         data,
         context,
-        options
+        options,
       );
 
       if (!data.name || data.name.trim() === "") {
@@ -123,11 +139,14 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   });
 
   const name = watch("name");
-  const slug = slugify((name || "").replace("_", "-"), {
-    lower: true,
-    strict: true,
-  });
   const columnTypes = watch("columnTypes");
+
+  // Use custom hook for slug validation against a name + datasetId
+  const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } =
+    useDatasetSlugValidation({
+      name,
+      datasetId: props.datasetToSave?.datasetId,
+    });
 
   useEffect(() => {
     if (props.datasetToSave) {
@@ -143,11 +162,24 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         columnTypes: initialColumns,
       });
     }
+    resetSlugInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
   const trpc = api.useContext();
   const onSubmit = (data: DatasetRecordForm) => {
+    // For localOnly mode, skip DB save and just call onSuccess
+    if (props.localOnly) {
+      props.onSuccess({
+        datasetId: props.datasetToSave?.datasetId ?? "",
+        name: data.name,
+        columnTypes: data.columnTypes,
+      });
+      reset();
+      onClose();
+      return;
+    }
+
     upsertDataset.mutate(
       {
         projectId: project?.id ?? "",
@@ -160,9 +192,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 tryToMapPreviousColumnsToNewColumns(
                   props.datasetToSave.datasetRecords,
                   props.datasetToSave.columnTypes,
-                  data.columnTypes
+                  data.columnTypes,
                 ),
-                data.columnTypes
+                data.columnTypes,
               ),
             }
           : {}),
@@ -178,13 +210,12 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             title: props.datasetToSave?.datasetId
               ? "Dataset Updated"
               : props.datasetToSave
-              ? "Dataset Saved"
-              : "Dataset Created",
+                ? "Dataset Saved"
+                : "Dataset Created",
             description: props.datasetToSave?.datasetId
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
             type: "success",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -192,22 +223,28 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           reset();
           onClose();
           // Refetch the datasets to get the latest data
-          trpc.dataset.getAll.invalidate();
+          void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
+          // Check if it's a slug conflict error from backend
+          const isConflictError =
+            error.message.includes("already exists") ||
+            (error as any).data?.code === "CONFLICT";
+
           toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Error updating dataset"
               : "Error creating dataset",
-            description: error.message,
+            description: isConflictError
+              ? "A dataset with this name already exists. Please choose a different name."
+              : error.message,
             type: "error",
-            placement: "top-end",
             meta: {
               closable: true,
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -221,13 +258,13 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              {props.datasetToSave?.datasetId
+            <Heading>
+              {props.datasetToSave?.datasetId || props.localOnly
                 ? "Edit Dataset"
                 : props.datasetToSave
-                ? "Save Dataset"
-                : "New Dataset"}
-            </Text>
+                  ? "Save Dataset"
+                  : "New Dataset"}
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -237,10 +274,17 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              invalid={!!errors.name}
+              invalid={!!errors.name || (slugInfo?.hasConflict ?? false)}
             >
               <Input {...register("name")} />
-              {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+              <DatasetSlugDisplay
+                marginLeft={1}
+                marginTop={1}
+                displaySlug={displaySlug}
+                slugWillChange={slugWillChange}
+                dbSlug={dbSlug}
+                slugInfo={slugInfo}
+              />
               <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
             </HorizontalFormControl>
 
@@ -251,37 +295,53 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
             >
               <VStack align="start">
                 <VStack align="start" width="full">
-                  {fields.map((field, index) => (
-                    <HStack key={field.id} width="full" gap={2}>
-                      <Input
-                        {...register(`columnTypes.${index}.name`, {
-                          required: "Column name cannot be empty",
-                        })}
-                        placeholder="Column name"
-                      />
-                      <NativeSelect.Root>
-                        <NativeSelect.Field
-                          {...register(`columnTypes.${index}.type`)}
-                        >
-                          <option value="string">string</option>
-                          <option value="number">number</option>
-                          <option value="boolean">boolean</option>
-                          <option value="date">date</option>
-                          <option value="list">list</option>
-                          <option value="json">json</option>
-                          <option value="image">image (URL)</option>
-                          <option value="chat_messages">
-                            json chat messages (OpenAI format)
-                          </option>
-                          <option value="spans">json spans</option>
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
-                      <Button size="sm" onClick={() => remove(index)}>
-                        <Trash2 size={32} />
-                      </Button>
-                    </HStack>
-                  ))}
+                  {fields.map((field, index) => {
+                    const columnName = watch(`columnTypes.${index}.name`);
+                    const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
+                    return (
+                      <HStack key={field.id} width="full" gap={2}>
+                        <Input
+                          {...register(`columnTypes.${index}.name`, {
+                            required: "Column name cannot be empty",
+                          })}
+                          placeholder="Column name"
+                        />
+                        <NativeSelect.Root>
+                          <NativeSelect.Field
+                            {...register(`columnTypes.${index}.type`)}
+                          >
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="boolean">boolean</option>
+                            <option value="date">date</option>
+                            <option value="list">list</option>
+                            <option value="json">json</option>
+                            <option value="image">image (URL)</option>
+                            <option value="chat_messages">
+                              json chat messages (OpenAI format)
+                            </option>
+                            <option value="spans">json spans</option>
+                          </NativeSelect.Field>
+                          <NativeSelect.Indicator />
+                        </NativeSelect.Root>
+                        {props.columnVisibility && (
+                          <IconButton
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
+                            color={isHidden ? "gray.400" : "gray.600"}
+                            aria-label={isHidden ? "Show column" : "Hide column"}
+                            title={isHidden ? "Show column" : "Hide column"}
+                          >
+                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </IconButton>
+                        )}
+                        <Button size="sm" onClick={() => remove(index)}>
+                          <Trash2 size={32} />
+                        </Button>
+                      </HStack>
+                    );
+                  })}
                   <Field.ErrorText>
                     {errors.columnTypes?.message}
                   </Field.ErrorText>
@@ -291,7 +351,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 </VStack>
               </VStack>
             </HorizontalFormControl>
-            {props.datasetToSave?.datasetRecords && (
+            {props.datasetToSave?.datasetRecords && !props.localOnly && (
               <VStack align="start" gap={4} paddingY={6}>
                 <HStack gap={2}>
                   <Heading size="md">Preview</Heading>
@@ -307,9 +367,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                         tryToMapPreviousColumnsToNewColumns(
                           props.datasetToSave.datasetRecords.slice(0, 5),
                           props.datasetToSave.columnTypes,
-                          columnTypes
+                          columnTypes,
                         ),
-                        columnTypes
+                        columnTypes,
                       )}
                       columns={columnTypes.slice(0, 50)}
                     />
@@ -323,7 +383,11 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               minWidth="fit-content"
               loading={upsertDataset.isLoading}
             >
-              {props.datasetToSave ? "Save" : "Create Dataset"}
+              {props.localOnly
+                ? "Apply"
+                : props.datasetToSave
+                  ? "Save"
+                  : "Create Dataset"}
             </Button>
           </form>
         </Drawer.Body>
@@ -334,10 +398,10 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 
 export const tryToConvertRowsToAppropriateType = (
   datasetRecords: DatasetRecordEntry[],
-  columnTypes: DatasetColumns
+  columnTypes: DatasetColumns,
 ) => {
   const typeForColumn = Object.fromEntries(
-    columnTypes.map((col) => [col.name, col.type])
+    columnTypes.map((col) => [col.name, col.type]),
   );
   return datasetRecords.map((record) => {
     const convertedRecord = { ...record };
@@ -352,7 +416,7 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type === "boolean") {
         if (
           ["true", "1", "yes", "y", "on", "ok"].includes(
-            `${value ?? ""}`.toLowerCase()
+            `${value ?? ""}`.toLowerCase(),
           )
         ) {
           convertedRecord[key] = true;
@@ -382,7 +446,9 @@ export const tryToConvertRowsToAppropriateType = (
       } else if (type !== "string") {
         try {
           convertedRecord[key] = JSON.parse(value);
-        } catch {}
+        } catch {
+          /* */
+        }
       }
     }
     return convertedRecord;

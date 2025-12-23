@@ -17,10 +17,10 @@ export const captureError = (error: unknown): ErrorCapture => {
       typeof err.stack === "string"
         ? err.stack.split("\n")
         : Array.isArray(err.stack) &&
-          err.stack.length > 0 &&
-          typeof err.stack[0] === "string"
-        ? err.stack
-        : ["No stack trace available"];
+            err.stack.length > 0 &&
+            typeof err.stack[0] === "string"
+          ? err.stack
+          : ["No stack trace available"];
     return {
       has_error: true,
       message,

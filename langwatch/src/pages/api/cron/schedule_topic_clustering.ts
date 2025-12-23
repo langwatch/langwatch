@@ -3,7 +3,7 @@ import { scheduleTopicClustering } from "~/server/background/queues/topicCluster
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   let cronApiKey = req.headers.authorization;
   cronApiKey = cronApiKey?.startsWith("Bearer ")

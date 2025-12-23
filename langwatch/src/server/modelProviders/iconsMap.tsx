@@ -1,6 +1,7 @@
 import { Anthropic } from "../../components/icons/Anthropic";
 import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";
+import { Cerebras } from "../../components/icons/Cerebras";
 import { Custom } from "../../components/icons/Custom";
 import { DeepSeek } from "../../components/icons/DeepSeek";
 import { Gemini } from "../../components/icons/Gemini";
@@ -8,8 +9,7 @@ import { GoogleCloud } from "../../components/icons/GoogleCloud";
 import { Groq } from "../../components/icons/Groq";
 import { OpenAI } from "../../components/icons/OpenAI";
 import { Xai } from "../../components/icons/Xai";
-import { Cerebras } from "../../components/icons/Cerebras";
-import { type modelProviders } from "./registry";
+import type { modelProviders } from "./registry";
 
 export const modelProviderIcons: Record<
   keyof typeof modelProviders,

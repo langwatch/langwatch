@@ -1,10 +1,10 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { getPostHogInstance } from "../../server/posthog";
-import * as Sentry from "@sentry/node";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") return res.status(405).end("Method Not Allowed");
 
@@ -19,7 +19,7 @@ export default async function handler(
         properties,
       });
     } catch (error) {
-      Sentry.captureException(error);
+      captureException(error);
     }
   }
 

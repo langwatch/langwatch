@@ -1,11 +1,11 @@
-import { Box, Text, type BoxProps, HStack, VStack } from "@chakra-ui/react";
+import { Box, type BoxProps, HStack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
 import { isJson } from "../utils/isJson";
-import { RenderInputOutput } from "./traces/RenderInputOutput";
 import { Markdown } from "./Markdown";
+import { RenderInputOutput } from "./traces/RenderInputOutput";
+import { Dialog } from "./ui/dialog";
 import { Switch } from "./ui/switch";
 import { Tooltip } from "./ui/tooltip";
-import { Dialog } from "./ui/dialog";
 
 export function ExpandedTextDialog({
   open,
@@ -24,7 +24,6 @@ export function ExpandedTextDialog({
       onOpenChange={({ open }) => onOpenChange(open)}
       size="5xl"
     >
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.Header
           background="gray.100"
@@ -75,7 +74,7 @@ export function HoverableBigText({
   const ref = useRef<HTMLDivElement>(null);
   const [isOverflown, setIsOverflown] = useState(false);
   const [textExpanded, setTextExpanded] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const expandedVersion_ = expandedVersion ?? children;
 
@@ -84,7 +83,7 @@ export function HoverableBigText({
       ref.current
         ? Math.abs(ref.current.offsetWidth - ref.current.scrollWidth) > 2 ||
             Math.abs(ref.current.offsetHeight - ref.current.scrollHeight) > 2
-        : false
+        : false,
     );
   };
 

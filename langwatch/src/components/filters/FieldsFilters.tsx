@@ -2,15 +2,15 @@ import {
   Box,
   Button,
   Field,
-  HStack,
   Heading,
+  HStack,
   Input,
   Skeleton,
   Spacer,
   Tag,
   Text,
-  VStack,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -18,12 +18,13 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-
-import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
-import { TeamRoleGroup } from "../../server/api/permission";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
@@ -35,17 +36,51 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
+import { LuZap } from "react-icons/lu";
 
-import { useDrawer } from "~/components/CurrentDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+export function QueryStringFieldsFilters({
+  hideTriggerButton = false,
+}: {
+  hideTriggerButton?: boolean;
+}) {
+  const { nonEmptyFilters, setFilters } = useFilterParams();
 
-export function FieldsFilters() {
-  const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
+  const { hasPermission } = useOrganizationTeamProject();
 
-  const isEditMode = isDrawerOpen("editTriggerFilter");
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
+  return (
+    <FieldsFilters
+      filters={nonEmptyFilters}
+      setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
+      actionButton={
+        hasPermission("triggers:manage") && !hideTriggerButton ? (
+          <Tooltip content="Create a filter to add a trigger.">
+            <Button
+              colorPalette="gray"
+              onClick={() => openDrawer("trigger", undefined)}
+              disabled={!hasAnyFilters}
+            >
+              <LuZap />
+              Add Trigger
+            </Button>
+          </Tooltip>
+        ) : undefined
+      }
+    />
+  );
+}
+
+export function FieldsFilters({
+  filters,
+  setFilters,
+  actionButton,
+}: {
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  actionButton?: React.ReactNode;
+}) {
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
     "spans.model",
@@ -63,35 +98,29 @@ export function FieldsFilters() {
     "annotations.hasAnnotation",
   ];
 
-  const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
+  const allFilters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
     id,
     availableFilters[id],
   ]);
 
-  const hasAnyFilters = nonEmptyFilters.length > 0;
-
   return (
-    <VStack align="start" width="300px" gap={6}>
+    <VStack align="start" width="300px" gap={4}>
       <HStack width={"full"}>
-        <Heading size="md">Filters</Heading>
+        <Heading fontSize="sm">Filters</Heading>
 
         <Spacer />
 
-        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
-          <Tooltip content="Create a filter to add a trigger.">
-            <Button
-              colorPalette="orange"
-              onClick={() => openDrawer("trigger", undefined)}
-              disabled={!hasAnyFilters}
-            >
-              Add Trigger
-            </Button>
-          </Tooltip>
-        )}
+        {actionButton}
       </HStack>
       <VStack gap={3} width="full">
-        {filters.map(([id, filter]) => (
-          <FieldsFilter key={id} filterId={id} filter={filter} />
+        {allFilters.map(([id, filter]) => (
+          <FieldsFilter
+            key={id}
+            filterId={id}
+            filter={filter}
+            filters={filters}
+            setFilters={setFilters}
+          />
         ))}
       </VStack>
     </VStack>
@@ -101,13 +130,22 @@ export function FieldsFilters() {
 function FieldsFilter({
   filterId,
   filter,
+  filters,
+  setFilters,
 }: {
   filterId: FilterField;
   filter: FilterDefinition;
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 }) {
   const gray400 = useColorRawValue("gray.400");
 
-  const { setFilter, filters } = useFilterParams();
+  const setFilter = useCallback(
+    (filterId: FilterField, values: FilterParam) => {
+      setFilters({ ...filters, [filterId]: values });
+    },
+    [setFilters, filters],
+  );
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
@@ -127,12 +165,10 @@ function FieldsFilter({
       >
         <Popover.Trigger asChild>
           <Button
-            variant="outline"
-            size="md"
+            variant="subtle"
+            size="sm"
             width="100%"
-            background="white"
             fontWeight="normal"
-            _hover={{ background: "white" }}
           >
             <HStack width="full" gap={1}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
@@ -210,6 +246,7 @@ function FieldsFilter({
                   filterId,
                 ]}
                 paddingX={4}
+                setFilter={setFilter}
               />
             )}
           </Popover.Body>
@@ -225,15 +262,15 @@ function NestedListSelection({
   keysAhead,
   keysBefore = [],
   paddingX = 0,
+  setFilter,
 }: {
   query: string;
   current: FilterParam;
   keysAhead: FilterField[];
   keysBefore?: string[];
   paddingX?: number;
+  setFilter: (filterId: FilterField, values: FilterParam) => void;
 }) {
-  const { setFilter } = useFilterParams();
-
   const filterId = keysAhead[0];
   if (!filterId) {
     console.warn("NestedListSelection called with empty keysAhead");
@@ -309,6 +346,7 @@ function NestedListSelection({
                   current={current}
                   keysAhead={keysAhead.slice(1)}
                   keysBefore={[...keysBefore, key]}
+                  setFilter={setFilter}
                 />
               );
             },
@@ -351,8 +389,35 @@ function ListSelection({
       refetchOnWindowFocus: false,
       keepPreviousData: true,
       enabled: queryOpts.enabled,
-    }
+    },
   );
+
+  const options = useMemo(() => {
+    const sortingFn = (a: { count: number }, b: { count: number }) =>
+      a.count > b.count ? -1 : 1;
+
+    if (query) {
+      return filterData.data?.options
+        .filter((option) => {
+          return option.label.toLowerCase().includes(query.toLowerCase());
+        })
+        .toSorted(sortingFn);
+    }
+
+    return filterData.data?.options.toSorted(sortingFn);
+  }, [filterData.data?.options, query]);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: options?.length ?? 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 35,
+    gap: 8,
+    overscan: 5,
+  });
+
+  const isEmpty = options && options.length === 0;
 
   if (
     filter.type === "numeric" &&
@@ -377,29 +442,6 @@ function ListSelection({
     );
   }
 
-  const options = useMemo(() => {
-    return filterData.data?.options
-      .sort((a, b) => (a.count > b.count ? -1 : 1))
-      .filter((option) => {
-        if (query) {
-          return option.label.toLowerCase().includes(query.toLowerCase());
-        }
-        return true;
-      });
-  }, [filterData.data?.options, query]);
-
-  const parentRef = React.useRef<HTMLDivElement>(null);
-
-  const virtualizer = useVirtualizer({
-    count: options?.length ?? 0,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 35,
-    gap: 8,
-    overscan: 5,
-  });
-
-  const isEmpty = options && options.length === 0;
-
   return (
     <Box
       width="full"
@@ -421,6 +463,7 @@ function ListSelection({
         position="relative"
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {
+          // eslint-disable-next-line prefer-const
           let { field, label, count } = options?.[virtualItem.index] ?? {
             field: "",
             label: "",
@@ -439,7 +482,7 @@ function ListSelection({
 
             if (currentValues.includes(field.toString())) {
               onChange(
-                currentValues.filter((v) => v.toString() !== field.toString())
+                currentValues.filter((v) => v.toString() !== field.toString()),
               );
             } else {
               onChange([...currentValues, field]);
@@ -512,7 +555,7 @@ function ListSelection({
               >
                 <Skeleton height="12px" width="120px" />
               </Checkbox>
-            )
+            ),
           )}
       </VStack>
     </Box>
@@ -532,10 +575,10 @@ function RangeFilter({
   onChange: (value: string[]) => void;
 }) {
   let min = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0)
+    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0),
   ).format("0.[0]");
   let max = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)
+    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0),
   ).format("0.[0]");
   if (isNaN(min)) {
     min = 0;

@@ -11,6 +11,7 @@ from ...models.post_api_scenario_events_body_type_2 import PostApiScenarioEvents
 from ...models.post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
 from ...models.post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
 from ...models.post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
+from ...models.post_api_scenario_events_response_422 import PostApiScenarioEventsResponse422
 from ...models.post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from ...types import Response
 
@@ -48,6 +49,7 @@ def _parse_response(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -63,6 +65,10 @@ def _parse_response(
         response_401 = PostApiScenarioEventsResponse401.from_dict(response.json())
 
         return response_401
+    if response.status_code == 422:
+        response_422 = PostApiScenarioEventsResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = PostApiScenarioEventsResponse500.from_dict(response.json())
 
@@ -80,6 +86,7 @@ def _build_response(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -100,6 +107,7 @@ def sync_detailed(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -114,7 +122,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse500]]
+        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -137,6 +145,7 @@ def sync(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -151,7 +160,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse500]
+        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]
     """
 
     return sync_detailed(
@@ -169,6 +178,7 @@ async def asyncio_detailed(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -183,7 +193,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse500]]
+        Response[Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -204,6 +214,7 @@ async def asyncio(
         PostApiScenarioEventsResponse201,
         PostApiScenarioEventsResponse400,
         PostApiScenarioEventsResponse401,
+        PostApiScenarioEventsResponse422,
         PostApiScenarioEventsResponse500,
     ]
 ]:
@@ -218,7 +229,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse500]
+        Union[PostApiScenarioEventsResponse201, PostApiScenarioEventsResponse400, PostApiScenarioEventsResponse401, PostApiScenarioEventsResponse422, PostApiScenarioEventsResponse500]
     """
 
     return (

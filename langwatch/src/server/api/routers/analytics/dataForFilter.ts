@@ -1,13 +1,13 @@
+import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { esClient, TRACE_INDEX } from "../../../elasticsearch";
-import { filterFieldsEnum } from "../../../filters/types";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
-import { protectedProcedure } from "../../trpc";
-import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
+import { esClient, TRACE_INDEX } from "../../../elasticsearch";
+import { availableFilters } from "../../../filters/registry";
+import { filterFieldsEnum } from "../../../filters/types";
+import { checkProjectPermission } from "../../rbac";
+import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 
 export const dataForFilter = protectedProcedure
   .input(
@@ -16,9 +16,9 @@ export const dataForFilter = protectedProcedure
       key: z.string().optional(),
       subkey: z.string().optional(),
       query: z.string().optional(),
-    })
+    }),
   )
-  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+  .use(checkProjectPermission("analytics:view"))
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 
@@ -54,13 +54,13 @@ export const dataForFilter = protectedProcedure
         aggs: availableFilters[field].listMatch.aggregation(
           input.query,
           key,
-          subkey
+          subkey,
         ) as Record<string, AggregationsAggregationContainer>,
       },
     });
 
     const results = availableFilters[field].listMatch.extract(
-      (response.aggregations ?? {}) as any
+      (response.aggregations ?? {}) as any,
     );
 
     return { options: results };

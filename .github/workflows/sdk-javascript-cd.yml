@@ -6,25 +6,26 @@ on:
       - published
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   publish-sdk-npm:
     if: startsWith(github.event.release.tag_name, 'typescript-sdk@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v2
         with:
-          version: 10.12.1
+          version: 10.24.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: 20
+          node-version: 24
           cache: pnpm
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
           registry-url: "https://registry.npmjs.org"
@@ -33,22 +34,32 @@ jobs:
         working-directory: typescript-sdk
         run: pnpm install --frozen-lockfile
 
-      - name: Run unit tests
+      - name: Build
+        working-directory: ./typescript-sdk
+        run: pnpm build
+
+      - name: Run tests
         working-directory: ./typescript-sdk
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
-      - name: Build
-        working-directory: ./typescript-sdk
-        run: pnpm build
+
+      ## We run these against the current codebase for the CI build
+      ## but here we want to validate the SDK against the deployed app
+      ## before publishing
+      ## NOTE(afr): Disabled for now as prompts tests are broken
+      # - name: Run e2e tests
+      #   working-directory: ./typescript-sdk
+      #   env:
+      #     OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+      #     LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
+      #   run: pnpm test:e2e
 
       - name: Publish to npm
         working-directory: ./typescript-sdk
         run: pnpm publish --provenance --access public --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Get version from tag or manifest
         id: get_version

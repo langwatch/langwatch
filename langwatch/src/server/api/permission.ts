@@ -1,67 +1,136 @@
 import {
   OrganizationUserRole,
-  TeamUserRole,
   type PrismaClient,
+  TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import type { Session } from "next-auth";
 import { env } from "~/env.mjs";
+import type { Permission } from "./rbac";
 
-export const teamRolePermissionMapping = {
-  SETUP_PROJECT: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  ARCHIVE_PROJECT: [TeamUserRole.ADMIN],
-  PROJECT_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-  ANALYTICS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  ANALYTICS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  COST_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  MESSAGES_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-  MESSAGES_SHARE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  ANNOTATIONS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  SPANS_DEBUG: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  GUARDRAILS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  GUARDRAILS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  EXPERIMENTS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  EXPERIMENTS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  DATASETS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-  DATASETS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  ANNOTATIONS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  TRIGGERS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  PLAYGROUND: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  WORKFLOWS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  WORKFLOWS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  PROMPTS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-  PROMPTS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
-  TEAM_ARCHIVE: [TeamUserRole.ADMIN],
-  TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
-  PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
+// ============================================================================
+// LEGACY PERMISSION SYSTEM (for backward compatibility)
+// ============================================================================
+// This will be gradually phased out in favor of the new RBAC system
+// See ./rbac.ts for the new permission system
 
-  SCENARIOS_VIEW: [
-    TeamUserRole.ADMIN,
-    TeamUserRole.MEMBER,
-    TeamUserRole.VIEWER,
-  ],
-  SCENARIOS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+// Organized nested permissions structure for better readability
+// Each section groups related permissions together
+const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
+  // Administrative resources first
+  organization: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+    manage: [TeamUserRole.ADMIN],
+  },
+  project: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    setup: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+    archive: [TeamUserRole.ADMIN],
+    changeCapturedDataVisibility: [TeamUserRole.ADMIN],
+  },
+  team: {
+    membersManage: [TeamUserRole.ADMIN],
+    archive: [TeamUserRole.ADMIN],
+    createNewProjects: [TeamUserRole.ADMIN],
+  },
+  // Functional resources
+  analytics: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  cost: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  messages: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    share: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  scenarios: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  annotations: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  guardrails: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  workflows: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  datasets: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  triggers: {
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  prompts: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  playground: {
+    access: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+};
+
+// Exported flat mapping maintains backward compatibility with exact old key names
+// eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
+  // Project permissions
+  SETUP_PROJECT: teamPermissions.project!.setup!,
+  ARCHIVE_PROJECT: teamPermissions.project!.archive!,
+  PROJECT_VIEW: teamPermissions.project!.view!,
+  PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY:
+    teamPermissions.project!.changeCapturedDataVisibility!,
+
+  // Analytics permissions
+  ANALYTICS_VIEW: teamPermissions.analytics!.view!,
+  ANALYTICS_MANAGE: teamPermissions.analytics!.manage!,
+
+  // Cost permissions
+  COST_VIEW: teamPermissions.cost!.view!,
+
+  // Messages permissions
+  MESSAGES_VIEW: teamPermissions.messages!.view!,
+  MESSAGES_SHARE: teamPermissions.messages!.share!,
+
+  // Annotations permissions
+  ANNOTATIONS_VIEW: teamPermissions.annotations!.view!,
+  ANNOTATIONS_MANAGE: teamPermissions.annotations!.manage!,
+
+  // Guardrails permissions
+  GUARDRAILS_VIEW: teamPermissions.guardrails!.view!,
+  GUARDRAILS_MANAGE: teamPermissions.guardrails!.manage!,
+
+  WORKFLOWS_VIEW: teamPermissions.workflows!.view!,
+  WORKFLOWS_MANAGE: teamPermissions.workflows!.manage!,
+
+  // Datasets permissions
+  DATASETS_VIEW: teamPermissions.datasets!.view!,
+  DATASETS_MANAGE: teamPermissions.datasets!.manage!,
+
+  // Triggers permissions
+  TRIGGERS_MANAGE: teamPermissions.triggers!.manage!,
+
+  // Playground permissions
+  PLAYGROUND: teamPermissions.playground!.access!,
+
+  // Prompts permissions
+  PROMPTS_VIEW: teamPermissions.prompts!.view!,
+  PROMPTS_MANAGE: teamPermissions.prompts!.manage!,
+
+  // Team permissions
+  TEAM_MEMBERS_MANAGE: teamPermissions.team!.membersManage!,
+  TEAM_ARCHIVE: teamPermissions.team!.archive!,
+  TEAM_CREATE_NEW_PROJECTS: teamPermissions.team!.createNewProjects!,
+
+  // Scenarios permissions
+  SCENARIOS_VIEW: teamPermissions.scenarios!.view!,
+  SCENARIOS_MANAGE: teamPermissions.scenarios!.manage!,
 };
 
 export const organizationRolePermissionMapping = {
@@ -75,14 +144,14 @@ export const organizationRolePermissionMapping = {
 };
 
 export const TeamRoleGroup = Object.fromEntries(
-  Object.keys(teamRolePermissionMapping).map((key) => [key, key])
+  Object.keys(teamRolePermissionMapping).map((key) => [key, key]),
 ) as Record<
   keyof typeof teamRolePermissionMapping,
   keyof typeof teamRolePermissionMapping
 >;
 
 export const OrganizationRoleGroup = Object.fromEntries(
-  Object.keys(organizationRolePermissionMapping).map((key) => [key, key])
+  Object.keys(organizationRolePermissionMapping).map((key) => [key, key]),
 ) as Record<
   keyof typeof organizationRolePermissionMapping,
   keyof typeof organizationRolePermissionMapping
@@ -90,7 +159,7 @@ export const OrganizationRoleGroup = Object.fromEntries(
 
 export const isDemoProject = (
   projectId: string,
-  roleGroup: string
+  roleGroup: string,
 ): boolean => {
   if (
     projectId === env.DEMO_PROJECT_ID &&
@@ -98,12 +167,10 @@ export const isDemoProject = (
       roleGroup === TeamRoleGroup.DATASETS_VIEW ||
       roleGroup === TeamRoleGroup.ANALYTICS_VIEW ||
       roleGroup === TeamRoleGroup.COST_VIEW ||
-      roleGroup === TeamRoleGroup.SPANS_DEBUG ||
       roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
       roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
       roleGroup === TeamRoleGroup.PLAYGROUND ||
       roleGroup === TeamRoleGroup.PROJECT_VIEW ||
-      roleGroup === TeamRoleGroup.EXPERIMENTS_VIEW ||
       roleGroup === TeamRoleGroup.WORKFLOWS_VIEW ||
       roleGroup === TeamRoleGroup.PROMPTS_VIEW ||
       roleGroup === TeamRoleGroup.SCENARIOS_VIEW)
@@ -125,7 +192,7 @@ type PermissionMiddlewareParams<InputType> = {
 };
 
 export type PermissionMiddleware<InputType> = (
-  params: PermissionMiddlewareParams<InputType>
+  params: PermissionMiddlewareParams<InputType>,
 ) => Promise<any>;
 
 type PublicResourceTypes = "TRACE" | "THREAD";
@@ -142,7 +209,7 @@ export const checkPermissionOrPubliclyShared =
     }: {
       resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
       resourceParam: Key;
-    }
+    },
   ) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
     let allowed;
@@ -192,7 +259,7 @@ export const checkUserPermissionForProject =
 export const backendHasTeamProjectPermission = async (
   ctx: { prisma: PrismaClient; session: Session | null },
   input: { projectId: string },
-  roleGroup: keyof typeof TeamRoleGroup
+  roleGroup: keyof typeof TeamRoleGroup,
 ): Promise<boolean> => {
   if (!ctx.session?.user) {
     return false;
@@ -211,18 +278,15 @@ export const backendHasTeamProjectPermission = async (
     },
   });
 
-  const teamMember = projectTeam?.team.members.find(
-    (member) => member.userId === ctx.session?.user.id
+  const teamMember = projectTeam?.team?.members?.find(
+    (member) => member.userId === ctx.session?.user.id,
   );
 
-  return (
-    !!projectTeam &&
-    projectTeam.team.members.length > 0 &&
-    !!teamMember &&
-    (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-      teamMember.role
-    )
-  );
+  if (!projectTeam?.team || !teamMember) {
+    return false;
+  }
+
+  return teamRolePermissionMapping[roleGroup]!.includes(teamMember.role);
 };
 
 export const checkUserPermissionForTeam =
@@ -243,7 +307,7 @@ export const checkUserPermissionForTeam =
 export const backendHasTeamPermission = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: { teamId: string },
-  roleGroup: keyof typeof TeamRoleGroup
+  roleGroup: keyof typeof TeamRoleGroup,
 ) => {
   if (!ctx.session?.user) {
     return false;
@@ -276,12 +340,12 @@ export const backendHasTeamPermission = async (
     },
   });
 
-  return (
-    teamUser &&
-    (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-      teamUser.role
-    )
-  );
+  if (!teamUser) {
+    return false;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  return teamRolePermissionMapping[roleGroup]!.includes(teamUser.role);
 };
 
 export const checkUserPermissionForOrganization =
@@ -302,7 +366,7 @@ export const checkUserPermissionForOrganization =
 export const backendHasOrganizationPermission = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: { organizationId: string },
-  roleGroup: keyof typeof OrganizationRoleGroup
+  roleGroup: keyof typeof OrganizationRoleGroup,
 ) => {
   if (!ctx.session?.user) {
     return false;
@@ -335,7 +399,7 @@ export const skipPermissionCheck = ({
   for (const key of SENSITIVE_KEYS) {
     if (key in input) {
       throw new Error(
-        `${key} is not allowed to be used without permission check`
+        `${key} is not allowed to be used without permission check`,
       );
     }
   }
@@ -351,3 +415,48 @@ export const skipPermissionCheckProjectCreation = ({
 
   return next();
 };
+
+// ============================================================================
+// MIGRATION HELPERS - Bridge between old and new RBAC systems
+// ============================================================================
+
+/**
+ * Mapping from legacy TeamRoleGroup keys to new RBAC permissions
+ * This allows gradual migration to the new system
+ */
+export const LEGACY_TO_RBAC_MAPPING: Partial<
+  Record<keyof typeof TeamRoleGroup, Permission>
+> = {
+  PROJECT_VIEW: "project:view",
+  SETUP_PROJECT: "project:update",
+  ARCHIVE_PROJECT: "project:delete",
+  PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: "project:manage",
+  ANALYTICS_VIEW: "analytics:view",
+  ANALYTICS_MANAGE: "analytics:manage",
+  COST_VIEW: "cost:view",
+  MESSAGES_VIEW: "traces:view",
+  MESSAGES_SHARE: "traces:share",
+  ANNOTATIONS_VIEW: "annotations:view",
+  ANNOTATIONS_MANAGE: "annotations:manage",
+  WORKFLOWS_VIEW: "workflows:view",
+  WORKFLOWS_MANAGE: "workflows:manage",
+  DATASETS_VIEW: "datasets:view",
+  DATASETS_MANAGE: "datasets:manage",
+  TRIGGERS_MANAGE: "triggers:manage",
+  PROMPTS_VIEW: "prompts:view",
+  PROMPTS_MANAGE: "prompts:manage",
+  TEAM_MEMBERS_MANAGE: "team:manage",
+  TEAM_ARCHIVE: "team:delete",
+  TEAM_CREATE_NEW_PROJECTS: "project:create",
+  SCENARIOS_VIEW: "scenarios:view",
+  SCENARIOS_MANAGE: "scenarios:manage",
+};
+
+/**
+ * Convert legacy permission to new RBAC permission
+ */
+export function legacyToRbacPermission(
+  legacyKey: keyof typeof TeamRoleGroup,
+): Permission | undefined {
+  return LEGACY_TO_RBAC_MAPPING[legacyKey];
+}

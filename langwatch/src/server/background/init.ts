@@ -1,7 +1,7 @@
-import { createLogger } from "../../utils/logger";
-import { startUsageStatsWorker } from "./workers/usageStatsWorker";
-import { scheduleUsageStats } from "./queues/usageStatsQueue";
 import { env } from "~/env.mjs";
+import { createLogger } from "../../utils/logger";
+import { scheduleUsageStats } from "./queues/usageStatsQueue";
+import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
 const logger = createLogger("langwatch:background:init");
 

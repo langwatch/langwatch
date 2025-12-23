@@ -165,21 +165,83 @@ class ClientReadableValueError(ValueError):
         return self.args[0]
 
 
+# Minimum max_tokens required by DSPy for reasoning models
+REASONING_MODEL_MIN_MAX_TOKENS = 16000
+
+
+def is_reasoning_model(model: str | None) -> bool:
+    """
+    Detects if a model is an OpenAI reasoning model (o1, o3, o4, o5, gpt-5).
+
+    Uses the same detection logic as DSPy: extracts model family from path
+    and matches against known reasoning model patterns.
+
+    Reasoning models require temperature=1.0 and max_tokens >= 16000 for DSPy.
+    """
+    if not model:
+        return False
+    # Match DSPy's approach: extract model family and match pattern
+    model_family = model.split("/")[-1].lower() if "/" in model else model.lower()
+    return bool(re.match(r"^(?:o[1345]|gpt-5)(?:-(?:mini|nano))?", model_family))
+
+
+def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
+    """
+    Returns corrected temperature and max_tokens for an LLMConfig.
+
+    For reasoning models (o1, o3, o4, o5, gpt-5):
+    - temperature: 1.0 (required by DSPy, which handles the API call internally)
+    - max_tokens: at least 16000
+
+    For non-reasoning models:
+    - temperature: config value or 0
+    - max_tokens: config value or 2048
+    """
+    if is_reasoning_model(llm_config.model):
+        return {
+            "temperature": 1.0,
+            "max_tokens": max(
+                llm_config.max_tokens or REASONING_MODEL_MIN_MAX_TOKENS,
+                REASONING_MODEL_MIN_MAX_TOKENS,
+            ),
+        }
+    return {
+        "temperature": llm_config.temperature or 0,
+        "max_tokens": llm_config.max_tokens or 2048,
+    }
+
+
 def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
+    """
+    Converts an LLMConfig to a DSPy LM instance.
+
+    For reasoning models (o1, o3, o4, o5, gpt-5):
+    - temperature: 1.0 (required by DSPy, which handles the API call internally)
+    - max_tokens: at least 16000
+
+    For non-reasoning models:
+    - temperature: config value or 0
+    - max_tokens: config value or 2048
+    """
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
     }
-    if "azure/" in (llm_params["model"] or "") and "api_version" not in llm_params and "use_azure_gateway" not in llm_params:
+    if (
+        "azure/" in (llm_params["model"] or "")
+        and "api_version" not in llm_params
+        and "use_azure_gateway" not in llm_params
+    ):
         llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
     llm_params["drop_params"] = True
     llm_params["model_type"] = "chat"
 
-    lm = dspy.LM(
-        max_tokens=llm_config.max_tokens or 2048,
-        temperature=llm_config.temperature or 0,
+    corrected = get_corrected_llm_params(llm_config)
+
+    return dspy.LM(
+        max_tokens=corrected["max_tokens"],
+        temperature=corrected["temperature"],
         **llm_params,
     )
-    return lm
 
 
 def shutdown_handler(sig, frame):

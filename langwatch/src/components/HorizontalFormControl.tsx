@@ -3,13 +3,14 @@ import {
   Field,
   HStack,
   Spacer,
-  VStack,
   type SystemStyleObject,
+  VStack,
 } from "@chakra-ui/react";
-import { type PropsWithChildren, type ReactNode } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
 
+import { FormErrorDisplay } from "~/components/FormErrorDisplay";
 import { Tooltip } from "~/components/ui/tooltip";
 
 export interface HorizontalFormControlProps extends SystemStyleObject {
@@ -56,6 +57,7 @@ export function HorizontalFormControl({
           direction === "horizontal" ? ["column", "column", "row"] : "column"
         }
         align={align}
+        gap={4}
       >
         <VStack
           align="start"
@@ -91,13 +93,7 @@ export function HorizontalFormControl({
         </VStack>
         {direction === "horizontal" && <Spacer />}
         <Box minWidth={["full", "full", inputWidth ?? "50%"]}>{children}</Box>
-        {error && (
-          <Field.ErrorText margin={0} fontSize="13px">
-            {typeof error == "object" && "message" in error
-              ? error.message?.toString()
-              : (error as any)}
-          </Field.ErrorText>
-        )}
+        <FormErrorDisplay error={error} />
       </HStack>
     </Field.Root>
   );

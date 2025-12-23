@@ -3,21 +3,27 @@ import type {
   QueryDslBoolQuery,
   SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
-import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
+import {
+  EvaluationExecutionMode,
+  ExperimentType,
+  Prisma,
+} from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
-  wizardStateSchema,
   type WizardState,
+  wizardStateSchema,
 } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
+import { persistedEvaluationsV3StateSchema } from "../../../evaluations-v3/types/persistence";
 import {
-  workflowJsonSchema,
   type Entry,
   type Evaluator,
   type Workflow,
+  workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
 import { slugify } from "../../../utils/slugify";
 import { prisma } from "../../db";
@@ -33,9 +39,12 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { saveOrCommitWorkflowVersion } from "./workflows";
+import {
+  copyWorkflowWithDatasets,
+  saveOrCommitWorkflowVersion,
+} from "./workflows";
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -46,9 +55,9 @@ export const experimentsRouter = createTRPCRouter({
         wizardState: wizardStateSchema,
         dsl: workflowJsonSchema,
         commitMessage: z.string().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
       let workflowId = input.dsl.workflow_id;
       const name =
@@ -183,14 +192,114 @@ export const experimentsRouter = createTRPCRouter({
       return updatedExperiment;
     }),
 
+  saveEvaluationsV3: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentId: z.string().optional(),
+        state: persistedEvaluationsV3StateSchema,
+      }),
+    )
+    .use(checkProjectPermission("workflows:create"))
+    .mutation(async ({ input }) => {
+      const isNewExperiment = !input.experimentId;
+      const experimentId = input.experimentId ?? generate("eval").toString();
+
+      // For new experiments, use the ID as the slug (guaranteed unique)
+      // For existing experiments, keep the same slug to avoid breaking URLs
+      const name =
+        input.state.name || (await findNextDraftName(input.projectId));
+
+      let slug: string;
+      if (isNewExperiment) {
+        // New experiment: prefer the slug from state (set by frontend redirect),
+        // otherwise use last 8 chars of the ID for a shorter, cleaner URL
+        slug = input.state.experimentSlug ?? experimentId.slice(-8);
+      } else {
+        // Existing experiment: fetch the current slug to keep it unchanged
+        const existing = await prisma.experiment.findUnique({
+          where: { id: experimentId, projectId: input.projectId },
+          select: { slug: true },
+        });
+        slug = existing?.slug ?? experimentId.slice(-8);
+      }
+
+      // Convert to plain JSON for Prisma storage
+      const wizardStateJson = JSON.parse(JSON.stringify(input.state));
+      const experimentData = {
+        name,
+        slug,
+        projectId: input.projectId,
+        type: ExperimentType.EVALUATIONS_V3,
+        wizardState: wizardStateJson,
+      };
+
+      await prisma.experiment.upsert({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+        update: experimentData,
+        create: {
+          ...experimentData,
+          id: experimentId,
+        },
+      });
+
+      const updatedExperiment = await prisma.experiment.findUnique({
+        where: {
+          id: experimentId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!updatedExperiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      return updatedExperiment;
+    }),
+
+  getEvaluationsV3BySlug: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        experimentSlug: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:view"))
+    .query(async ({ input }) => {
+      const experiment = await getExperimentBySlug(
+        input.projectId,
+        input.experimentSlug,
+      );
+
+      if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Experiment is not an EVALUATIONS_V3 type",
+        });
+      }
+
+      return {
+        ...experiment,
+        wizardState: experiment.wizardState as z.infer<
+          typeof persistedEvaluationsV3StateSchema
+        > | null,
+      };
+    }),
+
   saveAsMonitor: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         experimentId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
       const experiment = await prisma.experiment.findUnique({
         where: {
@@ -237,7 +346,7 @@ export const experimentsRouter = createTRPCRouter({
           (evaluator.data.parameters ?? []).map((param) => [
             param.identifier,
             param.value,
-          ])
+          ]),
         ) as Record<string, any>,
         mappings: wizardState.realTimeTraceMappings ?? {},
         sample: wizardState.realTimeExecution?.sample ?? 1,
@@ -268,9 +377,9 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string().optional(),
         experimentSlug: z.string().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
         const experiment = await prisma.experiment.findFirst({
@@ -291,7 +400,7 @@ export const experimentsRouter = createTRPCRouter({
       } else if (input.experimentSlug) {
         const experiment = await getExperimentBySlug(
           input.projectId,
-          input.experimentSlug
+          input.experimentSlug,
         );
 
         return experiment;
@@ -309,13 +418,13 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentSlug: z.string(),
         randomSeed: z.number().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
 
       const workflow = experiment.workflowId
@@ -338,7 +447,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiments = await prisma.experiment.findMany({
         where: {
@@ -350,14 +459,8 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getAllForEvaluationsList: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-        pageOffset: z.number().optional(),
-        pageSize: z.number().optional(),
-      })
-    )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const pageOffset = input.pageOffset ?? 0;
       const pageSize = input.pageSize ?? 25;
@@ -386,7 +489,7 @@ export const experimentsRouter = createTRPCRouter({
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (
           (dsl as Workflow | undefined)?.nodes.find(
-            (node) => node.type === "entry"
+            (node) => node.type === "entry",
           ) as Node<Entry>
         )?.data.dataset?.id;
       };
@@ -406,19 +509,19 @@ export const experimentsRouter = createTRPCRouter({
             },
             where: { projectId: input.projectId, id: { in: datasetIds } },
           })
-        ).map((dataset) => [dataset.id, dataset])
+        ).map((dataset) => [dataset.id, dataset]),
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
         input.projectId,
-        experiments.map((experiment) => experiment.id)
+        experiments.map((experiment) => experiment.id),
       );
 
       const experimentsWithDatasetsAndRuns = experiments
         .map((experiment) => {
           const runs = runsByExperimentId[experiment.id] ?? [];
           const latestRun = runs.sort(
-            (a, b) => b.timestamps.created_at - a.timestamps.created_at
+            (a, b) => b.timestamps.created_at - a.timestamps.created_at,
           )[0];
           const primaryMetric = latestRun
             ? Object.values(latestRun?.summary.evaluations)[0]
@@ -455,11 +558,11 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
       const client = await esClient({ projectId: input.projectId });
 
@@ -508,11 +611,11 @@ export const experimentsRouter = createTRPCRouter({
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source!.run_id === bucket.key
+            (hit) => hit._source?.run_id === bucket.key,
           );
           const versionId = steps.filter(
-            (step) => step._source!.workflow_version_id
-          )[0]?._source!.workflow_version_id;
+            (step) => step._source?.workflow_version_id,
+          )[0]?._source?.workflow_version_id;
 
           return {
             runId: bucket.key,
@@ -537,11 +640,11 @@ export const experimentsRouter = createTRPCRouter({
                         acc +
                         (curr.completion_tokens ?? 0) +
                         (curr.prompt_tokens ?? 0),
-                      0
+                      0,
                     ),
                     total_cost: llmCalls.reduce(
                       (acc, curr) => acc + (curr?.cost ?? 0),
-                      0
+                      0,
                     ),
                   },
                   timestamps: {
@@ -550,16 +653,16 @@ export const experimentsRouter = createTRPCRouter({
                 } as DSPyStepSummary;
               })
               .sort(
-                (a, b) => a.timestamps.created_at - b.timestamps.created_at
+                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
               ),
             created_at: Math.min(
-              ...steps.map((hit) => hit._source!.timestamps.created_at)
+              ...steps.map((hit) => hit._source!.timestamps.created_at),
             ),
           };
         })
         .sort(
           (a: DSPyRunsSummary, b: DSPyRunsSummary) =>
-            b.created_at - a.created_at
+            b.created_at - a.created_at,
         );
 
       return result;
@@ -572,13 +675,13 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
         runId: z.string(),
         index: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
 
       const client = await esClient({ projectId: input.projectId });
@@ -612,16 +715,16 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
-        input.experimentId
+        input.experimentId,
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
         input.projectId,
-        [experiment.id]
+        [experiment.id],
       );
 
       return { runs: runsByExperimentId[experiment.id] ?? [] };
@@ -633,13 +736,13 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string(),
         runId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
-        input.experimentId
+        input.experimentId,
       );
 
       const id = batchEvaluationId({
@@ -687,9 +790,9 @@ export const experimentsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         experimentId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ input }) => {
       // Verify the experiment exists and belongs to the project
       const experiment = await prisma.experiment.findUnique({
@@ -810,12 +913,156 @@ export const experimentsRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  copy: protectedProcedure
+    .input(
+      z.object({
+        experimentId: z.string(),
+        projectId: z.string(),
+        sourceProjectId: z.string(),
+        copyDatasets: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission("evaluations:manage"))
+    .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least evaluations:manage permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "evaluations:manage",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to manage evaluations in the source project",
+        });
+      }
+
+      const experiment = await ctx.prisma.experiment.findUnique({
+        where: {
+          id: input.experimentId,
+          projectId: input.sourceProjectId,
+        },
+        include: {
+          workflow: {
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!experiment) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment not found",
+        });
+      }
+
+      if (!experiment.workflowId || !experiment.workflow?.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Experiment workflow not found",
+        });
+      }
+
+      const { workflowId, dsl } = await copyWorkflowWithDatasets({
+        ctx,
+        workflow: {
+          id: experiment.workflow.id,
+          name: experiment.workflow.name,
+          icon: experiment.workflow.icon,
+          description: experiment.workflow.description,
+          latestVersion: experiment.workflow.latestVersion,
+        },
+        targetProjectId: input.projectId,
+        sourceProjectId: input.sourceProjectId,
+        copyDatasets: input.copyDatasets,
+        copiedFromWorkflowId: experiment.workflowId,
+      });
+
+      const newWorkflow = await ctx.prisma.workflow.findFirst({
+        where: {
+          id: workflowId,
+          projectId: input.projectId,
+        },
+      });
+
+      if (!newWorkflow) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create workflow",
+        });
+      }
+
+      // Save workflow version
+      await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId,
+          dsl,
+        },
+        autoSaved: false,
+        commitMessage: `Copied from ${experiment.workflow.name}`,
+      });
+
+      // Create new experiment with unique slug
+      const experimentName = experiment.name ?? experiment.slug;
+      const baseSlug = slugify(experimentName);
+
+      // Find a unique slug by appending -2, -3, etc. if needed
+      const MAX_ATTEMPTS = 100;
+      let newSlug = baseSlug;
+      let index = 2;
+      let attempts = 0;
+
+      while (attempts < MAX_ATTEMPTS) {
+        const existingExperiment = await ctx.prisma.experiment.findFirst({
+          where: {
+            projectId: input.projectId,
+            slug: newSlug,
+          },
+        });
+
+        if (!existingExperiment) {
+          break;
+        }
+
+        newSlug = `${baseSlug}-${index}`;
+        index++;
+        attempts++;
+      }
+
+      // Fallback to random suffix if we hit the limit (should never happen in practice)
+      if (attempts >= MAX_ATTEMPTS) {
+        newSlug = `${baseSlug}-${nanoid(8)}`;
+      }
+
+      const newExperiment = await ctx.prisma.experiment.create({
+        data: {
+          id: `experiment_${nanoid()}`,
+          name: experimentName,
+          slug: newSlug,
+          projectId: input.projectId,
+          type: experiment.type,
+          workflowId,
+          ...(experiment.wizardState && {
+            wizardState: experiment.wizardState as Prisma.InputJsonValue,
+          }),
+        },
+      });
+
+      return { experiment: newExperiment, workflow: newWorkflow };
+    }),
+
   /**
    * isLastExperimentADraft
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await prisma.experiment.findFirst({
         where: { projectId: input.projectId },
@@ -828,7 +1075,7 @@ export const experimentsRouter = createTRPCRouter({
 
 const getExperimentBySlug = async (
   projectId: string,
-  experimentSlug: string
+  experimentSlug: string,
 ) => {
   const experiment = await prisma.experiment.findFirst({
     where: {
@@ -891,7 +1138,7 @@ const getVersionMap = async (projectId: string, versionIds: string[]) => {
       acc[version.id] = version;
       return acc;
     },
-    {} as Record<string, (typeof versions)[number]>
+    {} as Record<string, (typeof versions)[number]>,
   );
 
   return versionsMap;
@@ -909,7 +1156,7 @@ const findNextDraftName = async (projectId: string) => {
   });
 
   const draftCount = experiments.filter(
-    (draft) => draft.name?.startsWith("Draft")
+    (draft) => draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -929,7 +1176,7 @@ const findNextDraftName = async (projectId: string) => {
 
 const getExperimentBatchEvaluationRuns = async (
   projectId: string,
-  experimentIds: string[]
+  experimentIds: string[],
 ) => {
   type ESBatchEvaluationRunInfo = Pick<
     ESBatchEvaluation,
@@ -1067,7 +1314,7 @@ const getExperimentBatchEvaluationRuns = async (
     const source = hit._source!;
 
     const runAgg = (batchEvaluationRuns.aggregations!.runs as any).buckets.find(
-      (bucket: any) => bucket.key === source.run_id
+      (bucket: any) => bucket.key === source.run_id,
     );
 
     return {
@@ -1109,7 +1356,7 @@ const getExperimentBatchEvaluationRuns = async (
                   : {}),
               },
             ];
-          })
+          }),
         ) as Record<
           string,
           {
@@ -1130,7 +1377,7 @@ const getExperimentBatchEvaluationRuns = async (
       acc[run.experiment_id]!.push(run);
       return acc;
     },
-    {} as Record<string, (typeof runs)[number][]>
+    {} as Record<string, (typeof runs)[number][]>,
   );
 
   return runsByExperimentId;

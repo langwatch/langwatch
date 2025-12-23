@@ -1,23 +1,13 @@
-import {
-  Alert,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { Spacer } from "@chakra-ui/react";
-import { TeamRoleGroup } from "~/server/api/permission";
+import { Alert, Button, Card, Heading, Text, VStack } from "@chakra-ui/react";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TopicClusteringModel } from "./model-providers";
-import { EmbeddingsModel } from "./model-providers";
+import { EmbeddingsModel, TopicClusteringModel } from "./model-providers";
 
-export default function TopicClusteringSettings() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject({
+function TopicClusteringSettings() {
+  const { project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -25,20 +15,8 @@ export default function TopicClusteringSettings() {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
-        <HStack width="full" marginTop={6}>
-          <Heading size="lg" as="h1">
-            Topic Clustering
-          </Heading>
-          <Spacer />
-        </HStack>
+      <VStack gap={6} width="full" align="start">
+        <Heading as="h2">Topic Clustering</Heading>
 
         <TopicClusteringCard project={project} />
       </VStack>
@@ -46,10 +24,11 @@ export default function TopicClusteringSettings() {
   );
 }
 
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(TopicClusteringSettings);
+
 function TopicClusteringCard({ project }: { project: { id: string } }) {
-  const { hasTeamPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -57,7 +36,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         description:
           "The topic clustering job has been queued and will run shortly.",
         type: "success",
-        placement: "top-end",
       });
     },
     onError: (error) => {
@@ -65,37 +43,22 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         title: "Failed to trigger topic clustering",
         description: error.message,
         type: "error",
-        placement: "top-end",
       });
     },
   });
 
-  // Only show to users with setup permissions
-  if (!hasTeamPermission(TeamRoleGroup.SETUP_PROJECT)) {
-    return (
-      <Card.Root>
-        <Card.Body>
-          <Text color="gray.600">
-            You need project setup permissions to manage topic clustering.
-          </Text>
-        </Card.Body>
-      </Card.Root>
-    );
-  }
-
   return (
-    <VStack
-      gap={6}
-      width="full"
-      maxWidth="920px"
-      align="start"
-      paddingBottom={12}
-    >
-      <Card.Root>
+    <VStack gap={6} width="full" align="start" paddingBottom={12}>
+      <VStack gap={0} width="full" align="stretch">
+        <TopicClusteringModel />
+        <EmbeddingsModel />
+      </VStack>
+
+      <Card.Root width="full">
         <Card.Header>
-          <Heading size="md">Manual Topic Clustering</Heading>
+          <Heading>Manual Topic Clustering</Heading>
         </Card.Header>
-        <Card.Body>
+        <Card.Body width="full">
           <VStack align="start" gap={4}>
             <Text>
               Manually trigger topic clustering to organize your traces into
@@ -126,25 +89,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
           </VStack>
         </Card.Body>
       </Card.Root>
-
-      <VStack width="full" align="start" gap={6}>
-        <VStack gap={2} marginTop={2} align="start" width="full">
-          <Heading size="md" as="h2">
-            Default Models
-          </Heading>
-          <Text>
-            Configure the default models used on topic clustering and embeddings
-          </Text>
-        </VStack>
-        <Card.Root width="full">
-          <Card.Body width="full">
-            <VStack gap={0} width="full" align="stretch">
-              <TopicClusteringModel />
-              <EmbeddingsModel />
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      </VStack>
     </VStack>
   );
 }

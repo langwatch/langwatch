@@ -2,19 +2,21 @@ import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { type Node, type NodeProps } from "@xyflow/react";
+import type { Node, NodeProps } from "@xyflow/react";
 import { useEffect, useState, useTransition } from "react";
 import { MoreHorizontal, Plus, Trash2 } from "react-feather";
+import type { AddDatasetDrawerProps } from "../../../components/AddOrEditDatasetDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import { DatasetPreview } from "../../../components/datasets/DatasetPreview";
 import { DEFAULT_DATASET_NAME } from "../../../components/datasets/DatasetTable";
+import { Menu } from "../../../components/ui/menu";
+import { toaster } from "../../../components/ui/toaster";
+import { useDeleteDatasetConfirmation } from "../../../hooks/useDeleteDatasetConfirmation";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
 import { useGetDatasetData } from "../../hooks/useGetDatasetData";
 import type { Component, Entry } from "../../types/dsl";
-import { useDrawer } from "../../../components/CurrentDrawer";
-import { Menu } from "../../../components/ui/menu";
-import { toaster } from "../../../components/ui/toaster";
 
 export function DatasetSelection({
   node,
@@ -27,7 +29,7 @@ export function DatasetSelection({
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const { openDrawer } = useDrawer();
@@ -41,21 +43,18 @@ export function DatasetSelection({
             size="sm"
             variant="outline"
             onClick={() => {
+              const handleSuccess: AddDatasetDrawerProps["onSuccess"] = ({
+                datasetId,
+                name,
+              }) => {
+                setIsEditing({ id: datasetId, name });
+              };
+
               openDrawer("uploadCSV", {
-                onSuccess: ({ datasetId, name }) => {
-                  setIsEditing({
-                    id: datasetId,
-                    name,
-                  });
-                },
+                onSuccess: handleSuccess,
                 onCreateFromScratch: () => {
                   openDrawer("addOrEditDataset", {
-                    onSuccess: ({ datasetId, name }) => {
-                      setIsEditing({
-                        id: datasetId,
-                        name,
-                      });
-                    },
+                    onSuccess: handleSuccess,
                   });
                 },
               });
@@ -124,14 +123,14 @@ export function DatasetSelectionItem({
           setRendered(true);
         });
       },
-      100 + Math.floor(Math.random() * 200)
+      100 + Math.floor(Math.random() * 200),
     );
   }, []);
 
   const { project } = useOrganizationTeamProject();
   const datasetDelete = api.dataset.deleteById.useMutation();
 
-  const deleteDataset = (id: string, name: string) => {
+  const deleteDataset = ({ id, name }: { id: string; name: string }) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
@@ -168,11 +167,10 @@ export function DatasetSelectionItem({
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                             duration: 5000,
                           });
                         },
-                      }
+                      },
                     );
                   }}
                 >
@@ -186,7 +184,6 @@ export function DatasetSelectionItem({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -199,12 +196,14 @@ export function DatasetSelectionItem({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
   };
+
+  const { showDeleteDialog, DeleteDialog } =
+    useDeleteDatasetConfirmation(deleteDataset);
 
   return (
     <VStack
@@ -216,6 +215,7 @@ export function DatasetSelectionItem({
       background="#F5F7F7"
       className="ag-borderless"
       position="relative"
+      overflow="hidden"
     >
       {dataset?.id && (
         <Box position="absolute" top={0} right={0} zIndex={11}>
@@ -246,7 +246,10 @@ export function DatasetSelectionItem({
                 css={{ color: "var(--chakra-colors-red-600)" }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  deleteDataset(dataset?.id ?? "", dataset?.name ?? "");
+                  showDeleteDialog({
+                    id: dataset?.id ?? "",
+                    name: dataset?.name ?? "",
+                  });
                 }}
               >
                 <Trash2 size={14} /> Delete dataset
@@ -281,6 +284,7 @@ export function DatasetSelectionItem({
       <Text fontSize="14px" fontWeight="bold" padding={4}>
         {dataset?.name ?? DEFAULT_DATASET_NAME}
       </Text>
+      <DeleteDialog />
     </VStack>
   );
 }

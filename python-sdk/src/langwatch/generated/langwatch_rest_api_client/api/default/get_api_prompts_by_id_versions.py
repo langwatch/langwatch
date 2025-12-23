@@ -9,6 +9,7 @@ from ...models.get_api_prompts_by_id_versions_response_200_item import GetApiPro
 from ...models.get_api_prompts_by_id_versions_response_400 import GetApiPromptsByIdVersionsResponse400
 from ...models.get_api_prompts_by_id_versions_response_401 import GetApiPromptsByIdVersionsResponse401
 from ...models.get_api_prompts_by_id_versions_response_404 import GetApiPromptsByIdVersionsResponse404
+from ...models.get_api_prompts_by_id_versions_response_422 import GetApiPromptsByIdVersionsResponse422
 from ...models.get_api_prompts_by_id_versions_response_500 import GetApiPromptsByIdVersionsResponse500
 from ...types import Response
 
@@ -31,6 +32,7 @@ def _parse_response(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -56,6 +58,10 @@ def _parse_response(
         response_404 = GetApiPromptsByIdVersionsResponse404.from_dict(response.json())
 
         return response_404
+    if response.status_code == 422:
+        response_422 = GetApiPromptsByIdVersionsResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = GetApiPromptsByIdVersionsResponse500.from_dict(response.json())
 
@@ -73,6 +79,7 @@ def _build_response(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -94,6 +101,7 @@ def sync_detailed(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -108,7 +116,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
+        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse422, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
     """
 
     kwargs = _get_kwargs(
@@ -131,6 +139,7 @@ def sync(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -145,7 +154,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
+        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse422, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
     """
 
     return sync_detailed(
@@ -163,6 +172,7 @@ async def asyncio_detailed(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -177,7 +187,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
+        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse422, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
     """
 
     kwargs = _get_kwargs(
@@ -198,6 +208,7 @@ async def asyncio(
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
+        GetApiPromptsByIdVersionsResponse422,
         GetApiPromptsByIdVersionsResponse500,
         list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
@@ -212,7 +223,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
+        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse422, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
     """
 
     return (

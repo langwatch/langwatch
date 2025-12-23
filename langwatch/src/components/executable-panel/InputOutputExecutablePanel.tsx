@@ -1,16 +1,16 @@
-import { Box, VStack, mergeRefs } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { Box, mergeRefs, VStack } from "@chakra-ui/react";
+import debounce from "lodash.debounce";
+import { motion } from "motion/react";
 import React, {
+  type ForwardedRef,
   forwardRef,
+  type PropsWithChildren,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type ForwardedRef,
-  type PropsWithChildren,
 } from "react";
-import debounce from "lodash.debounce";
 
 /**
  * Constants
@@ -42,7 +42,7 @@ interface PanelDimensions {
 const InputOutputExecutablePanelComponent = forwardRef(
   function InputOutputExecutablePanel(
     { children, isExpanded, onCloseExpanded }: InputOutputExecutablePanelProps,
-    ref: ForwardedRef<HTMLDivElement>
+    ref: ForwardedRef<HTMLDivElement>,
   ) {
     let leftDrawer: React.ReactNode | null = null;
     let centerContent: React.ReactNode | null = null;
@@ -263,7 +263,7 @@ const InputOutputExecutablePanelComponent = forwardRef(
         )}
       </Box>
     );
-  }
+  },
 );
 
 const Panel = ({
@@ -328,13 +328,6 @@ const Panel = ({
   );
 };
 
-type InputOutputExecutablePanelComponent =
-  typeof InputOutputExecutablePanelComponent & {
-    LeftDrawer: React.FC<Required<PropsWithChildren>>;
-    CenterContent: React.FC<Required<PropsWithChildren>>;
-    RightDrawer: React.FC<Required<PropsWithChildren>>;
-  };
-
 const LeftDrawer = ({ children }: { children: React.ReactNode }) => children;
 LeftDrawer.displayName = "InputOutputExecutablePanel.LeftDrawer";
 
@@ -350,5 +343,5 @@ export const InputOutputExecutablePanel = Object.assign(
     LeftDrawer,
     CenterContent,
     RightDrawer,
-  }
+  },
 );

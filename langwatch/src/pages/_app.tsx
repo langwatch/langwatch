@@ -1,9 +1,3 @@
-import { type Session } from "next-auth";
-import { SessionProvider } from "next-auth/react";
-import { type AppType } from "next/app";
-
-import { api } from "~/utils/api";
-
 import {
   ChakraProvider,
   createSystem,
@@ -11,6 +5,10 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
+import type { AppType } from "next/app";
+import type { Session } from "next-auth";
+import { SessionProvider } from "next-auth/react";
+import { api } from "~/utils/api";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
@@ -18,13 +16,15 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
+import { PostHogProvider } from "posthog-js/react";
 import { useEffect, useState } from "react";
+import { AnalyticsProvider } from "react-contextual-analytics";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
-import { dependencies } from "../injection/dependencies.client";
-
-import { PostHogProvider } from "posthog-js/react";
 import { usePostHog } from "../hooks/usePostHog";
+import { dependencies } from "../injection/dependencies.client";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -79,45 +79,68 @@ export const system = createSystem(defaultConfig, {
     semanticTokens: {
       colors: {
         gray: {
-          solid: { value: "{colors.gray.100}" },
+          solid: { value: "{colors.gray.200}" },
+          hover: { value: "{colors.gray.300}" },
           contrast: { value: "{colors.gray.800}" },
           subtle: { value: "{colors.gray.200}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         orange: {
           solid: { value: "#ED8926" },
+          hover: { value: "{colors.orange.600}" },
           focusRing: { value: "rgb(49, 130, 206)" },
           subtle: { value: "{colors.orange.50}" },
           fg: { value: "{colors.orange.800}" },
         },
         green: {
           solid: { value: "{colors.green.500}" },
+          hover: { value: "{colors.green.600}" },
           subtle: { value: "{colors.green.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         blue: {
           solid: { value: "{colors.blue.500}" },
+          hover: { value: "{colors.blue.600}" },
           subtle: { value: "{colors.blue.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         yellow: {
           solid: { value: "{colors.yellow.500}" },
+          hover: { value: "{colors.yellow.600}" },
           subtle: { value: "{colors.yellow.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
         },
         red: {
           solid: { value: "{colors.red.500}" },
+          hover: { value: "{colors.red.600}" },
           subtle: { value: "{colors.red.50}" },
           focusRing: { value: "rgb(49, 130, 206)" },
+        },
+      },
+      shadows: {
+        "2xs": {
+          value:
+            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
+        },
+        xs: {
+          value:
+            "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
         },
       },
     },
     recipes: {
       heading: defineRecipe({
+        base: {
+          fontWeight: "500",
+        },
         variants: {
           size: {
+            md: { textStyle: "md" },
             lg: { textStyle: "2xl" },
           },
+        },
+        defaultVariants: {
+          size: "md",
         },
       }),
       link: defineRecipe({
@@ -134,14 +157,22 @@ export const system = createSystem(defaultConfig, {
       button: defineRecipe({
         base: {
           fontWeight: 600,
+          borderRadius: "lg",
         },
         variants: {
           variant: {
+            solid: {
+              _hover: {
+                bg: "colorPalette.hover",
+              },
+            },
             outline: {
+              boxShadow: "2xs",
               borderColor: "gray.300",
               color: "gray.800",
               _hover: {
                 backgroundColor: "gray.50",
+                boxShadow: "inset 0 -2px 5px 0px rgba(0, 0, 0, 0.03)",
               },
               _expanded: {
                 backgroundColor: "gray.50",
@@ -150,10 +181,10 @@ export const system = createSystem(defaultConfig, {
             ghost: {
               color: "gray.800",
               _hover: {
-                backgroundColor: "gray.50",
+                backgroundColor: "gray.200",
               },
               _expanded: {
-                backgroundColor: "gray.50",
+                backgroundColor: "gray.200",
               },
             },
           },
@@ -174,6 +205,7 @@ export const system = createSystem(defaultConfig, {
               h: "8",
               minW: "8",
               px: "2.5",
+              fontSize: "13px",
               _icon: {
                 flexShrink: 1,
                 width: "auto",
@@ -213,9 +245,14 @@ export const system = createSystem(defaultConfig, {
       }),
       input: defineRecipe({
         base: {
-          borderRadius: "l1",
+          borderRadius: "lg",
         },
         variants: {
+          variant: {
+            outline: {
+              bg: "white/65",
+            },
+          },
           size: {
             xs: {
               "--input-height": "sizes.7",
@@ -226,17 +263,51 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
+      textarea: defineRecipe({
+        base: {
+          borderRadius: "md",
+        },
+        variants: {
+          variant: {
+            outline: {
+              bg: "white/65",
+            },
+          },
+        },
+      }),
+      radio: defineRecipe({
+        base: {
+          backgroundColor: "white/65",
+          "& .dot": {
+            backgroundColor: "white/65",
+          },
+        },
+      }),
     },
     slotRecipes: {
       card: defineSlotRecipe({
         slots: ["root"],
+        base: {
+          root: {
+            borderRadius: "xl",
+          },
+        },
         variants: {
           variant: {
+            outline: {
+              root: {
+                boxShadow: "2xs",
+              },
+            },
             elevated: {
               root: {
                 border: "1px solid",
-                borderColor: "gray.300",
-                boxShadow: "0px 4px 10px 0px rgba(0, 0, 0, 0.06)",
+                borderColor: "gray.100",
+                boxShadow: "md",
+                transition: "all 0.2s ease-in-out",
+                _hover: {
+                  boxShadow: "lg",
+                },
               },
             },
           },
@@ -258,6 +329,7 @@ export const system = createSystem(defaultConfig, {
           control: {
             borderWidth: "1px",
             cursor: "pointer",
+            backgroundColor: "white/65",
           },
           label: {
             fontWeight: "normal",
@@ -341,6 +413,9 @@ export const system = createSystem(defaultConfig, {
       table: defineSlotRecipe({
         slots: ["root"],
         base: {
+          root: {
+            borderRadius: "lg",
+          },
           columnHeader: {
             fontWeight: "bold",
             textStyle: "xs",
@@ -371,6 +446,12 @@ export const system = createSystem(defaultConfig, {
                 borderColor: "gray.100",
               },
             },
+            outline: {
+              header: {
+                background: "none",
+              },
+            },
+            ghost: {},
           },
           size: {
             xs: {
@@ -399,6 +480,9 @@ export const system = createSystem(defaultConfig, {
               },
             },
           },
+        },
+        defaultVariants: {
+          size: "sm",
         },
       }),
       switch: defineSlotRecipe({
@@ -438,7 +522,24 @@ export const system = createSystem(defaultConfig, {
         },
       }),
       dialog: defineSlotRecipe({
-        slots: ["content"],
+        slots: ["content", "header"],
+        base: {
+          header: {
+            pt: "4",
+            pb: "3",
+          },
+          body: {
+            pt: "3",
+          },
+          content: {
+            "& button:not([data-variant=ghost]):not([data-part])": {
+              boxShadow: "md",
+            },
+            "& input, & textarea, & select": {
+              boxShadow: "xs",
+            },
+          },
+        },
         variants: {
           size: {
             "5xl": {
@@ -455,13 +556,33 @@ export const system = createSystem(defaultConfig, {
         base: {
           trigger: {
             cursor: "pointer",
+            borderRadius: "lg",
+            background: "white/65",
+          },
+        },
+      }),
+      nativeSelect: defineSlotRecipe({
+        slots: [],
+        variants: {
+          variant: {
+            outline: {
+              field: {
+                borderRadius: "lg",
+                background: "white/65",
+              },
+            },
           },
         },
       }),
       drawer: defineSlotRecipe({
-        slots: ["content"],
+        slots: ["content", "header"],
         base: {
-          content: { maxWidth: "70%" },
+          content: {
+            maxWidth: "70%",
+          },
+          header: {
+            paddingY: 4,
+          },
         },
         variants: {
           size: {
@@ -479,6 +600,7 @@ export const system = createSystem(defaultConfig, {
         slots: ["root"],
         base: {
           root: {
+            borderRadius: "lg",
             "&[data-type=info]": {
               bg: "blue.solid",
               color: "blue.contrast",
@@ -501,11 +623,20 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
-
       alert: defineSlotRecipe({
         slots: ["root"],
-        defaultVariants: {
-          variant: "surface",
+        base: {
+          root: {
+            borderRadius: "lg",
+          },
+        },
+      }),
+      radioGroup: defineSlotRecipe({
+        slots: ["itemControl"],
+        base: {
+          itemControl: {
+            backgroundColor: "white/65",
+          },
         },
       }),
     },
@@ -524,6 +655,7 @@ const LangWatch: AppType<{
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
   const postHog = usePostHog();
+  const publicEnv = usePublicEnv();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
     useState<{ key: string; value: string }[]>([]);
@@ -533,7 +665,7 @@ const LangWatch: AppType<{
       .filter(
         ([key]) =>
           key.startsWith("NEXT_PUBLIC_FEATURE_") &&
-          typeof router.query[key] === "string"
+          typeof router.query[key] === "string",
       )
       .map(([key, value]) => ({ key, value: value as string }));
     setPreviousFeatureFlagQueryParams(featureFlagQueryParams);
@@ -599,13 +731,20 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        {postHog ? (
-          <PostHogProvider client={postHog}>
+        <AnalyticsProvider
+          client={createAppAnalyticsClient({
+            isSaaS: Boolean(publicEnv.data?.IS_SAAS),
+            posthogClient: postHog,
+          })}
+        >
+          {postHog ? (
+            <PostHogProvider client={postHog}>
+              <Component {...pageProps} />
+            </PostHogProvider>
+          ) : (
             <Component {...pageProps} />
-          </PostHogProvider>
-        ) : (
-          <Component {...pageProps} />
-        )}
+          )}
+        </AnalyticsProvider>
         <Toaster />
 
         {dependencies.ExtraFooterComponents && (

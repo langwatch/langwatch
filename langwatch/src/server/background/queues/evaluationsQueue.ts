@@ -1,14 +1,14 @@
+import type { ConnectionOptions } from "bullmq";
 import type { EvaluationJob } from "~/server/background/types";
 import { traceCheckIndexId } from "~/server/elasticsearch";
 import { captureError } from "../../../utils/captureError";
+import { createLogger } from "../../../utils/logger";
+import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
-import { createLogger } from "../../../utils/logger";
-import { QueueWithFallback } from "./queueWithFallback";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
-import type { ConnectionOptions } from "bullmq";
-import { safeTruncate } from "../../../utils/truncate";
+import { QueueWithFallback } from "./queueWithFallback";
 
 export const EVALUATIONS_QUEUE_NAME = "{evaluations}";
 
@@ -87,8 +87,8 @@ export const scheduleEvaluation = async ({
       {
         jobId,
         // Add a little delay to wait for the spans to be fully collected
-        delay: delay ?? 4000,
-      }
+        delay: delay ?? 30_000,
+      },
     );
   }
 };

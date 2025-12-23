@@ -12,6 +12,8 @@ import { datasetRecordRouter } from "./routers/datasetRecord";
 import { evaluationsRouter } from "./routers/evaluations";
 import { experimentsRouter } from "./routers/experiments";
 import { graphsRouter } from "./routers/graphs";
+import { dashboardsRouter } from "./routers/dashboards";
+import { homeRouter } from "./routers/home";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
@@ -24,6 +26,7 @@ import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
+import { roleRouter } from "./routers/role";
 import { scenarioRouter } from "./routers/scenario";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
@@ -34,7 +37,6 @@ import { translateRouter } from "./routers/translate";
 import { triggerRouter } from "./routers/triggers";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
-
 /**
  * This is the primary router for your server.
  *
@@ -54,6 +56,8 @@ export const appRouter = createTRPCRouter({
   dataset: datasetRouter,
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
+  dashboards: dashboardsRouter,
+  home: homeRouter,
   evaluations: evaluationsRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,
@@ -72,6 +76,7 @@ export const appRouter = createTRPCRouter({
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
+  role: roleRouter,
   prompts: promptsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });

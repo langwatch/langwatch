@@ -1,7 +1,6 @@
-import { getSession } from "next-auth/react";
-
 import { createServerSideHelpers } from "@trpc/react-query/server";
-import { type GetServerSidePropsContext } from "next";
+import type { GetServerSidePropsContext } from "next";
+import { getSession } from "next-auth/react";
 import { appRouter } from "~/server/api/root";
 import { prisma } from "../server/db";
 

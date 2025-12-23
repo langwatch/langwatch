@@ -1,12 +1,12 @@
-import { Box, Button, HStack, Text, VStack, Skeleton } from "@chakra-ui/react";
+import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import React, { useState } from "react";
-import { ArrowLeft, Clock, Check, X } from "react-feather";
+import { ArrowLeft, Check, Clock, X } from "react-feather";
 
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import {
   CustomCopilotKitChat,
-  SimulationConsole,
   PreviousRunsList,
+  SimulationConsole,
   SimulationLayout,
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -23,17 +23,16 @@ export default function IndividualScenarioRunPage() {
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
   // Fetch scenario run data using the correct API
-  const { data: scenarioState, isLoading: isScenarioStateLoading } =
-    api.scenarios.getRunState.useQuery(
-      {
-        scenarioRunId: scenarioRunId ?? "",
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioRunId,
-        refetchInterval: 1000,
-      }
-    );
+  const { data: scenarioState } = api.scenarios.getRunState.useQuery(
+    {
+      scenarioRunId: scenarioRunId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id && !!scenarioRunId,
+      refetchInterval: 1000,
+    },
+  );
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
@@ -158,6 +157,7 @@ export default function IndividualScenarioRunPage() {
                       <VStack>
                         <CustomCopilotKitChat
                           messages={scenarioState?.messages ?? []}
+                          hideInput
                         />
                         {/* Console Area */}
                         <Box

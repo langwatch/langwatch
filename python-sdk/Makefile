@@ -1,7 +1,10 @@
 .PHONY: test test-tracing install example
 
-test: test-tracing
-	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+test-unit:
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration and not e2e" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+
+test-e2e:
+	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "e2e"
 
 # Run tracing tests in isolation to avoid global OpenTelemetry state conflicts
 test-tracing:
@@ -14,8 +17,14 @@ test-tracing:
 	@echo "Running telemetry tracing tests..."
 	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
 
+test: install
+	$(MAKE) test-unit
+	$(MAKE) test-tracing
+	$(MAKE) test-e2e
+
 # Test bot/chatbot examples (excludes CLI examples)
-test-examples: cli-examples
+# Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
+test-examples:
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
 
 # Test CLI examples separately (they don't need mock messages)
@@ -45,6 +54,8 @@ example:
 		uv run python $$args; \
 	elif [[ $$args =~ "streamlit" ]]; then \
 		uv run streamlit run $$args; \
+	elif [[ $$args =~ "fetch_policies" ]]; then \
+		PYTHONPATH=$$PYTHONPATH:. uv run python $$args; \
 	else \
 		uv run chainlit run -w --port 9000 $$args; \
 	fi
@@ -58,6 +69,8 @@ ensure-openapi-python-client:
 	fi
 
 generate/api-client: ensure-openapi-python-client
+	@echo "Generating OpenAPI spec..."
+	@cd ../langwatch && pnpm run task generateOpenAPISpec
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."

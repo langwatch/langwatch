@@ -1,6 +1,6 @@
 import { Box } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
@@ -32,7 +32,7 @@ export function PropertiesPanel() {
       workflowSelected: state.workflowSelected,
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
-    }))
+    })),
   );
 
   const ComponentPropertiesPanelMap: Record<

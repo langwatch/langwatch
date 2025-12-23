@@ -1,8 +1,7 @@
-import * as Sentry from "@sentry/nextjs";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 import { dependencies } from "../../../../injection/dependencies.server";
 import { skipPermissionCheck } from "../../permission";
@@ -10,7 +9,6 @@ import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 
 import { signUpDataSchema } from "./schemas/sign-up-data.schema";
-
 
 /**
  * Router for handling onboarding-related operations.
@@ -36,7 +34,7 @@ export const onboardingRouter = createTRPCRouter({
         projectName: z.string().optional(),
         language: z.string().default("other"),
         framework: z.string().default("other"),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
@@ -84,10 +82,10 @@ export const onboardingRouter = createTRPCRouter({
                 orgName: orgResult.organization.name,
                 phoneNumber: input.phoneNumber,
                 signUpData: input.signUpData,
-              }
+              },
             );
           } catch (err) {
-            Sentry.captureException(err);
+            captureException(err);
           }
         }
 
@@ -101,7 +99,7 @@ export const onboardingRouter = createTRPCRouter({
           projectSlug: projectResult.projectSlug,
         };
       } catch (error) {
-        Sentry.captureException(error);
+        captureException(error);
         throw error;
       }
     }),

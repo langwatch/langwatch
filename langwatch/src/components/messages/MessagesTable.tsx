@@ -3,72 +3,64 @@ import {
   Box,
   Button,
   Card,
+  CloseButton,
   Container,
-  HStack,
   Heading,
+  HStack,
   Icon,
+  Portal,
   Progress,
   Skeleton,
   Spacer,
   Table,
   Tag,
   Text,
-  VStack,
   useDisclosure,
-  Portal,
-  CloseButton,
+  VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import numeral from "numeral";
+import Parse from "papaparse";
 import { useEffect, useRef, useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Download,
-  Edit,
-  List,
-  RefreshCw,
-  Shield,
-} from "react-feather";
+import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
+import { LuChevronsUpDown, LuRefreshCw } from "react-icons/lu";
+import { useLocalStorage } from "usehooks-ts";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
 import { api } from "~/utils/api";
 import { durationColor } from "~/utils/durationColor";
 import { getSingleQueryParam } from "~/utils/getSingleQueryParam";
+import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { useFilterParams } from "../../hooks/useFilterParams";
-
-import Parse from "papaparse";
-import { LuChevronsUpDown } from "react-icons/lu";
-import { useLocalStorage } from "usehooks-ts";
 import { getColorForString } from "../../utils/rotatingColors";
 import { titleCase } from "../../utils/stringCasing";
-import { useDrawer } from "../CurrentDrawer";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
+import { evaluationStatusColor } from "../checks/EvaluationStatus";
 import { Delayed } from "../Delayed";
+import { FilterSidebar } from "../filters/FilterSidebar";
+import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
 import { HoverableBigText } from "../HoverableBigText";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
-import { evaluationStatusColor } from "../checks/EvaluationStatus";
-import { FilterSidebar } from "../filters/FilterSidebar";
-import { FilterToggle, useFilterToggle } from "../filters/FilterToggle";
+import { AddParticipants } from "../traces/AddParticipants";
 import { formatEvaluationSingleValue } from "../traces/EvaluationStatusItem";
 import { Checkbox } from "../ui/checkbox";
-import { Popover } from "../ui/popover";
-import { toaster } from "../ui/toaster";
-import { Tooltip } from "../ui/tooltip";
 import { Dialog } from "../ui/dialog";
 import { Link } from "../ui/link";
+import { Popover } from "../ui/popover";
+import { RedactedField } from "../ui/RedactedField";
+import { toaster } from "../ui/toaster";
+import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
-
-import { AddParticipants } from "../traces/AddParticipants";
-import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { RedactedField } from "../ui/RedactedField";
-import { stringifyIfObject } from "~/utils/stringifyIfObject";
+import { PageLayout } from "../ui/layouts/PageLayout";
+import { LuList } from "react-icons/lu";
 
 export interface MessagesTableProps {
   hideExport?: boolean;
@@ -110,7 +102,7 @@ export function MessagesTable({
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
-    queryOpts
+    queryOpts,
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
@@ -121,7 +113,7 @@ export function MessagesTable({
       enabled: project?.id !== undefined,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   const downloadTraces = api.traces.getAllForDownload.useMutation();
@@ -137,13 +129,13 @@ export function MessagesTable({
 
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(
-      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
+      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {},
     ).flatMap((checks) =>
       checks.map((check: any) => [
         `evaluations.${check.evaluator_id}`,
         check.name,
-      ])
-    )
+      ]),
+    ),
   );
 
   const [scrollXPosition, setScrollXPosition] = useState(0);
@@ -208,7 +200,7 @@ export function MessagesTable({
     render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
     value: (
       trace: TraceWithGuardrail,
-      evaluations: ElasticSearchEvaluation[]
+      evaluations: ElasticSearchEvaluation[],
     ) => string | number | Date;
   };
 
@@ -228,7 +220,7 @@ export function MessagesTable({
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
-            traceCheck_.evaluator_id === checkId
+            traceCheck_.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -264,7 +256,7 @@ export function MessagesTable({
       value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
         const checkId = columnKey.split(".")[1];
         const traceCheck = evaluations.find(
-          (evaluation) => evaluation.evaluator_id === checkId
+          (evaluation) => evaluation.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -637,7 +629,7 @@ export function MessagesTable({
           <Text>
             {
               topics.data?.find(
-                (topic) => topic.id === trace.metadata.subtopic_id
+                (topic) => topic.id === trace.metadata.subtopic_id,
               )?.name
             }
           </Text>
@@ -661,8 +653,8 @@ export function MessagesTable({
         ([columnKey, checkName]) => [
           columnKey,
           headerColumnForEvaluation({ columnKey, checkName }),
-        ]
-      )
+        ],
+      ),
     ),
   };
 
@@ -684,8 +676,8 @@ export function MessagesTable({
               enabled: key !== "trace.trace_id",
               name: column.name,
             },
-          ])
-        )
+          ]),
+        ),
   );
 
   const isFirstRender = useRef(true);
@@ -758,9 +750,10 @@ export function MessagesTable({
           ...Object.fromEntries(
             Object.entries(traceCheckColumnsAvailable)
               .filter(
-                ([key]) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+                ([key]) =>
+                  !Object.keys(prevSelectedHeaderColumns).includes(key),
               )
-              .map(([key, name]) => [key, { enabled: true, name }])
+              .map(([key, name]) => [key, { enabled: true, name }]),
           ),
         }));
       }
@@ -769,7 +762,7 @@ export function MessagesTable({
 
   const { open, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
-    selectedHeaderColumns
+    selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -845,14 +838,13 @@ export function MessagesTable({
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       console.error(error);
     }
   };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    []
+    [],
   );
 
   const dialog = useDisclosure();
@@ -880,7 +872,6 @@ export function MessagesTable({
             meta: {
               closable: true,
             },
-            placement: "top-end",
             action: {
               label: "View Queues",
               onClick: () => {
@@ -889,7 +880,7 @@ export function MessagesTable({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -902,7 +893,7 @@ export function MessagesTable({
       : await fetchAllTraces();
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked"
+      ([column, _]) => column !== "checked",
     );
 
     const evaluations: Record<string, ElasticSearchEvaluation[]> =
@@ -911,12 +902,12 @@ export function MessagesTable({
     const getValueForColumn = (
       trace: TraceWithGuardrail,
       column: string,
-      name: string
+      name: string,
     ) => {
       return (
         headerColumns[column]?.value?.(
           trace,
-          evaluations[trace.trace_id] ?? []
+          evaluations[trace.trace_id] ?? [],
         ) ??
         headerColumnForEvaluation({
           columnKey: column,
@@ -933,9 +924,9 @@ export function MessagesTable({
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
               checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name)
-              )
-            )
+                getValueForColumn(trace, column, name),
+              ),
+            ),
         )
         .filter((row) => row.some((cell) => cell !== ""));
     } else {
@@ -943,8 +934,10 @@ export function MessagesTable({
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries_
             .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) => getValueForColumn(trace, column, name))
-        )
+            .map(([column, { name }]) =>
+              getValueForColumn(trace, column, name),
+            ),
+        ),
       );
     }
 
@@ -978,318 +971,290 @@ export function MessagesTable({
     } else {
       setSelectedTraceIds(
         traceGroups.data?.groups.flatMap((traceGroup) =>
-          traceGroup.map((trace) => trace.trace_id)
-        ) ?? []
+          traceGroup.map((trace) => trace.trace_id),
+        ) ?? [],
       );
     }
   };
 
   return (
     <>
-      <Container maxWidth="calc(100vw - 50px)" padding={6} flex="1">
-        <HStack width="full" align="top" paddingBottom={6}>
-          <HStack align="center" gap={6}>
-            <Heading as="h1" size="lg" paddingTop={1}>
-              Traces
-            </Heading>
-            {!hideAnalyticsToggle && <ToggleAnalytics />}
-            <Tooltip content="Refresh">
-              <Button
-                variant="outline"
-                minWidth={0}
-                height="32px"
-                padding={2}
-                marginTop={2}
-                onClick={() => void traceGroups.refetch()}
+      <PageLayout.Header>
+        <PageLayout.Heading>Traces</PageLayout.Heading>
+        <Tooltip content="Refresh">
+          <PageLayout.HeaderButton
+            variant="ghost"
+            onClick={() => void traceGroups.refetch()}
+          >
+            <LuRefreshCw
+              className={
+                traceGroups.isLoading || traceGroups.isRefetching
+                  ? "refresh-icon animation-spinning"
+                  : "refresh-icon"
+              }
+            />
+          </PageLayout.HeaderButton>
+        </Tooltip>
+        <Spacer />
+        {!hideExport && (
+          <Tooltip
+            disabled={navigationFooter.totalHits < 10_000}
+            content={
+              navigationFooter.totalHits >= 10_000 ? "Up to 10.000 items" : ""
+            }
+          >
+            <PageLayout.HeaderButton
+              variant={downloadTraces.isPending ? "ghost" : "outline"}
+              onClick={() => void downloadCSV()}
+              loading={downloadTraces.isPending}
+              loadingText="Downloading..."
+            >
+              <Download size={16} />
+              Export all
+            </PageLayout.HeaderButton>
+          </Tooltip>
+        )}
+        {!hideTableToggle && <ToggleTableView />}
+
+        {/** Column selector - start */}
+        <Popover.Root
+          open={open}
+          onOpenChange={({ open }) => (open ? onOpen() : onClose())}
+        >
+          <Popover.Trigger asChild>
+            <PageLayout.HeaderButton>
+              <HStack gap={2}>
+                <LuList />
+                <Text>Columns</Text>
+                <Box>
+                  <ChevronDown />
+                </Box>
+              </HStack>
+            </PageLayout.HeaderButton>
+          </Popover.Trigger>
+          <Popover.Content>
+            <Popover.Arrow />
+            <Popover.CloseTrigger />
+            <Popover.Header>
+              <Heading size="sm">Filter Traces</Heading>
+            </Popover.Header>
+            <Popover.Body padding={4}>
+              <VStack align="start" gap={2}>
+                {Object.entries({
+                  ...headerColumns,
+                  ...selectedHeaderColumns,
+                }).map(([columnKey, column]) => {
+                  if (columnKey === "checked") return null;
+                  return (
+                    <Checkbox
+                      key={columnKey}
+                      checked={selectedHeaderColumns[columnKey]?.enabled}
+                      onChange={() => {
+                        setSelectedHeaderColumns({
+                          ...selectedHeaderColumns,
+                          [columnKey]: {
+                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                            name: column.name,
+                          },
+                        });
+
+                        setLocalStorageHeaderColumns({
+                          ...selectedHeaderColumns,
+                          [columnKey]: {
+                            enabled: !selectedHeaderColumns[columnKey]?.enabled,
+                            name: column.name,
+                          },
+                        });
+                      }}
+                    >
+                      {column.name}
+                    </Checkbox>
+                  );
+                })}
+              </VStack>
+            </Popover.Body>
+          </Popover.Content>
+        </Popover.Root>
+        {/** Column selector - end */}
+
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+        <FilterToggle />
+        {!hideAnalyticsToggle && <ToggleAnalytics />}
+      </PageLayout.Header>
+      <HStack align="top" gap={8}>
+        <Box flex="1" minWidth="0">
+          <VStack
+            gap={0}
+            align="start"
+            width="full"
+            maxWidth={
+              showFilters ? "calc(100vw - 550px)" : "calc(100vw - 200px)"
+            }
+          >
+            {downloadProgress > 0 && (
+              <Progress.Root
+                colorPalette="orange"
+                value={downloadProgress}
+                size="xs"
+                width="full"
+                boxShadow="none"
               >
-                <RefreshCw
-                  size="16"
-                  className={
-                    traceGroups.isLoading || traceGroups.isRefetching
-                      ? "refresh-icon animation-spinning"
-                      : "refresh-icon"
-                  }
-                />
-              </Button>
-            </Tooltip>
-          </HStack>
-          <Spacer />
-          <HStack gap={1} marginBottom="-8px">
-            {!hideTableToggle && <ToggleTableView />}
-            {!hideExport && (
-              <Tooltip
-                disabled={navigationFooter.totalHits < 10_000}
-                content={
-                  navigationFooter.totalHits >= 10_000
-                    ? "Up to 10.000 items"
-                    : ""
+                <Progress.Track boxShadow="none" background="none">
+                  <Progress.Range />
+                </Progress.Track>
+              </Progress.Root>
+            )}
+            {checkedHeaderColumnsEntries.length === 0 && (
+              <Text>No columns selected</Text>
+            )}
+            <Table.ScrollArea
+              ref={scrollRef}
+              onScroll={() => {
+                if (scrollRef.current) {
+                  setScrollXPosition(scrollRef.current.scrollLeft);
                 }
-              >
+              }}
+              minHeight="calc(100vh - 188px)"
+            >
+              <Table.Root size="sm" height="fit-content" variant="line">
+                <Table.Header>
+                  <Table.Row background="transparent">
+                    {checkedHeaderColumnsEntries
+                      .filter(([_, { enabled }]) => enabled)
+                      .map(([columnKey, { name }], index) => (
+                        <Table.ColumnHeader
+                          key={index}
+                          paddingX={4}
+                          paddingY={4}
+                          background="white"
+                          borderRadius="4px 0 0 0"
+                          {...(columnKey === "checked"
+                            ? {
+                                position: "sticky",
+                                left: 0,
+                                transition: "box-shadow 0.3s ease-in-out",
+                                boxShadow:
+                                  scrollXPosition > 0
+                                    ? "0 2px 5px rgba(0, 0, 0, 0.1)"
+                                    : "0 0 0 rgba(0, 0, 0, 0)",
+                              }
+                            : {})}
+                        >
+                          {columnKey === "checked" ? (
+                            <HStack width="full">
+                              <Checkbox
+                                checked={
+                                  selectedTraceIds.length ===
+                                  traceGroups.data?.groups.length
+                                }
+                                onCheckedChange={() => toggleAllTraces()}
+                              />
+                            </HStack>
+                          ) : (
+                            <HStack gap={1}>
+                              <Text
+                                minWidth={headerColumns[columnKey]?.width}
+                                width="full"
+                              >
+                                {name}
+                              </Text>
+                              {headerColumns[columnKey]?.sortable &&
+                                sortButton(columnKey)}
+                            </HStack>
+                          )}
+                        </Table.ColumnHeader>
+                      ))}
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {traceGroups.data?.groups.flatMap((traceGroup) =>
+                    traceGroup.map((trace) => (
+                      <Table.Row
+                        key={trace.trace_id}
+                        role="button"
+                        cursor="pointer"
+                      >
+                        {checkedHeaderColumnsEntries.map(
+                          ([column, { name }], index) =>
+                            headerColumns[column]?.render(trace, index) ??
+                            headerColumnForEvaluation({
+                              columnKey: column,
+                              checkName: name,
+                            })?.render(trace, index),
+                        )}
+                      </Table.Row>
+                    )),
+                  )}
+                  {traceGroups.isLoading &&
+                    Array.from({ length: 3 }).map((_, i) => (
+                      <Table.Row key={i}>
+                        {Array.from({
+                          length: checkedHeaderColumnsEntries.length,
+                        }).map((_, i) => (
+                          <Table.Cell key={i}>
+                            <Delayed key={1} takeSpace>
+                              <Skeleton height="16px" />
+                            </Delayed>
+                          </Table.Cell>
+                        ))}
+                      </Table.Row>
+                    ))}
+                  {traceGroups.isFetched &&
+                    traceGroups.data?.groups.length === 0 && (
+                      <Table.Row>
+                        <Table.Cell />
+                        <Table.Cell
+                          colSpan={checkedHeaderColumnsEntries.length}
+                        >
+                          No messages found, try selecting different filters and
+                          dates
+                        </Table.Cell>
+                      </Table.Row>
+                    )}
+                </Table.Body>
+              </Table.Root>
+            </Table.ScrollArea>
+            <MessagesNavigationFooter {...navigationFooter} />
+          </VStack>
+        </Box>
+
+        {showFilters && (
+          <Box paddingRight={4}>
+            <FilterSidebar />
+          </Box>
+        )}
+      </HStack>
+      {selectedTraceIds.length > 0 && (
+        <Box
+          position="fixed"
+          bottom={10}
+          left="50%"
+          transform="translateX(-50%)"
+          backgroundColor="#ffffff"
+          padding="8px"
+          paddingX="16px"
+          border="1px solid #ccc"
+          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          borderRadius="md"
+        >
+          <HStack gap={3}>
+            <Text whiteSpace="nowrap">
+              {selectedTraceIds.length}{" "}
+              {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
+            </Text>
+            {!hideExport && (
+              <>
                 <Button
                   colorPalette="black"
-                  variant={downloadTraces.isLoading ? "outline" : "ghost"}
-                  onClick={() => void downloadCSV()}
-                  loading={downloadTraces.isLoading}
-                  loadingText="Downloading..."
+                  minWidth="fit-content"
+                  variant="outline"
+                  onClick={() => void downloadCSV(true)}
                 >
-                  <Download size={16} />
-                  Export all
+                  Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
-              </Tooltip>
+                <Text>or</Text>
+              </>
             )}
-
-            {/** Column selector - start */}
-            <Popover.Root
-              open={open}
-              onOpenChange={({ open }) => (open ? onOpen() : onClose())}
-            >
-              <Popover.Trigger asChild>
-                <Button variant="ghost" minWidth="fit-content">
-                  <HStack gap={2}>
-                    <List size={16} />
-                    <Text>Columns</Text>
-                    <Box>
-                      <ChevronDown />
-                    </Box>
-                  </HStack>
-                </Button>
-              </Popover.Trigger>
-              <Popover.Content>
-                <Popover.Arrow />
-                <Popover.CloseTrigger />
-                <Popover.Header>
-                  <Heading size="sm">Filter Traces</Heading>
-                </Popover.Header>
-                <Popover.Body padding={4}>
-                  <VStack align="start" gap={2}>
-                    {Object.entries({
-                      ...headerColumns,
-                      ...selectedHeaderColumns,
-                    }).map(([columnKey, column]) => {
-                      if (columnKey === "checked") return null;
-                      return (
-                        <Checkbox
-                          key={columnKey}
-                          checked={selectedHeaderColumns[columnKey]?.enabled}
-                          onChange={() => {
-                            setSelectedHeaderColumns({
-                              ...selectedHeaderColumns,
-                              [columnKey]: {
-                                enabled:
-                                  !selectedHeaderColumns[columnKey]?.enabled,
-                                name: column.name,
-                              },
-                            });
-
-                            setLocalStorageHeaderColumns({
-                              ...selectedHeaderColumns,
-                              [columnKey]: {
-                                enabled:
-                                  !selectedHeaderColumns[columnKey]?.enabled,
-                                name: column.name,
-                              },
-                            });
-                          }}
-                        >
-                          {column.name}
-                        </Checkbox>
-                      );
-                    })}
-                  </VStack>
-                </Popover.Body>
-              </Popover.Content>
-            </Popover.Root>
-            {/** Column selector - end */}
-
-            <PeriodSelector
-              period={{ startDate, endDate }}
-              setPeriod={setPeriod}
-            />
-            <FilterToggle />
-          </HStack>
-        </HStack>
-
-        <HStack align="top" gap={8}>
-          <Box flex="1" minWidth="0">
-            <VStack gap={0} align="start">
-              <Card.Root height="fit-content" width="full">
-                <Card.Body
-                  padding={0}
-                  width="full"
-                  maxWidth={
-                    showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
-                  }
-                >
-                  <Box minHeight="4px">
-                    {downloadProgress > 0 && (
-                      <Progress.Root
-                        colorPalette="orange"
-                        value={downloadProgress}
-                        size="xs"
-                        width="full"
-                        boxShadow="none"
-                      >
-                        <Progress.Track boxShadow="none" background="none">
-                          <Progress.Range />
-                        </Progress.Track>
-                      </Progress.Root>
-                    )}
-                  </Box>
-                  <Box minHeight="20px">
-                    {checkedHeaderColumnsEntries.length === 0 && (
-                      <Text>No columns selected</Text>
-                    )}
-                  </Box>
-                  <Table.ScrollArea
-                    ref={scrollRef}
-                    onScroll={() => {
-                      if (scrollRef.current) {
-                        setScrollXPosition(scrollRef.current.scrollLeft);
-                      }
-                    }}
-                  >
-                    <Table.Root size="sm" height="fit-content" variant="line">
-                      <Table.Header>
-                        <Table.Row background="transparent">
-                          {checkedHeaderColumnsEntries
-                            .filter(([_, { enabled }]) => enabled)
-                            .map(([columnKey, { name }], index) => (
-                              <Table.ColumnHeader
-                                key={index}
-                                paddingX={4}
-                                paddingY={4}
-                                background="white"
-                                borderRadius="4px 0 0 0"
-                                {...(columnKey === "checked"
-                                  ? {
-                                      position: "sticky",
-                                      left: 0,
-                                      transition: "box-shadow 0.3s ease-in-out",
-                                      boxShadow:
-                                        scrollXPosition > 0
-                                          ? "0 2px 5px rgba(0, 0, 0, 0.1)"
-                                          : "0 0 0 rgba(0, 0, 0, 0)",
-                                    }
-                                  : {})}
-                              >
-                                {columnKey === "checked" ? (
-                                  <HStack width="full">
-                                    <Checkbox
-                                      checked={
-                                        selectedTraceIds.length ===
-                                        traceGroups.data?.groups.length
-                                      }
-                                      onCheckedChange={() => toggleAllTraces()}
-                                    />
-                                  </HStack>
-                                ) : (
-                                  <HStack gap={1}>
-                                    <Text
-                                      minWidth={headerColumns[columnKey]?.width}
-                                      width="full"
-                                    >
-                                      {name}
-                                    </Text>
-                                    {headerColumns[columnKey]?.sortable &&
-                                      sortButton(columnKey)}
-                                  </HStack>
-                                )}
-                              </Table.ColumnHeader>
-                            ))}
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {traceGroups.data?.groups.flatMap((traceGroup) =>
-                          traceGroup.map((trace) => (
-                            <Table.Row
-                              key={trace.trace_id}
-                              role="button"
-                              cursor="pointer"
-                            >
-                              {checkedHeaderColumnsEntries.map(
-                                ([column, { name }], index) =>
-                                  headerColumns[column]?.render(trace, index) ??
-                                  headerColumnForEvaluation({
-                                    columnKey: column,
-                                    checkName: name,
-                                  })?.render(trace, index)
-                              )}
-                            </Table.Row>
-                          ))
-                        )}
-                        {traceGroups.isLoading &&
-                          Array.from({ length: 3 }).map((_, i) => (
-                            <Table.Row key={i}>
-                              {Array.from({
-                                length: checkedHeaderColumnsEntries.length,
-                              }).map((_, i) => (
-                                <Table.Cell key={i}>
-                                  <Delayed key={1} takeSpace>
-                                    <Skeleton height="16px" />
-                                  </Delayed>
-                                </Table.Cell>
-                              ))}
-                            </Table.Row>
-                          ))}
-                        {traceGroups.isFetched &&
-                          traceGroups.data?.groups.length === 0 && (
-                            <Table.Row>
-                              <Table.Cell />
-                              <Table.Cell
-                                colSpan={checkedHeaderColumnsEntries.length}
-                              >
-                                No messages found, try selecting different
-                                filters and dates
-                              </Table.Cell>
-                            </Table.Row>
-                          )}
-                      </Table.Body>
-                    </Table.Root>
-                  </Table.ScrollArea>
-                </Card.Body>
-              </Card.Root>
-              <Box minHeight="80px">
-                <MessagesNavigationFooter {...navigationFooter} />
-              </Box>
-            </VStack>
-          </Box>
-
-          <FilterSidebar />
-        </HStack>
-      </Container>
-      <Box
-        position="fixed"
-        bottom={10}
-        left="50%"
-        transform="translateX(-50%)"
-        backgroundColor="#ffffff"
-        padding="8px"
-        paddingX="16px"
-        border="1px solid #ccc"
-        boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
-        borderRadius="md"
-        opacity={selectedTraceIds.length > 0 ? 1 : 0}
-        visibility={selectedTraceIds.length > 0 ? "visible" : "hidden"}
-        transition="opacity 0.2s ease-in-out"
-      >
-        <HStack gap={3}>
-          <Text whiteSpace="nowrap">
-            {selectedTraceIds.length}{" "}
-            {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
-          </Text>
-          {!hideExport && (
-            <>
-              <Button
-                colorPalette="black"
-                minWidth="fit-content"
-                variant="outline"
-                onClick={() => void downloadCSV(true)}
-              >
-                Export <Download size={16} style={{ marginLeft: 8 }} />
-              </Button>
-              <Text>or</Text>
-            </>
-          )}
 
           <Button
             colorPalette="black"

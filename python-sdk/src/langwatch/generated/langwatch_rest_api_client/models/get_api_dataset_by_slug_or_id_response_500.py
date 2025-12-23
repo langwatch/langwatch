@@ -1,8 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="GetApiDatasetBySlugOrIdResponse500")
 
@@ -11,16 +13,16 @@ T = TypeVar("T", bound="GetApiDatasetBySlugOrIdResponse500")
 class GetApiDatasetBySlugOrIdResponse500:
     """
     Attributes:
-        status (str):  Default: 'error'.
-        message (str):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    message: str
-    status: str = "error"
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        status = self.status
+        error = self.error
 
         message = self.message
 
@@ -28,22 +30,23 @@ class GetApiDatasetBySlugOrIdResponse500:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "status": status,
-                "message": message,
+                "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        status = d.pop("status")
+        error = d.pop("error")
 
-        message = d.pop("message")
+        message = d.pop("message", UNSET)
 
         get_api_dataset_by_slug_or_id_response_500 = cls(
-            status=status,
+            error=error,
             message=message,
         )
 

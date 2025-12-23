@@ -1,4 +1,4 @@
-import { TRACE_INDEX, esClient } from "../server/elasticsearch";
+import { esClient, TRACE_INDEX } from "../server/elasticsearch";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 const RETENTION_PERIODS: Record<string, number> = {
@@ -72,7 +72,7 @@ export const deleteTracesRetentionPolicy = async (projectId?: string) => {
 
     totalDeleted += response.deleted ?? 0;
     console.log(
-      `Deleted ${response.deleted} traces with retention policy ${policy}`
+      `Deleted ${response.deleted} traces with retention policy ${policy}`,
     );
   }
 
@@ -87,7 +87,7 @@ export const deleteTracesRetentionPolicy = async (projectId?: string) => {
 
   totalDeleted += response.deleted ?? 0;
   console.log(
-    `Deleted ${response.deleted} traces with default retention policy (1 year)`
+    `Deleted ${response.deleted} traces with default retention policy (1 year)`,
   );
 
   return totalDeleted;

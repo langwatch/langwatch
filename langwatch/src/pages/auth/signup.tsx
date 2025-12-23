@@ -3,26 +3,26 @@ import {
   Button,
   Card,
   Container,
-  HStack,
   Heading,
+  HStack,
   Input,
   Spacer,
   VStack,
 } from "@chakra-ui/react";
-import { Link } from "../../components/ui/link";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { type Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import type { GetServerSidePropsContext } from "next";
 import { useSearchParams } from "next/navigation";
+import type { Session } from "next-auth";
+import { getSession, signIn } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { LogoIcon } from "../../components/icons/LogoIcon";
-import type { GetServerSidePropsContext } from "next";
-import { api } from "../../utils/api";
+import { Link } from "../../components/ui/link";
 import { toaster } from "../../components/ui/toaster";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { api } from "../../utils/api";
 
 export default function SignUp({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
@@ -51,7 +51,7 @@ export default function SignUp({ session }: { session: Session | null }) {
 }
 
 export const getServerSideProps = async (
-  context: GetServerSidePropsContext
+  context: GetServerSidePropsContext,
 ) => {
   const session = await getSession(context);
 
@@ -115,12 +115,11 @@ function SignUpForm() {
       if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
       }
-    } catch (e) {
+    } catch {
       toaster.create({
         title: "Error",
         description: "Failed to sign up",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },

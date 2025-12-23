@@ -1,16 +1,16 @@
-import { type NextApiRequest, type NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "next";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import { prisma } from "../../../../../server/db";
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   return runWorkflow(
     req,
     res,
     req.query.workflowId as string,
-    req.query.versionId as string | undefined
+    req.query.versionId as string | undefined,
   );
 }
 
@@ -18,7 +18,7 @@ export async function runWorkflow(
   req: NextApiRequest,
   res: NextApiResponse,
   workflowId: string,
-  versionId: string | undefined
+  versionId: string | undefined,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end();
@@ -60,7 +60,7 @@ export async function runWorkflow(
       workflowId,
       project.id,
       req.body,
-      versionId
+      versionId,
     );
     return res.status(200).json(result);
   } catch (error) {

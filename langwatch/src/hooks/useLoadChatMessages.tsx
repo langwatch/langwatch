@@ -1,8 +1,8 @@
-import { api } from "~/utils/api";
-import React from "react";
 import type { UIMessage } from "ai";
+import React from "react";
+import { api } from "~/utils/api";
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
+// biome-ignore lint/style/noNamespace: not serious enough to warrant a change
 export declare namespace useLoadChatMessagesEffect {
   export interface Props {
     spanId?: string;
@@ -29,7 +29,7 @@ export function useLoadChatMessagesEffect({
       enabled: !!projectId && !!traceId && !!spanId,
       refetchOnWindowFocus: false,
       trpc: { abortOnUnmount: true },
-    }
+    },
   );
 
   const spanObj = spanId
@@ -37,7 +37,7 @@ export function useLoadChatMessagesEffect({
         (currSpan) =>
           currSpan.span_id === spanId &&
           currSpan.type === "llm" &&
-          currSpan.input?.type === "chat_messages"
+          currSpan.input?.type === "chat_messages",
       )
     : spans.data?.[0];
 
@@ -71,14 +71,16 @@ export function useLoadChatMessagesEffect({
       const inputMessagesArr = (
         Array.isArray(inputMessages) ? inputMessages : [inputMessages]
       ).map((message) =>
-        message.role ? message : { id: void 0, role: "user", parts: message.parts }
+        message.role
+          ? message
+          : { id: void 0, role: "user", parts: message.parts },
       );
       const outputMessagesArr = (
         Array.isArray(outputMessages) ? outputMessages : [outputMessages]
       ).map((message) =>
         message.role
           ? message
-          : { id: void 0, role: "assistant", parts: message.parts }
+          : { id: void 0, role: "assistant", parts: message.parts },
       );
 
       // Generate message id placeholders in case they are missing
@@ -87,7 +89,7 @@ export function useLoadChatMessagesEffect({
       const messages = [...inputMessagesArr, ...outputMessagesArr].map(
         (message, ix) => {
           return { ...message, id: message.id ?? `${spanObj?.span_id}_${ix}` };
-        }
+        },
       );
 
       const systemMessage = messages.find((m) => m.role === "system");
@@ -96,7 +98,9 @@ export function useLoadChatMessagesEffect({
       for (const chatWindowId of chatWindowIds) {
         onSetMessages(chatWindowId, nonSystemMessages as UIMessage[]);
         if (systemMessage) {
-          const systemPrompt = systemMessage.parts.find(p => p.type === "text")?.text;
+          const systemPrompt = systemMessage.parts.find(
+            (p) => p.type === "text",
+          )?.text;
           if (systemPrompt) {
             onChangeSystemPrompt(chatWindowId, systemPrompt);
           }

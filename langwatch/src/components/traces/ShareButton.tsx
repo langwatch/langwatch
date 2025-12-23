@@ -1,13 +1,12 @@
-import { Button, HStack, Text, VStack, useDisclosure } from "@chakra-ui/react";
-import { Popover } from "../ui/popover";
-import { toaster } from "../ui/toaster";
-import { PublicShareResourceTypes, type Project } from "@prisma/client";
+import { Button, HStack, Text, useDisclosure, VStack } from "@chakra-ui/react";
+import { type Project, PublicShareResourceTypes } from "@prisma/client";
 import { useCallback, useState } from "react";
 import { Globe, Share } from "react-feather";
-import { CopyInput } from "../CopyInput";
-import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
+import { api } from "../../utils/api";
+import { CopyInput } from "../CopyInput";
+import { Popover } from "../ui/popover";
+import { toaster } from "../ui/toaster";
 
 export function ShareButton({
   project,
@@ -16,8 +15,8 @@ export function ShareButton({
   project: Project;
   traceId: string;
 }) {
-  const { hasTeamPermission } = useOrganizationTeamProject();
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
+  const { hasPermission } = useOrganizationTeamProject();
+  const { open, onOpen, onClose } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
       projectId: project.id,
@@ -27,12 +26,12 @@ export function ShareButton({
     {
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
   const shareItemMutation = api.share.shareItem.useMutation();
   const unshareItemMutation = api.share.unshareItem.useMutation();
   const [disableClose, setDisableClose] = useState(false); // bugfix for modal closing when starting the mutation
-  const hasSharePermission = hasTeamPermission(TeamRoleGroup.MESSAGES_SHARE);
+  const hasSharePermission = hasPermission("traces:share");
 
   const onClose_ = useCallback(() => {
     if (disableClose) return;
@@ -56,7 +55,7 @@ export function ShareButton({
       positioning={{ placement: "bottom-end" }}
     >
       <Popover.Trigger asChild>
-        <Button colorPalette="black" variant="outline">
+        <Button colorPalette="gray">
           {shareState.data?.id ? <Globe size={16} /> : <Share size={16} />}
           {shareState.data?.id ? "Public" : "Share"}
         </Button>
@@ -109,7 +108,6 @@ export function ShareButton({
                                       meta: {
                                         closable: true,
                                       },
-                                      placement: "top-end",
                                     });
                                   }
                                 })
@@ -122,7 +120,6 @@ export function ShareButton({
                                     meta: {
                                       closable: true,
                                     },
-                                    placement: "top-end",
                                   });
                                 });
                             },
@@ -136,10 +133,9 @@ export function ShareButton({
                                 meta: {
                                   closable: true,
                                 },
-                                placement: "top-end",
                               });
                             },
-                          }
+                          },
                         );
                       }}
                     >
@@ -181,10 +177,9 @@ export function ShareButton({
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                           });
                         },
-                      }
+                      },
                     );
                   }}
                 >

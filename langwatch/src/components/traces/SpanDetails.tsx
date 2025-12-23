@@ -1,17 +1,19 @@
 import {
   Badge,
   Box,
-  HStack,
+  Button,
   Heading,
+  HStack,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import numeral from "numeral";
-import { Clock, Settings } from "react-feather";
+import { useMemo } from "react";
+import { Clock, Play, Settings } from "react-feather";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-playground/hooks/useLoadSpanIntoPromptPlayground";
 import type {
-  ElasticSearchSpan,
   ErrorCapture,
   EvaluationResult,
   Span,
@@ -22,19 +24,21 @@ import {
   evaluationPassed,
   evaluationStatusColor,
 } from "../checks/EvaluationStatus";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { Link } from "../ui/link";
+import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
-import { OverflownTextWithTooltip } from "../OverflownText";
-import { RedactedField } from "../ui/RedactedField";
 
-export function SpanDetails({
-  project,
-  span,
-}: {
-  project: Project;
-  span: Span;
-}) {
+/**
+ * Displays detailed information about a trace span, including metadata, timing, tokens, cost, and input/output.
+ * Single Responsibility: Render comprehensive span details with conditional playground navigation.
+ *
+ * @param props - Component props
+ * @param props.span - The span object containing trace data
+ * @param props.project - The project context (maintained for API compatibility)
+ */
+export function SpanDetails({ span }: { project: Project; span: Span }) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
       <Text as="span" color="gray.400" borderBottom="1px dotted">
@@ -43,22 +47,44 @@ export function SpanDetails({
     </Tooltip>
   );
 
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
+
+  const canOpenSpanInPromptStudio = useMemo(() => {
+    return (
+      span.type === "llm" &&
+      span.span_id &&
+      span.input?.type === "chat_messages"
+    );
+  }, [span]);
+
   return (
     <VStack flexGrow={1} gap={3} align="start">
       <HStack width="full">
         <SpanTypeTag span={span} />
         <Heading as="h2" fontSize="22px" asChild>
           <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-            {span.name ?? ('model' in span ? span.model : "(unnamed)")}
+            {span.name ?? ("model" in span ? span.model : "(unnamed)")}
           </OverflownTextWithTooltip>
         </Heading>
         <Spacer />
       </HStack>
-      <VStack align="start" color="gray.500">
-        <HStack>
+      <VStack align="start" color="gray.500" width="full">
+        <HStack width="full" justifyContent="space-between">
           <Text>
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
+          {canOpenSpanInPromptStudio && (
+            <Link
+              // Potential nullability here is due to the buildUrl function returning null if the project slug is missing.
+              href={buildUrl(span.span_id)?.toString() ?? ""}
+              isExternal
+            >
+              <Button size="xs" colorPalette="orange">
+                <Play size={16} />
+                Open in Prompts
+              </Button>
+            </Link>
+          )}
         </HStack>
         <HStack>
           <Text>
@@ -97,13 +123,13 @@ export function SpanDetails({
                     span.timestamps.started_at);
                 return ` (${Math.round(
                   span.metrics.completion_tokens /
-                    (durationFromFirstToken / 1000)
+                    (durationFromFirstToken / 1000),
                 )} tokens/s)`;
               })()}
             {span.metrics?.tokens_estimated && estimatedCost}
           </Text>
         )}
-        {('vendor' in span || 'model' in span) && (
+        {("vendor" in span || "model" in span) && (
           <Text>
             <b>Model:</b> {[span.vendor, span.model].filter((x) => x).join("/")}
           </Text>
@@ -140,12 +166,15 @@ export function SpanDetails({
             borderColor="gray.300"
             width="full"
             whiteSpace="pre-wrap"
+            background="white/75"
           >
             <RenderInputOutput
               value={JSON.stringify(
                 Object.fromEntries(
-                  Object.entries(span.params).filter(([key]) => key !== "_keys")
-                )
+                  Object.entries(span.params).filter(
+                    ([key]) => key !== "_keys",
+                  ),
+                ),
               )}
               collapsed={
                 (!!span.input || !!span.output) &&
@@ -181,7 +210,7 @@ export function SpanDetails({
           </Box>
         </VStack>
       )}
-      {('contexts' in span && span.contexts) && (
+      {"contexts" in span && span.contexts && (
         <VStack alignItems="flex-start" gap={2} paddingTop={4} width="full">
           <Box
             fontSize="13px"
@@ -214,7 +243,7 @@ export function SpanDetails({
                     }
                   }
                   return context;
-                })
+                }),
               )}
               showTools
             />
@@ -244,7 +273,9 @@ export function SpanDetails({
             {span.error.message}
             {span.error.stacktrace && (
               <Box>
-                <Text as="code" fontSize="12px">{span.error.stacktrace.join("\n")}</Text>
+                <Text as="code" fontSize="12px">
+                  {span.error.stacktrace.join("\n")}
+                </Text>
               </Box>
             )}
           </Box>
@@ -285,7 +316,7 @@ export function SpanDetails({
 }
 
 export const getEvaluationResult = (
-  span: Span
+  span: Span,
 ): EvaluationResult | undefined => {
   if (!span.output?.value) {
     return undefined;
@@ -338,8 +369,8 @@ export const SpanTypeTag = ({ span }: { span: Span }) => {
                     ? evaluationStatusColor(evaluationResult).split(".")[0]
                     : "gray"
                   : evaluationPassed_
-                  ? "green"
-                  : "red",
+                    ? "green"
+                    : "red",
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
@@ -366,7 +397,7 @@ export const SpanDuration = ({
 }) => {
   const startedAt = span.timestamps.started_at;
   const finishedAt = renderFirstTokenDuration
-    ? span.timestamps.first_token_at ?? startedAt
+    ? (span.timestamps.first_token_at ?? startedAt)
     : span.timestamps.finished_at;
   const duration = finishedAt - startedAt;
 

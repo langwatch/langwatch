@@ -1,15 +1,16 @@
-import { Card, GridItem, HStack, Heading, SimpleGrid } from "@chakra-ui/react";
+import { Card, GridItem, Heading, HStack, SimpleGrid } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { SatisfactionGraphs } from "~/components/analytics/SatisfactionGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
 // Time unit conversion constants
@@ -76,26 +77,6 @@ const dailyActiveThreads = {
     },
   ],
   includePrevious: true,
-  timeScale: ONE_DAY,
-  height: 300,
-};
-
-const averageDailyThreadsPerUser = {
-  graphId: "custom",
-  graphType: "bar",
-  series: [
-    {
-      name: "Average threads count per user",
-      colorSet: "greenTones",
-      metric: "metadata.thread_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "user_id",
-        aggregation: "avg",
-      },
-    },
-  ],
-  includePrevious: false,
   timeScale: ONE_DAY,
   height: 300,
 };
@@ -196,14 +177,13 @@ const userThreads = {
   height: 300,
 };
 
-export default function Users() {
+function UsersContent() {
   const publicEnv = usePublicEnv();
-  const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
-  const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
+  const isQuickwit = publicEnv.data?.IS_QUICKWIT;
+  const isNotQuickwit = !isQuickwit;
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="Users" />
+    <GraphsLayout title="Users">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">
@@ -320,3 +300,5 @@ export default function Users() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view")(UsersContent);

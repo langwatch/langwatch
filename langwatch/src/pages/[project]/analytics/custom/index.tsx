@@ -5,32 +5,32 @@ import {
   Card,
   Center,
   Container,
+  createListCollection,
   Field,
   Grid,
-  HStack,
   Heading,
+  HStack,
   Input,
   NativeSelect,
   Spacer,
   Text,
   Textarea,
-  VStack,
-  createListCollection,
   useDisclosure,
+  VStack,
 } from "@chakra-ui/react";
 
 import {
-  Select as MultiSelect,
   chakraComponents,
+  Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
 import { useRouter } from "next/router";
 import {
-  useEffect,
-  useState,
-  useRef,
   type Dispatch,
   type SetStateAction,
+  useEffect,
+  useRef,
+  useState,
 } from "react";
 import {
   AlignLeft,
@@ -47,14 +47,15 @@ import {
 } from "react-feather";
 import {
   Controller,
-  useFieldArray,
-  useForm,
   type ControllerRenderProps,
   type FieldArrayWithId,
   type FieldValues,
   type Path,
   type UseFieldArrayReturn,
+  useFieldArray,
+  useForm,
 } from "react-hook-form";
+import { LuChartArea } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
@@ -62,16 +63,18 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useFilterParams } from "~/hooks/useFilterParams";
+import { useDrawer } from "~/hooks/useDrawer";
+import { type FilterParam, useFilterParams } from "~/hooks/useFilterParams";
 import {
   CustomGraph,
-  summaryGraphTypes,
   type CustomGraphInput,
+  summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
   FilterToggle,
+  FilterToggleButton,
   useFilterToggle,
 } from "../../../../components/filters/FilterToggle";
 import {
@@ -84,12 +87,12 @@ import {
   analyticsGroups,
   analyticsMetrics,
   analyticsPipelines,
+  type FlattenAnalyticsGroupsEnum,
+  type FlattenAnalyticsMetricsEnum,
   getGroup,
   getMetric,
   metricAggregations,
   pipelineAggregations,
-  type FlattenAnalyticsGroupsEnum,
-  type FlattenAnalyticsMetricsEnum,
 } from "../../../../server/analytics/registry";
 import type {
   AggregationTypes,
@@ -97,17 +100,17 @@ import type {
   PipelineFields,
   SharedFiltersInput,
 } from "../../../../server/analytics/types";
+import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import type { FilterField } from "../../../../server/filters/types";
 import { api } from "../../../../utils/api";
 import {
-  rotatingColors,
   type RotatingColorSet,
+  rotatingColors,
 } from "../../../../utils/rotatingColors";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { LuChartArea } from "react-icons/lu";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -133,8 +136,11 @@ export interface CustomGraphFormData {
       field: PipelineFields | "";
       aggregation: PipelineAggregationTypes;
     };
+    filters?: Record<FilterField, FilterParam>;
+    asPercent?: boolean;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum | "";
+  groupByKey?: string;
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -151,8 +157,10 @@ export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
       field: PipelineFields | "";
       aggregation: PipelineAggregationTypes;
     };
+    filters?: Record<FilterField, FilterParam>;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum;
+  groupByKey?: string;
   timeScale: number | "full";
 };
 
@@ -233,6 +241,8 @@ const defaultValues: CustomGraphFormData = {
         field: "",
         aggregation: "avg",
       },
+      filters: {} as Record<FilterField, FilterParam>,
+      asPercent: false,
     },
   ],
   groupBy: undefined,
@@ -434,12 +444,12 @@ EOF`}
 }
 
 const customGraphInputToFormData = (
-  graphInput: CustomGraphInput
+  graphInput: CustomGraphInput,
 ): CustomGraphFormData => {
   return {
     title: graphInput.graphId === "custom" ? undefined : graphInput.graphId,
     graphType: chartOptions.find(
-      (option) => option.value === graphInput.graphType
+      (option) => option.value === graphInput.graphType,
     )!,
     series: graphInput.series.map((series) => ({
       name: series.name,
@@ -458,8 +468,11 @@ const customGraphInputToFormData = (
               field: "",
               aggregation: "avg",
             },
+      filters: filterOutEmptyFilters(series.filters),
+      asPercent: series.asPercent,
     })),
     groupBy: graphInput.groupBy ?? "",
+    groupByKey: graphInput.groupByKey,
     includePrevious: graphInput.includePrevious ?? true,
     timeScale: graphInput.timeScale ?? 1,
     connected: graphInput.connected,
@@ -467,7 +480,7 @@ const customGraphInputToFormData = (
 };
 
 const customGraphFormToCustomGraphInput = (
-  formData: CustomGraphFormData
+  formData: CustomGraphFormData,
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
@@ -499,9 +512,12 @@ const customGraphFormToCustomGraphInput = (
         aggregation: series.aggregation,
         key: series.key,
         subkey: series.subkey,
+        filters: series.filters,
+        asPercent: series.asPercent,
       };
     }),
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
+    groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
     timeScale: formData.timeScale,
     connected: formData.connected,
@@ -511,7 +527,7 @@ const customGraphFormToCustomGraphInput = (
 
 const customAPIinput = (
   formData: CustomGraphFormData,
-  filterParams: SharedFiltersInput
+  filterParams: SharedFiltersInput,
 ): CustomAPICallData | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
@@ -542,9 +558,12 @@ const customAPIinput = (
         aggregation: series.aggregation,
         key: series.key,
         subkey: series.subkey,
+        filters: series.filters,
+        asPercent: series.asPercent,
       };
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
+    groupByKey: formData.groupByKey,
     timeScale: formData.timeScale,
   };
 };
@@ -589,14 +608,17 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
+
+  // Get dashboardId from URL query param
+  const dashboardId = router.query.dashboard as string | undefined;
 
   const addGraph = () => {
     const graphName = form.getValues("title");
     const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    if (graphJson && graphJson.hasOwnProperty("height")) {
+    if (graphJson?.hasOwnProperty("height")) {
       graphJson.height = 300;
     }
 
@@ -606,13 +628,18 @@ function CustomGraphForm({
         name: graphName ?? "",
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
+        dashboardId: dashboardId,
       },
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          void router.push(`/${project?.slug}/analytics/reports`);
+          // Navigate back to the same page we came from
+          const dashboardUrl = dashboardId
+            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+            : `/${project?.slug}/analytics/reports`;
+          void router.push(dashboardUrl);
         },
-      }
+      },
     );
   };
 
@@ -630,9 +657,13 @@ function CustomGraphForm({
       {
         onSuccess: () => {
           void trpc.graphs.getById.invalidate();
-          void router.push(`/${project?.slug}/analytics/reports`);
+          // Navigate back to the same dashboard we came from
+          const dashboardUrl = dashboardId
+            ? `/${project?.slug}/analytics/reports?dashboard=${dashboardId}`
+            : `/${project?.slug}/analytics/reports`;
+          void router.push(dashboardUrl);
         },
-      }
+      },
     );
   };
 
@@ -724,7 +755,7 @@ function CustomGraphForm({
                   aggregation: "avg",
                 },
               },
-              { shouldFocus: false }
+              { shouldFocus: false },
             );
             setTimeout(() => {
               form.resetField(`series.${index}.name`, {
@@ -744,24 +775,55 @@ function CustomGraphForm({
       </Field.Root>
       <Field.Root>
         <Field.Label>Group by</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field {...groupByField}>
-            <option value="">No grouping</option>
-            {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
-              <optgroup
-                key={groupParent}
-                label={camelCaseToTitleCase(groupParent)}
-              >
-                {Object.entries(metrics).map(([groupKey, group]) => (
-                  <option key={groupKey} value={`${groupParent}.${groupKey}`}>
-                    {group.label}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
+        <Grid
+          width="full"
+          gap={3}
+          templateColumns={
+            groupBy && getGroup(groupBy).requiresKey ? "repeat(2, 1fr)" : "1fr"
+          }
+        >
+          <NativeSelect.Root>
+            <NativeSelect.Field
+              {...groupByField}
+              onChange={(e) => {
+                // Clear groupByKey when groupBy changes
+                form.setValue("groupByKey", undefined);
+                void groupByField.onChange(e);
+              }}
+            >
+              <option value="">No grouping</option>
+              {Object.entries(analyticsGroups).map(([groupParent, metrics]) => (
+                <optgroup
+                  key={groupParent}
+                  label={camelCaseToTitleCase(groupParent)}
+                >
+                  {Object.entries(metrics).map(([groupKey, group]) => (
+                    <option key={groupKey} value={`${groupParent}.${groupKey}`}>
+                      {group.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+          {groupBy && getGroup(groupBy).requiresKey && (
+            <Controller
+              control={form.control}
+              name="groupByKey"
+              render={({ field }) => (
+                <FilterSelectField
+                  field={field}
+                  filter={getGroup(groupBy).requiresKey!.filter}
+                  emptyOption={
+                    getGroup(groupBy).requiresKey!.optional ? "all" : undefined
+                  }
+                  currentSelected={field.value}
+                />
+              )}
+            />
+          )}
+        </Grid>
       </Field.Root>
       {(!graphType || !summaryGraphTypes.includes(graphType.value)) && (
         <Field.Root>
@@ -790,27 +852,51 @@ function CustomGraphForm({
       <HStack width="full" gap={2}>
         <Spacer />
         {customId ? (
-          <Button
-            colorPalette="orange"
-            onClick={updateGraph}
-            loading={updateGraphById.isLoading}
-            marginX={2}
-            minWidth="fit-content"
+          <Tooltip
+            content={
+              !hasPermission("analytics:manage")
+                ? "You need analytics:manage permission to update graphs"
+                : undefined
+            }
+            disabled={hasPermission("analytics:manage")}
+            positioning={{ placement: "top" }}
+            showArrow
           >
-            Update
-          </Button>
+            <Button
+              colorPalette="orange"
+              onClick={updateGraph}
+              loading={updateGraphById.isLoading}
+              disabled={!hasPermission("analytics:manage")}
+              marginX={2}
+              minWidth="fit-content"
+            >
+              Update
+            </Button>
+          </Tooltip>
         ) : (
-          <Button
-            colorPalette="orange"
-            loading={addNewGraph.isLoading}
-            onClick={() => {
-              addGraph();
-            }}
-            marginX={2}
-            minWidth="fit-content"
+          <Tooltip
+            content={
+              !hasPermission("analytics:create")
+                ? "You need analytics:create permission to create graphs"
+                : undefined
+            }
+            disabled={hasPermission("analytics:create")}
+            positioning={{ placement: "top" }}
+            showArrow
           >
-            Save
-          </Button>
+            <Button
+              colorPalette="orange"
+              loading={addNewGraph.isLoading}
+              onClick={() => {
+                addGraph();
+              }}
+              disabled={!hasPermission("analytics:create")}
+              marginX={2}
+              minWidth="fit-content"
+            >
+              Save
+            </Button>
+          </Tooltip>
         )}
       </HStack>
     </VStack>
@@ -843,18 +929,36 @@ function SeriesFieldItem({
   const seriesLength = form.watch(`series`).length;
   const groupBy = form.watch("groupBy");
 
+  // Track the previous groupBy to only auto-set colors when user actually changes it
+  const prevGroupByRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
+    // Only auto-set colors when groupBy actually changes (not on initial load)
+    const prevGroupBy = prevGroupByRef.current;
+    prevGroupByRef.current = groupBy;
+
+    // Skip if this is the initial value being set (prevGroupBy was undefined)
+    if (prevGroupBy === undefined) {
+      return;
+    }
+
+    // Skip if groupBy didn't actually change
+    if (prevGroupBy === groupBy) {
+      return;
+    }
+
     if (seriesLength === 1 && groupBy) {
       form.setValue(
         `series.${index}.colorSet`,
         groupBy.startsWith("sentiment") ||
-          groupBy.startsWith("evaluations") ||
+          groupBy === "evaluations.evaluation_passed" ||
+          groupBy === "evaluations.evaluation_processing_state" ||
           groupBy.includes("has_error")
           ? "positiveNegativeNeutral"
-          : "colors"
+          : "colors",
       );
     }
-  }, [form, groupBy, index, seriesLength, customId]);
+  }, [form, groupBy, index, seriesLength]);
 
   return (
     <Accordion.Item
@@ -905,7 +1009,7 @@ function SeriesFieldItem({
                         key as RotatingColorSet,
                         {
                           shouldTouch: true,
-                        }
+                        },
                       );
                     }}
                   >
@@ -992,11 +1096,15 @@ function SeriesField({
   const key = form.watch(`series.${index}.key`);
   const pipelineField = form.watch(`series.${index}.pipeline.field`);
   const pipelineAggregation = form.watch(
-    `series.${index}.pipeline.aggregation`
+    `series.${index}.pipeline.aggregation`,
   );
+  const filters = form.watch(`series.${index}.filters`);
+  const nonEmptyFilters = filterOutEmptyFilters(filters);
 
   const metricField = form.control.register(`series.${index}.metric`);
   const metric_ = metric ? getMetric(metric) : undefined;
+
+  const { openDrawer } = useDrawer();
 
   useEffect(() => {
     const aggregation_ = aggregation
@@ -1013,7 +1121,7 @@ function SeriesField({
     const name_ = uppercaseFirstLetterLowerCaseRest(
       [pipelineAggregation_, metric_?.label, aggregation_, pipeline_]
         .filter((x) => x)
-        .join(" ")
+        .join(" "),
     );
 
     if (
@@ -1056,7 +1164,7 @@ function SeriesField({
                 if (!metric_.allowedAggregations.includes(aggregation)) {
                   form.setValue(
                     `series.${index}.aggregation`,
-                    metric_.allowedAggregations[0]!
+                    metric_.allowedAggregations[0]!,
                   );
                 }
                 void metricField.onChange(e);
@@ -1127,7 +1235,7 @@ function SeriesField({
               <option value="">all</option>
               {Object.entries(analyticsPipelines)
                 .filter(([key]) =>
-                  metric.includes("trace_id") ? key !== "trace_id" : true
+                  metric.includes("trace_id") ? key !== "trace_id" : true,
                 )
                 .map(([key, { label }]) => (
                   <option key={key} value={key}>
@@ -1156,6 +1264,67 @@ function SeriesField({
           </NativeSelect.Root>
         </Field.Root>
       )}
+      <HStack gap={4}>
+        <Field.Root flexShrink={1} maxWidth="fit-content">
+          <Controller
+            control={form.control}
+            name={`series.${index}.filters`}
+            render={({ field }) => {
+              return (
+                <FilterToggleButton
+                  toggled={false}
+                  filters={
+                    field.value ?? ({} as Record<FilterField, FilterParam>)
+                  }
+                  onClick={() =>
+                    openDrawer("seriesFilters", {
+                      filters:
+                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                      onChange: ({
+                        filters,
+                      }: {
+                        filters: Record<FilterField, FilterParam>;
+                      }) => {
+                        form.setValue(`series.${index}.filters`, filters);
+                      },
+                    })
+                  }
+                >
+                  {Object.keys(nonEmptyFilters).length > 0
+                    ? "Edit Filters"
+                    : "Add Filters"}
+                </FilterToggleButton>
+              );
+            }}
+          />
+        </Field.Root>
+        {Object.keys(nonEmptyFilters).length > 0 && (
+          <Field.Root
+            display="flex"
+            flexDirection="row"
+            alignItems="center"
+            gap={2}
+          >
+            <Controller
+              control={form.control}
+              name={`series.${index}.asPercent`}
+              render={({ field }) => (
+                <>
+                  <Switch
+                    {...field}
+                    checked={!!field.value}
+                    value="on"
+                    onChange={(e) => field.onChange(e.target.checked)}
+                  />
+                  <Field.Label flexShrink={0}>
+                    Show in percentage (%)
+                  </Field.Label>
+                </>
+              )}
+            />
+          </Field.Root>
+        )}
+      </HStack>
     </VStack>
   );
 }
@@ -1188,7 +1357,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       refetchOnWindowFocus: false,
       keepPreviousData: true,
       enabled: queryOpts.enabled,
-    }
+    },
   );
 
   const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
@@ -1197,7 +1366,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
     filterData.data?.options.map(({ field, label }) => ({
       value: field,
       label,
-    })) ?? []
+    })) ?? [],
   );
 
   if (
@@ -1299,7 +1468,7 @@ function GraphTypeField({
           value={[field.value!.value]}
           onValueChange={(change) => {
             const selectedOption = chartOptions.find(
-              (opt) => opt.value === change.value[0]
+              (opt) => opt.value === change.value[0],
             );
             field.onChange(selectedOption);
           }}

@@ -1,18 +1,16 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
-
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
 import {
-  handleSchema,
-  scopeSchema,
-  modelNameSchema,
   commitMessageSchema,
-  messageSchema,
+  handleSchema,
   inputsSchema,
+  messageSchema,
+  modelNameSchema,
   outputsSchema,
   schemaVersionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+  scopeSchema,
+} from "~/prompts/schemas/field-schemas";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 /**
  * Schema for creating new prompt versions
@@ -51,7 +49,7 @@ export const updatePromptInputSchema = createPromptInputSchema
       // Scope is optional, but on the update we don't want to set the default
       scope: scopeSchema.optional(),
       handle: handleSchema.optional(),
-    })
+    }),
   );
 
 export const updateHandleInputSchema = z.strictObject({

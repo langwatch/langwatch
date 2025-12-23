@@ -1,17 +1,10 @@
-import {
-  Box,
-  Center,
-  Link,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
+import { ExternalLink } from "react-feather";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { api } from "../../utils/api";
-import { SummaryMetricValue } from "./SummaryMetric";
-import { ExternalLink } from "react-feather";
-import { useDrawer } from "../CurrentDrawer";
 import { Tooltip } from "../ui/tooltip";
+import { SummaryMetricValue } from "./SummaryMetric";
 
 export const FeedbacksTable = () => {
   const { filterParams, queryOpts } = useFilterParams();
@@ -26,7 +19,10 @@ export const FeedbacksTable = () => {
       <Table.Root variant="line" padding={0} margin={0}>
         <Table.Header>
           <Table.Row>
-            <Table.ColumnHeader width="48px" paddingLeft={0}></Table.ColumnHeader>
+            <Table.ColumnHeader
+              width="48px"
+              paddingLeft={0}
+            ></Table.ColumnHeader>
             <Table.ColumnHeader>Feedback</Table.ColumnHeader>
             <Table.ColumnHeader width="250px">Date</Table.ColumnHeader>
             <Table.ColumnHeader width="180px" textAlign="center">
@@ -52,10 +48,11 @@ export const FeedbacksTable = () => {
           )}
 
           {feedbacks.data?.events.map((event, index) => {
-            const vote = event.metrics.find((metric) => metric.key === "vote")
-              ?.value;
+            const vote = event.metrics.find(
+              (metric) => metric.key === "vote",
+            )?.value;
             const feedback = event.event_details.find(
-              (detail) => detail.key === "feedback"
+              (detail) => detail.key === "feedback",
             )?.value;
 
             return (
@@ -80,7 +77,7 @@ export const FeedbacksTable = () => {
                 </Table.Cell>
                 <Table.Cell>
                   {new Date(
-                    event.timestamps.started_at ?? event.timestamps.inserted_at
+                    event.timestamps.started_at ?? event.timestamps.inserted_at,
                   ).toLocaleString()}
                 </Table.Cell>
                 <Table.Cell>
@@ -111,7 +108,7 @@ export const DocumentsCountsSummary = () => {
   const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   const count = documents.data?.totalUniqueDocuments;

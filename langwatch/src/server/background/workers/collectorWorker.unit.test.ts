@@ -1,9 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { asNonEmptyIO } from "./collectorWorker";
 
 describe("collectorWorker unit tests", () => {
   describe("asNonEmptyIO helper function", () => {
-
     it("should return undefined for null input", () => {
       expect(asNonEmptyIO(null)).toBeUndefined();
     });

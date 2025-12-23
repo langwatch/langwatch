@@ -1,8 +1,8 @@
 import { useRouter } from "next/router";
-import AnalyticsCustomGraph from "./index";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import AnalyticsCustomGraph from "./index";
 
 export default function EditCustomAnalyticsPage() {
   const router = useRouter();

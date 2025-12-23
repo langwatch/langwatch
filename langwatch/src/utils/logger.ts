@@ -21,7 +21,9 @@ const getDestinationStream = () => {
 export const createLogger = (name: string) => {
   const options: LoggerOptions = {
     name,
-    level: isBrowser ? "info" : process.env.PINO_LOG_LEVEL ?? "info",
+    level: isBrowser
+      ? "info"
+      : (process.env.PINO_LOG_LEVEL ?? process.env._LOG_LEVEL ?? "info"),
     timestamp: isBrowser ? undefined : pino.stdTimeFunctions.isoTime,
     browser: isBrowser ? { asObject: true } : void 0,
     serializers: {
@@ -40,3 +42,5 @@ export const createLogger = (name: string) => {
   const destination = getDestinationStream();
   return (pino as any).default(options, destination) as ReturnType<typeof pino>;
 };
+
+export type Logger = ReturnType<typeof createLogger>;

@@ -1,19 +1,13 @@
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-} from "@chakra-ui/react";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useDrawer } from "../CurrentDrawer";
-import { api } from "../../utils/api";
+import { Button, Field, Heading, HStack, Input, Text } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
-import { HorizontalFormControl } from "../HorizontalFormControl";
-import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../../components/ui/drawer";
 import { InputGroup } from "../../components/ui/input-group";
 import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { MaybeStoredLLMModelCost } from "../../server/modelProviders/llmModelCost";
+import { api } from "../../utils/api";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 
 export function LLMModelCostDrawer({
   id,
@@ -27,22 +21,20 @@ export function LLMModelCostDrawer({
 
   const llmModelCosts = api.llmModelCost.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   return (
-    <Drawer.Root open={true} placement="end" size={"xl"} onOpenChange={() => closeDrawer()}>
-      <Drawer.Backdrop />
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size={"xl"}
+      onOpenChange={() => closeDrawer()}
+    >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              {id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}
-            </Text>
-          </HStack>
+          <Heading>{id ? "Edit LLM Model Cost" : "Add LLM Model Cost"}</Heading>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           {llmModelCosts.data && (
@@ -74,14 +66,14 @@ function LLMModelCostForm({
 
   const llmModelCostsQuery = api.llmModelCost.getAllForProject.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id }
+    { enabled: !!project?.id },
   );
 
   const currentLLMModelCost = id
     ? llmModelCosts.find((llmModelCost) => llmModelCost.id === id)
     : cloneModel
     ? llmModelCosts.find(
-        (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel
+        (llmModelCost) => !llmModelCost.id && llmModelCost.model === cloneModel,
       )
     : undefined;
 
@@ -129,7 +121,6 @@ function LLMModelCostForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           closeDrawer();
           void llmModelCostsQuery.refetch();
@@ -143,10 +134,9 @@ function LLMModelCostForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
   };
 
@@ -168,8 +158,16 @@ function LLMModelCostForm({
           invalid={!!errors.regex}
         >
           <InputGroup
-            startElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
-            endElement={<Text paddingX={2} fontFamily="monospace">/</Text>}
+            startElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
+            endElement={
+              <Text paddingX={2} fontFamily="monospace">
+                /
+              </Text>
+            }
           >
             <Input
               required
@@ -197,9 +195,7 @@ function LLMModelCostForm({
               })}
             />
           </InputGroup>
-          <Field.ErrorText>
-            {errors.inputCostPerToken?.message}
-          </Field.ErrorText>
+          <Field.ErrorText>{errors.inputCostPerToken?.message}</Field.ErrorText>
         </HorizontalFormControl>
         <HorizontalFormControl
           label="Output Cost Per Token"
@@ -238,7 +234,7 @@ const isValidRegex = (pattern: string): boolean => {
   try {
     new RegExp(pattern);
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 };

@@ -2,13 +2,12 @@ import {
   Box,
   Card,
   GridItem,
-  SimpleGrid,
-  HStack,
   Heading,
+  HStack,
+  SimpleGrid,
   VStack,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
-import GraphsLayout from "~/components/GraphsLayout";
 import {
   CustomGraph,
   type CustomGraphInput,
@@ -18,8 +17,11 @@ import {
   DocumentsCountsTable,
 } from "~/components/analytics/DocumentsCountsTable";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
+import GraphsLayout from "~/components/GraphsLayout";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -80,31 +82,9 @@ const mostDisucussedTopics = {
   height: 300,
 };
 
-const inputSentiment = {
-  graphId: "custom",
-  graphType: "donnut",
-  series: [
-    {
-      name: "Sum messages count per message",
-      colorSet: "positiveNegativeNeutral",
-      metric: "metadata.trace_id",
-      aggregation: "cardinality",
-      pipeline: {
-        field: "trace_id",
-        aggregation: "sum",
-      },
-    },
-  ],
-  groupBy: "sentiment.input_sentiment",
-  includePrevious: false,
-  timeScale: "full",
-  height: 300,
-};
-
-export default function Topics() {
+function TopicsContent() {
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="Topics" />
+    <GraphsLayout title="Topics">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={1} display="inline-grid">
@@ -176,3 +156,5 @@ export default function Topics() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view")(TopicsContent);

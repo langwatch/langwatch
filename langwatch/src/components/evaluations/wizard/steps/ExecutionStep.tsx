@@ -4,14 +4,14 @@ import {
   type TaskType,
   useEvaluationWizardStore,
 } from "../hooks/evaluation-wizard-store/useEvaluationWizardStore";
-import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
 import { OfflineExecutionMethodSelectionStep } from "./execution/offline-exectution/OfflineExecutionMethodSelectionStep";
+import { RealTimeExecutionStep } from "./execution/RealTimeExecutionStep";
 
 export function ExecutionStep() {
   const { task } = useEvaluationWizardStore(
     useShallow(({ wizardState }) => ({
       task: wizardState.task,
-    }))
+    })),
   );
 
   return (

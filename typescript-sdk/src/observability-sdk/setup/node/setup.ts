@@ -241,6 +241,33 @@ export function createAndStartNodeSdk(
   sdk.start();
   logger.info("NodeSDK started successfully");
 
+  // Fix for Next.js 15: Explicitly verify and register provider if still proxy
+  // See: https://github.com/langwatch/langwatch/issues/753
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    // Wait a tick to ensure SDK initialization completes
+    setImmediate(() => {
+      const globalProvider = trace.getTracerProvider();
+
+      // Check if provider is still a proxy (Next.js 15 issue)
+      if (globalProvider.constructor.name === 'ProxyTracerProvider') {
+        logger.warn('Global provider is still ProxyTracerProvider after SDK start - applying Next.js 15 workaround');
+
+        // Access the real provider from the delegate
+        const realProvider = (globalProvider as any)._delegate;
+
+        if (realProvider?.constructor.name === 'NodeTracerProvider') {
+          // Explicitly register the real provider globally
+          trace.setGlobalTracerProvider(realProvider);
+          logger.info('Successfully registered NodeTracerProvider globally for Next.js 15');
+        } else {
+          logger.error('Could not find NodeTracerProvider in proxy delegate - spans may not be exported');
+        }
+      } else {
+        logger.debug(`Provider registered correctly: ${globalProvider.constructor.name}`);
+      }
+    });
+  }
+
   if (loggerProvider) {
     setLangWatchLoggerProvider(loggerProvider);
     logger.debug("Set LangWatch logger provider");

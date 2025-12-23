@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 
 /**
  * Higher-Order Component that wraps a component with a controller hook.
@@ -28,17 +28,21 @@ import React from "react";
  * export default withController(MyComponent, useMyController);
  * ```
  */
-export function withController<P extends object, C>(
-  Component: React.ComponentType<P & C>,
-  useController: (props: P) => C
-): React.ComponentType<P> {
-  const WrappedComponent = (props: P) => {
-    const controller = useController(props);
-    return <Component {...props} {...controller} />;
+export function withController<
+  P extends object,
+  C,
+  ComponentProps extends P & C = P & C,
+>(
+  Component: React.ComponentType<ComponentProps>,
+  useController: (props: P) => C,
+): React.ComponentType<P & Omit<ComponentProps, keyof (P & C)>> {
+  const WrappedComponent = (props: P & Omit<ComponentProps, keyof (P & C)>) => {
+    const controller = useController(props as P);
+    return <Component {...({ ...props, ...controller } as ComponentProps)} />;
   };
 
   WrappedComponent.displayName = `withController(${
-    Component.displayName || Component.name || "Component"
+    Component.displayName ?? Component.name ?? "Component"
   })`;
 
   return WrappedComponent;

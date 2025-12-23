@@ -37,7 +37,7 @@ export function Conversation({
     },
     {
       enabled: !!project && !!threadId,
-    }
+    },
   );
 
   const modalTraceId =
@@ -48,7 +48,7 @@ export function Conversation({
   useEffect(() => {
     if (threadTraces.data && threadTraces.data?.length > 0) {
       const container = document.getElementById(
-        "conversation-scroll-container"
+        "conversation-scroll-container",
       )!;
       if (container) {
         container.scrollTop = (currentTraceRef.current?.offsetTop ?? 0) - 176;
@@ -88,10 +88,10 @@ export function Conversation({
                         threadTraces.data.length === 1
                           ? "only"
                           : index === 0
-                          ? "first"
-                          : index === threadTraces.data.length - 1
-                          ? "last"
-                          : "other"
+                            ? "first"
+                            : index === threadTraces.data.length - 1
+                              ? "last"
+                              : "other"
                       }
                       ref={
                         trace.trace_id == traceId ? currentTraceRef : undefined
@@ -151,7 +151,7 @@ export function Conversation({
                   paddingRight={10}
                   paddingY={4}
                   background="white"
-                  borderRadius="4px"
+                  borderRadius="lg"
                   minHeight="524px"
                 >
                   <Message

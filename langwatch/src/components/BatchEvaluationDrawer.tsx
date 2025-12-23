@@ -17,11 +17,11 @@ import type { JsonObject } from "@prisma/client/runtime/library";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { RenderCode } from "~/components/code/RenderCode";
-import { useDrawer } from "~/components/CurrentDrawer";
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { api } from "~/utils/api";
@@ -36,7 +36,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
   const { project } = useOrganizationTeamProject();
   const [step, setStep] = useState<number>(1);
   const [selectedDataset, setSelectedDataset] = useState<string>(
-    props.datasetSlug ?? ""
+    props.datasetSlug ?? "",
   );
   const [selectDBError, setSelectDBError] = useState<boolean>(false);
 
@@ -51,14 +51,14 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project,
-    }
+    },
   );
 
   useEffect(() => {
@@ -80,7 +80,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
     checksData.forEach((check, index: number) => {
       const checkType = check.checkType;
       const evaluation = evaluations.find(
-        (evaluation) => evaluation[0] === checkType
+        (evaluation) => evaluation[0] === checkType,
       );
       if (evaluation) {
         // @ts-ignore: Unreachable code error
@@ -275,7 +275,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                   <Switch
                                     size="lg"
                                     checked={selectedChecks.includes(
-                                      check.slug
+                                      check.slug,
                                     )}
                                     position="relative"
                                     zIndex={1}
@@ -391,7 +391,7 @@ export function BatchEvaluationDrawer(props: BatchEvaluatioProps) {
                                   <Switch
                                     size="lg"
                                     checked={selectedChecks.includes(
-                                      check.slug
+                                      check.slug,
                                     )}
                                     position="relative"
                                     zIndex={1}

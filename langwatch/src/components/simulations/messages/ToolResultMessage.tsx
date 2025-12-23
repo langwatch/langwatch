@@ -1,4 +1,4 @@
-import { VStack, Box, Text } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import type { ResultMessage } from "@copilotkit/runtime-client-gql";
 import { RenderInputOutput } from "../../traces/RenderInputOutput";
 

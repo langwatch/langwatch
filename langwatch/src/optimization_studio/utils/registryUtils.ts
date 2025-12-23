@@ -1,13 +1,12 @@
 import { evaluatorTempNameMap } from "../../components/checks/EvaluatorSelection";
 import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators";
-import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
+import type { EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field } from "../types/dsl";
 
+export { DEFAULT_MAX_TOKENS } from "~/utils/constants";
+
 export const convertEvaluators = (
-  evaluators: Exclude<
-    ReturnType<typeof useAvailableEvaluators>,
-    undefined
-  >
+  evaluators: Exclude<ReturnType<typeof useAvailableEvaluators>, undefined>,
 ): Evaluator[] => {
   return Object.entries(evaluators)
     .filter(([evaluator, definition]) => {
@@ -23,8 +22,8 @@ export const convertEvaluators = (
     .map(([evaluator]) =>
       buildEvaluatorFromType(
         evaluator as EvaluatorTypes | `custom/${string}`,
-        evaluators
-      )
+        evaluators,
+      ),
     );
 };
 
@@ -38,7 +37,7 @@ export const buildEvaluatorFromType = (
   availableEvaluators: Exclude<
     ReturnType<typeof useAvailableEvaluators>,
     undefined
-  >
+  >,
 ): Evaluator => {
   const definition = availableEvaluators[evaluatorType];
 
@@ -82,7 +81,7 @@ export const buildEvaluatorFromType = (
   ];
   inputs = inputs.sort(
     (a, b) =>
-      fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier)
+      fieldsOrder.indexOf(a.identifier) - fieldsOrder.indexOf(b.identifier),
   );
 
   // Add outputs based on the result object

@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         message:
           "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
       },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   if (!project) {
     return NextResponse.json(
       { message: "Invalid auth token." },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   if (!workflow) {
     return NextResponse.json(
       { message: "Workflow not found." },
-      { status: 404 }
+      { status: 404 },
     );
   }
 
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     } else {
       return NextResponse.json(
         { message: `Failed to run sample workflow: ${await response.text()}` },
-        { status: 500 }
+        { status: 500 },
       );
     }
   }

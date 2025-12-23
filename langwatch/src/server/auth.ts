@@ -1,31 +1,33 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import { type GetServerSidePropsContext, type NextApiRequest } from "next";
+import type { Account, Organization } from "@prisma/client";
+import { compare } from "bcrypt";
+import type { GetServerSidePropsContext, NextApiRequest } from "next";
+import type { NextRequest } from "next/server";
 import {
-  getServerSession,
   type DefaultSession,
+  getServerSession,
+  type Account as NextAuthAccount,
   type NextAuthOptions,
   type User,
-  type Account as NextAuthAccount,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
+import AzureADProvider from "next-auth/providers/azure-ad";
 import CognitoProvider, {
   type CognitoProfile,
 } from "next-auth/providers/cognito";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcrypt";
-
-import { env } from "~/env.mjs";
-import { prisma } from "~/server/db";
-import { dependencies } from "../injection/dependencies.server";
-import type { NextRequest } from "next/server";
-import { getNextAuthSessionToken } from "../utils/auth";
-import AzureADProvider from "next-auth/providers/azure-ad";
 import GitHubProvider from "next-auth/providers/github";
 import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
-import type { Account, Organization } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { env } from "~/env.mjs";
+import { prisma } from "~/server/db";
+import { dependencies } from "../injection/dependencies.server";
+import { getNextAuthSessionToken } from "../utils/auth";
+import { createLogger } from "../utils/logger";
+import { captureException } from "../utils/posthogErrorCapture";
+
+const logger = createLogger("langwatch:auth");
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -47,7 +49,7 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions = (
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
 ): NextAuthOptions => ({
   session: {
     strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
@@ -95,7 +97,10 @@ export const authOptions = (
       };
     },
     signIn: async ({ user, account }) => {
-      if (!user.email) return false;
+      if (!user.email) {
+        logger.error({ user }, "SignIn failed: No email provided");
+        return false;
+      }
 
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
@@ -122,7 +127,7 @@ export const authOptions = (
         await createUserAndAddToOrganization(
           user,
           orgWithSsoDomain,
-          account as Account
+          account as Account,
         );
 
         return true;
@@ -163,120 +168,124 @@ export const authOptions = (
           },
         })
       : env.NEXTAUTH_PROVIDER === "azure-ad"
-      ? AzureADProvider({
-          clientId: env.AZURE_CLIENT_ID ?? "",
-          clientSecret: env.AZURE_CLIENT_SECRET ?? "",
-          tenantId: env.AZURE_TENANT_ID ?? "",
-          authorization: {
-            params: { prompt: "login", scope: "openid email profile" },
-          },
-          profile(profile) {
-            return {
-              id: profile.sub ?? profile.id,
-              name: profile.displayName,
-              email: profile.mail ?? profile.userPrincipalName,
-              image: null, // Microsoft Graph doesn't return image by default
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "cognito"
-      ? CognitoProvider({
-          clientId: env.COGNITO_CLIENT_ID ?? "",
-          clientSecret: env.COGNITO_CLIENT_SECRET ?? "",
-          issuer: env.COGNITO_ISSUER ?? "",
-          client: {
-            token_endpoint_auth_method: "none",
-          },
-
-          profile(profile: CognitoProfile) {
-            return {
-              id: profile.sub,
-              name: profile.name,
-              email: profile.email,
-              image: profile.picture,
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "github"
-      ? GitHubProvider({
-          clientId: env.GITHUB_CLIENT_ID ?? "",
-          clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
-          profile(profile) {
-            return {
-              id: profile.id.toString(),
-              name: profile.name ?? profile.login,
-              email: profile.email,
-              image: profile.avatar_url,
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "gitlab"
-      ? GitlabProvider({
-          clientId: env.GITLAB_CLIENT_ID ?? "",
-          clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
-          profile(profile) {
-            return {
-              id: profile.sub?.toString(),
-              name: profile.name ?? profile.username,
-              email: profile.email,
-              image: profile.avatar_url,
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "google"
-      ? GoogleProvider({
-          clientId: env.GOOGLE_CLIENT_ID ?? "",
-          clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
-          profile(profile) {
-            return {
-              id: profile.sub,
-              name: profile.name,
-              email: profile.email,
-              image: profile.picture,
-            };
-          },
-        })
-      : env.NEXTAUTH_PROVIDER === "okta"
-      ? OktaProvider({
-          clientId: env.OKTA_CLIENT_ID ?? "",
-          clientSecret: env.OKTA_CLIENT_SECRET ?? "",
-          issuer: env.OKTA_ISSUER ?? "",
-          profile(profile) {
-            return {
-              id: profile.sub,
-              name: profile.name,
-              email: profile.email,
-              image: profile.image,
-            };
-          },
-        })
-      : CredentialsProvider({
-          name: "Credentials",
-          credentials: {
-            email: {},
-            password: {},
-          },
-          async authorize(credentials, _req) {
-            const user = await prisma.user.findUnique({
-              where: {
-                email: credentials?.email,
+        ? AzureADProvider({
+            clientId: env.AZURE_AD_CLIENT_ID ?? "",
+            clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
+            tenantId: env.AZURE_AD_TENANT_ID ?? "",
+            authorization: {
+              params: {
+                prompt: "login",
+                scope: "openid email profile User.Read",
               },
-            });
-            if (!user?.password) return null;
-            const passwordMatch = await compare(
-              credentials?.password ?? "",
-              user.password
-            );
-            if (!passwordMatch) return null;
+            },
+            profile(profile) {
+              return {
+                id: profile.sub ?? profile.oid ?? profile.id,
+                name: profile.name ?? profile.displayName,
+                email:
+                  profile.email ?? profile.mail ?? profile.userPrincipalName,
+                image: null, // Microsoft Graph doesn't return image by default
+              };
+            },
+          })
+        : env.NEXTAUTH_PROVIDER === "cognito"
+          ? CognitoProvider({
+              clientId: env.COGNITO_CLIENT_ID ?? "",
+              clientSecret: env.COGNITO_CLIENT_SECRET ?? "",
+              issuer: env.COGNITO_ISSUER ?? "",
+              client: {
+                token_endpoint_auth_method: "none",
+              },
 
-            return {
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              image: user.image,
-            };
-          },
-        }),
+              profile(profile: CognitoProfile) {
+                return {
+                  id: profile.sub,
+                  name: profile.name,
+                  email: profile.email,
+                  image: profile.picture,
+                };
+              },
+            })
+          : env.NEXTAUTH_PROVIDER === "github"
+            ? GitHubProvider({
+                clientId: env.GITHUB_CLIENT_ID ?? "",
+                clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+                profile(profile) {
+                  return {
+                    id: profile.id.toString(),
+                    name: profile.name ?? profile.login,
+                    email: profile.email,
+                    image: profile.avatar_url,
+                  };
+                },
+              })
+            : env.NEXTAUTH_PROVIDER === "gitlab"
+              ? GitlabProvider({
+                  clientId: env.GITLAB_CLIENT_ID ?? "",
+                  clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+                  profile(profile) {
+                    return {
+                      id: profile.sub?.toString(),
+                      name: profile.name ?? profile.username,
+                      email: profile.email,
+                      image: profile.avatar_url,
+                    };
+                  },
+                })
+              : env.NEXTAUTH_PROVIDER === "google"
+                ? GoogleProvider({
+                    clientId: env.GOOGLE_CLIENT_ID ?? "",
+                    clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+                    profile(profile) {
+                      return {
+                        id: profile.sub,
+                        name: profile.name,
+                        email: profile.email,
+                        image: profile.picture,
+                      };
+                    },
+                  })
+                : env.NEXTAUTH_PROVIDER === "okta"
+                  ? OktaProvider({
+                      clientId: env.OKTA_CLIENT_ID ?? "",
+                      clientSecret: env.OKTA_CLIENT_SECRET ?? "",
+                      issuer: env.OKTA_ISSUER ?? "",
+                      profile(profile) {
+                        return {
+                          id: profile.sub,
+                          name: profile.name,
+                          email: profile.email,
+                          image: profile.image,
+                        };
+                      },
+                    })
+                  : CredentialsProvider({
+                      name: "Credentials",
+                      credentials: {
+                        email: {},
+                        password: {},
+                      },
+                      async authorize(credentials, _req) {
+                        const user = await prisma.user.findUnique({
+                          where: {
+                            email: credentials?.email,
+                          },
+                        });
+                        if (!user?.password) return null;
+                        const passwordMatch = await compare(
+                          credentials?.password ?? "",
+                          user.password,
+                        );
+                        if (!passwordMatch) return null;
+
+                        return {
+                          id: user.id,
+                          name: user.name,
+                          email: user.email,
+                          image: user.image,
+                        };
+                      },
+                    }),
     /**
      * ...add more providers here.
      *
@@ -296,7 +305,7 @@ export const authOptions = (
 const createUserAndAddToOrganization = async (
   user: User,
   organization: Organization,
-  account: Account
+  account: Account,
 ) => {
   const newUser = await prisma.user.create({
     data: {
@@ -334,7 +343,7 @@ const createUserAndAddToOrganization = async (
 
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
-  account: NextAuthAccount
+  account: NextAuthAccount,
 ) => {
   // Wrap operations in a transaction
   try {
@@ -371,7 +380,7 @@ const linkExistingUserToOAuthProvider = async (
   } catch (error: any) {
     // Tying to link an account that already exists will throw a P2002 error, let's ignore it
     if (error.code === "P2002") {
-      Sentry.captureException(error);
+      captureException(error);
       return;
     } else {
       throw error;
@@ -381,11 +390,18 @@ const linkExistingUserToOAuthProvider = async (
 
 const checkIfSsoProviderIsAllowed = async (
   org: Organization,
-  provider: NextAuthAccount
+  provider: NextAuthAccount,
 ) => {
   if (
     org?.ssoProvider &&
-    !provider.providerAccountId.startsWith(org.ssoProvider)
+    !(
+      // Auth0
+      (
+        provider.providerAccountId.startsWith(org.ssoProvider) ||
+        // NextAuth
+        provider.provider === org.ssoProvider
+      )
+    )
   ) {
     throw new Error("SSO_PROVIDER_NOT_ALLOWED");
   }

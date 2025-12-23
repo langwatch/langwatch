@@ -1,36 +1,49 @@
 import type { Project } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
 import { Worker } from "bullmq";
 import type {
   CollectorCheckAndAdjustJob,
   CollectorJob,
 } from "~/server/background/types";
+import {
+  getTraceById,
+  searchTraces,
+  searchTracesWithInternals,
+} from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
 import { createLogger } from "../../../utils/logger";
+import {
+  captureException,
+  getCurrentScope,
+  startSpan,
+  withScope,
+} from "../../../utils/posthogErrorCapture";
 import { safeTruncate } from "../../../utils/truncate";
 import {
   flattenObjectKeys,
   getInternalProtectionsForProject,
 } from "../../api/utils";
 import { prisma } from "../../db";
-import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
+import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
 import {
   collectorIndexDelayHistogram,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
+  getPayloadSizeHistogram,
+  traceSpanCountHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
-import {
-  type ElasticSearchInputOutput,
-  type ElasticSearchSpan,
-  type ElasticSearchTrace,
-  type ErrorCapture,
-  type Evaluation,
-  type Span,
-  type SpanInputOutput,
+import type {
+  ElasticSearchInputOutput,
+  ElasticSearchSpan,
+  ElasticSearchTrace,
+  ErrorCapture,
+  Evaluation,
+  Span,
+  SpanInputOutput,
 } from "../../tracer/types";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
+import { prewarmTiktokenModels } from "./collector/cost";
 import { mapEvaluations, scheduleEvaluations } from "./collector/evaluations";
 import {
   addGuardrailCosts,
@@ -40,26 +53,33 @@ import {
 import { cleanupPIIs } from "./collector/piiCheck";
 import { addInputAndOutputForRAGs } from "./collector/rag";
 import { scoreSatisfactionFromInput } from "./collector/satisfaction";
-import {
-  searchTraces,
-  getTraceById,
-  searchTracesWithInternals,
-} from "~/server/elasticsearch/traces";
-import { prewarmTiktokenModels } from "./collector/cost";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 
 export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
-  forceSync = false
+  forceSync = false,
 ) => {
+  traceSpanCountHistogram.observe(collectorJob.spans?.length ?? 0);
+  getPayloadSizeHistogram("collector").observe(
+    JSON.stringify(collectorJob).length,
+  );
+
   if (forceSync || !collectorQueue) {
     logger.debug("force sync enabled, processing job synchronously");
     await processCollectorJob(undefined, collectorJob);
     return;
   }
 
-  await scheduleTraceCollectionWithGrouping(collectorJob);
+  try {
+    await scheduleTraceCollectionWithGrouping(collectorJob);
+  } catch (error) {
+    logger.error(
+      { error },
+      "failed to schedule trace collection with grouping, processing job synchronously",
+    );
+    await processCollectorJob(undefined, collectorJob);
+  }
 };
 
 /**
@@ -76,7 +96,8 @@ export const scheduleTraceCollectionWithFallback = async (
  */
 const localLocks: Record<string, boolean> = {};
 export const scheduleTraceCollectionWithGrouping = async (
-  collectorJob: CollectorJob
+  collectorJob: CollectorJob,
+  attempts = 0,
 ) => {
   const yyyymmddhhmm = new Date()
     .toISOString()
@@ -90,10 +111,10 @@ export const scheduleTraceCollectionWithGrouping = async (
   localLocks[baseJobId] = true;
 
   try {
-    let jobId = baseJobId;
+    let index = attempts + 1;
+    let jobId = index > 1 ? `${baseJobId}_${index}` : baseJobId;
 
     let existingJob = await collectorQueue.getJob(jobId);
-    let index = 1;
     while (existingJob && (await existingJob.isActive())) {
       index++;
       jobId = `${baseJobId}_${index}`;
@@ -103,18 +124,31 @@ export const scheduleTraceCollectionWithGrouping = async (
     if (existingJob && "spans" in existingJob.data) {
       logger.debug(
         { collectionJobTraceId: collectorJob.traceId },
-        "found existing job trace, merging..."
+        `found existing job trace, merging... (attempt ${attempts + 1})`,
       );
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
-      await existingJob.remove();
-      await collectorQueue.add("collector", mergedJob, {
-        jobId,
-        delay: 10_000,
-      });
+      try {
+        await existingJob.remove();
+        await collectorQueue.add("collector", mergedJob, {
+          jobId,
+          delay: 10_000,
+        });
+      } catch (error) {
+        // If it failed to remove the job, it might be due to a race condition where another worker picked it up while we were merging jobs
+        // so we'll try again with a different job id
+        if (attempts > 2) {
+          logger.error(
+            { error, attempts: attempts + 1 },
+            "failed to merge insert jobs, giving up",
+          );
+          throw error;
+        }
+        await scheduleTraceCollectionWithGrouping(collectorJob, attempts + 1);
+      }
     } else {
       logger.debug(
         { collectionJobTraceId: collectorJob.traceId },
-        "collecting job trace"
+        "collecting job trace",
       );
       await collectorQueue.add("collector", collectorJob, {
         jobId,
@@ -128,7 +162,7 @@ export const scheduleTraceCollectionWithGrouping = async (
 
 const mergeCollectorJobs = (
   job1: CollectorJob,
-  job2: CollectorJob
+  job2: CollectorJob,
 ): CollectorJob => {
   return {
     ...job1,
@@ -156,12 +190,12 @@ const mergeCollectorJobs = (
 
 export async function processCollectorJob(
   id: string | undefined,
-  data: CollectorJob | CollectorCheckAndAdjustJob
+  data: CollectorJob | CollectorCheckAndAdjustJob,
 ) {
   if ("spans" in data && data.spans?.length > 200) {
     logger.warn(
       { spansLength: data.spans?.length, jobId: id },
-      "too many spans, maximum of 200 per trace, dropping job"
+      "too many spans, maximum of 200 per trace, dropping job",
     );
     return;
   }
@@ -173,19 +207,19 @@ export async function processCollectorJob(
     getJobProcessingCounter("collector_check_and_adjust", "completed").inc();
     const duration = Date.now() - start;
     getJobProcessingDurationHistogram("collector_check_and_adjust").observe(
-      duration
+      duration,
     );
     return result;
   }
   getJobProcessingCounter("collector", "processing").inc();
 
-  Sentry.getCurrentScope().setPropagationContext({
+  getCurrentScope().setPropagationContext?.({
     traceId: data.traceId,
     sampleRand: 1,
     parentSpanId: data.traceId,
   });
 
-  const result = await Sentry.startSpan(
+  const result = await startSpan(
     {
       name: "Process Collector Job",
       op: "rootSpan",
@@ -195,7 +229,7 @@ export async function processCollectorJob(
     },
     async () => {
       return await processCollectorJob_(id, data as CollectorJob);
-    }
+    },
   );
 
   getJobProcessingCounter("collector", "completed").inc();
@@ -206,9 +240,17 @@ export async function processCollectorJob(
 
 const processCollectorJob_ = async (
   id: string | undefined,
-  data: CollectorJob
+  data: CollectorJob,
 ) => {
-  logger.debug({ jobId: id, data }, "processing job");
+  logger.info(
+    {
+      jobId: id,
+      ...(data.traceId && { traceId: data.traceId }),
+      ...(data.projectId && { projectId: data.projectId }),
+      ...(data.spans?.length && { spanCount: data.spans.length }),
+    },
+    "processing job",
+  );
 
   let spans = data.spans;
   const {
@@ -221,9 +263,17 @@ const processCollectorJob_ = async (
     paramsMD5,
   } = data;
 
-  const project = await prisma.project.findUniqueOrThrow({
+  const project = await prisma.project.findUnique({
     where: { id: projectId, archivedAt: null },
   });
+
+  if (!project) {
+    logger.warn(
+      { projectId, traceId },
+      "Project not found or archived, skipping collector job",
+    );
+    return;
+  }
 
   spans = addGuardrailCosts(spans);
   try {
@@ -231,9 +281,9 @@ const processCollectorJob_ = async (
   } catch (error) {
     logger.debug(
       { error, projectId: project.id, traceId },
-      "failed to add LLM tokens count"
+      "failed to add LLM tokens count",
     );
-    Sentry.captureException(new Error("Failed to add LLM tokens count"), {
+    captureException(new Error("Failed to add LLM tokens count"), {
       extra: { projectId: project.id, traceId, error: error },
     });
   }
@@ -251,7 +301,7 @@ const processCollectorJob_ = async (
         // If ignore_timestamps_on_write is set, we'll preserve existing timestamps in the ES update script
         // For now, set the required fields but they may be overridden during update
         inserted_at: span.timestamps.ignore_timestamps_on_write
-          ? existingTrace?.inserted_at ?? currentTime
+          ? (existingTrace?.inserted_at ?? currentTime)
           : currentTime,
         updated_at: currentTime,
       },
@@ -271,7 +321,7 @@ const processCollectorJob_ = async (
   const existingSpans: Span[] = [];
   const existingEvaluations: Evaluation[] = [];
   const hasIgnoreTimestamps = (spans ?? []).some(
-    (s) => s.timestamps?.ignore_timestamps_on_write === true
+    (s) => s.timestamps?.ignore_timestamps_on_write === true,
   );
 
   if (existingTrace?.inserted_at) {
@@ -315,9 +365,13 @@ const processCollectorJob_ = async (
   // Only set trace input/output when this batch provides real I/O.
   // Avoid overriding with fallback-derived values (e.g., span names) if the batch has no I/O.
   // When provided, compute from the full uniqueSpans so heuristics reflect the entire trace state.
-  const hasNewIO = (spans ?? []).some((s) => !!s.input?.value || !!s.output?.value);
+  const hasNewIO = (spans ?? []).some(
+    (s) => !!s.input?.value || !!s.output?.value,
+  );
   const input = hasNewIO ? { value: getFirstInputAsText(uniqueSpans) } : void 0;
-  const output = hasNewIO ? { value: getLastOutputAsText(uniqueSpans) } : void 0;
+  const output = hasNewIO
+    ? { value: getLastOutputAsText(uniqueSpans) }
+    : void 0;
 
   const error = getLastOutputError(uniqueSpans);
 
@@ -346,7 +400,7 @@ const processCollectorJob_ = async (
           ...existingAllKeys,
           ...Object.keys(reservedTraceMetadata),
           ...flattenObjectKeys(customMetadata),
-        ])
+        ]),
       ),
     },
     timestamps: {
@@ -355,11 +409,11 @@ const processCollectorJob_ = async (
         hasIgnoreTimestamps && existingTrace?.inserted_at
           ? existingSpans.length > 0
             ? Math.min(
-                ...existingSpans.map((span) => span.timestamps.started_at)
+                ...existingSpans.map((span) => span.timestamps.started_at),
               )
             : Math.min(...allSpans.map((span) => span.timestamps.started_at))
-          : Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
-            Date.now(),
+          : (Math.min(...allSpans.map((span) => span.timestamps.started_at)) ??
+            Date.now()),
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
@@ -369,9 +423,9 @@ const processCollectorJob_ = async (
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5]
-      .reverse()
+      .toReversed()
       .slice(0, 10)
-      .reverse(),
+      .toReversed(),
   };
 
   if (
@@ -385,7 +439,7 @@ const processCollectorJob_ = async (
     });
   }
 
-  await Sentry.startSpan({ name: "updateTrace" }, async () => {
+  await startSpan({ name: "updateTrace" }, async () => {
     await updateTrace(trace, esSpans, evaluations);
   });
 
@@ -412,7 +466,7 @@ const processCollectorJob_ = async (
       {
         jobId: `collector_${traceId}_check_and_adjust${postfix}`,
         delay: 3000,
-      }
+      },
     );
   };
 
@@ -435,7 +489,7 @@ const processCollectorJob_ = async (
 const updateTrace = async (
   trace: Omit<ElasticSearchTrace, "spans">,
   esSpans: ElasticSearchSpan[],
-  evaluations: Evaluation[] | undefined
+  evaluations: Evaluation[] | undefined,
 ) => {
   if (env.IS_QUICKWIT) {
     const client = await esClient({ projectId: trace.project_id });
@@ -712,7 +766,7 @@ const updateTrace = async (
 
 export const processCollectorCheckAndAdjustJob = async (
   id: string | undefined,
-  data: CollectorCheckAndAdjustJob
+  data: CollectorCheckAndAdjustJob,
 ) => {
   logger.debug({ jobId: id }, "post-processing job");
   const { traceId, projectId } = data;
@@ -811,7 +865,7 @@ export const processCollectorCheckAndAdjustJob = async (
   if (
     // Does not re-schedule trace checks for too old traces being resynced
     (!existingTrace?.timestamps?.inserted_at ||
-      existingTrace.timestamps.inserted_at > Date.now() - 30 * 1000) &&
+      existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
     // Does not schedule evaluations for traces that are not from the studio in development
     (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
       customMetadata?.platform !== "optimization_studio" ||
@@ -845,14 +899,14 @@ export const startCollectorWorker = () => {
     {
       connection,
       concurrency: 20,
-    }
+    },
   );
 
   collectorWorker.on("ready", () => {
     logger.debug("collector worker active, waiting for jobs!");
   });
 
-  collectorWorker.on("failed", (job, err) => {
+  collectorWorker.on("failed", async (job, err) => {
     if (
       job?.data &&
       "action" in job.data &&
@@ -863,10 +917,10 @@ export const startCollectorWorker = () => {
       getJobProcessingCounter("collector", "failed").inc();
     }
     logger.debug({ jobId: job?.id, error: err.message }, "job failed");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "collector");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    await withScope((scope) => {
+      scope.setTag?.("worker", "collector");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 
@@ -875,7 +929,7 @@ export const startCollectorWorker = () => {
 };
 
 const typedValueToElasticSearch = (
-  typed: SpanInputOutput
+  typed: SpanInputOutput,
 ): ElasticSearchInputOutput => {
   return {
     type: typed.type,
@@ -884,7 +938,7 @@ const typedValueToElasticSearch = (
 };
 
 export const asNonEmptyIO = (
-  io: { value: string } | null | undefined
+  io: { value: string } | null | undefined,
 ): { value: string } | undefined => {
   if (!io?.value || io.value.trim() === "") {
     return void 0;
@@ -905,7 +959,7 @@ const getLastOutputError = (spans: Span[]): ErrorCapture | null => {
 
 const markProjectFirstMessage = async (
   project: Project,
-  metadata: ElasticSearchTrace["metadata"]
+  metadata: ElasticSearchTrace["metadata"],
 ) => {
   if (!project.firstMessage && !project.integrated) {
     await prisma.project.update({
@@ -920,10 +974,10 @@ const markProjectFirstMessage = async (
           metadata.custom?.platform === "optimization_studio"
             ? "other"
             : metadata.sdk_language === "python"
-            ? "python"
-            : metadata.sdk_language === "typescript"
-            ? "typescript"
-            : "other",
+              ? "python"
+              : metadata.sdk_language === "typescript"
+                ? "typescript"
+                : "other",
       },
     });
   }
@@ -931,7 +985,7 @@ const markProjectFirstMessage = async (
 
 export const fetchExistingMD5s = async (
   traceId: string,
-  projectId: string
+  projectId: string,
 ): Promise<
   | {
       indexing_md5s: ElasticSearchTrace["indexing_md5s"];

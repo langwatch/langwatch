@@ -1,14 +1,14 @@
 import {
   Alert,
+  Badge,
   Box,
-  HStack,
-  Spinner,
   Flex,
+  HStack,
+  Skeleton,
+  Spinner,
   type SystemStyleObject,
   Text,
   VStack,
-  Skeleton,
-  Badge,
 } from "@chakra-ui/react";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -16,6 +16,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
 import React, { useMemo } from "react";
+import { LuShield } from "react-icons/lu";
 import {
   Area,
   AreaChart,
@@ -37,7 +38,11 @@ import {
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { z } from "zod";
+import type { FilterField } from "~/server/filters/types";
+import { useColorRawValue } from "../../components/ui/color-mode";
+import { useFilterParams } from "../../hooks/useFilterParams";
 import { useGetRotatingColorForCharts } from "../../hooks/useGetRotatingColorForCharts";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 import {
   getGroup,
   getMetric,
@@ -48,15 +53,10 @@ import { api } from "../../utils/api";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
-import { SummaryMetric } from "./SummaryMetric";
-import { useFilterParams } from "../../hooks/useFilterParams";
-import { QuickwitNote } from "./QuickwitNote";
-import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { Delayed } from "../Delayed";
-import { useColorRawValue } from "../../components/ui/color-mode";
-import { LuShield } from "react-icons/lu";
 import { usePeriodSelector } from "../PeriodSelector";
-import type { FilterField } from "~/server/filters/types";
+import { QuickwitNote } from "./QuickwitNote";
+import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
@@ -82,6 +82,7 @@ export type CustomGraphInput = {
     | "monitor_graph";
   series: Series[];
   groupBy?: z.infer<typeof timeseriesSeriesInput>["groupBy"];
+  groupByKey?: z.infer<typeof timeseriesSeriesInput>["groupByKey"];
   includePrevious: boolean;
   timeScale: "full" | number;
   connected?: boolean;
@@ -100,7 +101,7 @@ export const summaryGraphTypes: CustomGraphInput["graphType"][] = [
 
 const GraphComponentMap: Partial<{
   [K in CustomGraphInput["graphType"]]: [
-    typeof LineChart | typeof BarChart | typeof AreaChart | typeof PieChart,
+    typeof LineChart | typeof PieChart,
     typeof Line | typeof Bar | typeof Area | typeof Scatter,
   ];
 }> = {
@@ -118,7 +119,6 @@ export function CustomGraph({
   input,
   titleProps,
   hideGroupLabel = false,
-  size = "md",
   filters,
 }: {
   input: CustomGraphInput;
@@ -132,7 +132,7 @@ export function CustomGraph({
   if (
     publicEnv.data?.IS_QUICKWIT &&
     (input.series.some(
-      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline
+      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline,
     ) ||
       (input.groupBy && !getGroup(input.groupBy).quickwitSupport))
   ) {
@@ -204,7 +204,7 @@ const CustomGraph_ = React.memo(
         timeScale,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
-      { ...queryOpts, enabled: queryOpts.enabled && load }
+      { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
     const currentAndPreviousData = shapeDataForGraph(input, timeseries);
@@ -212,10 +212,10 @@ const CustomGraph_ = React.memo(
       new Set(
         currentAndPreviousData?.flatMap((entry) =>
           Object.keys(entry).filter(
-            (key) => key !== "date" && !key.startsWith("previous")
-          )
-        ) ?? []
-      )
+            (key) => key !== "date" && !key.startsWith("previous"),
+          ),
+        ) ?? [],
+      ),
     );
     const currentAndPreviousDataFilled =
       input.graphType === "scatter"
@@ -226,26 +226,26 @@ const CustomGraph_ = React.memo(
             input.graphType === "monitor_graph" &&
               input.series[0]?.metric.includes("pass_rate")
               ? 1
-              : 0
+              : 0,
           );
     const keysToValues = Object.fromEntries(
       expectedKeys.map((key) => [
         key,
         currentAndPreviousDataFilled?.reduce(
           (acc, entry) => [...acc, entry[key]!],
-          [] as number[]
+          [] as number[],
         ) ?? [],
-      ])
+      ]),
     );
     const keysToSum = Object.fromEntries(
       Object.entries(keysToValues).map(([key, values]) => [
         key,
         values.reduce((acc, value) => acc + value, 0),
-      ])
+      ]),
     );
     const sortedKeys = expectedKeys
       .filter((key) => keysToSum[key]! !== 0)
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         const totalA = keysToSum[a]!;
         const totalB = keysToSum[b]!;
 
@@ -253,19 +253,20 @@ const CustomGraph_ = React.memo(
       });
 
     const seriesByKey = Object.fromEntries(
-      input.series.map((series) => {
+      input.series.map((series, index) => {
         const key = [
+          index,
           series.metric,
           series.aggregation,
           series.pipeline?.field,
           series.pipeline?.aggregation,
           series.key,
         ]
-          .filter((x) => x)
+          .filter((x) => x !== undefined && x !== "")
           .join("/");
 
         return [key, series];
-      })
+      }),
     );
 
     const nameForSeries = (aggKey: string) => {
@@ -283,6 +284,7 @@ const CustomGraph_ = React.memo(
             .replace("Evaluation passed passed", "Evaluation Passed")
             .replace("Evaluation passed failed", "Evaluation Failed")
             .replace("Contains error", "Traces")
+            .replace(/^Evaluation label /i, "")
         : series?.name ?? aggKey;
     };
 
@@ -316,7 +318,7 @@ const CustomGraph_ = React.memo(
 
     const formatWith = (
       format: string | ((value: number) => string) | undefined,
-      value: number
+      value: number,
     ) => {
       if (typeof format === "function") {
         return format(value);
@@ -329,12 +331,12 @@ const CustomGraph_ = React.memo(
         input.series.map((series) => {
           const metric = getMetric(series.metric);
           return metric?.format ?? "0a";
-        })
-      )
+        }),
+      ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
     const maxValue = Math.max(
-      ...Object.values(keysToValues).flatMap((values) => values)
+      ...Object.values(keysToValues).flatMap((values) => values),
     );
 
     const getColor = useGetRotatingColorForCharts();
@@ -357,14 +359,14 @@ const CustomGraph_ = React.memo(
     const tooltipValueFormatter = (
       value: number | string,
       _: string,
-      payload: Payload<any, any>
+      payload: Payload<any, any>,
     ) => {
       if (payload.dataKey === "date") {
         return formatDate(value as string);
       }
       const { series } = getSeries(
         seriesByKey,
-        payload.payload?.key ?? (payload.dataKey as string)
+        payload.payload?.key ?? (payload.dataKey as string),
       );
       const metric = series?.metric && getMetric(series.metric);
 
@@ -419,24 +421,35 @@ const CustomGraph_ = React.memo(
         input,
         seriesByKey,
         timeseries,
-        nameForSeries
+        nameForSeries,
       );
 
       const seriesSet = Object.fromEntries(
         input.series
-          .reverse()
+          .toReversed()
           .map((series) => [
             series.metric +
               series.aggregation +
               series.pipeline?.field +
               series.pipeline?.aggregation,
             series,
-          ])
+          ]),
       );
 
       return container(
-        <HStack gap={0} align="start" minHeight="101px" overflowX={"auto"}>
-          <Flex paddingBottom={3}>
+        <HStack
+          gap={0}
+          align="start"
+          minHeight="101px"
+          overflowX={"auto"}
+          width="full"
+        >
+          <Flex
+            paddingBottom={3}
+            width="full"
+            justifyContent="space-between"
+            maxWidth={Object.entries(seriesSet).length * 142}
+          >
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
                 <SummaryMetric
@@ -457,7 +470,7 @@ const CustomGraph_ = React.memo(
               />
             ))}
           </Flex>
-        </HStack>
+        </HStack>,
       );
     }
 
@@ -466,7 +479,7 @@ const CustomGraph_ = React.memo(
         input,
         seriesByKey,
         timeseries,
-        nameForSeries
+        nameForSeries,
       );
 
       return container(
@@ -480,7 +493,7 @@ const CustomGraph_ = React.memo(
               nameKey="name"
               dataKey="value"
               labelLine={false}
-              label={pieChartPercentageLabel}
+              label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
             >
               {summaryData.current.map((entry, index) => (
@@ -499,14 +512,15 @@ const CustomGraph_ = React.memo(
               }}
             />
           </PieChart>
-        </ResponsiveContainer>
+        </ResponsiveContainer>,
       );
     }
 
     const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
 
-    const [XAxisComponent, YAxisComponent] =
-      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis];
+    const [XAxisComponent, YAxisComponent] = (
+      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis]
+    ) as [typeof XAxis, typeof YAxis];
 
     if (
       ["bar", "horizontal_bar"].includes(input.graphType) &&
@@ -516,14 +530,14 @@ const CustomGraph_ = React.memo(
         input,
         seriesByKey,
         timeseries,
-        nameForSeries
+        nameForSeries,
       );
-      const sortedCurrentData = summaryData.current.sort(
-        (a, b) => b.value - a.value
+      const sortedCurrentData = summaryData.current.toSorted(
+        (a, b) => b.value - a.value,
       );
 
       const longestName = Math.max(
-        ...summaryData.current.map((entry) => entry.name.length)
+        ...summaryData.current.map((entry) => entry.name.length),
       );
 
       const xAxisWidth = Math.min(longestName * 8, 300);
@@ -562,7 +576,7 @@ const CustomGraph_ = React.memo(
               dataKey="value"
               domain={[0, "dataMax"]}
               tick={{ fill: gray400 }}
-              tickFormatter={(value) => {
+              tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
                 }
@@ -579,7 +593,7 @@ const CustomGraph_ = React.memo(
               ))}
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </ResponsiveContainer>,
       );
     }
 
@@ -599,7 +613,7 @@ const CustomGraph_ = React.memo(
           formatWith={formatWith}
           yAxisValueFormat={yAxisValueFormat}
           formatDate={formatDate}
-        />
+        />,
       );
     }
 
@@ -614,7 +628,9 @@ const CustomGraph_ = React.memo(
             top: 10,
             left: formatWith(yAxisValueFormat, maxValue).length * 6 - 5,
             right: 24,
+            bottom: 0,
           }}
+          // @ts-ignore
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
           <CartesianGrid
@@ -638,7 +654,7 @@ const CustomGraph_ = React.memo(
             tickMargin={20}
             domain={[0, "dataMax"]}
             tick={{ fill: gray400 }}
-            tickFormatter={(value) => {
+            tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
               }
@@ -720,7 +736,7 @@ const CustomGraph_ = React.memo(
             </React.Fragment>
           ))}
         </GraphComponent>
-      </ResponsiveContainer>
+      </ResponsiveContainer>,
     );
   },
   (prevProps, nextProps) => {
@@ -729,7 +745,7 @@ const CustomGraph_ = React.memo(
       JSON.stringify(prevProps.titleProps) ===
         JSON.stringify(nextProps.titleProps)
     );
-  }
+  },
 );
 
 const RADIAN = Math.PI / 180;
@@ -784,7 +800,7 @@ const shapeDataForGraph = (
   timeseries: UseTRPCQueryResult<
     inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
     TRPCClientErrorLike<AppRouter>
-  >
+  >,
 ) => {
   const flattenCurrentPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
@@ -798,8 +814,8 @@ const shapeDataForGraph = (
         ...entry,
         ...Object.fromEntries(
           Object.entries(flattenPreviousPeriod[index] ?? {}).map(
-            ([key, value]) => [`previous>${key}`, value ?? 0]
-          )
+            ([key, value]) => [`previous>${key}`, value ?? 0],
+          ),
         ),
       };
     });
@@ -816,7 +832,7 @@ const shapeDataForSummary = (
     inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
     TRPCClientErrorLike<AppRouter>
   >,
-  nameForSeries: (aggKey: string) => string
+  nameForSeries: (aggKey: string) => string,
 ) => {
   const flattenCurrentPeriod =
     timeseries.data && flattenGroupData(input, timeseries.data.currentPeriod);
@@ -847,12 +863,12 @@ const shapeDataForSummary = (
 };
 
 const collectAllDays = (
-  data: ({ date: string } & Record<string, number>)[]
+  data: ({ date: string } & Record<string, number>)[],
 ) => {
   const result: Record<string, number[]> = {};
 
   for (const entry of data) {
-    for (const key in entry) {
+    for (const key of Object.keys(entry)) {
       if (key === "date") continue;
       if (!result[key]) {
         result[key] = [];
@@ -871,7 +887,7 @@ const flattenGroupData = (
       inferRouterOutputs<AppRouter>["analytics"]["getTimeseries"],
       TRPCClientErrorLike<AppRouter>
     >["data"]
-  >["currentPeriod"]
+  >["currentPeriod"],
 ): ({
   date: string;
 } & Record<string, number>)[] => {
@@ -887,7 +903,7 @@ const flattenGroupData = (
           return Object.entries(bucket).map(([metricKey, metricValue]) => {
             return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
           });
-        })
+        }),
       );
 
       return {
@@ -902,7 +918,7 @@ const flattenGroupData = (
 const fillEmptyData = (
   data: ReturnType<typeof shapeDataForGraph>,
   expectedKeys: string[],
-  fillWith = 0
+  fillWith = 0,
 ) => {
   if (!data) return data;
   const filledData = data.map((entry) => {
@@ -948,14 +964,14 @@ function MonitorGraph({
   getColor: (
     colorSet: RotatingColorSet,
     index: number,
-    opacity: number
+    opacity: number,
   ) => string;
   size?: "sm" | "md";
   filterParams: ReturnType<typeof useFilterParams>["filterParams"];
   height_: number;
   formatWith: (
     format: string | ((value: number) => string) | undefined,
-    value: number
+    value: number,
   ) => string | ((value: number) => string);
   yAxisValueFormat: string | ((value: number) => string) | undefined;
   formatDate: (date: string) => string;
@@ -1052,11 +1068,11 @@ function MonitorGraph({
             (() => {
               const now = new Date().getTime();
               const daysDiff = Math.abs(
-                Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24))
+                Math.ceil((now - filterParams.endDate) / (1000 * 60 * 60 * 24)),
               );
               const periodDays = Math.ceil(
                 (filterParams.endDate - filterParams.startDate) /
-                  (1000 * 60 * 60 * 24)
+                  (1000 * 60 * 60 * 24),
               );
 
               // If end date is within one day of today, show "Last X days"
@@ -1067,7 +1083,7 @@ function MonitorGraph({
               else {
                 return `${format(
                   new Date(filterParams.startDate),
-                  "MMM d"
+                  "MMM d",
                 )} - ${format(new Date(filterParams.endDate), "MMM d, yyyy")}`;
               }
             })()}

@@ -1,10 +1,9 @@
-import type { NodeWithOptionalPosition } from "../../../../../../../types";
-import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
-
 import type {
   LlmPromptConfigComponent,
   NodeDataset,
 } from "~/optimization_studio/types/dsl";
+import type { NodeWithOptionalPosition } from "../../../../../../../types";
+import { DEFAULT_MODEL } from "../../../../../../../utils/constants";
 
 type LlmSignatureNode = Omit<
   NodeWithOptionalPosition<LlmPromptConfigComponent>,
@@ -14,7 +13,7 @@ type LlmSignatureNode = Omit<
 };
 
 const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
-  model: string
+  model: string,
 ): LlmSignatureNode => ({
   type: "signature",
   id: "llm_node",
@@ -69,7 +68,7 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
               },
             ],
           },
-        }
+        },
       },
     ],
     inputs: [
@@ -93,11 +92,11 @@ const DEFAULT_SIGNATURE_NODE_PROPERTIES = (
 export class LlmSignatureNodeFactory {
   static build(
     overrides?: Partial<LlmSignatureNode>,
-    project?: { defaultModel?: string | null }
+    project?: { defaultModel?: string | null },
   ): LlmSignatureNode {
     return {
       ...DEFAULT_SIGNATURE_NODE_PROPERTIES(
-        project?.defaultModel ?? DEFAULT_MODEL
+        project?.defaultModel ?? DEFAULT_MODEL,
       ),
       ...overrides,
     };

@@ -1,9 +1,10 @@
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { usePeriodSelector } from "../components/PeriodSelector";
 import { useRouter } from "next/router";
+import qs from "qs";
+import { usePeriodSelector } from "../components/PeriodSelector";
+import { filterOutEmptyFilters } from "../server/analytics/utils";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
-import qs from "qs";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export type FilterParam =
   | string[]
@@ -35,7 +36,7 @@ export const useFilterParams = () => {
 
       const filterEmptyAndConverScalarToArray = (
         obj: FilterParam,
-        filter: boolean
+        filter: boolean,
       ): FilterParam => {
         if (Array.isArray(obj)) {
           return obj.filter((x) => x !== "");
@@ -59,14 +60,14 @@ export const useFilterParams = () => {
               } else {
                 return [[key, [value]]];
               }
-            }
-          )
+            },
+          ),
         ) as FilterParam;
       };
 
       const filterParam_ = filterEmptyAndConverScalarToArray(
         filterParam,
-        false
+        false,
       );
       filters[filterKey as FilterField] = filterParam_;
     }
@@ -80,8 +81,8 @@ export const useFilterParams = () => {
           {
             ...Object.fromEntries(
               Object.entries(router.query).filter(
-                ([key]) => !key.startsWith(filterUrl)
-              )
+                ([key]) => !key.startsWith(filterUrl),
+              ),
             ),
             [filterUrl]: params,
           },
@@ -90,10 +91,10 @@ export const useFilterParams = () => {
             arrayFormat: "comma",
             // @ts-ignore of course it exists
             allowEmptyArrays: true,
-          }
+          },
         ),
       undefined,
-      { shallow: true, scroll: false }
+      { shallow: true, scroll: false },
     );
   };
 
@@ -106,9 +107,9 @@ export const useFilterParams = () => {
               Object.entries(router.query).filter(
                 ([key]) =>
                   !Object.values(availableFilters).some((f) =>
-                    key.startsWith(f.urlKey)
-                  )
-              )
+                    key.startsWith(f.urlKey),
+                  ),
+              ),
             ),
             ...Object.entries(filtersToSet).reduce(
               (acc, [filter, params]) => ({
@@ -116,7 +117,7 @@ export const useFilterParams = () => {
                 [availableFilters[filter as keyof typeof availableFilters]
                   .urlKey]: params,
               }),
-              {}
+              {},
             ),
           },
           {
@@ -124,10 +125,10 @@ export const useFilterParams = () => {
             arrayFormat: "comma",
             // @ts-ignore of course it exists
             allowEmptyArrays: true,
-          }
+          },
         ),
       undefined,
-      { shallow: true, scroll: false }
+      { shallow: true, scroll: false },
     );
   };
 
@@ -138,13 +139,13 @@ export const useFilterParams = () => {
           Object.entries(router.query).filter(
             ([key]) =>
               !Object.values(availableFilters).some((filter) =>
-                key.startsWith(filter.urlKey)
-              )
-          )
+                key.startsWith(filter.urlKey),
+              ),
+          ),
         ),
       },
       undefined,
-      { shallow: true, scroll: false }
+      { shallow: true, scroll: false },
     );
   };
 
@@ -154,19 +155,26 @@ export const useFilterParams = () => {
     endDate: endDate.getTime(),
     filters: filters,
     ...(queryParams.query ? { query: queryParams.query as string } : {}),
+    ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
   };
 
   const getLatestFilters = () => {
     return filterParams;
   };
 
-  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
+  const setNegateFilters = (negateFilters: boolean) => {
+    void router.push(
+      "?" +
+        qs.stringify(
+          {
+            ...router.query,
+            negateFilters: negateFilters ? "true" : "false",
+          },
+        ),
+      undefined,
+      { shallow: true, scroll: false },
+    );
+  };
 
   return {
     filters,
@@ -175,7 +183,7 @@ export const useFilterParams = () => {
     clearFilters,
     getLatestFilters,
     filterParams,
-    nonEmptyFilters,
+    nonEmptyFilters: filterOutEmptyFilters(filterParams.filters),
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,
@@ -186,5 +194,6 @@ export const useFilterParams = () => {
         },
       },
     },
+    setNegateFilters,
   };
 };

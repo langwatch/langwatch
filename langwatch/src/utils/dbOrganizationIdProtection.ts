@@ -1,4 +1,4 @@
-import { type Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 
 const PROTECTED_MODELS = ["OrganizationUser", "Team", "OrganizationInvite"];
 
@@ -23,7 +23,7 @@ const _guardOrganizationId = ({
 
     if (!hasOrganizationId) {
       throw new Error(
-        `The ${action} action on the ${model} model requires a 'organizationId' in the data field`
+        `The ${action} action on the ${model} model requires a 'organizationId' in the data field`,
       );
     }
   } else if (
@@ -33,7 +33,7 @@ const _guardOrganizationId = ({
     !(params.model === "Team" && params.args?.where?.id)
   ) {
     throw new Error(
-      `The ${action} action on the ${model} model requires a 'organizationId' in the where clause`
+      `The ${action} action on the ${model} model requires a 'organizationId' in the where clause`,
     );
   }
 };

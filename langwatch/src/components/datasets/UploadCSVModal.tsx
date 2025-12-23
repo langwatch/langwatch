@@ -9,23 +9,26 @@ import {
 } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import {
-  type DatasetColumns,
-  type DatasetRecordEntry,
-} from "../../server/datasets/types";
-import {
   formatFileSize,
   jsonToCSV as papaparseJsonToCSV,
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
-import type { InMemoryDataset } from "./DatasetTable";
-import { AddOrEditDatasetDrawer } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "../CurrentDrawer";
-import { Dialog } from "../../components/ui/dialog";
-import { toaster } from "../ui/toaster";
-import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
+import { Dialog } from "../../components/ui/dialog";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+} from "../../server/datasets/types";
+import {
+  AddOrEditDatasetDrawer,
+  type AddDatasetDrawerProps,
+} from "../AddOrEditDatasetDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
+import { toaster } from "../ui/toaster";
+import type { InMemoryDataset } from "./DatasetTable";
 import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
@@ -39,7 +42,7 @@ export function UploadCSVModal({
 }: {
   isOpen?: boolean;
   onClose?: () => void;
-  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+  onSuccess: AddDatasetDrawerProps["onSuccess"];
   onCreateFromScratch?: () => void;
 }) {
   const { closeDrawer } = useDrawer();
@@ -72,7 +75,6 @@ export function UploadCSVModal({
         open={localIsOpen}
         onOpenChange={({ open }) => !open && onClose()}
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Upload CSV</Dialog.Title>
@@ -107,7 +109,7 @@ export function UploadCSVModal({
 export function InlineUploadCSVForm({
   onSuccess,
 }: {
-  onSuccess: Parameters<typeof AddOrEditDatasetDrawer>[0]["onSuccess"];
+  onSuccess: AddDatasetDrawerProps["onSuccess"];
 }) {
   const addDatasetDrawer = useDisclosure();
   const [uploadedDataset, setUploadedDataset] = useState<
@@ -186,7 +188,6 @@ export function UploadCSVForm({
           meta: {
             closable: true,
           },
-          placement: "top-end",
         });
       }
 
@@ -280,7 +281,7 @@ export function CSVReaderComponent({
     acceptedFile: File;
   }) => void | Promise<void>;
   onUploadRemoved?: () => void;
-  children?: (acceptedFile: boolean) => React.ReactNode;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
 }) {
   const { CSVReader } = useCSVReader();
   const [zoneHover, setZoneHover] = useState(false);
@@ -307,7 +308,7 @@ export function CSVReaderComponent({
             let jsonContents;
             try {
               jsonContents = JSON.parse(contents);
-            } catch (error) {
+            } catch {
               // If the file is not a valid JSON, try to parse it as a JSONL file
               jsonContents = JSON.parse(
                 "[" +
@@ -316,7 +317,7 @@ export function CSVReaderComponent({
                     .split("\n")
                     .filter((line) => line.trim() !== "")
                     .join(", ") +
-                  "]"
+                  "]",
               );
             }
             readString(jsonToCSV(jsonContents), {
@@ -333,7 +334,6 @@ export function CSVReaderComponent({
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           }
         } else {
@@ -356,7 +356,13 @@ export function CSVReaderComponent({
         ProgressBar,
         getRemoveFileProps,
         Remove,
-      }: any) => {
+      }: {
+        getRootProps: () => Record<string, unknown>;
+        acceptedFile: File | null;
+        ProgressBar: React.ComponentType;
+        getRemoveFileProps: () => Record<string, unknown>;
+        Remove: React.ComponentType;
+      }) => {
         return (
           <>
             <CSVReaderBox
@@ -368,7 +374,7 @@ export function CSVReaderComponent({
               Remove={Remove}
               ProgressBar={ProgressBar}
             />
-            {children ? children(acceptedFile) : null}
+            {children ? children(acceptedFile !== null) : null} {/* Pass boolean indicating if file is accepted to render prop */}
           </>
         );
       }}
@@ -384,11 +390,11 @@ function jsonToCSV(jsonContents: object[]): string {
           return [key, JSON.stringify(value)];
         }
         return [key, value];
-      })
+      }),
     );
   });
   const columns = new Set(
-    stringifiedNestedValues.flatMap((item) => Object.keys(item))
+    stringifiedNestedValues.flatMap((item) => Object.keys(item)),
   );
 
   return papaparseJsonToCSV(stringifiedNestedValues, {
@@ -408,10 +414,10 @@ function CSVReaderBox({
   acceptedFile: File | null;
   setAcceptedFile: (file: File | null) => void;
   zoneHover: boolean;
-  getRootProps: () => any;
-  getRemoveFileProps: () => any;
-  Remove: () => any;
-  ProgressBar: () => any;
+  getRootProps: () => Record<string, unknown>;
+  getRemoveFileProps: () => Record<string, unknown>;
+  Remove: React.ComponentType;
+  ProgressBar: React.ComponentType;
 }) {
   useEffect(() => {
     setAcceptedFile(acceptedFile);

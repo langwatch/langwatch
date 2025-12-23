@@ -1,5 +1,5 @@
-import { z } from "zod";
 import type { ModelProvider } from "@prisma/client";
+import { z } from "zod";
 // @ts-ignore
 import * as llmModelCostsRaw from "./llmModelCosts.json";
 
@@ -30,11 +30,12 @@ export type MaybeStoredModelProvider = Omit<
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   disabledByDefault?: boolean;
+  extraHeaders?: { key: string; value: string }[] | null;
 };
 
 export const getProviderModelOptions = (
   provider: string,
-  mode: "chat" | "embedding"
+  mode: "chat" | "embedding",
 ) => {
   return Object.entries(allLitellmModels)
     .filter(([key, _]) => key.split("/")[0] === provider)
@@ -104,14 +105,14 @@ export const modelProviders = {
     name: "Azure OpenAI",
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
-    keysSchema: z.object({
-      AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
-      AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
-      AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
-      AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
-      AZURE_API_GATEWAY_HEADER_NAME: z.string().nullable().optional(),
-      AZURE_API_GATEWAY_HEADER_KEY: z.string().nullable().optional(),
-    }),
+    keysSchema: z
+      .object({
+        AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
+        AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+        AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
+        AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
+      })
+      .passthrough(),
     enabledSince: new Date("2023-01-01"),
   },
   bedrock: {
@@ -119,9 +120,9 @@ export const modelProviders = {
     apiKey: "AWS_ACCESS_KEY_ID",
     endpointKey: undefined,
     keysSchema: z.object({
-      AWS_ACCESS_KEY_ID: z.string().min(1),
-      AWS_SECRET_ACCESS_KEY: z.string().min(1),
-      AWS_REGION_NAME: z.string().min(1),
+      AWS_ACCESS_KEY_ID: z.string().nullable().optional(),
+      AWS_SECRET_ACCESS_KEY: z.string().nullable().optional(),
+      AWS_REGION_NAME: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -189,14 +190,14 @@ export const allLitellmModels = (() => {
             !(
               value.litellm_provider === "openai" &&
               key.match(
-                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|^ft:|search|^chatgpt/
+                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|^ft:|search|^chatgpt/,
               )
             ) &&
             // Remove azure realtime and old models
             !(
               value.litellm_provider === "azure" &&
               key.match(
-                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|mistral|command-r/
+                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|mistral|command-r/,
               )
             ) &&
             // Remove anthropic old models
@@ -208,21 +209,21 @@ export const allLitellmModels = (() => {
             !(
               value.litellm_provider === "gemini" &&
               key.match(
-                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro|-001$/
+                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro|-001$/,
               )
             ) &&
             // Remove bedrock region-specific and old models
             !(
               value.litellm_provider === "bedrock" &&
               key.match(
-                /^eu\.|^us\.|anthropic\.claude-3-\D|claude-v|claude-instant|llama2|llama3-70b|llama3-8b|llama3-1|titan-text/
+                /^eu\.|^us\.|anthropic\.claude-3-\D|claude-v|claude-instant|llama2|llama3-70b|llama3-8b|llama3-1|titan-text/,
               )
             ) &&
             // Remove groq old models
             !(
               value.litellm_provider === "groq" &&
               key.match(/llama2|llama3-|llama-3\.1|llama-3\.2|gemma-7b/)
-            )
+            ),
         )
         .map(([key, value]) => {
           return [
@@ -231,7 +232,7 @@ export const allLitellmModels = (() => {
               mode: (value as any).mode as "chat" | "embedding",
             },
           ];
-        })
+        }),
     ),
   };
 
@@ -239,7 +240,7 @@ export const allLitellmModels = (() => {
   models = Object.fromEntries(
     Object.entries(models).filter(([key, _]) => {
       const match = key.match(
-        /(.*?)-(\d{4}-\d{2}-\d{2}|\d{4}|\d{8}|\d{2}-\d{2})$/
+        /(.*?)-(\d{4}-\d{2}-\d{2}|\d{4}|\d{8}|\d{2}-\d{2})$/,
       );
       if (!match) return true;
       const modelName = match[1];
@@ -248,7 +249,7 @@ export const allLitellmModels = (() => {
         !(modelName in models) &&
         !(`${modelName}-latest` in models)
       );
-    })
+    }),
   );
 
   return models;

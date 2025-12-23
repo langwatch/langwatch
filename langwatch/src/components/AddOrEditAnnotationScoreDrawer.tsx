@@ -1,7 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-
-import { useDrawer } from "./CurrentDrawer";
-
+import { useDrawer } from "~/hooks/useDrawer";
 import { AddOrEditAnnotationScore } from "./annotations/AddOrEditAnnotationScore";
 import { Drawer } from "./ui/drawer";
 
@@ -46,7 +44,10 @@ export const AddOrEditAnnotationScoreDrawer = ({
           </HStack>
         </Drawer.Header>
         <Drawer.Body>
-          <AddOrEditAnnotationScore onClose={handleClose} annotationScoreId={annotationScoreId} />
+          <AddOrEditAnnotationScore
+            onClose={handleClose}
+            annotationScoreId={annotationScoreId}
+          />
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>

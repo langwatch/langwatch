@@ -1,20 +1,20 @@
-import { createBaseNodeSlice, type BaseNodeSlice } from "./baseNodeSlice";
-import {
-  createLlmSignatureNodeSlice,
-  type LlmSignatureNodeSlice,
-} from "./llmSignatureNodeSlice";
 import type { StateCreator } from "zustand";
 import type { EvaluationWizardStore } from "../useEvaluationWizardStore";
+import { type BaseNodeSlice, createBaseNodeSlice } from "./baseNodeSlice";
+import {
+  type CodeExecutionSlice,
+  createCodeExecutionSlice,
+} from "./codeExecutionSlice";
+import { createDatasetSlice, type DatasetSlice } from "./datasetSlice";
 import {
   createEvaluatorNodeSlice,
   type EvaluatorNodeSlice,
 } from "./evaluatorNodeSlice";
 import { createExecutorSlice, type ExecutorSlice } from "./executorSlice";
 import {
-  createCodeExecutionSlice,
-  type CodeExecutionSlice,
-} from "./codeExecutionSlice";
-import { createDatasetSlice, type DatasetSlice } from "./datasetSlice";
+  createLlmSignatureNodeSlice,
+  type LlmSignatureNodeSlice,
+} from "./llmSignatureNodeSlice";
 
 export type EvaluationWizardSlicesUnion = BaseNodeSlice &
   LlmSignatureNodeSlice &

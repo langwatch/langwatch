@@ -1,12 +1,12 @@
-import { useChat, type UIMessage } from "@ai-sdk/react";
-import { useCallback, useEffect, useRef, type FormEvent } from "react";
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
+import { type UIMessage, useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { type FormEvent, useCallback, useEffect, useRef } from "react";
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 export const useChatWithSubscription = (
   id: string,
   model: string,
-  systemPrompt: string
+  systemPrompt: string,
 ) => {
   const { project } = useOrganizationTeamProject();
 
@@ -35,13 +35,13 @@ export const useChatWithSubscription = (
     (listener: (messages: UIMessage[]) => void) => {
       listeners.current.add(listener);
     },
-    []
+    [],
   );
   const removeMessagesListener = useCallback(
     (listener: (messages: UIMessage[]) => void) => {
       listeners.current.delete(listener);
     },
-    []
+    [],
   );
 
   const localMessagesRef = useRef(localMessages);
@@ -52,12 +52,15 @@ export const useChatWithSubscription = (
   const handleSubmitWithUpdate = useCallback(
     async (message: string) => {
       await stop();
-      void sendMessage({ role: "user", parts: [{ type: "text", text: message }] });
+      void sendMessage({
+        role: "user",
+        parts: [{ type: "text", text: message }],
+      });
       listeners.current.forEach((listener) =>
-        listener(localMessagesRef.current)
+        listener(localMessagesRef.current),
       );
     },
-    [sendMessage, stop]
+    [sendMessage, stop],
   );
 
   const previousMessageRef = useRef<UIMessage[]>([]);

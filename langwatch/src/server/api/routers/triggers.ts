@@ -1,11 +1,10 @@
 import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
 import { z } from "zod";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { extractCheckKeys } from "../utils";
-
-import { nanoid } from "nanoid";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 
 export const triggerRouter = createTRPCRouter({
   create: protectedProcedure
@@ -31,13 +30,13 @@ export const triggerRouter = createTRPCRouter({
               z.object({
                 id: z.string(),
                 name: z.string(),
-              })
+              }),
             )
             .optional(),
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.prisma.project.findUnique({
         where: {
@@ -108,7 +107,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:delete"))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.trigger.update({
         where: {
@@ -134,9 +133,9 @@ export const triggerRouter = createTRPCRouter({
           .optional()
           .nullable(),
         name: z.string().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
@@ -149,7 +148,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
       const triggers = await ctx.prisma.trigger.findMany({
         where: {
@@ -211,9 +210,9 @@ export const triggerRouter = createTRPCRouter({
         triggerId: z.string(),
         active: z.boolean(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: {
@@ -227,7 +226,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.trigger.findUnique({
         where: { id: input.triggerId, projectId: input.projectId },
@@ -239,9 +238,9 @@ export const triggerRouter = createTRPCRouter({
         triggerId: z.string(),
         projectId: z.string(),
         filters: z.any(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },

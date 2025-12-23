@@ -1,5 +1,4 @@
-import { HStack, Text, VStack } from "@chakra-ui/react";
-import { Accordion } from "@chakra-ui/react";
+import { Accordion, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuChevronDown } from "react-icons/lu";
 
 export interface StepAccordionProps extends Omit<Accordion.ItemProps, "title"> {

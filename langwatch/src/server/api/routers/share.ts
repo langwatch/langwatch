@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
 import {
   createTRPCRouter,
@@ -10,11 +10,10 @@ import {
 import { prisma } from "~/server/db";
 
 import {
-  TeamRoleGroup,
   checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
   skipPermissionCheck,
 } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 export const shareRouter = createTRPCRouter({
   getShared: publicProcedure
@@ -35,7 +34,10 @@ export const shareRouter = createTRPCRouter({
       });
 
       // If this is a trace share and trace sharing is disabled, return null
-      if (share?.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+      if (
+        share?.resourceType === "TRACE" &&
+        !share.project.traceSharingEnabled
+      ) {
         return null;
       }
 
@@ -48,16 +50,13 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
-        {
-          resourceType: (input) => input.resourceType,
-          resourceParam: "resourceId",
-        }
-      )
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: (input) => input.resourceType,
+        resourceParam: "resourceId",
+      }),
     )
     .query(async ({ input, ctx }) => {
       const { resourceType, resourceId } = input;
@@ -78,9 +77,9 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
+    .use(checkProjectPermission("traces:share"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, resourceType, resourceId } = input;
 
@@ -113,9 +112,9 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
+    .use(checkProjectPermission("traces:share"))
     .mutation(async ({ input }) => {
       const { projectId, resourceType, resourceId } = input;
 
@@ -126,9 +125,9 @@ export const shareRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
 

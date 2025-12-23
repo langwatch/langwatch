@@ -1,8 +1,8 @@
 import { useRouter } from "next/router";
+import { useMemo } from "react";
 import { api } from "../utils/api";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 import { useRequiredSession } from "./useRequiredSession";
-import { useMemo } from "react";
 
 export function useAnnotationQueues(
   {
@@ -19,7 +19,7 @@ export function useAnnotationQueues(
     selectedAnnotations: "pending",
     showQueueAndUser: false,
     allQueueItems: false,
-  }
+  },
 ) {
   const { project } = useOrganizationTeamProject();
 
@@ -41,7 +41,7 @@ export function useAnnotationQueues(
     {
       enabled: !!project,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   // Get score options (this is still needed separately as it's used across the app)
@@ -49,7 +49,7 @@ export function useAnnotationQueues(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project,
-    }
+    },
   );
 
   // Memoize derived data to prevent unnecessary recalculations
@@ -61,7 +61,7 @@ export function useAnnotationQueues(
       };
     }
 
-    const { assignedQueueItems, totalCount, queues } = optimizedData.data;
+    const { assignedQueueItems, totalCount } = optimizedData.data;
 
     return {
       assignedQueueItems,

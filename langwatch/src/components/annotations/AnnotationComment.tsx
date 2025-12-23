@@ -14,30 +14,27 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-
-import { Menu } from "../ui/menu";
-import { Popover } from "../ui/popover";
-import { Checkbox, CheckboxGroup } from "../ui/checkbox";
-import { Radio, RadioGroup } from "../ui/radio";
-
-import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
-
 import type { AnnotationScoreDataType } from "@prisma/client";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+
+import { ChevronDown, MoreVertical, Trash2 } from "react-feather";
 import {
-  useForm,
   type UseFormSetValue,
   type UseFormWatch,
+  useForm,
 } from "react-hook-form";
+import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-
-import { useSession } from "next-auth/react";
-import { useAnnotationCommentStore } from "~/hooks/useAnnotationCommentStore";
-import { ScoreReasonModal } from "../ScoreReasonModal";
-import { toaster } from "../ui/toaster";
 import { RandomColorAvatar } from "../RandomColorAvatar";
+import { ScoreReasonModal } from "../ScoreReasonModal";
+import { Checkbox, CheckboxGroup } from "../ui/checkbox";
+import { Menu } from "../ui/menu";
+import { Popover } from "../ui/popover";
+import { Radio, RadioGroup } from "../ui/radio";
+import { toaster } from "../ui/toaster";
 
 type Annotation = {
   isThumbsUp?: string | null;
@@ -65,7 +62,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     },
     {
       enabled: !!project?.id && !isPublicRoute,
-    }
+    },
   );
 
   const getAnnotation = api.annotation.getById.useQuery({
@@ -114,8 +111,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           value.value !== "" &&
           value.value !== null &&
           (typeof value.value === "boolean" ? value.value : true) &&
-          (Array.isArray(value.value) ? value.value.length > 0 : true)
-      )
+          (Array.isArray(value.value) ? value.value.length > 0 : true),
+      ),
     );
 
     if (action === "edit") {
@@ -140,7 +137,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
 
             reset();
@@ -155,10 +151,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
-        }
+        },
       );
     } else {
       createAnnotation.mutate(
@@ -180,7 +175,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
 
             reset();
@@ -194,10 +188,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
-        }
+        },
       );
     }
   };
@@ -219,16 +212,15 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           commentState.resetComment();
         },
-      }
+      },
     );
   };
   const scoreReasonModal = useDisclosure();
   const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(
-    null
+    null,
   );
 
   const handleReasonClick = (scoreTypeId: string) => {
@@ -237,7 +229,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
   };
 
   const selectedReason = selectedScoreTypeId
-    ? watch(`scoreOptions.${selectedScoreTypeId}`)?.reason ?? ""
+    ? (watch(`scoreOptions.${selectedScoreTypeId}`)?.reason ?? "")
     : "";
 
   const { open, setOpen } = useDisclosure();
@@ -509,7 +501,7 @@ const ScoreBlock = ({
                   value={tempValue?.toString() ?? ""}
                   defaultValue={defaultRadioValue}
                   onValueChange={(change) => {
-                    setTempValue(change.value);
+                    setTempValue(change.value ?? "");
                   }}
                 >
                   <VStack align="start" gap={2}>

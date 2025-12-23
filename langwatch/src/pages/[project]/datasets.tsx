@@ -8,41 +8,52 @@ import {
   Text,
   useDisclosure,
 } from "@chakra-ui/react";
-
+import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
+import { useState } from "react";
 import {
+  Copy,
+  Edit,
   MoreVertical,
   Play,
-  Upload,
   Table as TableIcon,
-  Edit,
   Trash2,
+  Upload,
 } from "react-feather";
-import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
-import { useDrawer } from "../../components/CurrentDrawer";
-import { DashboardLayout } from "../../components/DashboardLayout";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { api } from "../../utils/api";
-import type { DatasetColumns } from "../../server/datasets/types";
-import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
-import { useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
+import { useDrawer } from "~/hooks/useDrawer";
+import { AddOrEditDatasetDrawer } from "../../components/AddOrEditDatasetDrawer";
+import { DashboardLayout } from "../../components/DashboardLayout";
+import { CopyDatasetDialog } from "../../components/datasets/CopyDatasetDialog";
+import { UploadCSVModal } from "../../components/datasets/UploadCSVModal";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Tooltip } from "../../components/ui/tooltip";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { AppRouter } from "../../server/api/root";
+import type { DatasetColumns } from "../../server/datasets/types";
+import { api } from "../../utils/api";
 
-export default function Datasets() {
+function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasDatasetsCreatePermission = hasPermission("datasets:create");
+  const hasDatasetsUpdatePermission = hasPermission("datasets:update");
+  const hasDatasetsDeletePermission = hasPermission("datasets:delete");
   const router = useRouter();
   const { openDrawer } = useDrawer();
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
+
+  type Dataset = inferRouterOutputs<AppRouter>["dataset"]["getAll"][number];
 
   const datasetDelete = api.dataset.deleteById.useMutation();
   const [editDataset, setEditDataset] = useState<
@@ -53,8 +64,12 @@ export default function Datasets() {
       }
     | undefined
   >();
+  const [copyDataset, setCopyDataset] = useState<{
+    datasetId: string;
+    datasetName: string;
+  } | null>(null);
 
-  const deleteDataset = (id: string, name: string) => {
+  const deleteDataset = ({ id, name }: { id: string; name: string }) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
@@ -87,11 +102,10 @@ export default function Datasets() {
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                           });
                           addEditDatasetDrawer.onClose();
                         },
-                      }
+                      },
                     );
                   }}
                 >
@@ -105,7 +119,6 @@ export default function Datasets() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -118,12 +131,14 @@ export default function Datasets() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
-      }
+      },
     );
   };
+
+  const { showDeleteDialog, DeleteDialog } =
+    useDeleteDatasetConfirmation(deleteDataset);
 
   const goToDataset = (id: string) => {
     void router.push({
@@ -134,28 +149,38 @@ export default function Datasets() {
 
   return (
     <DashboardLayout>
-      <PageLayout.Container
-        maxW={"calc(100vw - 200px)"}
-        padding={6}
-        marginTop={8}
-      >
-        <PageLayout.Header>
-          <PageLayout.Heading>Datasets</PageLayout.Heading>
-          <Spacer />
+      <PageLayout.Header>
+        <PageLayout.Heading>Datasets</PageLayout.Heading>
+        <Spacer />
+        <PageLayout.HeaderButton
+          onClick={() => {
+            openDrawer("batchEvaluation", {
+              selectDataset: true,
+            });
+          }}
+        >
+          <Play height={16} /> Batch Evaluation
+        </PageLayout.HeaderButton>
+        <Tooltip
+          content={
+            !hasDatasetsCreatePermission
+              ? "You need datasets:create permission to create datasets"
+              : undefined
+          }
+          disabled={hasDatasetsCreatePermission}
+          positioning={{ placement: "bottom" }}
+          showArrow
+        >
           <PageLayout.HeaderButton
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                selectDataset: true,
-              });
-            }}
+            onClick={() => uploadCSVModal.onOpen()}
+            disabled={!hasDatasetsCreatePermission}
           >
-            <Play height={16} /> Batch Evaluation
-          </PageLayout.HeaderButton>
-          <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
             <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
             Dataset
           </PageLayout.HeaderButton>
-        </PageLayout.Header>
+        </Tooltip>
+      </PageLayout.Header>
+      <PageLayout.Container maxW={"calc(100vw - 200px)"}>
         <PageLayout.Content>
           {datasets.data && datasets.data.length == 0 ? (
             <NoDataInfoBlock
@@ -201,7 +226,7 @@ export default function Datasets() {
                       </Table.Row>
                     ))
                   : datasets.data
-                  ? datasets.data?.map((dataset) => (
+                  ? datasets.data.map((dataset: Dataset) => (
                       <Table.Row
                         cursor="pointer"
                         onClick={() => goToDataset(dataset.id)}
@@ -240,31 +265,89 @@ export default function Datasets() {
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setEditDataset({
-                                    datasetId: dataset.id,
-                                    name: dataset.name,
-                                    columnTypes:
-                                      dataset.columnTypes as DatasetColumns,
-                                  });
-                                  addEditDatasetDrawer.onOpen();
-                                }}
+                              <Tooltip
+                                content={
+                                  !hasDatasetsCreatePermission
+                                    ? "You need datasets:create permission to replicate datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsCreatePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Edit size={16} /> Edit dataset
-                              </Menu.Item>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  deleteDataset(dataset.id, dataset.name);
-                                }}
+                                <Menu.Item
+                                  value="copy"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsCreatePermission) {
+                                      setCopyDataset({
+                                        datasetId: dataset.id,
+                                        datasetName: dataset.name,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsCreatePermission}
+                                >
+                                  <Copy size={16} /> Replicate to another
+                                  project
+                                </Menu.Item>
+                              </Tooltip>
+                              <Tooltip
+                                content={
+                                  !hasDatasetsUpdatePermission
+                                    ? "You need datasets:update permission to edit datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsUpdatePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash2 size={16} /> Delete dataset
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsUpdatePermission) {
+                                      setEditDataset({
+                                        datasetId: dataset.id,
+                                        name: dataset.name,
+                                        columnTypes:
+                                          dataset.columnTypes as DatasetColumns,
+                                      });
+                                      addEditDatasetDrawer.onOpen();
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsUpdatePermission}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                              </Tooltip>
+                              <Tooltip
+                                content={
+                                  !hasDatasetsDeletePermission
+                                    ? "You need datasets:delete permission to delete datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsDeletePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
+                              >
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsDeletePermission) {
+                                      showDeleteDialog({
+                                        id: dataset.id,
+                                        name: dataset.name,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsDeletePermission}
+                                >
+                                  <Trash2 size={16} /> Delete dataset
+                                </Menu.Item>
+                              </Tooltip>
                             </Menu.Content>
                           </Menu.Root>
                         </Table.Cell>
@@ -302,6 +385,19 @@ export default function Datasets() {
           }, 100);
         }}
       />
+      <DeleteDialog />
+      {copyDataset && (
+        <CopyDatasetDialog
+          open={!!copyDataset}
+          onClose={() => setCopyDataset(null)}
+          datasetId={copyDataset.datasetId}
+          datasetName={copyDataset.datasetName}
+        />
+      )}
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("datasets:view", {
+  layoutComponent: DashboardLayout,
+})(DatasetsPage);

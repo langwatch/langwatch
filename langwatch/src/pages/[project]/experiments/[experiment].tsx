@@ -1,12 +1,12 @@
-import { DashboardLayout } from "../../../components/DashboardLayout";
+import { ExperimentType } from "@prisma/client";
 
 import { useRouter } from "next/router";
+import { DashboardLayout } from "../../../components/DashboardLayout";
+import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
+import { BatchEvaluationV2 } from "../../../components/experiments/BatchEvaluationV2";
 import { DSPyExperiment } from "../../../components/experiments/DSPyExperiment";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
-import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
-import { ExperimentType } from "@prisma/client";
-import { BatchEvaluationV2 } from "../../../components/experiments/BatchEvaluationV2";
 
 export default function ExperimentPage() {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function ExperimentPage() {
     },
     {
       enabled: !!project && typeof experimentSlug === "string",
-    }
+    },
   );
 
   return (

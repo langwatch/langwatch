@@ -2,34 +2,36 @@ import {
   Badge,
   Box,
   Card,
-  HStack,
   Heading,
+  HStack,
   IconButton,
   SimpleGrid,
   Text,
 } from "@chakra-ui/react";
+import type { TRPCClientErrorLike } from "@trpc/react-query";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import type { inferRouterOutputs } from "@trpc/server";
+import { useRouter } from "next/router";
+import { CopyIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Menu } from "../../components/ui/menu";
-import { CustomGraph } from "../analytics/CustomGraph";
-import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import {
   LuChevronDown,
   LuChevronUp,
   LuEllipsis,
   LuPause,
-  LuPlay,
   LuPencil,
+  LuPlay,
   LuTrash,
 } from "react-icons/lu";
-import { TeamRoleGroup } from "../../server/api/permission";
-import { Link } from "../ui/link";
+import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { useRouter } from "next/router";
-import { api } from "../../utils/api";
-import type { TRPCClientErrorLike } from "@trpc/react-query";
-import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
-import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../server/api/root";
+import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
+import { api } from "../../utils/api";
+import { CustomGraph } from "../analytics/CustomGraph";
+import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
+import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
 
 type MonitorsSectionProps = {
@@ -42,21 +44,24 @@ type MonitorsSectionProps = {
 
 export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [copyDialogState, setCopyDialogState] = useState<{
+    open: boolean;
+    experimentId: string;
+    evaluationName: string;
+  } | null>(null);
 
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const experimentsSlugMap = useMemo(() => {
     return Object.fromEntries(
-      experiments.data?.experiments?.map((experiment) => [
-        experiment.id,
-        experiment.slug,
-      ]) ?? []
+      experiments.data?.map((experiment) => [experiment.id, experiment.slug]) ??
+        [],
     );
   }, [experiments.data]);
 
@@ -67,7 +72,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
       toaster.create({
         title: "Successfully deleted monitor",
         type: "success",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -78,7 +82,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
         title: "Error deleting monitor",
         description: "Please try again",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -117,7 +120,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {monitors.data?.map((monitor) => {
                 const evaluatorDefinition = getEvaluatorDefinitions(
-                  monitor.checkType
+                  monitor.checkType,
                 );
                 // TODO: handle custom evaluators
 
@@ -150,7 +153,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
                             console.log(
                               "experimentsSlugMap",
-                              experimentsSlugMap
+                              experimentsSlugMap,
                             );
                             console.log("monitor", monitor);
 
@@ -161,11 +164,11 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               void router.push(
                                 `/${project.slug}/evaluations/wizard/${
                                   experimentsSlugMap[monitor.experimentId]
-                                }`
+                                }`,
                               );
                             } else {
                               void router.push(
-                                `/${project.slug}/evaluations/${monitor.id}/edit`
+                                `/${project.slug}/evaluations/${monitor.id}/edit`,
                               );
                             }
                           }}
@@ -173,6 +176,43 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                           <LuPencil size={16} />
                           Edit
                         </Menu.Item>
+                        {monitor.experimentId && (
+                          <Tooltip
+                            content={
+                              !hasPermission("evaluations:manage")
+                                ? "You need evaluations:manage permission to replicate evaluations"
+                                : undefined
+                            }
+                            disabled={hasPermission("evaluations:manage")}
+                            positioning={{ placement: "right" }}
+                            showArrow
+                          >
+                            <Menu.Item
+                              value="copy"
+                              onClick={() => {
+                                if (!project || !monitor.experimentId) return;
+
+                                if (hasPermission("evaluations:manage")) {
+                                  const experiment = experiments.data?.find(
+                                    (e) => e.id === monitor.experimentId,
+                                  );
+                                  if (experiment) {
+                                    setCopyDialogState({
+                                      open: true,
+                                      experimentId: experiment.id,
+                                      evaluationName:
+                                        experiment.name ?? experiment.slug,
+                                    });
+                                  }
+                                }
+                              }}
+                              disabled={!hasPermission("evaluations:manage")}
+                            >
+                              <CopyIcon size={16} /> Replicate to another
+                              project
+                            </Menu.Item>
+                          </Tooltip>
+                        )}
                         <Menu.Item
                           value="toggle"
                           onClick={() => {
@@ -192,11 +232,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                       monitor.enabled ? "disabled" : "enabled"
                                     }`,
                                     type: "info",
-                                    placement: "top-end",
                                     meta: { closable: true },
                                   });
                                 },
-                              }
+                              },
                             );
                           }}
                         >
@@ -220,7 +259,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
                             if (
                               !confirm(
-                                "Are you sure you want to delete this monitor?"
+                                "Are you sure you want to delete this monitor?",
                               )
                             )
                               return;
@@ -267,25 +306,32 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
             {monitors.data?.length === 0 && (
               <Text color="gray.600">
                 No real-time monitors or guardrails set up yet.
-                {project &&
-                  hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-                    <>
-                      {" "}
-                      Click on{" "}
-                      <Link
-                        textDecoration="underline"
-                        href={`/${project.slug}/evaluations/wizard`}
-                      >
-                        New Evaluation
-                      </Link>{" "}
-                      to get started.
-                    </>
-                  )}
+                {project && hasPermission("evaluations:manage") && (
+                  <>
+                    {" "}
+                    Click on{" "}
+                    <Link
+                      textDecoration="underline"
+                      href={`/${project.slug}/evaluations/wizard`}
+                    >
+                      New Evaluation
+                    </Link>{" "}
+                    to get started.
+                  </>
+                )}
               </Text>
             )}
           </>
         )}
       </Card.Body>
+      {copyDialogState && (
+        <CopyEvaluationDialog
+          open={copyDialogState.open}
+          onClose={() => setCopyDialogState(null)}
+          experimentId={copyDialogState.experimentId}
+          evaluationName={copyDialogState.evaluationName}
+        />
+      )}
     </Card.Root>
   );
 };

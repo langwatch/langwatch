@@ -1,7 +1,7 @@
 import { useState } from "react";
+import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "../components/ui/drawer";
 import { useAnnotationCommentStore } from "../hooks/useAnnotationCommentStore";
-import { useDrawer } from "./CurrentDrawer";
 import { TraceDetails } from "./traces/TraceDetails";
 
 interface TraceDetailsDrawerProps {
@@ -31,7 +31,6 @@ export const TraceDetailsDrawer = (props: TraceDetailsDrawerProps) => {
         commentState.resetComment();
       }}
     >
-      <Drawer.Backdrop />
       <Drawer.Content
         paddingX={0}
         maxWidth={traceView === "full" ? undefined : "70%"}

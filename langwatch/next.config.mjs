@@ -1,11 +1,8 @@
-import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
 import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import bundleAnalyser from "@next/bundle-analyzer";
-
-process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -30,7 +27,7 @@ const cspHeader = `
 `;
 
 const existingNodeModules = new Set(
-  fs.readdirSync(path.join(__dirname, "node_modules"))
+  fs.readdirSync(path.join(__dirname, "node_modules")),
 );
 
 /**
@@ -49,34 +46,41 @@ const config = {
     // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
     ignoreBuildErrors: true,
   },
+  turbopack: {
+    rules: {
+      "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
+      "*.snippet.go": { loaders: ["raw-loader"], as: "*.js" },
+      "*.snippet.sh": { loaders: ["raw-loader"], as: "*.js" },
+      "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
+      "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
+    },
+    resolveAlias: {
+      "@injected-dependencies.client": path.join(
+        aliasPath,
+        "injection.client.ts",
+      ),
+      "@injected-dependencies.server": path.join(
+        aliasPath,
+        "injection.server.ts",
+      ),
+
+      // read all folders from ./saas-src/node_modules and create a map like the above
+      ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
+        ? Object.fromEntries(
+            fs
+              .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
+              .filter((key) => !existingNodeModules.has(key))
+              .flatMap((key) => [
+                [key, `./saas-src/node_modules/${key}`],
+                [`${key}/*`, `./saas-src/node_modules/${key}/*`],
+              ]),
+          )
+        : {}),
+    },
+  },
 
   experimental: {
     scrollRestoration: true,
-    turbo: {
-      resolveAlias: {
-        "@injected-dependencies.client": path.join(
-          aliasPath,
-          "injection.client.ts"
-        ),
-        "@injected-dependencies.server": path.join(
-          aliasPath,
-          "injection.server.ts"
-        ),
-
-        // read all folders from ./saas-src/node_modules and create a map like the above
-        ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
-          ? Object.fromEntries(
-              fs
-                .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
-                .filter((key) => !existingNodeModules.has(key))
-                .flatMap((key) => [
-                  [key, `./saas-src/node_modules/${key}`],
-                  [`${key}/*`, `./saas-src/node_modules/${key}/*`],
-                ])
-            )
-          : {}),
-      },
-    },
     optimizePackageImports: [
       "@chakra-ui/react",
       "react-feather",
@@ -114,11 +118,11 @@ const config = {
   webpack: (config) => {
     config.resolve.alias["@injected-dependencies.client"] = path.join(
       aliasPath,
-      "injection.client.ts"
+      "injection.client.ts",
     );
     config.resolve.alias["@injected-dependencies.server"] = path.join(
       aliasPath,
-      "injection.server.ts"
+      "injection.server.ts",
     );
 
     // Ensures that only a single version of those are ever loaded
@@ -132,11 +136,17 @@ const config = {
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
     // Add fallback for pino logger requirements
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      worker_threads: false,
-      fs: false,
-    };
+    if (!config.isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        "pino-pretty": false,
+        fs: false,
+        stream: false,
+        "node:stream": false,
+        worker_threads: false,
+        "node:worker_threads": false,
+      };
+    }
 
     config.module.rules.push({
       test: /\.(js|jsx|ts|tsx)$/,
@@ -160,27 +170,23 @@ const config = {
       ],
     });
 
+    // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
+    config.module.rules.push({
+      resourceQuery: /snippet/,
+      type: "asset/source",
+    });
+
+    // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
+    config.module.rules.push({
+      test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i,
+      type: "asset/source",
+    });
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return config;
   },
 };
 
 export default bundleAnalyser({ enabled: process.env.ANALYZE === "true" })(
-  withSentryConfig(config, {
-    // For all available options, see:
-    // https://github.com/getsentry/sentry-webpack-plugin#options
-
-    // Suppresses source map uploading logs during build
-    silent: true,
-    org: "langwatch",
-    project: "langwatch",
-
-    widenClientFileUpload: true,
-    tunnelRoute: "/monitoring",
-    sourcemaps: {
-      disable: false,
-      deleteSourcemapsAfterUpload: true,
-    },
-    disableLogger: true,
-  })
+  config,
 );

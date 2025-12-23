@@ -16,8 +16,8 @@ export const colorSystem = {
     400: { value: "#9CA3AF" },
     375: { value: "#B8BDBD" },
     350: { value: "#DDDDDD" },
-    300: { value: "#E5E7EB" },
-    200: { value: "#E6E9F0" },
+    300: { value: "#E0E2E6" },
+    200: { value: "#E8EBF2" },
     100: { value: "#F2F4F8" },
     50: { value: "#F7FAFC" },
   },
@@ -174,7 +174,7 @@ export function getRawColorValue(color: string): string {
   return (
     colorSystem[colorName as keyof typeof colorSystem][
       (parseInt(
-        number
+        number,
       ) as keyof (typeof colorSystem)[keyof typeof colorSystem]) ?? 0
     ]?.value ?? "pink"
   );
@@ -236,7 +236,7 @@ export const LightMode = React.forwardRef<HTMLSpanElement, SpanProps>(
         {...props}
       />
     );
-  }
+  },
 );
 
 export const DarkMode = React.forwardRef<HTMLSpanElement, SpanProps>(
@@ -251,5 +251,5 @@ export const DarkMode = React.forwardRef<HTMLSpanElement, SpanProps>(
         {...props}
       />
     );
-  }
+  },
 );

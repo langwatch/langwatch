@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
-import { LLMModelCost } from "../../components/settings/LLMModelCost";
 import SettingsLayout from "../../components/SettingsLayout";
+import { LLMModelCost } from "../../components/settings/LLMModelCost";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export default function ModelsPage() {
@@ -8,16 +8,7 @@ export default function ModelsPage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        gap={6}
-        width="full"
-        align="start"
-        paddingY={6}
-        paddingX={4}
-        paddingBottom={12}
-      >
-        <LLMModelCost projectId={project?.id} />
-      </VStack>
+      <LLMModelCost projectId={project?.id} />
     </SettingsLayout>
   );
 }
