@@ -1,33 +1,13 @@
 import type { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 
 /**
  * Row data structure for the scenarios table view
  * Represents a single scenario run with all its associated data
  */
-export interface ScenarioRunRow {
-  // Core identifiers
-  scenarioRunId: string;
-  scenarioId: string;
-  scenarioSetId: string;
-  batchRunId: string;
-
-  // Display fields
-  name: string | null;
-  description: string | null;
-  status: ScenarioRunStatus;
-  verdict: Verdict | null;
-  timestamp: number;
-  durationInMs: number;
-
-  // Results
-  metCriteria: string[];
-  unmetCriteria: string[];
-
+export interface ScenarioRunRow extends ScenarioRunData {
   // Traces (for expandable rows)
   traces: TraceRow[];
-
-  // Dynamic metadata from traces - flattened for filtering
-  [key: `metadata.${string}`]: unknown;
 }
 
 /**

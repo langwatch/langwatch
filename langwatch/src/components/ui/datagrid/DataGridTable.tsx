@@ -6,7 +6,7 @@ import {
   type Row,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useDataGridContext } from "./context";
+import { ColumnHeader } from "./ColumnHeader.v2";
 
 interface DataGridTableProps<T> {
   table: TanStackTable<T>;
@@ -38,24 +38,11 @@ export function DataGridTable<T>({
                   }}
                 >
                   {header.isPlaceholder ? null : (
-                    <Flex align="center" gap={2}>
-                      {header.column.getCanGroup() ? (
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={header.column.getToggleGroupingHandler()}
-                          cursor="pointer"
-                        >
-                          {header.column.getIsGrouped()
-                            ? `🛑(${header.column.getGroupedIndex()}) `
-                            : `👊 `}
-                        </Button>
-                      ) : null}
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                    </Flex>
+                    <ColumnHeader<T>
+                      table={table}
+                      column={header.column}
+                      header={header}
+                    />
                   )}
                 </Table.ColumnHeader>
               ))}
@@ -135,7 +122,7 @@ export function DataGridTable<T>({
                     );
                   })}
                 </Table.Row>
-                {row.getIsExpanded() && renderExpandedContent && (
+                {/* {row.getIsExpanded() && renderExpandedContent && (
                   <Table.Row>
                     <Table.Cell colSpan={row.getAllCells().length} style={{ padding: 0 }}>
                       <Box
@@ -149,7 +136,7 @@ export function DataGridTable<T>({
                       </Box>
                     </Table.Cell>
                   </Table.Row>
-                )}
+                )} */}
               </Fragment>
             ))
           )}

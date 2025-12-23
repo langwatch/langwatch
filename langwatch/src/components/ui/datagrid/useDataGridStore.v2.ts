@@ -113,6 +113,8 @@ const createStore = () => create<DataGridStore>((set) => ({
     })),
 }));
 
+export const dataGridStore = createStore();
+
 export const useDataGridStore = () => {
   const storeRef = useRef<ReturnType<typeof createStore> | null>(null);
 

@@ -9,31 +9,12 @@ const projectSchema = z.object({
   projectId: z.string(),
 });
 
-// Filter schema for table view
-const filterSchema = z.object({
-  columnId: z.string(),
-  operator: z.enum(["eq", "contains", "between"]),
-  value: z.unknown(),
-});
-
-// Sorting schema for table view
-const sortingSchema = z.object({
-  columnId: z.string(),
-  order: z.enum(["asc", "desc"]),
-});
-
-// Pagination schema for table view
-const paginationSchema = z.object({
-  page: z.number().min(1).default(1),
-  pageSize: z.number().min(1).max(100).default(20),
-});
-
 export const scenarioRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
     .input(projectSchema)
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioSetsDataForProject({
         projectId: input.projectId,
@@ -51,7 +32,7 @@ export const scenarioRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForScenarioSet({
         projectId: input.projectId,
@@ -66,7 +47,7 @@ export const scenarioRouter = createTRPCRouter({
   getAllScenarioSetRunData: protectedProcedure
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getAllRunDataForScenarioSet({
         projectId: input.projectId,
@@ -83,7 +64,7 @@ export const scenarioRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunData({
         projectId: input.projectId,
@@ -102,7 +83,7 @@ export const scenarioRouter = createTRPCRouter({
   getScenarioSetBatchRunCount: protectedProcedure
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const count = await scenarioRunnerService.getBatchRunCountForScenarioSet({
         projectId: input.projectId,
@@ -119,7 +100,7 @@ export const scenarioRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunDataByScenarioId({
         projectId: input.projectId,
@@ -137,7 +118,7 @@ export const scenarioRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForBatchRun({
         projectId: input.projectId,
@@ -147,96 +128,37 @@ export const scenarioRouter = createTRPCRouter({
       return data;
     }),
 
-  // Get filtered scenario runs for table view
-  getFilteredScenarioRuns: protectedProcedure
-    .input(
-      projectSchema.extend({
-        filters: z.array(filterSchema).optional(),
-        sorting: sortingSchema.optional(),
-        pagination: paginationSchema.optional(),
-        search: z.string().optional(),
-        includeTraces: z.boolean().default(false),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
-      const scenarioRunnerService = new ScenarioEventService();
-      return await scenarioRunnerService.getFilteredScenarioRuns({
-        projectId: input.projectId,
-        filters: input.filters,
-        sorting: input.sorting,
-        pagination: input.pagination,
-        search: input.search,
-        includeTraces: input.includeTraces,
-      });
-    }),
+      /**
+   * Fetch scenario runs
+   * Params are based on the DataGridStore
+   */
+  getAllScenarioRunsWithTraces: protectedProcedure
+  .input(projectSchema)
+  .use(checkProjectPermission("scenarios:view"))
+  .query(async ({ input, ctx }) => {
+    const scenarioRunnerService = new ScenarioEventService();
+    return await scenarioRunnerService.getAllScenarioRunsWithTraces({
+      projectId: input.projectId,
+    });
+  }),
 
-  // Get grouped scenario runs for table view with grouping enabled
-  getGroupedScenarioRuns: protectedProcedure
-    .input(
-      projectSchema.extend({
-        groupBy: z.string(),
-        filters: z.array(filterSchema).optional(),
-        sorting: sortingSchema.optional(),
-        pagination: paginationSchema.optional(),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
-      const scenarioRunnerService = new ScenarioEventService();
-      return await scenarioRunnerService.getGroupedScenarioRuns({
-        projectId: input.projectId,
-        groupBy: input.groupBy,
-        filters: input.filters,
-        sorting: input.sorting,
-        pagination: input.pagination,
-      });
-    }),
-
-  // Get available metadata keys for dynamic columns
-  getAvailableMetadataKeys: protectedProcedure
-    .input(projectSchema)
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
-      const scenarioRunnerService = new ScenarioEventService();
-      return await scenarioRunnerService.getAvailableMetadataKeys({
-        projectId: input.projectId,
-      });
-    }),
-
-  // Get filter options for enum columns
-  getFilterOptions: protectedProcedure
-    .input(
-      projectSchema.extend({
-        columnId: z.string(),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input }) => {
-      const scenarioRunnerService = new ScenarioEventService();
-      return await scenarioRunnerService.getFilterOptions({
-        projectId: input.projectId,
-        columnId: input.columnId,
-      });
-    }),
-
-  // Export scenarios as CSV
-  exportScenariosCsv: protectedProcedure
-    .input(
-      projectSchema.extend({
-        filters: z.array(filterSchema).optional(),
-        columns: z.array(z.string()),
-        includeTraces: z.boolean().default(false),
-      }),
-    )
-    .use(checkProjectPermission("scenarios:view"))
-    .mutation(async ({ input }) => {
-      const scenarioRunnerService = new ScenarioEventService();
-      return await scenarioRunnerService.exportScenariosCsv({
-        projectId: input.projectId,
-        filters: input.filters,
-        columns: input.columns,
-        includeTraces: input.includeTraces,
-      });
-    }),
+// // Export scenarios as CSV
+// exportScenariosCsv: protectedProcedure
+//   .input(
+//     projectSchema.extend({
+//       filters: z.array(filterSchema).optional(),
+//       columns: z.array(z.string()),
+//       includeTraces: z.boolean().default(false),
+//     }),
+//   )
+//   .use(checkProjectPermission("scenarios:view"))
+//   .mutation(async ({ input }) => {
+//     const scenarioRunnerService = new ScenarioEventService();
+//     return await scenarioRunnerService.exportScenariosCsv({
+//       projectId: input.projectId,
+//       filters: input.filters,
+//       columns: input.columns,
+//       includeTraces: input.includeTraces,
+//     });
+//   }),
 });

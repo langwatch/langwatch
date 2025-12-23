@@ -1,162 +1,87 @@
-import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import React, { useEffect, useMemo, useState } from "react";
+import { Button, HStack } from "@chakra-ui/react";
+import React from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { SetCard, SimulationsTabs, ScenariosTableView } from "~/components/simulations";
-import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { Tabs } from "@chakra-ui/react";
+import { useRouter } from "next/router";
+import { Grid, Table } from "lucide-react";
+import { SimulationsGridView } from "~/components/simulations/SimulationsGridView";
+import { ScenariosTableView } from "~/components/simulations/table-view/ScenariosTableView";
 
 function SimulationsPageContent() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
-  const [refetchInterval, setRefetchInterval] = useState(4000);
+  const currentView = (router.query.view as string) ?? "grid";
+  const isGridView = currentView === "grid";
+  const isTableView = !isGridView;
 
-  // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
-  useEffect(() => {
-    const onFocus = () => setRefetchInterval(4000);
-    const onBlur = () => setRefetchInterval(30000);
+  const handleTabChange = (details: { value: string }) => {
+    const newView = details.value;
+    const query = { ...router.query };
 
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("blur", onBlur);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, []);
-
-  const {
-    data: scenarioSetsData,
-    isLoading,
-    error,
-  } = api.scenarios.getScenarioSetsData.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      refetchInterval,
-      enabled: !!project,
-    },
-  );
-
-  const sortedScenarioSetsData = useMemo(() => {
-    if (!scenarioSetsData) {
-      return undefined;
+    if (newView === "grid") {
+      delete query.view;
+    } else {
+      query.view = newView;
     }
 
-    return [...scenarioSetsData].sort((a, b) => b.lastRunAt - a.lastRunAt);
-  }, [scenarioSetsData]);
-
-  const handleSetClick = (scenarioSetId: string) => {
-    // Navigate to the specific set page using the catch-all route
-    void router.push(`${router.asPath.split("?")[0]}/${scenarioSetId}`);
+    void router.replace({ query }, undefined, { shallow: true });
   };
-
-  // Grid view content
-  const gridViewContent = (
-    <>
-      {/* Show loading state */}
-      {isLoading && (
-        <VStack gap={4} align="center" py={8}>
-          <Spinner borderWidth="3px" animationDuration="0.8s" />
-        </VStack>
-      )}
-
-      {/* Show error state */}
-      {error && (
-        <VStack gap={4} align="center" py={8}>
-          <Text color="red.500">Error loading simulation batches</Text>
-          <Text fontSize="sm" color="gray.600">
-            {error.message}
-          </Text>
-        </VStack>
-      )}
-
-      {/* Show empty state when no batches */}
-      {!isLoading &&
-        !error &&
-        (!scenarioSetsData || scenarioSetsData.length === 0) && (
-          <ScenarioInfoCard />
-        )}
-
-      {/* Render grid of scenario sets */}
-      {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
-        <Grid
-          templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
-          gap={6}
-          width="full"
-        >
-          {sortedScenarioSetsData.map((setData) => (
-            <SetCard
-              {...setData}
-              key={setData.scenarioSetId}
-              onClick={() => handleSetClick(setData.scenarioSetId)}
-            />
-          ))}
-        </Grid>
-      )}
-    </>
-  );
-
-  // Table view content
-  const tableViewContent = <ScenariosTableView />;
-
-  // Check if we have any data to show tabs
-  const hasData = sortedScenarioSetsData && sortedScenarioSetsData.length > 0;
 
   return (
     <DashboardLayout>
-      {!isLoading &&
-        sortedScenarioSetsData &&
-        sortedScenarioSetsData.length > 0 && (
-          <PageLayout.Header>
-            <HStack justify="space-between" align="center" w="full">
-              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-            </HStack>
-          </PageLayout.Header>
-        )}
-      <PageLayout.Container maxW={"calc(100vw - 200px)"} padding={6}>
-        {/* Show loading state */}
-        {isLoading && (
-          <VStack gap={4} align="center" py={8}>
-            <Spinner borderWidth="3px" animationDuration="0.8s" />
-          </VStack>
-        )}
+      <PageLayout.Container
+        maxW={"calc(100vw - 200px)"}
+        padding={6}
+        marginTop={8}
+      >
+        <PageLayout.Header>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Simulations</PageLayout.Heading>
+          </HStack>
+        </PageLayout.Header>
 
-        {/* Show error state */}
-        {error && (
-          <VStack gap={4} align="center" py={8}>
-            <Text color="red.500">Error loading simulation batches</Text>
-            <Text fontSize="sm" color="gray.600">
-              {error.message}
-            </Text>
-          </VStack>
-        )}
-
-        {/* Show empty state when no batches */}
-        {!isLoading &&
-          !error &&
-          (!scenarioSetsData || scenarioSetsData.length === 0) && (
-            <ScenarioInfoCard />
-          )}
-
-        {/* Render based on view mode */}
-        {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
-            gap={6}
-            width="full"
+        <Tabs.Root
+          value={currentView}
+          onValueChange={handleTabChange}
+          variant="line"
+          size="md"
+        >
+          <Tabs.List
+            mb={4}
+            gap={0}
+            borderColor="gray.50"
+            backgroundColor="gray.50"
+            width="fit-content"
+            rounded="lg"
           >
-            {sortedScenarioSetsData.map((setData) => (
-              <SetCard
-                {...setData}
-                key={setData.scenarioSetId}
-                onClick={() => handleSetClick(setData.scenarioSetId)}
-              />
-            ))}
-          </Grid>
-        )}
+            <Tabs.Trigger value="grid">
+              <Button
+                variant={isGridView ? "solid" : "outline"}
+                colorPalette={isGridView ? "orange" : "gray"}
+              >
+                <Grid size={16} />
+                Grid View
+              </Button>
+            </Tabs.Trigger>
+            <Tabs.Trigger value="table">
+              <Button
+                variant={isTableView ? "solid" : "outline"}
+                colorPalette={isTableView ? "orange" : "gray"}
+              >
+                <Table size={16} />
+                Table View
+              </Button>
+            </Tabs.Trigger>
+          </Tabs.List>
+
+          <Tabs.Content value="grid">
+            <SimulationsGridView />
+          </Tabs.Content>
+          <Tabs.Content value="table">
+            <ScenariosTableView />
+          </Tabs.Content>
+        </Tabs.Root>
       </PageLayout.Container>
     </DashboardLayout>
   );

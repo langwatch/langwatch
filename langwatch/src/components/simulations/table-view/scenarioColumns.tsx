@@ -5,6 +5,7 @@ import { ScenarioSetCell } from "./cells/ScenarioSetCell";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DurationCell,
 StatusCell, TimestampCell, VerdictCell, ActionsCell } from "./cells";
+import { ColumnHeader } from "~/components/ui/datagrid/ColumnHeader.v2";
 
 const columnHelper = createColumnHelper<ScenarioRunRow>();
 
@@ -13,7 +14,7 @@ const columnHelper = createColumnHelper<ScenarioRunRow>();
  * Uses TanStack's columnHelper for type-safe column definitions
  * @param projectSlug - The project slug for generating links
  */
-export function createScenarioColumns(): DataGridColumnDef<ScenarioRunRow>[] {
+export function createScenarioColumns()  {
   return [
     columnHelper.accessor("status", {
       header: "",
@@ -21,6 +22,7 @@ export function createScenarioColumns(): DataGridColumnDef<ScenarioRunRow>[] {
       enableSorting: false,
       enableColumnFilter: false,
       cell: StatusCell,
+      enableHiding: false,
     }),
     columnHelper.accessor("name", {
       header: "Scenario Name",
@@ -40,7 +42,7 @@ export function createScenarioColumns(): DataGridColumnDef<ScenarioRunRow>[] {
       enableSorting: true,
       enableColumnFilter: true,
     }),
-    columnHelper.accessor("verdict", {
+    columnHelper.accessor("results.verdict", {
       header: "Verdict",
       enableSorting: true,
       enableColumnFilter: true,
@@ -76,6 +78,7 @@ export function createScenarioColumns(): DataGridColumnDef<ScenarioRunRow>[] {
       enableSorting: false,
       enableColumnFilter: false,
       cell: ActionsCell,
+      enableHiding: false,
     }),
   ];
 }

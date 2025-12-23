@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { Box, Text, VStack } from "@chakra-ui/react";
 import { DataGrid } from "~/components/ui/datagrid";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -6,15 +6,23 @@ import { api } from "~/utils/api";
 import { createScenarioColumns } from "./scenarioColumns";
 import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
 import type { ScenarioRunRow } from "./types";
-import { useDataGridStore } from "~/components/ui/datagrid/useDataGridStore.v2";
+import { dataGridStore,
+useDataGridStore } from "~/components/ui/datagrid/useDataGridStore.v2";
 import { useExportScenarioRuns } from "~/features/simulations/hooks/useExportScenarioRuns";
 import {
   getCoreRowModel,
   type Row,
   useReactTable,
+  getSortedRowModel,
+  getGroupedRowModel,
+  getExpandedRowModel,
+  getPaginationRowModel,
+  getFilteredRowModel,
 } from "@tanstack/react-table";
 
 const columns = createScenarioColumns();
+
+const store = dataGridStore;
 
 /**
  * Table view for scenarios/simulations data
@@ -26,44 +34,50 @@ const columns = createScenarioColumns();
  */
 export function ScenariosTableView() {
   const { project } = useOrganizationTeamProject();
-  const { downloadCsv } = useExportScenarioRuns();
+  // const { downloadCsv } = useExportScenarioRuns();
 
-  // Use the store - this is the Zustand hook pattern
-  const store = useDataGridStore();
+  // // Subscribe to specific state slices to avoid re-renders on every state change
+  // const filters = store((state) => state.columnFilters);
+  // const grouping = store((state) => state.grouping);
+  // const sorting = store((state) => state.sorting);
+  // const pagination = store((state) => state.pagination);
+  // const columnVisibility = store((state) => state.columnVisibility);
+  // const globalFilter = store((state) => state.globalFilter);
+  // const toggleColumnVisibility = store((state) => state.toggleColumnVisibility);
+  // const handlers = store(state => {
+  //   return {
+  //     onSortingChange: state.setSorting,
+  //     onGroupingChange: state.setGrouping,
+  //     onPaginationChange: state.setPagination,
+  //     onGlobalFilterChange: state.setGlobalFilter,
+  //     onColumnVisibilityChange: state.setColumnVisibility,
+  //   };
+  // });
 
-  // Subscribe to specific state slices to avoid re-renders on every state change
-  const filters = store((state) => state.columnFilters);
-  const grouping = store((state) => state.grouping);
-  const sorting = store((state) => state.sorting);
-  const pagination = store((state) => state.pagination);
-  const columnVisibility = store((state) => state.columnVisibility);
-  const globalFilter = store((state) => state.globalFilter);
-  const toggleColumnVisibility = store((state) => state.toggleColumnVisibility);
-
-  // Fetch filtered scenario runs (ungrouped)
+  // const scenarioRuns = [] as ScenarioRunRow[];
+  const isLoading = false;
+  const isFetching = false;
+  // // Fetch filtered scenario runs (ungrouped)
   const {
-    data: scenarioRuns,
+    data,
     isLoading: isLoadingScenarioRuns,
     isFetching: isFetchingScenarioRuns,
-    error: errorScenarioRuns,
-  } = api.scenarios.fetchScenarioRuns.useQuery(
+    // error: errorScenarioRuns,
+  } = api.scenarios.getAllScenarioRunsWithTraces.useQuery(
     {
       projectId: project?.id ?? "",
-      filters,
-      sorting,
-      pagination,
-      grouping,
-      globalFilter,
     },
     {
-      enabled: !!project?.id,
+      enabled: !!project,
       refetchInterval: 30000,
     }
   );
 
-  const isLoading = isLoadingScenarioRuns;
-  const isFetching = isFetchingScenarioRuns;
-  const error = errorScenarioRuns;
+  const scenarioRuns = useMemo(() => data ?? [], [data]);
+
+  // const isLoading = isLoadingScenarioRuns;
+  // const isFetching = isFetchingScenarioRuns;
+  // const error = errorScenarioRuns;
 
   // Render expanded content
   const renderExpandedContent = useCallback(
@@ -71,28 +85,50 @@ export function ScenariosTableView() {
     []
   );
 
-  const handleExport = useCallback(() => {
-    downloadCsv({
-      filters,
-      sorting,
-      pagination,
-      grouping,
-      globalFilter,
-    });
-  }, [downloadCsv, filters, sorting, pagination, grouping, globalFilter]);
+  console.log('scenarioRuns', scenarioRuns)
+
+  // const handleExport = useCallback(() => {
+  //   downloadCsv({
+  //     filters,
+  //     sorting,
+  //     pagination,
+  //     grouping,
+  //     globalFilter,
+  //   });
+  // }, [downloadCsv, filters, sorting, pagination, grouping, globalFilter]);
 
   const table = useReactTable<ScenarioRunRow>({
     data: scenarioRuns ?? [],
     columns: columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getGroupedRowModel: getGroupedRowModel(),
+    getExpandedRowModel: getExpandedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    // state: {
+    //   sorting,
+    //   columnVisibility,
+    //   grouping,
+    //   pagination,
+    //   globalFilter,
+    // },
+    // onSortingChange: handlers.onSortingChange,
+    // onGroupingChange: handlers.onGroupingChange,
+    // onPaginationChange: handlers.onPaginationChange,
+    // onGlobalFilterChange: handlers.onGlobalFilterChange,
+    // onColumnVisibilityChange: handlers.onColumnVisibilityChange,
+    debugAll: true,
   });
+
+  console.log('render')
 
   if (!project) {
     return (
       <VStack gap={4} align="center" py={8}>
         <Text color="gray.500">Loading project...</Text>
       </VStack>
-    );
+    )
   }
 
   return (
@@ -105,18 +141,20 @@ export function ScenariosTableView() {
           <DataGrid.Toolbar.ResetFiltersAndSorting
             onResetFiltersAndSorting={() => {}}
           />
-          <DataGrid.Toolbar.ColumnVisibility
-            columns={table._getColumnDefs()}
-            visibleColumns={columnVisibility}
-            onToggleColumnVisibility={toggleColumnVisibility}
-          />
-          <DataGrid.Toolbar.Export onExport={handleExport} />
+          <DataGrid.Toolbar.ColumnVisibility columns={table.getAllColumns()} />
+          {/* <DataGrid.Toolbar.Export onExport={handleExport} /> */}
         </DataGrid.Toolbar.Root>
         <DataGrid.Table
           table={table}
           renderExpandedContent={renderExpandedContent}
         />
-        {/* <DataGrid.Pagination /> */}
+        <DataGrid.Pagination
+          page={table.getState().pagination.pageIndex}
+          pageSize={table.getState().pagination.pageSize}
+          totalCount={table.getRowCount()}
+          onPageChange={table.setPagination}
+          onPageSizeChange={table.setPageSize}
+        />
       </DataGrid.Root>
     </Box>
   );

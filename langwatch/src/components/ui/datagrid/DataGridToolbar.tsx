@@ -1,4 +1,5 @@
-import { Box, Button, Flex, HStack, Spinner, Text } from "@chakra-ui/react";
+import { Button, Flex, Spinner, Text } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { Columns, Download, RotateCcw } from "lucide-react";
 import {
   PopoverRoot,
@@ -8,7 +9,8 @@ import {
 } from "../popover";
 import { Checkbox } from "../checkbox";
 import { FilterBar } from "./FilterBar";
-import type { DataGridColumnDef, FilterState, SortingState } from "./types";
+import type { ReactNode } from "react";
+import type { Column } from "@tanstack/react-table";
 
 interface DataGridToolbarProps {
   children: ReactNode;
@@ -19,7 +21,7 @@ interface DataGridToolbarProps {
  */
 function DataGridToolbarRoot({
   children,
-}: DataGridToolbarProps<T>) {
+}: DataGridToolbarProps) {
   return (
     <Flex direction="row" align="center" justify="space-between" gap={4} px={3}>
       {children}
@@ -51,15 +53,12 @@ function DataGridToolbarResetFiltersAndSorting({
   );
 }
 
-function DataGridToolbarColumnVisibility({
+function DataGridToolbarColumnVisibility<TData>({
   columns,
-  visibleColumns,
-  onToggleColumnVisibility,
 }: {
-  columns: DataGridColumnDef<T>[];
-  visibleColumns: Record<string, boolean>;
-  onToggleColumnVisibility: (columnId: string) => void;
+  columns: Column<TData>[];
 }) {
+  const displayColumns = useMemo(() => columns.filter((column) => column.getCanHide()), [columns]);
   return (
     <PopoverRoot>
       <PopoverTrigger asChild>
@@ -74,13 +73,13 @@ function DataGridToolbarColumnVisibility({
             <Text fontWeight="medium" fontSize="sm" mb={1}>
               Visible Columns
             </Text>
-            {columns.map((column) => (
+            {displayColumns.map((column) => (
               <Checkbox
                 key={column.id}
-                checked={visibleColumns[column.id]}
-                onCheckedChange={() => onToggleColumnVisibility(column.id)}
+                checked={column.getIsVisible()}
+                onCheckedChange={column.getToggleVisibilityHandler()}
               >
-                {column.header}
+                {typeof column.columnDef.header === "string" ? column.columnDef.header : ""}
               </Checkbox>
             ))}
           </Flex>

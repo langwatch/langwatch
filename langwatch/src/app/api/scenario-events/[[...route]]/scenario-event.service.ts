@@ -81,7 +81,6 @@ export class ScenarioEventService {
       scenarioId: runStartedEvent.scenarioId,
       batchRunId: runStartedEvent.batchRunId,
       scenarioRunId: runStartedEvent.scenarioRunId,
-      scenarioSetId: runStartedEvent.scenarioSetId ?? null,
       status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
       results: latestRunFinishedEvent?.results ?? null,
       messages: latestMessageEvent?.messages ?? [],
@@ -384,8 +383,8 @@ export class ScenarioEventService {
       runs.push({
         scenarioId: runStartedEvent.scenarioId,
         batchRunId: runStartedEvent.batchRunId,
+        scenarioSetId: runStartedEvent.scenarioSetId,
         scenarioRunId: runStartedEvent.scenarioRunId,
-        scenarioSetId: runStartedEvent.scenarioSetId ?? null,
         status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
         results: runFinishedEvent?.results ?? null,
         messages: messageEvent?.messages ?? [],
@@ -426,308 +425,30 @@ export class ScenarioEventService {
     });
   }
 
-  /**
-   * Retrieves filtered scenario runs with pagination for the table view.
-   * Filtering, sorting, and pagination are performed server-side in Elasticsearch.
-   *
-   * @param {Object} params - The parameters for retrieving filtered runs
-   * @param {string} params.projectId - The ID of the project
-   * @param {Array} params.filters - Filter conditions
-   * @param {Object} params.sorting - Sort configuration
-   * @param {Object} params.pagination - Page and pageSize
-   * @param {string} params.search - Global search query
-   * @param {boolean} params.includeTraces - Whether to include trace data
-   * @returns {Promise<Object>} Paginated scenario run data with total count
-   */
-  async getFilteredScenarioRuns({
-    projectId,
-    filters,
-    sorting,
-    pagination,
-    search,
-    includeTraces,
-  }: {
-    projectId: string;
-    filters?: Array<{
-      columnId: string;
-      operator: "eq" | "contains" | "between";
-      value?: unknown;
-    }>;
-    sorting?: { columnId: string; order: "asc" | "desc" };
-    pagination?: { page: number; pageSize: number };
-    search?: string;
-    includeTraces?: boolean;
-  }): Promise<{
-    rows: ScenarioRunData[];
-    totalCount: number;
-    metadataKeys: string[];
-  }> {
-    // Search for scenario runs with filters applied at the ES level
-    const { scenarioRunIds, totalCount } =
-      await this.eventRepository.searchScenarioRuns({
-        projectId,
-        filters,
-        sorting,
-        pagination,
-        search,
-      });
+  async getAllScenarioRunsWithTraces({ projectId }: { projectId: string }) {
+    // Get all scenario sets for the project
+    const scenarioSets = await this.eventRepository.getScenarioSetsDataForProject({
+      projectId,
+    });
 
-    if (scenarioRunIds.length === 0) {
-      return {
-        rows: [],
-        totalCount: 0,
-        metadataKeys: [],
-      };
+    const runIds = new Set<string>();
+    for (const scenarioSet of scenarioSets) {
+      const runs = await this.getAllRunDataForScenarioSet({
+        projectId,
+        scenarioSetId: scenarioSet.scenarioSetId,
+      });
+      runs.forEach((run) => runIds.add(run.scenarioRunId));
     }
 
-    // Get the full run data for the filtered scenario runs
     const runs = await this.getScenarioRunDataBatch({
       projectId,
-      scenarioRunIds,
+      scenarioRunIds: Array.from(runIds),
     });
 
-    // TODO: Extract metadata keys from traces when includeTraces is true
-    const metadataKeys: string[] = [];
 
-    return {
-      rows: runs,
-      totalCount,
-      metadataKeys,
-    };
-  }
-
-  /**
-   * Retrieves grouped scenario runs with pagination for the table view.
-   * Grouping is performed server-side in Elasticsearch using aggregations.
-   *
-   * @param {Object} params - The parameters for retrieving grouped runs
-   * @param {string} params.projectId - The ID of the project
-   * @param {string} params.groupBy - Column to group by
-   * @param {Array} params.filters - Filter conditions
-   * @param {Object} params.sorting - Sort configuration
-   * @param {Object} params.pagination - Page and pageSize
-   * @returns {Promise<Object>} Grouped scenario run data
-   */
-  async getGroupedScenarioRuns({
-    projectId,
-    groupBy,
-    filters,
-    sorting,
-    pagination,
-  }: {
-    projectId: string;
-    groupBy: string;
-    filters?: Array<{
-      columnId: string;
-      operator: "eq" | "contains" | "between";
-      value?: unknown;
-    }>;
-    sorting?: { columnId: string; order: "asc" | "desc" };
-    pagination?: { page: number; pageSize: number };
-  }): Promise<{
-    groups: Array<{
-      groupValue: string;
-      count: number;
-      rows: ScenarioRunData[];
-    }>;
-    totalGroups: number;
-  }> {
-    // Search for grouped scenario runs with filters applied at the ES level
-    const { groups, totalGroups } =
-      await this.eventRepository.searchGroupedScenarioRuns({
-        projectId,
-        groupBy,
-        filters,
-        sorting,
-        pagination,
-      });
-
-    // Fetch full run data for each group
-    const groupsWithData = await Promise.all(
-      groups.map(async (group) => {
-        const runs = await this.getScenarioRunDataBatch({
-          projectId,
-          scenarioRunIds: group.scenarioRunIds,
-        });
-        return {
-          groupValue: group.groupValue,
-          count: group.count,
-          rows: runs,
-        };
-      })
-    );
-
-    return {
-      groups: groupsWithData,
-      totalGroups,
-    };
-  }
-
-  /**
-   * Gets available metadata keys for dynamic columns.
-   * Scans scenario events to find unique metadata field names.
-   *
-   * @param {Object} params - The parameters
-   * @param {string} params.projectId - The ID of the project
-   * @returns {Promise<{keys: string[]}>} Array of unique metadata keys
-   */
-  async getAvailableMetadataKeys({
-    projectId,
-  }: {
-    projectId: string;
-  }): Promise<{ keys: string[] }> {
-    const keys = await this.eventRepository.getUniqueMetadataKeys({
-      projectId,
-    });
-    return { keys };
-  }
-
-  /**
-   * Gets filter options for enum columns.
-   * Returns unique values for a specific column.
-   *
-   * @param {Object} params - The parameters
-   * @param {string} params.projectId - The ID of the project
-   * @param {string} params.columnId - The column to get options for
-   * @returns {Promise<{options: string[]}>} Array of unique values
-   */
-  async getFilterOptions({
-    projectId,
-    columnId,
-  }: {
-    projectId: string;
-    columnId: string;
-  }): Promise<{ options: string[] }> {
-    const options = await this.eventRepository.getFilterOptions({
-      projectId,
-      columnId,
-    });
-    return { options };
-  }
-
-  /**
-   * Exports scenarios as CSV.
-   * Fetches all matching scenarios and formats them as CSV.
-   *
-   * @param {Object} params - The parameters
-   * @param {string} params.projectId - The ID of the project
-   * @param {Array} params.filters - Filter conditions
-   * @param {string[]} params.columns - Columns to include in export
-   * @param {boolean} params.includeTraces - Whether to include trace data
-   * @returns {Promise<{csv: string, filename: string}>} CSV data and suggested filename
-   */
-  async exportScenariosCsv({
-    projectId,
-    filters,
-    columns,
-    includeTraces,
-  }: {
-    projectId: string;
-    filters?: Array<{
-      columnId: string;
-      operator: "eq" | "contains" | "between";
-      value?: unknown;
-    }>;
-    columns: string[];
-    includeTraces?: boolean;
-  }): Promise<{ csv: string; filename: string }> {
-    // Fetch all matching scenarios (no pagination for export)
-    const { scenarioRunIds } = await this.eventRepository.searchScenarioRuns({
-      projectId,
-      filters,
-      pagination: { page: 1, pageSize: 10000 }, // Large limit for export
-    });
-
-    if (scenarioRunIds.length === 0) {
-      return {
-        csv: columns.join(",") + "\n",
-        filename: `scenarios-export-${new Date().toISOString().split("T")[0]}.csv`,
-      };
-    }
-
-    // Get the full run data
-    const runs = await this.getScenarioRunDataBatch({
-      projectId,
-      scenarioRunIds,
-    });
-
-    // Build CSV
-    const csvRows: string[] = [];
-
-    // Header row
-    csvRows.push(columns.join(","));
-
-    // Data rows
-    for (const run of runs) {
-      const row = columns.map((col) => {
-        let value: unknown;
-        switch (col) {
-          case "scenarioRunId":
-            value = run.scenarioRunId;
-            break;
-          case "scenarioId":
-            value = run.scenarioId;
-            break;
-          case "scenarioSetId":
-            value = run.scenarioSetId;
-            break;
-          case "batchRunId":
-            value = run.batchRunId;
-            break;
-          case "name":
-            value = run.name;
-            break;
-          case "description":
-            value = run.description;
-            break;
-          case "status":
-            value = run.status;
-            break;
-          case "verdict":
-            value = run.results?.verdict;
-            break;
-          case "timestamp":
-            value = run.timestamp
-              ? new Date(run.timestamp).toISOString()
-              : "";
-            break;
-          case "durationInMs":
-            value = run.durationInMs;
-            break;
-          case "metCriteria":
-            value = run.results?.metCriteria?.join("; ");
-            break;
-          case "unmetCriteria":
-            value = run.results?.unmetCriteria?.join("; ");
-            break;
-          default:
-            // Handle metadata.* columns
-            if (col.startsWith("metadata.")) {
-              const key = col.replace("metadata.", "");
-              // Metadata would need to be extracted from traces
-              value = "";
-            } else {
-              value = "";
-            }
-        }
-
-        // Escape CSV value
-        const strValue = String(value ?? "");
-        if (
-          strValue.includes(",") ||
-          strValue.includes('"') ||
-          strValue.includes("\n")
-        ) {
-          return `"${strValue.replace(/"/g, '""')}"`;
-        }
-        return strValue;
-      });
-      csvRows.push(row.join(","));
-    }
-
-    return {
-      csv: csvRows.join("\n"),
-      filename: `scenarios-export-${new Date().toISOString().split("T")[0]}.csv`,
-    };
+    return runs.map((run) => ({
+      ...run,
+      traces: []
+    }));
   }
 }
