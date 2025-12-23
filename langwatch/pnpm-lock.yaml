@@ -120,11 +120,11 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(@prisma/client@5.7.0(prisma@5.7.0))(next-auth@4.24.11(next@15.5.9(@babel/core@7.26.8)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.79.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0))
       '@next/bundle-analyzer':
-        specifier: ^15.3.3
-        version: 15.3.3(bufferutil@4.0.9)
+        specifier: ^15.5.9
+        version: 15.5.9(bufferutil@4.0.9)
       '@next/env':
-        specifier: 15.5.7
-        version: 15.5.7
+        specifier: ^15.5.9
+        version: 15.5.9
       '@opensearch-project/opensearch':
         specifier: ^2.11.0
         version: 2.11.0
@@ -3038,11 +3038,8 @@ packages:
       '@prisma/client': '>=2.26.0 || >=3'
       next-auth: ^4
 
-  '@next/bundle-analyzer@15.3.3':
-    resolution: {integrity: sha512-9gddnjACK6yOa5IkmeFyzcwZh2rscsb6ZspTd7tymPYKQM96fJuKjn9HrRtPNKiMm7ExKNadAJqREmHdBgHZ9A==}
-
-  '@next/env@15.5.7':
-    resolution: {integrity: sha512-4h6Y2NyEkIEN7Z8YxkA27pq6zTkS09bUSYC0xjd0NpwFxjnIKeZEeH591o5WECSmjpUhLn3H2QLJcDye3Uzcvg==}
+  '@next/bundle-analyzer@15.5.9':
+    resolution: {integrity: sha512-lT1EBpFyGVN9u8M43f2jE78DsCu0A5KPA5OkF5PdIHrKDo4oTJ4lUQKciA9T2u9gccSXIPQcZb5TYkHF4f8iiw==}
 
   '@next/env@15.5.9':
     resolution: {integrity: sha512-4GlTZ+EJM7WaW2HEZcyU317tIQDjkQIyENDLxYJfSWlfqguN+dHkZgyQTV/7ykvobU7yEH5gKvreNrH4B6QgIg==}
@@ -14282,14 +14279,12 @@ snapshots:
       '@prisma/client': 5.7.0(prisma@5.7.0)
       next-auth: 4.24.11(next@15.5.9(@babel/core@7.26.8)(@opentelemetry/api@1.9.0)(@playwright/test@1.52.0)(babel-plugin-macros@3.1.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.79.0))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
 
-  '@next/bundle-analyzer@15.3.3(bufferutil@4.0.9)':
+  '@next/bundle-analyzer@15.5.9(bufferutil@4.0.9)':
     dependencies:
       webpack-bundle-analyzer: 4.10.1(bufferutil@4.0.9)
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
-
-  '@next/env@15.5.7': {}
 
   '@next/env@15.5.9': {}
 
@@ -23499,7 +23494,7 @@ snapshots:
 
   uri-js@4.4.1:
     dependencies:
-      punycode: 2.3.0
+      punycode: 2.3.1
 
   url-parse@1.5.10:
     dependencies:
