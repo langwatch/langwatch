@@ -111,7 +111,7 @@ function DataGridToolbarSearch({
   onChange: (value: string) => void;
 }) {
   return (
-      <HStack flex="0 0 auto" minW="200px" bg="white" borderRadius="lg" shadow="sm" overflow="hidden" px={2}>
+      <HStack flex="0 0 auto" minW="200px" bg="white" borderRadius="lg" shadow="xs" overflow="hidden" px={2} border="1px solid" borderColor="gray.200">
         <Search size={16} color="gray" />
         <Input
           border="none"

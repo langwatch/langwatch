@@ -464,7 +464,9 @@ export class ScenarioEventService {
             return resolve({
               ...run,
               metadata: {
-                traces: traces.map((trace) => trace._source),
+                traces: traces.map((trace) => ({
+                  trace_id: trace._source.trace_id,
+                })),
               },
             });
           });

@@ -1,11 +1,9 @@
 import type { DataGridColumnDef } from "~/components/ui/datagrid";
-import { Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { ScenarioRunRow } from "./types";
 import { ScenarioSetCell } from "./cells/ScenarioSetCell";
 import { createColumnHelper } from "@tanstack/react-table";
 import { DurationCell,
-StatusCell, TimestampCell, VerdictCell, ActionsCell } from "./cells";
-import { ColumnHeader } from "~/components/ui/datagrid/ColumnHeader.v2";
+StatusCell, TimestampCell, VerdictCell } from "./cells";
 import { TracesListCell } from "./cells/TraceCells";
 
 const columnHelper = createColumnHelper<ScenarioRunRow>();
@@ -32,6 +30,20 @@ export function createScenarioColumns()  {
       enableColumnFilter: true,
       enableGrouping: true,
     }),
+    columnHelper.accessor("description", {
+      header: "Description",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => info.getValue() || "",
+    }),
+    columnHelper.accessor("messages", {
+      header: "Messages",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => info.getValue().map((message: ScenarioMessageSnapshotEvent["messages"][0]) => message.content).join("\n"),
+    }),
     columnHelper.accessor("scenarioSetId", {
       header: "Set Id",
       enableSorting: true,
@@ -51,6 +63,37 @@ export function createScenarioColumns()  {
       enableColumnFilter: true,
       cell: VerdictCell,
       enableGrouping: false,
+    }),
+    columnHelper.accessor("results.reasoning", {
+      header: "Reasoning",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => info.getValue() || "",
+    }),
+    columnHelper.accessor("results.metCriteria", {
+      id: "results.metCriteria",
+      header: "Met Criteria",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
+    }),
+    columnHelper.accessor("results.unmetCriteria", {
+      id: "results.unmetCriteria",
+      header: "Unmet Criteria",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
+    }),
+    columnHelper.accessor("results.error", {
+      id: "results.error",
+      header: "Error",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: info => info.getValue() || "",
     }),
     columnHelper.accessor("timestamp", {
       header: "Date",
@@ -79,6 +122,7 @@ export function createScenarioColumns()  {
       enableGrouping: false,
     }),
     columnHelper.accessor("metadata.traces", {
+      id: "metadata.traces",
       header: "Traces",
       enableSorting: false,
       enableColumnFilter: false,

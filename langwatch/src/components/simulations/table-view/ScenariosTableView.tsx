@@ -78,6 +78,12 @@ export function ScenariosTableView() {
         batchRunId: false,
         scenarioRunId: false,
         scenarioId: false,
+        messages: false,
+        description: false,
+        'results.metCriteria': false,
+        'results.unmetCriteria': false,
+        'results.error': false,
+        'metadata.traces': false,
       },
     },
     onRowClick: (row) => {
