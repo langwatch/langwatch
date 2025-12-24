@@ -72,8 +72,6 @@ export const ButtonToggleSlider = {
       totalButtons: buttonCount,
     };
 
-    console.log(contextValue);
-
     return (
       <ButtonToggleContext.Provider value={contextValue}>
         <HStack

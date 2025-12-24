@@ -1,4 +1,4 @@
 export { ScenariosTableView } from "./ScenariosTableView";
-export { createScenarioColumns, generateDynamicColumns } from "./scenarioColumns";
+export { createScenarioColumns } from "./scenarioColumns";
 export * from "./types";
 export * from "./cells";

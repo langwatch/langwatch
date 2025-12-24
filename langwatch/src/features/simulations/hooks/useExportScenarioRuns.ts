@@ -37,8 +37,8 @@ function formatValueForExport(columnId: string, value: unknown): string {
 export function useExportScenarioRuns() {
   const downloadCsv = useCallback(async (table: Table<ScenarioRunRow>) => {
     try {
-      // Get all scenario runs from the table's core model (unfiltered, unpaginated)
-      const scenarioRuns = table.getCoreRowModel().rows.map(row => row.original);
+      // Get scenario runs respecting active filters and sorts (all pages)
+      const scenarioRuns = table.getPrePaginationRowModel().rows.map(row => row.original);
 
       // Get headers from visible columns
       const headers = table

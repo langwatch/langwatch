@@ -3,12 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": "24.x",
+    "node": "20.x",
     "npm": ">=10.0.0"
-  },
-  "volta": {
-    "node": "24.12.0",
-    "pnpm": "10.24.0"
   },
   "scripts": {
     "build": "pnpm run start:prepare:files && BUILD_TIME=1 next build --no-lint",

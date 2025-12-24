@@ -36,14 +36,14 @@ export const runDataSchema = z.object({
   scenarioId: scenarioIdSchema,
   batchRunId: batchRunIdSchema,
   scenarioRunId: scenarioRunIdSchema,
-  scenarioSetId: z.string().optional().nullable(), // Added for table view
+  scenarioSetId: z.string().optional().nullable(),
   name: z.string().optional().nullable(),
   description: z.string().optional().nullable(),
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,
-  timestamp: z.number(), // Unix timestamp when run was executed
-  durationInMs: z.number(), // Execution time in milliseconds
+  timestamp: z.number(),
+  durationInMs: z.number(),
 });
 
 /**

@@ -8,7 +8,6 @@ import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
 import type {
   ScenarioEvent,
   ScenarioMessageSnapshotEvent,
-  ScenarioRunData,
   ScenarioRunFinishedEvent,
   ScenarioRunStartedEvent,
   ScenarioSetData,
@@ -469,9 +468,9 @@ export class ScenarioEventRepository {
         return String(keyA) < String(keyB)
           ? -1
           : String(keyA) > String(keyB)
-            ? 1
-            : 0;
-      },
+          ? 1
+          : 0;
+      }
     );
 
     // Determine if there are more results
@@ -496,7 +495,7 @@ export class ScenarioEventRepository {
         ) {
           // Encode cursor as base64 for stability and compactness
           nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
-            "base64",
+            "base64"
           );
         }
       }
@@ -634,7 +633,7 @@ export class ScenarioEventRepository {
 
     // Validate that all batchRunIds are valid strings
     const validBatchRunIds = batchRunIds.filter(
-      (id) => typeof id === "string" && id.length > 0,
+      (id) => typeof id === "string" && id.length > 0
     );
     if (validBatchRunIds.length !== batchRunIds.length) {
       captureException({
@@ -751,7 +750,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -799,7 +798,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult,
+            rawResult
           ) as ScenarioRunStartedEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);
@@ -831,7 +830,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -879,7 +878,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult,
+            rawResult
           ) as ScenarioMessageSnapshotEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);
@@ -911,7 +910,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -959,7 +958,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult,
+            rawResult
           ) as ScenarioRunFinishedEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);
@@ -983,6 +982,4 @@ export class ScenarioEventRepository {
 
     return this.client;
   }
-
-
 }

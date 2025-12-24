@@ -151,20 +151,3 @@ export function createScenarioColumns() {
     }),
   ];
 }
-
-/**
- * Generates dynamic columns from trace metadata keys
- * @param metadataKeys - Array of metadata key names
- */
-export function generateDynamicColumns(
-  metadataKeys: string[]
-): ColumnDef<ScenarioRunRow>[] {
-  return metadataKeys.map((key) =>
-    columnHelper.accessor(`metadata.${key}` as keyof ScenarioRunRow, {
-      id: `metadata.${key}`,
-      header: key,
-      enableSorting: true,
-      enableColumnFilter: true,
-    })
-  );
-}
