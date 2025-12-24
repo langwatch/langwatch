@@ -7,6 +7,7 @@ import type {
   scenarioRunFinishedSchema,
   scenarioRunStartedSchema,
 } from "./schemas";
+import type { ElasticSearchTrace } from "~/server/tracer/types";
 
 // Type exports
 export type ScenarioRunStartedEvent = z.infer<typeof scenarioRunStartedSchema>;
@@ -25,3 +26,5 @@ export type ScenarioSetData = {
   scenarioCount: number;
   lastRunAt: number;
 };
+
+export type ScenarioTrace = Pick<ElasticSearchTrace, "trace_id" | "metadata">;

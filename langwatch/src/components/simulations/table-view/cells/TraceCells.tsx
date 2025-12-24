@@ -2,6 +2,7 @@ import { Text, HStack } from "@chakra-ui/react";
 import type { CellContext } from "@tanstack/react-table";
 import { ArrowRight } from "lucide-react";
 import type { ScenarioRunRow } from "../types";
+import type { ScenarioTrace } from "~/app/api/scenario-events/[[...route]]/types";
 
 /**
  * Truncate text with ellipsis
@@ -12,7 +13,7 @@ function truncate(text: string, maxLength: number) {
 }
 
 export function TracesListCell({ getValue }: CellContext<ScenarioRunRow, unknown>) {
-  const traces = getValue() as { trace_id: string }[];
+  const traces = getValue() as ScenarioTrace[];
   if (!traces || traces.length === 0) {
     return <Text fontSize="sm" color="gray.400">-</Text>;
   }

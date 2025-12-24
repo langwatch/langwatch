@@ -1,5 +1,6 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
+import type { ElasticSearchTrace } from "~/server/tracer/types";
 
 export class TracesRepository {
 
@@ -17,11 +18,11 @@ export class TracesRepository {
   }: {
     projectId: string;
     traceIds: string[];
-    includes: string[];
+    includes?: string[];
   }) {
     const client = await this.getClient(projectId);
 
-    const traces = await client.search({
+    const traces = await client.search<ElasticSearchTrace>({
       index: TRACE_INDEX.all,
       size: traceIds.length,
       body: {
@@ -33,9 +34,7 @@ export class TracesRepository {
             ],
           },
         },
-        _source: {
-          includes,
-        },
+        ...(includes && includes.length > 0 ? { _source: { includes } } : {}),
       },
     });
 

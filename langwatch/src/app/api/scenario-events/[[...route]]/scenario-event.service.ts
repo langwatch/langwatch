@@ -1,6 +1,6 @@
 import { ScenarioRunStatus } from "./enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
-import type { ScenarioEvent, ScenarioRunData } from "./types";
+import type { ScenarioEvent, ScenarioRunData, ScenarioTrace } from "./types";
 import { TracesRepository } from "~/server/traces/traces.repository";
 
 /**
@@ -428,7 +428,11 @@ export class ScenarioEventService {
     });
   }
 
-  async getAllScenarioRunsWithTraces({ projectId }: { projectId: string }) {
+  async getAllScenarioRunsWithTraces({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<(ScenarioRunData & { metadata: { traces: ScenarioTrace[] } })[]> {
     // Get all scenario sets for the project
     const scenarioSets =
       await this.eventRepository.getScenarioSetsDataForProject({
@@ -459,9 +463,9 @@ export class ScenarioEventService {
           return {
             ...run,
             metadata: {
-              traces: traces.map((trace) => ({
-                trace_id: trace._source.trace_id,
-              })),
+              traces: traces
+                .filter((trace): trace is typeof trace & { _source: NonNullable<typeof trace._source> } => !!trace._source)
+                .map((trace) => trace._source as ScenarioTrace),
             },
           };
         })
@@ -470,8 +474,6 @@ export class ScenarioEventService {
 
     const runs = await Promise.all(runsWithMetadataPromises);
 
-    return runs as (ScenarioRunData & {
-      metadata: { traces: { trace_id: string }[] };
-    })[];
+    return runs;
   }
 }

@@ -1,5 +1,5 @@
 import type { ScenarioRunStatus, Verdict } from "~/app/api/scenario-events/[[...route]]/enums";
-import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
+import type { ScenarioRunData, ScenarioTrace } from "~/app/api/scenario-events/[[...route]]/types";
 
 /**
  * Row data structure for the scenarios table view
@@ -8,7 +8,7 @@ import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/typ
 export interface ScenarioRunRow extends ScenarioRunData {
   // Traces (for expandable rows)
   metadata: {
-    traces: { trace_id: string }[];
+    traces: ScenarioTrace[];
   };
 }
 
