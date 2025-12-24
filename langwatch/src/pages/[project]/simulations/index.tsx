@@ -1,4 +1,4 @@
-import { Button, HStack, Tabs } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
 import { Grid, Table } from "lucide-react";
 import { useRouter } from "next/router";
 import React from "react";

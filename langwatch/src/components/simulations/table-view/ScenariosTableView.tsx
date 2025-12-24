@@ -48,7 +48,7 @@ export function ScenariosTableView() {
   );
 
   const table = useReactTable<ScenarioRunRow>({
-    data: scenarioRuns ?? [],
+    data: scenarioRuns as ScenarioRunRow[],
     columns: columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -64,15 +64,12 @@ export function ScenariosTableView() {
         scenarioId: false,
         messages: false,
         description: false,
-        'results.metCriteria': false,
-        'results.unmetCriteria': false,
-        'results.error': false,
-        'metadata.traces': false,
+        "results.metCriteria": false,
+        "results.unmetCriteria": false,
+        "results.reasoning": false,
+        "results.error": false,
+        "metadata.traces": false,
       },
-    },
-    onRowClick: (row: Row<ScenarioRunRow>) => {
-      // Open the run in a new tab
-      window.open(`/${project?.slug}/simulations/${row.original.scenarioSetId}/${row.original.batchRunId}/${row.original.scenarioRunId}`, '_blank');
     },
   });
 
@@ -85,54 +82,71 @@ export function ScenariosTableView() {
   }
 
   const handleExport = useCallback(() => {
+    // Get all visible column headers
     const headers = table
       .getHeaderGroups()
       .flatMap((headerGroup) =>
-        headerGroup.headers.map((header) => header.column.columnDef.header as string)
+        headerGroup.headers
+          .filter((header) => header.column.getIsVisible())
+          .map((header) => header.column.columnDef.header as string)
       );
 
-    const rows = table.getRowModel().rows.map((row) =>
-      row.getVisibleCells().map((cell) => cell.getValue())
-    );
+    // Export ALL rows from scenarioRuns, not just the paginated table rows
+    const rows = scenarioRuns.map((row) => {
+      return table
+        .getAllColumns()
+        .filter((col) => col.getIsVisible())
+        .map((col) => {
+          // Use the column's accessorFn to get the formatted value
+          const rawValue = col.accessorFn
+            ? col.accessorFn(row as ScenarioRunRow, 0)
+            : (row as any)[col.id];
+
+          // Handle arrays and objects
+          if (Array.isArray(rawValue)) {
+            return rawValue.join(", ");
+          } else if (typeof rawValue === "object" && rawValue !== null) {
+            return JSON.stringify(rawValue);
+          }
+
+          return rawValue ?? "";
+        });
+    });
 
     downloadCsv({
-      data: {
-        headers,
-        rows,
-      },
+      headers,
+      rows,
     });
-  }, [downloadCsv, table]);
+  }, [downloadCsv, scenarioRuns, table]);
 
   return (
-    <Box h="600px">
-      <DataGrid.Root>
-        <DataGrid.Toolbar.Root mb={2}>
-          <DataGrid.Toolbar.Search
-            value={table.getState().globalFilter}
-            onChange={(value) => table.setGlobalFilter(value)}
-          />
-          <Spacer />
-          <DataGrid.Toolbar.LoadingIndicator
-            isLoading={isLoading || isFetching}
-          />
-          <DataGrid.Toolbar.ResetFiltersAndSorting
-            onResetFiltersAndSorting={table.reset}
-          />
-          <DataGrid.Toolbar.ColumnVisibility columns={table.getAllColumns()} />
-          <DataGrid.Toolbar.Export onExport={handleExport} />
-        </DataGrid.Toolbar.Root>
-          <DataGrid.Table
-          table={table}
-          renderExpandedContent={renderExpandedContent}
+    <DataGrid.Root>
+      <DataGrid.Toolbar.Root mb={2}>
+        <DataGrid.Toolbar.Search
+          value={table.getState().globalFilter}
+          onChange={(value) => table.setGlobalFilter(value)}
         />
-        <DataGrid.Pagination
-          page={table.getState().pagination.pageIndex + 1}
-          pageSize={table.getState().pagination.pageSize}
-          totalCount={table.getRowCount()}
-          onPageChange={(page) => table.setPageIndex(page - 1)}
-          onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
+        <Spacer />
+        <DataGrid.Toolbar.LoadingIndicator
+          isLoading={isLoading || isFetching}
         />
-      </DataGrid.Root>
-    </Box>
+        <DataGrid.Toolbar.ResetFiltersAndSorting
+          onResetFiltersAndSorting={table.reset}
+        />
+        <DataGrid.Toolbar.ColumnVisibility columns={table.getAllColumns()} />
+        <DataGrid.Toolbar.Export onExport={handleExport} />
+      </DataGrid.Toolbar.Root>
+      <DataGrid.Table
+        table={table}
+        renderExpandedContent={renderExpandedContent}
+      />
+      <DataGrid.Pagination
+        page={table.getState().pagination.pageIndex + 1}
+        pageSize={table.getState().pagination.pageSize}
+        totalCount={table.getRowCount()}
+        onPageChange={(page) => table.setPageIndex(page - 1)}
+        onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
+      />
+    </DataGrid.Root>
   );
 }

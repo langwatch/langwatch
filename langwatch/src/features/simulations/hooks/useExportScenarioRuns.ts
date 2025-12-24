@@ -1,20 +1,30 @@
 import { useCallback } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { createLogger } from "~/utils/logger";
-import exportToCsv from "tanstack-table-export-to-csv";
-
+import Parse from "papaparse";
 
 const logger = createLogger("useExportScenarioRuns");
 
-type CsvLike = {
-  headers: Parameters<typeof exportToCsv>[1];
-  rows: Parameters<typeof exportToCsv>[2];
-}
-
 export function useExportScenarioRuns() {
-  const downloadCsv = useCallback(async (params: { data: CsvLike }) => {
+  const downloadCsv = useCallback(async (params: { 
+    headers: string[], 
+    rows: any[][] 
+  }) => {
     try {
-      exportToCsv('scenario_runs' + new Date().toISOString() + '.csv', params.data.headers, params.data.rows);
+      const csvBlob = Parse.unparse({
+        fields: params.headers,
+        data: params.rows,
+      });
+
+      const url = window.URL.createObjectURL(new Blob([csvBlob]));
+      const link = document.createElement("a");
+      link.href = url;
+      const formattedDate = new Date().toISOString().split("T")[0];
+      const fileName = `${formattedDate}_scenario_runs.csv`;
+      link.setAttribute("download", fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
     } catch (error) {
       logger.error("Export failed", error);
       toaster.error({

@@ -475,7 +475,8 @@ export class ScenarioEventService {
 
     const runs = await Promise.all(runsWithMetadataPromises);
 
-    return runs;
+    return runs as (ScenarioRunData & {
+      metadata: { traces: { trace_id: string }[] };
+    })[];
   }
-
 }

@@ -2,8 +2,7 @@ import type { DataGridColumnDef } from "~/components/ui/datagrid";
 import type { ScenarioRunRow } from "./types";
 import { ScenarioSetCell } from "./cells/ScenarioSetCell";
 import { createColumnHelper } from "@tanstack/react-table";
-import { DurationCell,
-StatusCell, TimestampCell, VerdictCell } from "./cells";
+import { DurationCell, StatusCell, TimestampCell, VerdictCell } from "./cells";
 import { TracesListCell } from "./cells/TraceCells";
 
 const columnHelper = createColumnHelper<ScenarioRunRow>();
@@ -13,7 +12,7 @@ const columnHelper = createColumnHelper<ScenarioRunRow>();
  * Uses TanStack's columnHelper for type-safe column definitions
  * @param projectSlug - The project slug for generating links
  */
-export function createScenarioColumns()  {
+export function createScenarioColumns() {
   return [
     columnHelper.accessor("status", {
       header: "",
@@ -35,14 +34,21 @@ export function createScenarioColumns()  {
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => info.getValue() || "",
+      cell: (info) => info.getValue() || "",
     }),
     columnHelper.accessor("messages", {
       header: "Messages",
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => info.getValue().map((message: ScenarioMessageSnapshotEvent["messages"][0]) => message.content).join("\n"),
+      cell: (info) =>
+        info
+          .getValue()
+          .map(
+            (message: ScenarioMessageSnapshotEvent["messages"][0]) =>
+              message.content
+          )
+          .join("\n"),
     }),
     columnHelper.accessor("scenarioSetId", {
       header: "Set Id",
@@ -57,19 +63,33 @@ export function createScenarioColumns()  {
       enableColumnFilter: true,
       enableGrouping: false,
     }),
-    columnHelper.accessor("results.verdict", {
-      header: "Verdict",
-      enableSorting: true,
-      enableColumnFilter: true,
-      cell: VerdictCell,
-      enableGrouping: false,
-    }),
+    columnHelper.accessor(
+      (row) => {
+        const verdict = row.results?.verdict;
+        if (!verdict) return "";
+        const verdictMap: Record<string, string> = {
+          SUCCESS: "Pass",
+          FAILURE: "Fail",
+          INCONCLUSIVE: "Inconclusive",
+        };
+        return verdictMap[verdict] || verdict;
+      },
+      {
+        id: "results.verdict",
+        header: "Verdict",
+        enableSorting: true,
+        enableColumnFilter: true,
+        cell: VerdictCell,
+        enableGrouping: false,
+      }
+    ),
     columnHelper.accessor("results.reasoning", {
+      id: "results.reasoning",
       header: "Reasoning",
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => info.getValue() || "",
+      cell: (info) => info.getValue() || "",
     }),
     columnHelper.accessor("results.metCriteria", {
       id: "results.metCriteria",
@@ -77,7 +97,8 @@ export function createScenarioColumns()  {
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
+      cell: (info) =>
+        Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
     }),
     columnHelper.accessor("results.unmetCriteria", {
       id: "results.unmetCriteria",
@@ -85,7 +106,8 @@ export function createScenarioColumns()  {
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
+      cell: (info) =>
+        Array.isArray(info.getValue()) ? info.getValue().join(", ") : "",
     }),
     columnHelper.accessor("results.error", {
       id: "results.error",
@@ -93,22 +115,36 @@ export function createScenarioColumns()  {
       enableSorting: false,
       enableColumnFilter: false,
       enableGrouping: false,
-      cell: info => info.getValue() || "",
+      cell: (info) => info.getValue() || "",
     }),
-    columnHelper.accessor("timestamp", {
-      header: "Date",
-      enableSorting: true,
-      enableColumnFilter: true,
-      cell: TimestampCell,
-      enableGrouping: false,
-      aggregatedCell: ''
-    }),
-    columnHelper.accessor("durationInMs", {
-      header: "Duration",
-      enableColumnFilter: false,
-      cell: DurationCell,
-      aggregatedCell: '',
-    }),
+    columnHelper.accessor(
+      (row) => {
+        return row.timestamp ? new Date(row.timestamp).toISOString() : "";
+      },
+      {
+        id: "timestamp",
+        header: "Date",
+        enableSorting: true,
+        enableColumnFilter: true,
+        cell: TimestampCell,
+        enableGrouping: false,
+        aggregatedCell: "",
+      }
+    ),
+    columnHelper.accessor(
+      (row) => {
+        return row.durationInMs
+          ? `${(row.durationInMs / 1000).toFixed(2)}s`
+          : "";
+      },
+      {
+        id: "durationInMs",
+        header: "Duration",
+        enableColumnFilter: false,
+        cell: DurationCell,
+        aggregatedCell: "",
+      }
+    ),
     columnHelper.accessor("scenarioId", {
       header: "Scenario ID",
       enableSorting: true,
@@ -121,14 +157,19 @@ export function createScenarioColumns()  {
       enableColumnFilter: true,
       enableGrouping: false,
     }),
-    columnHelper.accessor("metadata.traces", {
-      id: "metadata.traces",
-      header: "Traces",
-      enableSorting: false,
-      enableColumnFilter: false,
-      enableGrouping: false,
-      cell: TracesListCell,
-    }),
+    columnHelper.accessor(
+      (row) => {
+        return row.metadata?.traces?.length || 0;
+      },
+      {
+        id: "metadata.traces",
+        header: "Traces",
+        enableSorting: false,
+        enableColumnFilter: false,
+        enableGrouping: false,
+        cell: TracesListCell,
+      }
+    ),
     // columnHelper.display({
     //   id: "actions",
     //   header: "",
