@@ -1,7 +1,6 @@
 import { ScenarioRunStatus } from "./enums";
 import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
-import { TRACE_INDEX } from "~/server/elasticsearch";
 import { TracesRepository } from "~/server/traces/traces.repository";
 
 /**
@@ -479,50 +478,4 @@ export class ScenarioEventService {
     return runs;
   }
 
-  /**
-   * Retrieves all raw scenario events for the supplied scenario run IDs, for the given project.
-   * Returns an array of all events (not just traces) for those runs.
-   */
-  async getEventsForScenarioRunIds({
-    projectId,
-    scenarioRunIds,
-  }: {
-    projectId: string;
-    scenarioRunIds: string[];
-  }) {
-    if (!scenarioRunIds.length) return [];
-
-    // Ideally, this logic should live in the repository for reuse and isolation.
-    // But as required, do the search here:
-    const client =
-      (await this.eventRepository["client"]) ??
-      (await (this.eventRepository as any).getClient());
-
-    // Import required ES_FIELDS/SCENARIO_EVENTS_INDEX if not already.
-    // @ts-expect-error: Access constants from the module
-    const { SCENARIO_EVENTS_INDEX, ES_FIELDS, transformFromElasticsearch } =
-      await import("./utils/elastic-search-transformers");
-
-    const response = await client.search({
-      index: SCENARIO_EVENTS_INDEX.alias,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: projectId } },
-              { terms: { [ES_FIELDS.scenarioRunId]: scenarioRunIds } },
-            ],
-          },
-        },
-        size: 10000, // Adjust if necessary based on expected volume
-        sort: [{ timestamp: "asc" }],
-      },
-    });
-
-    return response.hits.hits.map((hit: any) =>
-      transformFromElasticsearch
-        ? transformFromElasticsearch(hit._source)
-        : hit._source
-    );
-  }
 }

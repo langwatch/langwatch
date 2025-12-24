@@ -1,6 +1,6 @@
 import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
-import { esClient, SCENARIO_EVENTS_INDEX,TRACE_INDEX } from "~/server/elasticsearch";
+import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { ScenarioEventType, Verdict } from "./enums";
 import { scenarioEventSchema } from "./schemas";
