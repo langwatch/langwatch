@@ -24,6 +24,7 @@ export class TracesRepository {
 
     const traces = await client.search({
       index: TRACE_INDEX.all,
+      size: traceIds.length,
       body: {
         query: {
           bool: {

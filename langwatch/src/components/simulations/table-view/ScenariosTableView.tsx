@@ -81,42 +81,8 @@ export function ScenariosTableView() {
   }
 
   const handleExport = useCallback(() => {
-    // Get all visible column headers
-    const headers = table
-      .getHeaderGroups()
-      .flatMap((headerGroup) =>
-        headerGroup.headers
-          .filter((header) => header.column.getIsVisible())
-          .map((header) => header.column.columnDef.header as string)
-      );
-
-    // Export ALL rows from scenarioRuns, not just the paginated table rows
-    const rows = scenarioRuns.map((row) => {
-      return table
-        .getAllColumns()
-        .filter((col) => col.getIsVisible())
-        .map((col) => {
-          // Use the column's accessorFn to get the formatted value
-          const rawValue = col.accessorFn
-            ? col.accessorFn(row as ScenarioRunRow, 0)
-            : (row as any)[col.id];
-
-          // Handle arrays and objects
-          if (Array.isArray(rawValue)) {
-            return rawValue.join(", ");
-          } else if (typeof rawValue === "object" && rawValue !== null) {
-            return JSON.stringify(rawValue);
-          }
-
-          return rawValue ?? "";
-        });
-    });
-
-    downloadCsv({
-      headers,
-      rows,
-    });
-  }, [downloadCsv, scenarioRuns, table]);
+    downloadCsv(table);
+  }, [downloadCsv, table]);
 
   return (
     <DataGrid.Root>

@@ -114,34 +114,21 @@ export function createScenarioColumns() {
       enableGrouping: false,
       cell: (info) => info.getValue() || "",
     }),
-    columnHelper.accessor(
-      (row) => {
-        return row.timestamp ? new Date(row.timestamp).toISOString() : "";
-      },
-      {
-        id: "timestamp",
-        header: "Date",
-        enableSorting: true,
-        enableColumnFilter: true,
-        cell: TimestampCell,
-        enableGrouping: false,
-        aggregatedCell: "",
-      }
-    ),
-    columnHelper.accessor(
-      (row) => {
-        return row.durationInMs
-          ? `${(row.durationInMs / 1000).toFixed(2)}s`
-          : "";
-      },
-      {
-        id: "durationInMs",
-        header: "Duration",
-        enableColumnFilter: false,
-        cell: DurationCell,
-        aggregatedCell: "",
-      }
-    ),
+    columnHelper.accessor("timestamp", {
+      header: "Date",
+      enableSorting: true,
+      enableColumnFilter: true,
+      cell: TimestampCell,
+      enableGrouping: false,
+      aggregatedCell: "",
+    }),
+    columnHelper.accessor("durationInMs", {
+      header: "Duration",
+      enableSorting: true,
+      enableColumnFilter: false,
+      cell: DurationCell,
+      aggregatedCell: "",
+    }),
     columnHelper.accessor("scenarioId", {
       header: "Scenario ID",
       enableSorting: true,
@@ -155,6 +142,7 @@ export function createScenarioColumns() {
       enableGrouping: false,
     }),
     columnHelper.accessor("metadata.traces", {
+      id: "metadata.traces",
       header: "Traces",
       enableSorting: false,
       enableColumnFilter: false,
