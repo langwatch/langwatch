@@ -6,16 +6,9 @@ export type {
   SortingState,
   ColumnFiltersState,
   DataGridURLParams,
-  DataGridState,
-  DataGridActions,
-  DataGridStore,
-  DataGridConfig,
   ExpandedRowContentProps,
   GroupHeader,
 } from "./types";
-
-// Store
-export { createDataGridStore } from "./useDataGridStore";
 
 // URL Sync utilities
 export { DataGridUrlParams } from "./datagrid-url-params.util";

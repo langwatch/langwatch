@@ -8,12 +8,6 @@ import {
   TRACE_INDEX,
 } from "../server/elasticsearch";
 import type { ElasticSearchEvaluation } from "../server/tracer/types";
-// import {
-//   scheduleTraceCheck,
-//   traceChecksQueue,
-// } from "../server/background/queues/traceChecksQueue";
-// import { prisma } from "../server/db";
-// import type { EvaluatorTypes } from "../trace_checks/evaluators.generated";
 
 // TODO: update this task to use single traces index now
 

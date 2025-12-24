@@ -141,24 +141,4 @@ export const scenarioRouter = createTRPCRouter({
       projectId: input.projectId,
     });
   }),
-
-// // Export scenarios as CSV
-// exportScenariosCsv: protectedProcedure
-//   .input(
-//     projectSchema.extend({
-//       filters: z.array(filterSchema).optional(),
-//       columns: z.array(z.string()),
-//       includeTraces: z.boolean().default(false),
-//     }),
-//   )
-//   .use(checkProjectPermission("scenarios:view"))
-//   .mutation(async ({ input }) => {
-//     const scenarioRunnerService = new ScenarioEventService();
-//     return await scenarioRunnerService.exportScenariosCsv({
-//       projectId: input.projectId,
-//       filters: input.filters,
-//       columns: input.columns,
-//       includeTraces: input.includeTraces,
-//     });
-//   }),
 });

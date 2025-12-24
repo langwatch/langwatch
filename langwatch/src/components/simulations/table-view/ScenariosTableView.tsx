@@ -6,10 +6,6 @@ import { api } from "~/utils/api";
 import { createScenarioColumns } from "./scenarioColumns";
 import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
 import type { ScenarioRunRow } from "./types";
-import {
-  dataGridStore,
-  useDataGridStore,
-} from "~/components/ui/datagrid/useDataGridStore.v2";
 import { useExportScenarioRuns } from "~/features/simulations/hooks/useExportScenarioRuns";
 import {
   getCoreRowModel,
@@ -23,8 +19,6 @@ import {
 } from "@tanstack/react-table";
 
 const columns = createScenarioColumns();
-
-const store = dataGridStore;
 
 /**
  * Table view for scenarios/simulations data
@@ -53,16 +47,6 @@ export function ScenariosTableView() {
     []
   );
 
-  // const handleExport = useCallback(() => {
-  //   downloadCsv({
-  //     filters,
-  //     sorting,
-  //     pagination,
-  //     grouping,
-  //     globalFilter,
-  //   });
-  // }, [downloadCsv, filters, sorting, pagination, grouping, globalFilter]);
-
   const table = useReactTable<ScenarioRunRow>({
     data: scenarioRuns ?? [],
     columns: columns,
@@ -86,11 +70,10 @@ export function ScenariosTableView() {
         'metadata.traces': false,
       },
     },
-    onRowClick: (row) => {
+    onRowClick: (row: Row<ScenarioRunRow>) => {
       // Open the run in a new tab
       window.open(`/${project?.slug}/simulations/${row.original.scenarioSetId}/${row.original.batchRunId}/${row.original.scenarioRunId}`, '_blank');
     },
-    debugAll: true,
   });
 
   if (!project) {
@@ -104,10 +87,13 @@ export function ScenariosTableView() {
   const handleExport = useCallback(() => {
     const headers = table
       .getHeaderGroups()
-      .map((x) => x.headers)
-      .flat();
+      .flatMap((headerGroup) =>
+        headerGroup.headers.map((header) => header.column.columnDef.header as string)
+      );
 
-    const rows = table.getRowModel().rows;
+    const rows = table.getRowModel().rows.map((row) =>
+      row.getVisibleCells().map((cell) => cell.getValue())
+    );
 
     downloadCsv({
       data: {
@@ -143,8 +129,8 @@ export function ScenariosTableView() {
           page={table.getState().pagination.pageIndex + 1}
           pageSize={table.getState().pagination.pageSize}
           totalCount={table.getRowCount()}
-          onPageChange={table.setPagination}
-          onPageSizeChange={table.setPageSize}
+          onPageChange={(page) => table.setPageIndex(page - 1)}
+          onPageSizeChange={(pageSize) => table.setPageSize(pageSize)}
         />
       </DataGrid.Root>
     </Box>

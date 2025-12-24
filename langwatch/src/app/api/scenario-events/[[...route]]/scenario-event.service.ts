@@ -476,8 +476,6 @@ export class ScenarioEventService {
 
     const runs = await Promise.all(runsWithMetadataPromises);
 
-    console.log(runs);
-
     return runs;
   }
 
