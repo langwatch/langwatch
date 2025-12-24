@@ -6,12 +6,23 @@ import { useRouter } from "next/router";
 import type { ScenarioRunRow } from "../types";
 
 /**
+ * Sanitize the project slug derived from the router query to avoid
+ * using arbitrary user-controlled data in navigation paths.
+ */
+function sanitizeProjectSlug(value: unknown): string {
+  if (typeof value !== "string") return "";
+  // Allow only common slug characters; strip anything unexpected.
+  const sanitized = value.replace(/[^a-zA-Z0-9_-]/g, "");
+  return sanitized;
+}
+
+/**
  * Scenario Set ID cell - shows ID with external link icon
  * Includes link to scenario set page
  */
 export function ScenarioSetCell({ getValue, row }: CellContext<ScenarioRunRow, unknown>) {
   const router = useRouter();
-  const projectSlug = router.query.project as string;
+  const projectSlug = sanitizeProjectSlug(router.query.project);
   const scenarioSetId = String(getValue() ?? "");
   const href = `/${projectSlug}/simulations/${row.original.scenarioSetId}`;
 
