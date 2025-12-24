@@ -1,7 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect } from "react";
-import { List, Table } from "react-feather";
-import { LuTrendingUp } from "react-icons/lu";
+import { List, Table, TrendingUp } from "lucide-react";
 import { useLocalStorage } from "usehooks-ts";
 import { ButtonToggleSlider } from "../../components/ui/ButtonToggleSlider";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -91,7 +90,7 @@ export function ToggleAnalytics() {
           );
         }}
       >
-        <LuTrendingUp />
+        <TrendingUp />
         Show Graphs
       </PageLayout.HeaderButton>
     </Tooltip>
