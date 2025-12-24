@@ -1,4 +1,13 @@
-import { Button, Flex, Spinner, Text, HStack, Input, type FlexProps } from "@chakra-ui/react";
+import {
+  Button,
+  Flex,
+  Spinner,
+  Text,
+  HStack,
+  Input,
+  type CheckboxCheckedChangeDetails,
+  type FlexProps,
+} from "@chakra-ui/react";
 import { useMemo } from "react";
 import { Columns, Download, RotateCcw, Search } from "lucide-react";
 import {
@@ -18,12 +27,17 @@ interface DataGridToolbarProps extends FlexProps {
 /**
  * Toolbar with filter bar, column visibility, and export controls
  */
-function DataGridToolbarRoot({
-  children,
-  ...props
-}: DataGridToolbarProps) {
+function DataGridToolbarRoot({ children, ...props }: DataGridToolbarProps) {
   return (
-    <Flex direction="row" align="center" justify="space-between" gap={4} px={3} paddingInline={0} {...props}>
+    <Flex
+      direction="row"
+      align="center"
+      justify="space-between"
+      gap={4}
+      px={3}
+      paddingInline={0}
+      {...props}
+    >
       {children}
     </Flex>
   );
@@ -35,9 +49,7 @@ function DataGridToolbarLoadingIndicator({
   isLoading: boolean;
 }) {
   if (!isLoading) return null;
-  return (
-    <Spinner size="sm" color="gray.500" />
-  );
+  return <Spinner size="sm" color="gray.500" />;
 }
 
 function DataGridToolbarResetFiltersAndSorting({
@@ -58,7 +70,10 @@ function DataGridToolbarColumnVisibility<TData>({
 }: {
   columns: Column<TData>[];
 }) {
-  const displayColumns = useMemo(() => columns.filter((column) => column.getCanHide()), [columns]);
+  const displayColumns = useMemo(
+    () => columns.filter((column) => column.getCanHide()),
+    [columns]
+  );
   return (
     <PopoverRoot>
       <PopoverTrigger asChild>
@@ -77,9 +92,11 @@ function DataGridToolbarColumnVisibility<TData>({
               <Checkbox
                 key={column.id}
                 checked={column.getIsVisible()}
-                onCheckedChange={column.getToggleVisibilityHandler()}
+                onChange={(e) => column.toggleVisibility(e.target.checked)}
               >
-                {typeof column.columnDef.header === "string" ? column.columnDef.header : ""}
+                {typeof column.columnDef.header === "string"
+                  ? column.columnDef.header
+                  : ""}
               </Checkbox>
             ))}
           </Flex>
@@ -89,11 +106,7 @@ function DataGridToolbarColumnVisibility<TData>({
   );
 }
 
-function DataGridToolbarExport({
-  onExport,
-}: {
-  onExport: () => void;
-}) {
+function DataGridToolbarExport({ onExport }: { onExport: () => void }) {
   return (
     <Button size="sm" variant="outline" onClick={onExport}>
       <Download size={14} />
@@ -110,19 +123,29 @@ function DataGridToolbarSearch({
   onChange: (value: string) => void;
 }) {
   return (
-      <HStack flex="0 0 auto" minW="200px" bg="white" borderRadius="lg" shadow="xs" overflow="hidden" px={2} border="1px solid" borderColor="gray.200">
-        <Search size={16} color="gray" />
-        <Input
-          border="none"
-          outline="none"
-          size="sm"
-          placeholder="Search..."
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          bg="white"
-          maxW="200px"
-        />
-      </HStack>
+    <HStack
+      flex="0 0 auto"
+      minW="200px"
+      bg="white"
+      borderRadius="lg"
+      shadow="xs"
+      overflow="hidden"
+      px={2}
+      border="1px solid"
+      borderColor="gray.200"
+    >
+      <Search size={16} color="gray" />
+      <Input
+        border="none"
+        outline="none"
+        size="sm"
+        placeholder="Search..."
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        bg="white"
+        maxW="200px"
+      />
+    </HStack>
   );
 }
 
