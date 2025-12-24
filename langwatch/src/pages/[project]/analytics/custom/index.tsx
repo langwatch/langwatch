@@ -55,7 +55,7 @@ import {
   useFieldArray,
   useForm,
 } from "react-hook-form";
-import { LuChartArea } from "react-icons/lu";
+import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
@@ -72,6 +72,7 @@ import {
 } from "../../../../components/analytics/CustomGraph";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
+import { FilterIconWithBadge } from "../../../../components/filters/FilterIconWithBadge";
 import {
   FilterToggle,
   FilterToggleButton,
@@ -111,6 +112,7 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -327,30 +329,21 @@ export default function AnalyticsCustomGraph({
 
   return (
     <DashboardLayout>
+      <PageLayout.Header>
+        <PageLayout.Heading>Custom Graph</PageLayout.Heading>
+        <Spacer />
+        <FilterToggle />
+        <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      </PageLayout.Header>
       <Container maxWidth="1600" padding={6}>
         <VStack width="full" align="start" gap={6}>
-          <HStack width="full" align="top">
-            <Heading as="h1" size="lg" paddingTop={1}>
-              Custom Graph
-            </Heading>
-            <Spacer />
-            <FilterToggle />
-            <PeriodSelector
-              period={{ startDate, endDate }}
-              setPeriod={setPeriod}
-            />
-          </HStack>
           <HStack width="full" align="start" gap={8}>
-            <Card.Root minWidth="480px" minHeight="616px">
-              <Card.Body>
-                <CustomGraphForm
-                  form={form}
-                  seriesFields={seriesFields}
-                  customId={customId}
-                  filterParams={filterParams}
-                />
-              </Card.Body>
-            </Card.Root>
+            <CustomGraphForm
+              form={form}
+              seriesFields={seriesFields}
+              customId={customId}
+              filterParams={filterParams}
+            />
             <Card.Root width="full">
               <Card.Header paddingTop={3} paddingBottom={1} paddingX={3}>
                 <HStack width="full" justify="space-between">
@@ -720,7 +713,45 @@ function CustomGraphForm({
         </Field.Root>
       )}
       <Field.Root>
-        <Field.Label fontSize="16px">Series</Field.Label>
+        <Field.Label fontSize="16px" width="full">
+          <HStack width="full" justify="space-between">
+            Series
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => {
+                const index = seriesFields.fields.length;
+                seriesFields.append(
+                  {
+                    name: "Users count",
+                    colorSet: "blueTones",
+                    metric: "metadata.user_id",
+                    aggregation: "cardinality",
+                    pipeline: {
+                      field: "",
+                      aggregation: "avg",
+                    },
+                  },
+                  { shouldFocus: false },
+                );
+                setTimeout(() => {
+                  form.resetField(`series.${index}.name`, {
+                    defaultValue: "Users count",
+                  });
+                }, 0);
+                setTimeout(() => {
+                  setExpandedSeries([index.toString()]);
+                }, 100);
+                if (!form.getFieldState("includePrevious")?.isTouched) {
+                  form.setValue("includePrevious", false);
+                }
+              }}
+            >
+              <LuPlus />
+              Add Series
+            </Button>
+          </HStack>
+        </Field.Label>
         <Accordion.Root
           width="full"
           multiple
@@ -739,37 +770,6 @@ function CustomGraphForm({
             />
           ))}
         </Accordion.Root>
-        <Button
-          onClick={() => {
-            const index = seriesFields.fields.length;
-            seriesFields.append(
-              {
-                name: "Users count",
-                colorSet: "blueTones",
-                metric: "metadata.user_id",
-                aggregation: "cardinality",
-                pipeline: {
-                  field: "",
-                  aggregation: "avg",
-                },
-              },
-              { shouldFocus: false },
-            );
-            setTimeout(() => {
-              form.resetField(`series.${index}.name`, {
-                defaultValue: "Users count",
-              });
-            }, 0);
-            setTimeout(() => {
-              setExpandedSeries([index.toString()]);
-            }, 100);
-            if (!form.getFieldState("includePrevious")?.isTouched) {
-              form.setValue("includePrevious", false);
-            }
-          }}
-        >
-          Add Series
-        </Button>
       </Field.Root>
       <Field.Root>
         <Field.Label>Group by</Field.Label>
@@ -777,9 +777,7 @@ function CustomGraphForm({
           width="full"
           gap={3}
           templateColumns={
-            groupBy && getGroup(groupBy).requiresKey
-              ? "repeat(2, 1fr)"
-              : "1fr"
+            groupBy && getGroup(groupBy).requiresKey ? "repeat(2, 1fr)" : "1fr"
           }
         >
           <NativeSelect.Root>
@@ -839,17 +837,16 @@ function CustomGraphForm({
           />
         </Field.Root>
       )}
-      <HStack width="full" gap={2}>
+      <HStack width="full" gap={2} paddingTop={4}>
         <Button
           variant="outline"
           colorPalette="orange"
           size="sm"
           onClick={() => setShowFilters(!showFilters)}
         >
-          {showFilters ? "Hide filters" : "Show filters"}
+          <FilterIconWithBadge />
+          Add Graph Filter
         </Button>
-      </HStack>
-      <HStack width="full" gap={2}>
         <Spacer />
         {customId ? (
           <Tooltip
@@ -1051,6 +1048,7 @@ function SeriesFieldItem({
                   return prev;
                 });
               }}
+              background="none"
             />
           </HStack>
           <HStack gap={0}>
@@ -1108,14 +1106,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? (metricAggregations[aggregation] ?? aggregation)
+      ? metricAggregations[aggregation] ?? aggregation
       : undefined;
     const pipeline_ = pipelineField
-      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
+      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
+        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(
@@ -1292,7 +1290,7 @@ function SeriesField({
                 >
                   {Object.keys(nonEmptyFilters).length > 0
                     ? "Edit Filters"
-                    : "Add Filters"}
+                    : "Add Filter for Series"}
                 </FilterToggleButton>
               );
             }}

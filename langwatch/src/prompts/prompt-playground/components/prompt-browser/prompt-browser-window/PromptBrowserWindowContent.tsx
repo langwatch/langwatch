@@ -87,12 +87,14 @@ function PromptBrowserWindowInner(props: {
   return (
     <FormProvider {...form.methods}>
       <VStack height="full" width="full" gap={3} paddingBottom={3}>
-        <Box paddingX={3} width="full">
-          <PromptBrowserHeader />
-        </Box>
-        <Box paddingX={3} width="full">
-          <PromptMessagesEditor />
-        </Box>
+        <VStack paddingX={3} gap={3} width="full">
+          <Box width="full" maxWidth="768px" margin="0 auto">
+            <PromptBrowserHeader />
+          </Box>
+          <Box paddingBottom={2} width="full" maxWidth="768px" margin="0 auto">
+            <PromptMessagesEditor />
+          </Box>
+        </VStack>
         <PromptTabbedSection />
       </VStack>
     </FormProvider>

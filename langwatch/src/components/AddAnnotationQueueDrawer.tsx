@@ -192,7 +192,6 @@ export const AddAnnotationQueueDrawer = ({
           }
         }}
       >
-        <Drawer.Backdrop />
         <Drawer.Content>
           <Drawer.Header>
             <HStack>

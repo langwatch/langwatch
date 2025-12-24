@@ -185,13 +185,12 @@ export const ModelSelector = React.memo(function ModelSelector({
       onHighlightChange={(details) => {
         setHighlightedValue(details.highlightedValue);
       }}
-      size={size === "full" ? "lg" : size}
+      size={size === "full" ? undefined : size}
     >
       <Select.Trigger
         className="fix-hidden-inputs"
         width={size === "full" ? "100%" : "auto"}
         background="white"
-        borderRadius="5px"
         padding={0}
       >
         <Select.ValueText

@@ -47,21 +47,13 @@ export function ConfigModal({
         position="absolute"
         left={0}
         width="100%"
-        height="80px"
+        height="32px"
         zIndex={-1}
       />
       {unstyled ? (
         children
       ) : (
-        <Popover.Content
-          borderRadius="2px"
-          borderWidth="1px"
-          borderColor="gray.200"
-          bg="white"
-          minWidth="600px"
-          gap={0}
-          boxShadow="0px 0px 20px rgba(0, 0, 0, 0.1)"
-        >
+        <Popover.Content minWidth="600px" gap={0}>
           <HStack
             width="full"
             paddingX={4}

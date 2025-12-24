@@ -115,25 +115,24 @@ export function SyncedChatInput({
     <Box
       width="full"
       paddingX={4}
-      paddingY={3}
-      borderTop="1px solid"
-      borderColor="gray.200"
+      paddingBottom={3}
       bg="white"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <Box
         position="relative"
-        borderRadius="md"
+        borderRadius="xl"
         border="1px solid"
         borderColor="gray.300"
-        _focusWithin={{ borderColor: "orange.500" }}
+        transition="box-shadow 0.2s"
         bg="white"
         width="full"
         maxWidth="768px"
         margin="0 auto"
       >
         <ChatTextArea
+          borderRadius="xl"
           inProgress={inProgress}
           value={currentInput}
           onChange={(e) => setCurrentInput(e.target.value)}
@@ -160,7 +159,7 @@ export function SyncedChatInput({
           {/* Right icon - Send button */}
           <ChatSendButton
             position="absolute"
-            right={3}
+            right={2}
             bottom={2}
             disabled={inProgress || !currentInput.trim()}
             onSend={() => void handleSend()}

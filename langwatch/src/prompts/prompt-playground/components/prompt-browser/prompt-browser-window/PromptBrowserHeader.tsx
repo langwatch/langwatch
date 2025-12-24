@@ -4,7 +4,6 @@ import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton"
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
 import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
-import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
@@ -35,15 +34,6 @@ export function PromptBrowserHeader() {
   return (
     <HStack width="full" bg="white" display="flex" flexDirection="row">
       <HStack>
-        <EditablePromptHandleField width="auto" />
-        <GeneratePromptApiSnippetDialog
-          promptHandle={handle}
-          apiKey={project?.apiKey}
-        >
-          <GeneratePromptApiSnippetDialog.Trigger>
-            <GenerateApiSnippetButton hasHandle={!!handle} />
-          </GeneratePromptApiSnippetDialog.Trigger>
-        </GeneratePromptApiSnippetDialog>
         <ModelSelectFieldMini />
       </HStack>
       <Spacer />
@@ -54,6 +44,14 @@ export function PromptBrowserHeader() {
             onRestoreSuccess={(params) => handleOnRestore(params)}
           />
         )}
+        <GeneratePromptApiSnippetDialog
+          promptHandle={handle}
+          apiKey={project?.apiKey}
+        >
+          <GeneratePromptApiSnippetDialog.Trigger>
+            <GenerateApiSnippetButton hasHandle={!!handle} />
+          </GeneratePromptApiSnippetDialog.Trigger>
+        </GeneratePromptApiSnippetDialog>
         <SavePromptButton />
       </HStack>
     </HStack>

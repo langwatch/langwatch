@@ -176,6 +176,10 @@ export const useFilterParams = () => {
     );
   };
 
+  const nonEmptyFilters = filterOutEmptyFilters(filterParams.filters);
+  const filterCount = Object.keys(nonEmptyFilters).length;
+  const hasAnyFilters = filterCount > 0;
+
   return {
     filters,
     setFilter,
@@ -183,7 +187,9 @@ export const useFilterParams = () => {
     clearFilters,
     getLatestFilters,
     filterParams,
-    nonEmptyFilters: filterOutEmptyFilters(filterParams.filters),
+    nonEmptyFilters,
+    filterCount,
+    hasAnyFilters,
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,

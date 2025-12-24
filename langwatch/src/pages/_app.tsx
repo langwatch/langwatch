@@ -122,6 +122,10 @@ export const system = createSystem(defaultConfig, {
           value:
             "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 2px 0px rgba(0, 0, 0, 0.03)",
         },
+        sm: {
+          value:
+            "1px 1px 2px color-mix(in srgb, var(--chakra-colors-gray-900) 15%, transparent),0px 0px 1px color-mix(in srgb, var(--chakra-colors-gray-900) 30%, transparent)",
+        },
         xs: {
           value:
             "0 0 0 0 #000, 0 0 0 0 #000, 0px 1px 5px 0px rgba(0, 0, 0, 0.05)",
@@ -371,6 +375,39 @@ export const system = createSystem(defaultConfig, {
                 },
               },
             },
+            subtle: {
+              list: {
+                borderBottom: "none",
+              },
+              trigger: {
+                borderRadius: "lg",
+              },
+            },
+            enclosed: {
+              list: {
+                borderRadius: "lg",
+                gap: 1,
+              },
+              trigger: {
+                borderRadius: "lg",
+                _selected: {
+                  boxShadow: "sm",
+                },
+              },
+            },
+            outline: {
+              root: {
+                "--tabs-trigger-radius": "radii.lg",
+              },
+              list: {
+                _horizontal: {
+                  _before: {
+                    bottom: "1px",
+                    left: "0",
+                  },
+                },
+              },
+            },
           },
           size: {
             sm: {
@@ -382,6 +419,7 @@ export const system = createSystem(defaultConfig, {
                 py: "1",
                 px: "3",
                 textStyle: "sm",
+                fontSize: "13px",
               },
             },
           },
@@ -513,6 +551,12 @@ export const system = createSystem(defaultConfig, {
       accordion: defineSlotRecipe({
         slots: ["itemTrigger"],
         base: {
+          root: {
+            width: "full",
+          },
+          item: {
+            borderRadius: "lg",
+          },
           itemTrigger: {
             cursor: "pointer",
             _hover: {

@@ -24,6 +24,7 @@ import {
 import { AddMessageButton } from "./AddMessageButton";
 import { MessageRoleLabel } from "./MessageRoleLabel";
 import { RemoveMessageButton } from "./RemoveMessageButton";
+import { LuChevronDown } from "react-icons/lu";
 
 /**
  * Type for message field errors
@@ -83,8 +84,8 @@ export function PromptMessagesField({
           .map((message) => message.content?.message)
           .join(", ")
       : typeof errors.version?.configData?.messages === "string"
-        ? errors.version?.configData?.messages
-        : undefined;
+      ? errors.version?.configData?.messages
+      : undefined;
   }, [errors]);
   const { open, setOpen } = useDisclosure();
 
@@ -112,7 +113,7 @@ export function PromptMessagesField({
         width="full"
         key={field.id}
         label={
-          <HStack width="full">
+          <HStack width="full" align="center">
             {role !== "system" && open && (
               <MessageRoleLabel role={role} marginLeft={-1} />
             )}
@@ -125,7 +126,7 @@ export function PromptMessagesField({
         invalid={!!errors.version?.configData?.messages}
         error={messageErrors}
         size="sm"
-        marginTop={idx === 0 ? 2 : 4}
+        marginTop={idx === 0 ? 0 : 2}
       >
         <Controller
           control={form.control}
@@ -136,7 +137,7 @@ export function PromptMessagesField({
               borderColor={
                 getMessageError(idx, "content") ? "red.500" : "gray.200"
               }
-              borderRadius={6}
+              borderRadius="lg"
               overflow="hidden"
             >
               <PromptTextArea
@@ -162,20 +163,26 @@ export function PromptMessagesField({
   };
 
   return (
-    <Box width="full" padding={2}>
+    <Box width="full" padding={0}>
       <HStack width="full">
-        <HStack gap={2} cursor="pointer" onClick={() => setOpen(!open)}>
+        <HStack
+          gap={2}
+          cursor="pointer"
+          onClick={() => setOpen(!open)}
+          align="center"
+        >
+          <PropertySectionTitle transition="opacity 0.15s ease" padding={0}>
+            {open ? "System prompt" : "Prompt"}
+          </PropertySectionTitle>
           <Icon
             asChild
             transform={open ? "rotate(0deg)" : "rotate(-90deg)"}
             transition="transform 0.15s ease"
             color="gray.700"
+            marginBottom="-2px"
           >
-            <ChevronDown size={16} />
+            <LuChevronDown size={16} />
           </Icon>
-          <PropertySectionTitle transition="opacity 0.15s ease" padding={0}>
-            {open ? "System prompt" : "Messages"}
-          </PropertySectionTitle>
         </HStack>
         <Spacer />
         <AddMessageButton onAdd={handleAdd} />

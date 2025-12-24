@@ -1,7 +1,15 @@
-import { Box, HStack, IconButton, Tabs } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Container,
+  HStack,
+  IconButton,
+  Tabs,
+} from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
-import { LuPencil } from "react-icons/lu";
+import { LuSquarePen } from "react-icons/lu";
 import type { z } from "zod";
 import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
@@ -40,35 +48,50 @@ export function PromptTabbedSection() {
       flexDirection="column"
       flex={1}
       width="full"
+      variant="subtle"
+      size="sm"
     >
       <Tabs.List
-        colorPalette="orange"
         paddingX={3}
         display="flex"
         alignItems="center"
+        borderBottom="1px solid"
+        borderColor="gray.100"
+        height={8}
+        paddingBottom={2}
       >
-        <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
-        {hasInputs && (
-          <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
-        )}
-        <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
-        <Tabs.Context>
-          {(tabs) => (
-            <>
-              <Box flex={1} />
-              {tabs.value === PromptTab.Conversation && (
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => chatRef.current?.resetChat()}
-                  aria-label="Reset chat"
-                >
-                  <LuPencil size={16} />
-                </IconButton>
-              )}
-            </>
+        <HStack width="full" maxWidth="768px" margin="0 auto">
+          <Tabs.Trigger value={PromptTab.Conversation}>
+            Conversation
+          </Tabs.Trigger>
+          {hasInputs && (
+            <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
           )}
-        </Tabs.Context>
+          <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
+          <Tabs.Context>
+            {(tabs) => (
+              <>
+                <Box flex={1} />
+                {tabs.value === PromptTab.Conversation && (
+                  <Tooltip
+                    content="Start a new conversation"
+                    positioning={{ placement: "top" }}
+                    openDelay={0}
+                  >
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => chatRef.current?.resetChat()}
+                      aria-label="Reset chat"
+                    >
+                      <LuSquarePen />
+                    </Button>
+                  </Tooltip>
+                )}
+              </>
+            )}
+          </Tabs.Context>
+        </HStack>
       </Tabs.List>
       <HStack flex={1} width="full" margin="0 auto">
         <Tabs.Content

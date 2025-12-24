@@ -487,7 +487,6 @@ Also, DO NOT change my `function` declarations to `const`, leave it as is.
 Also, Drawer is different now:
 
 <Drawer.Root>
-  <Drawer.Backdrop />
   <Drawer.Trigger />
   <Drawer.Content>
     <Drawer.CloseTrigger />

@@ -13,12 +13,14 @@ export interface AnalyticsHeaderProps {
   title: string;
   isEditable?: boolean;
   onTitleSave?: (newTitle: string) => void;
+  extraHeaderButtons?: React.ReactNode;
 }
 
 export function AnalyticsHeader({
   title,
   isEditable,
   onTitleSave,
+  extraHeaderButtons,
 }: AnalyticsHeaderProps) {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
@@ -117,6 +119,7 @@ export function AnalyticsHeader({
             Show Traces
           </PageLayout.HeaderButton>
         </Tooltip>
+        {extraHeaderButtons}
       </HStack>
     </PageLayout.Header>
   );

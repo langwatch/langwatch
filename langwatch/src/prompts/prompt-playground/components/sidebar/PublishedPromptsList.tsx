@@ -1,3 +1,4 @@
+import { Skeleton } from "@chakra-ui/react";
 import { groupBy } from "lodash-es";
 import { useMemo } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -25,7 +26,7 @@ export function getDisplayHandle(handle?: string | null): string {
  * Single Responsibility: Renders published prompts organized by folder with click-to-open functionality.
  */
 export function PublishedPromptsList() {
-  const { data } = useAllPromptsForProject();
+  const { data, isLoading } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { project } = useOrganizationTeamProject();
 
@@ -49,7 +50,19 @@ export function PublishedPromptsList() {
 
   const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
 
-  if (!publishedPrompts || publishedPrompts.length === 0) {
+  if (isLoading) {
+    return (
+      <Sidebar.List>
+        {[1, 2, 3, 4].map((i) => (
+          <Sidebar.Item key={i} paddingY={1} paddingLeft={2}>
+            <Skeleton width="full" height="20px" borderRadius="sm" />
+          </Sidebar.Item>
+        ))}
+      </Sidebar.List>
+    );
+  }
+
+  if (publishedPrompts?.length === 0) {
     return <SidebarEmptyState />;
   }
 
