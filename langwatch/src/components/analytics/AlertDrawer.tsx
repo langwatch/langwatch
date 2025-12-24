@@ -1,6 +1,7 @@
 import {
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   NativeSelect,
@@ -9,10 +10,10 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Bell, Check, Trash } from "lucide-react";
+import { Check, Trash } from "lucide-react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { useMemo, useState, useEffect } from "react";
-import { Drawer, DrawerFooter } from "../ui/drawer";
+import { Drawer } from "../ui/drawer";
 import { Popover } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio";
 import { Tooltip } from "../ui/tooltip";
@@ -28,6 +29,7 @@ import {
   customGraphInputToFormData,
 } from "../../pages/[project]/analytics/custom/index";
 import type { CustomGraphInput } from "./CustomGraph";
+import { HorizontalFormControl } from "../HorizontalFormControl";
 
 interface AlertDrawerProps {
   form?: UseFormReturn<CustomGraphFormData>;
@@ -352,25 +354,27 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
       open={true}
       onOpenChange={() => closeDrawer()}
       placement="end"
-      size="md"
+      size="xl"
     >
-      <Drawer.Backdrop />
       <Drawer.Content>
+        <Drawer.CloseTrigger />
         <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <HStack gap={2}>
-            <Bell size={20} />
-            <Drawer.Title>Configure Alert</Drawer.Title>
-          </HStack>
+          <Heading>Configure Alert</Heading>
         </Drawer.Header>
         <Drawer.Body>
-          <VStack gap={5} align="stretch">
-            <Text color="gray.600" fontSize="sm">
-              Set up an alert to be notified when a metric crosses a threshold.
-            </Text>
+          <Text color="gray.600" fontSize="sm" marginBottom={6}>
+            Set up an alert to be notified when a metric crosses a threshold.
+          </Text>
 
-            <Field.Root>
-              <Field.Label>Monitor Series</Field.Label>
+          <VStack gap={0} align="stretch">
+            <HorizontalFormControl
+              label="Monitor Series"
+              helper={
+                seriesKeys.length > 1
+                  ? "Select which series to monitor for this alert"
+                  : undefined
+              }
+            >
               {seriesKeys.length > 1 ? (
                 <NativeSelect.Root>
                   <NativeSelect.Field
@@ -396,48 +400,48 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                   {seriesKeys[0]?.label || "Series 1"}
                 </Text>
               )}
-              {seriesKeys.length > 1 && (
-                <Field.HelperText>
-                  Select which series to monitor for this alert
-                </Field.HelperText>
-              )}
-            </Field.Root>
+            </HorizontalFormControl>
 
-            <HStack width="full" gap={3}>
-              <Field.Root flex="1">
-                <Field.Label>When value is</Field.Label>
-                <NativeSelect.Root>
-                  <NativeSelect.Field
-                    {...form.register("alert.operator")}
-                    defaultValue="gt"
-                  >
-                    <option value="gt">Greater than</option>
-                    <option value="lt">Less than</option>
-                    <option value="gte">Greater than or equal</option>
-                    <option value="lte">Less than or equal</option>
-                    <option value="eq">Equal to</option>
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </Field.Root>
+            <HorizontalFormControl
+              label="Condition"
+              helper="Define when the alert should trigger based on the metric value"
+            >
+              <HStack width="full" gap={3}>
+                <Field.Root flex="1">
+                  <NativeSelect.Root>
+                    <NativeSelect.Field
+                      {...form.register("alert.operator")}
+                      defaultValue="gt"
+                    >
+                      <option value="gt">Greater than</option>
+                      <option value="lt">Less than</option>
+                      <option value="gte">Greater than or equal</option>
+                      <option value="lte">Less than or equal</option>
+                      <option value="eq">Equal to</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
 
-              <Field.Root flex="1">
-                <Field.Label>Threshold</Field.Label>
-                <Input
-                  type="number"
-                  step="any"
-                  {...form.register("alert.threshold", {
-                    valueAsNumber: true,
-                    setValueAs: (v) => (isNaN(v) ? 0 : v),
-                  })}
-                  placeholder="0"
-                  defaultValue={0}
-                />
-              </Field.Root>
-            </HStack>
+                <Field.Root flex="1">
+                  <Input
+                    type="number"
+                    step="any"
+                    {...form.register("alert.threshold", {
+                      valueAsNumber: true,
+                      setValueAs: (v) => (isNaN(v) ? 0 : v),
+                    })}
+                    placeholder="Threshold value"
+                    defaultValue={0}
+                  />
+                </Field.Root>
+              </HStack>
+            </HorizontalFormControl>
 
-            <Field.Root>
-              <Field.Label>Check over last</Field.Label>
+            <HorizontalFormControl
+              label="Time Period"
+              helper="The time window to evaluate the metric over"
+            >
               <NativeSelect.Root>
                 <NativeSelect.Field
                   {...form.register("alert.timePeriod", {
@@ -453,10 +457,12 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
-            </Field.Root>
+            </HorizontalFormControl>
 
-            <Field.Root>
-              <Field.Label>Alert Type</Field.Label>
+            <HorizontalFormControl
+              label="Alert Type"
+              helper="Severity level of the alert"
+            >
               <NativeSelect.Root>
                 <NativeSelect.Field
                   {...form.register("alert.type")}
@@ -468,14 +474,13 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
-            </Field.Root>
+            </HorizontalFormControl>
 
-            <Field.Root>
-              <Field.Label>Notification Method</Field.Label>
-              <Text fontSize="sm" color="gray.500" marginBottom={3}>
-                Select how you would like to be notified when the alert is
-                triggered.
-              </Text>
+            <HorizontalFormControl
+              label="Notification Method"
+              helper="Choose how you want to be notified when the alert is triggered"
+              direction="vertical"
+            >
               <RadioGroup
                 value={alertAction}
                 onValueChange={(e) => {
@@ -488,7 +493,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                   <VStack align="start">
                     <Radio
                       value="SEND_SLACK_MESSAGE"
-                      colorPalette="orange"
+                      colorPalette="blue"
                       alignItems="start"
                       gap={3}
                       paddingTop={2}
@@ -520,7 +525,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                     <VStack align="start" width="full">
                       <Radio
                         value="SEND_EMAIL"
-                        colorPalette="orange"
+                        colorPalette="blue"
                         alignItems="start"
                         gap={3}
                         paddingTop={2}
@@ -539,11 +544,24 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                   </Tooltip>
                 </Stack>
               </RadioGroup>
-            </Field.Root>
+            </HorizontalFormControl>
           </VStack>
-        </Drawer.Body>
-        <DrawerFooter>
-          <HStack width="full" justify="space-between">
+
+          <HStack gap={2} marginTop={6}>
+            <Button
+              colorPalette="blue"
+              onClick={handleSave}
+              loading={updateGraphById.isLoading}
+            >
+              {alertEnabled ? "Update Alert" : "Add Alert"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={closeDrawer}
+              disabled={updateGraphById.isLoading}
+            >
+              Cancel
+            </Button>
             {alertEnabled && (
               <Button
                 variant="ghost"
@@ -555,24 +573,8 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                 Remove Alert
               </Button>
             )}
-            <HStack gap={2} marginLeft="auto">
-              <Button
-                variant="outline"
-                onClick={closeDrawer}
-                disabled={updateGraphById.isLoading}
-              >
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                onClick={handleSave}
-                loading={updateGraphById.isLoading}
-              >
-                {alertEnabled ? "Update Alert" : "Add Alert"}
-              </Button>
-            </HStack>
           </HStack>
-        </DrawerFooter>
+        </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
   );
