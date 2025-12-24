@@ -10,18 +10,13 @@ export type {
   GroupHeader,
 } from "./types";
 
-// URL Sync utilities
-export { DataGridUrlParams } from "./datagrid-url-params.util";
-
-// Components (to be added)
+// Components
 export { DataGrid } from "./DataGrid";
 export { DataGridTable } from "./DataGridTable";
 export { DataGridToolbar } from "./DataGridToolbar";
 export { DataGridPagination } from "./DataGridPagination";
-export { ColumnHeader } from "./ColumnHeader";
+export { ColumnHeader } from "./ColumnHeader.v2";
 export { ColumnPopover } from "./ColumnPopover";
-export { FilterBar } from "./FilterBar";
-export { ExpandableRow } from "./ExpandableRow";
 
 // Cell renderers
 export { LinkCell } from "./cells/LinkCell";
