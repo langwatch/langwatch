@@ -1,4 +1,4 @@
-import type { DataGridColumnDef } from "~/components/ui/datagrid";
+import type { ColumnDef } from "@tanstack/react-table";
 import type { ScenarioRunRow } from "./types";
 import { ScenarioSetCell } from "./cells/ScenarioSetCell";
 import { createColumnHelper } from "@tanstack/react-table";
@@ -158,7 +158,7 @@ export function createScenarioColumns() {
  */
 export function generateDynamicColumns(
   metadataKeys: string[]
-): DataGridColumnDef<ScenarioRunRow>[] {
+): ColumnDef<ScenarioRunRow>[] {
   return metadataKeys.map((key) =>
     columnHelper.accessor(`metadata.${key}` as keyof ScenarioRunRow, {
       id: `metadata.${key}`,
