@@ -1,6 +1,6 @@
 import { Button, Flex, Spinner, Text, HStack, Input, type FlexProps } from "@chakra-ui/react";
 import { useMemo } from "react";
-import { Columns, Download, RotateCcw } from "lucide-react";
+import { Columns, Download, RotateCcw, Search } from "lucide-react";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -9,7 +9,6 @@ import {
 } from "../popover";
 import { Checkbox } from "../checkbox";
 import type { ReactNode } from "react";
-import { Search } from "lucide-react";
 import type { Column } from "@tanstack/react-table";
 
 interface DataGridToolbarProps extends FlexProps {

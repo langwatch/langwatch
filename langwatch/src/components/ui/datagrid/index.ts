@@ -15,8 +15,7 @@ export { DataGrid } from "./DataGrid";
 export { DataGridTable } from "./DataGridTable";
 export { DataGridToolbar } from "./DataGridToolbar";
 export { DataGridPagination } from "./DataGridPagination";
-export { ColumnHeader } from "./ColumnHeader.v2";
-export { ColumnPopover } from "./ColumnPopover";
+export { ColumnHeader } from "./ColumnHeader";
 
 // Cell renderers
 export { LinkCell } from "./cells/LinkCell";

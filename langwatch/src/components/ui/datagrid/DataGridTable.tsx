@@ -6,7 +6,7 @@ import {
   type Row,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { ColumnHeader } from "./ColumnHeader.v2";
+import { ColumnHeader } from "./ColumnHeader";
 
 interface DataGridTableProps<T> {
   table: TanStackTable<T>;
