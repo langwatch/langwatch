@@ -551,6 +551,12 @@ export const system = createSystem(defaultConfig, {
       accordion: defineSlotRecipe({
         slots: ["itemTrigger"],
         base: {
+          root: {
+            width: "full",
+          },
+          item: {
+            borderRadius: "lg",
+          },
           itemTrigger: {
             cursor: "pointer",
             _hover: {

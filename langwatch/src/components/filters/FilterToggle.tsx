@@ -1,18 +1,37 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { Filter, X } from "react-feather";
+import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
 import { filterOutEmptyFilters } from "../../server/analytics/utils";
 import type { FilterField } from "../../server/filters/types";
 import { Tooltip } from "../ui/tooltip";
-import { LuFilter } from "react-icons/lu";
+import { FilterIconWithBadge } from "./FilterIconWithBadge";
+
+/**
+ * Utility to get filter count from a filters object
+ */
+export const getFilterCount = (
+  filters: Partial<Record<FilterField, FilterParam>> | undefined,
+) => {
+  const nonEmptyFilters = filterOutEmptyFilters(filters);
+  const filterCount = Object.keys(nonEmptyFilters).length;
+  const hasAnyFilters = filterCount > 0;
+  return { nonEmptyFilters, filterCount, hasAnyFilters };
+};
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false },
 ) => {
   const router = useRouter();
+  const {
+    filterParams,
+    filterCount,
+    hasAnyFilters,
+    clearFilters,
+    setNegateFilters,
+  } = useFilterParams();
 
   const showFilters =
     typeof router.query.show_filters === "string"
@@ -40,7 +59,15 @@ export const useFilterToggle = (
     );
   };
 
-  return { showFilters, setShowFilters };
+  return {
+    showFilters,
+    setShowFilters,
+    filterCount,
+    hasAnyFilters,
+    filterParams,
+    clearFilters,
+    setNegateFilters,
+  };
 };
 
 export function FilterToggle({
@@ -48,10 +75,15 @@ export function FilterToggle({
 }: {
   defaultShowFilters?: boolean;
 }) {
-  const { showFilters, setShowFilters } = useFilterToggle({
+  const {
+    showFilters,
+    setShowFilters,
+    filterParams,
+    clearFilters,
+    setNegateFilters,
+  } = useFilterToggle({
     defaultShowFilters,
   });
-  const { filterParams, clearFilters, setNegateFilters } = useFilterParams();
 
   return (
     <FilterToggleButton
@@ -84,9 +116,8 @@ export function FilterToggleButton({
   negateFiltersToggled?: boolean;
   setNegateFilters?: (negateFilters: boolean) => void;
 }) {
-  const nonEmptyFilters = filterOutEmptyFilters(filters);
-  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
   const { project } = useOrganizationTeamProject();
+  const { filterCount, hasAnyFilters } = getFilterCount(filters);
 
   const hasNegateFilters = dependencies.hasNegateFilters?.({
     projectId: project?.id ?? "",
@@ -103,24 +134,7 @@ export function FilterToggleButton({
         paddingRight={hasAnyFilters ? 1 : undefined}
       >
         <HStack gap={0}>
-          {hasAnyFilters && (
-            <Box
-              width="12px"
-              height="12px"
-              borderRadius="12px"
-              background="red.500"
-              position="absolute"
-              marginTop="10px"
-              marginLeft="8px"
-              fontSize="8px"
-              color="white"
-              lineHeight="12px"
-              textAlign="center"
-            >
-              {Object.keys(nonEmptyFilters).length}
-            </Box>
-          )}
-          <LuFilter size={14} />
+          <FilterIconWithBadge count={filterCount} />
           <Text paddingLeft={2}>{children}</Text>
           {hasAnyFilters && onClear && (
             <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>

@@ -13,16 +13,18 @@ export default function GraphsLayout({
   children,
   title,
   analyticsHeaderProps,
+  extraHeaderButtons,
 }: PropsWithChildren<{
   title: string;
   analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
+  extraHeaderButtons?: React.ReactNode;
 }>) {
   const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
 
   return (
     <DashboardLayout>
-      <AnalyticsHeader title={title} {...analyticsHeaderProps} />
+      <AnalyticsHeader title={title} {...analyticsHeaderProps} extraHeaderButtons={extraHeaderButtons} />
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"

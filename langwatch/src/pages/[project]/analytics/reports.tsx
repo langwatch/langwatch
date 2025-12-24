@@ -184,7 +184,17 @@ function ReportsContent() {
     <GraphsLayout title={dashboardTitle} analyticsHeaderProps={{
       isEditable: true,
       onTitleSave: handleTitleSave,
-    }}>
+    }}
+      extraHeaderButtons={
+        project ? (
+          <Link href={addChartUrl} asChild>
+            <Button colorPalette="orange" size="sm">
+              <Plus /> Add chart
+            </Button>
+          </Link>
+        ) : null
+      }
+    >
       {/* Empty state */}
       {hasNoGraphs && (
         <Alert.Root
@@ -198,24 +208,13 @@ function ReportsContent() {
             <Alert.Title>Add your custom graphs here</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add to get
+                You haven{"'"}t set up any custom graphs yet. Click + Add chart to get
                 started.
               </Text>
             </Alert.Description>
           </VStack>
         </Alert.Root>
       )}
-
-      {/* Add chart button */}
-      <HStack width="full" paddingBottom={6}>
-        {project ? (
-          <Link href={addChartUrl} asChild>
-            <Button size="sm" variant="ghost">
-              <Plus /> Add chart
-            </Button>
-          </Link>
-        ) : null}
-      </HStack>
 
       {/* Main content */}
       <HStack align="start" gap={6} width="full">
