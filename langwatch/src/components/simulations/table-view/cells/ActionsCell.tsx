@@ -1,5 +1,4 @@
 import { IconButton, Link } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import type { CellContext } from "@tanstack/react-table";
 import type { ScenarioRunRow } from "../types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -8,7 +7,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
  * Actions cell with icon button to open the run in a dedicated page
  */
 export function ActionsCell({ row }: CellContext<ScenarioRunRow, unknown>) {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const projectSlug = project?.slug ?? "";
   const data = row.original;
@@ -17,7 +15,7 @@ export function ActionsCell({ row }: CellContext<ScenarioRunRow, unknown>) {
   const runUrl = `/${projectSlug}/simulations/${data.scenarioSetId}/${data.batchRunId}/${data.scenarioRunId}`;
 
   return (
-    <Link asChild onClick={(e) => e.stopPropagation()}>
+    <Link href={runUrl}>
       <IconButton
         aria-label="Open run details"
         size="xs"

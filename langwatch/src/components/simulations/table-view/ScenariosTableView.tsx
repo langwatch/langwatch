@@ -4,7 +4,6 @@ import { DataGrid } from "~/components/ui/datagrid";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { createScenarioColumns } from "./scenarioColumns";
-import { ScenarioExpandedContent } from "./ScenarioExpandedContent";
 import type { ScenarioRunRow } from "./types";
 import { useExportScenarioRuns } from "~/features/simulations/hooks/useExportScenarioRuns";
 import {
@@ -12,7 +11,6 @@ import {
   useReactTable,
   getSortedRowModel,
   getGroupedRowModel,
-  getExpandedRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
   type Row,
@@ -41,19 +39,12 @@ export function ScenariosTableView() {
 
   const scenarioRuns = useMemo(() => data ?? [], [data]);
 
-  // Render expanded content
-  const renderExpandedContent = useCallback(
-    (row: Row<ScenarioRunRow>) => <ScenarioExpandedContent row={row} />,
-    []
-  );
-
   const table = useReactTable<ScenarioRunRow>({
     data: scenarioRuns as ScenarioRunRow[],
     columns: columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
-    getExpandedRowModel: getExpandedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     enableGrouping: false,
@@ -146,7 +137,6 @@ export function ScenariosTableView() {
       </DataGrid.Toolbar.Root>
       <DataGrid.Table
         table={table}
-        renderExpandedContent={renderExpandedContent}
         onRowClick={handleRowClick}
       />
       <DataGrid.Pagination

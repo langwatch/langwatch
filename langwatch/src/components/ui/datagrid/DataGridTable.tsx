@@ -10,7 +10,7 @@ import { ColumnHeader } from "./ColumnHeader";
 
 interface DataGridTableProps<T> {
   table: TanStackTable<T>;
-  renderExpandedContent: (row: Row<T>) => React.ReactNode;
+  renderExpandedContent?: (row: Row<T>) => React.ReactNode;
   onRowClick?: (row: Row<T>) => void;
 }
 

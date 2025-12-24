@@ -23,6 +23,13 @@ export function createScenarioColumns() {
       enableHiding: false,
       enableGrouping: false,
     }),
+    columnHelper.accessor("scenarioSetId", {
+      header: "Set Id",
+      enableSorting: true,
+      enableColumnFilter: true,
+      enableGrouping: true,
+      cell: ScenarioSetCell,
+    }),
     columnHelper.accessor("name", {
       header: "Scenario Name",
       enableSorting: true,
@@ -44,18 +51,8 @@ export function createScenarioColumns() {
       cell: (info) =>
         info
           .getValue()
-          .map(
-            (message: ScenarioMessageSnapshotEvent["messages"][0]) =>
-              message.content
-          )
+          .map((message) => message.content)
           .join("\n"),
-    }),
-    columnHelper.accessor("scenarioSetId", {
-      header: "Set Id",
-      enableSorting: true,
-      enableColumnFilter: true,
-      enableGrouping: true,
-      cell: ScenarioSetCell,
     }),
     columnHelper.accessor("batchRunId", {
       header: "Batch Run",
@@ -157,29 +154,13 @@ export function createScenarioColumns() {
       enableColumnFilter: true,
       enableGrouping: false,
     }),
-    columnHelper.accessor(
-      (row) => {
-        return row.metadata?.traces?.length || 0;
-      },
-      {
-        id: "metadata.traces",
-        header: "Traces",
-        enableSorting: false,
-        enableColumnFilter: false,
-        enableGrouping: false,
-        cell: TracesListCell,
-      }
-    ),
-    // columnHelper.display({
-    //   id: "actions",
-    //   header: "",
-    //   size: 50,
-    //   enableSorting: false,
-    //   enableColumnFilter: false,
-    //   cell: ActionsCell,
-    //   enableHiding: false,
-    //   enableGrouping: false,
-    // }),
+    columnHelper.accessor("metadata.traces", {
+      header: "Traces",
+      enableSorting: false,
+      enableColumnFilter: false,
+      enableGrouping: false,
+      cell: TracesListCell,
+    }),
   ];
 }
 

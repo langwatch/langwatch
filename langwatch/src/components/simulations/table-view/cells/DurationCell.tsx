@@ -34,7 +34,7 @@ export function DurationCell({
   const durationMs = getValue() as number;
 
   return (
-    <Text fontSize="sm" fontFamily="mono">
+    <Text fontSize="xs" fontFamily="mono">
       {formatDuration(durationMs)}
     </Text>
   );
