@@ -104,7 +104,7 @@ export function ScenariosTableView() {
   }, [downloadCsv, table]);
 
   return (
-    <Box h="full">
+    <Box h="600px">
       <DataGrid.Root>
         <DataGrid.Toolbar.Root mb={2}>
           <DataGrid.Toolbar.Search
