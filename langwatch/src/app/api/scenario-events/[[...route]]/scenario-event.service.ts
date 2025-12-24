@@ -445,30 +445,25 @@ export class ScenarioEventService {
 
       // Get traces for each run in parallel
       runsWithMetadataPromises.push(
-        ...runs.map((run) => {
-          const traceIdSet = new Set<string>();
-          run.messages.forEach((message) => {
-            if (message.trace_id) {
-              traceIdSet.add(message.trace_id);
-            }
+        ...runs.map(async (run) => {
+          const traceIds = run.messages
+            .map((m) => m.trace_id)
+            .filter((id): id is string => Boolean(id));
+
+          const traces = await this.tracesRepository.getTracesByIds({
+            projectId,
+            traceIds: [...new Set(traceIds)],
+            includes: ["trace_id", "metadata"],
           });
 
-          return new Promise(async (resolve) => {
-            const traces = await this.tracesRepository.getTracesByIds({
-              projectId,
-              traceIds: Array.from(traceIdSet),
-              includes: ["trace_id", "metadata"],
-            });
-
-            return resolve({
-              ...run,
-              metadata: {
-                traces: traces.map((trace) => ({
-                  trace_id: trace._source.trace_id,
-                })),
-              },
-            });
-          });
+          return {
+            ...run,
+            metadata: {
+              traces: traces.map((trace) => ({
+                trace_id: trace._source.trace_id,
+              })),
+            },
+          };
         })
       );
     }
