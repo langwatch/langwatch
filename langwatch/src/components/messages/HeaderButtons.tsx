@@ -1,23 +1,22 @@
-import { Box, Button, HStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { List, Table } from "react-feather";
+import { LuTrendingUp } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
+import { ButtonToggleSlider } from "../../components/ui/ButtonToggleSlider";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { PageLayout } from "../ui/layouts/PageLayout";
-import { LuTrendingUp } from "react-icons/lu";
 
 export function useTableView() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
 
-  const [localStorageTableView, setLocalStorageTableView] = useLocalStorage<
-    "table" | "list"
-  >("tableView", "table");
+  const [localStorageTableView, setLocalStorageTableView] =
+    useLocalStorage<string>("tableView", "table");
   const isTableView = (router.query.view ?? localStorageTableView) === "table";
 
-  const setView = (view: "table" | "list") => () => {
+  const setView = (view: string) => () => {
     void router.push(
       {
         query: {
@@ -26,7 +25,7 @@ export function useTableView() {
         },
       },
       undefined,
-      { shallow: true },
+      { shallow: true }
     );
     setLocalStorageTableView(view);
   };
@@ -48,74 +47,26 @@ export function useTableView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project]);
 
-  return { isTableView, setView };
+  return { isTableView, setView, value: localStorageTableView };
 }
 
 export function ToggleTableView() {
-  const { isTableView, setView } = useTableView();
-
-  const [isHovered, setIsHovered] = useState(false);
-
-  const sliderOnLeft = {
-    left: "3px",
-    width: "108px",
-  };
-  const sliderOnRight = {
-    left: "113px",
-    width: "112px",
-  };
-
-  const sliderProps =
-    (isTableView && !isHovered) || (!isTableView && isHovered)
-      ? sliderOnRight
-      : sliderOnLeft;
+  const { setView, value } = useTableView();
 
   return (
-    <HStack
-      background="gray.200"
-      padding="3px"
-      paddingY={0}
-      borderRadius="lg"
-      gap={2}
-      position="relative"
+    <ButtonToggleSlider.Root
+      value={value}
+      onChange={(value) => setView(value)()}
     >
-      <Box
-        background="white"
-        position="absolute"
-        height="26px"
-        borderRadius="6px"
-        transition="all 0.3s ease-out"
-        {...sliderProps}
-      ></Box>
-      <Button
-        height="32px"
-        variant="ghost"
-        _hover={{ background: "none" }}
-        {...(isTableView
-          ? {
-              onMouseEnter: () => setIsHovered(true),
-              onMouseLeave: () => setIsHovered(false),
-              onClick: setView("list"),
-            }
-          : {})}
-      >
-        <List size="14" /> List View
-      </Button>
-      <Button
-        height="32px"
-        variant="ghost"
-        _hover={{ background: "none" }}
-        {...(!isTableView
-          ? {
-              onMouseEnter: () => setIsHovered(true),
-              onMouseLeave: () => setIsHovered(false),
-              onClick: setView("table"),
-            }
-          : {})}
-      >
-        <Table size="14" /> Table View
-      </Button>
-    </HStack>
+      <ButtonToggleSlider.Button value="list">
+        <List size="14" />
+        List View
+      </ButtonToggleSlider.Button>
+      <ButtonToggleSlider.Button value="table">
+        <Table size="14" />
+        Table View
+      </ButtonToggleSlider.Button>
+    </ButtonToggleSlider.Root>
   );
 }
 
@@ -136,7 +87,7 @@ export function ToggleAnalytics() {
               },
             },
             undefined,
-            { shallow: true },
+            { shallow: true }
           );
         }}
       >
