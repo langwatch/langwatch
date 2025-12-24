@@ -168,13 +168,13 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   };
 
   const MultiSelect = () => (
-    <VStack width="full" align="start" marginLeft={7}>
+    <VStack width="full" align="start" paddingLeft={7}>
       <Popover.Root
         positioning={{ placement: "bottom" }}
         open={open}
         onOpenChange={handlePopoverChange}
       >
-        <Popover.Trigger width="calc(100% - 28px)">
+        <Popover.Trigger width="full">
           <Field.Root width="100%">
             <Input
               placeholder="Select email/s"
@@ -507,12 +507,13 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                       </VStack>
                     </Radio>
                     {alertAction === "SEND_SLACK_MESSAGE" && (
-                      <Input
-                        placeholder="Your Slack webhook URL"
-                        {...form.register("alert.actionParams.slackWebhook")}
-                        marginLeft={7}
-                        width="calc(100% - 28px)"
-                      />
+                      <VStack width="full" align="start" paddingLeft={7}>
+                        <Input
+                          placeholder="Your Slack webhook URL"
+                          {...form.register("alert.actionParams.slackWebhook")}
+                          width="full"
+                        />
+                      </VStack>
                     )}
                   </VStack>
 
