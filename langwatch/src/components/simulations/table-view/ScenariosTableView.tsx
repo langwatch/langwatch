@@ -9,13 +9,13 @@ import type { ScenarioRunRow } from "./types";
 import { useExportScenarioRuns } from "~/features/simulations/hooks/useExportScenarioRuns";
 import {
   getCoreRowModel,
-  type Row,
   useReactTable,
   getSortedRowModel,
   getGroupedRowModel,
   getExpandedRowModel,
   getPaginationRowModel,
   getFilteredRowModel,
+  type Row,
 } from "@tanstack/react-table";
 
 const columns = createScenarioColumns();
@@ -72,6 +72,14 @@ export function ScenariosTableView() {
       },
     },
   });
+
+  const handleRowClick = (row: Row<ScenarioRunRow>) => {
+    // Open the run in a new tab
+    window.open(
+      `/${project?.slug}/simulations/${row.original.scenarioSetId}/${row.original.batchRunId}/${row.original.scenarioRunId}`,
+      "_blank"
+    );
+  };
 
   if (!project) {
     return (
@@ -139,6 +147,7 @@ export function ScenariosTableView() {
       <DataGrid.Table
         table={table}
         renderExpandedContent={renderExpandedContent}
+        onRowClick={handleRowClick}
       />
       <DataGrid.Pagination
         page={table.getState().pagination.pageIndex + 1}

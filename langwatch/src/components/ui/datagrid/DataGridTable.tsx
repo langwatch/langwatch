@@ -11,6 +11,7 @@ import { ColumnHeader } from "./ColumnHeader";
 interface DataGridTableProps<T> {
   table: TanStackTable<T>;
   renderExpandedContent: (row: Row<T>) => React.ReactNode;
+  onRowClick?: (row: Row<T>) => void;
 }
 
 /**
@@ -20,6 +21,7 @@ interface DataGridTableProps<T> {
 export function DataGridTable<T>({
   table,
   renderExpandedContent,
+  onRowClick,
 }: DataGridTableProps<T>) {
   return (
     <Box overflowX="auto" bg="white" borderRadius="lg" shadow="sm">
@@ -61,7 +63,12 @@ export function DataGridTable<T>({
           ) : (
             table.getRowModel().rows.map((row) => (
               <Fragment key={row.id}>
-                <Table.Row>
+                <Table.Row
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  cursor={onRowClick ? "pointer" : "default"}
+                  _hover={onRowClick ? { bg: "gray.50" } : {}}
+                  transition={onRowClick ? "background-color 0.2s" : undefined}
+                >
                   {row.getVisibleCells().map((cell) => {
                     const isGrouped = cell.getIsGrouped();
                     const isAggregated = cell.getIsAggregated();
