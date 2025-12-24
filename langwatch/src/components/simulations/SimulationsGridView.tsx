@@ -1,6 +1,6 @@
 import { Grid, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import {
   SetCard,
 } from "~/components/simulations";
