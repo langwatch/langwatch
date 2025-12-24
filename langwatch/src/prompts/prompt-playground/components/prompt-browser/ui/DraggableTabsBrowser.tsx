@@ -3,7 +3,9 @@ import {
   type BoxProps,
   HStack,
   type StackProps,
+  Tabs,
   type TabsRootProps,
+  VStack,
 } from "@chakra-ui/react";
 import {
   closestCenter,
@@ -22,7 +24,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
-import { BrowserLikeTabs } from "./BrowserLikeTabs";
 import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
@@ -254,14 +255,21 @@ function DraggableTabsGroup({
 
   return (
     <TabGroupContext.Provider value={groupContextValue}>
-      <BrowserLikeTabs.Root
-        {...props}
-        value={activeTabId}
-        onValueChange={(tabId) => onTabChange?.(groupId, tabId)}
-        onClick={() => onClick?.(groupId, activeTabId ?? "")}
-      >
-        {children}
-      </BrowserLikeTabs.Root>
+      <VStack height="full" gap={0} align="stretch" width="full">
+        <Tabs.Root
+          value={activeTabId}
+          onValueChange={(change) => onTabChange?.(groupId, change.value)}
+          onClick={() => onClick?.(groupId, activeTabId ?? "")}
+          width="full"
+          height="full"
+          display="flex"
+          flexDirection="column"
+          variant="enclosed"
+          {...props}
+        >
+          {children}
+        </Tabs.Root>
+      </VStack>
     </TabGroupContext.Provider>
   );
 }
@@ -284,14 +292,16 @@ interface DraggableTabsTabBarProps extends StackProps {
  */
 function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBarProps) {
   return (
-    <BrowserLikeTabs.Bar {...props}>
+    <HStack gap={0} width="full" {...props}>
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}
       >
-        <BrowserLikeTabs.List>{children}</BrowserLikeTabs.List>
+        <Tabs.List width="full" gap={0} height="full" paddingY={0} background="none">
+          {children}
+        </Tabs.List>
       </SortableContext>
-    </BrowserLikeTabs.Bar>
+    </HStack>
   );
 }
 
@@ -305,7 +315,30 @@ interface DraggableTabTriggerProps extends BoxProps {
   id: string;
 }
 
-const DraggableBrowserTabTrigger = BrowserLikeTabs.Trigger;
+/**
+ * DraggableBrowserTabTrigger component
+ * Single Responsibility: Renders a single tab trigger with browser-like styling.
+ * @param value - Tab identifier
+ * @param children - Tab content/label
+ */
+function DraggableBrowserTabTrigger({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tabs.Trigger
+      value={value}
+      minWidth="fit-content"
+      cursor="pointer"
+      transition="all 0.15s ease-in-out"
+    >
+      {children}
+    </Tabs.Trigger>
+  );
+}
 
 /**
  * DraggableTab component
@@ -356,7 +389,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   );
 }
 
-const DraggableTabsContent = BrowserLikeTabs.Content;
+const DraggableTabsContent = Tabs.Content;
 
 /**
  * Compound component for draggable browser-like tabs.
