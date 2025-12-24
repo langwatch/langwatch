@@ -127,4 +127,18 @@ export const scenarioRouter = createTRPCRouter({
       });
       return data;
     }),
+
+      /**
+   * Fetch scenario runs
+   * Params are based on the DataGridStore
+   */
+  getAllScenarioRunsWithTraces: protectedProcedure
+  .input(projectSchema)
+  .use(checkProjectPermission("scenarios:view"))
+  .query(async ({ input, ctx }) => {
+    const scenarioRunnerService = new ScenarioEventService();
+    return await scenarioRunnerService.getAllScenarioRunsWithTraces({
+      projectId: input.projectId,
+    });
+  }),
 });

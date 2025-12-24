@@ -1,110 +1,60 @@
-import { Grid, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { HStack } from "@chakra-ui/react";
+import { Grid, Table } from "lucide-react";
 import { useRouter } from "next/router";
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { SetCard } from "~/components/simulations";
-import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
+import { SimulationsGridView } from "~/components/simulations/SimulationsGridView";
+import { ScenariosTableView } from "~/components/simulations/table-view/ScenariosTableView";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { ButtonToggleSlider } from "~/components/ui/ButtonToggleSlider";
 
 function SimulationsPageContent() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
-  const [refetchInterval, setRefetchInterval] = useState(4000);
+  const currentView = (router.query.view as string) ?? "grid";
 
-  // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
-  useEffect(() => {
-    const onFocus = () => setRefetchInterval(4000);
-    const onBlur = () => setRefetchInterval(30000);
+  const handleTabChange = (details: { value: string }) => {
+    const newView = details.value;
+    const query = { ...router.query };
 
-    window.addEventListener("focus", onFocus);
-    window.addEventListener("blur", onBlur);
-
-    return () => {
-      window.removeEventListener("focus", onFocus);
-      window.removeEventListener("blur", onBlur);
-    };
-  }, []);
-
-  const {
-    data: scenarioSetsData,
-    isLoading,
-    error,
-  } = api.scenarios.getScenarioSetsData.useQuery(
-    { projectId: project?.id ?? "" },
-    {
-      refetchInterval,
-      enabled: !!project,
-    },
-  );
-
-  const sortedScenarioSetsData = useMemo(() => {
-    if (!scenarioSetsData) {
-      return undefined;
+    if (newView === "grid") {
+      delete query.view;
+    } else {
+      query.view = newView;
     }
 
-    return [...scenarioSetsData].sort((a, b) => b.lastRunAt - a.lastRunAt);
-  }, [scenarioSetsData]);
-
-  const handleSetClick = (scenarioSetId: string) => {
-    // Navigate to the specific set page using the catch-all route
-    void router.push(`${router.asPath}/${scenarioSetId}`);
+    void router.replace({ query }, undefined, { shallow: true });
   };
 
   return (
     <DashboardLayout>
-      {!isLoading &&
-        sortedScenarioSetsData &&
-        sortedScenarioSetsData.length > 0 && (
-          <PageLayout.Header>
-            <HStack justify="space-between" align="center" w="full">
-              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-            </HStack>
-          </PageLayout.Header>
-        )}
-      <PageLayout.Container maxW={"calc(100vw - 200px)"} padding={6}>
-        {/* Show loading state */}
-        {isLoading && (
-          <VStack gap={4} align="center" py={8}>
-            <Spinner borderWidth="3px" animationDuration="0.8s" />
-          </VStack>
-        )}
+      <PageLayout.Container>
+        <PageLayout.Header>
+          <HStack justify="space-between" align="center" w="full">
+            <PageLayout.Heading>Simulations</PageLayout.Heading>
+            <ButtonToggleSlider.Root
+              value={currentView}
+              onChange={(value) => handleTabChange({ value })}
+            >
+              <ButtonToggleSlider.Button value="grid">
+                <Grid size={16} />
+                Grid View
+              </ButtonToggleSlider.Button>
+              <ButtonToggleSlider.Button value="table">
+                <Table size={16} />
+                Table View
+              </ButtonToggleSlider.Button>
+            </ButtonToggleSlider.Root>
+          </HStack>
+        </PageLayout.Header>
 
-        {/* Show error state */}
-        {error && (
-          <VStack gap={4} align="center" py={8}>
-            <Text color="red.500">Error loading simulation batches</Text>
-            <Text fontSize="sm" color="gray.600">
-              {error.message}
-            </Text>
-          </VStack>
-        )}
-
-        {/* Show empty state when no batches */}
-        {!isLoading &&
-          !error &&
-          (!scenarioSetsData || scenarioSetsData.length === 0) && (
-            <ScenarioInfoCard />
+        <PageLayout.Content>
+          {currentView === "grid" ? (
+            <SimulationsGridView />
+          ) : (
+            <ScenariosTableView />
           )}
-
-        {/* Render based on view mode */}
-        {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
-          <Grid
-            templateColumns="repeat(auto-fill, minmax(260px, 1fr))"
-            gap={6}
-            width="full"
-          >
-            {sortedScenarioSetsData.map((setData) => (
-              <SetCard
-                {...setData}
-                key={setData.scenarioSetId}
-                onClick={() => handleSetClick(setData.scenarioSetId)}
-              />
-            ))}
-          </Grid>
-        )}
+        </PageLayout.Content>
       </PageLayout.Container>
     </DashboardLayout>
   );
