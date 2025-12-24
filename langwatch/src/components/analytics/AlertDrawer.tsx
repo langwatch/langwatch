@@ -327,15 +327,11 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   // Show loading state while fetching graph data
   if (!providedForm && graphQuery.isLoading) {
     return (
-      <Drawer.Root open={true} placement="end" size="md">
-        <Drawer.Backdrop />
+      <Drawer.Root open={true} placement="end" size="xl">
         <Drawer.Content>
+          <Drawer.CloseTrigger />
           <Drawer.Header>
-            <Drawer.CloseTrigger onClick={closeDrawer} />
-            <HStack gap={2}>
-              <Bell size={20} />
-              <Drawer.Title>Configure Alert</Drawer.Title>
-            </HStack>
+            <Heading>Configure Alert</Heading>
           </Drawer.Header>
           <Drawer.Body>
             <Text>Loading graph data...</Text>
