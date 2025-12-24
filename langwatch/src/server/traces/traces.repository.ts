@@ -2,7 +2,6 @@ import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 
 export class TracesRepository {
-  private client: ElasticClient | null = null;
 
   /**
    * Retrieves traces for the given project and trace IDs.
@@ -20,7 +19,7 @@ export class TracesRepository {
     traceIds: string[];
     includes: string[];
   }) {
-    const client = await this.getClient();
+    const client = await this.getClient(projectId);
 
     const traces = await client.search({
       index: TRACE_INDEX.all,
@@ -44,16 +43,13 @@ export class TracesRepository {
   }
 
   /**
-   * Gets or creates a cached Elasticsearch client.
+   * Gets tenant-specific Elasticsearch client.
    *
+   * @param projectId - The project identifier
    * @returns Promise resolving to an Elasticsearch client instance
    * @private
    */
-  private async getClient(): Promise<ElasticClient> {
-    if (!this.client) {
-      this.client = await esClient({ test: true });
-    }
-
-    return this.client;
+  private async getClient(projectId: string): Promise<ElasticClient> {
+    return await esClient({ projectId });
   }
 }
