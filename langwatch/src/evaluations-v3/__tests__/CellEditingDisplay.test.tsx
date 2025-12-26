@@ -33,7 +33,9 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),
+    drawerOpen: () => false,
   }),
+  getComplexProps: () => ({}),
 }));
 
 // Mock mutation function that we can spy on
@@ -53,12 +55,53 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn() }),
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
+    evaluators: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
   },
 }));
 
 // Mock AddOrEditDatasetDrawer to avoid complex API dependencies
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
   AddOrEditDatasetDrawer: () => null,
+}));
+
+// Mock Agent Drawers
+vi.mock("~/components/agents/AgentListDrawer", () => ({
+  AgentListDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentTypeSelectorDrawer", () => ({
+  AgentTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
+  AgentCodeEditorDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentPromptEditorDrawer", () => ({
+  AgentPromptEditorDrawer: () => null,
+}));
+vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
+  WorkflowSelectorDrawer: () => null,
+}));
+
+// Mock Evaluator Drawers
+vi.mock("~/components/evaluators/EvaluatorListDrawer", () => ({
+  EvaluatorListDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorCategorySelectorDrawer", () => ({
+  EvaluatorCategorySelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorTypeSelectorDrawer", () => ({
+  EvaluatorTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
+  EvaluatorEditorDrawer: () => null,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

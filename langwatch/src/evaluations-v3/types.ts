@@ -81,6 +81,8 @@ export type EvaluatorConfig = {
   // Per-agent input mappings for this evaluator
   // agentId -> { inputFieldName -> mapping }
   mappings: Record<string, Record<string, FieldMapping>>;
+  // Reference to database-backed evaluator (if using saved evaluator)
+  dbEvaluatorId?: string;
 };
 
 // ============================================================================
@@ -94,6 +96,9 @@ export type AgentConfig = {
   type: AgentType;
   name: string;
   icon?: string;
+
+  // Reference to database-backed agent (if using saved agent)
+  dbAgentId?: string;
 
   // For LLM (mirrors LlmPromptConfigComponent structure)
   llmConfig?: LLMConfig;

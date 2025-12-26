@@ -17,7 +17,9 @@ vi.mock("~/hooks/useDrawer", () => ({
     closeDrawer: vi.fn(),
     isOpen: vi.fn(() => false),
     drawerParams: {},
+    drawerOpen: () => false,
   }),
+  getComplexProps: () => ({}),
 }));
 
 // Wrapper with Chakra provider

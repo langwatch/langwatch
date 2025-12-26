@@ -10,14 +10,24 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
+import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
+import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
+import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
+import { AgentPromptEditorDrawer } from "~/components/agents/AgentPromptEditorDrawer";
+import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
+import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
+import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
+import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
+import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
 import { useDrawer } from "~/hooks/useDrawer";
+import type { TypedAgent } from "~/server/agents/agent.repository";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
-import type { DatasetColumn, DatasetReference, SavedRecord } from "../types";
+import type { AgentConfig, DatasetColumn, DatasetReference, SavedRecord } from "../types";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
@@ -80,6 +90,8 @@ export function EvaluationsV3Table({
     setColumnWidths,
     hiddenColumns,
     toggleColumnVisibility,
+    addAgent,
+    addEvaluator,
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
@@ -103,6 +115,8 @@ export function EvaluationsV3Table({
     setColumnWidths: state.setColumnWidths,
     hiddenColumns: state.ui.hiddenColumns,
     toggleColumnVisibility: state.toggleColumnVisibility,
+    addAgent: state.addAgent,
+    addEvaluator: state.addEvaluator,
   }));
 
 
@@ -175,6 +189,61 @@ export function EvaluationsV3Table({
 
   // State for editing dataset columns
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
+
+  // State for agent/evaluator list drawers
+  const [agentListDrawerOpen, setAgentListDrawerOpen] = useState(false);
+  const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
+  const [agentCodeEditorOpen, setAgentCodeEditorOpen] = useState(false);
+  const [agentPromptEditorOpen, setAgentPromptEditorOpen] = useState(false);
+  const [workflowSelectorOpen, setWorkflowSelectorOpen] = useState(false);
+  const [evaluatorListDrawerOpen, setEvaluatorListDrawerOpen] = useState(false);
+  const [evaluatorCategorySelectorOpen, setEvaluatorCategorySelectorOpen] = useState(false);
+  const [evaluatorTypeSelectorOpen, setEvaluatorTypeSelectorOpen] = useState(false);
+  const [evaluatorEditorOpen, setEvaluatorEditorOpen] = useState(false);
+
+  // Track which agent we're adding an evaluator for
+  const [addEvaluatorForAgentId, setAddEvaluatorForAgentId] = useState<string | null>(null);
+
+  // Handler for when a saved agent is selected from the drawer
+  const handleSelectSavedAgent = useCallback(
+    (savedAgent: TypedAgent) => {
+      // Determine agent type - map DB type to workbench type
+      const agentType = savedAgent.type === "signature" ? "llm" : "code";
+      const config = savedAgent.config as Record<string, unknown>;
+
+      // Convert TypedAgent to AgentConfig format
+      const agentConfig: AgentConfig = {
+        id: `agent_${Date.now()}`, // Generate unique ID for the workbench
+        type: agentType,
+        name: savedAgent.name,
+        dbAgentId: savedAgent.id, // Reference to the database agent
+        // Extract config based on type
+        ...(agentType === "llm" && {
+          llmConfig: config.llm as AgentConfig["llmConfig"],
+          messages: config.messages as AgentConfig["messages"],
+          instructions: config.prompt as string,
+        }),
+        ...(agentType === "code" && {
+          code: ((config.parameters as Array<{ identifier: string; value: unknown }> | undefined)?.find(
+            (p) => p.identifier === "code",
+          )?.value as string) ?? "",
+        }),
+        inputs: (config.inputs as AgentConfig["inputs"]) ?? [{ identifier: "input", type: "str" }],
+        outputs: (config.outputs as AgentConfig["outputs"]) ?? [{ identifier: "output", type: "str" }],
+        mappings: {},
+        evaluatorIds: [],
+      };
+      addAgent(agentConfig);
+      setAgentListDrawerOpen(false);
+    },
+    [addAgent],
+  );
+
+  // Handler for opening the evaluator selector for a specific agent
+  const handleAddEvaluatorForAgent = useCallback((agentId: string) => {
+    setAddEvaluatorForAgentId(agentId);
+    setEvaluatorListDrawerOpen(true);
+  }, []);
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
@@ -378,6 +447,7 @@ export function EvaluationsV3Table({
                 evaluatorResults={data?.evaluators ?? {}}
                 row={info.row.index}
                 evaluatorsMap={evaluatorsMap}
+                onAddEvaluator={handleAddEvaluatorForAgent}
               />
             );
           },
@@ -403,6 +473,7 @@ export function EvaluationsV3Table({
     toggleRowSelection,
     selectAllRows,
     clearRowSelection,
+    handleAddEvaluatorForAgent,
   ]);
 
   // Column sizing state - initialize from store
@@ -546,7 +617,7 @@ export function EvaluationsV3Table({
             <SuperHeader
               type="agents"
               colSpan={agentsColSpan}
-              onAddClick={() => openOverlay("agent")}
+              onAddClick={() => setAgentListDrawerOpen(true)}
               showWarning={agents.length === 0}
               isLoading={isLoadingExperiment}
             />
@@ -722,6 +793,130 @@ export function EvaluationsV3Table({
           }
 
           setEditDatasetDrawerOpen(false);
+        }}
+      />
+
+      {/* Agent Drawers */}
+      <AgentListDrawer
+        open={agentListDrawerOpen}
+        onClose={() => setAgentListDrawerOpen(false)}
+        onSelect={handleSelectSavedAgent}
+        onCreateNew={() => {
+          setAgentListDrawerOpen(false);
+          setAgentTypeSelectorOpen(true);
+        }}
+      />
+      <AgentTypeSelectorDrawer
+        open={agentTypeSelectorOpen}
+        onClose={() => setAgentTypeSelectorOpen(false)}
+        onBack={() => {
+          setAgentTypeSelectorOpen(false);
+          setAgentListDrawerOpen(true);
+        }}
+        onSelect={(type) => {
+          setAgentTypeSelectorOpen(false);
+          if (type === "signature") {
+            setAgentPromptEditorOpen(true);
+          } else if (type === "code") {
+            setAgentCodeEditorOpen(true);
+          } else if (type === "workflow") {
+            setWorkflowSelectorOpen(true);
+          }
+        }}
+      />
+      <AgentCodeEditorDrawer
+        open={agentCodeEditorOpen}
+        onClose={() => setAgentCodeEditorOpen(false)}
+        onBack={() => {
+          setAgentCodeEditorOpen(false);
+          setAgentTypeSelectorOpen(true);
+        }}
+        onSave={(savedAgent) => {
+          handleSelectSavedAgent(savedAgent);
+          setAgentCodeEditorOpen(false);
+        }}
+      />
+      <AgentPromptEditorDrawer
+        open={agentPromptEditorOpen}
+        onClose={() => setAgentPromptEditorOpen(false)}
+        onBack={() => {
+          setAgentPromptEditorOpen(false);
+          setAgentTypeSelectorOpen(true);
+        }}
+        onSave={(savedAgent) => {
+          handleSelectSavedAgent(savedAgent);
+          setAgentPromptEditorOpen(false);
+        }}
+      />
+      <WorkflowSelectorDrawer
+        open={workflowSelectorOpen}
+        onClose={() => setWorkflowSelectorOpen(false)}
+        onBack={() => {
+          setWorkflowSelectorOpen(false);
+          setAgentTypeSelectorOpen(true);
+        }}
+        onSave={(savedAgent) => {
+          handleSelectSavedAgent(savedAgent);
+          setWorkflowSelectorOpen(false);
+        }}
+      />
+
+      {/* Evaluator Drawers */}
+      <EvaluatorListDrawer
+        open={evaluatorListDrawerOpen}
+        onClose={() => {
+          setEvaluatorListDrawerOpen(false);
+          setAddEvaluatorForAgentId(null);
+        }}
+        onCreateNew={() => {
+          setEvaluatorListDrawerOpen(false);
+          setEvaluatorCategorySelectorOpen(true);
+        }}
+      />
+      <EvaluatorCategorySelectorDrawer
+        open={evaluatorCategorySelectorOpen}
+        onClose={() => {
+          setEvaluatorCategorySelectorOpen(false);
+          setAddEvaluatorForAgentId(null);
+        }}
+        onBack={() => {
+          setEvaluatorCategorySelectorOpen(false);
+          setEvaluatorListDrawerOpen(true);
+        }}
+        onSelectCategory={() => {
+          setEvaluatorCategorySelectorOpen(false);
+          setEvaluatorTypeSelectorOpen(true);
+        }}
+      />
+      <EvaluatorTypeSelectorDrawer
+        open={evaluatorTypeSelectorOpen}
+        onClose={() => {
+          setEvaluatorTypeSelectorOpen(false);
+          setAddEvaluatorForAgentId(null);
+        }}
+        onBack={() => {
+          setEvaluatorTypeSelectorOpen(false);
+          setEvaluatorCategorySelectorOpen(true);
+        }}
+        onSelect={() => {
+          setEvaluatorTypeSelectorOpen(false);
+          setEvaluatorEditorOpen(true);
+        }}
+      />
+      <EvaluatorEditorDrawer
+        open={evaluatorEditorOpen}
+        onClose={() => {
+          setEvaluatorEditorOpen(false);
+          setAddEvaluatorForAgentId(null);
+        }}
+        onBack={() => {
+          setEvaluatorEditorOpen(false);
+          setEvaluatorTypeSelectorOpen(true);
+        }}
+        onSave={() => {
+          // TODO: Link evaluator to agent when addEvaluatorForAgentId is set
+          setEvaluatorEditorOpen(false);
+          setAddEvaluatorForAgentId(null);
         }}
       />
     </Box>
