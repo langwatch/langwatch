@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.11.0...langwatch@v1.12.0) (2025-12-26)
+
+
+### Features
+
+* add custom dashboards with drag-drop and resizable graphs ([#996](https://github.com/langwatch/langwatch/issues/996)) ([1e4721c](https://github.com/langwatch/langwatch/commit/1e4721c66b969f8f84b513ac3728ad77820bc3c2))
+* add keyword subfield to metadata.name for sorting support ([#1007](https://github.com/langwatch/langwatch/issues/1007)) ([0a2559e](https://github.com/langwatch/langwatch/commit/0a2559e8f6639280d69179a2abb5794a67c8d10c))
+* replicate evaluations ([#1004](https://github.com/langwatch/langwatch/issues/1004)) ([98d2166](https://github.com/langwatch/langwatch/commit/98d2166ad32232fa3c64f561e80e13dbe8fa0867))
+* **ui:** langwatch 2026 design ([#1025](https://github.com/langwatch/langwatch/issues/1025)) ([61d53b6](https://github.com/langwatch/langwatch/commit/61d53b656a383708e59ccd667771e81af207c229))
+
+
+### Bug Fixes
+
+* 2026 redesign patches 1 ([#1027](https://github.com/langwatch/langwatch/issues/1027)) ([dbe118d](https://github.com/langwatch/langwatch/commit/dbe118def9c72e9622c1786f693a105361c44907))
+* 2026 redesign patches 2 ([#1028](https://github.com/langwatch/langwatch/issues/1028)) ([e7499ef](https://github.com/langwatch/langwatch/commit/e7499effa4f9b0d9ee9370161720917d05a3a5f5))
+* copy workflow bug ([#1003](https://github.com/langwatch/langwatch/issues/1003)) ([b64a051](https://github.com/langwatch/langwatch/commit/b64a0516ec6a132c007a8dbb2032cf77459c9a99))
+* types ([e4ecb11](https://github.com/langwatch/langwatch/commit/e4ecb11c6df6044dcd9ab68d809c41a0eb588d80))
+
 ## [1.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.10.0...langwatch@v1.11.0) (2025-12-16)
 
 
