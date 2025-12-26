@@ -7,8 +7,6 @@ import { CurrentDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import { AgentConfigPanel } from "~/evaluations-v3/components/AgentSection/AgentConfigOverlay";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
 import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
@@ -105,7 +103,6 @@ export default function EvaluationsV3Page() {
               isLoadingDatasets={isLoadingDatasets}
             />
           </Box>
-          <AgentConfigPanel />
         </Box>
       </VStack>
 

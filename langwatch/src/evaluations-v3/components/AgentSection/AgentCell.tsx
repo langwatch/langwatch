@@ -124,6 +124,7 @@ type AgentCellContentProps = {
   evaluatorResults: Record<string, unknown>;
   row: number;
   evaluatorsMap: Map<string, EvaluatorConfig>;
+  onAddEvaluator?: (agentId: string) => void;
 };
 
 export function AgentCellContent({
@@ -132,6 +133,7 @@ export function AgentCellContent({
   evaluatorResults,
   row,
   evaluatorsMap,
+  onAddEvaluator,
 }: AgentCellContentProps) {
   const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
     (state) => ({
@@ -202,10 +204,16 @@ export function AgentCellContent({
         color="gray.500"
         onClick={(e) => {
           e.stopPropagation();
-          openOverlay("evaluator", agent.id);
+          if (onAddEvaluator) {
+            onAddEvaluator(agent.id);
+          } else {
+            // Fallback to overlay if no callback provided
+            openOverlay("evaluator", agent.id);
+          }
         }}
         justifyContent="flex-start"
         paddingX={1}
+        data-testid={`add-evaluator-button-${agent.id}`}
       >
         <Plus size={10} />
         <Text marginLeft={1}>Add evaluator</Text>

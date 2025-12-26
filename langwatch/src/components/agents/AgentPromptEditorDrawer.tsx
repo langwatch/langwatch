@@ -1,0 +1,339 @@
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { ArrowLeft, MessageSquare } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Controller, FormProvider, useFieldArray } from "react-hook-form";
+
+import { Drawer } from "~/components/ui/drawer";
+import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+
+import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "~/components/ModelSelector";
+import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompts/types";
+import { PromptTextArea } from "~/prompts/components/ui/PromptTextArea";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
+import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+
+export type AgentPromptEditorDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
+  onSave?: (agent: TypedAgent) => void;
+  onBack?: () => void;
+  /** If provided, loads an existing agent for editing */
+  agentId?: string;
+};
+
+/**
+ * Converts PromptConfigFormValues to agent config format
+ */
+const formValuesToAgentConfig = (formValues: PromptConfigFormValues) => {
+  return {
+    llm: formValues.version?.configData?.llm,
+    prompt: formValues.version?.configData?.prompt,
+    messages: formValues.version?.configData?.messages,
+    inputs: formValues.version?.configData?.inputs,
+    outputs: formValues.version?.configData?.outputs,
+  };
+};
+
+/**
+ * Converts agent config to PromptConfigFormValues format
+ */
+const agentConfigToInitialValues = (
+  config: Record<string, unknown> | null
+): Partial<PromptConfigFormValues> => {
+  if (!config) return {};
+
+  return {
+    version: {
+      configData: {
+        llm: config.llm as PromptConfigFormValues["version"]["configData"]["llm"],
+        prompt: (config.prompt as string) ?? "",
+        messages: config.messages as PromptConfigFormValues["version"]["configData"]["messages"],
+        inputs: config.inputs as PromptConfigFormValues["version"]["configData"]["inputs"],
+        outputs: config.outputs as PromptConfigFormValues["version"]["configData"]["outputs"],
+      },
+    },
+  };
+};
+
+/**
+ * Drawer for creating/editing a prompt-based agent.
+ * Features:
+ * - Name input field
+ * - LLM model selection
+ * - System prompt editor
+ * - Message history support
+ * - Save/Cancel buttons
+ */
+export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer, openDrawer } = useDrawer();
+  const complexProps = getComplexProps();
+  const utils = api.useContext();
+
+  const onClose = props.onClose ?? closeDrawer;
+  const onSave = props.onSave ?? (complexProps.onSave as AgentPromptEditorDrawerProps["onSave"]);
+  const onBack = props.onBack ?? (() => openDrawer("agentTypeSelector"));
+  const agentId = props.agentId ?? (complexProps.agentId as string | undefined);
+  const isOpen = props.open !== false && props.open !== undefined;
+
+  // Form state
+  const [name, setName] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Load existing agent if editing
+  const agentQuery = api.agents.getById.useQuery(
+    { id: agentId ?? "", projectId: project?.id ?? "" },
+    { enabled: !!agentId && !!project?.id && isOpen }
+  );
+
+  // Build initial values from agent config or defaults
+  const initialConfigValues = useMemo(() => {
+    if (agentQuery.data?.config) {
+      return agentConfigToInitialValues(
+        agentQuery.data.config as Record<string, unknown>
+      );
+    }
+    return buildDefaultFormValues();
+  }, [agentQuery.data]);
+
+  // Form setup using the prompts module hook
+  const { methods } = usePromptConfigForm({
+    initialConfigValues,
+    onChange: () => {
+      setHasUnsavedChanges(true);
+    },
+  });
+
+  // Initialize name from agent data
+  useEffect(() => {
+    if (agentQuery.data) {
+      setName(agentQuery.data.name);
+      setHasUnsavedChanges(false);
+    } else if (!agentId && isOpen) {
+      // Reset form for new agent
+      setName("");
+      methods.reset(buildDefaultFormValues());
+      setHasUnsavedChanges(false);
+    }
+  }, [agentQuery.data, agentId, isOpen, methods]);
+
+  // Message fields array for PromptMessagesField
+  const messageFields = useFieldArray({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+
+  // Mutations
+  const createMutation = api.agents.create.useMutation({
+    onSuccess: (agent) => {
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+      onSave?.(agent);
+      onClose();
+    },
+  });
+
+  const updateMutation = api.agents.update.useMutation({
+    onSuccess: (agent) => {
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+      void utils.agents.getById.invalidate({ id: agent.id, projectId: project?.id ?? "" });
+      onSave?.(agent);
+      onClose();
+    },
+  });
+
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isValid = name.trim().length > 0;
+
+  const handleSave = useCallback(() => {
+    if (!project?.id || !isValid) return;
+
+    const formValues = methods.getValues();
+    const config = formValuesToAgentConfig(formValues);
+
+    if (agentId) {
+      updateMutation.mutate({
+        id: agentId,
+        projectId: project.id,
+        name: name.trim(),
+        config,
+      });
+    } else {
+      createMutation.mutate({
+        projectId: project.id,
+        name: name.trim(),
+        type: "signature",
+        config,
+      });
+    }
+  }, [project?.id, agentId, name, isValid, methods, createMutation, updateMutation]);
+
+  const handleNameChange = (value: string) => {
+    setName(value);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm("You have unsaved changes. Are you sure you want to close?")) {
+        return;
+      }
+    }
+    onClose();
+  };
+
+  // Get model option for display
+  const currentModel = methods.watch("version.configData.llm.model") ?? "";
+  const { modelOption } = useModelSelectionOptions(
+    allModelOptions,
+    currentModel,
+    "chat"
+  );
+
+  return (
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={({ open }) => !open && handleClose()}
+      size="lg"
+    >
+      <Drawer.Content>
+        <Drawer.CloseTrigger />
+        <Drawer.Header>
+          <HStack gap={2}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onBack}
+              padding={1}
+              minWidth="auto"
+              data-testid="back-button"
+            >
+              <ArrowLeft size={20} />
+            </Button>
+            <MessageSquare size={20} />
+            <Text fontSize="xl" fontWeight="semibold">
+              {agentId ? "Edit Prompt Agent" : "New Prompt Agent"}
+            </Text>
+          </HStack>
+        </Drawer.Header>
+        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+          {agentId && agentQuery.isLoading ? (
+            <HStack justify="center" paddingY={8}>
+              <Spinner size="md" />
+            </HStack>
+          ) : (
+            <FormProvider {...methods}>
+              <VStack
+                as="form"
+                gap={4}
+                align="stretch"
+                flex={1}
+                paddingX={6}
+                paddingY={4}
+                overflowY="auto"
+              >
+                {/* Name field */}
+                <Field.Root required>
+                  <Field.Label>Agent Name</Field.Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="Enter agent name"
+                    data-testid="agent-name-input"
+                  />
+                </Field.Root>
+
+                {/* LLM Model selection */}
+                <VerticalFormControl
+                  label="Model"
+                  invalid={!!methods.formState.errors.version?.configData?.llm}
+                  helper={methods.formState.errors.version?.configData?.llm?.message?.toString()}
+                  error={methods.formState.errors.version?.configData?.llm}
+                  size="sm"
+                >
+                  <Controller
+                    name="version.configData.llm"
+                    control={methods.control}
+                    render={({ field }) => (
+                      <LLMConfigField
+                        llmConfig={field.value}
+                        onChange={(values) => {
+                          field.onChange(values);
+                          setHasUnsavedChanges(true);
+                        }}
+                        modelOption={modelOption}
+                        requiresCustomKey={false}
+                      />
+                    )}
+                  />
+                </VerticalFormControl>
+
+                {/* System Prompt */}
+                <VerticalFormControl
+                  label="System Prompt"
+                  invalid={!!methods.formState.errors.version?.configData?.prompt}
+                  helper={methods.formState.errors.version?.configData?.prompt?.message?.toString()}
+                  error={methods.formState.errors.version?.configData?.prompt}
+                  size="sm"
+                >
+                  <Controller
+                    control={methods.control}
+                    name="version.configData.prompt"
+                    render={({ field }) => (
+                      <PromptTextArea
+                        {...field}
+                        availableFields={[]}
+                        otherNodesFields={{}}
+                        isTemplateSupported={false}
+                        placeholder="You are a helpful assistant..."
+                      />
+                    )}
+                  />
+                </VerticalFormControl>
+
+                {/* Message History */}
+                <PromptMessagesField
+                  messageFields={messageFields}
+                  availableFields={[]}
+                  otherNodesFields={{}}
+                />
+              </VStack>
+            </FormProvider>
+          )}
+        </Drawer.Body>
+        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+          <HStack gap={3}>
+            <Button variant="outline" onClick={handleClose}>
+              Cancel
+            </Button>
+            <Button
+              colorScheme="blue"
+              onClick={handleSave}
+              disabled={!isValid || isSaving}
+              loading={isSaving}
+              data-testid="save-agent-button"
+            >
+              {agentId ? "Save Changes" : "Create Agent"}
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
