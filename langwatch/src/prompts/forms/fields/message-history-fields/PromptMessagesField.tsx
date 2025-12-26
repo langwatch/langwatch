@@ -16,7 +16,7 @@ import {
 } from "react-hook-form";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { PromptConfigFormValues } from "~/prompts";
-import { PropertySectionTitle } from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
