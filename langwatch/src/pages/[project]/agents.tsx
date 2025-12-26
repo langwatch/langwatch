@@ -1,0 +1,107 @@
+import {
+  Center,
+  EmptyState,
+  Grid,
+  Skeleton,
+  Spacer,
+  VStack,
+} from "@chakra-ui/react";
+import { Bot, Plus } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { DashboardLayout } from "~/components/DashboardLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
+import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
+import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
+import { AgentPromptEditorDrawer } from "~/components/agents/AgentPromptEditorDrawer";
+import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { AgentCard } from "~/components/agents/AgentCard";
+
+/**
+ * Agents management page
+ * Single Responsibility: Route and permission handling for agents
+ *
+ * This is a hidden page for managing database-backed agents.
+ */
+function Page() {
+  const { project } = useOrganizationTeamProject();
+  const { openDrawer, drawerOpen } = useDrawer();
+
+  const agentsQuery = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+
+  const hasAgents = agentsQuery.data && agentsQuery.data.length > 0;
+  const showEmptyState = !agentsQuery.isLoading && !hasAgents;
+
+  return (
+    <DashboardLayout>
+      <PageLayout.Header>
+        <PageLayout.Heading>Agents</PageLayout.Heading>
+        <Spacer />
+        <PageLayout.HeaderButton onClick={() => openDrawer("agentTypeSelector")}>
+          <Plus size={16} /> New Agent
+        </PageLayout.HeaderButton>
+      </PageLayout.Header>
+
+      {showEmptyState ? (
+        <Center flex={1} padding={6}>
+          <EmptyState.Root>
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <Bot size={32} />
+              </EmptyState.Indicator>
+              <EmptyState.Title>No agents yet</EmptyState.Title>
+              <EmptyState.Description>
+                Create reusable agents for your evaluations.
+              </EmptyState.Description>
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("agentTypeSelector")}
+              >
+                <Plus size={16} /> Create your first agent
+              </PageLayout.HeaderButton>
+            </EmptyState.Content>
+          </EmptyState.Root>
+        </Center>
+      ) : (
+        <VStack gap={6} width="full" align="start" padding={6}>
+          <Grid
+            templateColumns="repeat(auto-fill, minmax(300px, 1fr))"
+            gap={4}
+            width="full"
+          >
+            {agentsQuery.isLoading &&
+              Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} height="100px" borderRadius="md" />
+              ))}
+            {agentsQuery.data?.map((agent) => (
+              <AgentCard
+                key={agent.id}
+                agent={agent}
+                onClick={() => {
+                  // TODO: Open agent editor for this agent
+                }}
+              />
+            ))}
+          </Grid>
+        </VStack>
+      )}
+
+      {/* Agent management drawers */}
+      <AgentListDrawer open={drawerOpen("agentList")} />
+      <AgentTypeSelectorDrawer open={drawerOpen("agentTypeSelector")} />
+      <AgentCodeEditorDrawer open={drawerOpen("agentCodeEditor")} />
+      <AgentPromptEditorDrawer open={drawerOpen("agentPromptEditor")} />
+      <WorkflowSelectorDrawer open={drawerOpen("workflowSelector")} />
+    </DashboardLayout>
+  );
+}
+
+export default withPermissionGuard("evaluations:view", {
+  layoutComponent: DashboardLayout,
+})(Page);
