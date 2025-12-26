@@ -19,7 +19,19 @@ export type DrawerType =
   | "addOrEditDataset"
   | "editTriggerFilter"
   | "seriesFilters"
-  | "selectDataset";
+  | "selectDataset"
+  // Agent drawers
+  | "agentList"
+  | "agentTypeSelector"
+  | "agentCodeEditor"
+  | "agentPromptEditor"
+  | "workflowSelector"
+  // Evaluator drawers
+  | "evaluatorList"
+  | "evaluatorCategorySelector"
+  | "evaluatorTypeSelector"
+  | "evaluatorEditor"
+  | "workflowSelectorForEvaluator";
 
 /** Generic callback type for drawer props - callers must narrow before use */
 type DrawerCallback = (...args: unknown[]) => void;
@@ -29,6 +41,24 @@ let complexProps = {} as Record<string, DrawerCallback>;
 
 export function getComplexProps() {
   return complexProps;
+}
+
+/**
+ * Get simple (serializable) drawer params from URL query.
+ * Call this inside a component to get params like `category`, `evaluatorType`, etc.
+ */
+export function useDrawerParams() {
+  const router = useRouter();
+  const params: Record<string, string | undefined> = {};
+
+  for (const [key, value] of Object.entries(router.query)) {
+    if (key.startsWith("drawer.") && key !== "drawer.open") {
+      const paramName = key.replace("drawer.", "");
+      params[paramName] = typeof value === "string" ? value : undefined;
+    }
+  }
+
+  return params;
 }
 
 /**
