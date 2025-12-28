@@ -11,6 +11,17 @@ export type CodeBlockEditorProps = {
   onChange: (code: string) => void;
   /** Syntax highlighting language */
   language?: string;
+  /**
+   * If true, the modal is rendered by the parent instead of internally.
+   * Use with onEditClick to handle modal state externally.
+   * This is needed when CodeBlockEditor is inside a Drawer to avoid focus conflicts.
+   */
+  externalModal?: boolean;
+  /**
+   * Called when the edit button is clicked. Use with externalModal=true
+   * to open the modal from the parent component.
+   */
+  onEditClick?: () => void;
 };
 
 /**
@@ -27,11 +38,22 @@ export function CodeBlockEditor({
   code,
   onChange,
   language = "python",
+  externalModal = false,
+  onEditClick,
 }: CodeBlockEditorProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const handleOpen = () => setIsModalOpen(true);
-  const handleClose = () => setIsModalOpen(false);
+  const handleOpen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (externalModal) {
+      onEditClick?.();
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+  const handleClose = () => {
+    setIsModalOpen(false);
+  };
 
   return (
     <Box position="relative" width="full">
@@ -84,13 +106,15 @@ export function CodeBlockEditor({
         }}
       />
 
-      {/* Editor modal */}
-      <CodeEditorModal
-        code={code}
-        setCode={onChange}
-        open={isModalOpen}
-        onClose={handleClose}
-      />
+      {/* Editor modal - only render internally when not using external modal */}
+      {!externalModal && (
+        <CodeEditorModal
+          code={code}
+          setCode={onChange}
+          open={isModalOpen}
+          onClose={handleClose}
+        />
+      )}
     </Box>
   );
 }

@@ -17,6 +17,7 @@ import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
+import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
   TypedAgent,
   AgentComponentConfig,
@@ -103,6 +104,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const [name, setName] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Track when code modal is open - we hide the drawer to avoid focus conflicts
+  const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -192,7 +196,9 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const handleClose = () => {
     if (hasUnsavedChanges) {
       if (
-        !window.confirm("You have unsaved changes. Are you sure you want to close?")
+        !window.confirm(
+          "You have unsaved changes. Are you sure you want to close?",
+        )
       ) {
         return;
       }
@@ -201,89 +207,110 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   };
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && handleClose()}
-      size="lg"
-    >
-      <Drawer.Content>
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            <Heading>
-              {agentId ? "Edit Code Agent" : "New Code Agent"}
-            </Heading>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-        >
-          {agentId && agentQuery.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
+    <>
+      <Drawer.Root
+        open={isOpen}
+        onOpenChange={({ open }) => !open && handleClose()}
+        size="lg"
+        closeOnInteractOutside={false}
+        modal={false}
+        preventScroll={false}
+      >
+        <Drawer.Content>
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <HStack gap={2}>
+              {canGoBack && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  padding={1}
+                  minWidth="auto"
+                  data-testid="back-button"
+                >
+                  <LuArrowLeft size={20} />
+                </Button>
+              )}
+              <Heading>
+                {agentId ? "Edit Code Agent" : "New Code Agent"}
+              </Heading>
             </HStack>
-          ) : (
-            <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4}>
-              {/* Name field */}
-              <Field.Root required>
-                <Field.Label>Agent Name</Field.Label>
-                <Input
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter agent name"
-                  data-testid="agent-name-input"
-                />
-              </Field.Root>
-
-              {/* Code editor */}
-              <Box flex={1}>
-                <Field.Root>
-                  <Field.Label>Python Code</Field.Label>
-                  <Text fontSize="sm" color="gray.500" marginBottom={2}>
-                    Write a DSPy module that takes inputs and returns outputs.
-                  </Text>
-                  <CodeBlockEditor
-                    code={code}
-                    onChange={handleCodeChange}
-                    language="python"
+          </Drawer.Header>
+          <Drawer.Body
+            display="flex"
+            flexDirection="column"
+            overflow="hidden"
+            padding={0}
+          >
+            {agentId && agentQuery.isLoading ? (
+              <HStack justify="center" paddingY={8}>
+                <Spinner size="md" />
+              </HStack>
+            ) : (
+              <VStack
+                gap={4}
+                align="stretch"
+                flex={1}
+                paddingX={6}
+                paddingY={4}
+              >
+                {/* Name field */}
+                <Field.Root required>
+                  <Field.Label>Agent Name</Field.Label>
+                  <Input
+                    value={name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="Enter agent name"
+                    data-testid="agent-name-input"
                   />
                 </Field.Root>
-              </Box>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
-          <HStack gap={3}>
-            <Button variant="outline" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="blue"
-              onClick={handleSave}
-              disabled={!isValid || isSaving}
-              loading={isSaving}
-              data-testid="save-agent-button"
-            >
-              {agentId ? "Save Changes" : "Create Agent"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+
+                {/* Code editor */}
+                <Box flex={1}>
+                  <Field.Root>
+                    <Field.Label>Python Code</Field.Label>
+                    <Text fontSize="sm" color="gray.500" marginBottom={2}>
+                      Write a DSPy module that takes inputs and returns outputs.
+                    </Text>
+                    <CodeBlockEditor
+                      code={code}
+                      onChange={handleCodeChange}
+                      language="python"
+                      externalModal
+                      onEditClick={() => setIsCodeModalOpen(true)}
+                    />
+                  </Field.Root>
+                </Box>
+              </VStack>
+            )}
+          </Drawer.Body>
+          <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
+            <HStack gap={3}>
+              <Button variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button
+                colorPalette="blue"
+                onClick={handleSave}
+                disabled={!isValid || isSaving}
+                loading={isSaving}
+                data-testid="save-agent-button"
+              >
+                {agentId ? "Save Changes" : "Create Agent"}
+              </Button>
+            </HStack>
+          </Drawer.Footer>
+        </Drawer.Content>
+      </Drawer.Root>
+
+      {/* Code editor modal - rendered outside drawer to avoid focus conflicts */}
+      <CodeEditorModal
+        code={code}
+        setCode={handleCodeChange}
+        open={isCodeModalOpen}
+        onClose={() => setIsCodeModalOpen(false)}
+      />
+    </>
   );
 }

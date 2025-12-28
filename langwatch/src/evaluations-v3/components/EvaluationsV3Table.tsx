@@ -631,10 +631,11 @@ export function EvaluationsV3Table({
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
   const DRAWER_WIDTH = 456;
+  const MENU_PLUS_PADDING = 56 + 16;
 
   return (
     <Box
-      width="full"
+      minWidth={`calc(100vw - ${MENU_PLUS_PADDING}px + ${DRAWER_WIDTH}px)`}
       minHeight="full"
       css={{
         "& table": {
