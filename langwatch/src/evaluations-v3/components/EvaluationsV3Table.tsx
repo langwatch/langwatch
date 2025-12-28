@@ -8,20 +8,11 @@ import {
   type ColumnSizingState,
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
-import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
-import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
-import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
-import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
-import { RunnerTypeSelectorDrawer } from "~/components/runners/RunnerTypeSelectorDrawer";
-import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
-import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
-import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
-import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
-import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
-import { EvaluatorEditorDrawer } from "~/components/evaluators/EvaluatorEditorDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import { useDrawer, useDrawerParams, setFlowCallbacks } from "~/hooks/useDrawer";
+import { PromptEditorDrawerHandler } from "./PromptEditorDrawerHandler";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -29,16 +20,18 @@ import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
-import type { RunnerConfig, DatasetColumn, DatasetReference, SavedRecord } from "../types";
+import type {
+  RunnerConfig,
+  DatasetColumn,
+  DatasetReference,
+  SavedRecord,
+} from "../types";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
 import { RunnerCellContent } from "./RunnerSection/RunnerCell";
 import { RunnerHeader } from "./RunnerSection/RunnerHeader";
-import {
-  ColumnTypeIcon,
-  SuperHeader,
-} from "./TableUI";
+import { ColumnTypeIcon, SuperHeader } from "./TableUI";
 import { SelectionToolbar } from "./SelectionToolbar";
 
 // ============================================================================
@@ -48,7 +41,10 @@ import { SelectionToolbar } from "./SelectionToolbar";
 type RowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  runners: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
+  runners: Record<
+    string,
+    { output: unknown; evaluators: Record<string, unknown> }
+  >;
 };
 
 // ============================================================================
@@ -64,7 +60,7 @@ export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
 }: EvaluationsV3TableProps) {
-  const { openDrawer } = useDrawer();
+  const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
   // Sync saved dataset changes to DB
@@ -89,43 +85,48 @@ export function EvaluationsV3Table({
     setActiveDataset,
     removeDataset,
     updateDataset,
-    columnWidths,
     setColumnWidths,
-    hiddenColumns,
     toggleColumnVisibility,
     addRunner,
     updateRunner,
     removeRunner,
     addEvaluator,
-  } = useEvaluationsV3Store((state) => ({
-    datasets: state.datasets,
-    activeDatasetId: state.activeDatasetId,
-    evaluators: state.evaluators,
-    runners: state.runners,
-    results: state.results,
-    ui: state.ui,
-    openOverlay: state.openOverlay,
-    setSelectedCell: state.setSelectedCell,
-    setEditingCell: state.setEditingCell,
-    toggleRowSelection: state.toggleRowSelection,
-    selectAllRows: state.selectAllRows,
-    clearRowSelection: state.clearRowSelection,
-    deleteSelectedRows: state.deleteSelectedRows,
-    getRowCount: state.getRowCount,
-    addDataset: state.addDataset,
-    setActiveDataset: state.setActiveDataset,
-    removeDataset: state.removeDataset,
-    updateDataset: state.updateDataset,
-    columnWidths: state.ui.columnWidths,
-    setColumnWidths: state.setColumnWidths,
-    hiddenColumns: state.ui.hiddenColumns,
-    toggleColumnVisibility: state.toggleColumnVisibility,
-    addRunner: state.addRunner,
-    updateRunner: state.updateRunner,
-    removeRunner: state.removeRunner,
-    addEvaluator: state.addEvaluator,
-  }));
-
+  } = useEvaluationsV3Store(
+    useShallow((state) => ({
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      evaluators: state.evaluators,
+      runners: state.runners,
+      results: state.results,
+      // Only subscribe to specific UI properties we need (not the entire ui object)
+      ui: {
+        selectedRows: state.ui.selectedRows,
+        editingCell: state.ui.editingCell,
+        selectedCell: state.ui.selectedCell,
+        columnWidths: state.ui.columnWidths,
+        hiddenColumns: state.ui.hiddenColumns,
+      },
+      // Actions (stable references)
+      openOverlay: state.openOverlay,
+      setSelectedCell: state.setSelectedCell,
+      setEditingCell: state.setEditingCell,
+      toggleRowSelection: state.toggleRowSelection,
+      selectAllRows: state.selectAllRows,
+      clearRowSelection: state.clearRowSelection,
+      deleteSelectedRows: state.deleteSelectedRows,
+      getRowCount: state.getRowCount,
+      addDataset: state.addDataset,
+      setActiveDataset: state.setActiveDataset,
+      removeDataset: state.removeDataset,
+      updateDataset: state.updateDataset,
+      setColumnWidths: state.setColumnWidths,
+      toggleColumnVisibility: state.toggleColumnVisibility,
+      addRunner: state.addRunner,
+      updateRunner: state.updateRunner,
+      removeRunner: state.removeRunner,
+      addEvaluator: state.addEvaluator,
+    })),
+  );
 
   // State to track pending dataset loads
   const [pendingDatasetLoad, setPendingDatasetLoad] = useState<{
@@ -142,12 +143,16 @@ export function EvaluationsV3Table({
     },
     {
       enabled: !!project?.id && !!pendingDatasetLoad,
-    }
+    },
   );
 
   // Effect to handle when saved dataset records finish loading
   useEffect(() => {
-    if (pendingDatasetLoad && savedDatasetRecords.data && !savedDatasetRecords.isLoading) {
+    if (
+      pendingDatasetLoad &&
+      savedDatasetRecords.data &&
+      !savedDatasetRecords.isLoading
+    ) {
       const { datasetId, name, columnTypes } = pendingDatasetLoad;
 
       // Build columns
@@ -158,10 +163,15 @@ export function EvaluationsV3Table({
       }));
 
       // Transform records to SavedRecord format
-      const savedRecords: SavedRecord[] = (savedDatasetRecords.data?.datasetRecords ?? []).map((record: { id: string; entry: unknown }) => ({
+      const savedRecords: SavedRecord[] = (
+        savedDatasetRecords.data?.datasetRecords ?? []
+      ).map((record: { id: string; entry: unknown }) => ({
         id: record.id,
         ...Object.fromEntries(
-          columnTypes.map((col) => [col.name, (record.entry as Record<string, unknown>)?.[col.name] ?? ""])
+          columnTypes.map((col) => [
+            col.name,
+            (record.entry as Record<string, unknown>)?.[col.name] ?? "",
+          ]),
         ),
       }));
 
@@ -178,41 +188,36 @@ export function EvaluationsV3Table({
       setActiveDataset(newDataset.id);
       setPendingDatasetLoad(null);
     }
-  }, [pendingDatasetLoad, savedDatasetRecords.data, savedDatasetRecords.isLoading, addDataset, setActiveDataset]);
+  }, [
+    pendingDatasetLoad,
+    savedDatasetRecords.data,
+    savedDatasetRecords.isLoading,
+    addDataset,
+    setActiveDataset,
+  ]);
 
   // Get the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
-    [datasets, activeDatasetId]
+    [datasets, activeDatasetId],
   );
 
   // State for AddOrEditDatasetDrawer (for Save as dataset)
   const [saveAsDatasetDrawerOpen, setSaveAsDatasetDrawerOpen] = useState(false);
-  const [datasetToSave, setDatasetToSave] = useState<{
-    name: string;
-    columnTypes: { name: string; type: DatasetColumnType }[];
-    datasetRecords: Array<{ id: string } & Record<string, string>>;
-  } | undefined>(undefined);
+  const [datasetToSave, setDatasetToSave] = useState<
+    | {
+        name: string;
+        columnTypes: { name: string; type: DatasetColumnType }[];
+        datasetRecords: Array<{ id: string } & Record<string, string>>;
+      }
+    | undefined
+  >(undefined);
 
   // State for editing dataset columns
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
-  // State for runner/evaluator list drawers
-  const [runnerTypeSelectorOpen, setRunnerTypeSelectorOpen] = useState(false);
-  const [promptListDrawerOpen, setPromptListDrawerOpen] = useState(false);
-  const [promptEditorDrawerOpen, setPromptEditorDrawerOpen] = useState(false);
-  const [editingRunnerId, setEditingRunnerId] = useState<string | null>(null);
-  const [agentListDrawerOpen, setAgentListDrawerOpen] = useState(false);
-  const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
-  const [agentCodeEditorOpen, setAgentCodeEditorOpen] = useState(false);
-  const [workflowSelectorOpen, setWorkflowSelectorOpen] = useState(false);
-  const [evaluatorListDrawerOpen, setEvaluatorListDrawerOpen] = useState(false);
-  const [evaluatorCategorySelectorOpen, setEvaluatorCategorySelectorOpen] = useState(false);
-  const [evaluatorTypeSelectorOpen, setEvaluatorTypeSelectorOpen] = useState(false);
-  const [evaluatorEditorOpen, setEvaluatorEditorOpen] = useState(false);
-
-  // Track which runner we're adding an evaluator for
-  const [addEvaluatorForRunnerId, setAddEvaluatorForRunnerId] = useState<string | null>(null);
+  // Get drawer params from URL
+  const drawerParams = useDrawerParams();
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
@@ -226,15 +231,19 @@ export function EvaluationsV3Table({
         type: "agent", // This is a runner of type "agent" (code/workflow)
         name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: (config.inputs as RunnerConfig["inputs"]) ?? [{ identifier: "input", type: "str" }],
-        outputs: (config.outputs as RunnerConfig["outputs"]) ?? [{ identifier: "output", type: "str" }],
+        inputs: (config.inputs as RunnerConfig["inputs"]) ?? [
+          { identifier: "input", type: "str" },
+        ],
+        outputs: (config.outputs as RunnerConfig["outputs"]) ?? [
+          { identifier: "output", type: "str" },
+        ],
         mappings: {},
         evaluatorIds: [],
       };
       addRunner(runnerConfig);
-      setAgentListDrawerOpen(false);
+      closeDrawer();
     },
-    [addRunner],
+    [addRunner, closeDrawer],
   );
 
   // Handler for when a prompt is selected from the drawer
@@ -253,63 +262,73 @@ export function EvaluationsV3Table({
         evaluatorIds: [],
       };
       addRunner(runnerConfig);
-      setPromptListDrawerOpen(false);
+      closeDrawer();
     },
-    [addRunner],
+    [addRunner, closeDrawer],
   );
 
   // Handler for opening the evaluator selector for a specific runner
-  const handleAddEvaluatorForRunner = useCallback((runnerId: string) => {
-    setAddEvaluatorForRunnerId(runnerId);
-    setEvaluatorListDrawerOpen(true);
-  }, []);
+  const handleAddEvaluatorForRunner = useCallback(
+    (runnerId: string) => {
+      openDrawer("evaluatorList", { urlParams: { runnerId } });
+    },
+    [openDrawer],
+  );
 
   // tRPC utils for fetching agent data
   const trpcUtils = api.useContext();
 
   // Handler for editing a runner (clicking on the header)
-  const handleEditRunner = useCallback(async (runner: RunnerConfig) => {
-    if (runner.type === "prompt") {
-      setEditingRunnerId(runner.id);
-      setPromptEditorDrawerOpen(true);
-    } else if (runner.type === "agent" && runner.dbAgentId) {
-      // Fetch the agent to determine its type
-      try {
-        const agent = await trpcUtils.agents.getById.fetch({
-          projectId: project?.id ?? "",
-          id: runner.dbAgentId,
-        });
+  const handleEditRunner = useCallback(
+    async (runner: RunnerConfig) => {
+      if (runner.type === "prompt") {
+        openDrawer("promptEditor", { promptId: runner.promptId, urlParams: { runnerId: runner.id } });
+      } else if (runner.type === "agent" && runner.dbAgentId) {
+        // Fetch the agent to determine its type
+        try {
+          const agent = await trpcUtils.agents.getById.fetch({
+            projectId: project?.id ?? "",
+            id: runner.dbAgentId,
+          });
 
-        if (agent?.type === "workflow") {
-          // Open workflow in new tab
-          const config = agent.config as Record<string, unknown>;
-          const workflowId = config.workflowId as string | undefined;
-          if (workflowId) {
-            const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
-            window.open(workflowUrl, "_blank");
+          if (agent?.type === "workflow") {
+            // Open workflow in new tab
+            const config = agent.config as Record<string, unknown>;
+            const workflowId = config.workflowId as string | undefined;
+            if (workflowId) {
+              const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
+              window.open(workflowUrl, "_blank");
+            }
+          } else {
+            // Code agent - open code editor drawer
+            openDrawer("agentCodeEditor", { urlParams: { runnerId: runner.id, agentId: runner.dbAgentId ?? "" } });
           }
-        } else {
-          // Code agent - open code editor drawer
-          setEditingRunnerId(runner.id);
-          setAgentCodeEditorOpen(true);
+        } catch (error) {
+          console.error("Failed to fetch agent:", error);
         }
-      } catch (error) {
-        console.error("Failed to fetch agent:", error);
       }
-    }
-  }, [project?.id, project?.slug, trpcUtils.agents.getById]);
+    },
+    [project?.id, project?.slug, trpcUtils.agents.getById, openDrawer],
+  );
 
   // Handler for removing a runner from the workbench
-  const handleRemoveRunner = useCallback((runnerId: string) => {
-    removeRunner(runnerId);
-  }, [removeRunner]);
+  const handleRemoveRunner = useCallback(
+    (runnerId: string) => {
+      removeRunner(runnerId);
+    },
+    [removeRunner],
+  );
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
     () => ({
       onSelectExisting: () => {
         openDrawer("selectDataset", {
-          onSelect: (dataset: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
+          onSelect: (dataset: {
+            datasetId: string;
+            name: string;
+            columnTypes: { name: string; type: DatasetColumnType }[];
+          }) => {
             // Trigger loading of saved dataset records
             setPendingDatasetLoad({
               datasetId: dataset.datasetId,
@@ -321,7 +340,11 @@ export function EvaluationsV3Table({
       },
       onUploadCSV: () => {
         openDrawer("uploadCSV", {
-          onSuccess: (params: { datasetId: string; name: string; columnTypes: { name: string; type: DatasetColumnType }[] }) => {
+          onSuccess: (params: {
+            datasetId: string;
+            name: string;
+            columnTypes: { name: string; type: DatasetColumnType }[];
+          }) => {
             // Trigger loading of uploaded dataset records
             setPendingDatasetLoad({
               datasetId: params.datasetId,
@@ -339,23 +362,29 @@ export function EvaluationsV3Table({
 
         // Convert inline dataset to row-based format, filtering empty rows
         const columns = dataset.inline.columns;
-        const datasetRecords = convertInlineToRowRecords(columns, dataset.inline.records);
+        const datasetRecords = convertInlineToRowRecords(
+          columns,
+          dataset.inline.records,
+        );
 
         setDatasetToSave({
           name: dataset.name,
-          columnTypes: columns.map((col) => ({ name: col.name, type: col.type as DatasetColumnType })),
+          columnTypes: columns.map((col) => ({
+            name: col.name,
+            type: col.type as DatasetColumnType,
+          })),
           datasetRecords,
         });
         setSaveAsDatasetDrawerOpen(true);
       },
     }),
-    [openDrawer, addDataset, setActiveDataset]
+    [openDrawer, addDataset, setActiveDataset],
   );
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
   const evaluatorsMap = useMemo(
     () => new Map(evaluators.map((e) => [e.id, e])),
-    [evaluators]
+    [evaluators],
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
@@ -369,8 +398,8 @@ export function EvaluationsV3Table({
   // Get columns from active dataset, filtering out hidden columns
   const allDatasetColumns = activeDataset?.columns ?? [];
   const datasetColumns = useMemo(
-    () => allDatasetColumns.filter((col) => !hiddenColumns.has(col.name)),
-    [allDatasetColumns, hiddenColumns]
+    () => allDatasetColumns.filter((col) => !ui.hiddenColumns.has(col.name)),
+    [allDatasetColumns, ui.hiddenColumns],
   );
 
   // Keyboard navigation hook - handles arrow keys, Tab, Enter, Escape
@@ -399,7 +428,7 @@ export function EvaluationsV3Table({
         datasetColumns.map((col) => [
           col.id,
           getCellValue(activeDatasetId, index, col.id),
-        ])
+        ]),
       ),
       runners: Object.fromEntries(
         runners.map((runner) => [
@@ -409,15 +438,24 @@ export function EvaluationsV3Table({
             evaluators: Object.fromEntries(
               runner.evaluatorIds.map((evaluatorId) => [
                 evaluatorId,
-                results.evaluatorResults[runner.id]?.[evaluatorId]?.[index] ?? null,
-              ])
+                results.evaluatorResults[runner.id]?.[evaluatorId]?.[index] ??
+                  null,
+              ]),
             ),
           },
-        ])
+        ]),
       ),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
-  }, [activeDatasetId, activeDataset, datasetColumns, runners, results, displayRowCount, getCellValue]);
+  }, [
+    activeDatasetId,
+    activeDataset,
+    datasetColumns,
+    runners,
+    results,
+    displayRowCount,
+    getCellValue,
+  ]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -461,7 +499,7 @@ export function EvaluationsV3Table({
           columnType: "checkbox" as ColumnType,
           columnId: "__checkbox__",
         },
-      })
+      }),
     );
 
     // Dataset columns from active dataset
@@ -484,7 +522,7 @@ export function EvaluationsV3Table({
             columnId: column.id,
             dataType: column.type,
           },
-        }) as ColumnDef<RowData>
+        }) as ColumnDef<RowData>,
       );
     }
 
@@ -517,11 +555,12 @@ export function EvaluationsV3Table({
             );
           },
           size: 280,
+          minSize: 200,
           meta: {
             columnType: "runner" as ColumnType,
             columnId: `runner.${runner.id}`,
           },
-        }) as ColumnDef<RowData>
+        }) as ColumnDef<RowData>,
       );
     }
 
@@ -544,14 +583,21 @@ export function EvaluationsV3Table({
   ]);
 
   // Column sizing state - initialize from store
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(() => columnWidths);
+  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>(
+    () => ui.columnWidths,
+  );
 
   // Sync column sizing changes to store (debounced to avoid excessive updates)
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handleColumnSizingChange = useCallback(
-    (updater: ColumnSizingState | ((prev: ColumnSizingState) => ColumnSizingState)) => {
+    (
+      updater:
+        | ColumnSizingState
+        | ((prev: ColumnSizingState) => ColumnSizingState),
+    ) => {
       setColumnSizing((prev) => {
-        const newSizing = typeof updater === "function" ? updater(prev) : updater;
+        const newSizing =
+          typeof updater === "function" ? updater(prev) : updater;
         // Debounce sync to store
         if (syncTimeoutRef.current) {
           clearTimeout(syncTimeoutRef.current);
@@ -562,7 +608,7 @@ export function EvaluationsV3Table({
         return newSizing;
       });
     },
-    [setColumnWidths]
+    [setColumnWidths],
   );
 
   const table = useReactTable({
@@ -579,10 +625,12 @@ export function EvaluationsV3Table({
 
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
-  const runnersColSpan = Math.max(runners.length, 1);
+  // +1 for the spacer column that's always present
+  const runnersColSpan = runners.length + 1;
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
+  const DRAWER_WIDTH = 456;
 
   return (
     <Box
@@ -668,7 +716,7 @@ export function EvaluationsV3Table({
         },
         "& tr:has(+ tr[data-selected='true']) td": {
           "border-bottom-color": "var(--chakra-colors-blue-100)",
-        }
+        },
       }}
     >
       <table ref={tableRef}>
@@ -684,7 +732,15 @@ export function EvaluationsV3Table({
             <SuperHeader
               type="runners"
               colSpan={runnersColSpan}
-              onAddClick={() => setRunnerTypeSelectorOpen(true)}
+              onAddClick={() => {
+                // Set flow callbacks for the entire add-runner flow
+                setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
+                setFlowCallbacks("promptEditor", { onSave: handleSelectPrompt });
+                setFlowCallbacks("agentList", { onSelect: handleSelectSavedAgent });
+                setFlowCallbacks("agentCodeEditor", { onSave: handleSelectSavedAgent });
+                setFlowCallbacks("workflowSelector", { onSave: handleSelectSavedAgent });
+                openDrawer("runnerTypeSelector");
+              }}
               showWarning={runners.length === 0}
               hasComparison={runners.length > 0}
               isLoading={isLoadingExperiment}
@@ -698,24 +754,30 @@ export function EvaluationsV3Table({
                     ? null
                     : flexRender(
                         header.column.columnDef.header,
-                        header.getContext()
+                        header.getContext(),
                       )}
                   {/* Resize handle */}
                   {header.column.getCanResize() && (
                     <div
                       onMouseDown={header.getResizeHandler()}
                       onTouchStart={header.getResizeHandler()}
-                      className={`resizer ${header.column.getIsResizing() ? "isResizing" : ""}`}
+                      className={`resizer ${
+                        header.column.getIsResizing() ? "isResizing" : ""
+                      }`}
                     />
                   )}
                 </th>
               ))}
-              {runners.length === 0 && (
-                <th style={{ minWidth: 200 }}>
+              {runners.length === 0 ? (
+                // Spacer column to match drawer width + default runner column width
+                <th style={{ width: DRAWER_WIDTH + 280, minWidth: DRAWER_WIDTH + 280 }}>
                   <Text fontSize="xs" color="gray.400" fontStyle="italic">
                     Click "+ Add" above to get started
                   </Text>
                 </th>
+              ) : (
+                // Spacer column to match drawer width
+                <th style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}></th>
               )}
             </tr>
           ))}
@@ -735,7 +797,8 @@ export function EvaluationsV3Table({
                   isLoading={isLoadingExperiment || isLoadingDatasets}
                 />
               ))}
-              {runners.length === 0 && <td />}
+              {/* Spacer column to match drawer width */}
+              <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
             </tr>
           ))}
         </tbody>
@@ -761,11 +824,13 @@ export function EvaluationsV3Table({
           const currentDataset = datasets.find((d) => d.id === activeDatasetId);
           if (currentDataset && currentDataset.type === "inline") {
             // Build columns with proper types
-            const columns: DatasetColumn[] = savedDataset.columnTypes.map((col, index) => ({
-              id: `${col.name}_${index}`,
-              name: col.name,
-              type: col.type as DatasetColumnType,
-            }));
+            const columns: DatasetColumn[] = savedDataset.columnTypes.map(
+              (col, index) => ({
+                id: `${col.name}_${index}`,
+                name: col.name,
+                type: col.type as DatasetColumnType,
+              }),
+            );
             // Update the dataset to be a saved reference
             const updatedDataset: DatasetReference = {
               ...currentDataset,
@@ -789,7 +854,10 @@ export function EvaluationsV3Table({
         datasetToSave={
           activeDataset
             ? {
-                datasetId: activeDataset.type === "saved" ? activeDataset.datasetId : undefined,
+                datasetId:
+                  activeDataset.type === "saved"
+                    ? activeDataset.datasetId
+                    : undefined,
                 name: activeDataset.name,
                 columnTypes: activeDataset.columns.map((col) => ({
                   name: col.name,
@@ -800,7 +868,7 @@ export function EvaluationsV3Table({
                   ? {
                       datasetRecords: convertInlineToRowRecords(
                         activeDataset.inline.columns,
-                        activeDataset.inline.records
+                        activeDataset.inline.records,
                       ),
                     }
                   : {}),
@@ -811,18 +879,20 @@ export function EvaluationsV3Table({
         onClose={() => setEditDatasetDrawerOpen(false)}
         localOnly={activeDataset?.type === "inline"}
         columnVisibility={{
-          hiddenColumns,
+          hiddenColumns: ui.hiddenColumns,
           onToggleVisibility: toggleColumnVisibility,
         }}
         onSuccess={(updatedDataset) => {
           if (!activeDataset) return;
 
           // Build new columns from the drawer result
-          const newColumns: DatasetColumn[] = updatedDataset.columnTypes.map((col, index) => ({
-            id: `${col.name}_${index}`,
-            name: col.name,
-            type: col.type as DatasetColumnType,
-          }));
+          const newColumns: DatasetColumn[] = updatedDataset.columnTypes.map(
+            (col, index) => ({
+              id: `${col.name}_${index}`,
+              name: col.name,
+              type: col.type as DatasetColumnType,
+            }),
+          );
 
           if (activeDataset.type === "inline") {
             // For inline datasets, update columns and map records
@@ -832,7 +902,9 @@ export function EvaluationsV3Table({
             // Map old records to new columns (by name matching)
             const currentRowCount = getRowCount(activeDataset.id);
             for (const newCol of newColumns) {
-              const oldCol = activeDataset.columns.find((c) => c.name === newCol.name);
+              const oldCol = activeDataset.columns.find(
+                (c) => c.name === newCol.name,
+              );
               const oldValues = oldCol ? oldRecords[oldCol.id] : undefined;
               if (oldValues) {
                 newRecords[newCol.id] = oldValues;
@@ -864,137 +936,11 @@ export function EvaluationsV3Table({
         }}
       />
 
-      {/* Runner Type Selector Drawer */}
-      <RunnerTypeSelectorDrawer
-        open={runnerTypeSelectorOpen}
-        onClose={() => setRunnerTypeSelectorOpen(false)}
-        onSelect={(type) => {
-          setRunnerTypeSelectorOpen(false);
-          if (type === "prompt") {
-            setPromptListDrawerOpen(true);
-          } else if (type === "agent") {
-            setAgentListDrawerOpen(true);
-          }
-        }}
-      />
-
-      {/* Prompt Drawers */}
-      <PromptListDrawer
-        open={promptListDrawerOpen}
-        onClose={() => setPromptListDrawerOpen(false)}
-        onSelect={handleSelectPrompt}
-        onCreateNew={() => {
-          setPromptListDrawerOpen(false);
-          setPromptEditorDrawerOpen(true);
-        }}
-      />
-      <PromptEditorDrawer
-        open={promptEditorDrawerOpen}
-        onClose={() => {
-          setPromptEditorDrawerOpen(false);
-          setEditingRunnerId(null);
-        }}
-        promptId={editingRunnerId ? runners.find(r => r.id === editingRunnerId)?.promptId : undefined}
-        onSave={(savedPrompt) => {
-          // If we were editing an existing runner, update it
-          if (editingRunnerId) {
-            updateRunner(editingRunnerId, {
-              name: savedPrompt.name,
-              promptId: savedPrompt.id,
-            });
-          } else {
-            // Otherwise, create a new runner with the saved prompt
-            handleSelectPrompt(savedPrompt);
-          }
-          setPromptEditorDrawerOpen(false);
-          setEditingRunnerId(null);
-        }}
-      />
-
-      {/* Agent Drawers */}
-      <AgentListDrawer
-        open={agentListDrawerOpen}
-        onClose={() => setAgentListDrawerOpen(false)}
-        onSelect={handleSelectSavedAgent}
-        onCreateNew={() => {
-          setAgentListDrawerOpen(false);
-          setAgentTypeSelectorOpen(true);
-        }}
-      />
-      <AgentTypeSelectorDrawer
-        open={agentTypeSelectorOpen}
-        onClose={() => setAgentTypeSelectorOpen(false)}
-        onSelect={(type) => {
-          setAgentTypeSelectorOpen(false);
-          if (type === "code") {
-            setAgentCodeEditorOpen(true);
-          } else if (type === "workflow") {
-            setWorkflowSelectorOpen(true);
-          }
-        }}
-      />
-      <AgentCodeEditorDrawer
-        open={agentCodeEditorOpen}
-        onClose={() => setAgentCodeEditorOpen(false)}
-        onSave={(savedAgent) => {
-          handleSelectSavedAgent(savedAgent);
-          setAgentCodeEditorOpen(false);
-        }}
-      />
-      <WorkflowSelectorDrawer
-        open={workflowSelectorOpen}
-        onClose={() => setWorkflowSelectorOpen(false)}
-        onSave={(savedAgent) => {
-          handleSelectSavedAgent(savedAgent);
-          setWorkflowSelectorOpen(false);
-        }}
-      />
-
-      {/* Evaluator Drawers */}
-      <EvaluatorListDrawer
-        open={evaluatorListDrawerOpen}
-        onClose={() => {
-          setEvaluatorListDrawerOpen(false);
-          setAddEvaluatorForRunnerId(null);
-        }}
-        onCreateNew={() => {
-          setEvaluatorListDrawerOpen(false);
-          setEvaluatorCategorySelectorOpen(true);
-        }}
-      />
-      <EvaluatorCategorySelectorDrawer
-        open={evaluatorCategorySelectorOpen}
-        onClose={() => {
-          setEvaluatorCategorySelectorOpen(false);
-          setAddEvaluatorForRunnerId(null);
-        }}
-        onSelectCategory={() => {
-          setEvaluatorCategorySelectorOpen(false);
-          setEvaluatorTypeSelectorOpen(true);
-        }}
-      />
-      <EvaluatorTypeSelectorDrawer
-        open={evaluatorTypeSelectorOpen}
-        onClose={() => {
-          setEvaluatorTypeSelectorOpen(false);
-          setAddEvaluatorForRunnerId(null);
-        }}
-        onSelect={() => {
-          setEvaluatorTypeSelectorOpen(false);
-          setEvaluatorEditorOpen(true);
-        }}
-      />
-      <EvaluatorEditorDrawer
-        open={evaluatorEditorOpen}
-        onClose={() => {
-          setEvaluatorEditorOpen(false);
-          setAddEvaluatorForRunnerId(null);
-        }}
-        onSave={() => {
-          // TODO: Link evaluator to runner when addEvaluatorForRunnerId is set
-          setEvaluatorEditorOpen(false);
-          setAddEvaluatorForRunnerId(null);
-        }}
+      {/* Handler for PromptEditorDrawer - manages local config state */}
+      <PromptEditorDrawerHandler
+        runnerId={drawerParams.runnerId}
+        isOpen={drawerOpen("promptEditor")}
+        onSelectPrompt={handleSelectPrompt}
       />
     </Box>
   );

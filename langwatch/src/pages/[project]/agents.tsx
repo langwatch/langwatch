@@ -47,11 +47,11 @@ function Page() {
     // Open the appropriate editor based on agent type
     switch (agent.type) {
       case "code":
-        openDrawer("agentCodeEditor", { agentId: agent.id });
+        openDrawer("agentCodeEditor", { urlParams: { agentId: agent.id } });
         break;
       case "workflow":
         // Workflow agents can't be edited directly, just view
-        openDrawer("workflowSelector", { agentId: agent.id });
+        openDrawer("workflowSelector", { urlParams: { agentId: agent.id } });
         break;
     }
   };

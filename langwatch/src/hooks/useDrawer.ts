@@ -1,55 +1,87 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { createLogger } from "../utils/logger";
+import {
+  drawers,
+  type DrawerType,
+  type DrawerProps,
+  type DrawerCallbacks,
+} from "../components/drawerRegistry";
 
 const logger = createLogger("useDrawer");
 
+// ============================================================================
+// Complex Props (per-drawer, replaced on each navigation)
+// ============================================================================
+
 /**
- * Drawer type registry. Add new drawer types here.
+ * Complex props for the currently active drawer.
+ * These are non-serializable props (functions, objects) that can't go in the URL.
+ * Replaced on each openDrawer call.
  */
-export type DrawerType =
-  | "traceDetails"
-  | "batchEvaluation"
-  | "trigger"
-  | "addOrEditAnnotationScore"
-  | "addAnnotationQueue"
-  | "addDatasetRecord"
-  | "llmModelCost"
-  | "uploadCSV"
-  | "addOrEditDataset"
-  | "editTriggerFilter"
-  | "seriesFilters"
-  | "selectDataset"
-  // Runner type selector (Prompt vs Agent)
-  | "runnerTypeSelector"
-  // Prompt drawers
-  | "promptList"
-  | "promptEditor"
-  // Agent drawers (code or workflow only)
-  | "agentList"
-  | "agentTypeSelector"
-  | "agentCodeEditor"
-  | "workflowSelector"
-  // Evaluator drawers
-  | "evaluatorList"
-  | "evaluatorCategorySelector"
-  | "evaluatorTypeSelector"
-  | "evaluatorEditor"
-  | "workflowSelectorForEvaluator";
+let complexProps: Record<string, unknown> = {};
 
-/** Generic callback type for drawer props - callers must narrow before use */
-type DrawerCallback = (...args: unknown[]) => void;
+export const getComplexProps = () => complexProps;
 
-// workaround to pass complexProps to drawers
-let complexProps = {} as Record<string, DrawerCallback>;
+// ============================================================================
+// Flow Callbacks (persist across drawer navigation within a flow)
+// ============================================================================
 
-export const getComplexProps = () => {
-  return complexProps;
+/**
+ * Flow callbacks registry - persists across drawer navigation.
+ * Use this for callbacks that need to survive navigation between drawers
+ * (e.g., onSelectPrompt callback that should work in promptList even when
+ * opened from runnerTypeSelector).
+ *
+ * Cleared automatically when closeDrawer() is called.
+ */
+let flowCallbacks: Record<string, Record<string, unknown>> = {};
+
+/**
+ * Set flow callbacks for a specific drawer type.
+ * These persist across drawer navigation until closeDrawer() is called.
+ *
+ * @example
+ * // In EvaluationsV3Table:
+ * setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
+ * setFlowCallbacks("agentList", { onSelect: handleSelectAgent });
+ * openDrawer("runnerTypeSelector");
+ *
+ * // Later, in PromptListDrawer, callbacks are available via getFlowCallbacks
+ */
+export const setFlowCallbacks = <T extends DrawerType>(
+  drawer: T,
+  callbacks: DrawerCallbacks<T>,
+) => {
+  flowCallbacks[drawer] = callbacks as Record<string, unknown>;
 };
 
 /**
- * Drawer stack entry for navigation history.
+ * Get flow callbacks for a specific drawer type.
+ * Returns undefined if no callbacks are registered for this drawer.
  */
+export const getFlowCallbacks = <T extends DrawerType>(
+  drawer: T,
+): DrawerCallbacks<T> | undefined => {
+  return flowCallbacks[drawer] as DrawerCallbacks<T> | undefined;
+};
+
+/**
+ * Clear all flow callbacks. Called automatically by closeDrawer().
+ */
+export const clearFlowCallbacks = () => {
+  flowCallbacks = {};
+};
+
+/**
+ * Get all flow callbacks (for debugging/testing).
+ */
+export const getAllFlowCallbacks = () => flowCallbacks;
+
+// ============================================================================
+// Drawer Stack (navigation history)
+// ============================================================================
+
 type DrawerStackEntry = {
   drawer: DrawerType;
   params: Record<string, unknown>;
@@ -57,21 +89,18 @@ type DrawerStackEntry = {
 
 /**
  * Module-level drawer stack for tracking navigation history.
- * This enables automatic back button visibility based on navigation depth.
+ * Enables automatic back button visibility based on navigation depth.
  */
 let drawerStack: DrawerStackEntry[] = [];
 
-/**
- * Get the current drawer stack (for testing/debugging).
- */
 export const getDrawerStack = () => drawerStack;
-
-/**
- * Clear the drawer stack (useful for testing).
- */
 export const clearDrawerStack = () => {
   drawerStack = [];
 };
+
+// ============================================================================
+// URL Params
+// ============================================================================
 
 /**
  * Get simple (serializable) drawer params from URL query.
@@ -91,6 +120,10 @@ export const useDrawerParams = () => {
   return params;
 };
 
+// ============================================================================
+// Main Hook
+// ============================================================================
+
 /**
  * Hook to manage drawer state via URL query params.
  * Includes navigation stack for automatic back button handling.
@@ -109,12 +142,13 @@ export const useDrawer = () => {
     props?: Record<string, unknown>,
     options: { replace?: boolean } = {},
   ) => {
+    // Extract non-serializable props into complexProps
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
         ([_key, value]) =>
           typeof value === "function" || typeof value === "object",
       ),
-    ) as Record<string, DrawerCallback>;
+    );
 
     void router[options.replace ? "replace" : "push"](
       "?" +
@@ -136,7 +170,7 @@ export const useDrawer = () => {
           {
             allowDots: true,
             arrayFormat: "comma",
-            // @ts-ignore of course it exists
+            // @ts-ignore - allowEmptyArrays exists
             allowEmptyArrays: true,
           },
         ),
@@ -145,48 +179,74 @@ export const useDrawer = () => {
     );
   };
 
+  /**
+   * Open a drawer with type-safe props.
+   *
+   * @param drawer - The drawer type to open
+   * @param props - Props for the drawer component (type-checked against drawer props).
+   *                Can also include additional URL params via the `urlParams` property.
+   * @param options - Options like { replace: true } to replace URL instead of push
+   *
+   * @example
+   * // Type-safe drawer props
+   * openDrawer("promptEditor", { promptId: "abc" });
+   *
+   * // With additional URL params for context
+   * openDrawer("promptEditor", { promptId: "abc", urlParams: { runnerId: "123" } });
+   */
   const openDrawer = <T extends DrawerType>(
     drawer: T,
-    props?: Record<string, unknown>,
+    props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
     { replace }: { replace?: boolean } = {},
   ) => {
+    // Extract urlParams and merge with props
+    const { urlParams, ...drawerProps } = props ?? {};
+    const allParams = { ...drawerProps, ...urlParams } as Record<string, unknown>;
+
     // Manage drawer stack for navigation history
     if (currentDrawer) {
       // A drawer is already open - navigating forward, push to stack
-      drawerStack.push({ drawer, params: props ?? {} });
+      drawerStack.push({ drawer, params: allParams });
     } else {
       // No drawer open - fresh start, reset stack
-      drawerStack = [{ drawer, params: props ?? {} }];
+      drawerStack = [{ drawer, params: allParams }];
     }
 
-    const badKeys = Object.entries(props ?? {})
+    const badKeys = Object.entries(allParams)
       .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
       .map(([k]) => k);
     if (badKeys.length > 0) {
       logger.warn(
-        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}`,
+        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}. ` +
+          `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
       );
     }
 
-    updateDrawerUrl(drawer, props, { replace });
+    updateDrawerUrl(drawer, allParams, { replace });
   };
 
+  /**
+   * Close the current drawer.
+   * Also clears the drawer stack and flow callbacks.
+   */
   const closeDrawer = () => {
-    // Clear the entire stack when closing
+    // Clear the entire stack and flow callbacks
     drawerStack = [];
+    clearFlowCallbacks();
+    complexProps = {};
 
     void router.push(
       "?" +
         qs.stringify(
           Object.fromEntries(
             Object.entries(router.query).filter(
-              ([key]) => !key.startsWith("drawer.") && key !== "span", // remove span key as well left by trace details
+              ([key]) => !key.startsWith("drawer.") && key !== "span",
             ),
           ),
           {
             allowDots: true,
             arrayFormat: "comma",
-            // @ts-ignore of course it exists
+            // @ts-ignore - allowEmptyArrays exists
             allowEmptyArrays: true,
           },
         ),
@@ -219,6 +279,9 @@ export const useDrawer = () => {
     updateDrawerUrl(previous.drawer, previous.params, { replace: true });
   };
 
+  /**
+   * Check if a specific drawer is currently open.
+   */
   const drawerOpen = (drawer: DrawerType) => {
     return router.query["drawer.open"] === drawer;
   };
@@ -229,5 +292,17 @@ export const useDrawer = () => {
    */
   const canGoBack = drawerStack.length > 1;
 
-  return { openDrawer, closeDrawer, drawerOpen, goBack, canGoBack };
+  return {
+    openDrawer,
+    closeDrawer,
+    drawerOpen,
+    goBack,
+    canGoBack,
+    currentDrawer,
+    setFlowCallbacks,
+    getFlowCallbacks,
+  };
 };
+
+// Re-export types for convenience
+export type { DrawerType, DrawerProps, DrawerCallbacks } from "../components/drawerRegistry";

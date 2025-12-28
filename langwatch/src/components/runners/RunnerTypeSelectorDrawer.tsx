@@ -30,13 +30,13 @@ const runnerTypes: Array<{
     type: "prompt",
     icon: FileText,
     title: "Prompt",
-    description: "Use a versioned prompt from your Prompts library",
+    description: "Select versioned prompt or create a new one",
   },
   {
     type: "agent",
     icon: Bot,
     title: "Agent",
-    description: "Use a code executor or workflow-based agent",
+    description: "Integrate with your existing agent or create a workflow",
   },
 ];
 
@@ -53,8 +53,18 @@ export function RunnerTypeSelectorDrawer(props: RunnerTypeSelectorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: RunnerType) => {
-    // Just call onSelect - parent handles navigation
-    onSelect?.(type);
+    // Navigate to appropriate drawer based on type
+    if (onSelect) {
+      // Parent handles navigation (backward compat)
+      onSelect(type);
+    } else {
+      // Use drawer navigation
+      if (type === "prompt") {
+        openDrawer("promptList", {}, { replace: true });
+      } else if (type === "agent") {
+        openDrawer("agentList", {}, { replace: true });
+      }
+    }
   };
 
   return (
@@ -148,18 +158,18 @@ function RunnerTypeCard({ type, icon: Icon, title, description, onClick }: Runne
     >
       <HStack gap={4} align="start">
         <Box
-          padding={3}
+          padding={1}
           borderRadius="md"
           bg={iconBg}
           color={`${iconColor}.600`}
         >
-          <Icon size={24} />
+          <Icon size={16} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="semibold" fontSize="md">
+          <Text fontWeight="medium">
             {title}
           </Text>
-          <Text fontSize="sm" color="gray.600">
+          <Text fontSize="13px" color="gray.600">
             {description}
           </Text>
         </VStack>
