@@ -239,3 +239,84 @@ Feature: Runner configuration
     Then the PromptListDrawer opens with a back button
     When I click the back button
     Then I return to the RunnerTypeSelectorDrawer
+
+  # ============================================================================
+  # Unpublished prompt modifications (local tinkering)
+  # ============================================================================
+
+  Scenario: Edit prompt and close without saving persists local changes
+    Given a prompt runner "my-assistant" is configured
+    When I click on the runner header "my-assistant"
+    And I click "Edit Prompt" in the menu
+    And I modify the system message to "You are a modified assistant"
+    And I close the drawer without clicking Save
+    Then the local modifications are preserved in the runner config
+    And no new version is published to the Prompts system
+
+  Scenario: Runner header shows orange dot for unpublished modifications
+    Given a prompt runner "my-assistant" is configured
+    And the runner has unpublished local modifications
+    Then the runner header shows an orange dot next to the name
+    And hovering the dot shows tooltip "Unpublished modifications"
+
+  Scenario: Orange dot disappears after publishing
+    Given a prompt runner "my-assistant" has unpublished modifications
+    When I click "Edit Prompt" in the menu
+    And I click "Save" to publish the changes
+    Then the orange dot disappears from the runner header
+    And a new version is created in the Prompts system
+
+  Scenario: Run evaluation with unpublished modifications
+    Given a prompt runner "my-assistant" has unpublished modifications
+    When I run the evaluation
+    Then the evaluation uses the unpublished local configuration
+    And the published version remains unchanged
+
+  Scenario: PromptEditorDrawer header matches prompt playground
+    Given a prompt runner "my-assistant" is configured
+    When I click "Edit Prompt" in the menu
+    Then the PromptEditorDrawer shows a header above the messages
+    And the header contains a model selector (ModelSelectFieldMini)
+    And the header contains a version history button
+    And the header contains a Save/Saved button
+    And there is no save button in the footer
+
+  Scenario: Save button shows "Saved" when no changes
+    Given the PromptEditorDrawer is open for prompt "my-assistant"
+    And no modifications have been made
+    Then the Save button shows "Saved" and is disabled
+
+  Scenario: Save button shows "Save" when changes exist
+    Given the PromptEditorDrawer is open for prompt "my-assistant"
+    When I modify any field (model, message, inputs, or outputs)
+    Then the Save button shows "Save" and is enabled
+
+  Scenario: Version history restore updates form
+    Given the PromptEditorDrawer is open for prompt "my-assistant"
+    When I click the version history button
+    And I select a previous version to restore
+    Then the form is updated with the restored version's content
+    And the Save button shows "Save" (indicating unsaved changes)
+
+  Scenario: Discard local changes from version history drawer
+    Given the PromptEditorDrawer is open for prompt "my-assistant"
+    And I have made unpublished modifications
+    When I click the version history button
+    Then I see a "Discard local changes" button below the current version badge
+    When I click "Discard local changes"
+    Then the form is reset to the last published version
+    And the Save button shows "Saved"
+    And the orange dot disappears from the runner header
+
+  Scenario: Local config updates immediately on form change
+    Given a prompt runner "my-assistant" is configured
+    When I click "Edit Prompt" in the menu
+    And I modify the system message
+    Then the orange dot appears immediately on the runner header
+    And I can run the evaluation with the modified config without closing the drawer
+
+  Scenario: Orange dot disappears when changes are reverted
+    Given a prompt runner "my-assistant" has unpublished modifications
+    When I click "Edit Prompt" in the menu
+    And I revert my changes to match the published version
+    Then the orange dot disappears from the runner header

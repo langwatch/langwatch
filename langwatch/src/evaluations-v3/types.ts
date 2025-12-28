@@ -1,6 +1,7 @@
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { Field } from "~/optimization_studio/types/dsl";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
 // Dataset Types
@@ -94,6 +95,28 @@ export type EvaluatorConfig = {
 export type RunnerType = "prompt" | "agent";
 
 /**
+ * Local prompt configuration for unpublished modifications.
+ * Stores the prompt config locally in the runner without publishing a new version.
+ * Used for quick tinkering - allows running evaluations against modified prompts
+ * without committing to the versioning system.
+ */
+export type LocalPromptConfig = {
+  llm: {
+    model: string;
+    temperature?: number;
+    maxTokens?: number;
+    litellmParams?: Record<string, string>;
+  };
+  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
+  inputs: Array<{ identifier: string; type: LlmConfigInputType }>;
+  outputs: Array<{
+    identifier: string;
+    type: LlmConfigOutputType;
+    json_schema?: unknown;
+  }>;
+};
+
+/**
  * Runner configuration - unified type for prompts and agents in evaluations.
  * A runner can be either:
  * - A Prompt: references a versioned prompt from the Prompts system
@@ -108,6 +131,11 @@ export type RunnerConfig = {
   // For prompts - reference to versioned prompt from Prompts system
   promptId?: string;
   promptVersionId?: string;
+
+  // For prompts - local unpublished modifications
+  // When set, this config is used for evaluation instead of the published version.
+  // Allows quick tinkering without committing to the versioning system.
+  localPromptConfig?: LocalPromptConfig;
 
   // For agents - reference to database-backed agent (code or workflow)
   // Agent type and workflow ID are fetched at runtime via dbAgentId

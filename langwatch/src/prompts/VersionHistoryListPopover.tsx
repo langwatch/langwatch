@@ -74,13 +74,17 @@ const VersionNumberBox = ({
 function VersionHistoryItem({
   data,
   onRestore,
+  onDiscardChanges,
   isLoading,
   isCurrent,
+  hasUnsavedChanges,
 }: {
   data: VersionHistoryItemData;
   onRestore: () => void;
+  onDiscardChanges?: () => void;
   isLoading: boolean;
   isCurrent: boolean;
+  hasUnsavedChanges?: boolean;
 }) {
   return (
     <VStack width="full" align="start" paddingBottom={2}>
@@ -113,6 +117,19 @@ function VersionHistoryItem({
             </Avatar.Root>
             {data.author?.name}
           </HStack>
+          {/* Discard changes button for current version when there are unsaved changes */}
+          {isCurrent && hasUnsavedChanges && onDiscardChanges && (
+            <Button
+              size="xs"
+              variant="outline"
+              colorPalette="red"
+              onClick={onDiscardChanges}
+              data-testid="discard-local-changes-button"
+              marginTop={1}
+            >
+              Discard local changes
+            </Button>
+          )}
         </VStack>
         {!isCurrent && (
           <Tooltip
@@ -140,11 +157,15 @@ function VersionHistoryItem({
 function VersionHistoryList({
   versions,
   onRestore,
+  onDiscardChanges,
   isLoading,
+  hasUnsavedChanges,
 }: {
   versions: VersionHistoryItemData[];
   onRestore: (params: { versionId: string }) => void;
+  onDiscardChanges?: () => void;
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
 }) {
   return (
     <VStack
@@ -159,8 +180,10 @@ function VersionHistoryList({
           key={version.versionId}
           data={version}
           onRestore={() => void onRestore({ versionId: version.versionId })}
+          onDiscardChanges={onDiscardChanges}
           isCurrent={index === 0}
           isLoading={isLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
         />
       ))}
     </VStack>
@@ -192,12 +215,16 @@ function VersionHistoryTrigger({
  */
 function VersionHistoryContent({
   onRestore,
+  onDiscardChanges,
   versions,
   isLoading,
+  hasUnsavedChanges,
 }: {
   onRestore: (params: { versionId: string }) => void;
+  onDiscardChanges?: () => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
 }) {
   return (
     <Popover.Content width="500px">
@@ -210,7 +237,9 @@ function VersionHistoryContent({
         <VersionHistoryList
           versions={versions}
           onRestore={onRestore}
+          onDiscardChanges={onDiscardChanges}
           isLoading={isLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
         />
       </Popover.Body>
     </Popover.Content>
@@ -224,15 +253,19 @@ function VersionHistoryPopover({
   isOpen,
   onOpenChange,
   onRestore,
+  onDiscardChanges,
   versions,
   isLoading,
+  hasUnsavedChanges,
   label,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRestore: (params: { versionId: string }) => void;
+  onDiscardChanges?: () => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
   label?: string;
 }) {
   return (
@@ -241,8 +274,10 @@ function VersionHistoryPopover({
       {isOpen && (
         <VersionHistoryContent
           onRestore={onRestore}
+          onDiscardChanges={onDiscardChanges}
           versions={versions}
           isLoading={isLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
         />
       )}
     </Popover.Root>
@@ -255,10 +290,14 @@ function VersionHistoryPopover({
 export function VersionHistoryListPopover({
   configId,
   onRestoreSuccess,
+  onDiscardChanges,
+  hasUnsavedChanges,
   label,
 }: {
   configId: string;
   onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
+  onDiscardChanges?: () => void;
+  hasUnsavedChanges?: boolean;
   label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
@@ -310,6 +349,11 @@ export function VersionHistoryListPopover({
     [restoreVersion, onRestoreSuccess, onClose, project?.id],
   );
 
+  const handleDiscardChanges = useCallback(() => {
+    onDiscardChanges?.();
+    onClose();
+  }, [onDiscardChanges, onClose]);
+
   return (
     <VersionHistoryPopover
       isOpen={open}
@@ -317,8 +361,10 @@ export function VersionHistoryListPopover({
         setOpen(open);
       }}
       onRestore={handleRestore}
+      onDiscardChanges={handleDiscardChanges}
       versions={prompts}
       isLoading={isLoading}
+      hasUnsavedChanges={hasUnsavedChanges}
       label={label}
     />
   );

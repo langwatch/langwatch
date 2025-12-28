@@ -1,18 +1,22 @@
 import {
   Box,
   Button,
+  Circle,
   HStack,
   Icon,
   IconButton,
   Spacer,
   Text,
 } from "@chakra-ui/react";
+import { memo } from "react";
 import { Code, Edit2, Trash2 } from "react-feather";
 import { ChevronDown, FileText } from "lucide-react";
 import { LuPlay } from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { RunnerConfig } from "../../types";
 
 type RunnerHeaderProps = {
@@ -32,13 +36,31 @@ type RunnerHeaderProps = {
  *
  * Note: For workflow agents, clicking "Edit Agent" opens the workflow in a new tab.
  * This is determined at runtime by fetching the agent data via tRPC.
+ *
+ * Memoized to prevent unnecessary re-renders when other runners' config changes.
  */
-export function RunnerHeader({
+export const RunnerHeader = memo(function RunnerHeader({
   runner,
   onEdit,
   onRemove,
   onRun,
 }: RunnerHeaderProps) {
+  // First check if prop has localPromptConfig (for direct prop usage)
+  const propHasUnpublished =
+    runner.type === "prompt" && !!runner.localPromptConfig;
+
+  // Subscribe directly to just this runner's unpublished state from store
+  // This is used when the table passes runners without localPromptConfig in props
+  // (e.g., when using useShallow which doesn't deep-compare)
+  const storeHasUnpublished = useEvaluationsV3Store((state) => {
+    if (runner.type !== "prompt") return false;
+    const currentRunner = state.runners.find((r) => r.id === runner.id);
+    return currentRunner?.type === "prompt" && !!currentRunner.localPromptConfig;
+  });
+
+  // Use prop value if available, otherwise use store value
+  const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
+
   // Determine icon based on runner type
   const getRunnerIcon = () => {
     if (runner.type === "prompt") {
@@ -54,7 +76,7 @@ export function RunnerHeader({
   const editLabel = runner.type === "prompt" ? "Edit Prompt" : "Edit Agent";
 
   return (
-    <HStack gap={2} width="full">
+    <HStack gap={2} width="full" marginY={-2}>
       <Menu.Root positioning={{ placement: "bottom-start" }}>
         <Menu.Trigger asChild>
           <Button
@@ -77,12 +99,27 @@ export function RunnerHeader({
             <Text fontSize="13px" fontWeight="medium" truncate>
               {runner.name}
             </Text>
+            {hasUnpublishedChanges && (
+              <Tooltip
+                content="Unpublished modifications"
+                positioning={{ placement: "top" }}
+                openDelay={0}
+                showArrow
+              >
+                <Circle
+                  size="8px"
+                  bg="orange.400"
+                  flexShrink={0}
+                  data-testid="unpublished-indicator"
+                />
+              </Tooltip>
+            )}
             <Icon
               as={ChevronDown}
               width={2.5}
               height={2.5}
-              display="none"
-              _groupHover={{ display: "block" }}
+              visibility="hidden"
+              _groupHover={{ visibility: "visible" }}
             />
           </Button>
         </Menu.Trigger>
@@ -123,4 +160,4 @@ export function RunnerHeader({
       </IconButton>
     </HStack>
   );
-}
+});

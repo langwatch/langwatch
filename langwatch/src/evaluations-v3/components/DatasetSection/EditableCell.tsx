@@ -131,7 +131,7 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
           position: "fixed",
           top: rect.top - 8,
           left: rect.left - 8,
-          width: Math.max(rect.width, 250),
+          width: Math.max(rect.width + padding, 250),
           minHeight: rect.height + padding,
           zIndex: 1000,
         });

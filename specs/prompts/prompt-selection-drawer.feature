@@ -222,3 +222,48 @@ Feature: Prompt selection drawer
     Given prompts exist with different models
     When I filter by model "openai/gpt-4o"
     Then only prompts using that model are shown
+
+  # ============================================================================
+  # PromptEditorDrawer - Header structure (matches prompt playground)
+  # ============================================================================
+
+  Scenario: PromptEditorDrawer header displays model selector
+    When the PromptEditorDrawer opens for "my-assistant"
+    Then I see a header bar above the messages section
+    And the header contains a ModelSelectFieldMini component
+    And clicking the model selector opens the LLM configuration modal
+
+  Scenario: PromptEditorDrawer header displays version history button
+    Given prompt "my-assistant" exists with multiple versions
+    When the PromptEditorDrawer opens for "my-assistant"
+    Then the header contains a version history button
+    And clicking it shows the version history panel
+
+  Scenario: PromptEditorDrawer header displays Save button
+    When the PromptEditorDrawer opens for "my-assistant"
+    Then the header contains a Save/Saved button on the right
+    And the button shows "Saved" when no changes exist
+    And the button shows "Save" when changes exist
+
+  Scenario: No version history button in create mode
+    When the PromptEditorDrawer opens in create mode
+    Then no version history button is shown
+    And the Save button is enabled once name is provided
+
+  # ============================================================================
+  # Close without save behavior (for evaluations context)
+  # ============================================================================
+
+  Scenario: Close without save in evaluations context preserves local changes
+    Given the PromptEditorDrawer is open from evaluations-v3
+    And I have made modifications to the prompt
+    When I close the drawer without saving
+    Then no confirmation dialog appears
+    And the modifications are stored locally in the runner config
+    And I can run evaluations with the modified prompt
+
+  Scenario: Close without save in standalone context warns user
+    Given the PromptEditorDrawer is open directly (not from evaluations)
+    And I have made modifications to the prompt
+    When I close the drawer without saving
+    Then a confirmation dialog asks if I want to discard changes

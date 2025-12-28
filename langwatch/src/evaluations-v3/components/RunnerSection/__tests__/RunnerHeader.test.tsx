@@ -128,6 +128,86 @@ describe("RunnerHeader", () => {
     });
   });
 
+  describe("Unpublished modifications indicator", () => {
+    const promptRunnerWithLocalConfig: RunnerConfig = {
+      id: "runner-3",
+      name: "modified-prompt",
+      type: "prompt",
+      promptId: "prompt-123",
+      promptVersionId: "version-456",
+      localPromptConfig: {
+        llm: { model: "openai/gpt-4o", temperature: 0.7 },
+        messages: [{ role: "system", content: "Modified content" }],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      },
+      inputs: [],
+      outputs: [],
+      mappings: {},
+      evaluatorIds: [],
+    };
+
+    const promptRunnerWithoutLocalConfig: RunnerConfig = {
+      id: "runner-4",
+      name: "published-prompt",
+      type: "prompt",
+      promptId: "prompt-456",
+      promptVersionId: "version-789",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+      evaluatorIds: [],
+    };
+
+    it("does not show orange dot when no localPromptConfig", () => {
+      renderWithProviders(
+        <RunnerHeader
+          runner={promptRunnerWithoutLocalConfig}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />
+      );
+
+      expect(screen.queryByTestId("unpublished-indicator")).not.toBeInTheDocument();
+    });
+
+    it("shows orange dot when localPromptConfig exists", () => {
+      renderWithProviders(
+        <RunnerHeader
+          runner={promptRunnerWithLocalConfig}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />
+      );
+
+      expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
+    });
+
+    it("does not show orange dot for agent runners even with localPromptConfig", () => {
+      const agentWithLocalConfig: RunnerConfig = {
+        id: "runner-5",
+        name: "Agent",
+        type: "agent",
+        dbAgentId: "agent-123",
+        // Even if this were somehow set, agents shouldn't show it
+        inputs: [],
+        outputs: [],
+        mappings: {},
+        evaluatorIds: [],
+      };
+
+      renderWithProviders(
+        <RunnerHeader
+          runner={agentWithLocalConfig}
+          onEdit={mockOnEdit}
+          onRemove={mockOnRemove}
+        />
+      );
+
+      expect(screen.queryByTestId("unpublished-indicator")).not.toBeInTheDocument();
+    });
+  });
+
   describe("Agent runner", () => {
     const agentRunner: RunnerConfig = {
       id: "runner-2",

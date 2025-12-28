@@ -81,6 +81,48 @@ const evaluatorConfigSchema = z.object({
 });
 
 /**
+ * Zod schema for local prompt config validation.
+ * Stores unpublished prompt modifications for quick tinkering.
+ */
+const localPromptConfigSchema = z.object({
+  llm: z.object({
+    model: z.string(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+    litellmParams: z.record(z.string(), z.string()).optional(),
+  }),
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant", "system"]),
+      content: z.string(),
+    })
+  ),
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum([
+        "str",
+        "float",
+        "bool",
+        "image",
+        "list[str]",
+        "list[float]",
+        "list[int]",
+        "list[bool]",
+        "dict",
+      ]),
+    })
+  ),
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum(["str", "float", "bool", "json_schema"]),
+      json_schema: z.unknown().optional(),
+    })
+  ),
+});
+
+/**
  * Zod schema for runner config validation.
  * Runners can be either prompts (referencing saved prompts) or agents (code/workflow).
  */
@@ -91,6 +133,8 @@ const runnerConfigSchema = z.object({
   // For prompt type
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),
+  // For prompt type - local unpublished modifications
+  localPromptConfig: localPromptConfigSchema.optional(),
   // For agent type
   dbAgentId: z.string().optional(),
   // Common fields
