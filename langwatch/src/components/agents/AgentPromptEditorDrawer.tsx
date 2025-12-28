@@ -1,18 +1,18 @@
 import {
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   Spinner,
-  Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Controller, FormProvider, useFieldArray } from "react-hook-form";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { TypedAgent } from "~/server/agents/agent.repository";
@@ -33,7 +33,6 @@ export type AgentPromptEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSave?: (agent: TypedAgent) => void;
-  onBack?: () => void;
   /** If provided, loads an existing agent for editing */
   agentId?: string;
 };
@@ -83,14 +82,17 @@ const agentConfigToInitialValues = (
  */
 export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const drawerParams = useDrawerParams();
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave = props.onSave ?? (complexProps.onSave as AgentPromptEditorDrawerProps["onSave"]);
-  const onBack = props.onBack ?? (() => openDrawer("agentTypeSelector"));
-  const agentId = props.agentId ?? (complexProps.agentId as string | undefined);
+  const agentId =
+    props.agentId ??
+    drawerParams.agentId ??
+    (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Form state
@@ -216,20 +218,21 @@ export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <MessageSquare size={20} />
-            <Text fontSize="xl" fontWeight="semibold">
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>
               {agentId ? "Edit Prompt Agent" : "New Prompt Agent"}
-            </Text>
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
@@ -323,7 +326,7 @@ export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={handleSave}
               disabled={!isValid || isSaving}
               loading={isSaving}

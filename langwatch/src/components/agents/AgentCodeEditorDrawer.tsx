@@ -2,17 +2,18 @@ import {
   Box,
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Code } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 import { useState, useCallback, useEffect } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
@@ -73,7 +74,6 @@ export type AgentCodeEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSave?: (agent: TypedAgent) => void;
-  onBack?: () => void;
   /** If provided, loads an existing agent for editing */
   agentId?: string;
 };
@@ -84,16 +84,19 @@ export type AgentCodeEditorDrawerProps = {
  */
 export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const drawerParams = useDrawerParams();
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ??
     (complexProps.onSave as AgentCodeEditorDrawerProps["onSave"]);
-  const onBack = props.onBack ?? (() => openDrawer("agentTypeSelector"));
-  const agentId = props.agentId ?? (complexProps.agentId as string | undefined);
+  const agentId =
+    props.agentId ??
+    drawerParams.agentId ??
+    (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Form state
@@ -207,20 +210,21 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Code size={20} />
-            <Text fontSize="xl" fontWeight="semibold">
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>
               {agentId ? "Edit Code Agent" : "New Code Agent"}
-            </Text>
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -269,7 +273,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={handleSave}
               disabled={!isValid || isSaving}
               loading={isSaving}

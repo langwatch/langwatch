@@ -1,14 +1,17 @@
 import {
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { LuArrowLeft } from "react-icons/lu";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { z } from "zod";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
@@ -18,16 +21,21 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
+import DynamicZodForm from "~/components/checks/DynamicZodForm";
+import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
 
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSave?: (evaluator: { id: string; name: string }) => void;
-  onBack?: () => void;
   /** Evaluator type (e.g., "langevals/exact_match") */
   evaluatorType?: string;
   /** If provided, loads an existing evaluator for editing */
   evaluatorId?: string;
+  /** Category for back navigation (informational only) */
+  category?: EvaluatorCategoryId;
 };
 
 /**
@@ -36,7 +44,7 @@ export type EvaluatorEditorDrawerProps = {
  */
 export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
@@ -45,39 +53,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const onSave =
     props.onSave ??
     (complexProps.onSave as EvaluatorEditorDrawerProps["onSave"]);
-  const onBack =
-    props.onBack ?? (() => openDrawer("evaluatorTypeSelector"));
-  // Get evaluatorType from props, URL params, or complexProps (in that order)
-  const evaluatorType =
-    props.evaluatorType ??
-    drawerParams.evaluatorType ??
-    (complexProps.evaluatorType as string | undefined);
+
+  // Get evaluatorId from props, URL params, or complexProps
   const evaluatorId =
-    props.evaluatorId ?? drawerParams.evaluatorId ?? (complexProps.evaluatorId as string | undefined);
+    props.evaluatorId ??
+    drawerParams.evaluatorId ??
+    (complexProps.evaluatorId as string | undefined);
+
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // Form state
-  const [name, setName] = useState("");
-  const [settings, setSettings] = useState<Record<string, unknown>>({});
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  // Get evaluator definition
-  const evaluatorDef = evaluatorType
-    ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
-    : undefined;
-
-  // Initialize default settings from evaluator definition
-  useEffect(() => {
-    if (evaluatorDef?.settings && !evaluatorId) {
-      const defaults: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(evaluatorDef.settings)) {
-        defaults[key] = (value as { default: unknown }).default;
-      }
-      setSettings(defaults);
-      // Set default name based on evaluator name
-      setName(evaluatorDef.name);
-    }
-  }, [evaluatorDef, evaluatorId]);
 
   // Load existing evaluator if editing
   const evaluatorQuery = api.evaluators.getById.useQuery(
@@ -85,19 +68,74 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     { enabled: !!evaluatorId && !!project?.id && isOpen },
   );
 
+  // Get evaluatorType from props, URL params, complexProps, or loaded evaluator data
+  const loadedEvaluatorType = (
+    evaluatorQuery.data?.config as { evaluatorType?: string } | null
+  )?.evaluatorType;
+  const evaluatorType =
+    props.evaluatorType ??
+    drawerParams.evaluatorType ??
+    (complexProps.evaluatorType as string | undefined) ??
+    loadedEvaluatorType;
+
+  // Get evaluator definition
+  const evaluatorDef = evaluatorType
+    ? AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes]
+    : undefined;
+
+  // Get the schema for this evaluator type
+  const settingsSchema = useMemo(() => {
+    if (!evaluatorType) return undefined;
+    const schema =
+      evaluatorsSchema.shape[evaluatorType as EvaluatorTypes]?.shape?.settings;
+    return schema;
+  }, [evaluatorType]);
+
+  // Get default settings
+  const defaultSettings = useMemo(() => {
+    if (!evaluatorDef || !project) return {};
+    return getEvaluatorDefaultSettings(evaluatorDef, project) ?? {};
+  }, [evaluatorDef, project]);
+
+  // Form state using react-hook-form
+  const form = useForm<{ name: string; settings: Record<string, unknown> }>({
+    defaultValues: {
+      name: evaluatorDef?.name ?? "",
+      settings: defaultSettings,
+    },
+  });
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Update form defaults when evaluator type changes
+  useEffect(() => {
+    if (evaluatorDef && !evaluatorId) {
+      form.reset({
+        name: evaluatorDef.name,
+        settings: defaultSettings,
+      });
+    }
+  }, [evaluatorDef, evaluatorId, defaultSettings, form]);
+
   // Initialize form with evaluator data
   useEffect(() => {
     if (evaluatorQuery.data) {
-      setName(evaluatorQuery.data.name);
       const config = evaluatorQuery.data.config as {
         settings?: Record<string, unknown>;
       } | null;
-      if (config?.settings) {
-        setSettings(config.settings);
-      }
+      form.reset({
+        name: evaluatorQuery.data.name,
+        settings: config?.settings ?? {},
+      });
       setHasUnsavedChanges(false);
     }
-  }, [evaluatorQuery.data]);
+  }, [evaluatorQuery.data, form]);
+
+  // Track form changes
+  useEffect(() => {
+    const subscription = form.watch(() => setHasUnsavedChanges(true));
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   // Mutations
   const createMutation = api.evaluators.create.useMutation({
@@ -121,27 +159,29 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0;
+  const name = form.watch("name");
+  const isValid = name?.trim().length > 0;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid || !evaluatorType) return;
 
+    const formValues = form.getValues();
     const config = {
       evaluatorType,
-      settings,
+      settings: formValues.settings,
     };
 
     if (evaluatorId) {
       updateMutation.mutate({
         id: evaluatorId,
         projectId: project.id,
-        name: name.trim(),
+        name: formValues.name.trim(),
         config,
       });
     } else {
       createMutation.mutate({
         projectId: project.id,
-        name: name.trim(),
+        name: formValues.name.trim(),
         type: "evaluator",
         config,
       });
@@ -150,17 +190,11 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     project?.id,
     evaluatorId,
     evaluatorType,
-    name,
-    settings,
     isValid,
+    form,
     createMutation,
     updateMutation,
   ]);
-
-  const handleNameChange = (value: string) => {
-    setName(value);
-    setHasUnsavedChanges(true);
-  };
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
@@ -175,6 +209,10 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     onClose();
   };
 
+  const hasSettings =
+    settingsSchema instanceof z.ZodObject &&
+    Object.keys(settingsSchema.shape).length > 0;
+
   return (
     <Drawer.Root
       open={isOpen}
@@ -185,19 +223,21 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Text fontSize="xl" fontWeight="semibold">
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>
               {evaluatorDef?.name ?? "Configure Evaluator"}
-            </Text>
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -211,55 +251,50 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               <Spinner size="md" />
             </HStack>
           ) : (
-            <VStack
-              gap={4}
-              align="stretch"
-              flex={1}
-              paddingX={6}
-              paddingY={4}
-              overflowY="auto"
-            >
-              {/* Description */}
-              {evaluatorDef?.description && (
-                <Text fontSize="sm" color="gray.600">
-                  {evaluatorDef.description}
-                </Text>
-              )}
+            <FormProvider {...form}>
+              <VStack
+                gap={4}
+                align="stretch"
+                flex={1}
+                paddingX={6}
+                paddingY={4}
+                overflowY="auto"
+              >
+                {/* Description */}
+                {evaluatorDef?.description && (
+                  <Text fontSize="sm" color="gray.600">
+                    {evaluatorDef.description}
+                  </Text>
+                )}
 
-              {/* Name field */}
-              <Field.Root required>
-                <Field.Label>Evaluator Name</Field.Label>
-                <Input
-                  value={name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="Enter evaluator name"
-                  data-testid="evaluator-name-input"
-                />
-              </Field.Root>
+                {/* Name field */}
+                <Field.Root required>
+                  <Field.Label>Evaluator Name</Field.Label>
+                  <Input
+                    {...form.register("name")}
+                    placeholder="Enter evaluator name"
+                    data-testid="evaluator-name-input"
+                  />
+                </Field.Root>
 
-              {/* Settings fields */}
-              {evaluatorDef?.settings &&
-                Object.entries(evaluatorDef.settings).map(([key, value]) => {
-                  const settingDef = value as {
-                    description?: string;
-                    default: unknown;
-                  };
-                  const currentValue = settings[key] ?? settingDef.default;
+                {/* Settings fields using DynamicZodForm */}
+                {hasSettings && evaluatorType && (
+                  <DynamicZodForm
+                    schema={settingsSchema}
+                    evaluatorType={evaluatorType as EvaluatorTypes}
+                    prefix="settings"
+                    errors={form.formState.errors.settings}
+                    variant="default"
+                  />
+                )}
 
-                  return (
-                    <SettingField
-                      key={key}
-                      fieldKey={key}
-                      description={settingDef.description}
-                      value={currentValue}
-                      onChange={(newValue) => {
-                        setSettings((prev) => ({ ...prev, [key]: newValue }));
-                        setHasUnsavedChanges(true);
-                      }}
-                    />
-                  );
-                })}
-            </VStack>
+                {!hasSettings && (
+                  <Text fontSize="sm" color="gray.500">
+                    This evaluator does not have any settings to configure.
+                  </Text>
+                )}
+              </VStack>
+            </FormProvider>
           )}
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="gray.200">
@@ -268,7 +303,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorScheme="green"
+              colorPalette="green"
               onClick={handleSave}
               disabled={!isValid || isSaving}
               loading={isSaving}
@@ -280,87 +315,5 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
-  );
-}
-
-// ============================================================================
-// Setting Field Component
-// ============================================================================
-
-type SettingFieldProps = {
-  fieldKey: string;
-  description?: string;
-  value: unknown;
-  onChange: (value: unknown) => void;
-};
-
-/**
- * Renders a form field for an evaluator setting based on its type.
- */
-function SettingField({
-  fieldKey,
-  description,
-  value,
-  onChange,
-}: SettingFieldProps) {
-  const label = fieldKey
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (l) => l.toUpperCase());
-
-  // Determine field type based on value
-  if (typeof value === "boolean") {
-    return (
-      <Field.Root>
-        <HStack justify="space-between" width="full">
-          <VStack align="start" gap={0}>
-            <Field.Label marginBottom={0}>{label}</Field.Label>
-            {description && (
-              <Text fontSize="xs" color="gray.500">
-                {description}
-              </Text>
-            )}
-          </VStack>
-          <input
-            type="checkbox"
-            checked={value}
-            onChange={(e) => onChange(e.target.checked)}
-          />
-        </HStack>
-      </Field.Root>
-    );
-  }
-
-  if (typeof value === "number") {
-    return (
-      <Field.Root>
-        <Field.Label>{label}</Field.Label>
-        {description && (
-          <Text fontSize="xs" color="gray.500" marginBottom={1}>
-            {description}
-          </Text>
-        )}
-        <Input
-          type="number"
-          value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
-        />
-      </Field.Root>
-    );
-  }
-
-  // Default to text input
-  return (
-    <Field.Root>
-      <Field.Label>{label}</Field.Label>
-      {description && (
-        <Text fontSize="xs" color="gray.500" marginBottom={1}>
-          {description}
-        </Text>
-      )}
-      <Input
-        value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </Field.Root>
   );
 }

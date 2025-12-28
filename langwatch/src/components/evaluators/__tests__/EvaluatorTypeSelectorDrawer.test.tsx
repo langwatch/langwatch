@@ -101,12 +101,15 @@ vi.mock("next/router", () => ({
 
 const mockOpenDrawer = vi.fn();
 const mockCloseDrawer = vi.fn();
+const mockGoBack = vi.fn();
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: mockOpenDrawer,
     drawerOpen: vi.fn(() => false),
+    canGoBack: false,
+    goBack: mockGoBack,
   }),
   getComplexProps: () => ({}),
   useDrawerParams: () => ({}),
@@ -120,7 +123,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe("EvaluatorTypeSelectorDrawer", () => {
   const mockOnSelect = vi.fn();
   const mockOnClose = vi.fn();
-  const mockOnBack = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -153,14 +155,6 @@ describe("EvaluatorTypeSelectorDrawer", () => {
       });
     });
 
-    it("shows back button", async () => {
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("back-button")).toBeInTheDocument();
-      });
-    });
-
     it("shows evaluators for the selected category", async () => {
       renderDrawer({ category: "expected_answer" });
 
@@ -183,19 +177,6 @@ describe("EvaluatorTypeSelectorDrawer", () => {
   });
 
   describe("Navigation", () => {
-    it("calls onBack when clicking back button", async () => {
-      const user = userEvent.setup();
-      renderDrawer({ onBack: mockOnBack });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("back-button")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId("back-button"));
-
-      expect(mockOnBack).toHaveBeenCalled();
-    });
-
     it("opens evaluator editor when selecting an evaluator", async () => {
       const user = userEvent.setup();
       renderDrawer({ onSelect: mockOnSelect });

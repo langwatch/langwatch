@@ -20,14 +20,18 @@ vi.mock("next/router", () => ({
 
 const mockOpenDrawer = vi.fn();
 const mockCloseDrawer = vi.fn();
+const mockGoBack = vi.fn();
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: mockOpenDrawer,
     drawerOpen: vi.fn(() => false),
+    canGoBack: false,
+    goBack: mockGoBack,
   }),
   getComplexProps: () => ({}),
+  useDrawerParams: () => ({}),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -118,7 +122,6 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 describe("AgentPromptEditorDrawer", () => {
   const mockOnSave = vi.fn();
   const mockOnClose = vi.fn();
-  const mockOnBack = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -134,7 +137,6 @@ describe("AgentPromptEditorDrawer", () => {
         open={true}
         onClose={mockOnClose}
         onSave={mockOnSave}
-        onBack={mockOnBack}
         {...props}
       />,
       { wrapper: Wrapper }
@@ -146,13 +148,6 @@ describe("AgentPromptEditorDrawer", () => {
       renderDrawer();
       await waitFor(() => {
         expect(screen.getByText("New Prompt Agent")).toBeInTheDocument();
-      });
-    });
-
-    it("shows back button", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(screen.getByTestId("back-button")).toBeInTheDocument();
       });
     });
 
@@ -214,21 +209,6 @@ describe("AgentPromptEditorDrawer", () => {
         const nameInput = screen.getByTestId("agent-name-input") as HTMLInputElement;
         expect(nameInput.value).toBe("Test Agent");
       });
-    });
-  });
-
-  describe("Navigation", () => {
-    it("calls onBack when clicking back button", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("back-button")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId("back-button"));
-
-      expect(mockOnBack).toHaveBeenCalled();
     });
   });
 

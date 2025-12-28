@@ -809,10 +809,6 @@ export function EvaluationsV3Table({
       <AgentTypeSelectorDrawer
         open={agentTypeSelectorOpen}
         onClose={() => setAgentTypeSelectorOpen(false)}
-        onBack={() => {
-          setAgentTypeSelectorOpen(false);
-          setAgentListDrawerOpen(true);
-        }}
         onSelect={(type) => {
           setAgentTypeSelectorOpen(false);
           if (type === "signature") {
@@ -827,10 +823,6 @@ export function EvaluationsV3Table({
       <AgentCodeEditorDrawer
         open={agentCodeEditorOpen}
         onClose={() => setAgentCodeEditorOpen(false)}
-        onBack={() => {
-          setAgentCodeEditorOpen(false);
-          setAgentTypeSelectorOpen(true);
-        }}
         onSave={(savedAgent) => {
           handleSelectSavedAgent(savedAgent);
           setAgentCodeEditorOpen(false);
@@ -839,10 +831,6 @@ export function EvaluationsV3Table({
       <AgentPromptEditorDrawer
         open={agentPromptEditorOpen}
         onClose={() => setAgentPromptEditorOpen(false)}
-        onBack={() => {
-          setAgentPromptEditorOpen(false);
-          setAgentTypeSelectorOpen(true);
-        }}
         onSave={(savedAgent) => {
           handleSelectSavedAgent(savedAgent);
           setAgentPromptEditorOpen(false);
@@ -851,10 +839,6 @@ export function EvaluationsV3Table({
       <WorkflowSelectorDrawer
         open={workflowSelectorOpen}
         onClose={() => setWorkflowSelectorOpen(false)}
-        onBack={() => {
-          setWorkflowSelectorOpen(false);
-          setAgentTypeSelectorOpen(true);
-        }}
         onSave={(savedAgent) => {
           handleSelectSavedAgent(savedAgent);
           setWorkflowSelectorOpen(false);
@@ -879,10 +863,6 @@ export function EvaluationsV3Table({
           setEvaluatorCategorySelectorOpen(false);
           setAddEvaluatorForAgentId(null);
         }}
-        onBack={() => {
-          setEvaluatorCategorySelectorOpen(false);
-          setEvaluatorListDrawerOpen(true);
-        }}
         onSelectCategory={() => {
           setEvaluatorCategorySelectorOpen(false);
           setEvaluatorTypeSelectorOpen(true);
@@ -894,10 +874,6 @@ export function EvaluationsV3Table({
           setEvaluatorTypeSelectorOpen(false);
           setAddEvaluatorForAgentId(null);
         }}
-        onBack={() => {
-          setEvaluatorTypeSelectorOpen(false);
-          setEvaluatorCategorySelectorOpen(true);
-        }}
         onSelect={() => {
           setEvaluatorTypeSelectorOpen(false);
           setEvaluatorEditorOpen(true);
@@ -908,10 +884,6 @@ export function EvaluationsV3Table({
         onClose={() => {
           setEvaluatorEditorOpen(false);
           setAddEvaluatorForAgentId(null);
-        }}
-        onBack={() => {
-          setEvaluatorEditorOpen(false);
-          setEvaluatorTypeSelectorOpen(true);
         }}
         onSave={() => {
           // TODO: Link evaluator to agent when addEvaluatorForAgentId is set

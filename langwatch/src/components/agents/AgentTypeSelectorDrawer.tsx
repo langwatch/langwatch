@@ -1,11 +1,13 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Code, MessageSquare, Workflow } from "lucide-react";
+import { Code, MessageSquare, Workflow } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
@@ -16,7 +18,6 @@ export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSelect?: (type: AgentType) => void;
-  onBack?: () => void;
 };
 
 const agentTypes: Array<{
@@ -50,12 +51,11 @@ const agentTypes: Array<{
  * Shows cards for each agent type with icons and descriptions.
  */
 export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect = props.onSelect ?? (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
-  const onBack = props.onBack ?? (() => openDrawer("agentList"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: AgentType) => {
@@ -84,19 +84,19 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Text fontSize="xl" fontWeight="semibold">
-              Choose Agent Type
-            </Text>
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>Choose Agent Type</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>

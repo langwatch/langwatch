@@ -82,7 +82,18 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         })),
       },
+      delete: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
     },
+    useContext: vi.fn(() => ({
+      evaluators: {
+        getAll: { invalidate: vi.fn() },
+      },
+    })),
   },
 }));
 

@@ -1,11 +1,12 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
@@ -16,7 +17,6 @@ export type EvaluatorTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSelect?: (evaluatorType: string) => void;
-  onBack?: () => void;
   category?: EvaluatorCategoryId;
 };
 
@@ -71,13 +71,12 @@ const categoryNames: Record<EvaluatorCategoryId, string> = {
  * Shows a list of evaluators for the selected category.
  */
 export function EvaluatorTypeSelectorDrawer(props: EvaluatorTypeSelectorDrawerProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSelect = props.onSelect ?? (complexProps.onSelect as EvaluatorTypeSelectorDrawerProps["onSelect"]);
-  const onBack = props.onBack ?? (() => openDrawer("evaluatorCategorySelector"));
   // Get category from props, URL params, or complexProps (in that order)
   const category = props.category ?? (drawerParams.category as EvaluatorCategoryId | undefined) ?? (complexProps.category as EvaluatorCategoryId | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
@@ -86,7 +85,7 @@ export function EvaluatorTypeSelectorDrawer(props: EvaluatorTypeSelectorDrawerPr
 
   const handleSelectEvaluator = (evaluatorType: string) => {
     onSelect?.(evaluatorType);
-    openDrawer("evaluatorEditor", { evaluatorType });
+    openDrawer("evaluatorEditor", { evaluatorType, category });
   };
 
   return (
@@ -99,19 +98,21 @@ export function EvaluatorTypeSelectorDrawer(props: EvaluatorTypeSelectorDrawerPr
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Text fontSize="xl" fontWeight="semibold">
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>
               {category ? categoryNames[category] : "Select Evaluator"}
-            </Text>
+            </Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
@@ -183,7 +184,7 @@ function EvaluatorCard({ evaluatorType, name, description, onClick }: EvaluatorC
       data-testid={`evaluator-type-${evaluatorType.replace("/", "-")}`}
     >
       <VStack align="start" gap={1}>
-        <Text fontWeight="semibold" fontSize="sm">
+        <Text fontWeight="500" fontSize="sm">
           {name}
         </Text>
         <Text fontSize="xs" color="gray.600" lineClamp={2}>

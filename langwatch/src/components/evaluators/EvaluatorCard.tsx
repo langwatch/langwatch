@@ -1,7 +1,9 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { CheckSquare, Workflow } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { CheckSquare, MoreVertical, Workflow } from "lucide-react";
+import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { Evaluator } from "@prisma/client";
+import { Menu } from "../ui/menu";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 const evaluatorTypeIcons: Record<string, typeof CheckSquare> = {
   evaluator: CheckSquare,
@@ -16,9 +18,16 @@ const evaluatorTypeLabels: Record<string, string> = {
 export type EvaluatorCardProps = {
   evaluator: Evaluator;
   onClick?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 };
 
-export function EvaluatorCard({ evaluator, onClick }: EvaluatorCardProps) {
+export function EvaluatorCard({
+  evaluator,
+  onClick,
+  onEdit,
+  onDelete,
+}: EvaluatorCardProps) {
   const Icon = evaluatorTypeIcons[evaluator.type] ?? CheckSquare;
   const typeLabel = evaluatorTypeLabels[evaluator.type] ?? evaluator.type;
 
@@ -27,49 +36,76 @@ export function EvaluatorCard({ evaluator, onClick }: EvaluatorCardProps) {
   const evaluatorType = config?.evaluatorType;
 
   return (
-    <Box
-      as="button"
+    <Card.Root
+      variant="elevated"
       onClick={onClick}
-      padding={4}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="gray.200"
-      bg="white"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "green.400", bg: "green.50" }}
-      transition="all 0.15s"
+      cursor="pointer"
+      height="142px"
+      transition="all 0.2s ease-in-out"
       data-testid={`evaluator-card-${evaluator.id}`}
     >
-      <HStack gap={3} align="start">
-        <Box
-          padding={2}
-          borderRadius="md"
-          bg="green.50"
-          color="green.600"
-        >
-          <Icon size={20} />
-        </Box>
-        <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="semibold" fontSize="sm">
+      <Card.Body padding={4}>
+        <VStack align="start" gap={2} height="full">
+          {/* Top row: Icon and menu */}
+          <HStack width="full">
+            <Box bg="green.50" padding={1} borderRadius="md">
+              <Icon size={18} color="var(--chakra-colors-green-600)" />
+            </Box>
+            <Spacer />
+            {(onEdit || onDelete) && (
+              <Menu.Root>
+                <Menu.Trigger
+                  className="js-inner-menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical size={16} />
+                </Menu.Trigger>
+                <Menu.Content className="js-inner-menu">
+                  {onEdit && (
+                    <Menu.Item
+                      value="edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit();
+                      }}
+                    >
+                      <LuPencil size={14} />
+                      Edit
+                    </Menu.Item>
+                  )}
+                  {onDelete && (
+                    <Menu.Item
+                      value="delete"
+                      color="red.500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                    >
+                      <LuTrash2 size={14} />
+                      Delete
+                    </Menu.Item>
+                  )}
+                </Menu.Content>
+              </Menu.Root>
+            )}
+          </HStack>
+
+          <Spacer />
+
+          {/* Name */}
+          <Text color="gray.600" fontSize="sm" fontWeight={500}>
             {evaluator.name}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
-            <Text>{typeLabel}</Text>
-            {evaluatorType && (
-              <>
-                <Text>•</Text>
-                <Text>{evaluatorType}</Text>
-              </>
-            )}
-            <Text>•</Text>
-            <Text>
-              Updated {formatDistanceToNow(new Date(evaluator.updatedAt), { addSuffix: true })}
-            </Text>
-          </HStack>
+
+          {/* Metadata */}
+          <Text color="gray.400" fontSize="12px">
+            {typeLabel}
+            {evaluatorType && ` • ${evaluatorType}`} •{" "}
+            {formatTimeAgo(new Date(evaluator.updatedAt).getTime())}
+          </Text>
         </VStack>
-      </HStack>
-    </Box>
+      </Card.Body>
+    </Card.Root>
   );
 }
-

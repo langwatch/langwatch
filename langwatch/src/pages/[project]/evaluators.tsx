@@ -28,11 +28,37 @@ import { api } from "~/utils/api";
 function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
+  const utils = api.useContext();
 
   const evaluatorsQuery = api.evaluators.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  const deleteMutation = api.evaluators.delete.useMutation({
+    onSuccess: () => {
+      void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+    },
+  });
+
+  const handleEditEvaluator = (evaluator: { id: string; config: unknown }) => {
+    const config = evaluator.config as { evaluatorType?: string } | null;
+    openDrawer("evaluatorEditor", {
+      evaluatorId: evaluator.id,
+      evaluatorType: config?.evaluatorType,
+    });
+  };
+
+  const handleDeleteEvaluator = (evaluator: { id: string; name: string }) => {
+    if (
+      window.confirm(`Are you sure you want to delete "${evaluator.name}"?`)
+    ) {
+      deleteMutation.mutate({
+        id: evaluator.id,
+        projectId: project?.id ?? "",
+      });
+    }
+  };
 
   const hasEvaluators = evaluatorsQuery.data && evaluatorsQuery.data.length > 0;
   const showEmptyState = !evaluatorsQuery.isLoading && !hasEvaluators;
@@ -42,7 +68,9 @@ function Page() {
       <PageLayout.Header>
         <PageLayout.Heading>Evaluators</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton onClick={() => openDrawer("evaluatorCategorySelector")}>
+        <PageLayout.HeaderButton
+          onClick={() => openDrawer("evaluatorCategorySelector")}
+        >
           <Plus size={16} /> New Evaluator
         </PageLayout.HeaderButton>
       </PageLayout.Header>
@@ -81,9 +109,9 @@ function Page() {
               <EvaluatorCard
                 key={evaluator.id}
                 evaluator={evaluator}
-                onClick={() => {
-                  // TODO: Open evaluator editor for this evaluator
-                }}
+                onClick={() => handleEditEvaluator(evaluator)}
+                onEdit={() => handleEditEvaluator(evaluator)}
+                onDelete={() => handleDeleteEvaluator(evaluator)}
               />
             ))}
           </Grid>

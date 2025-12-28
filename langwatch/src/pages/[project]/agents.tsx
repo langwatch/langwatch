@@ -7,7 +7,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
@@ -20,6 +19,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AgentCard } from "~/components/agents/AgentCard";
+import type { TypedAgent } from "~/server/agents/agent.repository";
 
 /**
  * Agents management page
@@ -30,11 +30,43 @@ import { AgentCard } from "~/components/agents/AgentCard";
 function Page() {
   const { project } = useOrganizationTeamProject();
   const { openDrawer, drawerOpen } = useDrawer();
+  const utils = api.useContext();
 
   const agentsQuery = api.agents.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+
+  const deleteMutation = api.agents.delete.useMutation({
+    onSuccess: () => {
+      void utils.agents.getAll.invalidate({ projectId: project?.id ?? "" });
+    },
+  });
+
+  const handleEditAgent = (agent: TypedAgent) => {
+    // Open the appropriate editor based on agent type
+    switch (agent.type) {
+      case "signature":
+        openDrawer("agentPromptEditor", { agentId: agent.id });
+        break;
+      case "code":
+        openDrawer("agentCodeEditor", { agentId: agent.id });
+        break;
+      case "workflow":
+        // Workflow agents can't be edited directly, just view
+        openDrawer("workflowSelector", { agentId: agent.id });
+        break;
+    }
+  };
+
+  const handleDeleteAgent = (agent: TypedAgent) => {
+    if (window.confirm(`Are you sure you want to delete "${agent.name}"?`)) {
+      deleteMutation.mutate({
+        id: agent.id,
+        projectId: project?.id ?? "",
+      });
+    }
+  };
 
   const hasAgents = agentsQuery.data && agentsQuery.data.length > 0;
   const showEmptyState = !agentsQuery.isLoading && !hasAgents;
@@ -83,9 +115,9 @@ function Page() {
               <AgentCard
                 key={agent.id}
                 agent={agent}
-                onClick={() => {
-                  // TODO: Open agent editor for this agent
-                }}
+                onClick={() => handleEditAgent(agent)}
+                onEdit={() => handleEditAgent(agent)}
+                onDelete={() => handleDeleteAgent(agent)}
               />
             ))}
           </Grid>

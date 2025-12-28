@@ -1,13 +1,15 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
   Input,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Search, Workflow } from "lucide-react";
+import { Search, Workflow } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 import { useState, useMemo, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 
@@ -21,7 +23,6 @@ export type WorkflowSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
   onSave?: (agent: TypedAgent) => void;
-  onBack?: () => void;
   /** Name for the new agent (optional, prompts if not provided) */
   agentName?: string;
 };
@@ -35,13 +36,12 @@ export type WorkflowSelectorDrawerProps = {
  */
 export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const { closeDrawer, openDrawer } = useDrawer();
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave = props.onSave ?? (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
-  const onBack = props.onBack ?? (() => openDrawer("agentTypeSelector"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -112,20 +112,19 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Workflow size={20} />
-            <Text fontSize="xl" fontWeight="semibold">
-              Select Workflow
-            </Text>
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>Select Workflow</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
@@ -207,7 +206,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
               Cancel
             </Button>
             <Button
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={handleSave}
               disabled={!isValid || isSaving}
               loading={isSaving}

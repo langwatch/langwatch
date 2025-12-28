@@ -39,15 +39,41 @@ type DrawerCallback = (...args: unknown[]) => void;
 // workaround to pass complexProps to drawers
 let complexProps = {} as Record<string, DrawerCallback>;
 
-export function getComplexProps() {
+export const getComplexProps = () => {
   return complexProps;
-}
+};
+
+/**
+ * Drawer stack entry for navigation history.
+ */
+type DrawerStackEntry = {
+  drawer: DrawerType;
+  params: Record<string, unknown>;
+};
+
+/**
+ * Module-level drawer stack for tracking navigation history.
+ * This enables automatic back button visibility based on navigation depth.
+ */
+let drawerStack: DrawerStackEntry[] = [];
+
+/**
+ * Get the current drawer stack (for testing/debugging).
+ */
+export const getDrawerStack = () => drawerStack;
+
+/**
+ * Clear the drawer stack (useful for testing).
+ */
+export const clearDrawerStack = () => {
+  drawerStack = [];
+};
 
 /**
  * Get simple (serializable) drawer params from URL query.
  * Call this inside a component to get params like `category`, `evaluatorType`, etc.
  */
-export function useDrawerParams() {
+export const useDrawerParams = () => {
   const router = useRouter();
   const params: Record<string, string | undefined> = {};
 
@@ -59,18 +85,25 @@ export function useDrawerParams() {
   }
 
   return params;
-}
+};
 
 /**
  * Hook to manage drawer state via URL query params.
+ * Includes navigation stack for automatic back button handling.
  */
-export function useDrawer() {
+export const useDrawer = () => {
   const router = useRouter();
 
-  const openDrawer = <T extends DrawerType>(
-    drawer: T,
+  const currentDrawer = router.query["drawer.open"] as DrawerType | undefined;
+
+  /**
+   * Internal function to update URL without modifying the stack.
+   * Used by goBack to restore previous drawer state.
+   */
+  const updateDrawerUrl = (
+    drawer: DrawerType,
     props?: Record<string, unknown>,
-    { replace }: { replace?: boolean } = {},
+    options: { replace?: boolean } = {},
   ) => {
     complexProps = Object.fromEntries(
       Object.entries(props ?? {}).filter(
@@ -79,16 +112,7 @@ export function useDrawer() {
       ),
     ) as Record<string, DrawerCallback>;
 
-    const badKeys = Object.entries(props ?? {})
-      .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
-      .map(([k]) => k);
-    if (badKeys.length > 0) {
-      logger.warn(
-        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}`,
-      );
-    }
-
-    void router[replace ? "replace" : "push"](
+    void router[options.replace ? "replace" : "push"](
       "?" +
         qs.stringify(
           {
@@ -117,7 +141,36 @@ export function useDrawer() {
     );
   };
 
+  const openDrawer = <T extends DrawerType>(
+    drawer: T,
+    props?: Record<string, unknown>,
+    { replace }: { replace?: boolean } = {},
+  ) => {
+    // Manage drawer stack for navigation history
+    if (currentDrawer) {
+      // A drawer is already open - navigating forward, push to stack
+      drawerStack.push({ drawer, params: props ?? {} });
+    } else {
+      // No drawer open - fresh start, reset stack
+      drawerStack = [{ drawer, params: props ?? {} }];
+    }
+
+    const badKeys = Object.entries(props ?? {})
+      .filter(([_, v]) => typeof v === "function" || typeof v === "symbol")
+      .map(([k]) => k);
+    if (badKeys.length > 0) {
+      logger.warn(
+        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}`,
+      );
+    }
+
+    updateDrawerUrl(drawer, props, { replace });
+  };
+
   const closeDrawer = () => {
+    // Clear the entire stack when closing
+    drawerStack = [];
+
     void router.push(
       "?" +
         qs.stringify(
@@ -138,9 +191,39 @@ export function useDrawer() {
     );
   };
 
+  /**
+   * Go back to the previous drawer in the stack.
+   * If at the root (stack length <= 1), closes the drawer entirely.
+   */
+  const goBack = () => {
+    if (drawerStack.length <= 1) {
+      closeDrawer();
+      return;
+    }
+
+    // Remove current drawer from stack
+    drawerStack.pop();
+
+    // Get the previous drawer
+    const previous = drawerStack[drawerStack.length - 1];
+    if (!previous) {
+      closeDrawer();
+      return;
+    }
+
+    // Restore previous drawer (use replace to avoid browser history pollution)
+    updateDrawerUrl(previous.drawer, previous.params, { replace: true });
+  };
+
   const drawerOpen = (drawer: DrawerType) => {
     return router.query["drawer.open"] === drawer;
   };
 
-  return { openDrawer, closeDrawer, drawerOpen };
-}
+  /**
+   * Whether there's a previous drawer to go back to.
+   * Use this to conditionally show the back button.
+   */
+  const canGoBack = drawerStack.length > 1;
+
+  return { openDrawer, closeDrawer, drawerOpen, goBack, canGoBack };
+};

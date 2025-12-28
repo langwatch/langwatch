@@ -1,12 +1,5 @@
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import {
-  ArrowLeft,
   Brain,
   CheckSquare,
   Database,
@@ -14,6 +7,7 @@ import {
   Star,
   Workflow,
 } from "lucide-react";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
@@ -30,7 +24,6 @@ export type EvaluatorCategorySelectorDrawerProps = {
   onClose?: () => void;
   onSelectCategory?: (category: EvaluatorCategoryId) => void;
   onSelectWorkflow?: () => void;
-  onBack?: () => void;
 };
 
 const evaluatorCategories: Array<{
@@ -43,7 +36,8 @@ const evaluatorCategories: Array<{
     id: "expected_answer",
     icon: CheckSquare,
     title: "Expected Answer",
-    description: "Compare output against expected values (exact match, similarity)",
+    description:
+      "Compare output against expected values (exact match, similarity)",
   },
   {
     id: "llm_judge",
@@ -75,14 +69,19 @@ const evaluatorCategories: Array<{
  * Drawer for selecting the category of evaluator to create.
  * Shows cards for each evaluator category plus a "Custom (from Workflow)" option.
  */
-export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelectorDrawerProps) {
-  const { closeDrawer, openDrawer } = useDrawer();
+export function EvaluatorCategorySelectorDrawer(
+  props: EvaluatorCategorySelectorDrawerProps,
+) {
+  const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelectCategory = props.onSelectCategory ?? (complexProps.onSelectCategory as EvaluatorCategorySelectorDrawerProps["onSelectCategory"]);
-  const onSelectWorkflow = props.onSelectWorkflow ?? (() => openDrawer("workflowSelectorForEvaluator"));
-  const onBack = props.onBack ?? (() => openDrawer("evaluatorList"));
+  const onSelectCategory =
+    props.onSelectCategory ??
+    (complexProps.onSelectCategory as EvaluatorCategorySelectorDrawerProps["onSelectCategory"]);
+  const onSelectWorkflow =
+    props.onSelectWorkflow ??
+    (() => openDrawer("workflowSelectorForEvaluator"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectCategory = (categoryId: EvaluatorCategoryId) => {
@@ -100,34 +99,35 @@ export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelector
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2}>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBack}
-              padding={1}
-              minWidth="auto"
-              data-testid="back-button"
-            >
-              <ArrowLeft size={20} />
-            </Button>
-            <Text fontSize="xl" fontWeight="semibold">
-              Choose Evaluator Category
-            </Text>
+            {canGoBack && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBack}
+                padding={1}
+                minWidth="auto"
+                data-testid="back-button"
+              >
+                <LuArrowLeft size={20} />
+              </Button>
+            )}
+            <Heading>Choose Evaluator Category</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select a category to see available evaluators, or create a custom one from a workflow.
+              Select a category to see available evaluators, or create a custom
+              one from a workflow.
             </Text>
 
             {/* Category cards */}
-            <VStack
-              gap={3}
-              align="stretch"
-              paddingX={6}
-              paddingBottom={4}
-            >
+            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
               {evaluatorCategories.map((category) => (
                 <CategoryCard
                   key={category.id}
@@ -171,7 +171,13 @@ type CategoryCardProps = {
   onClick: () => void;
 };
 
-function CategoryCard({ id, icon: Icon, title, description, onClick }: CategoryCardProps) {
+function CategoryCard({
+  id,
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: CategoryCardProps) {
   return (
     <Box
       as="button"
@@ -188,16 +194,11 @@ function CategoryCard({ id, icon: Icon, title, description, onClick }: CategoryC
       data-testid={`evaluator-category-${id}`}
     >
       <HStack gap={3} align="start">
-        <Box
-          padding={2}
-          borderRadius="md"
-          bg="green.50"
-          color="green.600"
-        >
-          <Icon size={20} />
+        <Box padding={1} borderRadius="md" bg="green.50" color="green.600">
+          <Icon size={18} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="semibold" fontSize="sm">
+          <Text fontWeight="500" fontSize="sm">
             {title}
           </Text>
           <Text fontSize="xs" color="gray.600">

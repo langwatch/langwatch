@@ -1,7 +1,9 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { Bot, Code, MessageSquare, Workflow } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { Box,Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Bot, Code, MessageSquare, MoreVertical, Workflow } from "lucide-react";
+import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { Menu } from "../ui/menu";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
@@ -18,50 +20,88 @@ const agentTypeLabels: Record<string, string> = {
 export type AgentCardProps = {
   agent: TypedAgent;
   onClick?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 };
 
-export function AgentCard({ agent, onClick }: AgentCardProps) {
+export function AgentCard({
+  agent,
+  onClick,
+  onEdit,
+  onDelete,
+}: AgentCardProps) {
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
 
   return (
-    <Box
-      as="button"
+    <Card.Root
+      variant="elevated"
       onClick={onClick}
-      padding={4}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="gray.200"
-      bg="white"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
-      transition="all 0.15s"
+      cursor="pointer"
+      height="142px"
+      transition="all 0.2s ease-in-out"
       data-testid={`agent-card-${agent.id}`}
     >
-      <HStack gap={3} align="start">
-        <Box
-          padding={2}
-          borderRadius="md"
-          bg="blue.50"
-          color="blue.600"
-        >
-          <Icon size={20} />
-        </Box>
-        <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="semibold" fontSize="sm">
+      <Card.Body padding={4}>
+        <VStack align="start" gap={2} height="full">
+          {/* Top row: Icon and menu */}
+          <HStack width="full">
+            <Box bg="blue.50" padding={1} borderRadius="md">
+              <Icon size={18} color="var(--chakra-colors-blue-600)" />
+            </Box>
+            <Spacer />
+            {(onEdit || onDelete) && (
+              <Menu.Root>
+                <Menu.Trigger
+                  className="js-inner-menu"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical size={16} />
+                </Menu.Trigger>
+                <Menu.Content className="js-inner-menu">
+                  {onEdit && (
+                    <Menu.Item
+                      value="edit"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit();
+                      }}
+                    >
+                      <LuPencil size={14} />
+                      Edit
+                    </Menu.Item>
+                  )}
+                  {onDelete && (
+                    <Menu.Item
+                      value="delete"
+                      color="red.500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete();
+                      }}
+                    >
+                      <LuTrash2 size={14} />
+                      Delete
+                    </Menu.Item>
+                  )}
+                </Menu.Content>
+              </Menu.Root>
+            )}
+          </HStack>
+
+          <Spacer />
+
+          {/* Name */}
+          <Text color="gray.600" fontSize="sm" fontWeight={500}>
             {agent.name}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
-            <Text>{typeLabel}</Text>
-            <Text>•</Text>
-            <Text>
-              Updated {formatDistanceToNow(new Date(agent.updatedAt), { addSuffix: true })}
-            </Text>
-          </HStack>
+
+          {/* Metadata */}
+          <Text color="gray.400" fontSize="12px">
+            {typeLabel} • {formatTimeAgo(new Date(agent.updatedAt).getTime())}
+          </Text>
         </VStack>
-      </HStack>
-    </Box>
+      </Card.Body>
+    </Card.Root>
   );
 }
-

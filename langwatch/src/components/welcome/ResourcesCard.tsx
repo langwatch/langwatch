@@ -63,7 +63,7 @@ const ResourceButton: React.FC<ResourceButtonProps> = ({
   <Button
     asChild
     variant="outline"
-    colorScheme={resource.colorScheme}
+    colorPalette={resource.colorScheme}
     borderRadius="md"
     px={3}
     py={6}

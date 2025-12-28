@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  Heading,
   HStack,
   Spinner,
   Text,
@@ -60,15 +61,10 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
         <Drawer.CloseTrigger />
         <Drawer.Header>
           <HStack gap={2} justify="space-between" width="full">
-            <HStack gap={2}>
-              <Bot size={20} />
-              <Text fontSize="xl" fontWeight="semibold">
-                Choose Agent
-              </Text>
-            </HStack>
+            <Heading>Choose Agent</Heading>
             <Button
               size="sm"
-              colorScheme="blue"
+              colorPalette="blue"
               onClick={onCreateNew}
               data-testid="new-agent-button"
             >
@@ -144,7 +140,7 @@ function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
         </Text>
       </VStack>
       <Button
-        colorScheme="blue"
+        colorPalette="blue"
         onClick={onCreateNew}
         data-testid="create-first-agent-button"
       >
