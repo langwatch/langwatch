@@ -19,7 +19,7 @@ import {
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
@@ -124,7 +124,11 @@ export function SignaturePropertiesPanelForm({
       }
 
       // Reset the form with the updated node data
-      formProps.methods.reset(versionedPromptToPromptConfigFormValues(config));
+      // Use WithSystemMessage to ensure the system prompt is added to the messages array,
+      // since PromptMessagesField expects system prompt to be in messages[0] with role: "system"
+      formProps.methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(config),
+      );
     } catch (error) {
       console.error(error);
       toaster.error({
