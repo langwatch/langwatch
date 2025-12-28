@@ -9,6 +9,13 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock optimization_studio hooks to prevent circular dependency issues
+vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+  store: vi.fn(() => ({})),
+  initialState: {},
+  useWorkflowStore: vi.fn(() => ({})),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 
@@ -35,12 +42,21 @@ vi.mock("~/hooks/useDrawer", () => ({
     closeDrawer: vi.fn(),
     drawerOpen: () => false,
   }),
+  useDrawerParams: () => ({}),
   getComplexProps: () => ({}),
+  setFlowCallbacks: vi.fn(),
 }));
 
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      agents: {
+        getById: {
+          fetch: vi.fn(),
+        },
+      },
+    }),
     datasetRecord: {
       getAll: {
         useQuery: () => ({ data: null, isLoading: false }),

@@ -69,7 +69,7 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer();
       await waitFor(() => {
         expect(screen.getByText("Prompt")).toBeInTheDocument();
-        expect(screen.getByText("Use a versioned prompt from your Prompts library")).toBeInTheDocument();
+        expect(screen.getByText("Select versioned prompt or create a new one")).toBeInTheDocument();
       });
     });
 
@@ -77,7 +77,7 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer();
       await waitFor(() => {
         expect(screen.getByText("Agent")).toBeInTheDocument();
-        expect(screen.getByText("Use a code executor or workflow-based agent")).toBeInTheDocument();
+        expect(screen.getByText("Integrate with your existing agent or create a workflow")).toBeInTheDocument();
       });
     });
   });
@@ -121,7 +121,7 @@ describe("RunnerTypeSelectorDrawer", () => {
 
       await user.click(screen.getByTestId("runner-type-prompt"));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("promptList");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("promptList", {}, { replace: true });
     });
 
     it("opens agentList drawer when selecting Agent", async () => {
@@ -134,7 +134,7 @@ describe("RunnerTypeSelectorDrawer", () => {
 
       await user.click(screen.getByTestId("runner-type-agent"));
 
-      expect(mockOpenDrawer).toHaveBeenCalledWith("agentList");
+      expect(mockOpenDrawer).toHaveBeenCalledWith("agentList", {}, { replace: true });
     });
   });
 
