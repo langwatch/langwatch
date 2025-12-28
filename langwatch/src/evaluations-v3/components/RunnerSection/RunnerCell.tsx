@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Check, ChevronDown, ChevronUp, Plus, X } from "react-feather";
+import { LuCheck, LuChevronDown, LuChevronUp, LuPlus, LuX } from "react-icons/lu";
 
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { RunnerConfig, EvaluatorConfig } from "../../types";
@@ -48,9 +48,9 @@ export function EvaluatorChip({
 
   const statusColors = {
     pending: { bg: "gray.100", color: "gray.600", icon: null },
-    passed: { bg: "green.100", color: "green.700", icon: <Check size={10} /> },
-    failed: { bg: "red.100", color: "red.700", icon: <X size={10} /> },
-    error: { bg: "orange.100", color: "orange.700", icon: <X size={10} /> },
+    passed: { bg: "green.100", color: "green.700", icon: <LuCheck size={10} /> },
+    failed: { bg: "red.100", color: "red.700", icon: <LuX size={10} /> },
+    error: { bg: "orange.100", color: "orange.700", icon: <LuX size={10} /> },
   };
 
   const statusConfig = statusColors[status];
@@ -74,7 +74,7 @@ export function EvaluatorChip({
         {statusConfig.icon}
         <Text>{evaluator.name}</Text>
         {score !== undefined && <Text>({score.toFixed(2)})</Text>}
-        {isExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+        {isExpanded ? <LuChevronUp size={10} /> : <LuChevronDown size={10} />}
       </HStack>
 
       {isExpanded && (
@@ -213,7 +213,7 @@ export function RunnerCellContent({
         paddingX={1}
         data-testid={`add-evaluator-button-${runner.id}`}
       >
-        <Plus size={10} />
+        <LuPlus size={10} />
         <Text marginLeft={1}>Add evaluator</Text>
       </Button>
     </VStack>

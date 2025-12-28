@@ -11,8 +11,10 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { type RunnerType } from "~/evaluations-v3/types";
 
-export type RunnerType = "prompt" | "agent";
+// Re-export for backward compatibility
+export type { RunnerType };
 
 export type RunnerTypeSelectorDrawerProps = {
   open?: boolean;

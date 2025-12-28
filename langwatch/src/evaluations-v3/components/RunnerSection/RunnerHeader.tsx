@@ -9,9 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { memo } from "react";
-import { Code, Edit2, Trash2 } from "react-feather";
-import { ChevronDown, FileText } from "lucide-react";
-import { LuPlay } from "react-icons/lu";
+import { LuChevronDown, LuCode, LuFileText, LuPencil, LuPlay, LuTrash2 } from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -64,9 +62,9 @@ export const RunnerHeader = memo(function RunnerHeader({
   // Determine icon based on runner type
   const getRunnerIcon = () => {
     if (runner.type === "prompt") {
-      return <FileText size={12} />;
+      return <LuFileText size={12} />;
     }
-    return <Code size={12} />;
+    return <LuCode size={12} />;
   };
 
   const getRunnerColor = () => {
@@ -115,7 +113,7 @@ export const RunnerHeader = memo(function RunnerHeader({
               </Tooltip>
             )}
             <Icon
-              as={ChevronDown}
+              as={LuChevronDown}
               width={2.5}
               height={2.5}
               visibility="hidden"
@@ -126,14 +124,14 @@ export const RunnerHeader = memo(function RunnerHeader({
         <Menu.Content minWidth="200px">
           <Menu.Item value="edit" onClick={() => onEdit?.(runner)}>
             <HStack gap={2}>
-              <Edit2 size={14} />
+              <LuPencil size={14} />
               <Text>{editLabel}</Text>
             </HStack>
           </Menu.Item>
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
           <Menu.Item value="remove" onClick={() => onRemove?.(runner.id)}>
             <HStack gap={2} color="red.600">
-              <Trash2 size={14} />
+              <LuTrash2 size={14} />
               <Text>Remove from Workbench</Text>
             </HStack>
           </Menu.Item>
