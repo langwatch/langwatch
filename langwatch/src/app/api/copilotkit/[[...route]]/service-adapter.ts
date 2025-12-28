@@ -297,6 +297,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     messagesHistory: ChatMessage[];
   }): Omit<LlmPromptConfigComponent, "configId"> {
     const { formValues, messagesHistory } = params;
+
+    // Extract system prompt from messages array
+    const messages = formValues.version.configData.messages ?? [];
+    const systemMessage = messages.find((msg) => msg.role === "system");
+    const systemPrompt = systemMessage?.content ?? "";
+
     return {
       name: "LLM Node",
       description: "LLM calling node",
@@ -314,7 +320,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "instructions",
           type: "str",
-          value: formValues.version.configData.prompt ?? "",
+          value: systemPrompt,
         },
         {
           identifier: "messages",

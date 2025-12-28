@@ -16,7 +16,6 @@ import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompts/forms/fields/PromptField";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
@@ -255,14 +254,6 @@ export function SignaturePropertiesPanelForm({
             }
           />
           <WrappedOptimizationStudioLLMConfigField />
-          <PromptField
-            messageFields={messageFields}
-            templateAdapter={templateAdapter}
-            availableFields={availableFields}
-            otherNodesFields={otherNodesFields}
-            onAddEdge={onAddPromptEdge}
-            isTemplateSupported={templateAdapter === "default"}
-          />
           {templateAdapter === "default" && (
             <PromptMessagesField
               messageFields={messageFields}

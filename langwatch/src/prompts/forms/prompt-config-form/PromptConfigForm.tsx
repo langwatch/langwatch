@@ -22,7 +22,6 @@ import {
   InputsFieldGroup,
   OutputsFieldGroup,
 } from "../fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "../fields/PromptField";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
@@ -120,13 +119,6 @@ function InnerPromptConfigForm() {
         <VStack width="full" gap={6} mb={6} paddingBottom="70px">
           <PromptHandleInfo />
           <ModelSelectField />
-          <PromptField
-            templateAdapter="default"
-            messageFields={messageFields}
-            availableFields={availableFields}
-            otherNodesFields={{}}
-            isTemplateSupported={true}
-          />
           <PromptMessagesField
             messageFields={messageFields}
             availableFields={availableFields}

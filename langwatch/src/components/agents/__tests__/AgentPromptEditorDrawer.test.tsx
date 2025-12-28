@@ -165,13 +165,6 @@ describe("AgentPromptEditorDrawer", () => {
       });
     });
 
-    it("shows system prompt field", async () => {
-      renderDrawer();
-      await waitFor(() => {
-        expect(screen.getByText("System Prompt")).toBeInTheDocument();
-      });
-    });
-
     it("shows Create Agent button", async () => {
       renderDrawer();
       await waitFor(() => {

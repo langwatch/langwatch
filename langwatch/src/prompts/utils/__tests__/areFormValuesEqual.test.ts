@@ -23,11 +23,19 @@ describe("areFormValuesEqual", () => {
     it("returns true when values are deeply equal", () => {
       const value1 = {
         handle: "test",
-        version: { configData: { prompt: "test prompt" } },
+        version: {
+          configData: {
+            messages: [{ role: "system" as const, content: "test prompt" }],
+          },
+        },
       };
       const value2 = {
         handle: "test",
-        version: { configData: { prompt: "test prompt" } },
+        version: {
+          configData: {
+            messages: [{ role: "system" as const, content: "test prompt" }],
+          },
+        },
       };
       const result = areFormValuesEqual(value1, value2);
       expect(result).toBe(true);

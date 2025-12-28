@@ -30,7 +30,6 @@ export function useCreateDraftPrompt() {
       scope: "PROJECT",
       version: {
         configData: {
-          prompt: "You are a helpful assistant.",
           llm: {
             model: normalizedDefaultModel,
             maxTokens: DEFAULT_MAX_TOKENS,

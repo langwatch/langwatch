@@ -25,7 +25,6 @@ import {
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { PromptTextArea } from "~/prompts/components/ui/PromptTextArea";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 
@@ -39,11 +38,11 @@ export type AgentPromptEditorDrawerProps = {
 
 /**
  * Converts PromptConfigFormValues to agent config format
+ * Note: System prompt is now part of the messages array (role: "system")
  */
 const formValuesToAgentConfig = (formValues: PromptConfigFormValues) => {
   return {
     llm: formValues.version?.configData?.llm,
-    prompt: formValues.version?.configData?.prompt,
     messages: formValues.version?.configData?.messages,
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
@@ -52,18 +51,32 @@ const formValuesToAgentConfig = (formValues: PromptConfigFormValues) => {
 
 /**
  * Converts agent config to PromptConfigFormValues format
+ * Handles migration from old format (with separate prompt) to new format (system message in messages array)
  */
 const agentConfigToInitialValues = (
   config: Record<string, unknown> | null
 ): Partial<PromptConfigFormValues> => {
   if (!config) return {};
 
+  // Handle migration: if old config has separate `prompt` field, convert to system message
+  let messages = config.messages as PromptConfigFormValues["version"]["configData"]["messages"] | undefined;
+
+  if (config.prompt && typeof config.prompt === "string") {
+    // Old format: had separate prompt field - migrate to system message
+    const hasSystemMessage = messages?.some(msg => msg.role === "system");
+    if (!hasSystemMessage) {
+      messages = [
+        { role: "system" as const, content: config.prompt as string },
+        ...(messages ?? []),
+      ];
+    }
+  }
+
   return {
     version: {
       configData: {
         llm: config.llm as PromptConfigFormValues["version"]["configData"]["llm"],
-        prompt: (config.prompt as string) ?? "",
-        messages: config.messages as PromptConfigFormValues["version"]["configData"]["messages"],
+        messages: messages ?? [],
         inputs: config.inputs as PromptConfigFormValues["version"]["configData"]["inputs"],
         outputs: config.outputs as PromptConfigFormValues["version"]["configData"]["outputs"],
       },
@@ -76,8 +89,7 @@ const agentConfigToInitialValues = (
  * Features:
  * - Name input field
  * - LLM model selection
- * - System prompt editor
- * - Message history support
+ * - Message editor (system prompt + user messages)
  * - Save/Cancel buttons
  */
 export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
@@ -287,30 +299,7 @@ export function AgentPromptEditorDrawer(props: AgentPromptEditorDrawerProps) {
                   />
                 </VerticalFormControl>
 
-                {/* System Prompt */}
-                <VerticalFormControl
-                  label="System Prompt"
-                  invalid={!!methods.formState.errors.version?.configData?.prompt}
-                  helper={methods.formState.errors.version?.configData?.prompt?.message?.toString()}
-                  error={methods.formState.errors.version?.configData?.prompt}
-                  size="sm"
-                >
-                  <Controller
-                    control={methods.control}
-                    name="version.configData.prompt"
-                    render={({ field }) => (
-                      <PromptTextArea
-                        {...field}
-                        availableFields={[]}
-                        otherNodesFields={{}}
-                        isTemplateSupported={false}
-                        placeholder="You are a helpful assistant..."
-                      />
-                    )}
-                  />
-                </VerticalFormControl>
-
-                {/* Message History */}
+                {/* Messages (includes system prompt + user messages) */}
                 <PromptMessagesField
                   messageFields={messageFields}
                   availableFields={[]}
