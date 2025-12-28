@@ -5,9 +5,9 @@
  * This is a one-way conversion - state is persisted via wizardState, not DSL.
  *
  * Key concepts:
- * - Evaluators are global/shared in state - agents reference them by ID
- * - When generating DSL, evaluators are duplicated per-agent with {agentId}.{evaluatorId} naming
- * - Mappings: agent.mappings for agent inputs, evaluator.mappings[agentId] for evaluator inputs
+ * - Evaluators are global/shared in state - runners reference them by ID
+ * - When generating DSL, evaluators are duplicated per-runner with {runnerId}.{evaluatorId} naming
+ * - Mappings: runner.mappings for runner inputs, evaluator.mappings[runnerId] for evaluator inputs
  * - Multi-dataset: DSL is generated for the active dataset only
  */
 
@@ -22,7 +22,7 @@ import type {
   Field,
 } from "~/optimization_studio/types/dsl";
 import type {
-  AgentConfig,
+  RunnerConfig,
   DatasetColumn,
   DatasetReference,
   EvaluationsV3State,
@@ -37,7 +37,7 @@ import type {
 /**
  * Convert V3 state to workflow DSL for execution.
  * Uses the active dataset for generating the entry node.
- * Evaluators are duplicated per-agent with clear naming for result mapping.
+ * Evaluators are duplicated per-runner with clear naming for result mapping.
  *
  * @param state - The current evaluations V3 state
  * @param datasetIdOverride - Optional dataset ID to use instead of activeDatasetId
@@ -56,37 +56,40 @@ export const stateToWorkflow = (
 
   const entryNode = createEntryNode(activeDataset);
 
-  const agentNodes: Array<Node<Signature> | Node<Code>> = [];
+  const runnerNodes: Array<Node<Signature> | Node<Code>> = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
-  // Create agent nodes
-  state.agents.forEach((agent, agentIndex) => {
-    const agentNode =
-      agent.type === "llm"
-        ? createSignatureNode(agent, agentIndex)
-        : createCodeNode(agent, agentIndex);
+  // Create runner nodes
+  state.runners.forEach((runner, runnerIndex) => {
+    // Skip prompt runners - they need different handling via API calls
+    if (runner.type === "prompt") {
+      // For now, skip prompts - they would be handled differently
+      return;
+    }
 
-    agentNodes.push(agentNode);
+    // For agent runners, check the underlying agent type
+    const runnerNode = createCodeNode(runner, runnerIndex);
+    runnerNodes.push(runnerNode);
 
-    // Create evaluator nodes for each evaluator this agent uses
-    // Evaluators are duplicated per-agent in the DSL
-    agent.evaluatorIds.forEach((evaluatorId, evalIndex) => {
+    // Create evaluator nodes for each evaluator this runner uses
+    // Evaluators are duplicated per-runner in the DSL
+    runner.evaluatorIds.forEach((evaluatorId, evalIndex) => {
       const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
       if (!evaluator) return;
 
       const evaluatorNode = createEvaluatorNode(
         evaluator,
-        agent.id,
-        agentIndex,
+        runner.id,
+        runnerIndex,
         evalIndex
       );
       evaluatorNodes.push(evaluatorNode);
     });
   });
 
-  const agentEdges = buildAgentEdges(state.agents, datasetId);
+  const runnerEdges = buildRunnerEdges(state.runners, datasetId);
   const evaluatorEdges = buildEvaluatorEdges(
-    state.agents,
+    state.runners,
     state.evaluators,
     datasetId
   );
@@ -104,8 +107,8 @@ export const stateToWorkflow = (
     },
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, ...agentNodes, ...evaluatorNodes] as Workflow["nodes"],
-    edges: [...agentEdges, ...evaluatorEdges],
+    nodes: [entryNode, ...runnerNodes, ...evaluatorNodes] as Workflow["nodes"],
+    edges: [...runnerEdges, ...evaluatorEdges],
     state: {},
   };
 };
@@ -151,78 +154,19 @@ const columnTypeToFieldType = (
 };
 
 /**
- * Create a signature (LLM) node from an agent config.
+ * Create a code node from a runner config.
  * Uses the `parameters` array structure expected by the DSL.
  */
-const createSignatureNode = (
-  agent: AgentConfig,
-  index: number
-): Node<Signature> => {
+const createCodeNode = (runner: RunnerConfig, index: number): Node<Code> => {
   const parameters: Field[] = [];
 
-  // LLM config parameter
-  if (agent.llmConfig) {
-    parameters.push({
-      identifier: "llm",
-      type: "llm",
-      value: agent.llmConfig,
-    });
-  }
-
-  // Instructions parameter
-  if (agent.instructions) {
-    parameters.push({
-      identifier: "instructions",
-      type: "str",
-      value: agent.instructions,
-    });
-  }
-
-  // Messages/prompts parameter
-  if (agent.messages) {
-    parameters.push({
-      identifier: "messages",
-      type: "chat_messages",
-      value: agent.messages,
-    });
-  }
-
   return {
-    id: agent.id,
-    type: "signature",
-    data: {
-      name: agent.name,
-      inputs: agent.inputs,
-      outputs: agent.outputs,
-      parameters,
-    },
-    position: { x: 300, y: index * 200 },
-  };
-};
-
-/**
- * Create a code node from an agent config.
- * Uses the `parameters` array structure expected by the DSL.
- */
-const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
-  const parameters: Field[] = [];
-
-  // Code parameter
-  if (agent.code) {
-    parameters.push({
-      identifier: "code",
-      type: "code",
-      value: agent.code,
-    });
-  }
-
-  return {
-    id: agent.id,
+    id: runner.id,
     type: "code",
     data: {
-      name: agent.name,
-      inputs: agent.inputs,
-      outputs: agent.outputs,
+      name: runner.name,
+      inputs: runner.inputs ?? [],
+      outputs: runner.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
     },
     position: { x: 300, y: index * 200 },
@@ -230,17 +174,17 @@ const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
 };
 
 /**
- * Create an evaluator node for a specific agent.
- * Node ID is {agentId}.{evaluatorId} for clear result mapping back to the table.
+ * Create an evaluator node for a specific runner.
+ * Node ID is {runnerId}.{evaluatorId} for clear result mapping back to the table.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
-  agentId: string,
-  agentIndex: number,
+  runnerId: string,
+  runnerIndex: number,
   evalIndex: number
 ): Node<Evaluator> => {
   return {
-    id: `${agentId}.${evaluator.id}`,
+    id: `${runnerId}.${evaluator.id}`,
     type: "evaluator",
     data: {
       name: `${evaluator.name}`,
@@ -250,40 +194,42 @@ const createEvaluatorNode = (
       evaluator: evaluator.evaluatorType,
       ...evaluator.settings,
     },
-    position: { x: 600, y: agentIndex * 200 + evalIndex * 100 },
+    position: { x: 600, y: runnerIndex * 200 + evalIndex * 100 },
   };
 };
 
 /**
- * Build edges connecting entry to agents based on agent.mappings.
+ * Build edges connecting entry to runners based on runner.mappings.
  * Only creates edges for mappings that reference the active dataset.
  */
-const buildAgentEdges = (
-  agents: AgentConfig[],
+const buildRunnerEdges = (
+  runners: RunnerConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const agent of agents) {
-    for (const [inputField, mapping] of Object.entries(agent.mappings)) {
+  for (const runner of runners) {
+    if (!runner.mappings) continue;
+
+    for (const [inputField, mapping] of Object.entries(runner.mappings)) {
       if (
         mapping.source === "dataset" &&
         mapping.sourceId === activeDatasetId
       ) {
         edges.push({
-          id: `entry->${agent.id}.${inputField}`,
+          id: `entry->${runner.id}.${inputField}`,
           source: "entry",
           sourceHandle: `output-${mapping.sourceField}`,
-          target: agent.id,
+          target: runner.id,
           targetHandle: `input-${inputField}`,
         });
-      } else if (mapping.source === "agent") {
-        // Agent-to-agent mapping
+      } else if (mapping.source === "runner") {
+        // Runner-to-runner mapping
         edges.push({
-          id: `${mapping.sourceId}->${agent.id}.${inputField}`,
+          id: `${mapping.sourceId}->${runner.id}.${inputField}`,
           source: mapping.sourceId,
           sourceHandle: `output-${mapping.sourceField}`,
-          target: agent.id,
+          target: runner.id,
           targetHandle: `input-${inputField}`,
         });
       }
@@ -294,26 +240,26 @@ const buildAgentEdges = (
 };
 
 /**
- * Build edges connecting agents to their evaluators.
- * Mappings are stored inside evaluator.mappings[agentId].
+ * Build edges connecting runners to their evaluators.
+ * Mappings are stored inside evaluator.mappings[runnerId].
  * Only creates edges for mappings that reference the active dataset.
  */
 const buildEvaluatorEdges = (
-  agents: AgentConfig[],
+  runners: RunnerConfig[],
   evaluators: EvaluatorConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const agent of agents) {
-    for (const evaluatorId of agent.evaluatorIds) {
+  for (const runner of runners) {
+    for (const evaluatorId of runner.evaluatorIds) {
       const evaluator = evaluators.find((e) => e.id === evaluatorId);
       if (!evaluator) continue;
 
-      const agentMappings = evaluator.mappings[agent.id] ?? {};
-      const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
+      const runnerMappings = evaluator.mappings[runner.id] ?? {};
+      const evaluatorNodeId = `${runner.id}.${evaluator.id}`;
 
-      for (const [inputField, mapping] of Object.entries(agentMappings)) {
+      for (const [inputField, mapping] of Object.entries(runnerMappings)) {
         if (
           mapping.source === "dataset" &&
           mapping.sourceId === activeDatasetId
@@ -327,13 +273,13 @@ const buildEvaluatorEdges = (
             targetHandle: `input-${inputField}`,
           });
         } else if (
-          mapping.source === "agent" &&
-          mapping.sourceId === agent.id
+          mapping.source === "runner" &&
+          mapping.sourceId === runner.id
         ) {
-          // From this agent's output
+          // From this runner's output
           edges.push({
-            id: `${agent.id}->${evaluatorNodeId}.${inputField}`,
-            source: agent.id,
+            id: `${runner.id}->${evaluatorNodeId}.${inputField}`,
+            source: runner.id,
             sourceHandle: `output-${mapping.sourceField}`,
             target: evaluatorNodeId,
             targetHandle: `input-${inputField}`,

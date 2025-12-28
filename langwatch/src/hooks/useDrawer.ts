@@ -20,11 +20,15 @@ export type DrawerType =
   | "editTriggerFilter"
   | "seriesFilters"
   | "selectDataset"
-  // Agent drawers
+  // Runner type selector (Prompt vs Agent)
+  | "runnerTypeSelector"
+  // Prompt drawers
+  | "promptList"
+  | "promptEditor"
+  // Agent drawers (code or workflow only)
   | "agentList"
   | "agentTypeSelector"
   | "agentCodeEditor"
-  | "agentPromptEditor"
   | "workflowSelector"
   // Evaluator drawers
   | "evaluatorList"

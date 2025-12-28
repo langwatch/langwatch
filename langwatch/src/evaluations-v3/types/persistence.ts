@@ -24,7 +24,7 @@ export const extractPersistedState = (
  * Zod schema for field mapping validation.
  */
 const fieldMappingSchema = z.object({
-  source: z.enum(["dataset", "agent"]),
+  source: z.enum(["dataset", "runner"]),
   sourceId: z.string(),
   sourceField: z.string(),
 });
@@ -81,42 +81,22 @@ const evaluatorConfigSchema = z.object({
 });
 
 /**
- * Zod schema for LLM config validation.
+ * Zod schema for runner config validation.
+ * Runners can be either prompts (referencing saved prompts) or agents (code/workflow).
  */
-const llmConfigSchema = z.object({
-  model: z.string(),
-  temperature: z.number().optional(),
-  max_tokens: z.number().optional(),
-  top_p: z.number().optional(),
-  frequency_penalty: z.number().optional(),
-  presence_penalty: z.number().optional(),
-  litellm_params: z.record(z.string(), z.unknown()).optional(),
-}).passthrough();
-
-/**
- * Zod schema for chat message validation.
- * Uses unknown for content to handle rich content types.
- */
-const chatMessageSchema = z.object({
-  role: z.string().optional(),
-  content: z.unknown(),
-}).passthrough();
-
-/**
- * Zod schema for agent config validation.
- */
-const agentConfigSchema = z.object({
+const runnerConfigSchema = z.object({
   id: z.string(),
-  type: z.enum(["llm", "code"]),
+  type: z.enum(["prompt", "agent"]),
   name: z.string(),
-  icon: z.string().optional(),
-  llmConfig: llmConfigSchema.optional(),
-  messages: z.array(chatMessageSchema).optional(),
-  instructions: z.string().optional(),
-  code: z.string().optional(),
-  inputs: z.array(fieldSchema),
-  outputs: z.array(fieldSchema),
-  mappings: z.record(z.string(), fieldMappingSchema),
+  // For prompt type
+  promptId: z.string().optional(),
+  promptVersionId: z.string().optional(),
+  // For agent type
+  dbAgentId: z.string().optional(),
+  // Common fields
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  mappings: z.record(z.string(), fieldMappingSchema).optional(),
   evaluatorIds: z.array(z.string()),
 });
 
@@ -130,7 +110,7 @@ export const persistedEvaluationsV3StateSchema = z.object({
   datasets: z.array(datasetReferenceSchema),
   activeDatasetId: z.string(),
   evaluators: z.array(evaluatorConfigSchema),
-  agents: z.array(agentConfigSchema),
+  runners: z.array(runnerConfigSchema),
 });
 
 export type ValidatedPersistedState = z.infer<

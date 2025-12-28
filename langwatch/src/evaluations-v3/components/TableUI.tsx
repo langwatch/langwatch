@@ -10,7 +10,7 @@ import { DatasetTabs } from "./DatasetSection/DatasetTabs";
 // Types
 // ============================================================================
 
-export type SuperHeaderType = "dataset" | "agents";
+export type SuperHeaderType = "dataset" | "runners";
 
 export type DatasetHandlers = {
   onSelectExisting: () => void;
@@ -98,6 +98,7 @@ type SuperHeaderProps = {
   colSpan: number;
   onAddClick?: () => void;
   showWarning?: boolean;
+  hasComparison?: boolean;
   activeDataset?: DatasetReference;
   datasetHandlers?: DatasetHandlers;
   isLoading?: boolean;
@@ -112,8 +113,8 @@ const superHeaderConfig: Record<
     color: "blue.400",
     icon: <Database size={14} />,
   },
-  agents: {
-    title: "Agents",
+  runners: {
+    title: "Prompts or Agents",
     color: "green.400",
     icon: <LLMIcon />,
   },
@@ -124,11 +125,15 @@ export function SuperHeader({
   colSpan,
   onAddClick,
   showWarning,
+  hasComparison,
   activeDataset,
   datasetHandlers,
   isLoading,
 }: SuperHeaderProps) {
   const config = superHeaderConfig[type];
+  const addButtonText = type === "runners"
+    ? (hasComparison ? "Add Comparison" : "Add")
+    : "Add";
 
   return (
     <th
@@ -172,7 +177,7 @@ export function SuperHeader({
             _hover={{ color: "gray.700" }}
           >
             <Plus size={12} />
-            Add Agent
+            {addButtonText}
             {showWarning && <PulsingDot />}
           </Button>
         )}

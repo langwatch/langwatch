@@ -4,6 +4,9 @@ Feature: Agent management
   I want to create, edit, and manage reusable agents
   So that I can use them across evaluations and other platform features
 
+  # Note: Agents are now only Code or Workflow types.
+  # For LLM-based prompts, use the Prompts feature instead.
+
   # ============================================================================
   # Agent types
   # ============================================================================
@@ -12,7 +15,6 @@ Feature: Agent management
     When I create a new agent
     Then I can choose from the following types:
       | type     | description                          |
-      | prompt   | LLM-based agent with prompt config   |
       | code     | Python code executor                 |
       | workflow | Reference to an existing workflow    |
 
@@ -20,22 +22,10 @@ Feature: Agent management
   # Agent CRUD - Create
   # ============================================================================
 
-  Scenario: Create prompt-based agent
-    Given I am on the agents page
-    When I click "New Agent"
-    And I select "From Prompt" type
-    Then the AgentPromptEditorDrawer opens
-    When I enter name "My GPT Assistant"
-    And I select model "openai/gpt-4o"
-    And I enter prompt "You are a helpful assistant"
-    And I click "Save"
-    Then the agent "My GPT Assistant" is saved to the database
-    And the agent appears in the agents list
-
   Scenario: Create code-based agent
     Given I am on the agents page
     When I click "New Agent"
-    And I select "From Code" type
+    And I select "Code Agent" type
     Then the AgentCodeEditorDrawer opens
     When I enter name "Python Processor"
     And I enter python code that processes input
@@ -47,7 +37,7 @@ Feature: Agent management
     Given I am on the agents page
     And workflow "Complex Pipeline" exists in the project
     When I click "New Agent"
-    And I select "From Workflow" type
+    And I select "Workflow Agent" type
     Then the WorkflowSelectorDrawer opens
     When I select workflow "Complex Pipeline"
     And I enter name "Pipeline Agent"
@@ -60,7 +50,7 @@ Feature: Agent management
   # ============================================================================
 
   Scenario: View agents list
-    Given agents "GPT Assistant" and "Code Processor" exist
+    Given agents "Code Processor" and "Pipeline Agent" exist
     When I navigate to the agents page
     Then I see a list of agents
     And each agent shows its name, type, and last updated date
@@ -73,30 +63,30 @@ Feature: Agent management
 
   Scenario: Agents are project-scoped
     Given I am in project "Project A"
-    And agent "GPT Assistant" exists in "Project A"
+    And agent "Code Processor" exists in "Project A"
     And agent "Other Agent" exists in "Project B"
     When I navigate to the agents page
-    Then I only see "GPT Assistant"
+    Then I only see "Code Processor"
     And I do not see "Other Agent"
 
   # ============================================================================
   # Agent CRUD - Update
   # ============================================================================
 
-  Scenario: Edit prompt-based agent
-    Given agent "GPT Assistant" of type "prompt" exists
-    When I click on agent "GPT Assistant"
-    Then the AgentPromptEditorDrawer opens with existing config
-    When I change the prompt to "You are an expert analyst"
-    And I click "Save"
-    Then the agent is updated in the database
-    And the updatedAt timestamp is refreshed
-
   Scenario: Edit code-based agent
     Given agent "Python Processor" of type "code" exists
     When I click on agent "Python Processor"
     Then the AgentCodeEditorDrawer opens with existing code
     When I modify the python code
+    And I click "Save"
+    Then the agent is updated in the database
+    And the updatedAt timestamp is refreshed
+
+  Scenario: Edit workflow-based agent
+    Given agent "Pipeline Agent" of type "workflow" exists
+    When I click on agent "Pipeline Agent"
+    Then the WorkflowSelectorDrawer opens with existing workflow selected
+    When I select a different workflow
     And I click "Save"
     Then the agent is updated in the database
 
@@ -122,14 +112,6 @@ Feature: Agent management
   # Agent config storage
   # ============================================================================
 
-  Scenario: Prompt agent config stored as JSON
-    Given I create a prompt-based agent with:
-      | name   | GPT Assistant                    |
-      | model  | openai/gpt-4o                    |
-      | prompt | You are a helpful assistant      |
-    Then the agent record has type "signature"
-    And the config JSON contains the model and prompt configuration
-
   Scenario: Code agent config stored as JSON
     Given I create a code-based agent with:
       | name | Python Processor           |
@@ -148,9 +130,9 @@ Feature: Agent management
   # ============================================================================
 
   Scenario: AgentListDrawer shows available agents
-    Given agents "GPT Assistant", "Code Processor", and "Pipeline Agent" exist
+    Given agents "Code Processor" and "Pipeline Agent" exist
     When the AgentListDrawer opens
-    Then I see all three agents listed
+    Then I see both agents listed
     And I see a "New Agent" button at the top
 
   Scenario: AgentListDrawer empty state
@@ -161,17 +143,17 @@ Feature: Agent management
 
   Scenario: Select agent from drawer
     Given the AgentListDrawer is open
-    And agent "GPT Assistant" exists
-    When I click on "GPT Assistant"
+    And agent "Code Processor" exists
+    When I click on "Code Processor"
     Then the drawer closes
-    And "GPT Assistant" is selected for use
+    And "Code Processor" is selected for use
 
   Scenario: Create new agent from drawer flow
     Given the AgentListDrawer is open
     When I click "New Agent"
     Then the AgentTypeSelectorDrawer opens
-    When I select "From Prompt"
-    Then the AgentPromptEditorDrawer opens
+    When I select "Code Agent"
+    Then the AgentCodeEditorDrawer opens
     When I complete the agent configuration and save
     Then the new agent appears in the AgentListDrawer
     And I can select it
@@ -180,21 +162,18 @@ Feature: Agent management
   # Agent type selector drawer
   # ============================================================================
 
-  Scenario: AgentTypeSelectorDrawer shows three options
+  Scenario: AgentTypeSelectorDrawer shows two options
     When the AgentTypeSelectorDrawer opens
-    Then I see three options:
-      | option        | icon       | description                    |
-      | From Prompt   | message    | Create an LLM-based agent      |
-      | From Code     | code       | Create a Python code executor  |
-      | From Workflow | workflow   | Use an existing workflow       |
+    Then I see two options:
+      | option         | icon     | description                    |
+      | Code Agent     | code     | Create a Python code executor  |
+      | Workflow Agent | workflow | Use an existing workflow       |
 
   Scenario: Selecting type navigates to appropriate editor
     Given the AgentTypeSelectorDrawer is open
-    When I select "From Prompt"
-    Then the AgentPromptEditorDrawer opens
-    When I go back and select "From Code"
+    When I select "Code Agent"
     Then the AgentCodeEditorDrawer opens
-    When I go back and select "From Workflow"
+    When I go back and select "Workflow Agent"
     Then the WorkflowSelectorDrawer opens
 
   # ============================================================================

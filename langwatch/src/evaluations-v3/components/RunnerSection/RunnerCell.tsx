@@ -1,10 +1,8 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { Check, ChevronDown, ChevronUp, Code, Plus, X } from "react-feather";
+import { Check, ChevronDown, ChevronUp, Plus, X } from "react-feather";
 
-import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
-import { LLMIcon } from "~/components/icons/LLMIcon";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import type { AgentConfig, EvaluatorConfig } from "../../types";
+import type { RunnerConfig, EvaluatorConfig } from "../../types";
 
 // ============================================================================
 // Evaluator Chip Component
@@ -13,7 +11,7 @@ import type { AgentConfig, EvaluatorConfig } from "../../types";
 type EvaluatorChipProps = {
   evaluator: EvaluatorConfig;
   result: unknown;
-  agentId: string;
+  runnerId: string;
   row: number;
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -115,26 +113,26 @@ export function EvaluatorChip({
 }
 
 // ============================================================================
-// Agent Cell Content Component
+// Runner Cell Content Component
 // ============================================================================
 
-type AgentCellContentProps = {
-  agent: AgentConfig;
+type RunnerCellContentProps = {
+  runner: RunnerConfig;
   output: unknown;
   evaluatorResults: Record<string, unknown>;
   row: number;
   evaluatorsMap: Map<string, EvaluatorConfig>;
-  onAddEvaluator?: (agentId: string) => void;
+  onAddEvaluator?: (runnerId: string) => void;
 };
 
-export function AgentCellContent({
-  agent,
+export function RunnerCellContent({
+  runner,
   output,
   evaluatorResults,
   row,
   evaluatorsMap,
   onAddEvaluator,
-}: AgentCellContentProps) {
+}: RunnerCellContentProps) {
   const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
     (state) => ({
       ui: state.ui,
@@ -150,24 +148,24 @@ export function AgentCellContent({
         ? JSON.stringify(output)
         : String(output);
 
-  // Get evaluator configs for this agent's evaluatorIds
-  const agentEvaluators = agent.evaluatorIds
-    .map((id) => evaluatorsMap.get(id))
+  // Get evaluator configs for this runner's evaluatorIds
+  const runnerEvaluators = runner.evaluatorIds
+    .map((id: string) => evaluatorsMap.get(id))
     .filter((e): e is EvaluatorConfig => e !== undefined);
 
   return (
     <VStack align="stretch" gap={2}>
-      {/* Agent output */}
+      {/* Runner output */}
       <Text fontSize="13px" lineClamp={3}>
         {displayOutput || <Text as="span" color="gray.400">No output yet</Text>}
       </Text>
 
       {/* Evaluator chips */}
-      {agentEvaluators.length > 0 && (
+      {runnerEvaluators.length > 0 && (
         <HStack flexWrap="wrap" gap={1}>
-          {agentEvaluators.map((evaluator) => {
+          {runnerEvaluators.map((evaluator: EvaluatorConfig) => {
             const isExpanded =
-              ui.expandedEvaluator?.agentId === agent.id &&
+              ui.expandedEvaluator?.runnerId === runner.id &&
               ui.expandedEvaluator?.evaluatorId === evaluator.id &&
               ui.expandedEvaluator?.row === row;
 
@@ -176,7 +174,7 @@ export function AgentCellContent({
                 key={evaluator.id}
                 evaluator={evaluator}
                 result={evaluatorResults[evaluator.id]}
-                agentId={agent.id}
+                runnerId={runner.id}
                 row={row}
                 isExpanded={isExpanded}
                 onToggleExpand={() => {
@@ -184,13 +182,13 @@ export function AgentCellContent({
                     setExpandedEvaluator(undefined);
                   } else {
                     setExpandedEvaluator({
-                      agentId: agent.id,
+                      runnerId: runner.id,
                       evaluatorId: evaluator.id,
                       row,
                     });
                   }
                 }}
-                onEdit={() => openOverlay("evaluator", agent.id, evaluator.id)}
+                onEdit={() => openOverlay("evaluator", runner.id, evaluator.id)}
               />
             );
           })}
@@ -205,47 +203,19 @@ export function AgentCellContent({
         onClick={(e) => {
           e.stopPropagation();
           if (onAddEvaluator) {
-            onAddEvaluator(agent.id);
+            onAddEvaluator(runner.id);
           } else {
             // Fallback to overlay if no callback provided
-            openOverlay("evaluator", agent.id);
+            openOverlay("evaluator", runner.id);
           }
         }}
         justifyContent="flex-start"
         paddingX={1}
-        data-testid={`add-evaluator-button-${agent.id}`}
+        data-testid={`add-evaluator-button-${runner.id}`}
       >
         <Plus size={10} />
         <Text marginLeft={1}>Add evaluator</Text>
       </Button>
     </VStack>
-  );
-}
-
-// ============================================================================
-// Agent Header Component
-// ============================================================================
-
-export function AgentHeader({ agent }: { agent: AgentConfig }) {
-  const { openOverlay } = useEvaluationsV3Store((state) => ({
-    openOverlay: state.openOverlay,
-  }));
-
-  return (
-    <HStack
-      gap={2}
-      cursor="pointer"
-      onClick={() => openOverlay("agent", agent.id)}
-      _hover={{ color: "green.600" }}
-    >
-      <ColorfulBlockIcon
-        color={agent.type === "llm" ? "green.400" : "#3E5A60"}
-        size="xs"
-        icon={agent.type === "llm" ? <LLMIcon /> : <Code size={12} />}
-      />
-      <Text fontSize="13px" fontWeight="medium">
-        {agent.name}
-      </Text>
-    </HStack>
   );
 }

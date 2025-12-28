@@ -1,7 +1,6 @@
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { DatasetColumnType } from "~/server/datasets/types";
-import type { ChatMessage } from "~/server/tracer/types";
-import type { Field, LLMConfig } from "~/optimization_studio/types/dsl";
+import type { Field } from "~/optimization_studio/types/dsl";
 
 // ============================================================================
 // Dataset Types
@@ -54,11 +53,11 @@ export type DatasetReference = {
 
 /**
  * Maps a target field to a source field.
- * Source can be "dataset" (with datasetId) or "agent" (with agentId).
+ * Source can be "dataset" (with datasetId) or "runner" (with runnerId).
  */
 export type FieldMapping = {
-  source: "dataset" | "agent";
-  sourceId: string; // dataset ID or agent ID
+  source: "dataset" | "runner";
+  sourceId: string; // dataset ID or runner ID
   sourceField: string;
 };
 
@@ -68,9 +67,9 @@ export type FieldMapping = {
 
 /**
  * Global evaluator configuration.
- * Evaluators are shared across agents - agents reference them by ID.
- * Per-agent mappings are stored inside the evaluator for easy access in the global panel.
- * When generating DSL, evaluators are duplicated per-agent with {agentId}.{evaluatorId} naming.
+ * Evaluators are shared across runners - runners reference them by ID.
+ * Per-runner mappings are stored inside the evaluator for easy access in the global panel.
+ * When generating DSL, evaluators are duplicated per-runner with {runnerId}.{evaluatorId} naming.
  */
 export type EvaluatorConfig = {
   id: string;
@@ -78,41 +77,47 @@ export type EvaluatorConfig = {
   name: string;
   settings: Record<string, unknown>;
   inputs: Field[];
-  // Per-agent input mappings for this evaluator
-  // agentId -> { inputFieldName -> mapping }
+  // Per-runner input mappings for this evaluator
+  // runnerId -> { inputFieldName -> mapping }
   mappings: Record<string, Record<string, FieldMapping>>;
   // Reference to database-backed evaluator (if using saved evaluator)
   dbEvaluatorId?: string;
 };
 
 // ============================================================================
-// Agent Types
+// Runner Types
 // ============================================================================
 
-export type AgentType = "llm" | "code";
+/**
+ * Runner type - either a versioned prompt or an agent (code/workflow)
+ */
+export type RunnerType = "prompt" | "agent";
 
-export type AgentConfig = {
+/**
+ * Runner configuration - unified type for prompts and agents in evaluations.
+ * A runner can be either:
+ * - A Prompt: references a versioned prompt from the Prompts system
+ * - An Agent: references a saved agent (code or workflow type)
+ */
+export type RunnerConfig = {
   id: string;
-  type: AgentType;
+  type: RunnerType;
   name: string;
   icon?: string;
 
-  // Reference to database-backed agent (if using saved agent)
+  // For prompts - reference to versioned prompt from Prompts system
+  promptId?: string;
+  promptVersionId?: string;
+
+  // For agents - reference to database-backed agent (code or workflow)
+  // Agent type and workflow ID are fetched at runtime via dbAgentId
   dbAgentId?: string;
 
-  // For LLM (mirrors LlmPromptConfigComponent structure)
-  llmConfig?: LLMConfig;
-  messages?: ChatMessage[];
-  instructions?: string;
-
-  // For Code (mirrors Code node structure)
-  code?: string;
-
-  // Common
+  // Common fields
   inputs: Field[];
   outputs: Field[];
 
-  // Agent input mappings (how agent inputs connect to dataset/other agents)
+  // Runner input mappings (how runner inputs connect to dataset/other runners)
   // inputFieldName -> mapping
   mappings: Record<string, FieldMapping>;
 
@@ -133,10 +138,10 @@ export type EvaluationResults = {
   progress?: number;
   total?: number;
   // Per-row results
-  agentOutputs: Record<string, unknown[]>; // agentId -> array of outputs per row
-  // Evaluator results nested by agent
-  evaluatorResults: Record<string, Record<string, unknown[]>>; // agentId -> evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // agentId -> array of errors per row
+  runnerOutputs: Record<string, unknown[]>; // runnerId -> array of outputs per row
+  // Evaluator results nested by runner
+  evaluatorResults: Record<string, Record<string, unknown[]>>; // runnerId -> evaluatorId -> array of results per row
+  errors: Record<string, string[]>; // runnerId -> array of errors per row
 };
 
 // ============================================================================
@@ -144,7 +149,7 @@ export type EvaluationResults = {
 // ============================================================================
 
 export type OverlayType =
-  | "agent"
+  | "runner"
   | "evaluator"
   | "dataset-columns"
   | "dataset-switch"
@@ -168,13 +173,13 @@ export type AutosaveStatus = {
 
 export type UIState = {
   openOverlay?: OverlayType;
-  overlayTargetId?: string; // which agent is being configured
-  overlayEvaluatorId?: string; // which evaluator within the agent (for evaluator overlay)
+  overlayTargetId?: string; // which runner is being configured
+  overlayEvaluatorId?: string; // which evaluator within the runner (for evaluator overlay)
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   selectedRows: Set<number>;
   expandedEvaluator?: {
-    agentId: string;
+    runnerId: string;
     evaluatorId: string;
     row: number;
   };
@@ -205,12 +210,12 @@ export type EvaluationsV3State = {
   activeDatasetId: string;
 
   // Global evaluators (shared definitions, will be stored in DB in future)
-  // Each evaluator contains per-agent mappings inside it
+  // Each evaluator contains per-runner mappings inside it
   evaluators: EvaluatorConfig[];
 
-  // Agents (multiple for comparison) - reference evaluators by ID
-  // Agent mappings are inside each agent
-  agents: AgentConfig[];
+  // Runners (multiple for comparison) - reference evaluators by ID
+  // Runner mappings are inside each runner
+  runners: RunnerConfig[];
 
   // Execution results (populated after run)
   results: EvaluationResults;
@@ -273,12 +278,12 @@ export type EvaluationsV3Actions = {
     type: DatasetColumnType
   ) => void;
 
-  // Agent actions
-  addAgent: (agent: AgentConfig) => void;
-  updateAgent: (agentId: string, updates: Partial<AgentConfig>) => void;
-  removeAgent: (agentId: string) => void;
-  setAgentMapping: (
-    agentId: string,
+  // Runner actions
+  addRunner: (runner: RunnerConfig) => void;
+  updateRunner: (runnerId: string, updates: Partial<RunnerConfig>) => void;
+  removeRunner: (runnerId: string) => void;
+  setRunnerMapping: (
+    runnerId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
@@ -291,14 +296,14 @@ export type EvaluationsV3Actions = {
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
 
-  // Agent-evaluator relationship actions
-  addEvaluatorToAgent: (agentId: string, evaluatorId: string) => void;
-  removeEvaluatorFromAgent: (agentId: string, evaluatorId: string) => void;
+  // Runner-evaluator relationship actions
+  addEvaluatorToRunner: (runnerId: string, evaluatorId: string) => void;
+  removeEvaluatorFromRunner: (runnerId: string, evaluatorId: string) => void;
 
-  // Evaluator mapping actions (per-agent mappings stored inside evaluator)
+  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
   setEvaluatorMapping: (
     evaluatorId: string,
-    agentId: string,
+    runnerId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
@@ -321,7 +326,7 @@ export type EvaluationsV3Actions = {
   clearRowSelection: () => void;
   deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
-    expanded: { agentId: string; evaluatorId: string; row: number } | undefined
+    expanded: { runnerId: string; evaluatorId: string; row: number } | undefined
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
@@ -377,7 +382,7 @@ export const createInitialDataset = (): DatasetReference => ({
 
 export const createInitialResults = (): EvaluationResults => ({
   status: "idle",
-  agentOutputs: {},
+  runnerOutputs: {},
   evaluatorResults: {},
   errors: {},
 });
@@ -399,7 +404,7 @@ export const createInitialState = (): EvaluationsV3State => ({
   datasets: [createInitialDataset()],
   activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],
-  agents: [],
+  runners: [],
   results: createInitialResults(),
   pendingSavedChanges: {},
   ui: createInitialUIState(),

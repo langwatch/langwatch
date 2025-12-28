@@ -60,7 +60,7 @@ vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
   AddOrEditDatasetDrawer: () => null,
 }));
 
-// Mock Agent Drawers
+// Mock Agent and Runner Drawers
 vi.mock("~/components/agents/AgentListDrawer", () => ({
   AgentListDrawer: () => null,
 }));
@@ -70,11 +70,14 @@ vi.mock("~/components/agents/AgentTypeSelectorDrawer", () => ({
 vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
   AgentCodeEditorDrawer: () => null,
 }));
-vi.mock("~/components/agents/AgentPromptEditorDrawer", () => ({
-  AgentPromptEditorDrawer: () => null,
-}));
 vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
   WorkflowSelectorDrawer: () => null,
+}));
+vi.mock("~/components/runners/RunnerTypeSelectorDrawer", () => ({
+  RunnerTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/prompts/PromptListDrawer", () => ({
+  PromptListDrawer: () => null,
 }));
 
 // Mock Evaluator Drawers - track which one is opened
@@ -116,13 +119,13 @@ describe("Add Evaluator Button", () => {
     const store = useEvaluationsV3Store.getState();
     store.reset();
 
-    // Set up test data with an agent
+    // Set up test data with a runner
     useEvaluationsV3Store.setState({
-      agents: [
+      runners: [
         {
-          id: "agent-1",
-          type: "llm",
-          name: "Test Agent",
+          id: "runner-1",
+          type: "prompt",
+          name: "Test Runner",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},

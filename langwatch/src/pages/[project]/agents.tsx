@@ -12,7 +12,6 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
 import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
-import { AgentPromptEditorDrawer } from "~/components/agents/AgentPromptEditorDrawer";
 import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -26,6 +25,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
  * Single Responsibility: Route and permission handling for agents
  *
  * This is a hidden page for managing database-backed agents.
+ * Note: Prompt-based agents are no longer supported - use the Prompts page instead.
  */
 function Page() {
   const { project } = useOrganizationTeamProject();
@@ -46,9 +46,6 @@ function Page() {
   const handleEditAgent = (agent: TypedAgent) => {
     // Open the appropriate editor based on agent type
     switch (agent.type) {
-      case "signature":
-        openDrawer("agentPromptEditor", { agentId: agent.id });
-        break;
       case "code":
         openDrawer("agentCodeEditor", { agentId: agent.id });
         break;
@@ -128,7 +125,6 @@ function Page() {
       <AgentListDrawer open={drawerOpen("agentList")} />
       <AgentTypeSelectorDrawer open={drawerOpen("agentTypeSelector")} />
       <AgentCodeEditorDrawer open={drawerOpen("agentCodeEditor")} />
-      <AgentPromptEditorDrawer open={drawerOpen("agentPromptEditor")} />
       <WorkflowSelectorDrawer open={drawerOpen("workflowSelector")} />
     </DashboardLayout>
   );

@@ -69,19 +69,19 @@ describe("AgentTypeSelectorDrawer", () => {
       });
     });
 
-    it("shows all three agent type options", async () => {
+    it("shows only code and workflow agent type options", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByText("Prompt Agent")).toBeInTheDocument();
         expect(screen.getByText("Code Agent")).toBeInTheDocument();
         expect(screen.getByText("Workflow Agent")).toBeInTheDocument();
       });
+      // Prompt Agent should no longer exist
+      expect(screen.queryByText("Prompt Agent")).not.toBeInTheDocument();
     });
 
     it("shows descriptions for each type", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByText("Use an LLM with a configured prompt to generate responses")).toBeInTheDocument();
         expect(screen.getByText("Write custom Python code to process inputs and generate outputs")).toBeInTheDocument();
         expect(screen.getByText("Use an existing workflow as the agent implementation")).toBeInTheDocument();
       });
@@ -89,20 +89,6 @@ describe("AgentTypeSelectorDrawer", () => {
   });
 
   describe("Type selection", () => {
-    it("calls onSelect with 'signature' and opens prompt editor when clicking Prompt Agent", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByTestId("agent-type-signature")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId("agent-type-signature"));
-
-      expect(mockOnSelect).toHaveBeenCalledWith("signature");
-      expect(mockOpenDrawer).toHaveBeenCalledWith("agentPromptEditor");
-    });
-
     it("calls onSelect with 'code' and opens code editor when clicking Code Agent", async () => {
       const user = userEvent.setup();
       renderDrawer();

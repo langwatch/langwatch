@@ -6,69 +6,55 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Code, Workflow } from "lucide-react";
+import { Bot, FileText } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
 
-/**
- * Agent types - code or workflow only.
- * Note: "signature" (prompt) agents have been removed.
- * Use the Prompts feature directly for LLM-based prompts.
- */
-export type AgentType = "code" | "workflow";
+export type RunnerType = "prompt" | "agent";
 
-export type AgentTypeSelectorDrawerProps = {
+export type RunnerTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (type: AgentType) => void;
+  onSelect?: (type: RunnerType) => void;
 };
 
-const agentTypes: Array<{
-  type: AgentType;
-  icon: typeof Code;
+const runnerTypes: Array<{
+  type: RunnerType;
+  icon: typeof FileText;
   title: string;
   description: string;
 }> = [
   {
-    type: "code",
-    icon: Code,
-    title: "Code Agent",
-    description: "Write custom Python code to process inputs and generate outputs",
+    type: "prompt",
+    icon: FileText,
+    title: "Prompt",
+    description: "Use a versioned prompt from your Prompts library",
   },
   {
-    type: "workflow",
-    icon: Workflow,
-    title: "Workflow Agent",
-    description: "Use an existing workflow as the agent implementation",
+    type: "agent",
+    icon: Bot,
+    title: "Agent",
+    description: "Use a code executor or workflow-based agent",
   },
 ];
 
 /**
- * Drawer for selecting the type of agent to create.
- * Shows cards for Code and Workflow agent types.
- * Note: Prompt-based agents have been removed - use Prompts directly instead.
+ * Drawer for selecting the type of runner to add to an evaluation.
+ * Shows cards for Prompt vs Agent with icons and descriptions.
  */
-export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
+export function RunnerTypeSelectorDrawer(props: RunnerTypeSelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
+  const onSelect = props.onSelect ?? (complexProps.onSelect as RunnerTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const handleSelectType = (type: AgentType) => {
+  const handleSelectType = (type: RunnerType) => {
+    // Just call onSelect - parent handles navigation
     onSelect?.(type);
-    // Navigate to the appropriate editor drawer based on type
-    switch (type) {
-      case "code":
-        openDrawer("agentCodeEditor");
-        break;
-      case "workflow":
-        openDrawer("workflowSelector");
-        break;
-    }
   };
 
   return (
@@ -93,27 +79,27 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Agent Type</Heading>
+            <Heading>Add to Evaluation</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select the type of agent you want to create.
+              Choose what you want to evaluate - a prompt from your library or a custom agent.
             </Text>
 
-            {/* Agent type cards */}
+            {/* Runner type cards */}
             <VStack
               gap={3}
               align="stretch"
               paddingX={6}
               paddingBottom={4}
             >
-              {agentTypes.map((agentType) => (
-                <AgentTypeCard
-                  key={agentType.type}
-                  {...agentType}
-                  onClick={() => handleSelectType(agentType.type)}
+              {runnerTypes.map((runnerType) => (
+                <RunnerTypeCard
+                  key={runnerType.type}
+                  {...runnerType}
+                  onClick={() => handleSelectType(runnerType.type)}
                 />
               ))}
             </VStack>
@@ -130,18 +116,21 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
 }
 
 // ============================================================================
-// Agent Type Card Component
+// Runner Type Card Component
 // ============================================================================
 
-type AgentTypeCardProps = {
-  type: AgentType;
-  icon: typeof Code;
+type RunnerTypeCardProps = {
+  type: RunnerType;
+  icon: typeof FileText;
   title: string;
   description: string;
   onClick: () => void;
 };
 
-function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentTypeCardProps) {
+function RunnerTypeCard({ type, icon: Icon, title, description, onClick }: RunnerTypeCardProps) {
+  const iconColor = type === "prompt" ? "green" : "blue";
+  const iconBg = type === "prompt" ? "green.50" : "blue.50";
+
   return (
     <Box
       as="button"
@@ -153,16 +142,16 @@ function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentT
       bg="white"
       textAlign="left"
       width="full"
-      _hover={{ borderColor: "blue.400", bg: "blue.50" }}
+      _hover={{ borderColor: `${iconColor}.400`, bg: `${iconColor}.50` }}
       transition="all 0.15s"
-      data-testid={`agent-type-${type}`}
+      data-testid={`runner-type-${type}`}
     >
       <HStack gap={4} align="start">
         <Box
           padding={3}
           borderRadius="md"
-          bg="blue.50"
-          color="blue.600"
+          bg={iconBg}
+          color={`${iconColor}.600`}
         >
           <Icon size={24} />
         </Box>

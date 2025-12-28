@@ -7,7 +7,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 
 import {
   createInitialState,
-  type AgentConfig,
+  type RunnerConfig,
   type CellPosition,
   type DatasetColumn,
   type DatasetReference,
@@ -24,39 +24,39 @@ import {
 // ============================================================================
 
 /**
- * Remove all mappings that reference a specific dataset from agents and evaluators.
+ * Remove all mappings that reference a specific dataset from runners and evaluators.
  */
 const removeMappingsForDataset = (
   state: EvaluationsV3State,
   datasetId: string
-): { agents: AgentConfig[]; evaluators: EvaluatorConfig[] } => {
-  // Remove dataset mappings from agents
-  const agents = state.agents.map((agent) => {
+): { runners: RunnerConfig[]; evaluators: EvaluatorConfig[] } => {
+  // Remove dataset mappings from runners
+  const runners = state.runners.map((runner) => {
     const newMappings: Record<string, FieldMapping> = {};
-    for (const [field, mapping] of Object.entries(agent.mappings)) {
+    for (const [field, mapping] of Object.entries(runner.mappings)) {
       if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
         newMappings[field] = mapping;
       }
     }
-    return { ...agent, mappings: newMappings };
+    return { ...runner, mappings: newMappings };
   });
 
   // Remove dataset mappings from evaluators
   const evaluators = state.evaluators.map((evaluator) => {
     const newMappings: Record<string, Record<string, FieldMapping>> = {};
-    for (const [agentId, agentMappings] of Object.entries(evaluator.mappings)) {
-      const newAgentMappings: Record<string, FieldMapping> = {};
-      for (const [field, mapping] of Object.entries(agentMappings)) {
+    for (const [runnerId, runnerMappings] of Object.entries(evaluator.mappings)) {
+      const newRunnerMappings: Record<string, FieldMapping> = {};
+      for (const [field, mapping] of Object.entries(runnerMappings)) {
         if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
-          newAgentMappings[field] = mapping;
+          newRunnerMappings[field] = mapping;
         }
       }
-      newMappings[agentId] = newAgentMappings;
+      newMappings[runnerId] = newRunnerMappings;
     }
     return { ...evaluator, mappings: newMappings };
   });
 
-  return { agents, evaluators };
+  return { runners, evaluators };
 };
 
 // ============================================================================
@@ -107,12 +107,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           : state.activeDatasetId;
 
       // Clean up mappings pointing to this dataset
-      const { agents, evaluators } = removeMappingsForDataset(state, datasetId);
+      const { runners, evaluators } = removeMappingsForDataset(state, datasetId);
 
       return {
         datasets: newDatasets,
         activeDatasetId: newActiveDatasetId,
-        agents,
+        runners,
         evaluators,
       };
     });
@@ -469,63 +469,63 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   // -------------------------------------------------------------------------
-  // Agent actions
+  // Runner actions
   // -------------------------------------------------------------------------
 
-  addAgent: (agent) => {
+  addRunner: (runner) => {
     set((state) => ({
-      agents: [...state.agents, agent],
+      runners: [...state.runners, runner],
     }));
   },
 
-  updateAgent: (agentId, updates) => {
+  updateRunner: (runnerId, updates) => {
     set((state) => ({
-      agents: state.agents.map((a) =>
-        a.id === agentId ? { ...a, ...updates } : a
+      runners: state.runners.map((r) =>
+        r.id === runnerId ? { ...r, ...updates } : r
       ),
     }));
   },
 
-  removeAgent: (agentId) => {
+  removeRunner: (runnerId) => {
     set((state) => {
-      // Also remove this agent's mappings from all evaluators
+      // Also remove this runner's mappings from all evaluators
       const evaluators = state.evaluators.map((e) => {
         const mappings = { ...e.mappings };
-        delete mappings[agentId];
+        delete mappings[runnerId];
         return { ...e, mappings };
       });
 
-      // Also remove mappings that reference this agent from other agents
-      const agents = state.agents
-        .filter((a) => a.id !== agentId)
-        .map((agent) => {
+      // Also remove mappings that reference this runner from other runners
+      const runners = state.runners
+        .filter((r) => r.id !== runnerId)
+        .map((runner) => {
           const newMappings: Record<string, FieldMapping> = {};
-          for (const [field, mapping] of Object.entries(agent.mappings)) {
+          for (const [field, mapping] of Object.entries(runner.mappings)) {
             if (
-              !(mapping.source === "agent" && mapping.sourceId === agentId)
+              !(mapping.source === "runner" && mapping.sourceId === runnerId)
             ) {
               newMappings[field] = mapping;
             }
           }
-          return { ...agent, mappings: newMappings };
+          return { ...runner, mappings: newMappings };
         });
 
-      return { agents, evaluators };
+      return { runners, evaluators };
     });
   },
 
-  setAgentMapping: (agentId, inputField, mapping) => {
+  setRunnerMapping: (runnerId, inputField, mapping) => {
     set((state) => ({
-      agents: state.agents.map((a) =>
-        a.id === agentId
+      runners: state.runners.map((r) =>
+        r.id === runnerId
           ? {
-              ...a,
+              ...r,
               mappings: {
-                ...a.mappings,
+                ...r.mappings,
                 [inputField]: mapping,
               },
             }
-          : a
+          : r
       ),
     }));
   },
@@ -551,44 +551,44 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeEvaluator: (evaluatorId) => {
     set((state) => ({
       evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
-      // Also remove this evaluator from all agents' evaluatorIds
-      agents: state.agents.map((a) => ({
-        ...a,
-        evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId),
+      // Also remove this evaluator from all runners' evaluatorIds
+      runners: state.runners.map((r) => ({
+        ...r,
+        evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
       })),
     }));
   },
 
   // -------------------------------------------------------------------------
-  // Agent-evaluator relationship actions
+  // Runner-evaluator relationship actions
   // -------------------------------------------------------------------------
 
-  addEvaluatorToAgent: (agentId, evaluatorId) => {
+  addEvaluatorToRunner: (runnerId, evaluatorId) => {
     set((state) => {
-      const agent = state.agents.find((a) => a.id === agentId);
-      if (!agent) return state;
+      const runner = state.runners.find((r) => r.id === runnerId);
+      if (!runner) return state;
 
       // Check if evaluator exists
       const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
       if (!evaluator) return state;
 
       // Don't add if already exists
-      if (agent.evaluatorIds.includes(evaluatorId)) return state;
+      if (runner.evaluatorIds.includes(evaluatorId)) return state;
 
       return {
-        agents: state.agents.map((a) =>
-          a.id === agentId
-            ? { ...a, evaluatorIds: [...a.evaluatorIds, evaluatorId] }
-            : a
+        runners: state.runners.map((r) =>
+          r.id === runnerId
+            ? { ...r, evaluatorIds: [...r.evaluatorIds, evaluatorId] }
+            : r
         ),
-        // Initialize empty mappings for this agent in the evaluator
+        // Initialize empty mappings for this runner in the evaluator
         evaluators: state.evaluators.map((e) =>
           e.id === evaluatorId
             ? {
                 ...e,
                 mappings: {
                   ...e.mappings,
-                  [agentId]: e.mappings[agentId] ?? {},
+                  [runnerId]: e.mappings[runnerId] ?? {},
                 },
               }
             : e
@@ -597,31 +597,31 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     });
   },
 
-  removeEvaluatorFromAgent: (agentId, evaluatorId) => {
+  removeEvaluatorFromRunner: (runnerId, evaluatorId) => {
     set((state) => ({
-      agents: state.agents.map((a) =>
-        a.id === agentId
+      runners: state.runners.map((r) =>
+        r.id === runnerId
           ? {
-              ...a,
-              evaluatorIds: a.evaluatorIds.filter((id) => id !== evaluatorId),
+              ...r,
+              evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
             }
-          : a
+          : r
       ),
-      // Remove this agent's mappings from the evaluator
+      // Remove this runner's mappings from the evaluator
       evaluators: state.evaluators.map((e) => {
         if (e.id !== evaluatorId) return e;
         const mappings = { ...e.mappings };
-        delete mappings[agentId];
+        delete mappings[runnerId];
         return { ...e, mappings };
       }),
     }));
   },
 
   // -------------------------------------------------------------------------
-  // Evaluator mapping actions (per-agent mappings stored inside evaluator)
+  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
-  setEvaluatorMapping: (evaluatorId, agentId, inputField, mapping) => {
+  setEvaluatorMapping: (evaluatorId, runnerId, inputField, mapping) => {
     set((state) => ({
       evaluators: state.evaluators.map((e) =>
         e.id === evaluatorId
@@ -629,8 +629,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
               ...e,
               mappings: {
                 ...e.mappings,
-                [agentId]: {
-                  ...e.mappings[agentId],
+                [runnerId]: {
+                  ...e.mappings[runnerId],
                   [inputField]: mapping,
                 },
               },
@@ -657,7 +657,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set({
       results: {
         status: "idle",
-        agentOutputs: {},
+        runnerOutputs: {},
         evaluatorResults: {},
         errors: {},
       },
@@ -976,7 +976,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
       activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
       evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-      agents: (state.agents as typeof current.agents) ?? current.agents,
+      // Support loading old state format (agents) and new format (runners)
+      runners: (state.runners as typeof current.runners) ?? (state.agents as typeof current.runners) ?? current.runners,
     }));
   },
 
@@ -1005,7 +1006,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
  */
 type PartializedState = Pick<
   EvaluationsV3State,
-  "name" | "datasets" | "activeDatasetId" | "evaluators" | "agents"
+  "name" | "datasets" | "activeDatasetId" | "evaluators" | "runners"
 >;
 
 /**
@@ -1018,7 +1019,7 @@ const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   datasets: state.datasets,
   activeDatasetId: state.activeDatasetId,
   evaluators: state.evaluators,
-  agents: state.agents,
+  runners: state.runners,
 });
 
 /**

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { DatasetColumn, AgentConfig } from "../types";
+import type { DatasetColumn, RunnerConfig } from "../types";
 
-type ColumnType = "checkbox" | "dataset" | "agent";
+type ColumnType = "checkbox" | "dataset" | "runner";
 
 type NavigableColumn = {
   id: string;
@@ -10,7 +10,7 @@ type NavigableColumn = {
 
 type UseTableKeyboardNavigationParams = {
   datasetColumns: DatasetColumn[];
-  agents: AgentConfig[];
+  runners: RunnerConfig[];
   displayRowCount: number;
   editingCell: { row: number; columnId: string } | undefined;
   selectedCell: { row: number; columnId: string } | undefined;
@@ -20,11 +20,11 @@ type UseTableKeyboardNavigationParams = {
 };
 
 /**
- * Builds the list of navigable columns in order: checkbox, dataset columns, agent columns
+ * Builds the list of navigable columns in order: checkbox, dataset columns, runner columns
  */
 export const buildNavigableColumns = (
   datasetColumns: DatasetColumn[],
-  agents: AgentConfig[]
+  runners: RunnerConfig[]
 ): NavigableColumn[] => {
   const cols: NavigableColumn[] = [];
 
@@ -36,9 +36,9 @@ export const buildNavigableColumns = (
     cols.push({ id: col.id, type: "dataset" });
   }
 
-  // Agent columns
-  for (const agent of agents) {
-    cols.push({ id: `agent.${agent.id}`, type: "agent" });
+  // Runner columns
+  for (const runner of runners) {
+    cols.push({ id: `runner.${runner.id}`, type: "runner" });
   }
 
   return cols;
@@ -50,7 +50,7 @@ export const buildNavigableColumns = (
  */
 export const useTableKeyboardNavigation = ({
   datasetColumns,
-  agents,
+  runners,
   displayRowCount,
   editingCell,
   selectedCell,
@@ -58,7 +58,7 @@ export const useTableKeyboardNavigation = ({
   setEditingCell,
   toggleRowSelection,
 }: UseTableKeyboardNavigationParams): NavigableColumn[] => {
-  const allColumns = buildNavigableColumns(datasetColumns, agents);
+  const allColumns = buildNavigableColumns(datasetColumns, runners);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

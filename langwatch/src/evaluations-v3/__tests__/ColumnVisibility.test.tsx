@@ -81,9 +81,6 @@ vi.mock("~/components/agents/AgentTypeSelectorDrawer", () => ({
 vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
   AgentCodeEditorDrawer: () => null,
 }));
-vi.mock("~/components/agents/AgentPromptEditorDrawer", () => ({
-  AgentPromptEditorDrawer: () => null,
-}));
 vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
   WorkflowSelectorDrawer: () => null,
 }));

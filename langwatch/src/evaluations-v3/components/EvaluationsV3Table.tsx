@@ -13,8 +13,10 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
 import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
-import { AgentPromptEditorDrawer } from "~/components/agents/AgentPromptEditorDrawer";
 import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
+import { RunnerTypeSelectorDrawer } from "~/components/runners/RunnerTypeSelectorDrawer";
+import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
+import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { EvaluatorListDrawer } from "~/components/evaluators/EvaluatorListDrawer";
 import { EvaluatorCategorySelectorDrawer } from "~/components/evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorTypeSelectorDrawer } from "~/components/evaluators/EvaluatorTypeSelectorDrawer";
@@ -27,11 +29,12 @@ import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
-import type { AgentConfig, DatasetColumn, DatasetReference, SavedRecord } from "../types";
+import type { RunnerConfig, DatasetColumn, DatasetReference, SavedRecord } from "../types";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
-import { AgentCellContent, AgentHeader } from "./AgentSection/AgentCell";
+import { RunnerCellContent } from "./RunnerSection/RunnerCell";
+import { RunnerHeader } from "./RunnerSection/RunnerHeader";
 import {
   ColumnTypeIcon,
   SuperHeader,
@@ -45,7 +48,7 @@ import { SelectionToolbar } from "./SelectionToolbar";
 type RowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  agents: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
+  runners: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
 };
 
 // ============================================================================
@@ -71,7 +74,7 @@ export function EvaluationsV3Table({
     datasets,
     activeDatasetId,
     evaluators,
-    agents,
+    runners,
     results,
     ui,
     openOverlay,
@@ -90,13 +93,15 @@ export function EvaluationsV3Table({
     setColumnWidths,
     hiddenColumns,
     toggleColumnVisibility,
-    addAgent,
+    addRunner,
+    updateRunner,
+    removeRunner,
     addEvaluator,
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
     evaluators: state.evaluators,
-    agents: state.agents,
+    runners: state.runners,
     results: state.results,
     ui: state.ui,
     openOverlay: state.openOverlay,
@@ -115,7 +120,9 @@ export function EvaluationsV3Table({
     setColumnWidths: state.setColumnWidths,
     hiddenColumns: state.ui.hiddenColumns,
     toggleColumnVisibility: state.toggleColumnVisibility,
-    addAgent: state.addAgent,
+    addRunner: state.addRunner,
+    updateRunner: state.updateRunner,
+    removeRunner: state.removeRunner,
     addEvaluator: state.addEvaluator,
   }));
 
@@ -190,60 +197,112 @@ export function EvaluationsV3Table({
   // State for editing dataset columns
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
-  // State for agent/evaluator list drawers
+  // State for runner/evaluator list drawers
+  const [runnerTypeSelectorOpen, setRunnerTypeSelectorOpen] = useState(false);
+  const [promptListDrawerOpen, setPromptListDrawerOpen] = useState(false);
+  const [promptEditorDrawerOpen, setPromptEditorDrawerOpen] = useState(false);
+  const [editingRunnerId, setEditingRunnerId] = useState<string | null>(null);
   const [agentListDrawerOpen, setAgentListDrawerOpen] = useState(false);
   const [agentTypeSelectorOpen, setAgentTypeSelectorOpen] = useState(false);
   const [agentCodeEditorOpen, setAgentCodeEditorOpen] = useState(false);
-  const [agentPromptEditorOpen, setAgentPromptEditorOpen] = useState(false);
   const [workflowSelectorOpen, setWorkflowSelectorOpen] = useState(false);
   const [evaluatorListDrawerOpen, setEvaluatorListDrawerOpen] = useState(false);
   const [evaluatorCategorySelectorOpen, setEvaluatorCategorySelectorOpen] = useState(false);
   const [evaluatorTypeSelectorOpen, setEvaluatorTypeSelectorOpen] = useState(false);
   const [evaluatorEditorOpen, setEvaluatorEditorOpen] = useState(false);
 
-  // Track which agent we're adding an evaluator for
-  const [addEvaluatorForAgentId, setAddEvaluatorForAgentId] = useState<string | null>(null);
+  // Track which runner we're adding an evaluator for
+  const [addEvaluatorForRunnerId, setAddEvaluatorForRunnerId] = useState<string | null>(null);
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
     (savedAgent: TypedAgent) => {
-      // Determine agent type - map DB type to workbench type
-      const agentType = savedAgent.type === "signature" ? "llm" : "code";
       const config = savedAgent.config as Record<string, unknown>;
 
-      // Convert TypedAgent to AgentConfig format
-      const agentConfig: AgentConfig = {
-        id: `agent_${Date.now()}`, // Generate unique ID for the workbench
-        type: agentType,
+      // Convert TypedAgent to RunnerConfig format (agent type)
+      // Agent type and workflow ID are fetched at runtime via dbAgentId when needed
+      const runnerConfig: RunnerConfig = {
+        id: `runner_${Date.now()}`, // Generate unique ID for the workbench
+        type: "agent", // This is a runner of type "agent" (code/workflow)
         name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
-        // Extract config based on type
-        ...(agentType === "llm" && {
-          llmConfig: config.llm as AgentConfig["llmConfig"],
-          messages: config.messages as AgentConfig["messages"],
-          instructions: config.prompt as string,
-        }),
-        ...(agentType === "code" && {
-          code: ((config.parameters as Array<{ identifier: string; value: unknown }> | undefined)?.find(
-            (p) => p.identifier === "code",
-          )?.value as string) ?? "",
-        }),
-        inputs: (config.inputs as AgentConfig["inputs"]) ?? [{ identifier: "input", type: "str" }],
-        outputs: (config.outputs as AgentConfig["outputs"]) ?? [{ identifier: "output", type: "str" }],
+        inputs: (config.inputs as RunnerConfig["inputs"]) ?? [{ identifier: "input", type: "str" }],
+        outputs: (config.outputs as RunnerConfig["outputs"]) ?? [{ identifier: "output", type: "str" }],
         mappings: {},
         evaluatorIds: [],
       };
-      addAgent(agentConfig);
+      addRunner(runnerConfig);
       setAgentListDrawerOpen(false);
     },
-    [addAgent],
+    [addRunner],
   );
 
-  // Handler for opening the evaluator selector for a specific agent
-  const handleAddEvaluatorForAgent = useCallback((agentId: string) => {
-    setAddEvaluatorForAgentId(agentId);
+  // Handler for when a prompt is selected from the drawer
+  const handleSelectPrompt = useCallback(
+    (prompt: { id: string; name: string; versionId?: string }) => {
+      // Convert prompt to RunnerConfig format (prompt type)
+      const runnerConfig: RunnerConfig = {
+        id: `runner_${Date.now()}`, // Generate unique ID for the workbench
+        type: "prompt",
+        name: prompt.name,
+        promptId: prompt.id,
+        promptVersionId: prompt.versionId,
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+        evaluatorIds: [],
+      };
+      addRunner(runnerConfig);
+      setPromptListDrawerOpen(false);
+    },
+    [addRunner],
+  );
+
+  // Handler for opening the evaluator selector for a specific runner
+  const handleAddEvaluatorForRunner = useCallback((runnerId: string) => {
+    setAddEvaluatorForRunnerId(runnerId);
     setEvaluatorListDrawerOpen(true);
   }, []);
+
+  // tRPC utils for fetching agent data
+  const trpcUtils = api.useContext();
+
+  // Handler for editing a runner (clicking on the header)
+  const handleEditRunner = useCallback(async (runner: RunnerConfig) => {
+    if (runner.type === "prompt") {
+      setEditingRunnerId(runner.id);
+      setPromptEditorDrawerOpen(true);
+    } else if (runner.type === "agent" && runner.dbAgentId) {
+      // Fetch the agent to determine its type
+      try {
+        const agent = await trpcUtils.agents.getById.fetch({
+          projectId: project?.id ?? "",
+          id: runner.dbAgentId,
+        });
+
+        if (agent?.type === "workflow") {
+          // Open workflow in new tab
+          const config = agent.config as Record<string, unknown>;
+          const workflowId = config.workflowId as string | undefined;
+          if (workflowId) {
+            const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
+            window.open(workflowUrl, "_blank");
+          }
+        } else {
+          // Code agent - open code editor drawer
+          setEditingRunnerId(runner.id);
+          setAgentCodeEditorOpen(true);
+        }
+      } catch (error) {
+        console.error("Failed to fetch agent:", error);
+      }
+    }
+  }, [project?.id, project?.slug, trpcUtils.agents.getById]);
+
+  // Handler for removing a runner from the workbench
+  const handleRemoveRunner = useCallback((runnerId: string) => {
+    removeRunner(runnerId);
+  }, [removeRunner]);
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
@@ -317,7 +376,7 @@ export function EvaluationsV3Table({
   // Keyboard navigation hook - handles arrow keys, Tab, Enter, Escape
   useTableKeyboardNavigation({
     datasetColumns,
-    agents,
+    runners,
     displayRowCount,
     editingCell: ui.editingCell,
     selectedCell: ui.selectedCell,
@@ -342,15 +401,15 @@ export function EvaluationsV3Table({
           getCellValue(activeDatasetId, index, col.id),
         ])
       ),
-      agents: Object.fromEntries(
-        agents.map((agent) => [
-          agent.id,
+      runners: Object.fromEntries(
+        runners.map((runner) => [
+          runner.id,
           {
-            output: results.agentOutputs[agent.id]?.[index] ?? null,
+            output: results.runnerOutputs[runner.id]?.[index] ?? null,
             evaluators: Object.fromEntries(
-              agent.evaluatorIds.map((evaluatorId) => [
+              runner.evaluatorIds.map((evaluatorId) => [
                 evaluatorId,
-                results.evaluatorResults[agent.id]?.[evaluatorId]?.[index] ?? null,
+                results.evaluatorResults[runner.id]?.[evaluatorId]?.[index] ?? null,
               ])
             ),
           },
@@ -358,7 +417,7 @@ export function EvaluationsV3Table({
       ),
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
-  }, [activeDatasetId, activeDataset, datasetColumns, agents, results, displayRowCount, getCellValue]);
+  }, [activeDatasetId, activeDataset, datasetColumns, runners, results, displayRowCount, getCellValue]);
 
   // Build columns
   const columnHelper = createColumnHelper<RowData>();
@@ -429,32 +488,38 @@ export function EvaluationsV3Table({
       );
     }
 
-    // Agent columns (each agent is ONE column, with output + evaluators inside)
-    for (const agent of agents) {
+    // Runner columns (each runner is ONE column, with output + evaluators inside)
+    for (const runner of runners) {
       cols.push(
-        columnHelper.accessor((row) => row.agents[agent.id], {
-          id: `agent.${agent.id}`,
-          header: () => <AgentHeader agent={agent} />,
+        columnHelper.accessor((row) => row.runners[runner.id], {
+          id: `runner.${runner.id}`,
+          header: () => (
+            <RunnerHeader
+              runner={runner}
+              onEdit={handleEditRunner}
+              onRemove={handleRemoveRunner}
+            />
+          ),
           cell: (info) => {
             const data = info.getValue() as {
               output: unknown;
               evaluators: Record<string, unknown>;
             };
             return (
-              <AgentCellContent
-                agent={agent}
+              <RunnerCellContent
+                runner={runner}
                 output={data?.output}
                 evaluatorResults={data?.evaluators ?? {}}
                 row={info.row.index}
                 evaluatorsMap={evaluatorsMap}
-                onAddEvaluator={handleAddEvaluatorForAgent}
+                onAddEvaluator={handleAddEvaluatorForRunner}
               />
             );
           },
           size: 280,
           meta: {
-            columnType: "agent" as ColumnType,
-            columnId: `agent.${agent.id}`,
+            columnType: "runner" as ColumnType,
+            columnId: `runner.${runner.id}`,
           },
         }) as ColumnDef<RowData>
       );
@@ -463,7 +528,7 @@ export function EvaluationsV3Table({
     return cols;
   }, [
     datasetColumns,
-    agents,
+    runners,
     evaluatorsMap,
     columnHelper,
     selectedRows,
@@ -473,7 +538,9 @@ export function EvaluationsV3Table({
     toggleRowSelection,
     selectAllRows,
     clearRowSelection,
-    handleAddEvaluatorForAgent,
+    handleAddEvaluatorForRunner,
+    handleEditRunner,
+    handleRemoveRunner,
   ]);
 
   // Column sizing state - initialize from store
@@ -512,7 +579,7 @@ export function EvaluationsV3Table({
 
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
-  const agentsColSpan = Math.max(agents.length, 1);
+  const runnersColSpan = Math.max(runners.length, 1);
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
@@ -615,10 +682,11 @@ export function EvaluationsV3Table({
               isLoading={isLoadingExperiment}
             />
             <SuperHeader
-              type="agents"
-              colSpan={agentsColSpan}
-              onAddClick={() => setAgentListDrawerOpen(true)}
-              showWarning={agents.length === 0}
+              type="runners"
+              colSpan={runnersColSpan}
+              onAddClick={() => setRunnerTypeSelectorOpen(true)}
+              showWarning={runners.length === 0}
+              hasComparison={runners.length > 0}
               isLoading={isLoadingExperiment}
             />
           </tr>
@@ -642,10 +710,10 @@ export function EvaluationsV3Table({
                   )}
                 </th>
               ))}
-              {agents.length === 0 && (
+              {runners.length === 0 && (
                 <th style={{ minWidth: 200 }}>
                   <Text fontSize="xs" color="gray.400" fontStyle="italic">
-                    Click "Add Agent" above
+                    Click "+ Add" above to get started
                   </Text>
                 </th>
               )}
@@ -667,7 +735,7 @@ export function EvaluationsV3Table({
                   isLoading={isLoadingExperiment || isLoadingDatasets}
                 />
               ))}
-              {agents.length === 0 && <td />}
+              {runners.length === 0 && <td />}
             </tr>
           ))}
         </tbody>
@@ -796,6 +864,53 @@ export function EvaluationsV3Table({
         }}
       />
 
+      {/* Runner Type Selector Drawer */}
+      <RunnerTypeSelectorDrawer
+        open={runnerTypeSelectorOpen}
+        onClose={() => setRunnerTypeSelectorOpen(false)}
+        onSelect={(type) => {
+          setRunnerTypeSelectorOpen(false);
+          if (type === "prompt") {
+            setPromptListDrawerOpen(true);
+          } else if (type === "agent") {
+            setAgentListDrawerOpen(true);
+          }
+        }}
+      />
+
+      {/* Prompt Drawers */}
+      <PromptListDrawer
+        open={promptListDrawerOpen}
+        onClose={() => setPromptListDrawerOpen(false)}
+        onSelect={handleSelectPrompt}
+        onCreateNew={() => {
+          setPromptListDrawerOpen(false);
+          setPromptEditorDrawerOpen(true);
+        }}
+      />
+      <PromptEditorDrawer
+        open={promptEditorDrawerOpen}
+        onClose={() => {
+          setPromptEditorDrawerOpen(false);
+          setEditingRunnerId(null);
+        }}
+        promptId={editingRunnerId ? runners.find(r => r.id === editingRunnerId)?.promptId : undefined}
+        onSave={(savedPrompt) => {
+          // If we were editing an existing runner, update it
+          if (editingRunnerId) {
+            updateRunner(editingRunnerId, {
+              name: savedPrompt.name,
+              promptId: savedPrompt.id,
+            });
+          } else {
+            // Otherwise, create a new runner with the saved prompt
+            handleSelectPrompt(savedPrompt);
+          }
+          setPromptEditorDrawerOpen(false);
+          setEditingRunnerId(null);
+        }}
+      />
+
       {/* Agent Drawers */}
       <AgentListDrawer
         open={agentListDrawerOpen}
@@ -811,9 +926,7 @@ export function EvaluationsV3Table({
         onClose={() => setAgentTypeSelectorOpen(false)}
         onSelect={(type) => {
           setAgentTypeSelectorOpen(false);
-          if (type === "signature") {
-            setAgentPromptEditorOpen(true);
-          } else if (type === "code") {
+          if (type === "code") {
             setAgentCodeEditorOpen(true);
           } else if (type === "workflow") {
             setWorkflowSelectorOpen(true);
@@ -826,14 +939,6 @@ export function EvaluationsV3Table({
         onSave={(savedAgent) => {
           handleSelectSavedAgent(savedAgent);
           setAgentCodeEditorOpen(false);
-        }}
-      />
-      <AgentPromptEditorDrawer
-        open={agentPromptEditorOpen}
-        onClose={() => setAgentPromptEditorOpen(false)}
-        onSave={(savedAgent) => {
-          handleSelectSavedAgent(savedAgent);
-          setAgentPromptEditorOpen(false);
         }}
       />
       <WorkflowSelectorDrawer
@@ -850,7 +955,7 @@ export function EvaluationsV3Table({
         open={evaluatorListDrawerOpen}
         onClose={() => {
           setEvaluatorListDrawerOpen(false);
-          setAddEvaluatorForAgentId(null);
+          setAddEvaluatorForRunnerId(null);
         }}
         onCreateNew={() => {
           setEvaluatorListDrawerOpen(false);
@@ -861,7 +966,7 @@ export function EvaluationsV3Table({
         open={evaluatorCategorySelectorOpen}
         onClose={() => {
           setEvaluatorCategorySelectorOpen(false);
-          setAddEvaluatorForAgentId(null);
+          setAddEvaluatorForRunnerId(null);
         }}
         onSelectCategory={() => {
           setEvaluatorCategorySelectorOpen(false);
@@ -872,7 +977,7 @@ export function EvaluationsV3Table({
         open={evaluatorTypeSelectorOpen}
         onClose={() => {
           setEvaluatorTypeSelectorOpen(false);
-          setAddEvaluatorForAgentId(null);
+          setAddEvaluatorForRunnerId(null);
         }}
         onSelect={() => {
           setEvaluatorTypeSelectorOpen(false);
@@ -883,12 +988,12 @@ export function EvaluationsV3Table({
         open={evaluatorEditorOpen}
         onClose={() => {
           setEvaluatorEditorOpen(false);
-          setAddEvaluatorForAgentId(null);
+          setAddEvaluatorForRunnerId(null);
         }}
         onSave={() => {
-          // TODO: Link evaluator to agent when addEvaluatorForAgentId is set
+          // TODO: Link evaluator to runner when addEvaluatorForRunnerId is set
           setEvaluatorEditorOpen(false);
-          setAddEvaluatorForAgentId(null);
+          setAddEvaluatorForRunnerId(null);
         }}
       />
     </Box>
