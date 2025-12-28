@@ -1,4 +1,12 @@
-import { Box, HStack, IconButton, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Icon,
+  IconButton,
+  Spacer,
+  Text,
+} from "@chakra-ui/react";
 import { Code, Edit2, Trash2 } from "react-feather";
 import { ChevronDown, FileText } from "lucide-react";
 import { LuPlay } from "react-icons/lu";
@@ -25,7 +33,12 @@ type RunnerHeaderProps = {
  * Note: For workflow agents, clicking "Edit Agent" opens the workflow in a new tab.
  * This is determined at runtime by fetching the agent data via tRPC.
  */
-export function RunnerHeader({ runner, onEdit, onRemove, onRun }: RunnerHeaderProps) {
+export function RunnerHeader({
+  runner,
+  onEdit,
+  onRemove,
+  onRun,
+}: RunnerHeaderProps) {
   // Determine icon based on runner type
   const getRunnerIcon = () => {
     if (runner.type === "prompt") {
@@ -41,20 +54,20 @@ export function RunnerHeader({ runner, onEdit, onRemove, onRun }: RunnerHeaderPr
   const editLabel = runner.type === "prompt" ? "Edit Prompt" : "Edit Agent";
 
   return (
-    <HStack gap={2} width="full" justify="space-between">
+    <HStack gap={2} width="full">
       <Menu.Root positioning={{ placement: "bottom-start" }}>
         <Menu.Trigger asChild>
-          <HStack
+          <Button
+            variant="ghost"
+            size="xs"
+            _hover={{ bg: "gray.100" }}
+            paddingX={2}
+            paddingY={1}
             gap={2}
-            cursor="pointer"
-            _hover={{ bg: "gray.50" }}
+            marginX={-2}
+            marginY={-2}
+            className="group"
             data-testid="runner-header-button"
-            flex={1}
-            minWidth={0}
-            paddingX={1}
-            paddingY={0.5}
-            marginX={-1}
-            borderRadius="md"
           >
             <ColorfulBlockIcon
               color={getRunnerColor()}
@@ -64,8 +77,14 @@ export function RunnerHeader({ runner, onEdit, onRemove, onRun }: RunnerHeaderPr
             <Text fontSize="13px" fontWeight="medium" truncate>
               {runner.name}
             </Text>
-            {/* <ChevronDown size={12} /> */}
-          </HStack>
+            <Icon
+              as={ChevronDown}
+              width={2.5}
+              height={2.5}
+              display="none"
+              _groupHover={{ display: "block" }}
+            />
+          </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
           <Menu.Item value="edit" onClick={() => onEdit?.(runner)}>
@@ -83,6 +102,8 @@ export function RunnerHeader({ runner, onEdit, onRemove, onRun }: RunnerHeaderPr
           </Menu.Item>
         </Menu.Content>
       </Menu.Root>
+
+      <Spacer />
 
       {/* Play button on far right */}
       <IconButton

@@ -91,7 +91,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
-        <Drawer.Header paddingRight={12}>
+        <Drawer.Header>
           <HStack gap={2} justify="space-between" width="full">
             <Heading>Choose Evaluator</Heading>
             <Button

@@ -626,6 +626,7 @@ export const system = createSystem(defaultConfig, {
           },
           header: {
             paddingY: 4,
+            paddingRight: 12,
           },
         },
         variants: {
