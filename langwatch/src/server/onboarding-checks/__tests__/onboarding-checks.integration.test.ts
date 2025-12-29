@@ -40,7 +40,7 @@ describe("OnboardingChecksService Integration", () => {
     // Clean up created entities
     if (createdEntityIds.promptVersions.length > 0) {
       await prisma.llmPromptConfigVersion.deleteMany({
-        where: { id: { in: createdEntityIds.promptVersions } },
+        where: { id: { in: createdEntityIds.promptVersions }, projectId },
       });
     }
     if (createdEntityIds.prompts.length > 0) {
@@ -70,11 +70,7 @@ describe("OnboardingChecksService Integration", () => {
       expect(typeof result.prompts).toBe("number");
     });
 
-    it("counts enabled model providers", async () => {
-      // Get initial count
-      const initialResult = await service.getCheckStatus(projectId);
-      const initialCount = initialResult.modelProviders;
-
+    it("returns 1 when at least one enabled model provider exists", async () => {
       // Create an enabled model provider
       const modelProvider = await prisma.modelProvider.create({
         data: {
@@ -88,8 +84,8 @@ describe("OnboardingChecksService Integration", () => {
 
       const result = await service.getCheckStatus(projectId);
 
-      // Should have one more than initial
-      expect(result.modelProviders).toBeGreaterThan(initialCount);
+      // Service returns 0 or 1 (has at least one), not a count
+      expect(result.modelProviders).toBe(1);
     });
 
     it("does not count disabled model providers", async () => {
@@ -111,11 +107,7 @@ describe("OnboardingChecksService Integration", () => {
       expect(typeof result.modelProviders).toBe("number");
     });
 
-    it("counts prompts with at least one version", async () => {
-      // Get initial count
-      const initialResult = await service.getCheckStatus(projectId);
-      const initialCount = initialResult.prompts;
-
+    it("returns 1 when at least one versioned prompt exists", async () => {
       // Create a prompt with a version
       const prompt = await prisma.llmPromptConfig.create({
         data: {
@@ -143,7 +135,8 @@ describe("OnboardingChecksService Integration", () => {
 
       const result = await service.getCheckStatus(projectId);
 
-      expect(result.prompts).toBeGreaterThan(initialCount);
+      // Service returns 0 or 1 (has at least one), not a count
+      expect(result.prompts).toBe(1);
     });
 
     it("does not count prompts without versions", async () => {
