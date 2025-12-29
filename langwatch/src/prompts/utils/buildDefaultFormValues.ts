@@ -11,13 +11,15 @@ const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   scope: PromptScope.PROJECT,
   version: {
     configData: {
-      prompt: "You are a helpful assistant.",
       llm: {
         model: DEFAULT_MODEL,
         temperature: 0.5,
         maxTokens: 1000,
       },
-      messages: [{ role: "user" as const, content: "{{input}}" }],
+      messages: [
+        { role: "system" as const, content: "You are a helpful assistant." },
+        { role: "user" as const, content: "{{input}}" },
+      ],
       inputs: [{ identifier: "input", type: "str" as const }],
       outputs: [{ identifier: "output", type: "str" as const }],
     },

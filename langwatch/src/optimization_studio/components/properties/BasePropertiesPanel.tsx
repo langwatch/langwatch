@@ -1,7 +1,6 @@
 import {
   Box,
   Button,
-  Center,
   Field,
   HStack,
   Input,
@@ -9,7 +8,6 @@ import {
   Spacer,
   type StackProps,
   Text,
-  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
@@ -18,7 +16,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ChevronDown,
   Columns,
-  Edit2,
   Info,
   Plus,
   Trash2,
@@ -28,7 +25,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
-import { RenderCode } from "../../../components/code/RenderCode";
+import { CodeBlockEditor } from "../../../components/blocks/CodeBlockEditor";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
@@ -42,7 +39,6 @@ import type {
 } from "../../types/dsl";
 import { nameToId } from "../../utils/nodeUtils";
 import { ComponentIcon } from "../ColorfulBlockIcons";
-import { CodeEditorModal } from "../code/CodeEditorModal";
 import {
   ComponentExecutionButton,
   getNodeDisplayName,
@@ -50,6 +46,7 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
@@ -389,8 +386,6 @@ export function FieldsForm({
     return () => subscription.unsubscribe();
   }, [watch, handleSubmitDebounced]);
 
-  const codeEditorModal = useDisclosure();
-
   return (
     <VStack as="form" align="start" gap={3} width="full">
       {fields.map((field, index) => {
@@ -418,65 +413,18 @@ export function FieldsForm({
             (p) => p.identifier === field.identifier,
           );
           return (
-            <Box position="relative" width="full" key={field.id}>
-              <Center
-                role="button"
-                aria-label="Edit code"
-                onClick={codeEditorModal.onOpen}
-                position="absolute"
-                top={0}
-                left={0}
-                width="100%"
-                height="100%"
-                background="rgba(0, 0, 0, 0.2)"
-                zIndex={10}
-                opacity={0}
-                cursor="pointer"
-                transition="opacity 0.2s ease-in-out"
-                _hover={{
-                  opacity: 1,
-                }}
-              >
-                <HStack
-                  gap={2}
-                  fontSize="18px"
-                  fontWeight="bold"
-                  color="white"
-                  background="rgba(0, 0, 0, .5)"
-                  paddingY={2}
-                  paddingX={4}
-                  borderRadius="6px"
-                >
-                  <Edit2 size={20} />
-                  <Text>Edit</Text>
-                </HStack>
-              </Center>
-              <RenderCode
-                code={(stateField?.value ?? "") as string}
-                language="python"
-                style={{
-                  width: "100%",
-                  fontSize: "12px",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  backgroundColor: "rgb(39, 40, 34)",
-                  maxHeight: "200px",
-                  overflowY: "hidden",
-                }}
-              />
-              <CodeEditorModal
-                code={stateField?.value as string}
-                setCode={(code) => {
-                  setNodeParameter(node.id, {
-                    identifier: field.identifier,
-                    type: "code",
-                    value: code,
-                  });
-                }}
-                open={codeEditorModal.open}
-                onClose={codeEditorModal.onClose}
-              />
-            </Box>
+            <CodeBlockEditor
+              key={field.id}
+              code={(stateField?.value ?? "") as string}
+              onChange={(code) => {
+                setNodeParameter(node.id, {
+                  identifier: field.identifier,
+                  type: "code",
+                  value: code,
+                });
+              }}
+              language="python"
+            />
           );
         }
 
@@ -528,31 +476,8 @@ export function FieldsForm({
   );
 }
 
-export interface PropertySectionTitleProps extends StackProps {
-  tooltip?: React.ReactNode;
-}
-
-export function PropertySectionTitle({
-  children,
-  tooltip,
-  ...props
-}: {
-  children: React.ReactNode;
-  tooltip?: React.ReactNode;
-} & StackProps) {
-  return (
-    <HStack paddingLeft={2} {...props}>
-      <NodeSectionTitle fontSize="12px">{children}</NodeSectionTitle>
-      {tooltip && (
-        <Tooltip content={tooltip}>
-          <Box marginBottom="-2px">
-            <Info size={14} />
-          </Box>
-        </Tooltip>
-      )}
-    </HStack>
-  );
-}
+// Re-export PropertySectionTitle for backwards compatibility
+export { PropertySectionTitle, type PropertySectionTitleProps } from "~/components/ui/PropertySectionTitle";
 
 export function BasePropertiesPanel({
   node,

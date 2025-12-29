@@ -1,11 +1,11 @@
 import {
   PropertySectionTitle,
   type PropertySectionTitleProps,
-} from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
+} from "~/components/ui/PropertySectionTitle";
 
-interface MessageRoleLabelProps extends PropertySectionTitleProps {
+export type MessageRoleLabelProps = Omit<PropertySectionTitleProps, "children"> & {
   role: "system" | "user" | "assistant";
-}
+};
 
 /**
  * MessageRoleLabel

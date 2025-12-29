@@ -17,7 +17,9 @@ vi.mock("~/hooks/useDrawer", () => ({
     closeDrawer: vi.fn(),
     isOpen: vi.fn(() => false),
     drawerParams: {},
+    drawerOpen: () => false,
   }),
+  getComplexProps: () => ({}),
 }));
 
 // Wrapper with Chakra provider
@@ -32,7 +34,7 @@ const KeyboardNavigationTestComponent = () => {
   const {
     datasets,
     activeDatasetId,
-    agents,
+    runners,
     ui,
     setSelectedCell,
     setEditingCell,
@@ -41,7 +43,7 @@ const KeyboardNavigationTestComponent = () => {
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
-    agents: state.agents,
+    runners: state.runners,
     ui: state.ui,
     setSelectedCell: state.setSelectedCell,
     setEditingCell: state.setEditingCell,
@@ -57,7 +59,7 @@ const KeyboardNavigationTestComponent = () => {
   // Use the extracted keyboard navigation hook
   const allColumns = useTableKeyboardNavigation({
     datasetColumns,
-    agents,
+    runners,
     displayRowCount,
     editingCell: ui.editingCell,
     selectedCell: ui.selectedCell,

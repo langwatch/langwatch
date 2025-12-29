@@ -122,7 +122,7 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.prompt).toBe("");
+      expect(result.version?.configData?.messages?.[0]?.content).toBe("");
     });
   });
 

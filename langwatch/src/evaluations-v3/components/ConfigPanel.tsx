@@ -1,5 +1,5 @@
 import { Box, Heading, HStack, IconButton, Spacer } from "@chakra-ui/react";
-import { X } from "react-feather";
+import { LuX } from "react-icons/lu";
 
 type ConfigPanelProps = {
   isOpen: boolean;
@@ -54,7 +54,7 @@ export function ConfigPanel({
         </Heading>
         <Spacer />
         <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
-          <X size={18} />
+          <LuX size={18} />
         </IconButton>
       </HStack>
 

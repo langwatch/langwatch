@@ -68,6 +68,7 @@ export const DialogRoot = function DialogRoot(props: DialogRootProps) {
     <ChakraDialog.Root
       {...(props as ChakraDialog.RootProps)}
       trapFocus={false}
+      preventScroll={false}
     />
   );
 };

@@ -20,9 +20,12 @@ describe("usePromptConfigForm", () => {
         scope: "PROJECT" as const,
         version: {
           configData: {
-            prompt: "Test prompt",
-            inputs: [{ identifier: "input", type: "str" }],
-            outputs: [{ identifier: "output", type: "str" }],
+            messages: [
+              { role: "system" as const, content: "Test prompt" },
+              { role: "user" as const, content: "{{input}}" },
+            ],
+            inputs: [{ identifier: "input", type: "str" as const }],
+            outputs: [{ identifier: "output", type: "str" as const }],
           },
         },
       };
@@ -30,7 +33,10 @@ describe("usePromptConfigForm", () => {
       const result = salvageValidData(formSchema, initialValues, defaults);
 
       expect(result.handle).toBe("test-handle");
-      expect(result.version.configData.prompt).toBe("Test prompt");
+      expect(result.version.configData.messages).toHaveLength(2);
+      expect(result.version.configData.messages[0]?.content).toBe(
+        "Test prompt",
+      );
     });
   });
 
@@ -48,7 +54,10 @@ describe("usePromptConfigForm", () => {
         // Missing required field: scope
         version: {
           configData: {
-            prompt: "Valid prompt text", // This should be salvaged
+            messages: [
+              { role: "system" as const, content: "Valid prompt text" },
+              { role: "user" as const, content: "{{input}}" },
+            ], // This should be salvaged
             inputs: [{ identifier: "", type: "str" }], // Empty identifier - invalid
             outputs: [{ identifier: "output", type: "str" }], // Valid - should be salvaged
           },
@@ -62,7 +71,10 @@ describe("usePromptConfigForm", () => {
 
       // Should salvage valid parts
       expect(result.handle).toBe("valid-handle");
-      expect(result.version.configData.prompt).toBe("Valid prompt text");
+      expect(result.version.configData.messages).toHaveLength(2);
+      expect(result.version.configData.messages[0]?.content).toBe(
+        "Valid prompt text",
+      );
       expect(result.version.configData.outputs).toHaveLength(1);
       expect(result.version.configData.outputs[0]?.identifier).toBe("output");
 

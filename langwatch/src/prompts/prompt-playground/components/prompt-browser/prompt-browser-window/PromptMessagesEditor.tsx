@@ -18,6 +18,7 @@ export function PromptMessagesEditor() {
   const availableMentions = useMemo(() => {
     return inputs.map((input) => input.identifier);
   }, [inputs]);
+
   return (
     <PromptMessagesField
       messageFields={messageFields}

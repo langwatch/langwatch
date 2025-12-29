@@ -318,3 +318,117 @@ export type ServerWorkflow = Omit<Workflow, "workflow_id"> & {
   api_key: string;
   workflow_id: string;
 };
+
+// ============================================================================
+// Component Schemas for Agent Config Validation
+// These schemas validate that agent configs match existing DSL node data types
+// so they can be used directly when generating workflows for execution.
+// ============================================================================
+
+/**
+ * Schema for Field type used in parameters, inputs, outputs
+ */
+export const fieldSchema = z.object({
+  identifier: z.string(),
+  type: z.enum(FIELD_TYPES),
+  optional: z.boolean().optional(),
+  value: z.unknown().optional(),
+  desc: z.string().optional(),
+  prefix: z.string().optional(),
+  hidden: z.boolean().optional(),
+  json_schema: z.object({}).passthrough().optional(),
+});
+
+/**
+ * Schema for BaseComponent - the foundation of all node data types
+ */
+export const baseComponentSchema = z.object({
+  _library_ref: z.string().optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  cls: z.string().optional(),
+  parameters: z.array(fieldSchema).optional(),
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  isCustom: z.boolean().optional(),
+  behave_as: z.literal("evaluator").optional(),
+});
+
+/**
+ * Schema for chat messages used in signature configs
+ */
+export const chatMessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]).optional(),
+  content: z.string().optional(),
+});
+
+/**
+ * Schema for Signature/LlmPromptConfigComponent node data
+ * Used for "signature" type agents
+ *
+ * Supports two storage formats:
+ * 1. Top-level llm/prompt/messages (used by agent drawers)
+ * 2. Parameters array with llm/instructions/messages entries (used by workflow nodes)
+ */
+export const signatureComponentSchema = baseComponentSchema.extend({
+  configId: z.string().optional(),
+  handle: z.string().nullable().optional(),
+  versionMetadata: z
+    .object({
+      versionId: z.string(),
+      versionNumber: z.number(),
+      versionCreatedAt: z.string(),
+    })
+    .optional(),
+  // Top-level LLM config (alternative to parameters array)
+  llm: llmConfigSchema.optional(),
+  prompt: z.string().optional(),
+  messages: z.array(chatMessageSchema).optional(),
+});
+
+/**
+ * Schema for the code parameter specifically
+ */
+export const codeParameterSchema = z.object({
+  identifier: z.literal("code"),
+  type: z.literal("code"),
+  value: z.string(),
+  optional: z.boolean().optional(),
+  desc: z.string().optional(),
+  prefix: z.string().optional(),
+  hidden: z.boolean().optional(),
+});
+
+/**
+ * Schema for Code node data
+ * Used for "code" type agents
+ * Requires a parameters array with at least a "code" parameter
+ */
+export const codeComponentSchema = baseComponentSchema.extend({
+  parameters: z
+    .array(z.union([codeParameterSchema, fieldSchema]))
+    .refine(
+      (params) => params?.some((p) => p.identifier === "code" && p.type === "code"),
+      { message: "Code component must have a 'code' parameter with type 'code'" },
+    ),
+});
+
+/**
+ * Schema for Custom/Workflow node data
+ * Used for "workflow" type agents
+ */
+export const customComponentSchema = baseComponentSchema.extend({
+  isCustom: z.boolean().optional(),
+  workflow_id: z.string().optional(),
+  publishedId: z.string().optional(),
+  version_id: z.string().optional(),
+  versions: z.record(z.any()).optional(),
+});
+
+/**
+ * Union type for all valid agent config types
+ * These match the existing Component types so they're directly usable in DSL
+ */
+export type SignatureComponentConfig = z.infer<typeof signatureComponentSchema>;
+export type CodeComponentConfig = z.infer<typeof codeComponentSchema>;
+export type CustomComponentConfig = z.infer<typeof customComponentSchema>;

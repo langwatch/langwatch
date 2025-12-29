@@ -34,6 +34,11 @@ import { generateUniqueIdentifier } from "./identifierUtils";
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,
 ): Node<LlmPromptConfigComponent>["data"] {
+  const messages = formValues.version?.configData?.messages ?? [];
+  const systemMessage = messages.find((msg) => msg.role === "system");
+  const systemPrompt = systemMessage?.content ?? "";
+  const messagesWithoutSystem = messages.filter((msg) => msg.role !== "system");
+
   return {
     configId: formValues.configId,
     handle: formValues.handle,
@@ -49,7 +54,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
       {
         identifier: "instructions",
         type: "str",
-        value: formValues.version?.configData?.prompt,
+        value: systemPrompt,
       },
       {
         identifier: "demonstrations",
@@ -59,7 +64,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
       {
         identifier: "messages",
         type: "chat_messages",
-        value: formValues.version?.configData?.messages ?? [],
+        value: messagesWithoutSystem,
       },
       {
         identifier: "prompting_technique",
@@ -133,13 +138,12 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
         inputs,
         outputs,
         llm: llmValue,
-        prompt:
-          typeof parametersMap.instructions?.value === "string"
-            ? parametersMap.instructions.value
-            : "",
-        messages: Array.isArray(parametersMap.messages?.value)
-          ? parametersMap.messages.value
-          : [],
+        messages: [
+          { role: "system", content: parametersMap.instructions?.value ?? "" },
+          ...(Array.isArray(parametersMap.messages?.value)
+            ? parametersMap.messages.value
+            : []),
+        ],
         demonstrations: {
           inline: {
             columnTypes: inputsAndOutputsToDemostrationColumns(inputs, outputs),
@@ -371,9 +375,8 @@ export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues,
 ): Omit<Omit<SaveVersionParams, "projectId">["data"], "commitMessage"> {
   const systemPrompt =
-    formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
-      ?.content;
+      ?.content ?? "";
   const messages = formValues.version.configData.messages?.filter(
     (msg) => msg.role !== "system",
   );

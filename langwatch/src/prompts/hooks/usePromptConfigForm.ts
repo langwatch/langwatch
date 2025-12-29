@@ -80,15 +80,24 @@ export const usePromptConfigForm = ({
    */
   useEffect(() => {
     if (systemMessage) {
-      const currentPrompt = methods.getValues("version.configData.prompt");
+      const currentMessages = methods.getValues("version.configData.messages");
+      const currentPrompt = currentMessages?.find(
+        (msg) => msg.role === "system",
+      )?.content;
       // Only sync when value differs; do not mark dirty for this derived update
       if (currentPrompt !== systemMessage) {
-        methods.setValue("version.configData.prompt", systemMessage, {
-          shouldDirty: false,
-        });
+        methods.setValue(
+          "version.configData.messages",
+          currentMessages?.map((msg) =>
+            msg.role === "system" ? { ...msg, content: systemMessage } : msg,
+          ),
+          {
+            shouldDirty: false,
+          },
+        );
       }
     }
-  }, [systemMessage, methods]);
+  }, [systemMessage, messages, methods]);
 
   // Handle syncing the inputs/outputs with the demonstrations columns
   useEffect(() => {

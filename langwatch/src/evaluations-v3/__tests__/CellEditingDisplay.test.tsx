@@ -9,6 +9,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock optimization_studio hooks to prevent circular dependency issues
+vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+  store: vi.fn(() => ({})),
+  initialState: {},
+  useWorkflowStore: vi.fn(() => ({})),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 
@@ -33,7 +40,11 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),
+    drawerOpen: () => false,
   }),
+  useDrawerParams: () => ({}),
+  getComplexProps: () => ({}),
+  setFlowCallbacks: vi.fn(),
 }));
 
 // Mock mutation function that we can spy on
@@ -42,6 +53,13 @@ const mockUpdateMutate = vi.fn();
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      agents: {
+        getById: {
+          fetch: vi.fn(),
+        },
+      },
+    }),
     datasetRecord: {
       getAll: {
         useQuery: () => ({ data: null, isLoading: false }),
@@ -53,12 +71,50 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn() }),
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
+    evaluators: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
   },
 }));
 
 // Mock AddOrEditDatasetDrawer to avoid complex API dependencies
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
   AddOrEditDatasetDrawer: () => null,
+}));
+
+// Mock Agent Drawers
+vi.mock("~/components/agents/AgentListDrawer", () => ({
+  AgentListDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentTypeSelectorDrawer", () => ({
+  AgentTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
+  AgentCodeEditorDrawer: () => null,
+}));
+vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
+  WorkflowSelectorDrawer: () => null,
+}));
+
+// Mock Evaluator Drawers
+vi.mock("~/components/evaluators/EvaluatorListDrawer", () => ({
+  EvaluatorListDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorCategorySelectorDrawer", () => ({
+  EvaluatorCategorySelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorTypeSelectorDrawer", () => ({
+  EvaluatorTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
+  EvaluatorEditorDrawer: () => null,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (

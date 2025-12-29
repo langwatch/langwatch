@@ -1,4 +1,4 @@
-import { Box, HStack, Heading, Spacer, VStack } from "@chakra-ui/react";
+import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import ErrorPage from "next/error";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -7,9 +7,8 @@ import { CurrentDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-
-import { AgentConfigPanel } from "~/evaluations-v3/components/AgentSection/AgentConfigOverlay";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
+import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
 import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
 import { SavedDatasetLoaders } from "~/evaluations-v3/components/SavedDatasetLoaders";
@@ -28,12 +27,14 @@ export default function EvaluationsV3Page() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, datasets, reset, autosaveStatus } = useEvaluationsV3Store((state) => ({
-    name: state.name,
-    datasets: state.datasets,
-    reset: state.reset,
-    autosaveStatus: state.ui.autosaveStatus,
-  }));
+  const { name, setName, datasets, reset, autosaveStatus } =
+    useEvaluationsV3Store((state) => ({
+      name: state.name,
+      setName: state.setName,
+      datasets: state.datasets,
+      reset: state.reset,
+      autosaveStatus: state.ui.autosaveStatus,
+    }));
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const { isLoading: isLoadingExperiment } = useAutosaveEvaluationsV3();
@@ -58,7 +59,7 @@ export default function EvaluationsV3Page() {
   }
 
   return (
-    <DashboardLayout backgroundColor="white">
+    <DashboardLayout backgroundColor="white" compactMenu={true}>
       <VStack
         width="full"
         height="calc(100vh - 50px)"
@@ -68,7 +69,11 @@ export default function EvaluationsV3Page() {
       >
         {/* Header */}
         <HStack paddingX={6} paddingY={3} flexShrink={0}>
-          <Heading size="md">{name || "New Evaluation"}</Heading>
+          <EditableHeading
+            value={name}
+            onSave={setName}
+            isLoading={isLoadingExperiment}
+          />
           <Spacer />
           <HStack gap={2}>
             <AutosaveStatus
@@ -95,17 +100,12 @@ export default function EvaluationsV3Page() {
           borderColor="gray.350"
           bg="white"
         >
-          <Box
-            position="absolute"
-            inset={0}
-            overflow="auto"
-          >
+          <Box position="absolute" inset={0} overflow="auto">
             <EvaluationsV3Table
               isLoadingExperiment={isLoadingExperiment}
               isLoadingDatasets={isLoadingDatasets}
             />
           </Box>
-          <AgentConfigPanel />
         </Box>
       </VStack>
 
