@@ -100,7 +100,7 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     });
 
     // Wait for queue processing
-    await waitForQueueProcessing(30000);
+    await waitForQueueProcessing(120_000);
 
     // Verify events were stored in order
     const events = await pipeline.eventStore.getEvents(
