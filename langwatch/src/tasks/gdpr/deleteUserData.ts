@@ -692,79 +692,84 @@ export async function deleteUserData(
     originalLog(...args);
   };
 
-  log(`\n🔍 Analyzing user data for: ${email}`);
+  try {
+    log(`\n🔍 Analyzing user data for: ${email}`);
 
-  const report = await generateReport(email, executeMode);
-  printReport(report);
+    const report = await generateReport(email, executeMode);
+    printReport(report);
 
-  // Check for blockers
-  if (report.blockers.length > 0) {
-    logError("Cannot proceed due to blocking conditions.");
-    throw new Error("Blocking conditions found");
-  }
+    // Check for blockers
+    if (report.blockers.length > 0) {
+      logError("Cannot proceed due to blocking conditions.");
+      throw new Error("Blocking conditions found");
+    }
 
-  if (!executeMode) {
-    log("🟢 DRY RUN COMPLETE - NO CHANGES MADE");
+    if (!executeMode) {
+      log("🟢 DRY RUN COMPLETE - NO CHANGES MADE");
+      log("");
+      log("To execute deletion, run:");
+      log(`  pnpm run task gdpr/deleteUserData ${email} --execute`);
+
+      // Write report to file
+      writeReportFile(email, reportLines);
+
+      return report;
+    }
+
+    // Execute deletion
+    log("🔴 EXECUTING DELETION...");
     log("");
-    log("To execute deletion, run:");
-    log(`  pnpm run task gdpr/deleteUserData ${email} --execute`);
+
+    // Re-discover sole-owned entities for deletion
+    const soleOwnedOrgs = await getSoleOwnedOrganizations(report.userId);
+    const soleOwnedTeams = await getSoleOwnedTeams(report.userId);
+    const soleOwnedTeamIds = soleOwnedTeams.map((t) => t.id);
+    const projectIds = (await getProjectsUnderTeams(soleOwnedTeamIds)).map(
+      (p) => p.id
+    );
+
+    // Delete Postgres data
+    log("📦 Deleting Postgres data...");
+    await executePostgresDeletion(
+      report.userId,
+      soleOwnedOrgs.map((o) => o.id),
+      soleOwnedTeamIds,
+      projectIds
+    );
+    logSuccess("Postgres data deleted");
+
+    // Delete ES data
+    if (projectIds.length > 0) {
+      log("🔍 Deleting Elasticsearch data...");
+      await deleteEsDocuments(projectIds);
+      logSuccess("Elasticsearch data deleted");
+    }
+
+    // Verify deletion
+    log("");
+    log("🔍 Verifying deletion...");
+    const remainingUser = await prisma.user.findUnique({
+      where: { id: report.userId },
+    });
+    if (remainingUser) {
+      logError("User still exists - deletion may have failed!");
+      throw new Error("Deletion verification failed");
+    }
+    logSuccess("User successfully deleted");
+
+    log("");
+    log("═══════════════════════════════════════════════════════════════");
+    log("                    DELETION COMPLETE");
+    log("═══════════════════════════════════════════════════════════════");
 
     // Write report to file
     writeReportFile(email, reportLines);
 
     return report;
+  } finally {
+    // Always restore console.log, even on error
+    console.log = originalLog;
   }
-
-  // Execute deletion
-  log("🔴 EXECUTING DELETION...");
-  log("");
-
-  // Re-discover sole-owned entities for deletion
-  const soleOwnedOrgs = await getSoleOwnedOrganizations(report.userId);
-  const soleOwnedTeams = await getSoleOwnedTeams(report.userId);
-  const soleOwnedTeamIds = soleOwnedTeams.map((t) => t.id);
-  const projectIds = (await getProjectsUnderTeams(soleOwnedTeamIds)).map(
-    (p) => p.id
-  );
-
-  // Delete Postgres data
-  log("📦 Deleting Postgres data...");
-  await executePostgresDeletion(
-    report.userId,
-    soleOwnedOrgs.map((o) => o.id),
-    soleOwnedTeamIds,
-    projectIds
-  );
-  logSuccess("Postgres data deleted");
-
-  // Delete ES data
-  if (projectIds.length > 0) {
-    log("🔍 Deleting Elasticsearch data...");
-    await deleteEsDocuments(projectIds);
-    logSuccess("Elasticsearch data deleted");
-  }
-
-  // Verify deletion
-  log("");
-  log("🔍 Verifying deletion...");
-  const remainingUser = await prisma.user.findUnique({
-    where: { id: report.userId },
-  });
-  if (remainingUser) {
-    logError("User still exists - deletion may have failed!");
-    throw new Error("Deletion verification failed");
-  }
-  logSuccess("User successfully deleted");
-
-  log("");
-  log("═══════════════════════════════════════════════════════════════");
-  log("                    DELETION COMPLETE");
-  log("═══════════════════════════════════════════════════════════════");
-
-  // Write report to file
-  writeReportFile(email, reportLines);
-
-  return report;
 }
 
 export default async function execute(email?: string, ...args: string[]) {
