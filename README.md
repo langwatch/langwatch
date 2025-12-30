@@ -13,7 +13,7 @@
       alt="follow on X(Twitter)"></a>
 </p>
 
-![Preview](./assets/langwatch-preview.mp4)
+![Preview](./assets/langwatch-preview.webm)
 
 ## Why LangWatch?
 
