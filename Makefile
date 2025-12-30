@@ -1,4 +1,4 @@
-.PHONY: start sync-all-openapi quickstart
+.PHONY: start sync-all-openapi quickstart user-delete-dry-run user-delete
 
 
 install:
@@ -32,3 +32,19 @@ sync-all-openapi:
 	pnpm run task generateOpenAPISpec
 	cd typescript-sdk && pnpm run generate:openapi-types
 	cd python-sdk && make generate/api-client
+
+# GDPR/Compliance: Dry run user deletion (shows what would be deleted)
+# Usage: make user-delete-dry-run EMAIL=user@example.com
+user-delete-dry-run:
+ifndef EMAIL
+	$(error EMAIL is required. Usage: make user-delete-dry-run EMAIL=user@example.com)
+endif
+	@cd langwatch && set -a && source .env && ./scripts/user-delete.sh $(EMAIL)
+
+# GDPR/Compliance: Execute user deletion (requires confirmation)
+# Usage: make user-delete EMAIL=user@example.com
+user-delete:
+ifndef EMAIL
+	$(error EMAIL is required. Usage: make user-delete EMAIL=user@example.com)
+endif
+	@cd langwatch && set -a && source .env && ./scripts/user-delete.sh $(EMAIL) --execute
