@@ -10,6 +10,7 @@
  *   Multiple: pnpm run task gdpr/deleteProjectEsData proj_123,proj_456 --execute
  */
 
+import { PrismaClient } from "@prisma/client";
 import {
   esClient,
   TRACE_INDEX,
@@ -17,6 +18,8 @@ import {
   BATCH_EVALUATION_INDEX,
   SCENARIO_EVENTS_INDEX,
 } from "../../server/elasticsearch";
+
+const prisma = new PrismaClient();
 
 // ============================================================
 // Types
@@ -46,11 +49,39 @@ const logSuccess = (message: string) => console.log(`✅ ${message}`);
 // Elasticsearch Operations
 // ============================================================
 
+/**
+ * Validates all projects belong to the same organization.
+ *
+ * Organizations can have custom ES configs (elasticsearchNodeUrl/elasticsearchApiKey).
+ * If projects span multiple orgs with different ES clusters, using a single client
+ * would miss documents stored in other clusters. We validate same-org to prevent
+ * silent data retention failures during GDPR deletion.
+ */
+async function validateSameOrganization(projectIds: string[]): Promise<void> {
+  if (projectIds.length <= 1) return;
+
+  const projects = await prisma.project.findMany({
+    where: { id: { in: projectIds } },
+    select: { id: true, team: { select: { organizationId: true } } },
+  });
+
+  const orgIds = new Set(projects.map((p) => p.team.organizationId));
+
+  if (orgIds.size > 1) {
+    throw new Error(
+      `Projects span ${orgIds.size} organizations. ` +
+        `Organizations may have different ES clusters. ` +
+        `Run deletion separately per organization to ensure complete data removal.`
+    );
+  }
+}
+
 export async function countEsDocuments(projectIds: string[]) {
   if (projectIds.length === 0) {
     return { traces: 0, dspySteps: 0, batchEvaluations: 0, scenarioEvents: 0 };
   }
 
+  await validateSameOrganization(projectIds);
   const client = await esClient({ projectId: projectIds[0]! });
   const query = { terms: { project_id: projectIds } };
 
@@ -84,6 +115,7 @@ export async function countEsDocuments(projectIds: string[]) {
 export async function deleteEsDocuments(projectIds: string[]) {
   if (projectIds.length === 0) return { deleted: 0 };
 
+  await validateSameOrganization(projectIds);
   const client = await esClient({ projectId: projectIds[0]! });
   const query = { terms: { project_id: projectIds } };
 
