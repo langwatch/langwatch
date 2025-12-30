@@ -214,8 +214,7 @@ async function getProjectsUnderTeams(teamIds: string[]) {
 
 async function checkBlockingConditions(
   userId: string,
-  soleOwnedOrgs: { id: string }[],
-  soleOwnedTeams: { id: string; organizationId: string }[]
+  soleOwnedOrgs: { id: string }[]
 ): Promise<string[]> {
   const blockers: string[] = [];
 
@@ -516,11 +515,7 @@ async function generateReport(
   ]);
 
   // Check blockers
-  const blockers = await checkBlockingConditions(
-    userId,
-    soleOwnedOrgs,
-    soleOwnedTeams
-  );
+  const blockers = await checkBlockingConditions(userId, soleOwnedOrgs);
 
   // Count ES documents
   const esCounts = await countEsDocuments(projectIds);
