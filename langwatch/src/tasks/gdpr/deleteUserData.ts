@@ -13,6 +13,7 @@
 import { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
 import * as path from "path";
+import { countEsDocuments, deleteEsDocuments } from "./deleteProjectEsData";
 
 // ============================================================
 // File Logging Setup
@@ -74,7 +75,6 @@ function writeReportFile(email: string, lines: string[]) {
     sqlLogStream.end();
   }
 }
-import { countEsDocuments, deleteEsDocuments } from "./deleteProjectEsData";
 
 // ============================================================
 // Types
@@ -122,7 +122,6 @@ interface DeletionReport {
 const log = (message: string) => console.log(message);
 const logError = (message: string) => console.error(`❌ ${message}`);
 const logSuccess = (message: string) => console.log(`✅ ${message}`);
-const logWarning = (message: string) => console.log(`⚠️  ${message}`);
 
 // ============================================================
 // Data Collection
