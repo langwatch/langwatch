@@ -1,4 +1,4 @@
-.PHONY: start sync-all-openapi quickstart user-delete-dry-run user-delete
+.PHONY: start sync-all-openapi quickstart user-delete-dry-run user-delete es-delete-dry-run es-delete
 
 
 install:
@@ -48,3 +48,20 @@ ifndef EMAIL
 	$(error EMAIL is required. Usage: make user-delete EMAIL=user@example.com)
 endif
 	@cd langwatch && set -a && source .env && ./scripts/user-delete.sh $(EMAIL) --execute
+
+# GDPR/Compliance: Dry run ES project deletion (shows what would be deleted)
+# Usage: make es-delete-dry-run PROJECT_ID=proj_123
+#        make es-delete-dry-run PROJECT_ID=proj_123,proj_456  (multiple)
+es-delete-dry-run:
+ifndef PROJECT_ID
+	$(error PROJECT_ID is required. Usage: make es-delete-dry-run PROJECT_ID=proj_123)
+endif
+	@cd langwatch && set -a && source .env && ./scripts/es-project-delete.sh $(PROJECT_ID)
+
+# GDPR/Compliance: Execute ES project deletion (requires confirmation)
+# Usage: make es-delete PROJECT_ID=proj_123
+es-delete:
+ifndef PROJECT_ID
+	$(error PROJECT_ID is required. Usage: make es-delete PROJECT_ID=proj_123)
+endif
+	@cd langwatch && set -a && source .env && ./scripts/es-project-delete.sh $(PROJECT_ID) --execute

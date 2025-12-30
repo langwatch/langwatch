@@ -54,6 +54,12 @@ if [ -z "$DATABASE_URL" ]; then
     exit 1
 fi
 
+# Check for ES environment (optional - will skip ES deletion if not set)
+ES_AVAILABLE=false
+if [ -n "$ELASTICSEARCH_NODE_URL" ]; then
+    ES_AVAILABLE=true
+fi
+
 # Extract schema from DATABASE_URL if present (Prisma-specific parameter)
 # and convert to psql-compatible format
 SCHEMA=""
@@ -317,8 +323,45 @@ run_sql "SELECT 'NULLIFY AnnotationQueueItem.userId ' || id FROM \"AnnotationQue
 # NULLIFY: Queue items created
 run_sql "SELECT 'NULLIFY AnnotationQueueItem.createdByUserId ' || id FROM \"AnnotationQueueItem\" WHERE \"createdByUserId\" = '${USER_ID}';" | while read -r line; do [ -n "$line" ] && log "${CYAN}$line${NC}"; done
 
-# RETAIN: Audit logs
-run_sql "SELECT 'RETAIN AuditLog ' || id FROM \"AuditLog\" WHERE \"userId\" = '${USER_ID}';" | while read -r line; do [ -n "$line" ] && log "${BLUE}$line${NC}"; done
+# ANONYMIZE: Audit logs (keep trail, strip PII)
+run_sql "SELECT 'ANONYMIZE AuditLog ' || id FROM \"AuditLog\" WHERE \"userId\" = '${USER_ID}';" | while read -r line; do [ -n "$line" ] && log "${CYAN}$line${NC}"; done
+
+log ""
+
+# ============================================================
+# ELASTICSEARCH DATA AUDIT
+# ============================================================
+log "${BOLD}${YELLOW}>> ELASTICSEARCH DATA (to be deleted)${NC}"
+log ""
+
+# Get project IDs for sole-owned projects
+ES_PROJECT_IDS=$(run_sql "
+    SELECT string_agg(p.id, ',')
+    FROM \"Project\" p
+    WHERE p.\"teamId\" IN (
+        SELECT t.id FROM \"Team\" t
+        JOIN \"TeamUser\" tu ON t.id = tu.\"teamId\"
+        WHERE tu.\"userId\" = '${USER_ID}'
+        GROUP BY t.id HAVING COUNT(*) = 1
+    );
+")
+
+if [ -z "$ES_PROJECT_IDS" ]; then
+    log "No sole-owned projects - no ES data to delete"
+elif [ "$ES_AVAILABLE" = false ]; then
+    log "${YELLOW}⚠ ELASTICSEARCH_NODE_URL not set - cannot audit ES data${NC}"
+    log "  Projects that would be deleted: $ES_PROJECT_IDS"
+    log "  Set ELASTICSEARCH_NODE_URL to see ES document counts"
+else
+    SCRIPT_DIR="$(dirname "$0")"
+    if [ -x "$SCRIPT_DIR/es-project-delete.sh" ]; then
+        # Run ES script in dry-run mode (no --execute)
+        "$SCRIPT_DIR/es-project-delete.sh" "$ES_PROJECT_IDS" 2>&1 | grep -v "Report saved" | tee -a "$REPORT_FILE"
+    else
+        log "${YELLOW}⚠ ES deletion script not found${NC}"
+        log "  Projects: $ES_PROJECT_IDS"
+    fi
+fi
 
 log ""
 
@@ -341,6 +384,18 @@ if [ "$EXECUTE_MODE" = true ]; then
         exit 1
     fi
 
+    # Collect project IDs BEFORE deletion (for ES cleanup)
+    PROJECT_IDS_TO_DELETE=$(run_sql "
+        SELECT string_agg(p.id, ',')
+        FROM \"Project\" p
+        WHERE p.\"teamId\" IN (
+            SELECT t.id FROM \"Team\" t
+            JOIN \"TeamUser\" tu ON t.id = tu.\"teamId\"
+            WHERE tu.\"userId\" = '${USER_ID}'
+            GROUP BY t.id HAVING COUNT(*) = 1
+        );
+    ")
+
     log "${YELLOW}Starting deletion transaction...${NC}"
 
     # Build the deletion SQL
@@ -359,6 +414,9 @@ UPDATE \"WorkflowVersion\" SET \"authorId\" = NULL WHERE \"authorId\" = '${USER_
 UPDATE \"AnnotationQueueItem\" SET \"userId\" = NULL WHERE \"userId\" = '${USER_ID}';
 UPDATE \"AnnotationQueueItem\" SET \"createdByUserId\" = NULL WHERE \"createdByUserId\" = '${USER_ID}';
 UPDATE \"LlmPromptConfigVersion\" SET \"authorId\" = NULL WHERE \"authorId\" = '${USER_ID}';
+
+-- Anonymize audit logs (keep trail, strip PII)
+UPDATE \"AuditLog\" SET \"userId\" = '[deleted]', \"ipAddress\" = '[deleted]', \"userAgent\" = '[deleted]' WHERE \"userId\" = '${USER_ID}';
 
 -- Remove from shared annotation queues
 DELETE FROM \"AnnotationQueueMembers\" WHERE \"userId\" = '${USER_ID}';
@@ -500,14 +558,40 @@ $DELETION_SQL"
         exit 1
     fi
 
-    # Verify deletion
+    # Verify Postgres deletion
     log ""
-    log "${BOLD}${YELLOW}>> POST-DELETION VERIFICATION${NC}"
+    log "${BOLD}${YELLOW}>> POST-DELETION VERIFICATION (Postgres)${NC}"
     REMAINING=$(run_sql "SELECT COUNT(*) FROM \"User\" WHERE id = '${USER_ID}'")
     if [ "$REMAINING" = "0" ]; then
-        log "${GREEN}✓ User successfully deleted${NC}"
+        log "${GREEN}✓ User successfully deleted from Postgres${NC}"
     else
         log "${RED}❌ User still exists - deletion may have failed${NC}"
+        exit 1
+    fi
+
+    # ============================================================
+    # ELASTICSEARCH DELETION
+    # ============================================================
+    if [ "$ES_AVAILABLE" = true ] && [ -n "$PROJECT_IDS_TO_DELETE" ]; then
+        log ""
+        log "${BOLD}${YELLOW}>> ELASTICSEARCH DELETION${NC}"
+        log "Deleting ES data for projects: $PROJECT_IDS_TO_DELETE"
+        log ""
+
+        SCRIPT_DIR="$(dirname "$0")"
+        if [ -x "$SCRIPT_DIR/es-project-delete.sh" ]; then
+            # Run ES deletion with --execute flag (no confirmation since user already confirmed)
+            echo "DELETE" | "$SCRIPT_DIR/es-project-delete.sh" "$PROJECT_IDS_TO_DELETE" --execute 2>&1 | tee -a "$REPORT_FILE"
+        else
+            log "${YELLOW}⚠ ES deletion script not found or not executable${NC}"
+            log "  Run manually: ./scripts/es-project-delete.sh $PROJECT_IDS_TO_DELETE --execute"
+        fi
+    elif [ "$ES_AVAILABLE" = false ]; then
+        log ""
+        log "${YELLOW}⚠ ELASTICSEARCH_NODE_URL not set - skipping ES deletion${NC}"
+        if [ -n "$PROJECT_IDS_TO_DELETE" ]; then
+            log "  Run manually: ELASTICSEARCH_NODE_URL=<url> ./scripts/es-project-delete.sh $PROJECT_IDS_TO_DELETE --execute"
+        fi
     fi
 
 else
