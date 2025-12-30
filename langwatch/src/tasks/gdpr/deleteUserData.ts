@@ -74,13 +74,7 @@ function writeReportFile(email: string, lines: string[]) {
     sqlLogStream.end();
   }
 }
-import {
-  esClient,
-  TRACE_INDEX,
-  DSPY_STEPS_INDEX,
-  BATCH_EVALUATION_INDEX,
-  SCENARIO_EVENTS_INDEX,
-} from "../../server/elasticsearch";
+import { countEsDocuments, deleteEsDocuments } from "./deleteProjectEsData";
 
 // ============================================================
 // Types
@@ -280,91 +274,6 @@ async function checkBlockingConditions(
   }
 
   return blockers;
-}
-
-// ============================================================
-// Elasticsearch Operations
-// ============================================================
-
-async function countEsDocuments(projectIds: string[]) {
-  if (projectIds.length === 0) {
-    return { traces: 0, dspySteps: 0, batchEvaluations: 0, scenarioEvents: 0 };
-  }
-
-  // Use first project to get client (they should all use same ES)
-  const client = await esClient({ projectId: projectIds[0]! });
-
-  const query = {
-    terms: { project_id: projectIds },
-  };
-
-  const [traces, dspySteps, batchEvals, scenarios] = await Promise.all([
-    client
-      .count({ index: TRACE_INDEX.all, query })
-      .then((r) => r.count)
-      .catch(() => 0),
-    client
-      .count({ index: DSPY_STEPS_INDEX.alias, query })
-      .then((r) => r.count)
-      .catch(() => 0),
-    client
-      .count({ index: BATCH_EVALUATION_INDEX.alias, query })
-      .then((r) => r.count)
-      .catch(() => 0),
-    client
-      .count({ index: SCENARIO_EVENTS_INDEX.alias, query })
-      .then((r) => r.count)
-      .catch(() => 0),
-  ]);
-
-  return {
-    traces,
-    dspySteps,
-    batchEvaluations: batchEvals,
-    scenarioEvents: scenarios,
-  };
-}
-
-async function deleteEsDocuments(projectIds: string[]) {
-  if (projectIds.length === 0) return;
-
-  const client = await esClient({ projectId: projectIds[0]! });
-  const query = { terms: { project_id: projectIds } };
-
-  const results = await Promise.all([
-    client
-      .deleteByQuery({
-        index: TRACE_INDEX.all,
-        body: { query },
-        conflicts: "proceed",
-      })
-      .then((r) => ({ index: "traces", deleted: r.deleted ?? 0 })),
-    client
-      .deleteByQuery({
-        index: DSPY_STEPS_INDEX.alias,
-        body: { query },
-        conflicts: "proceed",
-      })
-      .then((r) => ({ index: "dspy-steps", deleted: r.deleted ?? 0 })),
-    client
-      .deleteByQuery({
-        index: BATCH_EVALUATION_INDEX.alias,
-        body: { query },
-        conflicts: "proceed",
-      })
-      .then((r) => ({ index: "batch-evaluations", deleted: r.deleted ?? 0 })),
-    client
-      .deleteByQuery({
-        index: SCENARIO_EVENTS_INDEX.alias,
-        body: { query },
-        conflicts: "proceed",
-      })
-      .then((r) => ({ index: "scenario-events", deleted: r.deleted ?? 0 })),
-  ]);
-
-  for (const r of results) {
-    log(`  Deleted ${r.deleted} documents from ${r.index}`);
-  }
 }
 
 // ============================================================
@@ -721,10 +630,10 @@ function printReport(report: DeletionReport) {
 
   // ES counts
   log("📊 ELASTICSEARCH DOCUMENTS:");
-  log(`  ${TRACE_INDEX.all}: ${report.elasticsearch.traces}`);
-  log(`  ${DSPY_STEPS_INDEX.alias}: ${report.elasticsearch.dspySteps}`);
-  log(`  ${BATCH_EVALUATION_INDEX.alias}: ${report.elasticsearch.batchEvaluations}`);
-  log(`  ${SCENARIO_EVENTS_INDEX.alias}: ${report.elasticsearch.scenarioEvents}`);
+  log(`  traces: ${report.elasticsearch.traces}`);
+  log(`  dspy-steps: ${report.elasticsearch.dspySteps}`);
+  log(`  batch-evaluations: ${report.elasticsearch.batchEvaluations}`);
+  log(`  scenario-events: ${report.elasticsearch.scenarioEvents}`);
   log("");
 
   // Actions

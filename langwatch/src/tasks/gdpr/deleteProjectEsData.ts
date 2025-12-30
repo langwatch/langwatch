@@ -46,7 +46,7 @@ const logSuccess = (message: string) => console.log(`✅ ${message}`);
 // Elasticsearch Operations
 // ============================================================
 
-async function countDocuments(projectIds: string[]) {
+export async function countEsDocuments(projectIds: string[]) {
   if (projectIds.length === 0) {
     return { traces: 0, dspySteps: 0, batchEvaluations: 0, scenarioEvents: 0 };
   }
@@ -81,7 +81,7 @@ async function countDocuments(projectIds: string[]) {
   };
 }
 
-async function deleteDocuments(projectIds: string[]) {
+export async function deleteEsDocuments(projectIds: string[]) {
   if (projectIds.length === 0) return { deleted: 0 };
 
   const client = await esClient({ projectId: projectIds[0]! });
@@ -167,7 +167,7 @@ export async function deleteProjectEsData(
 
   log(`\n🔍 Analyzing ES data for ${projectIds.length} project(s)...`);
 
-  const counts = await countDocuments(projectIds);
+  const counts = await countEsDocuments(projectIds);
   const total = counts.traces + counts.dspySteps + counts.batchEvaluations + counts.scenarioEvents;
 
   const report: EsDeletionReport = {
@@ -196,7 +196,7 @@ export async function deleteProjectEsData(
   log("🔴 EXECUTING DELETION...");
   log("");
 
-  const result = await deleteDocuments(projectIds);
+  const result = await deleteEsDocuments(projectIds);
 
   log("");
   logSuccess(`Deleted ${result.deleted} total documents`);
@@ -204,7 +204,7 @@ export async function deleteProjectEsData(
   // Verify
   log("");
   log("🔍 Verifying deletion...");
-  const remaining = await countDocuments(projectIds);
+  const remaining = await countEsDocuments(projectIds);
   const remainingTotal =
     remaining.traces +
     remaining.dspySteps +
