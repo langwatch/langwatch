@@ -13,9 +13,7 @@
       alt="follow on X(Twitter)"></a>
 </p>
 
-<video autoplay muted loop>
-    <source src="./assets/langwatch-preview.mp4" type="video/mp4" />
-</video>
+![Preview](./assets/langwatch-preview.mp4)
 
 ## Why LangWatch?
 
