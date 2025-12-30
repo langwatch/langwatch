@@ -410,7 +410,7 @@ UPDATE \"AnnotationQueueItem\" SET \"createdByUserId\" = NULL WHERE \"createdByU
 UPDATE \"LlmPromptConfigVersion\" SET \"authorId\" = NULL WHERE \"authorId\" = '${USER_ID}';
 
 -- Anonymize audit logs (keep trail, strip PII)
-UPDATE \"AuditLog\" SET \"userId\" = '[deleted]', \"ipAddress\" = '[deleted]', \"userAgent\" = '[deleted]' WHERE \"userId\" = '${USER_ID}';
+UPDATE \"AuditLog\" SET \"userId\" = '[deleted]', \"ipAddress\" = NULL, \"userAgent\" = NULL WHERE \"userId\" = '${USER_ID}';
 
 -- Remove from shared annotation queues
 DELETE FROM \"AnnotationQueueMembers\" WHERE \"userId\" = '${USER_ID}';
