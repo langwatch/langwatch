@@ -48,14 +48,15 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
   const { open, onOpen, onClose } = useDisclosure();
 
-  // Fetch graph data if graphId is provided but form is not
+  // Fetch graph data when graphId is provided to get the latest alert data
   const graphQuery = api.graphs.getById.useQuery(
     {
       projectId: project?.id ?? "",
       id: graphId ?? "",
     },
     {
-      enabled: !!graphId && !providedForm && !!project?.id,
+      // Always fetch when graphId is provided to get the latest alert data
+      enabled: !!graphId && !!project?.id,
     },
   );
 
@@ -65,19 +66,30 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   // Use provided form or internal form
   const form = providedForm || internalForm;
 
-  // Update internal form when graph data loads
+  // Update form when graph data loads
   useEffect(() => {
-    if (!providedForm && graphQuery.data) {
-      const formData = customGraphInputToFormData(
-        graphQuery.data.graph as CustomGraphInput,
-      );
-      internalForm.reset({
-        ...formData,
-        title: graphQuery.data.name,
-        alert: graphQuery.data.alert as CustomGraphFormData["alert"],
-      });
+    if (graphQuery.data) {
+      if (providedForm) {
+        // If form was provided, only update the alert data from the server
+        if (graphQuery.data.alert) {
+          providedForm.setValue(
+            "alert",
+            graphQuery.data.alert as CustomGraphFormData["alert"],
+          );
+        }
+      } else {
+        // If no form provided, populate the internal form with all graph data
+        const formData = customGraphInputToFormData(
+          graphQuery.data.graph as CustomGraphInput,
+        );
+        internalForm.reset({
+          ...formData,
+          title: graphQuery.data.name,
+          alert: graphQuery.data.alert as CustomGraphFormData["alert"],
+        });
+      }
     }
-  }, [graphQuery.data, providedForm]);
+  }, [graphQuery.data, providedForm, internalForm]);
 
   const updateGraphById = api.graphs.updateById.useMutation();
   const trpc = api.useContext();
@@ -136,7 +148,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
     if (members) {
       setSelectedMembers(members);
     }
-  }, [graphQuery.data]);
+  }, [graphQuery.data, form]);
 
   // Initialize alert fields with default values if not set
   useEffect(() => {
@@ -325,7 +337,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   };
 
   // Show loading state while fetching graph data
-  if (!providedForm && graphQuery.isLoading) {
+  if (graphQuery.isLoading) {
     return (
       <Drawer.Root open={true} placement="end" size="xl">
         <Drawer.Content>
@@ -334,7 +346,7 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
             <Heading>Configure Alert</Heading>
           </Drawer.Header>
           <Drawer.Body>
-            <Text>Loading graph data...</Text>
+            <Text>Loading alert data...</Text>
           </Drawer.Body>
         </Drawer.Content>
       </Drawer.Root>
