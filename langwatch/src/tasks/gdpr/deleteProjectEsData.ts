@@ -50,6 +50,27 @@ const logSuccess = (message: string) => console.log(`✅ ${message}`);
 // ============================================================
 
 /**
+ * Handle ES errors: allow "index not found" (return 0), rethrow connection/auth failures.
+ *
+ * For GDPR compliance, we must distinguish "no documents" from "cannot verify".
+ * Connection failures, auth issues, or misconfigs should fail loudly, not silently return 0.
+ */
+function handleEsError(error: unknown, operation: string): number {
+  const err = error as { meta?: { statusCode?: number }; message?: string };
+
+  // Index not found (404) is expected for fresh/empty setups - treat as 0 documents
+  if (err.meta?.statusCode === 404) {
+    return 0;
+  }
+
+  // Connection refused, auth failure, timeout, etc. - must fail loudly
+  throw new Error(
+    `ES ${operation} failed: ${err.message ?? "Unknown error"}. ` +
+      `Cannot verify document count - manual investigation required.`
+  );
+}
+
+/**
  * Validates all projects belong to the same organization.
  *
  * Organizations can have custom ES configs (elasticsearchNodeUrl/elasticsearchApiKey).
@@ -89,19 +110,19 @@ export async function countEsDocuments(projectIds: string[]) {
     client
       .count({ index: TRACE_INDEX.all, query })
       .then((r) => r.count)
-      .catch(() => 0),
+      .catch((e) => handleEsError(e, "count traces")),
     client
       .count({ index: DSPY_STEPS_INDEX.alias, query })
       .then((r) => r.count)
-      .catch(() => 0),
+      .catch((e) => handleEsError(e, "count dspy-steps")),
     client
       .count({ index: BATCH_EVALUATION_INDEX.alias, query })
       .then((r) => r.count)
-      .catch(() => 0),
+      .catch((e) => handleEsError(e, "count batch-evaluations")),
     client
       .count({ index: SCENARIO_EVENTS_INDEX.alias, query })
       .then((r) => r.count)
-      .catch(() => 0),
+      .catch((e) => handleEsError(e, "count scenario-events")),
   ]);
 
   return {
@@ -126,28 +147,32 @@ export async function deleteEsDocuments(projectIds: string[]) {
         body: { query },
         conflicts: "proceed",
       })
-      .then((r) => ({ index: "traces", deleted: r.deleted ?? 0 })),
+      .then((r) => ({ index: "traces", deleted: r.deleted ?? 0 }))
+      .catch((e) => ({ index: "traces", deleted: handleEsError(e, "delete traces") })),
     client
       .deleteByQuery({
         index: DSPY_STEPS_INDEX.alias,
         body: { query },
         conflicts: "proceed",
       })
-      .then((r) => ({ index: "dspy-steps", deleted: r.deleted ?? 0 })),
+      .then((r) => ({ index: "dspy-steps", deleted: r.deleted ?? 0 }))
+      .catch((e) => ({ index: "dspy-steps", deleted: handleEsError(e, "delete dspy-steps") })),
     client
       .deleteByQuery({
         index: BATCH_EVALUATION_INDEX.alias,
         body: { query },
         conflicts: "proceed",
       })
-      .then((r) => ({ index: "batch-evaluations", deleted: r.deleted ?? 0 })),
+      .then((r) => ({ index: "batch-evaluations", deleted: r.deleted ?? 0 }))
+      .catch((e) => ({ index: "batch-evaluations", deleted: handleEsError(e, "delete batch-evaluations") })),
     client
       .deleteByQuery({
         index: SCENARIO_EVENTS_INDEX.alias,
         body: { query },
         conflicts: "proceed",
       })
-      .then((r) => ({ index: "scenario-events", deleted: r.deleted ?? 0 })),
+      .then((r) => ({ index: "scenario-events", deleted: r.deleted ?? 0 }))
+      .catch((e) => ({ index: "scenario-events", deleted: handleEsError(e, "delete scenario-events") })),
   ]);
 
   let totalDeleted = 0;
