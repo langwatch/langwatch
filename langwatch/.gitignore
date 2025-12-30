@@ -66,5 +66,5 @@ node_modules/
 /playwright/.cache/
 /e2e/auth.json
 
-# vscode
-.vscode/
+# GDPR compliance reports (contain PII)
+/reports/

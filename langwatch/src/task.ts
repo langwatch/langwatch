@@ -6,7 +6,9 @@ import { createLogger } from "./utils/logger";
 loadEnvConfig(process.cwd());
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { connection: redis } = require("./server/redis");
+const redis = process.env.SKIP_REDIS
+  ? null
+  : require("./server/redis").connection;
 
 const logger = createLogger("langwatch:task");
 
