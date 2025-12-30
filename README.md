@@ -13,7 +13,7 @@
       alt="follow on X(Twitter)"></a>
 </p>
 
-<img src="assets/langwatch-quick-preview.gif" alt="LangWatch Quick Gif" width="100%" style="border-radius: 8px;">
+<video src="./assets/langwatch-preview.mp4" autoplay muted loop></video>
 
 ## Why LangWatch?
 
