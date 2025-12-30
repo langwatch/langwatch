@@ -70,12 +70,6 @@ fi
 # Remove schema parameter from URL (psql doesn't understand it)
 PSQL_URL=$(echo "$DATABASE_URL" | sed 's/[&?]schema=[^&]*//')
 
-# Build psql options
-PSQL_OPTS=""
-if [ -n "$SCHEMA" ]; then
-    PSQL_OPTS="-c \"SET search_path TO $SCHEMA, public;\""
-fi
-
 # Create reports directory
 REPORTS_DIR="$(dirname "$0")/../reports"
 mkdir -p "$REPORTS_DIR"
