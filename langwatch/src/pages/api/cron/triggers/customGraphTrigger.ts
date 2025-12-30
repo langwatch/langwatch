@@ -16,7 +16,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
 import type { ActionParams, TriggerData, TriggerResult } from "./types";
-import { checkThreshold, updateAlert } from "./utils";
+import { addTriggersSent, checkThreshold, updateAlert } from "./utils";
 
 // Graph config stored in database (subset of CustomGraphInput)
 type StoredGraphConfig = Pick<
@@ -181,71 +181,109 @@ export const processCustomGraphTrigger = async (
     // Check threshold condition
     const conditionMet = checkThreshold(currentValue, threshold, operator);
 
-    if (conditionMet) {
-      const project = projects.find((p) => p.id === projectId);
+    // Check if there's an unresolved alert (still firing)
+    const unresolvedTriggerSent = await prisma.triggerSent.findFirst({
+      where: {
+        triggerId,
+        projectId,
+        customGraphId,
+        resolvedAt: null, // Only look for unresolved alerts
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
 
-      if (!project) {
+    if (conditionMet) {
+      // Only send alert if this is a NEW incident (no unresolved TriggerSent)
+      if (!unresolvedTriggerSent) {
+        const project = projects.find((p) => p.id === projectId);
+
+        if (!project) {
+          return {
+            triggerId,
+            status: "error",
+            message: "Project not found",
+          };
+        }
+
+        // Create trigger data for notification
+        const triggerData: TriggerData[] = [
+          {
+            input: `Graph: ${customGraph.name}`,
+            output: `Current value: ${currentValue.toFixed(
+              2,
+            )} (threshold: ${operator} ${threshold})`,
+            graphId: customGraphId,
+            projectId,
+            fullTrace: {} as Trace,
+          },
+        ];
+
+        const context = {
+          trigger: {
+            ...trigger,
+            message:
+              trigger.message ??
+              `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(
+                2,
+              )} ${operator} ${threshold}`,
+          },
+          projects,
+          triggerData,
+          projectSlug: project.slug,
+        };
+
+        // Execute the appropriate action
+        if (action === TriggerAction.SEND_EMAIL) {
+          await handleSendEmail(context);
+        } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
+          await handleSendSlackMessage(context);
+        }
+
+        // Record that this alert was sent (creates new TriggerSent with resolvedAt = null)
+        await addTriggersSent(triggerId, triggerData);
+
+        await updateAlert(triggerId, Date.now(), projectId);
+
         return {
           triggerId,
-          status: "error",
-          message: "Project not found",
+          status: "triggered",
+          value: currentValue,
+          threshold,
+          operator,
+        };
+      } else {
+        // Condition still met but alert already firing - just update lastRunAt
+        await updateAlert(triggerId, Date.now(), projectId);
+
+        return {
+          triggerId,
+          status: "already_firing",
+          value: currentValue,
+          threshold,
+          operator,
         };
       }
-
-      // Create trigger data for notification
-      const triggerData: TriggerData[] = [
-        {
-          input: `Graph: ${customGraph.name}`,
-          output: `Current value: ${currentValue.toFixed(
-            2,
-          )} (threshold: ${operator} ${threshold})`,
-          graphId: customGraphId,
-          projectId,
-          fullTrace: {} as Trace,
-        },
-      ];
-
-      const context = {
-        trigger: {
-          ...trigger,
-          message:
-            trigger.message ??
-            `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(
-              2,
-            )} ${operator} ${threshold}`,
-        },
-        projects,
-        triggerData,
-        projectSlug: project.slug,
-      };
-
-      // Execute the appropriate action
-      if (action === TriggerAction.SEND_EMAIL) {
-        await handleSendEmail(context);
-      } else if (action === TriggerAction.SEND_SLACK_MESSAGE) {
-        await handleSendSlackMessage(context);
+    } else {
+      // Condition not met - mark alert as resolved if it was firing
+      if (unresolvedTriggerSent) {
+        await prisma.triggerSent.update({
+          where: { id: unresolvedTriggerSent.id },
+          data: { resolvedAt: new Date() },
+        });
       }
 
       await updateAlert(triggerId, Date.now(), projectId);
 
       return {
         triggerId,
-        status: "triggered",
+        status: "not_triggered",
         value: currentValue,
         threshold,
         operator,
       };
     }
-
-    await updateAlert(triggerId, Date.now(), projectId);
-
-    return {
-      triggerId,
-      status: "not_triggered",
-      value: currentValue,
-      threshold,
-      operator,
-    };
   } catch (error) {
     captureException(error, {
       extra: {

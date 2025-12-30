@@ -17,21 +17,35 @@ export const addTriggersSent = async (
   triggerId: string,
   triggerData: TriggerData[],
 ) => {
-  // Only create TriggerSent records for actual traces (not custom graphs)
+  // Separate trace-based and custom graph alerts
   const traceData = triggerData.filter((data) => data.traceId);
+  const customGraphData = triggerData.filter((data) => data.graphId && !data.traceId);
 
-  if (traceData.length === 0) {
-    return;
+  // Create TriggerSent records for trace-based triggers
+  if (traceData.length > 0) {
+    await prisma.triggerSent.createMany({
+      data: traceData.map((data) => ({
+        triggerId: triggerId,
+        traceId: data.traceId!,
+        customGraphId: null,
+        projectId: data.projectId,
+      })),
+      skipDuplicates: true,
+    });
   }
 
-  await prisma.triggerSent.createMany({
-    data: traceData.map((data) => ({
-      triggerId: triggerId,
-      traceId: data.traceId!,
-      projectId: data.projectId,
-    })),
-    skipDuplicates: true,
-  });
+  // Create TriggerSent record for custom graph alerts (one per fire)
+  if (customGraphData.length > 0) {
+    await prisma.triggerSent.create({
+      data: {
+        triggerId: triggerId,
+        traceId: null, // No traceId for custom graph alerts
+        customGraphId: customGraphData[0]!.graphId!, // Set customGraphId for custom graph alerts
+        projectId: customGraphData[0]!.projectId,
+        resolvedAt: null, // New alert is unresolved
+      },
+    });
+  }
 };
 
 export const triggerSentForMany = async (

@@ -407,11 +407,12 @@ model CustomGraph {
     dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
     // Grid positioning (2-column grid)
-    gridColumn Int      @default(0)
-    gridRow    Int      @default(0)
-    colSpan    Int      @default(1)
-    rowSpan    Int      @default(1)
-    trigger    Trigger?
+    gridColumn  Int           @default(0)
+    gridRow     Int           @default(0)
+    colSpan     Int           @default(1)
+    rowSpan     Int           @default(1)
+    trigger     Trigger?
+    TriggerSent TriggerSent[]
 
     @@index([projectId])
     @@index([dashboardId])
@@ -544,18 +545,23 @@ model ModelProvider {
 }
 
 model TriggerSent {
-    id        String   @id @default(nanoid())
-    triggerId String
-    traceId   String
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    trigger   Trigger  @relation(fields: [triggerId], references: [id])
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    id            String       @id @default(nanoid())
+    triggerId     String
+    traceId       String? // Set for trace-based triggers, null for custom graph alerts
+    customGraphId String? // Set for custom graph alerts, null for trace-based triggers
+    customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+    projectId     String
+    project       Project      @relation(fields: [projectId], references: [id])
+    trigger       Trigger      @relation(fields: [triggerId], references: [id])
+    resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+    createdAt     DateTime     @default(now())
+    updatedAt     DateTime     @default(now()) @updatedAt
 
     @@unique([triggerId, traceId])
     @@index([triggerId])
     @@index([projectId])
+    @@index([customGraphId])
+    @@index([resolvedAt])
 }
 
 enum AnnotationScoreDataType {
