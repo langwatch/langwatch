@@ -40,7 +40,7 @@ user-delete-dry-run:
 ifndef EMAIL
 	$(error EMAIL is required. Usage: make user-delete-dry-run EMAIL=user@example.com)
 endif
-	@cd langwatch && set -a && source .env && ./scripts/user-delete.sh $(EMAIL)
+	@cd langwatch && SKIP_REDIS=1 pnpm run task gdpr/deleteUserData $(EMAIL)
 
 # GDPR/Compliance: Execute user deletion (requires confirmation)
 # Deletes: Postgres data + Elasticsearch data (traces, evals, etc.) for sole-owned projects
@@ -49,7 +49,7 @@ user-delete:
 ifndef EMAIL
 	$(error EMAIL is required. Usage: make user-delete EMAIL=user@example.com)
 endif
-	@cd langwatch && set -a && source .env && ./scripts/user-delete.sh $(EMAIL) --execute
+	@cd langwatch && SKIP_REDIS=1 pnpm run task gdpr/deleteUserData $(EMAIL) --execute
 
 # GDPR/Compliance: Dry run ES-only deletion by project ID (standalone, not tied to user)
 # Deletes: traces, dspy-steps, batch-evaluations, scenario-events
@@ -59,7 +59,7 @@ es-delete-dry-run:
 ifndef PROJECT_ID
 	$(error PROJECT_ID is required. Usage: make es-delete-dry-run PROJECT_ID=proj_123)
 endif
-	@cd langwatch && set -a && source .env && ./scripts/es-project-delete.sh $(PROJECT_ID)
+	@cd langwatch && SKIP_REDIS=1 pnpm run task gdpr/deleteProjectEsData $(PROJECT_ID)
 
 # GDPR/Compliance: Execute ES-only deletion by project ID (standalone, not tied to user)
 # Deletes: traces, dspy-steps, batch-evaluations, scenario-events
@@ -68,4 +68,4 @@ es-delete:
 ifndef PROJECT_ID
 	$(error PROJECT_ID is required. Usage: make es-delete PROJECT_ID=proj_123)
 endif
-	@cd langwatch && set -a && source .env && ./scripts/es-project-delete.sh $(PROJECT_ID) --execute
+	@cd langwatch && SKIP_REDIS=1 pnpm run task gdpr/deleteProjectEsData $(PROJECT_ID) --execute
