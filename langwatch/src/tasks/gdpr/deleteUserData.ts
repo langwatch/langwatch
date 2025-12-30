@@ -284,178 +284,184 @@ async function executePostgresDeletion(
   soleOwnedTeamIds: string[],
   projectIds: string[]
 ) {
-  await prisma.$transaction(async (tx) => {
-    // Phase 1: Nullify user references on shared entities
-    await tx.annotation.updateMany({
-      where: { userId },
-      data: { userId: null },
-    });
-    await tx.publicShare.updateMany({
-      where: { userId },
-      data: { userId: null },
-    });
-    await tx.workflow.updateMany({
-      where: { publishedById: userId },
-      data: { publishedById: null },
-    });
-    // WorkflowVersion.authorId is required - delete versions authored by this user
-    // (versions in sole-owned projects will be cascade deleted anyway)
-    await tx.workflowVersion.deleteMany({
-      where: { authorId: userId },
-    });
-    await tx.llmPromptConfigVersion.updateMany({
-      where: { authorId: userId },
-      data: { authorId: null },
-    });
-    await tx.annotationQueueItem.updateMany({
-      where: { userId },
-      data: { userId: null },
-    });
-    await tx.annotationQueueItem.updateMany({
-      where: { createdByUserId: userId },
-      data: { createdByUserId: null },
-    });
-
-    // Anonymize audit logs (keep trail, strip PII)
-    await tx.auditLog.updateMany({
-      where: { userId },
-      data: { userId: "[deleted]", ipAddress: null, userAgent: null },
-    });
-
-    // Remove from shared annotation queues
-    await tx.annotationQueueMembers.deleteMany({ where: { userId } });
-
-    // Phase 2: Delete sole-owned projects and children
-    if (projectIds.length > 0) {
-      // Delete project children in correct order
-      const configIds = await tx.llmPromptConfig
-        .findMany({
-          where: { projectId: { in: projectIds } },
-          select: { id: true },
-        })
-        .then((configs) => configs.map((c) => c.id));
-
-      await tx.llmPromptConfigVersion.deleteMany({
-        where: { configId: { in: configIds } },
+  await prisma.$transaction(
+    async (tx) => {
+      // Phase 1: Nullify user references on shared entities
+      await tx.annotation.updateMany({
+        where: { userId },
+        data: { userId: null },
       });
-      await tx.llmPromptConfig.deleteMany({
-        where: { projectId: { in: projectIds } },
+      await tx.publicShare.updateMany({
+        where: { userId },
+        data: { userId: null },
       });
-
-      // Workflow: clear self-references first
       await tx.workflow.updateMany({
-        where: { projectId: { in: projectIds } },
-        data: { latestVersionId: null, currentVersionId: null },
+        where: { publishedById: userId },
+        data: { publishedById: null },
       });
+      // WorkflowVersion.authorId is required - delete versions authored by this user
+      // (versions in sole-owned projects will be cascade deleted anyway)
       await tx.workflowVersion.deleteMany({
-        where: { projectId: { in: projectIds } },
+        where: { authorId: userId },
       });
-      await tx.workflow.deleteMany({
-        where: { projectId: { in: projectIds } },
+      await tx.llmPromptConfigVersion.updateMany({
+        where: { authorId: userId },
+        data: { authorId: null },
+      });
+      await tx.annotationQueueItem.updateMany({
+        where: { userId },
+        data: { userId: null },
+      });
+      await tx.annotationQueueItem.updateMany({
+        where: { createdByUserId: userId },
+        data: { createdByUserId: null },
       });
 
-      await tx.batchEvaluation.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.monitor.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.experiment.deleteMany({
-        where: { projectId: { in: projectIds } },
+      // Anonymize audit logs (keep trail, strip PII)
+      await tx.auditLog.updateMany({
+        where: { userId },
+        data: { userId: "[deleted]", ipAddress: null, userAgent: null },
       });
 
-      // Annotation queue children
-      const queueIds = await tx.annotationQueue
-        .findMany({
+      // Remove from shared annotation queues
+      await tx.annotationQueueMembers.deleteMany({ where: { userId } });
+
+      // Phase 2: Delete sole-owned projects and children
+      if (projectIds.length > 0) {
+        // Delete project children in correct order
+        const configIds = await tx.llmPromptConfig
+          .findMany({
+            where: { projectId: { in: projectIds } },
+            select: { id: true },
+          })
+          .then((configs) => configs.map((c) => c.id));
+
+        await tx.llmPromptConfigVersion.deleteMany({
+          where: { configId: { in: configIds } },
+        });
+        await tx.llmPromptConfig.deleteMany({
           where: { projectId: { in: projectIds } },
-          select: { id: true },
-        })
-        .then((queues) => queues.map((q) => q.id));
+        });
 
-      await tx.annotationQueueItem.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.annotationQueueScores.deleteMany({
-        where: { annotationQueueId: { in: queueIds } },
-      });
-      await tx.annotationQueueMembers.deleteMany({
-        where: { annotationQueueId: { in: queueIds } },
-      });
-      await tx.annotationQueue.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
+        // Workflow: clear self-references first
+        await tx.workflow.updateMany({
+          where: { projectId: { in: projectIds } },
+          data: { latestVersionId: null, currentVersionId: null },
+        });
+        await tx.workflowVersion.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.workflow.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
 
-      // Dataset children
-      await tx.datasetRecord.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.dataset.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
+        await tx.batchEvaluation.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.monitor.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.experiment.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
 
-      // Other project entities
-      await tx.customGraph.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.dashboard.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.trigger.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.annotation.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.publicShare.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.topic.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.cost.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
-      await tx.modelProvider.deleteMany({
-        where: { projectId: { in: projectIds } },
-      });
+        // Annotation queue children
+        const queueIds = await tx.annotationQueue
+          .findMany({
+            where: { projectId: { in: projectIds } },
+            select: { id: true },
+          })
+          .then((queues) => queues.map((q) => q.id));
 
-      // Delete projects
-      await tx.project.deleteMany({
-        where: { id: { in: projectIds } },
-      });
+        await tx.annotationQueueItem.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.annotationQueueScores.deleteMany({
+          where: { annotationQueueId: { in: queueIds } },
+        });
+        await tx.annotationQueueMembers.deleteMany({
+          where: { annotationQueueId: { in: queueIds } },
+        });
+        await tx.annotationQueue.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+
+        // Dataset children
+        await tx.datasetRecord.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.dataset.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+
+        // Other project entities
+        await tx.customGraph.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.dashboard.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.trigger.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.annotation.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.publicShare.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.topic.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.cost.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+        await tx.modelProvider.deleteMany({
+          where: { projectId: { in: projectIds } },
+        });
+
+        // Delete projects
+        await tx.project.deleteMany({
+          where: { id: { in: projectIds } },
+        });
+      }
+
+      // Phase 3: Delete sole-owned teams
+      if (soleOwnedTeamIds.length > 0) {
+        await tx.teamUser.deleteMany({
+          where: { teamId: { in: soleOwnedTeamIds } },
+        });
+        await tx.team.deleteMany({
+          where: { id: { in: soleOwnedTeamIds } },
+        });
+      }
+
+      // Phase 4: Delete sole-owned organizations
+      if (soleOwnedOrgIds.length > 0) {
+        await tx.organizationUser.deleteMany({
+          where: { organizationId: { in: soleOwnedOrgIds } },
+        });
+        await tx.organization.deleteMany({
+          where: { id: { in: soleOwnedOrgIds } },
+        });
+      }
+
+      // Phase 5: Remove from shared teams/orgs
+      await tx.teamUser.deleteMany({ where: { userId } });
+      await tx.organizationUser.deleteMany({ where: { userId } });
+
+      // Phase 6: Delete user-owned entities
+      await tx.account.deleteMany({ where: { userId } });
+      await tx.session.deleteMany({ where: { userId } });
+
+      // Phase 7: Delete user
+      await tx.user.delete({ where: { id: userId } });
+    },
+    {
+      timeout: 120000, // 2 minutes for large deletions
+      maxWait: 30000, // 30 seconds to acquire connection
     }
-
-    // Phase 3: Delete sole-owned teams
-    if (soleOwnedTeamIds.length > 0) {
-      await tx.teamUser.deleteMany({
-        where: { teamId: { in: soleOwnedTeamIds } },
-      });
-      await tx.team.deleteMany({
-        where: { id: { in: soleOwnedTeamIds } },
-      });
-    }
-
-    // Phase 4: Delete sole-owned organizations
-    if (soleOwnedOrgIds.length > 0) {
-      await tx.organizationUser.deleteMany({
-        where: { organizationId: { in: soleOwnedOrgIds } },
-      });
-      await tx.organization.deleteMany({
-        where: { id: { in: soleOwnedOrgIds } },
-      });
-    }
-
-    // Phase 5: Remove from shared teams/orgs
-    await tx.teamUser.deleteMany({ where: { userId } });
-    await tx.organizationUser.deleteMany({ where: { userId } });
-
-    // Phase 6: Delete user-owned entities
-    await tx.account.deleteMany({ where: { userId } });
-    await tx.session.deleteMany({ where: { userId } });
-
-    // Phase 7: Delete user
-    await tx.user.delete({ where: { id: userId } });
-  });
+  );
 }
 
 // ============================================================
