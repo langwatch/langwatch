@@ -36,6 +36,7 @@ sync-all-openapi:
 # GDPR/Compliance: Dry run user deletion (shows what would be deleted)
 # Deletes: Postgres data + Elasticsearch data (traces, evals, etc.) for sole-owned projects
 # Usage: make user-delete-dry-run EMAIL=user@example.com
+# Recommended usage with .env.gdpr file: set -a && source langwatch/.env.gdpr && ...
 user-delete-dry-run:
 ifndef EMAIL
 	$(error EMAIL is required. Usage: make user-delete-dry-run EMAIL=user@example.com)
@@ -45,6 +46,7 @@ endif
 # GDPR/Compliance: Execute user deletion (requires confirmation)
 # Deletes: Postgres data + Elasticsearch data (traces, evals, etc.) for sole-owned projects
 # Usage: make user-delete EMAIL=user@example.com
+# Recommended usage with .env.gdpr file: set -a && source langwatch/.env.gdpr && ...
 user-delete:
 ifndef EMAIL
 	$(error EMAIL is required. Usage: make user-delete EMAIL=user@example.com)
@@ -55,6 +57,7 @@ endif
 # Deletes: traces, dspy-steps, batch-evaluations, scenario-events
 # Usage: make es-delete-dry-run PROJECT_ID=proj_123
 #        make es-delete-dry-run PROJECT_ID=proj_123,proj_456  (multiple)
+# Recommended usage with .env.gdpr file: set -a && source langwatch/.env.gdpr && ...
 es-delete-dry-run:
 ifndef PROJECT_ID
 	$(error PROJECT_ID is required. Usage: make es-delete-dry-run PROJECT_ID=proj_123)
@@ -64,6 +67,7 @@ endif
 # GDPR/Compliance: Execute ES-only deletion by project ID (standalone, not tied to user)
 # Deletes: traces, dspy-steps, batch-evaluations, scenario-events
 # Usage: make es-delete PROJECT_ID=proj_123
+# Recommended usage with .env.gdpr file: set -a && source langwatch/.env.gdpr && ...
 es-delete:
 ifndef PROJECT_ID
 	$(error PROJECT_ID is required. Usage: make es-delete PROJECT_ID=proj_123)
