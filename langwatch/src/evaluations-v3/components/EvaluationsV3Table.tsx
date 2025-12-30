@@ -11,8 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
-import { useDrawer, useDrawerParams, setFlowCallbacks } from "~/hooks/useDrawer";
-import { PromptEditorDrawerHandler } from "./PromptEditorDrawerHandler";
+import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -60,7 +59,7 @@ export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
 }: EvaluationsV3TableProps) {
-  const { openDrawer, closeDrawer, drawerOpen } = useDrawer();
+  const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
 
   // Sync saved dataset changes to DB
@@ -216,9 +215,6 @@ export function EvaluationsV3Table({
   // State for editing dataset columns
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
-  // Get drawer params from URL
-  const drawerParams = useDrawerParams();
-
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
     (savedAgent: TypedAgent) => {
@@ -282,7 +278,28 @@ export function EvaluationsV3Table({
   const handleEditRunner = useCallback(
     async (runner: RunnerConfig) => {
       if (runner.type === "prompt") {
-        openDrawer("promptEditor", { promptId: runner.promptId, urlParams: { runnerId: runner.id } });
+        // Set flow callbacks for the prompt editor
+        // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
+        // onSave: updates runner when prompt is published
+        setFlowCallbacks("promptEditor", {
+          onLocalConfigChange: (localConfig) => {
+            updateRunner(runner.id, { localPromptConfig: localConfig });
+          },
+          onSave: (savedPrompt) => {
+            updateRunner(runner.id, {
+              name: savedPrompt.name,
+              promptId: savedPrompt.id,
+              localPromptConfig: undefined, // Clear local config on save
+            });
+          },
+        });
+        // Pass initialLocalConfig as a complex prop (object gets extracted to complexProps)
+        const initialLocalConfig = runner.localPromptConfig;
+        openDrawer("promptEditor", {
+          promptId: runner.promptId,
+          initialLocalConfig,
+          urlParams: { runnerId: runner.id },
+        });
       } else if (runner.type === "agent" && runner.dbAgentId) {
         // Fetch the agent to determine its type
         try {
@@ -935,13 +952,6 @@ export function EvaluationsV3Table({
 
           setEditDatasetDrawerOpen(false);
         }}
-      />
-
-      {/* Handler for PromptEditorDrawer - manages local config state */}
-      <PromptEditorDrawerHandler
-        runnerId={drawerParams.runnerId}
-        isOpen={drawerOpen("promptEditor")}
-        onSelectPrompt={handleSelectPrompt}
       />
     </Box>
   );
