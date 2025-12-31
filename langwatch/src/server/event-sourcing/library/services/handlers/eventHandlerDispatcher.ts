@@ -652,10 +652,6 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             );
             // Continue to validateEventProcessing - it will check failures and return null,
             // but the idempotency checker will save a pending checkpoint first
-            // We need to skip the ordering check in validateEventProcessing since we already know it will fail
-            // But we want to let it save the pending checkpoint, so we'll pass skipOrderingCheck
-            // Actually, validateEventProcessing checks failures first, so it will return null before checking ordering
-            // So we can just continue and let it handle it
           } else {
             const previousSequenceNumber = sequenceNumber - 1;
 
