@@ -1,6 +1,7 @@
 import type {
   AggregateType,
   CommandHandlerClass,
+  DeduplicationConfig,
   Event,
   EventHandlerClass,
   EventPublisher,
@@ -8,28 +9,36 @@ import type {
   EventStore,
   EventStoreReadContext,
   ExtractCommandHandlerPayload,
+  ParentLink,
   Projection,
   ProjectionHandlerClass,
 } from "../../library";
+import type { PipelineMetadata } from "./types";
 import type {
   EventHandlerDefinition,
   EventHandlerOptions,
 } from "../../library/eventHandler.types";
-import type { ProjectionDefinition } from "../../library/projection.types";
+import type {
+  ProjectionDefinition,
+  ProjectionDefinitions,
+  ProjectionOptions,
+  ProjectionTypeMap,
+} from "../../library/projection.types";
+import type { ExtractProjectionHandlerProjection } from "../../library/domain/handlers/projectionHandlerClass";
 import { ConfigurationError } from "../../library/services/errorHandling";
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
-import { EventSourcingPipeline } from "../index";
+import { EventSourcingPipeline } from "../pipeline";
 import type { QueueProcessorFactory } from "../queue";
-import { defaultQueueProcessorFactory } from "../queue";
 import type { PipelineWithCommandHandlers, RegisteredPipeline } from "./types";
 
-export interface PipelineBuilderOptions {
-  eventStore: EventStore<any>;
+export interface PipelineBuilderOptions<EventType extends Event = Event> {
+  eventStore: EventStore<EventType>;
   queueProcessorFactory?: QueueProcessorFactory;
   distributedLock?: DistributedLock;
   handlerLockTtlMs?: number;
   updateLockTtlMs?: number;
+  commandLockTtlMs?: number;
   processorCheckpointStore?: ProcessorCheckpointStore;
 }
 
@@ -45,20 +54,19 @@ export interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
 
   /**
-   * Optional: Custom job ID factory for idempotency.
-   * Default: Uses static makeJobId from handler class, or auto-generated
-   */
-  makeJobId?: (payload: Payload) => string;
-
-  /**
    * Optional: Delay in milliseconds before processing the job.
-   * Default: Uses static delay from handler class, or 0
    */
   delay?: number;
 
   /**
+   * Optional: Deduplication configuration.
+   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   */
+  deduplication?: DeduplicationConfig<Payload>;
+
+  /**
    * Optional: Concurrency limit for processing jobs.
-   * Default: Uses static concurrency from handler class, or 5
+   * Default: 5
    */
   concurrency?: number;
 
@@ -69,44 +77,23 @@ export interface CommandHandlerOptions<Payload> {
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
+
+  /**
+   * Optional: Lock TTL in milliseconds for this command handler.
+   * Default: Uses commandLockTtlMs from PipelineBuilderOptions, or 30000ms
+   */
+  lockTtlMs?: number;
 }
 
 /**
  * Builder for creating event sourcing pipelines with type-safe required fields.
  * Uses TypeScript type state machine pattern to enforce that all required fields
  * are provided before build() can be called.
- *
- * **Builder Pattern Flow:**
- * 1. Start with `registerPipeline()` which returns `PipelineBuilder`
- * 2. Call `withName(name)` → returns `PipelineBuilderWithName`
- * 3. Call `withAggregateType(type)` → returns `PipelineBuilderWithNameAndType`
- * 4. Optionally call `withProjection(name, HandlerClass)` multiple times to register projections
- * 5. Optionally call `withEventPublisher(publisher)` to register an event publisher
- * 6. Optionally call `withEventHandler(name, HandlerClass, options?)` to register event handlers
- * 7. Optionally call `withCommand(name, HandlerClass, options?)` to register command handlers
- * 8. Call `build()` to create the `RegisteredPipeline`
- *
- * **Example:**
- * ```typescript
- * const pipeline = eventSourcing
- *   .registerPipeline<MyEvent>()
- *   .withName("my-pipeline")
- *   .withAggregateType("trace")
- *   .withProjection("summary", SummaryProjectionHandler)
- *   .withProjection("analytics", AnalyticsProjectionHandler)
- *   .withEventPublisher(publisher)
- *   .withEventHandler("span-storage", SpanClickHouseHandler, { eventTypes: [...] })
- *   .withCommand("recordSpan", RecordSpanCommand, { delay: 5000 })
- *   .build();
- * ```
  */
-export class PipelineBuilder<
-  EventType extends Event,
-  ProjectionType extends Projection,
-> {
-  constructor(private readonly options: PipelineBuilderOptions) {}
+export class PipelineBuilder<EventType extends Event> {
+  constructor(private readonly options: PipelineBuilderOptions<EventType>) {}
 
-  withName(name: string): PipelineBuilderWithName<EventType, ProjectionType> {
+  withName(name: string): PipelineBuilderWithName<EventType> {
     return new PipelineBuilderWithName(this.options, name);
   }
 
@@ -118,18 +105,20 @@ export class PipelineBuilder<
   }
 }
 
-export class PipelineBuilderWithName<
-  EventType extends Event,
-  ProjectionType extends Projection,
-> {
+export class PipelineBuilderWithName<EventType extends Event> {
   constructor(
-    private readonly options: PipelineBuilderOptions,
+    private readonly options: PipelineBuilderOptions<EventType>,
     private readonly name: string,
   ) {}
 
   withAggregateType(
     aggregateType: AggregateType,
-  ): PipelineBuilderWithNameAndType<EventType, ProjectionType, never, never> {
+  ): PipelineBuilderWithNameAndType<
+    EventType,
+    never,
+    never,
+    ProjectionTypeMap
+  > {
     return new PipelineBuilderWithNameAndType(
       this.options,
       this.name,
@@ -169,9 +158,9 @@ type CommandHandlersToRecord<Handlers extends RegisteredCommandHandler> = {
 
 export class PipelineBuilderWithNameAndType<
   EventType extends Event,
-  ProjectionType extends Projection,
   RegisteredHandlerNames extends string = never,
   RegisteredCommandHandlers extends RegisteredCommandHandler = never,
+  RegisteredProjections extends ProjectionTypeMap = ProjectionTypeMap,
 > {
   private projections = new Map<
     string,
@@ -183,9 +172,10 @@ export class PipelineBuilderWithNameAndType<
     EventHandlerDefinition<EventType, RegisteredHandlerNames>
   >();
   private commandHandlers: Array<CommandHandlerRegistration<EventType>> = [];
+  private parentLinks: Array<ParentLink<EventType>> = [];
 
   constructor(
-    private readonly options: PipelineBuilderOptions,
+    private readonly options: PipelineBuilderOptions<EventType>,
     private readonly name: string,
     private readonly aggregateType: AggregateType,
   ) {}
@@ -196,7 +186,8 @@ export class PipelineBuilderWithNameAndType<
    * This method can be called multiple times to register multiple projections.
    *
    * @param name - Unique name for this projection within the pipeline
-   * @param HandlerClass - Projection handler class to register (must have static `store` property)
+   * @param handlerClass - Projection handler class to register (must have static `store` property)
+   * @param options - Optional configuration for projection processing behavior (deduplication, batching)
    * @returns The same builder instance for method chaining
    * @throws Error if projection name already exists or if handler class doesn't have static store property
    *
@@ -204,20 +195,28 @@ export class PipelineBuilderWithNameAndType<
    * ```typescript
    * pipeline
    *   .withProjection("summary", SummaryProjectionHandler)
-   *   .withProjection("analytics", AnalyticsProjectionHandler)
+   *   .withProjection("analytics", AnalyticsProjectionHandler, {
+   *     deduplication: {
+   *       makeId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
+   *       ttlMs: 1000,
+   *     },
+   *   })
    * ```
    */
   withProjection<
-    HandlerClass extends ProjectionHandlerClass<EventType, any>,
+    handlerClass extends ProjectionHandlerClass<EventType, any>,
     ProjectionName extends string,
   >(
     name: ProjectionName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
+    options?: ProjectionOptions<EventType>,
   ): PipelineBuilderWithNameAndType<
     EventType,
-    ProjectionType,
     RegisteredHandlerNames,
-    RegisteredCommandHandlers
+    RegisteredCommandHandlers,
+    RegisteredProjections & {
+      [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
+    }
   > {
     if (this.projections.has(name)) {
       throw new ConfigurationError(
@@ -228,7 +227,7 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Extract store from static property
-    if (!HandlerClass.store) {
+    if (!handlerClass.store) {
       throw new ConfigurationError(
         "PipelineBuilder",
         `Projection handler class must have a static "store" property.`,
@@ -237,14 +236,58 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Instantiate handler
-    const handler = new HandlerClass();
+    const handler = new handlerClass();
 
-    this.projections.set(name, {
+    const projectionDef: ProjectionDefinition<
+      EventType,
+      ExtractProjectionHandlerProjection<handlerClass>
+    > = {
       name,
-      store: HandlerClass.store,
+      store: handlerClass.store,
       handler,
-    } as ProjectionDefinition<EventType, any>);
+      options,
+    };
 
+    this.projections.set(name, projectionDef);
+
+    return this as unknown as PipelineBuilderWithNameAndType<
+      EventType,
+      RegisteredHandlerNames,
+      RegisteredCommandHandlers,
+      RegisteredProjections & {
+        [K in ProjectionName]: ExtractProjectionHandlerProjection<handlerClass>;
+      }
+    >;
+  }
+
+  /**
+   * Register a parent link to another aggregate type.
+   * This defines a many-to-one relationship from this aggregate to a parent.
+   * The inverse (one-to-many children) relationship is automatically inferred.
+   *
+   * @param targetAggregateType - The aggregate type of the parent
+   * @param extractParentId - Function to extract the parent aggregate ID from an event
+   * @returns The same builder instance for method chaining
+   *
+   * @example
+   * ```typescript
+   * // Span has a parent Trace, linked via traceId
+   * pipeline.withParentLink("trace", (e) => e.data.spanData.traceId)
+   * ```
+   */
+  withParentLink(
+    targetAggregateType: AggregateType,
+    extractParentId: (event: EventType) => string | null,
+  ): PipelineBuilderWithNameAndType<
+    EventType,
+    RegisteredHandlerNames,
+    RegisteredCommandHandlers,
+    RegisteredProjections
+  > {
+    this.parentLinks.push({
+      targetAggregateType,
+      extractParentId,
+    });
     return this;
   }
 
@@ -264,9 +307,9 @@ export class PipelineBuilderWithNameAndType<
     publisher: EventPublisher<EventType>,
   ): PipelineBuilderWithNameAndType<
     EventType,
-    ProjectionType,
     RegisteredHandlerNames,
-    RegisteredCommandHandlers
+    RegisteredCommandHandlers,
+    RegisteredProjections
   > {
     this.eventPublisher = publisher;
     return this;
@@ -277,7 +320,7 @@ export class PipelineBuilderWithNameAndType<
    * Handlers are dispatched asynchronously via queues after events are stored.
    *
    * @param name - Unique name for this handler within the pipeline
-   * @param HandlerClass - Event handler class to register
+   * @param handlerClass - Event handler class to register
    * @param options - Options for configuring the handler (event types, idempotency, etc.)
    * @returns A new builder instance with the handler name added to the registered names type
    * @throws Error if handler name already exists
@@ -286,23 +329,23 @@ export class PipelineBuilderWithNameAndType<
    * ```typescript
    * pipeline
    *   .withEventHandler("span-storage", SpanClickHouseHandler, {
-   *     eventTypes: ["lw.obs.span_ingestion.recorded"],
+   *     eventTypes: ["lw.obs.trace.span_received"],
    *   })
    *   .withEventHandler("trace-aggregator", TraceHandler)
    * ```
    */
   withEventHandler<
-    HandlerClass extends EventHandlerClass<EventType>,
+    handlerClass extends EventHandlerClass<EventType>,
     HandlerName extends string,
   >(
     name: HandlerName,
-    HandlerClass: HandlerClass,
+    handlerClass: handlerClass,
     options?: EventHandlerOptions<EventType, RegisteredHandlerNames>,
   ): PipelineBuilderWithNameAndType<
     EventType,
-    ProjectionType,
     RegisteredHandlerNames | HandlerName,
-    RegisteredCommandHandlers
+    RegisteredCommandHandlers,
+    RegisteredProjections
   > {
     if (this.eventHandlers.has(name)) {
       throw new ConfigurationError(
@@ -313,7 +356,7 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Instantiate handler
-    const handler = new HandlerClass();
+    const handler = new handlerClass();
 
     // Merge event types from static method and options (options take precedence)
     const mergedOptions: EventHandlerOptions<
@@ -322,20 +365,25 @@ export class PipelineBuilderWithNameAndType<
     > = {
       ...options,
       eventTypes:
-        options?.eventTypes ?? HandlerClass.getEventTypes?.() ?? void 0,
+        options?.eventTypes ?? handlerClass.getEventTypes?.() ?? void 0,
     };
 
-    this.eventHandlers.set(name, {
+    const handlerDef: EventHandlerDefinition<
+      EventType,
+      RegisteredHandlerNames
+    > = {
       name,
       handler,
       options: mergedOptions,
-    } as EventHandlerDefinition<EventType, RegisteredHandlerNames>);
+    };
+
+    this.eventHandlers.set(name, handlerDef);
 
     return this as PipelineBuilderWithNameAndType<
       EventType,
-      ProjectionType,
       RegisteredHandlerNames | HandlerName,
-      RegisteredCommandHandlers
+      RegisteredCommandHandlers,
+      RegisteredProjections
     >;
   }
 
@@ -344,7 +392,7 @@ export class PipelineBuilderWithNameAndType<
    * The class bundles schema, handler implementation, and all configuration methods.
    *
    * @param name - Unique name for this command handler within the pipeline
-   * @param HandlerClass - The command handler class to register
+   * @param handlerClass - The command handler class to register
    * @param options - Optional configuration that can override static methods (delay, concurrency, etc.)
    * @returns A new builder instance with the command handler tracked in the type system
    *
@@ -355,21 +403,21 @@ export class PipelineBuilderWithNameAndType<
    * ```
    */
   withCommand<
-    HandlerClass extends CommandHandlerClass<any, any, EventType>,
+    handlerClass extends CommandHandlerClass<any, any, EventType>,
     Name extends string,
   >(
     name: Name,
-    HandlerClass: HandlerClass,
-    options?: CommandHandlerOptions<ExtractCommandHandlerPayload<HandlerClass>>,
+    handlerClass: handlerClass,
+    options?: CommandHandlerOptions<ExtractCommandHandlerPayload<handlerClass>>,
   ): PipelineBuilderWithNameAndType<
     EventType,
-    ProjectionType,
     RegisteredHandlerNames,
     | RegisteredCommandHandlers
     | {
         name: Name;
-        payload: ExtractCommandHandlerPayload<HandlerClass>;
-      }
+        payload: ExtractCommandHandlerPayload<handlerClass>;
+      },
+    RegisteredProjections
   > {
     // Validate uniqueness
     if (this.commandHandlers.some((reg) => reg.name === name)) {
@@ -381,32 +429,41 @@ export class PipelineBuilderWithNameAndType<
     }
 
     this.commandHandlers.push({
-      HandlerClass,
+      HandlerClass: handlerClass,
       name,
       options,
     });
 
-    return this as PipelineBuilderWithNameAndType<
+    return this as unknown as PipelineBuilderWithNameAndType<
       EventType,
-      ProjectionType,
       RegisteredHandlerNames,
       | RegisteredCommandHandlers
       | {
           name: Name;
-          payload: ExtractCommandHandlerPayload<HandlerClass>;
-        }
+          payload: ExtractCommandHandlerPayload<handlerClass>;
+        },
+      RegisteredProjections
     >;
   }
 
   build(): PipelineWithCommandHandlers<
-    RegisteredPipeline<EventType, ProjectionType>,
+    RegisteredPipeline<EventType, RegisteredProjections>,
     RegisteredCommandHandlers extends never
       ? Record<string, EventSourcedQueueProcessor<any>>
       : CommandHandlersToRecord<RegisteredCommandHandlers>
   > {
     // Convert projections map to object format
-    const projectionsObject =
-      this.projections.size > 0 ? Object.fromEntries(this.projections) : void 0;
+    // Use Array.from to convert Map entries to array so our type augmentation works
+    // TypeScript can't infer the specific mapped type from Object.fromEntries,
+    // but we know the runtime values match RegisteredProjections
+    const projectionsObject:
+      | ProjectionDefinitions<EventType, RegisteredProjections>
+      | undefined =
+      this.projections.size > 0
+        ? (Object.fromEntries(
+            Array.from(this.projections),
+          ) as ProjectionDefinitions<EventType, RegisteredProjections>)
+        : void 0;
 
     // Convert event handlers map to object format
     const eventHandlersObject =
@@ -414,10 +471,36 @@ export class PipelineBuilderWithNameAndType<
         ? Object.fromEntries(this.eventHandlers)
         : void 0;
 
-    const pipeline = new EventSourcingPipeline<EventType, ProjectionType>({
+    // Build metadata for tooling and introspection
+    const metadata: PipelineMetadata = {
       name: this.name,
       aggregateType: this.aggregateType,
-      eventStore: this.options.eventStore as EventStore<EventType>,
+      projections: Array.from(this.projections.entries()).map(
+        ([name, def]) => ({
+          name,
+          handlerClassName: def.handler.constructor.name,
+        }),
+      ),
+      eventHandlers: Array.from(this.eventHandlers.entries()).map(
+        ([name, def]) => ({
+          name,
+          handlerClassName: def.handler.constructor.name,
+          eventTypes: [...(def.options?.eventTypes || [])],
+        }),
+      ),
+      commands: this.commandHandlers.map((reg) => ({
+        name: reg.name,
+        handlerClassName: reg.HandlerClass.name,
+      })),
+    };
+
+    const pipeline = new EventSourcingPipeline<
+      EventType,
+      RegisteredProjections
+    >({
+      name: this.name,
+      aggregateType: this.aggregateType,
+      eventStore: this.options.eventStore,
       projections: projectionsObject,
       eventPublisher: this.eventPublisher,
       eventHandlers: eventHandlersObject,
@@ -425,7 +508,10 @@ export class PipelineBuilderWithNameAndType<
       distributedLock: this.options.distributedLock,
       handlerLockTtlMs: this.options.handlerLockTtlMs,
       updateLockTtlMs: this.options.updateLockTtlMs,
+      commandLockTtlMs: this.options.commandLockTtlMs,
       processorCheckpointStore: this.options.processorCheckpointStore,
+      parentLinks: this.parentLinks.length > 0 ? this.parentLinks : undefined,
+      metadata,
     });
 
     // Create dispatchers now that we have the service
@@ -465,8 +551,8 @@ export class PipelineBuilderWithNameAndType<
     // and create dispatchers that match those types at runtime
     return Object.assign(pipeline, {
       commands: dispatchers,
-    }) as unknown as PipelineWithCommandHandlers<
-      RegisteredPipeline<EventType, ProjectionType>,
+    }) as PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, RegisteredProjections>,
       RegisteredCommandHandlers extends never
         ? Record<string, EventSourcedQueueProcessor<any>>
         : CommandHandlersToRecord<RegisteredCommandHandlers>

@@ -13,7 +13,7 @@ const mockLogger = {
 };
 
 const mockTracer = {
-  withActiveSpan: vi.fn((name, options, fn) => fn()),
+  withActiveSpan: vi.fn((_name, _options, fn) => fn()),
 };
 
 vi.mock("../../../../utils/logger", () => ({
@@ -240,7 +240,9 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const definition: EventSourcedQueueDefinition<string> = {
         name: queueName,
         process: processFn,
-        makeJobId,
+        deduplication: {
+          makeId: makeJobId,
+        },
       };
 
       const processor = new EventSourcedQueueProcessorBullMq(definition);
@@ -567,7 +569,9 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
       const definition: EventSourcedQueueDefinition<string> = {
         name: queueName,
         process: processFn,
-        makeJobId,
+        deduplication: {
+          makeId: makeJobId,
+        },
       };
 
       const processor = new EventSourcedQueueProcessorBullMq(definition);

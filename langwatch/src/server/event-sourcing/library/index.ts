@@ -7,9 +7,12 @@
  */
 
 export type {
-  EventSourcingPipelineDefinition,
-  RegisteredPipeline,
-} from "../runtime/pipeline";
+  CommandHandlerOptions as StaticCommandHandlerOptions,
+  NoCommands,
+  RegisteredCommand,
+  StaticPipelineDefinition,
+} from "./pipeline/types";
+export { definePipeline } from "./pipeline/staticBuilder";
 export type {
   Command,
   CommandHandler,
@@ -64,6 +67,7 @@ export type {
   Event,
   EventMetadataBase,
   EventOrderingStrategy,
+  ParentLink,
   ProcessorCheckpoint,
   Projection,
   ProjectionEnvelope,
@@ -85,6 +89,7 @@ export type {
 } from "./projection.types";
 export type { EventPublisher } from "./publishing/eventPublisher.types";
 export type {
+  DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,
@@ -122,17 +127,4 @@ export {
   RedisDistributedLock,
 } from "./utils/distributedLock";
 export type { CreateEventOptions } from "./utils/event.utils";
-export {
-  buildEventMetadataWithCurrentProcessingTraceparent,
-  buildProjectionMetadata,
-  createEvent,
-  createEventStream,
-  createProjection,
-  EventUtils,
-  eventBelongsToAggregate,
-  filterEventsByType,
-  getLatestProjection,
-  isValidEvent,
-  isValidProjection,
-  sortEventsByTimestamp,
-} from "./utils/event.utils";
+export { EventUtils } from "./utils/event.utils";

@@ -246,6 +246,29 @@ enum INVITE_STATUS {
     ACCEPTED
 }
 
+model ProjectDailyUsage {
+    id         String   @id
+    projectId  String
+    date       DateTime
+    traceCount Int      @default(0)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@unique([projectId, date])
+}
+
+model ProjectDailyUsageProcessedAggregates {
+    id          String   @id
+    projectId   String
+    aggregateId String
+    date        DateTime
+
+    processedAt DateTime @default(now())
+
+    @@unique([projectId, aggregateId, date])
+}
+
 model OrganizationInvite {
     id              String               @id @default(nanoid())
     email           String
@@ -395,24 +418,24 @@ model Dashboard {
 }
 
 model CustomGraph {
-    id           String      @id @default(nanoid())
-    projectId    String
-    project      Project     @relation(fields: [projectId], references: [id])
-    name         String
-    graph        Json
-    filters      Json?
-    createdAt    DateTime    @default(now())
-    updatedAt    DateTime    @default(now()) @updatedAt
+    id        String   @id @default(nanoid())
+    projectId String
+    project   Project  @relation(fields: [projectId], references: [id])
+    name      String
+    graph     Json
+    filters   Json?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
 
     // Report page relationship
     dashboardId String?
     dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
     // Grid positioning (2-column grid)
-    gridColumn   Int         @default(0)
-    gridRow      Int         @default(0)
-    colSpan      Int         @default(1)
-    rowSpan      Int         @default(1)
+    gridColumn Int @default(0)
+    gridRow    Int @default(0)
+    colSpan    Int @default(1)
+    rowSpan    Int @default(1)
 
     @@index([projectId])
     @@index([dashboardId])

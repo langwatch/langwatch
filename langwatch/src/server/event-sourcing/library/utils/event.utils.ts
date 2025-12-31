@@ -36,7 +36,9 @@ function generateEventId(
   aggregateId: string,
   aggregateType: string,
 ): string {
-  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${generate("event").toString()}`;
+  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${generate(
+    "event",
+  ).toString()}`;
 }
 
 /**
@@ -58,6 +60,7 @@ export interface CreateEventOptions {
  * @param tenantId - Tenant identifier for multi-tenant isolation
  * @param type - Event type identifier
  * @param data - Event-specific payload data
+ * @param version - Event version
  * @param metadata - Optional metadata (e.g., trace context)
  * @param timestamp - Optional timestamp (defaults to current time)
  * @param options - Optional configuration (e.g., includeTraceContext)
@@ -69,6 +72,7 @@ function createEvent<TEvent extends Event>(
   aggregateId: string,
   tenantId: TenantId,
   type: TEvent["type"],
+  version: TEvent["version"],
   data: TEvent["data"],
   metadata?: TEvent["metadata"],
   timestamp?: number,
@@ -85,6 +89,7 @@ function createEvent<
   aggregateId: string,
   tenantId: TenantId,
   type: TEventType,
+  version: string,
   data: Payload,
   metadata?: Metadata,
   timestamp?: number,
@@ -109,6 +114,7 @@ function createEvent<
       aggregateId,
       aggregateType,
     ),
+    version,
     aggregateId,
     aggregateType,
     tenantId,
@@ -183,7 +189,7 @@ function createProjection<Data = unknown>(
   aggregateId: string,
   tenantId: TenantId,
   data: Data,
-  version: number = Date.now(),
+  version: string,
 ): Projection<Data> {
   return {
     id,
@@ -369,22 +375,6 @@ function validateTenantId(
     throw new SecurityError(operation, errorMessage);
   }
 }
-
-export {
-  generateEventId,
-  createEvent,
-  createEventStream,
-  createProjection,
-  eventBelongsToAggregate,
-  sortEventsByTimestamp,
-  filterEventsByType,
-  getLatestProjection,
-  isValidEvent,
-  isValidProjection,
-  validateTenantId,
-  buildProjectionMetadata,
-  buildEventMetadataWithCurrentProcessingTraceparent,
-};
 
 export const EventUtils = {
   generateEventId,

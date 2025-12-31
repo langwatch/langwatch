@@ -3,12 +3,16 @@ import type {
   SearchTotalHits,
   Sort,
 } from "@elastic/elasticsearch/lib/api/types";
+import { on } from "events";
 import { type PrismaClient, PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import type { Session } from "next-auth";
 import { z } from "zod";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
+import { sseService } from "~/server/services/sse.service";
+import { createLogger } from "~/utils/logger";
+
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -21,6 +25,7 @@ import {
   searchTraces,
 } from "~/server/elasticsearch/traces";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
+import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { esClient, TRACE_INDEX } from "../../elasticsearch";
 import type { Protections } from "../../elasticsearch/protections";
@@ -43,13 +48,32 @@ export const getAllForProjectInput = tracesFilterInput.extend({
   sortBy: z.string().optional(),
   sortDirection: z.string().optional(),
   updatedAt: z.number().optional(),
+  scrollId: z.string().optional().nullable(),
 });
+
+const logger = createLogger("langwatch:traces:sse-subscription");
 
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getAllTracesForProject(
+        input,
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return await getAllTracesForProject({ input, ctx });
     }),
   getById: publicProcedure
@@ -292,6 +316,19 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getTracesWithSpans(
+        projectId,
+        traceIds,
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return getTracesWithSpans(projectId, traceIds, protections);
     }),
 
@@ -460,11 +497,30 @@ export const tracesRouter = createTRPCRouter({
     .input(
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
-        scrollId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ ctx, input }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      // Try ClickHouse first if enabled for this project
+      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
+      const clickHouseResult = await clickHouseService.getAllTracesForProject(
+        {
+          ...input,
+          pageOffset: input.pageOffset ?? 0,
+          pageSize: input.pageSize ?? 10_000,
+        },
+        protections
+      );
+
+      if (clickHouseResult !== null) {
+        return clickHouseResult;
+      }
+
+      // Fall back to Elasticsearch
       return await getAllTracesForProject({
         input: {
           ...input,
@@ -476,6 +532,29 @@ export const tracesRouter = createTRPCRouter({
         includeSpans: input.includeSpans,
         scrollId: input.scrollId,
       });
+    }),
+
+  onTraceUpdate: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("traces:view"))
+    .subscription(async function* (opts) {
+      const { projectId } = opts.input;
+      const emitter = sseService.getTenantEmitter(projectId);
+
+      logger.info({ projectId }, "SSE subscription started");
+
+      try {
+        for await (const eventArgs of on(emitter, "trace_updated", {
+          signal: opts.signal,
+        })) {
+          logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
+          yield eventArgs[0];
+        }
+        logger.info({ projectId }, "SSE subscription ended normally");
+      } finally {
+        logger.debug({ projectId }, "SSE subscription cleanup");
+        sseService.cleanupTenantEmitter(projectId);
+      }
     }),
 });
 
@@ -494,7 +573,7 @@ export const getAllTracesForProject = async ({
   };
   downloadMode?: boolean;
   includeSpans?: boolean;
-  scrollId?: string;
+  scrollId?: string | null;
 }) => {
   const { pivotIndexConditions } = generateTracesPivotQueryConditions({
     ...input,
@@ -638,8 +717,8 @@ export const getAllTracesForProject = async ({
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 
-  // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
-  const groups = groupTraces(input.groupBy, traces as TraceWithGuardrail[]);
+  const tracesWithGuardrails = transformTracesWithGuardrails(traces);
+  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
 
   return {
     groups,
@@ -800,3 +879,18 @@ const sortTracesByTimestampDesc = (traces: Trace[]) => {
     return dateBValue - dateAValue; // Descending order for valid dates
   });
 };
+
+/**
+ * Transform traces to include guardrail information
+ */
+function transformTracesWithGuardrails(
+  traces: Trace[],
+): TraceWithGuardrail[] {
+  return traces.map((trace) => {
+    return {
+      ...trace,
+      lastGuardrail: void 0,
+      annotations: void 0,
+    };
+  });
+}
