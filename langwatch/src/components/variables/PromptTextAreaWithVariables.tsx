@@ -676,6 +676,7 @@ export const PromptTextAreaWithVariables = ({
       position="relative"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
+      minHeight="120px"
       {...boxProps}
     >
       <RichTextarea
