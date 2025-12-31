@@ -210,11 +210,7 @@ jobs:
           chmod +x /usr/local/bin/goose
 
       - name: Configure ClickHouse storage policy
-        working-directory: langwatch
         run: |
-          # Run ClickHouse migrations
-          pnpm clickhouse:migrate
-
           # Get ClickHouse container ID
           CLICKHOUSE_CONTAINER=$(docker ps --filter "ancestor=clickhouse/clickhouse-server:latest" --format "{{.ID}}")
           
@@ -246,6 +242,10 @@ jobs:
           
           # Reload ClickHouse configuration (using password from service container env)
           docker exec -e CLICKHOUSE_PASSWORD=ci_password $CLICKHOUSE_CONTAINER clickhouse-client --password=ci_password --query "SYSTEM RELOAD CONFIG"
+
+      - name: Run ClickHouse migrations
+        working-directory: langwatch
+        run: pnpm clickhouse:migrate
 
       - name: Run integration tests with coverage
         working-directory: langwatch
