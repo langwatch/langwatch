@@ -13,7 +13,7 @@
       alt="follow on X(Twitter)"></a>
 </p>
 
-<video src="https://github.com/user-attachments/assets/ff49882d-4e9d-4b7c-819b-be690fba9387" autoplay loop muted playsinline nocontrols width="100%"></video>
+<video src="https://github.com/user-attachments/assets/ff49882d-4e9d-4b7c-819b-be690fba9387" autoplay loop muted playsinline width="100%" style="display: block; aspect-ratio: 16 / 9;"></video>
 
 ## Why LangWatch?
 
