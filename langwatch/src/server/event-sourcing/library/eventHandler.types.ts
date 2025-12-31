@@ -5,6 +5,7 @@
 import type { EventHandler } from "./domain/handlers/eventHandler";
 import type { Event } from "./domain/types";
 import type { KillSwitchOptions } from "./pipeline/types";
+import type { DeduplicationConfig } from "./queues";
 
 /**
  * Options for configuring an event handler.
@@ -19,18 +20,15 @@ export interface EventHandlerOptions<
    */
   eventTypes?: readonly EventType["type"][];
   /**
-   * Optional: Custom job ID factory for idempotency.
-   * Default: `${event.tenantId}:${event.aggregateId}:${event.timestamp}:${event.type}`
-   */
-  makeJobId?: (event: EventType) => string;
-  /**
    * Optional: Delay in milliseconds before processing the job.
    */
   delay?: number;
   /**
-   * Optional: Debounce time in milliseconds before processing the job.
+   * Optional: Deduplication configuration.
+   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   * Default deduplication ID: `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
    */
-  debounceMs?: number;
+  deduplication?: DeduplicationConfig<EventType>;
   /**
    * Optional: Concurrency limit for processing jobs.
    */

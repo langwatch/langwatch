@@ -89,6 +89,7 @@ export type {
 } from "./projection.types";
 export type { EventPublisher } from "./publishing/eventPublisher.types";
 export type {
+  DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,

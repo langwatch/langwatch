@@ -136,8 +136,8 @@ export function createMockProjectionDefinition<
 >(
   name: string,
   handler?: ProjectionHandler<TEvent, TProjection>,
-  options?: ProjectionOptions,
   store?: ProjectionStore<TProjection>,
+  options?: ProjectionOptions<TEvent>,
 ): ProjectionDefinition<TEvent, TProjection> {
   return {
     name,

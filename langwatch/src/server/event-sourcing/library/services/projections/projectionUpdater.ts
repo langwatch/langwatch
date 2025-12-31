@@ -10,7 +10,6 @@ import type {
 } from "../../domain/types";
 import type {
   ProjectionDefinition,
-  ProjectionTypeFromDefinition,
 } from "../../projection.types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type {
@@ -253,7 +252,7 @@ export class ProjectionUpdater<
           if (!eventsByAggregate.has(aggregateId)) {
             eventsByAggregate.set(aggregateId, []);
           }
-          eventsByAggregate.get(aggregateId)!.push(event);
+          eventsByAggregate.get(aggregateId)?.push(event);
         }
 
         span.setAttributes({
@@ -272,14 +271,14 @@ export class ProjectionUpdater<
           const eventsForAggregate = eventsByAggregate.get(aggregateId)!;
           // For inline processing, checkpoint per event (similar to queue processing)
           for (const event of eventsForAggregate) {
-            for (const projectionName of this.projections!.keys()) {
+            for (const projectionName of this.projections?.keys() ?? []) {
               try {
                 span.addEvent("projection.update.aggregate.start", {
                   "projection.name": projectionName,
                   "aggregate.id": aggregateId,
                 });
                 // Use processProjectionEvent for inline processing to get checkpointing
-                const projectionDef = this.projections!.get(projectionName);
+                const projectionDef = this.projections?.get(projectionName);
                 if (projectionDef) {
                   await this.processProjectionEvent(
                     projectionName,
@@ -503,7 +502,6 @@ export class ProjectionUpdater<
         );
 
         // Validate event processing prerequisites (sequence number, idempotency, ordering)
-        // Skip ordering check if projection has disableOrderingGuaranteeAndDebounceMs enabled
         // Pass eventsUpToCurrent for sequence number computation
         const sequenceNumber = await this.validator.validateEventProcessing(
           projectionName,
@@ -511,7 +509,6 @@ export class ProjectionUpdater<
           event,
           context,
           {
-            skipOrderingCheck: Boolean(projectionDef.options?.debounceMs),
             events: eventsUpToCurrent,
           },
         );

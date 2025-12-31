@@ -163,8 +163,11 @@ export interface EventSourcingServiceOptions<
     create<Payload>(definition: {
       name: string;
       process: (payload: Payload) => Promise<void>;
-      makeJobId: (payload: Payload) => string;
       delay?: number;
+      deduplication?: {
+        makeId: (payload: Payload) => string;
+        ttlMs?: number;
+      };
       options?: { concurrency?: number };
       spanAttributes?: (
         payload: Payload

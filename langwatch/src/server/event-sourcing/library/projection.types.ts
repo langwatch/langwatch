@@ -2,44 +2,46 @@ import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { Event, Projection } from "./domain/types";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 import type { KillSwitchOptions } from "./pipeline/types";
+import type { DeduplicationConfig } from "./queues";
 
 /**
  * Configuration options for projection processing behavior.
  */
-export interface ProjectionOptions {
+export interface ProjectionOptions<EventType extends Event = Event> {
   /**
-   * Debounce delay in milliseconds. When set, events for the same aggregate will be
-   * debounced - later events replace earlier queues events.
-   *
-   * Default: undefined (no debouncing)
+   * Optional: Delay in milliseconds before processing the job.
+   */
+  delay?: number;
+
+  /**
+   * Optional: Deduplication configuration.
+   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   * Default deduplication ID: `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`
    *
    * @example
    * ```typescript
-   * // Debounce trace summary updates by 1 second
+   * // Debounce trace summary updates by deduplicating on aggregate
    * .withProjection("traceSummary", TraceSummaryProjectionHandler, {
-   *   debounceMs: 1000,
+   *   deduplication: {
+   *     makeId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
+   *     ttlMs: 1000,
+   *   },
    * })
    * ```
    */
-  debounceMs?: number;
+  deduplication?: DeduplicationConfig<EventType>;
 
   /**
    * Maximum batch size for processing. When set, events are accumulated
-   * before processing. Only used when debouncing is enabled.
+   * before processing. Only used when deduplication is enabled.
    *
    * This limits the number of events that can be accumulated during the
-   * debounce period. If more events arrive, they will still be processed
+   * deduplication period. If more events arrive, they will still be processed
    * but may require multiple batches.
    *
    * Default: undefined (no batching limit)
    */
   maxBatchSize?: number;
-
-  /**
-   * Optional: Custom job ID factory for idempotency.
-   * Default: event.id (ensures serial processing per event)
-   */
-  makeJobId?: (event: Event) => string;
 
   /**
    * Kill switch configuration for this projection.
@@ -72,7 +74,7 @@ export interface ProjectionDefinition<
   /**
    * Optional configuration for projection processing behavior.
    */
-  options?: ProjectionOptions;
+  options?: ProjectionOptions<EventType>;
 }
 
 /**

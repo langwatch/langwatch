@@ -12,6 +12,7 @@ import type {
   EventStoreReadContext,
 } from "../stores/eventStore.types";
 import { EventUtils } from "../utils/event.utils";
+import { BatchEventProcessor } from "./batch/batchEventProcessor";
 import { CheckpointManager } from "./checkpoints/checkpointManager";
 import { ConfigurationError } from "./errorHandling";
 import type {
@@ -63,6 +64,9 @@ export class EventSourcingService<
     ProjectionTypes
   >;
   private readonly featureFlagService?: FeatureFlagServiceInterface;
+  private readonly handlerBatchProcessor?: BatchEventProcessor<EventType>;
+  private readonly projectionBatchProcessor?: BatchEventProcessor<EventType>;
+  private readonly checkpointManager: CheckpointManager<EventType>;
 
   constructor({
     pipelineName,
@@ -146,7 +150,7 @@ export class EventSourcingService<
       pipelineName: this.pipelineName,
     });
 
-    const checkpointManager = new CheckpointManager(
+    this.checkpointManager = new CheckpointManager(
       this.pipelineName,
       processorCheckpointStore,
     );
@@ -162,7 +166,7 @@ export class EventSourcingService<
       eventHandlers: this.eventHandlers,
       processorCheckpointStore,
       validator,
-      checkpointManager,
+      checkpointManager: this.checkpointManager,
       queueManager: this.queueManager,
       distributedLock,
       handlerLockTtlMs,
@@ -178,30 +182,69 @@ export class EventSourcingService<
       updateLockTtlMs,
       ordering: this.options.ordering ?? "timestamp",
       validator,
-      checkpointManager,
+      checkpointManager: this.checkpointManager,
       queueManager: this.queueManager,
       featureFlagService: this.featureFlagService,
     });
+
+    // Create batch processors for queue-based processing
+    // These handle the BullMQ deduplication issue by fetching all unprocessed events
+    if (queueProcessorFactory && distributedLock) {
+      this.handlerBatchProcessor = new BatchEventProcessor<EventType>(
+        eventStore,
+        processorCheckpointStore,
+        distributedLock,
+        this.pipelineName,
+        aggregateType,
+      );
+
+      this.projectionBatchProcessor = new BatchEventProcessor<EventType>(
+        eventStore,
+        processorCheckpointStore,
+        distributedLock,
+        this.pipelineName,
+        aggregateType,
+      );
+    }
 
     // Initialize queue processors for event handlers if factory is provided
     if (queueProcessorFactory && eventHandlers) {
       this.queueManager.initializeHandlerQueues(
         eventHandlers,
-        async (handlerName, event, context) => {
-          const handlerDef = this.eventHandlers?.get(handlerName);
-          if (!handlerDef) {
-            throw new ConfigurationError(
-              "EventSourcingService",
-              `Handler "${handlerName}" not found`,
-              { handlerName },
+        async (handlerName, triggerEvent, _context) => {
+          // Use batch processor to handle all unprocessed events for this aggregate
+          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
+          if (this.handlerBatchProcessor) {
+            await this.handlerBatchProcessor.processUnprocessedEvents(
+              triggerEvent,
+              handlerName,
+              "handler",
+              async (event, sequenceNumber, context) => {
+                await this.processHandlerEvent(
+                  handlerName,
+                  event,
+                  sequenceNumber,
+                  context,
+                );
+              },
+            );
+          } else {
+            // Fallback to single-event processing if no batch processor
+            const handlerDef = this.eventHandlers?.get(handlerName);
+            if (!handlerDef) {
+              throw new ConfigurationError(
+                "EventSourcingService",
+                `Handler "${handlerName}" not found`,
+                { handlerName },
+              );
+            }
+            await this.handlerDispatcher.handleEvent(
+              handlerName,
+              handlerDef,
+              triggerEvent,
+              { tenantId: triggerEvent.tenantId },
             );
           }
-          await this.handlerDispatcher.handleEvent(
-            handlerName,
-            handlerDef,
-            event,
-            context,
-          );
         },
       );
     }
@@ -210,23 +253,167 @@ export class EventSourcingService<
     if (queueProcessorFactory && projections) {
       this.queueManager.initializeProjectionQueues(
         projections,
-        async (projectionName, event, context) => {
-          const projectionDef = this.projections?.get(projectionName);
-          if (!projectionDef) {
-            throw new ConfigurationError(
-              "EventSourcingService",
-              `Projection "${projectionName}" not found`,
-              { projectionName },
+        async (projectionName, triggerEvent, _context) => {
+          // Use batch processor to handle all unprocessed events for this aggregate
+          // The triggerEvent is just a trigger - we fetch all unprocessed events from the store
+          if (this.projectionBatchProcessor) {
+            await this.projectionBatchProcessor.processUnprocessedEvents(
+              triggerEvent,
+              projectionName,
+              "projection",
+              async (event, sequenceNumber, context) => {
+                await this.processProjectionEvent(
+                  projectionName,
+                  event,
+                  sequenceNumber,
+                  context,
+                );
+              },
+            );
+          } else {
+            // Fallback to single-event processing if no batch processor
+            const projectionDef = this.projections?.get(projectionName);
+            if (!projectionDef) {
+              throw new ConfigurationError(
+                "EventSourcingService",
+                `Projection "${projectionName}" not found`,
+                { projectionName },
+              );
+            }
+            await this.projectionUpdater.processProjectionEvent(
+              projectionName,
+              projectionDef,
+              triggerEvent,
+              { tenantId: triggerEvent.tenantId },
             );
           }
-          await this.projectionUpdater.processProjectionEvent(
-            projectionName,
-            projectionDef,
-            event,
-            context,
-          );
         },
       );
+    }
+  }
+
+  /**
+   * Processes a single handler event within a batch.
+   * Called by BatchEventProcessor for each unprocessed event.
+   */
+  private async processHandlerEvent(
+    handlerName: string,
+    event: EventType,
+    sequenceNumber: number,
+    _context: EventStoreReadContext<EventType>,
+  ): Promise<void> {
+    const handlerDef = this.eventHandlers?.get(handlerName);
+    if (!handlerDef) {
+      throw new ConfigurationError(
+        "EventSourcingService",
+        `Handler "${handlerName}" not found`,
+        { handlerName },
+      );
+    }
+
+    // Save pending checkpoint before processing
+    await this.checkpointManager.saveCheckpointSafely(
+      handlerName,
+      "handler",
+      event,
+      "pending",
+      sequenceNumber,
+    );
+
+    try {
+      // Execute the handler
+      await handlerDef.handler.handle(event);
+
+      // Save processed checkpoint on success
+      await this.checkpointManager.saveCheckpointSafely(
+        handlerName,
+        "handler",
+        event,
+        "processed",
+        sequenceNumber,
+      );
+    } catch (error) {
+      // Save failed checkpoint on error
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      await this.checkpointManager.saveCheckpointSafely(
+        handlerName,
+        "handler",
+        event,
+        "failed",
+        sequenceNumber,
+        errorMessage,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Processes a single projection event within a batch.
+   * Called by BatchEventProcessor for each unprocessed event.
+   */
+  private async processProjectionEvent(
+    projectionName: string,
+    event: EventType,
+    sequenceNumber: number,
+    context: EventStoreReadContext<EventType>,
+  ): Promise<void> {
+    const projectionDef = this.projections?.get(projectionName);
+    if (!projectionDef) {
+      throw new ConfigurationError(
+        "EventSourcingService",
+        `Projection "${projectionName}" not found`,
+        { projectionName },
+      );
+    }
+
+    // Save pending checkpoint before processing
+    await this.checkpointManager.saveCheckpointSafely(
+      projectionName,
+      "projection",
+      event,
+      "pending",
+      sequenceNumber,
+    );
+
+    try {
+      // Fetch events up to and including the current event for projection rebuild
+      const eventsUpToCurrent = await this.eventStore.getEventsUpTo(
+        String(event.aggregateId),
+        context,
+        this.aggregateType,
+        event,
+      );
+
+      // Update the projection with events up to current
+      await this.projectionUpdater.updateProjectionByName(
+        projectionName,
+        String(event.aggregateId),
+        context,
+        { events: eventsUpToCurrent },
+      );
+
+      // Save processed checkpoint on success
+      await this.checkpointManager.saveCheckpointSafely(
+        projectionName,
+        "projection",
+        event,
+        "processed",
+        sequenceNumber,
+      );
+    } catch (error) {
+      // Save failed checkpoint on error
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      await this.checkpointManager.saveCheckpointSafely(
+        projectionName,
+        "projection",
+        event,
+        "failed",
+        sequenceNumber,
+        errorMessage,
+      );
+      throw error;
     }
   }
 
