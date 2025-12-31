@@ -6,16 +6,16 @@ import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
 import { toaster } from "~/components/ui/toaster";
+import {
+  FormVariablesSection,
+  type PromptTextAreaOnAddMention,
+} from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
-import type { PromptTextAreaOnAddMention } from "~/prompts/components/ui/PromptTextArea";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import {
-  InputsFieldGroup,
-  OutputsFieldGroup,
-} from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
+import { OutputsFieldGroup } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
@@ -152,7 +152,10 @@ export function SignaturePropertiesPanelForm({
   // TODO: Refactor so that all of the node call back methods are in the parent,
   // not here in the form logic
   const availableFields = useMemo(() => {
-    return node.data.inputs.map((input) => input.identifier);
+    return node.data.inputs.map((input) => ({
+      identifier: input.identifier,
+      type: input.type,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(node.data.inputs)]);
 
@@ -266,7 +269,7 @@ export function SignaturePropertiesPanelForm({
               onAddEdge={onAddMessageEdge}
             />
           )}
-          <InputsFieldGroup />
+          <FormVariablesSection showMappings={false} title="Variables" />
           <OutputsFieldGroup />
           {!isInsideWizard && <DemonstrationsField />}
         </VStack>

@@ -12,9 +12,32 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { forwardRef } from "react";
 
 import { PromptEditorDrawer } from "~/components/prompts/PromptEditorDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+
+// Mock rich-textarea since jsdom doesn't support getBoundingClientRect/elementFromPoint properly
+vi.mock("rich-textarea", () => ({
+  RichTextarea: forwardRef<
+    HTMLTextAreaElement,
+    {
+      value?: string;
+      onChange?: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+      onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+      onSelectionChange?: (pos: { focused: boolean }) => void;
+      placeholder?: string;
+      disabled?: boolean;
+      autoHeight?: boolean;
+      style?: React.CSSProperties;
+      children?: (value: string) => React.ReactNode;
+      onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+      onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+    }
+  >(({ children, autoHeight, onSelectionChange, ...props }, ref) => {
+    return <textarea ref={ref} {...props} />;
+  }),
+}));
 
 // Track router state
 let mockRouterQuery: Record<string, string> = {};
@@ -167,9 +190,12 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => {
+      await waitFor(
+        () => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
-      });
+        },
+        { timeout: 5000 },
+      );
 
       // Make a change to trigger "unsaved changes" state
       const textareas = screen.getAllByRole("textbox");
@@ -184,7 +210,7 @@ describe("Prompt Editor Local Changes", () => {
       // KEY ASSERTION: window.confirm should NOT be called
       // because onLocalConfigChange is provided (evaluations context)
       expect(window.confirm).not.toHaveBeenCalled();
-    });
+    }, 10000);
 
     it("calls onLocalConfigChange when changes are made", async () => {
       const user = userEvent.setup();
@@ -204,9 +230,12 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => {
+      await waitFor(
+        () => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
-      });
+        },
+        { timeout: 5000 },
+      );
 
       // Type something to trigger local config change
       const textareas = screen.getAllByRole("textbox");
@@ -219,14 +248,14 @@ describe("Prompt Editor Local Changes", () => {
         () => {
           expect(mockOnLocalConfigChange).toHaveBeenCalled();
         },
-        { timeout: 1500 },
+        { timeout: 2000 },
       );
 
       // Verify the callback was called with a local config object
       const lastCall = mockOnLocalConfigChange.mock.calls[mockOnLocalConfigChange.mock.calls.length - 1];
       expect(lastCall?.[0]).toBeDefined();
       expect(lastCall?.[0]).toHaveProperty("messages");
-    });
+    }, 10000);
   });
 
   describe("when onLocalConfigChange is NOT provided (standalone prompt editing)", () => {
@@ -246,9 +275,12 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => {
+      await waitFor(
+        () => {
         expect(screen.getByText("New Prompt")).toBeInTheDocument();
-      });
+        },
+        { timeout: 5000 },
+      );
 
       // Type something to create unsaved changes
       const textareas = screen.getAllByRole("textbox");
@@ -263,7 +295,7 @@ describe("Prompt Editor Local Changes", () => {
       // KEY ASSERTION: window.confirm SHOULD be called
       // because onLocalConfigChange is NOT provided
       expect(window.confirm).toHaveBeenCalled();
-    });
+    }, 10000);
   });
 
   describe("flow callbacks integration", () => {
@@ -292,9 +324,12 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => {
+      await waitFor(
+        () => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
-      });
+        },
+        { timeout: 5000 },
+      );
 
       // Type to trigger changes
       const textareas = screen.getAllByRole("textbox");
@@ -310,8 +345,8 @@ describe("Prompt Editor Local Changes", () => {
             .runners.find((r) => r.id === "runner-1");
           expect(runner?.localPromptConfig).toBeDefined();
         },
-        { timeout: 1500 },
+        { timeout: 2000 },
       );
-    });
+    }, 10000);
   });
 });

@@ -1,24 +1,16 @@
-import {
-  Box,
-  Button,
-  Container,
-  HStack,
-  IconButton,
-  Tabs,
-} from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useRef, useState } from "react";
+import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
+import { useCallback, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuSquarePen } from "react-icons/lu";
-import type { z } from "zod";
-import type { runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
+import { VariablesSection, type Variable } from "~/components/variables";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompts/types";
+import type { LlmConfigInputType } from "~/types";
 import {
   PromptPlaygroundChat,
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
 import { SettingsTabContent } from "./SettingsTabContent";
-import { VariablesForm } from "./VariablesForm";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -32,13 +24,52 @@ enum PromptTab {
 export function PromptTabbedSection() {
   const form = useFormContext<PromptConfigFormValues>();
   const inputs = form.watch("version.configData.inputs") ?? [];
-  const [variables, setVariables] = useState<
-    z.infer<typeof runtimeInputsSchema>
-  >([]);
+  // Track runtime variable values (keyed by identifier)
+  const [variableValues, setVariableValues] = useState<Record<string, string>>(
+    {},
+  );
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
   const chatRef = useRef<PromptPlaygroundChatRef>(null);
   const [activeTab, setActiveTab] = useState<PromptTab>(PromptTab.Conversation);
+
+  // Convert inputs to Variable[] format
+  const variables: Variable[] = inputs.map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
+
+  // Handle value changes
+  const handleValueChange = useCallback(
+    (identifier: string, value: string) => {
+      setVariableValues((prev) => ({
+        ...prev,
+        [identifier]: value,
+      }));
+    },
+    [],
+  );
+
+  // Handle variable schema changes (add/remove/edit identifier/type)
+  const handleVariablesChange = useCallback(
+    (newVariables: Variable[]) => {
+      form.setValue(
+        "version.configData.inputs",
+        newVariables.map((v) => ({
+          identifier: v.identifier,
+          type: v.type as LlmConfigInputType,
+        })),
+      );
+    },
+    [form],
+  );
+
+  // Convert variableValues to the format expected by PromptPlaygroundChat
+  const runtimeVariables = inputs.map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+    value: variableValues[input.identifier] ?? "",
+  }));
 
   return (
     <Tabs.Root
@@ -113,7 +144,7 @@ export function PromptTabbedSection() {
             <PromptPlaygroundChat
               ref={chatRef}
               formValues={formValues}
-              variables={variables}
+              variables={runtimeVariables}
             />
           </Box>
         </Tabs.Content>
@@ -125,7 +156,16 @@ export function PromptTabbedSection() {
             margin="0 auto"
             padding={3}
           >
-            <VariablesForm inputs={inputs} onChange={setVariables} />
+            <VariablesSection
+              variables={variables}
+              onChange={handleVariablesChange}
+              values={variableValues}
+              onValueChange={handleValueChange}
+              showMappings={false}
+              canAddRemove={true}
+              readOnly={false}
+              title="Variables"
+            />
           </Box>
         </Tabs.Content>
         {activeTab === PromptTab.Settings && (

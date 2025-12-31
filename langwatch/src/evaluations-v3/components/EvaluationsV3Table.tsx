@@ -405,6 +405,24 @@ export function EvaluationsV3Table({
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
+
+  // Clear cell selection when clicking outside the table rows
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      // Only clear if there's a selected cell
+      if (!ui.selectedCell) return;
+
+      // Check if click was inside the actual table element (rows)
+      if (tableRef.current?.contains(e.target as Node)) return;
+
+      // Clear the selection
+      setSelectedCell(undefined);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ui.selectedCell, setSelectedCell]);
+
   const rowCount = getRowCount(activeDatasetId);
   // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);

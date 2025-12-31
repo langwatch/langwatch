@@ -20,13 +20,11 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 
+import { FormVariablesSection } from "~/components/variables";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import {
-  InputsFieldGroup,
-  OutputsFieldGroup,
-} from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
+import { OutputsFieldGroup } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
@@ -429,10 +427,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     methods.reset(newFormValues);
   };
 
-  // Get available fields for message editor
+  // Get available fields for message editor (with type information)
   const availableFields = (
     methods.watch("version.configData.inputs") ?? []
-  ).map((input) => input.identifier);
+  ).map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
 
   // Get configId for version history
   const configId = promptQuery.data?.id;
@@ -548,10 +549,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   />
                 </Box>
 
-                {/* Inputs and Outputs */}
+                {/* Variables and Outputs */}
                 <Box paddingX={4} paddingBottom={4}>
                   <VStack gap={4} align="stretch">
-                    <InputsFieldGroup />
+                    <FormVariablesSection showMappings={false} title="Variables" />
                     <OutputsFieldGroup />
                   </VStack>
                 </Box>

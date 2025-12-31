@@ -7,20 +7,22 @@ import {
   Spacer,
   useDisclosure,
 } from "@chakra-ui/react";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import {
   Controller,
   type UseFieldArrayReturn,
+  useFieldArray,
   useFormContext,
 } from "react-hook-form";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import {
+  PromptTextAreaWithVariables,
+  type PromptTextAreaOnAddMention,
+  type Variable,
+} from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
-import {
-  PromptTextArea,
-  type PromptTextAreaOnAddMention,
-} from "../../../components/ui/PromptTextArea";
 import { AddMessageButton } from "./AddMessageButton";
 import { MessageRoleLabel } from "./MessageRoleLabel";
 import { RemoveMessageButton } from "./RemoveMessageButton";
@@ -48,7 +50,8 @@ export function PromptMessagesField({
     "version.configData.messages",
     "id"
   >;
-  availableFields: string[];
+  /** Available variables with their types */
+  availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
   onAddEdge?: (
     id: string,
@@ -58,8 +61,34 @@ export function PromptMessagesField({
   ) => void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
-  const { formState } = form;
+  const { formState, control } = form;
   const { errors } = formState;
+
+  // Access inputs field array to add new variables
+  const inputsFieldArray = useFieldArray({
+    control,
+    name: "version.configData.inputs",
+  });
+
+  // Handle creating a new variable from the textarea
+  const handleCreateVariable = useCallback(
+    (variable: Variable) => {
+      // Check if variable already exists
+      const existingInputs = form.getValues("version.configData.inputs") ?? [];
+      const alreadyExists = existingInputs.some(
+        (input: { identifier: string }) =>
+          input.identifier === variable.identifier
+      );
+
+      if (!alreadyExists) {
+        inputsFieldArray.append({
+          identifier: variable.identifier,
+          type: variable.type as "str" | "float" | "bool" | "image",
+        });
+      }
+    },
+    [form, inputsFieldArray]
+  );
 
   /**
    * Get the error for a specific message field
@@ -132,25 +161,18 @@ export function PromptMessagesField({
           control={form.control}
           name={`version.configData.messages.${idx}.content`}
           render={({ field }) => (
-            <Box
-              border="1px solid"
-              borderColor={
-                getMessageError(idx, "content") ? "red.500" : "gray.200"
-              }
-              borderRadius="lg"
-              overflow="hidden"
-            >
-              <PromptTextArea
-                availableFields={availableFields}
+            <PromptTextAreaWithVariables
+              variables={availableFields}
                 otherNodesFields={otherNodesFields}
                 value={field.value}
                 onChange={field.onChange}
-                bg="white"
+              hasError={!!getMessageError(idx, "content")}
+              onCreateVariable={handleCreateVariable}
                 onAddEdge={(id, handle, content) => {
                   onAddEdge?.(id, handle, content, idx);
                 }}
+              showAddContextButton
               />
-            </Box>
           )}
         />
         {getMessageError(idx, "content") && (

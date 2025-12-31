@@ -1,0 +1,439 @@
+import {
+  Box,
+  Button,
+  HStack,
+  Input,
+  NativeSelect,
+  Spacer,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { ChevronDown, Plus, X } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Tooltip } from "~/components/ui/tooltip";
+import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
+import {
+  VariableMappingInput,
+  type AvailableSource,
+  type FieldMapping,
+} from "./VariableMappingInput";
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type Variable = {
+  identifier: string;
+  type: string;
+};
+
+export type VariablesSectionProps = {
+  /** The list of variables (maps to "inputs" in DSL) */
+  variables: Variable[];
+  /** Callback when variables change */
+  onChange: (variables: Variable[]) => void;
+
+  /** Mappings for each variable (keyed by identifier) */
+  mappings?: Record<string, FieldMapping>;
+  /** Callback when a mapping changes */
+  onMappingChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
+  /** Available sources for mapping */
+  availableSources?: AvailableSource[];
+
+  /** Values for each variable (keyed by identifier) - used when showMappings is false */
+  values?: Record<string, string>;
+  /** Callback when a value changes */
+  onValueChange?: (identifier: string, value: string) => void;
+
+  /** Whether to show the mapping UI (false for Prompt Playground) */
+  showMappings?: boolean;
+  /** Whether variables can be added/removed (false for evaluator fields) */
+  canAddRemove?: boolean;
+  /** Whether variables are read-only (true for evaluator fields) */
+  readOnly?: boolean;
+
+  /** Section title (defaults to "Variables") */
+  title?: string;
+};
+
+// ============================================================================
+// Helper Functions
+// ============================================================================
+
+const generateUniqueIdentifier = (
+  baseName: string,
+  existingIdentifiers: string[],
+): string => {
+  if (!existingIdentifiers.includes(baseName)) {
+    return baseName;
+  }
+
+  let counter = 1;
+  while (existingIdentifiers.includes(`${baseName}_${counter}`)) {
+    counter++;
+  }
+  return `${baseName}_${counter}`;
+};
+
+const normalizeIdentifier = (value: string): string => {
+  return value.replace(/ /g, "_").toLowerCase();
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+export const VariablesSection = ({
+  variables,
+  onChange,
+  mappings = {},
+  onMappingChange,
+  availableSources = [],
+  values = {},
+  onValueChange,
+  showMappings = true,
+  canAddRemove = true,
+  readOnly = false,
+  title = "Variables",
+}: VariablesSectionProps) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const handleAddVariable = useCallback(() => {
+    const existingIdentifiers = variables.map((v) => v.identifier);
+    const newIdentifier = generateUniqueIdentifier(
+      "input",
+      existingIdentifiers,
+    );
+    onChange([...variables, { identifier: newIdentifier, type: "str" }]);
+    // Auto-focus the new variable name
+    setEditingId(newIdentifier);
+  }, [variables, onChange]);
+
+  const handleRemoveVariable = useCallback(
+    (identifier: string) => {
+      onChange(variables.filter((v) => v.identifier !== identifier));
+      // Also remove the mapping if it exists
+      if (onMappingChange) {
+        onMappingChange(identifier, undefined);
+      }
+    },
+    [variables, onChange, onMappingChange],
+  );
+
+  const handleUpdateVariable = useCallback(
+    (oldIdentifier: string, updates: Partial<Variable>) => {
+      const newIdentifier = updates.identifier
+        ? normalizeIdentifier(updates.identifier)
+        : oldIdentifier;
+
+      // Check for duplicates
+      if (
+        updates.identifier &&
+        newIdentifier !== oldIdentifier &&
+        variables.some((v) => v.identifier === newIdentifier)
+      ) {
+        // Don't allow duplicate identifiers
+        return false;
+      }
+
+      onChange(
+        variables.map((v) =>
+          v.identifier === oldIdentifier
+            ? { ...v, ...updates, identifier: newIdentifier }
+            : v,
+        ),
+      );
+
+      // If identifier changed, update the mapping key
+      if (
+        updates.identifier &&
+        newIdentifier !== oldIdentifier &&
+        onMappingChange
+      ) {
+        const existingMapping = mappings[oldIdentifier];
+        if (existingMapping) {
+          onMappingChange(oldIdentifier, undefined);
+          onMappingChange(newIdentifier, existingMapping);
+        }
+      }
+
+      return true;
+    },
+    [variables, onChange, mappings, onMappingChange],
+  );
+
+  return (
+    <VStack align="stretch" gap={3} width="full">
+      {/* Header */}
+      <HStack width="full">
+        <Text
+          fontSize="xs"
+          fontWeight="bold"
+          textTransform="uppercase"
+          color="gray.500"
+        >
+          {title}
+        </Text>
+        <Spacer />
+        {canAddRemove && !readOnly && (
+          <Button size="xs" variant="outline" onClick={handleAddVariable}>
+            <Plus size={14} />
+            Add
+          </Button>
+        )}
+      </HStack>
+
+      {/* Variables List */}
+      {variables.length === 0 ? (
+        <Text fontSize="sm" color="gray.400" fontStyle="italic">
+          No variables defined
+        </Text>
+      ) : (
+        <VStack align="stretch" gap={2}>
+          {variables.map((variable) => (
+            <VariableRow
+              key={variable.identifier}
+              variable={variable}
+              mapping={mappings[variable.identifier]}
+              availableSources={availableSources}
+              showMappings={showMappings}
+              canRemove={canAddRemove}
+              readOnly={readOnly}
+              isEditing={editingId === variable.identifier}
+              onStartEdit={() => setEditingId(variable.identifier)}
+              onEndEdit={() => setEditingId(null)}
+              onUpdate={(updates) =>
+                handleUpdateVariable(variable.identifier, updates)
+              }
+              onRemove={() => handleRemoveVariable(variable.identifier)}
+              onMappingChange={
+                onMappingChange
+                  ? (mapping) => onMappingChange(variable.identifier, mapping)
+                  : undefined
+              }
+              defaultValue={values[variable.identifier]}
+              onDefaultValueChange={
+                onValueChange
+                  ? (value) => onValueChange(variable.identifier, value)
+                  : undefined
+              }
+            />
+          ))}
+        </VStack>
+      )}
+    </VStack>
+  );
+};
+
+// ============================================================================
+// Variable Row Component
+// ============================================================================
+
+// Type options for the dropdown - uses shared TYPE_LABELS for consistency
+const INPUT_TYPE_OPTIONS = [
+  { value: "str", label: TYPE_LABELS["str"] ?? "Text" },
+  { value: "float", label: TYPE_LABELS["float"] ?? "Number" },
+  { value: "bool", label: TYPE_LABELS["bool"] ?? "Boolean" },
+  { value: "image", label: TYPE_LABELS["image"] ?? "Image" },
+  { value: "list", label: TYPE_LABELS["list"] ?? "List" },
+  { value: "dict", label: TYPE_LABELS["dict"] ?? "Object" },
+];
+
+type VariableRowProps = {
+  variable: Variable;
+  mapping?: FieldMapping;
+  availableSources: AvailableSource[];
+  showMappings: boolean;
+  canRemove: boolean;
+  readOnly: boolean;
+  isEditing: boolean;
+  onStartEdit: () => void;
+  onEndEdit: () => void;
+  onUpdate: (updates: Partial<Variable>) => boolean;
+  onRemove: () => void;
+  onMappingChange?: (mapping: FieldMapping | undefined) => void;
+  defaultValue?: string;
+  onDefaultValueChange?: (value: string) => void;
+};
+
+const VariableRow = ({
+  variable,
+  mapping,
+  availableSources,
+  showMappings,
+  canRemove,
+  readOnly,
+  isEditing,
+  onStartEdit,
+  onEndEdit,
+  onUpdate,
+  onRemove,
+  onMappingChange,
+  defaultValue,
+  onDefaultValueChange,
+}: VariableRowProps) => {
+  const [editValue, setEditValue] = useState(variable.identifier);
+  const [hasError, setHasError] = useState(false);
+
+  const handleSave = () => {
+    if (editValue.trim() === "") {
+      setEditValue(variable.identifier);
+      onEndEdit();
+      return;
+    }
+
+    const success = onUpdate({ identifier: editValue });
+    if (!success) {
+      setHasError(true);
+      // Reset after a moment
+      setTimeout(() => setHasError(false), 2000);
+    } else {
+      onEndEdit();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      setEditValue(variable.identifier);
+      onEndEdit();
+    }
+  };
+
+  return (
+    <HStack gap={2} width="full">
+      {/* Type Icon with selector */}
+      {readOnly ? (
+        <Box flexShrink={0} padding={1}>
+          <VariableTypeIcon type={variable.type} size={14} />
+        </Box>
+      ) : (
+        <NativeSelect.Root size="xs" width="30px" marginX={-2} flexShrink={0}>
+          <NativeSelect.Field
+            value={variable.type}
+            onChange={(e) => onUpdate({ type: e.target.value })}
+            border="1px solid"
+            borderColor="transparent"
+            borderRadius="lg"
+            padding={1}
+            paddingRight={5}
+            _hover={{ borderColor: "gray.200" }}
+            css={{
+              // Hide the default text, show only icon
+              color: "transparent",
+              "& option": { color: "black" },
+            }}
+            background="transparent"
+          >
+            {INPUT_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          {/* Custom indicator with type icon */}
+          <Box
+            position="absolute"
+            left={2}
+            top="50%"
+            transform="translateY(-50%)"
+            pointerEvents="none"
+          >
+            <VariableTypeIcon type={variable.type} size={14} />
+          </Box>
+        </NativeSelect.Root>
+      )}
+
+      {/* Variable Name */}
+      {isEditing && !readOnly ? (
+        <Input
+          value={editValue}
+          onChange={(e) => setEditValue(normalizeIdentifier(e.target.value))}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          size="sm"
+          width="100px"
+          fontFamily="mono"
+          fontSize="13px"
+          autoFocus
+          borderColor={hasError ? "red.500" : undefined}
+        />
+      ) : (
+        <Text
+          fontFamily="mono"
+          fontSize="13px"
+          cursor={readOnly ? "default" : "pointer"}
+          onClick={readOnly ? undefined : onStartEdit}
+          border="1px solid"
+          borderColor="transparent"
+          paddingX={2}
+          paddingY={1}
+          marginX={-2}
+          marginY={-1}
+          borderRadius="lg"
+          _hover={readOnly ? undefined : { borderColor: "gray.200" }}
+          minWidth="60px"
+        >
+          {variable.identifier}
+        </Text>
+      )}
+
+      {/* = sign and value/mapping input */}
+      <Text color="gray.400" fontSize="sm" flexShrink={0}>
+        =
+      </Text>
+
+      {showMappings ? (
+        // Mapping input with source dropdown
+        <Box flex={1} minWidth={0}>
+          <VariableMappingInput
+            mapping={mapping}
+            availableSources={availableSources}
+            expectedType={variable.type}
+            onMappingChange={onMappingChange}
+            disabled={readOnly && !onMappingChange}
+            placeholder="Select source or enter value..."
+          />
+        </Box>
+      ) : (
+        // Simple value input (for Prompt Playground)
+        <Input
+          value={defaultValue ?? ""}
+          onChange={(e) => onDefaultValueChange?.(e.target.value)}
+          size="sm"
+          flex={1}
+          minWidth={0}
+          fontFamily="mono"
+          fontSize="13px"
+          variant="flushed"
+          borderColor="gray.200"
+        />
+      )}
+
+      {/* Delete Button */}
+      {canRemove && !readOnly && (
+        <Tooltip content="Remove variable" positioning={{ placement: "top" }}>
+          <Button
+            size="xs"
+            variant="ghost"
+            colorPalette="gray"
+            onClick={onRemove}
+            flexShrink={0}
+            color="gray.400"
+          >
+            <X size={14} />
+          </Button>
+        </Tooltip>
+      )}
+    </HStack>
+  );
+};
+
+export {
+  type AvailableSource,
+  type FieldMapping,
+} from "./VariableMappingInput";

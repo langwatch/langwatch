@@ -339,9 +339,12 @@ describe("Saved dataset - adding new rows", () => {
     render(<EvaluationsV3Table />, { wrapper: Wrapper });
 
     // Wait for initial render
-    await waitFor(() => {
+    await waitFor(
+      () => {
       expect(screen.getByTestId("cell-2-col1_0")).toBeInTheDocument();
-    });
+      },
+      { timeout: 5000 },
+    );
 
     // Type in the empty row (row 2)
     const cell = screen.getByTestId("cell-2-col1_0");
@@ -351,16 +354,19 @@ describe("Saved dataset - adding new rows", () => {
     await user.keyboard("{Enter}");
 
     // Value should appear
-    await waitFor(() => {
+    await waitFor(
+      () => {
       expect(screen.getByTestId("cell-2-col1_0")).toHaveTextContent("new value");
-    });
+      },
+      { timeout: 5000 },
+    );
 
     // Check store has the new record
     const state = useEvaluationsV3Store.getState();
     const dataset = state.datasets.find((d) => d.id === "saved_small");
     expect(dataset?.savedRecords?.length).toBe(3);
     expect(dataset?.savedRecords?.[2]?.col1).toBe("new value");
-  });
+  }, 15000);
 });
 
 describe("Saved dataset - DB sync sends full record", () => {

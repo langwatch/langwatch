@@ -7,6 +7,7 @@ import {
   Separator,
   Tag,
   Text,
+  Spacer,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
@@ -89,17 +90,31 @@ function VersionHistoryItem({
   return (
     <VStack width="full" align="start" paddingBottom={2}>
       <Separator marginBottom={2} />
-      <HStack width="full" gap={3}>
+      <HStack width="full" gap={3} align="start">
         <VersionNumberBox version={data} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
-          <HStack width="full" justify="space-between">
+          <HStack width="full">
             <Text fontWeight={600} fontSize="13px" lineClamp={1}>
               {data.commitMessage}
+              {isCurrent && (
+                <Tag.Root colorPalette="green" size="sm" paddingX={2} marginLeft={2} marginTop="1px" fontWeight="normal">
+                  <Tag.Label>current</Tag.Label>
+                </Tag.Root>
+              )}
             </Text>
-            {isCurrent && (
-              <Tag.Root colorPalette="green" size="sm" paddingX={2}>
-                <Tag.Label>current</Tag.Label>
-              </Tag.Root>
+            <Spacer />
+            {/* Discard changes button for current version when there are unsaved changes */}
+            {isCurrent && hasUnsavedChanges && onDiscardChanges && (
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="red"
+                onClick={onDiscardChanges}
+                data-testid="discard-local-changes-button"
+                marginTop={1}
+              >
+                Discard local changes
+              </Button>
             )}
           </HStack>
           <HStack fontSize="12px">
@@ -117,19 +132,6 @@ function VersionHistoryItem({
             </Avatar.Root>
             {data.author?.name}
           </HStack>
-          {/* Discard changes button for current version when there are unsaved changes */}
-          {isCurrent && hasUnsavedChanges && onDiscardChanges && (
-            <Button
-              size="xs"
-              variant="outline"
-              colorPalette="red"
-              onClick={onDiscardChanges}
-              data-testid="discard-local-changes-button"
-              marginTop={1}
-            >
-              Discard local changes
-            </Button>
-          )}
         </VStack>
         {!isCurrent && (
           <Tooltip

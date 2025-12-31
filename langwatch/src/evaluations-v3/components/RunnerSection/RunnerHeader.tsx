@@ -8,8 +8,15 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import { memo } from "react";
-import { LuChevronDown, LuCode, LuFileText, LuPencil, LuPlay, LuTrash2 } from "react-icons/lu";
+import { memo, useState } from "react";
+import {
+  LuChevronDown,
+  LuCode,
+  LuFileText,
+  LuPencil,
+  LuPlay,
+  LuTrash2,
+} from "react-icons/lu";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -53,11 +60,16 @@ export const RunnerHeader = memo(function RunnerHeader({
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
     if (runner.type !== "prompt") return false;
     const currentRunner = state.runners.find((r) => r.id === runner.id);
-    return currentRunner?.type === "prompt" && !!currentRunner.localPromptConfig;
+    return (
+      currentRunner?.type === "prompt" && !!currentRunner.localPromptConfig
+    );
   });
 
   // Use prop value if available, otherwise use store value
   const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
+
+  // Controlled menu state to prevent closing on re-renders
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Determine icon based on runner type
   const getRunnerIcon = () => {
@@ -75,7 +87,11 @@ export const RunnerHeader = memo(function RunnerHeader({
 
   return (
     <HStack gap={2} width="full" marginY={-2}>
-      <Menu.Root positioning={{ placement: "bottom-start" }}>
+      <Menu.Root
+        positioning={{ placement: "bottom-start" }}
+        open={menuOpen}
+        onOpenChange={(e) => setMenuOpen(e.open)}
+      >
         <Menu.Trigger asChild>
           <Button
             variant="ghost"

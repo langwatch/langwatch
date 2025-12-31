@@ -69,10 +69,10 @@ export const usePromptConfigForm = ({
     }
   }, [dynamicSchema, methods]);
   const messages = methods.watch("version.configData.messages");
-  // Messages should always be defined, but we're being defensive here.
-  const systemMessage = messages?.find(
-    ({ role }) => role === "system",
-  )?.content;
+  // Messages should always be an array, but we're being defensive here.
+  const systemMessage = Array.isArray(messages)
+    ? messages.find(({ role }) => role === "system")?.content
+    : undefined;
 
   /**
    * In the case that we're using system messages,
@@ -81,14 +81,16 @@ export const usePromptConfigForm = ({
   useEffect(() => {
     if (systemMessage) {
       const currentMessages = methods.getValues("version.configData.messages");
-      const currentPrompt = currentMessages?.find(
+      if (!Array.isArray(currentMessages)) return;
+
+      const currentPrompt = currentMessages.find(
         (msg) => msg.role === "system",
       )?.content;
       // Only sync when value differs; do not mark dirty for this derived update
       if (currentPrompt !== systemMessage) {
         methods.setValue(
           "version.configData.messages",
-          currentMessages?.map((msg) =>
+          currentMessages.map((msg) =>
             msg.role === "system" ? { ...msg, content: systemMessage } : msg,
           ),
           {

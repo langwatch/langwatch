@@ -39,6 +39,15 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   }),
 }));
 
+// Mock components with Prism dependency
+vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
+  CodeEditor: () => null,
+}));
+
+vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
+  TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
+}));
+
 // Mock usePromptConfigForm to return a real form
 const mockDefaultFormValues = {
   isNew: true,
@@ -237,9 +246,9 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByTestId("messages-field")).toBeInTheDocument();
     });
 
-    it("shows inputs field group", () => {
+    it("shows variables section", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
-      expect(screen.getByTestId("inputs-field")).toBeInTheDocument();
+      expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
     it("shows outputs field group", () => {

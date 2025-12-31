@@ -7,6 +7,7 @@ import {
   useFormContext,
 } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
+import { FormVariablesSection } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
@@ -18,10 +19,7 @@ import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
 import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
-import {
-  InputsFieldGroup,
-  OutputsFieldGroup,
-} from "../fields/PromptConfigVersionFieldGroup";
+import { OutputsFieldGroup } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
@@ -55,7 +53,10 @@ function InnerPromptConfigForm() {
 
   const availableFields = (
     methods.watch("version.configData.inputs") ?? []
-  ).map((input) => input.identifier);
+  ).map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
 
   const handleSaveClick = useCallback(async () => {
     const isValid = await methods.trigger("version.configData.llm");
@@ -124,7 +125,7 @@ function InnerPromptConfigForm() {
             availableFields={availableFields}
             otherNodesFields={{}}
           />
-          <InputsFieldGroup />
+          <FormVariablesSection showMappings={false} title="Variables" />
           <OutputsFieldGroup />
           {hasDemonstrations && <DemonstrationsField />}
         </VStack>
