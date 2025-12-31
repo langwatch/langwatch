@@ -2,13 +2,10 @@ import { definePipeline } from "../../library";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import {
   SpanStorageEventHandler,
-  ObservabilityPushEventHandler,
-  TraceDailyUsageEventHandler,
 } from "./handlers";
 import { TraceSummaryProjectionHandler } from "./projections";
 import type { TraceProcessingEvent } from "./schemas/events";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./schemas/constants";
-import { env } from "~/env.mjs";
 
 /**
  * Trace processing pipeline definition (static, no runtime dependencies).
@@ -28,24 +25,20 @@ export const traceProcessingPipelineDefinition =
     .withProjection("traceSummary", TraceSummaryProjectionHandler, {
       // This reduces strain of computationally heavy trace summary projections being done
       // unnecessarily due to the burst-heavy nature of span collection.
-      debounceMs: 1500,
-      // Reduce the amount of unnecessary projection rebuilds by using a job ID that is
-      // unique to the trace, not the span.
-      makeJobId: (event) =>
-        `${event.tenantId}.${event.aggregateType}.${event.aggregateId}`,
+      delay: 1500,
     })
     .withEventHandler("spanStorage", SpanStorageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
     })
-    .withEventHandler("traceDailyUsage", TraceDailyUsageEventHandler, {
-      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-      delay: 5000,
-      disabled: !env.IS_SAAS,
-    })
-    .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
-      eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-      // dependsOn: ["spanStorage", "traceSummary"],
-      // delay: 200,
-    })
+    // .withEventHandler("traceDailyUsage", TraceDailyUsageEventHandler, {
+    //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    //   delay: 5000,
+    //   disabled: !env.IS_SAAS,
+    // })
+    // .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
+    //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+    //   // dependsOn: ["spanStorage", "traceSummary"],
+    //   // delay: 200,
+    // })
     .withCommand("recordSpan", RecordSpanCommand)
     .build();
