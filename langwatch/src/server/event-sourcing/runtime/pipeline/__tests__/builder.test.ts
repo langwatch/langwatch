@@ -621,6 +621,11 @@ describe("PipelineBuilder", () => {
           });
 
           const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
+          const event = createTestEventForBuilder("aggregate-1", tenantId);
+
+          // Configure mock to return the event when getEvents is called
+          // This is needed because BatchEventProcessor fetches events from the store
+          eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
           const builder = new PipelineBuilder<TestEvent>({
             eventStore,
@@ -632,7 +637,6 @@ describe("PipelineBuilder", () => {
             .withEventHandler("test-handler", HandlerClass);
 
           const pipeline = builder.build();
-          const event = createTestEventForBuilder("aggregate-1", tenantId);
 
           await pipeline.service.storeEvents([event], { tenantId });
 
@@ -740,6 +744,11 @@ describe("PipelineBuilder", () => {
         });
 
         const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
+        const event = createTestEventForBuilder("aggregate-1", tenantId);
+
+        // Configure mock to return the event when getEvents is called
+        // This is needed because BatchEventProcessor fetches events from the store
+        eventStore.getEvents = vi.fn().mockResolvedValue([event]);
 
         const builder = new PipelineBuilder<TestEvent>({
           eventStore,
@@ -752,7 +761,6 @@ describe("PipelineBuilder", () => {
           .withEventHandler("handler-2", HandlerClass2);
 
         const pipeline = builder.build();
-        const event = createTestEventForBuilder("aggregate-1", tenantId);
 
         await pipeline.service.storeEvents([event], { tenantId });
 

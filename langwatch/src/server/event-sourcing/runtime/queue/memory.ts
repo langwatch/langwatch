@@ -3,6 +3,7 @@ import { getLangWatchTracer } from "langwatch";
 import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger";
 import type {
+  DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
@@ -10,7 +11,8 @@ import { isSequentialOrderingError } from "../../library/services/errorHandling"
 
 interface QueuedJob<Payload> {
   payload: Payload;
-  jobId?: string;
+  jobId: string;
+  deduplicationId?: string;
   resolve: () => void;
   reject: (error: Error) => void;
 }
@@ -37,23 +39,24 @@ export class EventSourcedQueueProcessorMemory<Payload>
   private readonly queueName: string;
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
-  private readonly makeJobId?: (payload: Payload) => string;
+  private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly delay?: number;
   private readonly concurrency: number;
 
   // Simple queue state
   private readonly queue: QueuedJob<Payload>[] = [];
-  private readonly pendingJobs = new Map<string, QueuedJob<Payload>>();
+  /** Map of deduplication ID to job for deduplication */
+  private readonly pendingJobsByDeduplicationId = new Map<string, QueuedJob<Payload>>();
   private activeCount = 0;
   private shutdownRequested = false;
 
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
-    const { name, process, spanAttributes, makeJobId, delay, options } =
+    const { name, process, spanAttributes, deduplication, delay, options } =
       definition;
 
     this.tracer = getLangWatchTracer("langwatch.event-sourcing.queue");
     this.spanAttributes = spanAttributes;
-    this.makeJobId = makeJobId;
+    this.deduplication = deduplication;
     this.delay = delay;
     this.concurrency = options?.concurrency ?? 5;
     this.queueName = name;
@@ -65,20 +68,32 @@ export class EventSourcedQueueProcessorMemory<Payload>
     );
   }
 
+  /**
+   * Generates a unique job ID for the payload.
+   * Uses payload.id if available (for Event payloads), otherwise generates a random ID.
+   * Format: ${queueName}:${payloadId}
+   */
+  private generateJobId(payload: Payload): string {
+    const payloadWithId = payload as { id?: string };
+    const payloadId = payloadWithId.id ?? crypto.randomUUID();
+    return `${this.queueName}:${payloadId}`;
+  }
+
   async send(payload: Payload): Promise<void> {
     // Memory implementation allows sends after close since it has no persistent state
     // This is different from BullMQ which should reject sends after shutdown
 
-    const jobId = this.makeJobId ? this.makeJobId(payload) : void 0;
+    const jobId = this.generateJobId(payload);
+    const deduplicationId = this.deduplication?.makeId(payload);
 
-    // Simple job deduplication: replace existing job with same ID
-    if (jobId) {
-      const existingJob = this.pendingJobs.get(jobId);
+    // Simple job deduplication: replace existing job with same deduplication ID
+    if (deduplicationId) {
+      const existingJob = this.pendingJobsByDeduplicationId.get(deduplicationId);
       if (existingJob) {
         existingJob.payload = payload;
         this.logger.debug(
-          { queueName: this.queueName, jobId },
-          "Replaced existing job with same jobId",
+          { queueName: this.queueName, jobId, deduplicationId },
+          "Replaced existing job with same deduplication ID",
         );
         return;
       }
@@ -89,12 +104,13 @@ export class EventSourcedQueueProcessorMemory<Payload>
       const job: QueuedJob<Payload> = {
         payload,
         jobId,
+        deduplicationId,
         resolve,
         reject,
       };
 
-      if (jobId) {
-        this.pendingJobs.set(jobId, job);
+      if (deduplicationId) {
+        this.pendingJobsByDeduplicationId.set(deduplicationId, job);
       }
 
       this.queue.push(job);
@@ -121,8 +137,8 @@ export class EventSourcedQueueProcessorMemory<Payload>
     this.activeCount++;
     void this.processJob(job).finally(() => {
       this.activeCount--;
-      if (job.jobId) {
-        this.pendingJobs.delete(job.jobId);
+      if (job.deduplicationId) {
+        this.pendingJobsByDeduplicationId.delete(job.deduplicationId);
       }
       // Try to process next job
       this.tryProcessNext();
@@ -240,7 +256,7 @@ export class EventSourcedQueueProcessorMemory<Payload>
       );
     }
     this.queue.length = 0;
-    this.pendingJobs.clear();
+    this.pendingJobsByDeduplicationId.clear();
 
     this.logger.info(
       { queueName: this.queueName },

@@ -11,9 +11,7 @@ import { CheckpointRepositoryMemory } from "../../stores/repositories/checkpoint
 import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { PipelineBuilder } from "../builder";
 import {
-  createMockEventHandler,
   createMockEventPublisher,
-  createMockEventReactionHandler,
   createMockEventStore,
   createMockProjectionStore,
   createMockQueueProcessorFactory,
@@ -330,7 +328,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(storeEventsSpy).toHaveBeenCalledWith(events, {
         tenantId: createTenantId("tenant-1"),
@@ -373,7 +371,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(handleSpy).toHaveBeenCalled();
     });
@@ -425,7 +423,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(getEventsSpy).toHaveBeenCalled();
       expect(handleSpy).toHaveBeenCalled();
@@ -468,7 +466,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(publishSpy).toHaveBeenCalledWith(events, context);
     });
@@ -506,7 +504,7 @@ describe("PipelineBuilder Integration Tests", () => {
       };
 
       await expect(
-        pipeline.commands.testDispatcher!.send(payload),
+        pipeline.commands.testDispatcher?.send(payload),
       ).resolves.not.toThrow();
     });
 
@@ -545,8 +543,8 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 43,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload1);
-      await pipeline.commands.testDispatcher!.send(payload2);
+      await pipeline.commands.testDispatcher?.send(payload1);
+      await pipeline.commands.testDispatcher?.send(payload2);
 
       expect(handleSpy).toHaveBeenCalledTimes(2);
     });
@@ -627,18 +625,12 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 1000,
-        concurrency: 5,
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 2000,
-        concurrency: 10,
-      });
+      >();
 
       const distributedLock = createMockDistributedLock();
       const pipeline = new PipelineBuilder<TestEvent>({
@@ -818,7 +810,7 @@ describe("PipelineBuilder Integration Tests", () => {
       };
 
       // Send command - should create events and process them
-      await pipeline.commands.recordSpan!.send(payload);
+      await pipeline.commands.recordSpan?.send(payload);
 
       // Get created processors
       const processors = factory.getCreatedProcessors();

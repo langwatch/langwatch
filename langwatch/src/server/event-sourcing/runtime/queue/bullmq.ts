@@ -1,8 +1,10 @@
 import { trace } from "@opentelemetry/api";
 import {
+  DelayedError,
   type Job,
   type JobsOptions,
   Queue,
+  QueueEvents,
   type QueueOptions,
   Worker,
   type WorkerOptions,
@@ -14,6 +16,7 @@ import type { SemConvAttributes } from "langwatch/observability";
 import { createLogger } from "../../../../utils/logger";
 import { connection } from "../../../redis";
 import type {
+  DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
@@ -76,19 +79,22 @@ const SHUTDOWN_CONFIG = {
   timeoutMs: 20000,
 } as const;
 
+/** Default TTL for deduplication in milliseconds */
+const DEFAULT_DEDUPLICATION_TTL_MS = 200;
+
 export class EventSourcedQueueProcessorBullMq<Payload>
   implements EventSourcedQueueProcessor<Payload>
 {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
   private readonly queueName: string;
   private readonly jobName: string;
-  private readonly makeJobId: (payload: Payload) => string;
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly queue: Queue<Payload, unknown, string>;
   private readonly worker: Worker<Payload>;
+  private readonly queueEvents: QueueEvents;
   private readonly delay?: number;
-  private readonly debounceMs: number | undefined;
+  private readonly deduplication?: DeduplicationConfig<Payload>;
   private readonly redisConnection: IORedis | Cluster;
   private shutdownRequested = false;
 
@@ -96,7 +102,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     definition: EventSourcedQueueDefinition<Payload>,
     redisConnection?: IORedis | Cluster,
   ) {
-    const { name, makeJobId, process, options, delay, spanAttributes, debounceMs } =
+    const { name, process, options, delay, spanAttributes, deduplication } =
       definition;
 
     // Use provided connection if available, otherwise fall back to global connection
@@ -113,10 +119,9 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     this.spanAttributes = spanAttributes;
     this.delay = delay;
-    this.debounceMs = debounceMs ?? void 0
+    this.deduplication = deduplication;
     this.queueName = name;
     this.jobName = "queue";
-    this.makeJobId = makeJobId;
     this.process = process;
 
     const queueOptions: QueueOptions = {
@@ -190,6 +195,27 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         "Event-sourced queue job failed",
       );
     });
+
+    // Listen for deduplication events to debug job deduplication behavior
+    // Note: QueueEvents can share the same Redis connection as Queue/Worker
+    this.queueEvents = new QueueEvents(this.queueName, {
+      connection: this.redisConnection,
+    });
+
+    this.queueEvents.on(
+      "deduplicated",
+      ({ jobId, deduplicationId, deduplicatedJobId }) => {
+        this.logger.debug(
+          {
+            queueName: this.queueName,
+            existingJobId: jobId,
+            deduplicationId,
+            deduplicatedJobId,
+          },
+          "Job deduplicated",
+        );
+      },
+    );
   }
 
   /**
@@ -246,9 +272,11 @@ export class EventSourcedQueueProcessorBullMq<Payload>
           "Re-queuing job with delay due to ordering (previous event not yet processed)",
         );
 
-        await job.moveToDelayed(progressiveDelayMs / 1000, job.token);
-        // await this.requeueWithDelay(job, progressiveDelayMs, previousSequence);
-        return;
+        const targetTimestamp = Date.now() + progressiveDelayMs;
+        await job.moveToDelayed(targetTimestamp, job.token);
+        // Throw DelayedError to tell BullMQ not to try to complete the job
+        // (the job has been moved to delayed state, so there's nothing to complete)
+        throw new DelayedError();
       }
 
       // For lock contention, log at DEBUG and let BullMQ handle retry
@@ -306,6 +334,18 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     );
   }
 
+  /**
+   * Generates a unique job ID for the payload.
+   * Uses payload.id if available (for Event payloads), otherwise generates a random ID.
+   * Format: ${queueName}:${payloadId}
+   */
+  private generateJobId(payload: Payload): string {
+    const payloadWithId = payload as { id?: string };
+    const payloadId = payloadWithId.id ?? crypto.randomUUID();
+    // Sanitize for BullMQ (replace colons with dots)
+    return `${this.queueName}.${payloadId}`.replaceAll(":", ".");
+  }
+
   async send(payload: Payload): Promise<void> {
     if (this.shutdownRequested) {
       throw new QueueError(
@@ -315,18 +355,19 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       );
     }
 
-    const jobId = this.makeJobId(payload);
-    // Sanitize jobId for BullMQ (replace colons with dots)
-    const sanitizedJobId = jobId.replaceAll(":", ".");
-    const _sanitizedEventId = payload.id.replaceAll(":", ".");
+    const jobId = this.generateJobId(payload);
     const opts: JobsOptions = {
-      ...(sanitizedJobId ? { jobId: sanitizedJobId } : {}),
+      jobId,
       ...(this.delay !== void 0 ? { delay: this.delay } : {}),
-      ...(this.debounceMs !== void 0 ? {
+      ...(this.deduplication !== void 0 ? {
         deduplication: {
-          id: sanitizedJobId,
-          ttl: 200,
-          replace: true,
+          // Sanitize deduplication ID for BullMQ (replace colons with dots)
+          id: this.deduplication.makeId(payload).replaceAll(":", "."),
+          ttl: this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS,
+          // Enable Debounce Mode by default: new jobs replace existing ones and reset TTL
+          // This ensures the latest event is always processed, and batch processor catches up on missed events
+          extend: this.deduplication.extend ?? true,
+          replace: this.deduplication.replace ?? true,
         },
       } : {}),
     };
@@ -387,6 +428,12 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       if (this.queue) {
         await this.queue.close();
         this.logger.debug({ queueName: this.queueName }, "Queue closed");
+      }
+
+      // Close queue events listener
+      if (this.queueEvents) {
+        await this.queueEvents.close();
+        this.logger.debug({ queueName: this.queueName }, "Queue events closed");
       }
     };
 
