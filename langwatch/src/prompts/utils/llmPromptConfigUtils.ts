@@ -260,14 +260,14 @@ export function inputsAndOutputsToDemostrationColumns(
   outputs: PromptConfigFormValues["version"]["configData"]["outputs"],
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
-    ...inputs
+    ...(inputs ?? [])
       .filter(({ type }) => type !== "image")
       .map((input) => ({
         id: input.identifier,
         name: input.identifier,
         type: inputOutputTypeToDatasetColumnType(input.type),
       })),
-    ...outputs.map((output) => ({
+    ...(outputs ?? []).map((output) => ({
       id: output.identifier,
       name: output.identifier,
       type: inputOutputTypeToDatasetColumnType(output.type),

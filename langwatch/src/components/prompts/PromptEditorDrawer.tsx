@@ -113,7 +113,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Load existing prompt if editing
   const promptQuery = api.prompts.getByIdOrHandle.useQuery(
     { idOrHandle: promptId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!promptId && !!project?.id && isOpen },
+    { enabled: !!promptId && !!project?.id && isOpen, refetchOnWindowFocus: false },
   );
 
   // Compute saved form values from the published prompt

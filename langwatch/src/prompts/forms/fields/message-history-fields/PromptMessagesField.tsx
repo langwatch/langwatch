@@ -8,7 +8,6 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo } from "react";
-import { ChevronDown } from "react-feather";
 import {
   Controller,
   type UseFieldArrayReturn,
@@ -35,6 +34,103 @@ type MessageError = {
   role?: { message?: string };
   content?: { message?: string };
 };
+
+type MessageRowProps = {
+  field: {
+    id: string;
+    role: "system" | "user" | "assistant";
+    content?: string;
+  };
+  idx: number;
+  open: boolean;
+  availableFields: Variable[];
+  otherNodesFields: Record<string, string[]>;
+  messageErrors?: string;
+  hasMessagesError: boolean;
+  getMessageError: (
+    index: number,
+    key: "role" | "content",
+  ) => { message?: string } | undefined;
+  onRemove: () => void;
+  onCreateVariable: (variable: Variable) => void;
+  onAddEdge?: (
+    id: string,
+    handle: string,
+    content: PromptTextAreaOnAddMention,
+    idx: number,
+  ) => void;
+};
+
+/**
+ * Renders a single message row in the prompt messages field.
+ */
+function MessageRow({
+  field,
+  idx,
+  open,
+  availableFields,
+  otherNodesFields,
+  messageErrors,
+  hasMessagesError,
+  getMessageError,
+  onRemove,
+  onCreateVariable,
+  onAddEdge,
+}: MessageRowProps) {
+  const form = useFormContext<PromptConfigFormValues>();
+  const role = field.role;
+
+  useEffect(() => {
+    console.log("mounting MessageRow");
+    return () => {
+      console.log("unmounting MessageRow");
+    };
+  }, []);
+
+  return (
+    <VerticalFormControl
+      width="full"
+      label={
+        <HStack width="full" align="center">
+          {role !== "system" && open && (
+            <MessageRoleLabel role={role} marginLeft={-1} />
+          )}
+          <Spacer />
+          {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
+        </HStack>
+      }
+      invalid={hasMessagesError}
+      error={messageErrors}
+      size="sm"
+      marginTop={idx === 0 ? 0 : 2}
+    >
+      <Controller
+        key={`message-row-${idx}-content`}
+        control={form.control}
+        name={`version.configData.messages.${idx}.content`}
+        render={({ field: controllerField }) => (
+          <PromptTextAreaWithVariables
+            variables={availableFields}
+            otherNodesFields={otherNodesFields}
+            value={controllerField.value ?? ""}
+            onChange={controllerField.onChange}
+            hasError={!!getMessageError(idx, "content")}
+            onCreateVariable={onCreateVariable}
+            onAddEdge={(id, handle, content) => {
+              onAddEdge?.(id, handle, content, idx);
+            }}
+            showAddContextButton
+          />
+        )}
+      />
+      {getMessageError(idx, "content") && (
+        <Field.ErrorText fontSize="13px">
+          {String(getMessageError(idx, "content")?.message ?? "")}
+        </Field.ErrorText>
+      )}
+    </VerticalFormControl>
+  );
+}
 
 /**
  * Single Responsibility: Render and manage the configurable prompt message list.
@@ -77,7 +173,7 @@ export function PromptMessagesField({
       const existingInputs = form.getValues("version.configData.inputs") ?? [];
       const alreadyExists = existingInputs.some(
         (input: { identifier: string }) =>
-          input.identifier === variable.identifier
+          input.identifier === variable.identifier,
       );
 
       if (!alreadyExists) {
@@ -87,7 +183,7 @@ export function PromptMessagesField({
         });
       }
     },
-    [form, inputsFieldArray]
+    [form, inputsFieldArray],
   );
 
   /**
@@ -131,58 +227,7 @@ export function PromptMessagesField({
     messageFields.append({ role, content: "" });
   };
 
-  const renderMessageRow = (
-    field: (typeof messageFields.fields)[number],
-    idx: number,
-  ) => {
-    const role = field.role;
-
-    return (
-      <VerticalFormControl
-        width="full"
-        key={field.id}
-        label={
-          <HStack width="full" align="center">
-            {role !== "system" && open && (
-              <MessageRoleLabel role={role} marginLeft={-1} />
-            )}
-            <Spacer />
-            {role !== "system" && (
-              <RemoveMessageButton onRemove={() => messageFields.remove(idx)} />
-            )}
-          </HStack>
-        }
-        invalid={!!errors.version?.configData?.messages}
-        error={messageErrors}
-        size="sm"
-        marginTop={idx === 0 ? 0 : 2}
-      >
-        <Controller
-          control={form.control}
-          name={`version.configData.messages.${idx}.content`}
-          render={({ field }) => (
-            <PromptTextAreaWithVariables
-              variables={availableFields}
-                otherNodesFields={otherNodesFields}
-                value={field.value}
-                onChange={field.onChange}
-              hasError={!!getMessageError(idx, "content")}
-              onCreateVariable={handleCreateVariable}
-                onAddEdge={(id, handle, content) => {
-                  onAddEdge?.(id, handle, content, idx);
-                }}
-              showAddContextButton
-              />
-          )}
-        />
-        {getMessageError(idx, "content") && (
-          <Field.ErrorText fontSize="13px">
-            {String(getMessageError(idx, "content")?.message ?? "")}
-          </Field.ErrorText>
-        )}
-      </VerticalFormControl>
-    );
-  };
+  const hasMessagesError = !!errors.version?.configData?.messages;
 
   return (
     <Box width="full" padding={0}>
@@ -215,13 +260,41 @@ export function PromptMessagesField({
           {(() => {
             const systemField =
               systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
-            return systemField
-              ? renderMessageRow(systemField, systemIndex)
-              : null;
+            return systemField ? (
+              <MessageRow
+                key="system-message-row"
+                field={systemField}
+                idx={systemIndex}
+                open={open}
+                availableFields={availableFields}
+                otherNodesFields={otherNodesFields}
+                messageErrors={messageErrors}
+                hasMessagesError={hasMessagesError}
+                getMessageError={getMessageError}
+                onRemove={() => messageFields.remove(systemIndex)}
+                onCreateVariable={handleCreateVariable}
+                onAddEdge={onAddEdge}
+              />
+            ) : null;
           })()}
           {messageFields.fields.map((field, idx) => {
             if (idx === systemIndex) return null;
-            return renderMessageRow(field, idx);
+            return (
+              <MessageRow
+                key={`message-row-${idx}`}
+                field={field}
+                idx={idx}
+                open={open}
+                availableFields={availableFields}
+                otherNodesFields={otherNodesFields}
+                messageErrors={messageErrors}
+                hasMessagesError={hasMessagesError}
+                getMessageError={getMessageError}
+                onRemove={() => messageFields.remove(idx)}
+                onCreateVariable={handleCreateVariable}
+                onAddEdge={onAddEdge}
+              />
+            );
           })}
         </Collapsible.Content>
       </Collapsible.Root>
