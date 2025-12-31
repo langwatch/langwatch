@@ -1,6 +1,7 @@
 import type {
   AggregateType,
   CommandHandlerClass,
+  DeduplicationConfig,
   Event,
   EventHandlerClass,
   EventPublisher,
@@ -53,20 +54,19 @@ export interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
 
   /**
-   * Optional: Custom job ID factory for idempotency.
-   * Default: Uses static makeJobId from handler class, or auto-generated
-   */
-  makeJobId?: (payload: Payload) => string;
-
-  /**
    * Optional: Delay in milliseconds before processing the job.
-   * Default: Uses static delay from handler class, or 0
    */
   delay?: number;
 
   /**
+   * Optional: Deduplication configuration.
+   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   */
+  deduplication?: DeduplicationConfig<Payload>;
+
+  /**
    * Optional: Concurrency limit for processing jobs.
-   * Default: Uses static concurrency from handler class, or 5
+   * Default: 5
    */
   concurrency?: number;
 
@@ -187,7 +187,7 @@ export class PipelineBuilderWithNameAndType<
    *
    * @param name - Unique name for this projection within the pipeline
    * @param handlerClass - Projection handler class to register (must have static `store` property)
-   * @param options - Optional configuration for projection processing behavior (debouncing, batching)
+   * @param options - Optional configuration for projection processing behavior (deduplication, batching)
    * @returns The same builder instance for method chaining
    * @throws Error if projection name already exists or if handler class doesn't have static store property
    *
@@ -196,7 +196,10 @@ export class PipelineBuilderWithNameAndType<
    * pipeline
    *   .withProjection("summary", SummaryProjectionHandler)
    *   .withProjection("analytics", AnalyticsProjectionHandler, {
-   *     debounceMs: 1000, // Debounce updates by 1 second
+   *     deduplication: {
+   *       makeId: (event) => `${event.tenantId}:${event.aggregateType}:${event.aggregateId}`,
+   *       ttlMs: 1000,
+   *     },
    *   })
    * ```
    */
@@ -206,7 +209,7 @@ export class PipelineBuilderWithNameAndType<
   >(
     name: ProjectionName,
     handlerClass: handlerClass,
-    options?: ProjectionOptions,
+    options?: ProjectionOptions<EventType>,
   ): PipelineBuilderWithNameAndType<
     EventType,
     RegisteredHandlerNames,

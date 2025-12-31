@@ -83,25 +83,17 @@ describe("Pipeline Builder Helper Functions", () => {
       expect(calledWithContext).toBe(TestHandler);
     });
 
-    it("extracts makeJobId method when handler class has it", () => {
+    it("uses deduplication config from registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
-      class TestHandler {
-        static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
+      const HandlerClass = createTestCommandHandlerClass<
+        TestCommandPayload,
+        TestEvent
+      >({});
 
-        static getAggregateId(payload: TestCommandPayload): string {
-          return payload.id;
-        }
-
-        static makeJobId(payload: TestCommandPayload): string {
-          return `job-${payload.id}`;
-        }
-
-        async handle(): Promise<TestEvent[]> {
-          return [];
-        }
-      }
+      const customDeduplicationId = (payload: TestCommandPayload): string =>
+        `dedup-${payload.id}`;
 
       new PipelineBuilder<TestEvent>({
         eventStore,
@@ -110,29 +102,19 @@ describe("Pipeline Builder Helper Functions", () => {
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
-        .withCommand("testDispatcher", TestHandler)
+        .withCommand("testDispatcher", HandlerClass, {
+          deduplication: { makeId: customDeduplicationId },
+        })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          makeJobId: expect.any(Function),
+          deduplication: { makeId: customDeduplicationId },
         }),
       );
-
-      const makeJobId = createSpy.mock.calls[0]?.[0]?.makeJobId;
-      expect(makeJobId).toBeDefined();
-      if (makeJobId) {
-        const payload: TestCommandPayload = {
-          tenantId: "tenant-1",
-          id: "aggregate-1",
-          value: 42,
-        };
-        const jobId = makeJobId(payload);
-        expect(jobId).toBe("job-aggregate-1");
-      }
     });
 
-    it("does not extract makeJobId when handler class lacks the method", () => {
+    it("does not have deduplication when not provided in options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
@@ -153,21 +135,19 @@ describe("Pipeline Builder Helper Functions", () => {
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          makeJobId: void 0,
+          deduplication: void 0,
         }),
       );
     });
 
-    it("extracts delay number when handler class has delay property", () => {
+    it("uses delay from registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 5000,
-      });
+      >({});
 
       new PipelineBuilder<TestEvent>({
         eventStore,
@@ -176,7 +156,7 @@ describe("Pipeline Builder Helper Functions", () => {
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
-        .withCommand("testDispatcher", HandlerClass)
+        .withCommand("testDispatcher", HandlerClass, { delay: 5000 })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -186,7 +166,7 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("does not extract delay when handler class lacks the property", () => {
+    it("does not have delay when not provided in options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
@@ -292,16 +272,14 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("extracts concurrency number when handler class has concurrency property", () => {
+    it("uses concurrency from registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        concurrency: 10,
-      });
+      >({});
 
       new PipelineBuilder<TestEvent>({
         eventStore,
@@ -310,7 +288,7 @@ describe("Pipeline Builder Helper Functions", () => {
       })
         .withName("test-pipeline")
         .withAggregateType("trace")
-        .withCommand("testDispatcher", HandlerClass)
+        .withCommand("testDispatcher", HandlerClass, { concurrency: 10 })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -320,7 +298,7 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("does not extract concurrency options when handler class lacks the property", () => {
+    it("does not have concurrency options when not provided in registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 

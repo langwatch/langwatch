@@ -10,7 +10,7 @@ const mockLogger = {
 };
 
 const mockTracer = {
-  withActiveSpan: vi.fn((name, options, fn) => fn()),
+  withActiveSpan: vi.fn((_name,_optionss, fn) => fn()),
 };
 
 vi.mock("../../../../utils/logger", () => ({
@@ -103,7 +103,7 @@ describe("EventSourcedQueueProcessorMemory", () => {
     });
 
     it("awaits processing completion before returning", async () => {
-      let resolveProcess: () => void;
+      let resolveProcess!: () => void;
       const processPromise = new Promise<void>((resolve) => {
         resolveProcess = resolve;
       });
@@ -118,8 +118,9 @@ describe("EventSourcedQueueProcessorMemory", () => {
 
       expect(processFn).toHaveBeenCalledWith("test-payload");
       expect(mockTracer.withActiveSpan).toHaveBeenCalled();
+      expect(resolveProcess).toBeDefined();
 
-      resolveProcess!();
+      resolveProcess?.();
       await sendPromise;
 
       expect(processFn).toHaveBeenCalledTimes(1);
@@ -146,13 +147,11 @@ describe("EventSourcedQueueProcessorMemory", () => {
       expect(processFn).toHaveBeenCalledWith("payload-3");
     });
 
-    it("silently ignores unsupported options (makeJobId, delay, concurrency)", async () => {
+    it("silently ignores unsupported options (delay, concurrency)", async () => {
       const processFn = vi.fn().mockResolvedValue(void 0);
-      const makeJobId = vi.fn((payload: string) => `job-${payload}`);
       const definition: EventSourcedQueueDefinition<string> = {
         name: "test-queue",
         process: processFn,
-        makeJobId,
         delay: 10, // Small delay to test it works without timing out
         options: { concurrency: 1 },
       };
@@ -165,7 +164,6 @@ describe("EventSourcedQueueProcessorMemory", () => {
 
       // Processor works normally - options are accepted but may not all be fully implemented
       expect(processFn).toHaveBeenCalledWith("test-payload");
-      // makeJobId is used internally for deduplication, but we can verify the processor works
     });
   });
 
