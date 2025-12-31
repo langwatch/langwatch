@@ -213,22 +213,14 @@ jobs:
           cat > /tmp/storage_policy.xml << 'EOF'
           <clickhouse>
               <storage_configuration>
-                  <disks>
-                      <hot>
-                          <path>/var/lib/clickhouse/</path>
-                      </hot>
-                      <cold>
-                          <path>/var/lib/clickhouse/</path>
-                      </cold>
-                  </disks>
                   <policies>
                       <local_primary>
                           <volumes>
                               <hot>
-                                  <disk>hot</disk>
+                                  <disk>default</disk>
                               </hot>
                               <cold>
-                                  <disk>cold</disk>
+                                  <disk>default</disk>
                               </cold>
                           </volumes>
                       </local_primary>
