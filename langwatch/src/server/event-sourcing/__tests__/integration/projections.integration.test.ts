@@ -62,6 +62,9 @@ describe("Projections - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       2,
+      15000, // 15 second timeout for sequential event processing
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify projection

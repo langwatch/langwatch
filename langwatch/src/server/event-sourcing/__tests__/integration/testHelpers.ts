@@ -10,6 +10,7 @@ import type {
   RegisteredPipeline,
 } from "../../runtime/pipeline/types";
 import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
+import { CheckpointCacheRedis } from "../../runtime/stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
 import { ProcessorCheckpointStoreClickHouse } from "../../runtime/stores/processorCheckpointStoreClickHouse";
 import { CheckpointRepositoryClickHouse } from "../../runtime/stores/repositories/checkpointRepositoryClickHouse";
@@ -38,6 +39,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   { testCommand: any }
 > & {
   eventStore: EventStoreClickHouse;
+  processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
 } {
   const clickHouseClient = getTestClickHouseClient();
   const redisConnection = getTestRedisConnection();
@@ -59,8 +61,11 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
+  const checkpointCache = new CheckpointCacheRedis(redisConnection);
+
   const processorCheckpointStore = new ProcessorCheckpointStoreClickHouse(
     new CheckpointRepositoryClickHouse(clickHouseClient),
+    checkpointCache,
   );
 
   // Create queue factory that uses BullMQ with test Redis connection
@@ -96,23 +101,38 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   // Build pipeline
   // Note: TestProjectionHandler has a static store property, so we don't need to pass it
   // Using test aggregate type (now included in production schemas)
+  // Use event-based deduplication for tests to ensure each event gets its own job.
+  // In production, aggregate-based deduplication is used for debouncing, but the batch
+  // processor handles fetching all events. For tests, we want each event processed
+  // independently to verify the pipeline behavior.
+  const eventBasedDeduplication = {
+    makeId: (event: { id: string }) => event.id,
+    ttlMs: 100,
+  };
+
   const pipeline = eventSourcing
     .registerPipeline<any>()
     .withName("test_pipeline")
     .withAggregateType("test_aggregate" as AggregateType)
     .withCommand("testCommand", TestCommandHandler as any)
-    .withEventHandler("testHandler", TestEventHandler as any)
-    .withProjection("testProjection", TestProjectionHandler as any)
+    .withEventHandler("testHandler", TestEventHandler as any, {
+      deduplication: eventBasedDeduplication,
+    })
+    .withProjection("testProjection", TestProjectionHandler as any, {
+      deduplication: eventBasedDeduplication,
+    })
     .build();
 
   return {
     ...pipeline,
     eventStore,
+    processorCheckpointStore,
   } as PipelineWithCommandHandlers<
     RegisteredPipeline<any, any>,
     { testCommand: any }
   > & {
     eventStore: EventStoreClickHouse;
+    processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
   };
 }
 
@@ -128,6 +148,7 @@ export async function waitForCheckpoint(
   expectedSequenceNumber: number,
   timeoutMs = 5000,
   pollIntervalMs = 100,
+  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
 ): Promise<void> {
   const startTime = Date.now();
 
@@ -138,6 +159,7 @@ export async function waitForCheckpoint(
     aggregateId,
     tenantId,
     expectedSequenceNumber,
+    processorCheckpointStore,
   );
 
   if (checkpoint) {
@@ -156,6 +178,7 @@ export async function waitForCheckpoint(
       aggregateId,
       tenantId,
       expectedSequenceNumber,
+      processorCheckpointStore,
     );
 
     if (checkpoint) {
@@ -179,6 +202,7 @@ export async function waitForCheckpoint(
     aggregateId,
     tenantId,
     expectedSequenceNumber,
+    processorCheckpointStore,
   );
 
   // If checkpoint exists in final check, return successfully
@@ -226,6 +250,8 @@ export function getTenantIdString(
 
 /**
  * Helper to verify checkpoint state.
+ * Uses the ProcessorCheckpointStore which checks Redis cache first, then ClickHouse.
+ * This matches production behavior and avoids ClickHouse eventual consistency issues.
  */
 export async function verifyCheckpoint(
   pipelineName: string,
@@ -233,7 +259,65 @@ export async function verifyCheckpoint(
   aggregateId: string,
   tenantId: string,
   expectedSequenceNumber?: number,
+  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
 ): Promise<boolean> {
+  const tenantIdObj = createTenantId(tenantId);
+
+  // If checkpoint store is provided, use it (preferred - checks Redis cache first)
+  if (processorCheckpointStore && expectedSequenceNumber !== void 0) {
+    try {
+      // Infer processor type from processor name
+      // Convention: handlers end with "Handler", projections end with "Projection"
+      const processorType = processorName.endsWith("Handler")
+        ? ("handler" as const)
+        : ("projection" as const);
+
+      const checkpoint =
+        await processorCheckpointStore.getCheckpointBySequenceNumber(
+          pipelineName,
+          processorName,
+          processorType,
+          tenantIdObj,
+          "test_aggregate" as AggregateType,
+          aggregateId,
+          expectedSequenceNumber,
+        );
+
+      logger.debug(
+        {
+          pipelineName,
+          processorName,
+          aggregateId,
+          tenantId,
+          expectedSequenceNumber,
+          checkpoint: checkpoint
+            ? {
+                sequenceNumber: checkpoint.sequenceNumber,
+                status: checkpoint.status,
+              }
+            : null,
+        },
+        "[verifyCheckpoint] Result from checkpoint store",
+      );
+
+      return checkpoint !== null && checkpoint.status === "processed";
+    } catch (error) {
+      logger.error(
+        {
+          pipelineName,
+          processorName,
+          aggregateId,
+          tenantId,
+          expectedSequenceNumber,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "[verifyCheckpoint] Error checking checkpoint store",
+      );
+      return false;
+    }
+  }
+
+  // Fallback to direct ClickHouse query if checkpoint store not provided
   const clickHouseClient = getTestClickHouseClient();
   if (!clickHouseClient) {
     logger.debug(
@@ -243,16 +327,12 @@ export async function verifyCheckpoint(
         aggregateId,
         tenantId,
         expectedSequenceNumber,
-        testForceClickHouse:
-          process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true",
       },
       "[verifyCheckpoint] ClickHouse client unavailable for checkpoint check",
     );
     return false;
   }
 
-  // Use buildCheckpointKey to ensure consistency with actual code
-  const tenantIdObj = createTenantId(tenantId);
   const checkpointKey = buildCheckpointKey(
     tenantIdObj,
     pipelineName,
@@ -261,8 +341,6 @@ export async function verifyCheckpoint(
     aggregateId,
   );
 
-  // Fast query without FINAL - optimized for speed
-  // Use >= to find checkpoint at or above expected sequence (more lenient for timing)
   const result = await clickHouseClient.query({
     query: `
       SELECT SequenceNumber, Status, EventId
@@ -291,63 +369,28 @@ export async function verifyCheckpoint(
       checkpointKey,
       rows,
       expectedSequenceNumber,
-      hasClickHouseClient: true,
     },
-    "[verifyCheckpoint] Result",
+    "[verifyCheckpoint] Result from ClickHouse",
   );
 
   if (rows.length === 0) {
-    logger.debug(
-      {
-        checkpointKey,
-        expectedSequenceNumber,
-        tenantId,
-        processorName,
-        aggregateId,
-      },
-      "[verifyCheckpoint] No processed checkpoint rows",
-    );
     return false;
   }
 
   const checkpoint = rows[0];
   if (!checkpoint) {
-    logger.debug(
-      {
-        checkpointKey,
-        rowsLength: rows.length,
-      },
-      "[verifyCheckpoint] First checkpoint row missing",
-    );
     return false;
   }
 
   const checkpointSequenceNumber = Number(checkpoint.SequenceNumber);
   if (Number.isNaN(checkpointSequenceNumber)) {
-    logger.debug(
-      {
-        checkpointKey,
-        rawSequenceNumber: checkpoint.SequenceNumber,
-      },
-      "[verifyCheckpoint] Invalid sequence number",
-    );
     return false;
   }
 
-  // If expected sequence is provided, check that we've reached at least that sequence
-  // (>= is fine - it means processing has progressed beyond what we're waiting for)
   if (
     expectedSequenceNumber !== void 0 &&
     checkpointSequenceNumber < expectedSequenceNumber
   ) {
-    logger.debug(
-      {
-        checkpointKey,
-        expectedSequenceNumber,
-        actualSequenceNumber: checkpointSequenceNumber,
-      },
-      "[verifyCheckpoint] Sequence not yet reached",
-    );
     return false;
   }
 

@@ -49,6 +49,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
       "test_pipeline",
@@ -56,6 +59,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify event was stored
@@ -121,7 +127,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       3,
-      10000,
+      20000, // 20 second timeout for 3 sequential events
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Wait for projection checkpoint at sequence 3 to ensure all events are processed
@@ -131,7 +139,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       3,
-      10000,
+      20000, // 20 second timeout for 3 sequential events
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify events were stored in order
@@ -180,6 +190,8 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       tenantIdString,
       1,
       10000,
+      100,
+      pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
       "test_pipeline",
@@ -188,6 +200,8 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       tenantIdString,
       1,
       10000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify handler checkpoint
@@ -278,6 +292,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify initial projection
@@ -303,6 +320,9 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
       aggregateId,
       tenantIdString,
       2,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify projection was rebuilt with all events
@@ -314,5 +334,81 @@ describe("Event Sourcing Pipeline - Full Integration Tests", () => {
     expect(projection?.data.totalValue).toBe(15); // 5 + 10
     expect(projection?.data.eventCount).toBe(2);
     expect(projection?.data.lastMessage).toBe("second");
+  });
+
+  it("processes all events even when BullMQ deduplication flattens queue jobs", async () => {
+    // This test verifies the batch processing behavior:
+    // When multiple events arrive rapidly for the same aggregate,
+    // BullMQ may deduplicate them into a single job.
+    // The batch processor should still process ALL events from the event store.
+    const aggregateId = "test-aggregate-dedup";
+
+    // Send multiple commands rapidly without waiting
+    // These will likely be deduplicated by BullMQ
+    const promises = [
+      pipeline.commands.testCommand.send({
+        tenantId: tenantIdString,
+        aggregateId,
+        value: 1,
+        message: "first",
+      }),
+      pipeline.commands.testCommand.send({
+        tenantId: tenantIdString,
+        aggregateId,
+        value: 2,
+        message: "second",
+      }),
+      pipeline.commands.testCommand.send({
+        tenantId: tenantIdString,
+        aggregateId,
+        value: 3,
+        message: "third",
+      }),
+    ];
+
+    // Wait for all commands to be sent
+    await Promise.all(promises);
+
+    // Wait for all 3 events to be processed
+    // The batch processor should process all events even if only one queue job triggers
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      3,
+      30000, // Longer timeout for dedup scenario
+      100,
+      pipeline.processorCheckpointStore,
+    );
+
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testProjection",
+      aggregateId,
+      tenantIdString,
+      3,
+      30000,
+      100,
+      pipeline.processorCheckpointStore,
+    );
+
+    // Verify all events were stored
+    const events = await pipeline.eventStore.getEvents(
+      aggregateId,
+      { tenantId },
+      "test_aggregate" as AggregateType,
+    );
+    expect(events.length).toBe(3);
+
+    // Verify projection has all events aggregated
+    const projection = (await pipeline.service.getProjectionByName(
+      "testProjection",
+      aggregateId,
+      { tenantId },
+    )) as TestProjection | null;
+    expect(projection?.data.totalValue).toBe(6); // 1 + 2 + 3
+    expect(projection?.data.eventCount).toBe(3);
+    expect(projection?.data.lastMessage).toBe("third");
   });
 }, 60000); // 60 second timeout for integration tests

@@ -51,6 +51,9 @@ describe("BullMQ Queue - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Check that queues exist in Redis
@@ -94,6 +97,9 @@ describe("BullMQ Queue - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify job was processed (no failures in normal case)
@@ -122,6 +128,9 @@ describe("BullMQ Queue - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Close pipeline

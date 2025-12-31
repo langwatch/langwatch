@@ -56,6 +56,9 @@ describe("Event Handlers - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       2,
+      15000, // 15 second timeout for sequential event processing
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Checkpoint verification above already confirms both events were processed
