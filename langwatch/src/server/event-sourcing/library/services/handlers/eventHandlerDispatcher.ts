@@ -715,17 +715,13 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         }
 
         try {
-          // Validate event processing prerequisites (idempotency, failures)
-          // Note: ordering is already checked above in early check using the same method
-          // (getCheckpointBySequenceNumber) that orderingValidator uses, so it's safe to skip here.
-          // The lock acquisition above ensures no concurrent processing of the same aggregate.
+          // Validate event processing prerequisites (idempotency, failures, ordering)
           const validatedSequenceNumber =
             await this.validator.validateEventProcessing(
               handlerName,
               "handler",
               event,
               context,
-              { skipOrderingCheck: true },
             );
 
           // If validation returned null, processing should be skipped (already processed or has failures)

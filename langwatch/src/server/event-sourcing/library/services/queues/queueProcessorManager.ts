@@ -6,7 +6,7 @@ import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
-import type { CommandSchemaType, CommandType } from "../../index";
+import type { CommandSchemaType, CommandType, DeduplicationConfig } from "../../index";
 import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
@@ -14,6 +14,10 @@ import type { EventStoreReadContext } from "../../stores/eventStore.types";
 import { ConfigurationError, ValidationError } from "../errorHandling";
 import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { DistributedLock } from "../../utils/distributedLock";
+
+const logger = createLogger(
+  "langwatch:event-sourcing:queue-processor-manager",
+);
 
 /**
  * Kill switch options for event sourcing components.
@@ -27,60 +31,19 @@ interface KillSwitchOptions {
 }
 
 /**
- * Configuration extracted from a command handler class, merged with options.
- */
-interface HandlerConfig<Payload> {
-  getAggregateId: (payload: Payload) => string;
-  makeJobId?: (payload: Payload) => string;
-  delay?: number;
-  spanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
-  concurrency?: number;
-  lockTtlMs?: number;
-}
-
-/**
  * Options for configuring a command handler.
  * This interface matches CommandHandlerOptions from the builder to avoid circular dependencies.
  */
 interface CommandHandlerOptions<Payload> {
   getAggregateId?: (payload: Payload) => string;
-  makeJobId?: (payload: Payload) => string;
   delay?: number;
+  deduplication?: DeduplicationConfig<Payload>;
   concurrency?: number;
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
   killSwitch?: KillSwitchOptions;
-}
-
-/**
- * Extracts configuration from a command handler class and merges with options.
- * Options take precedence over static methods.
- */
-function extractHandlerConfig<Payload>(
-  handlerClass: {
-    getAggregateId: (payload: Payload) => string;
-    getSpanAttributes?: (
-      payload: Payload,
-    ) => Record<string, string | number | boolean>;
-    makeJobId?: (payload: Payload) => string;
-    delay?: number;
-    concurrency?: number;
-  },
-  options?: CommandHandlerOptions<Payload>,
-): HandlerConfig<Payload> {
-  return {
-    getAggregateId:
-      options?.getAggregateId ?? handlerClass.getAggregateId.bind(handlerClass),
-    makeJobId: options?.makeJobId ?? handlerClass.makeJobId?.bind(handlerClass),
-    delay: options?.delay ?? handlerClass.delay,
-    spanAttributes:
-      options?.spanAttributes ??
-      handlerClass.getSpanAttributes?.bind(handlerClass),
-    concurrency: options?.concurrency ?? handlerClass.concurrency,
-  };
+  lockTtlMs?: number;
 }
 
 /**
@@ -122,15 +85,24 @@ async function isComponentDisabled(
       false,
     );
     if (isDisabled) {
-      console.log(
-        `[KILL_SWITCH] Component disabled via feature flag: ${componentType}:${componentName} for tenant ${tenantId}`,
+      logger.debug(
+        {
+          componentType,
+          componentName,
+          tenantId,
+        },
+        "Component disabled via feature flag",
       );
     }
     return isDisabled;
   } catch (error) {
     // Log error but don't fail - default to enabled
-    console.warn(
-      `[KILL_SWITCH] Error checking feature flag for ${componentType}:${componentName}:`,
+    logger.warn(
+      {
+        componentType,
+        componentName,
+      },
+      "Error checking feature flag",
       error,
     );
     return false;
@@ -144,7 +116,8 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   commandType: CommandType,
   commandSchema: CommandSchemaType<Payload, CommandType>,
   handler: CommandHandler<Command<Payload>, EventType>,
-  config: HandlerConfig<Payload>,
+  options: CommandHandlerOptions<Payload>,
+  getAggregateId: (payload: Payload) => string,
   queueName: string,
   storeEventsFn: (
     events: EventType[],
@@ -160,10 +133,10 @@ function createCommandDispatcher<Payload, EventType extends Event>(
 ): EventSourcedQueueProcessor<Payload> {
   const processor = factory.create<Payload>({
     name: queueName,
-    makeJobId: config.makeJobId,
-    delay: config.delay,
-    spanAttributes: config.spanAttributes,
-    options: config.concurrency ? { concurrency: config.concurrency } : void 0,
+    delay: options.delay,
+    deduplication: options.deduplication,
+    spanAttributes: options.spanAttributes,
+    options: options.concurrency ? { concurrency: options.concurrency } : void 0,
     async process(payload: Payload) {
       // Validate payload (also validated in send, but keep here for safety)
       const validation = commandSchema.validate(payload);
@@ -177,7 +150,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
       }
 
       const tenantId = createTenantId((payload as any).tenantId);
-      const aggregateId = config.getAggregateId(payload);
+      const aggregateId = getAggregateId(payload);
 
       // Check kill switch - if enabled, skip command processing
       const isDisabled = await isComponentDisabled(
@@ -344,11 +317,11 @@ export class QueueProcessorManager<EventType extends Event = Event> {
   }
 
   /**
-   * Creates a default job ID for event handler processing.
-   * Format: ${event.id}`
+   * Creates a default deduplication ID for event processing.
+   * Format: ${event.tenantId}:${event.aggregateType}:${event.aggregateId}
    */
-  createDefaultJobId(event: EventType): string {
-    return event.id;
+  private createDefaultDeduplicationId(event: EventType): string {
+    return `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
   }
 
   /**
@@ -383,10 +356,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
-        makeJobId:
-          handlerDef.options.makeJobId ?? this.createDefaultJobId.bind(this),
         delay: handlerDef.options.delay,
-        debounceMs: handlerDef.options.debounceMs,
+        deduplication: handlerDef.options.deduplication ?? {
+          makeId: this.createDefaultDeduplicationId.bind(this),
+        },
         options: handlerDef.options.concurrency
           ? { concurrency: handlerDef.options.concurrency }
           : void 0,
@@ -406,8 +379,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
    * Initializes queue processors for all registered projections.
    * Each projection gets its own queue processor for async processing.
    *
-   * **Job ID Strategy**: Uses custom makeJobId if provided in projection options,
-   * otherwise defaults to event ID to prevent deduplication (all events are queued).
+   * **Deduplication Strategy**: Uses custom deduplication config if provided in projection options,
+   * otherwise defaults to `${tenantId}:${aggregateType}:${aggregateId}` for deduplication.
    * The distributed lock in `updateProjectionByName` ensures serial processing per aggregate.
    * When lock acquisition fails, BullMQ will retry the job with backoff.
    *
@@ -434,28 +407,12 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       const queueName = `${this.aggregateType}/projection/${projectionName}`;
 
-      // Use custom makeJobId if provided, otherwise default to event ID
-      // Distributed lock ensures serial processing per aggregate
-      const makeProjectionJobId =
-        projectionDef.options?.makeJobId ??
-        ((event: EventType): string => {
-          this.logger.debug(
-            {
-              projectionName,
-              eventId: event.id,
-              tenantId: event.tenantId,
-              aggregateId: String(event.aggregateId),
-              eventType: event.type,
-            },
-            "Created projection job ID from event ID",
-          );
-          return event.id;
-        });
-
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
-        makeJobId: makeProjectionJobId,
-        debounceMs: projectionDef.options?.debounceMs,
+        delay: projectionDef.options?.delay,
+        deduplication: projectionDef.options?.deduplication ?? {
+          makeId: this.createDefaultDeduplicationId.bind(this),
+        },
         spanAttributes: (event) => ({
           "projection.name": projectionName,
           "event.type": event.type,
@@ -502,7 +459,23 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       const schema = handlerClass.schema;
       const commandType = schema.type;
       const handlerInstance = new handlerClass();
-      const config = extractHandlerConfig(handlerClass, registration.options);
+
+      // Get aggregate ID extractor from options or handler class
+      const getAggregateId =
+        registration.options?.getAggregateId ??
+        handlerClass.getAggregateId.bind(handlerClass);
+
+      // Build options, merging registration options with handler class statics
+      const options: CommandHandlerOptions<Payload> = {
+        delay: registration.options?.delay,
+        deduplication: registration.options?.deduplication,
+        concurrency: registration.options?.concurrency,
+        spanAttributes:
+          registration.options?.spanAttributes ??
+          handlerClass.getSpanAttributes?.bind(handlerClass),
+        killSwitch: registration.options?.killSwitch,
+        lockTtlMs: registration.options?.lockTtlMs,
+      };
 
       // Use static dispatcherName if available, otherwise use the registration name
       const commandName = handlerClass.dispatcherName ?? registration.name;
@@ -520,14 +493,15 @@ export class QueueProcessorManager<EventType extends Event = Event> {
       const queueName = `${pipelineName}/command/${commandName}`;
 
       // Use per-command lockTtlMs if provided, otherwise use default
-      const effectiveLockTtlMs = config.lockTtlMs ?? this.commandLockTtlMs;
+      const effectiveLockTtlMs = options.lockTtlMs ?? this.commandLockTtlMs;
 
       // Create and register dispatcher
       const dispatcher = createCommandDispatcher(
         commandType,
         schema,
         handlerInstance,
-        config,
+        options,
+        getAggregateId,
         queueName,
         storeEventsFn,
         this.queueProcessorFactory,
