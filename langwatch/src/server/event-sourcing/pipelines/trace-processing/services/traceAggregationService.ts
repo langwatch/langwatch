@@ -2,7 +2,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "../../../../../utils/logger";
 import { ValidationError } from "../../../library/services/errorHandling";
-import type { NormalizedSpan, NormalizedStatusCode } from "../schemas/spans";
+import type { NormalizedSpan, } from "../schemas/spans";
 import { NormalizedStatusCode as StatusCode } from "../schemas/spans";
 import { ATTR_KEYS } from "../canonicalisation/extractors/_constants";
 import { traceIOExtractionService } from "./traceIOExtractionService";
@@ -77,7 +77,7 @@ interface TokenTiming {
 // ============================================================================
 
 const isValidTimestamp = (ts: number | undefined | null): ts is number =>
-  typeof ts === "number" && ts > 0 && isFinite(ts);
+  typeof ts === "number" && ts > 0 && Number.isFinite(ts);
 
 /**
  * Extracts unique model names from spans.
@@ -369,7 +369,7 @@ export class TraceAggregationService {
         const validSpans = this.filterValidTimestamps(spans, otelSpan);
 
         // Basic metrics
-        const traceId = spans[0]!.traceId;
+        const traceId = spans[0].traceId;
         const { startTimeUnixMs, endTimeUnixMs, durationMs } =
           this.computeTiming(validSpans);
 
@@ -459,7 +459,7 @@ export class TraceAggregationService {
   private validateSpans(
     spans: NormalizedSpan[],
     otelSpan: { addEvent: (name: string) => void },
-  ): void {
+  ): asserts spans is [NormalizedSpan, ...NormalizedSpan[]] {
     if (spans.length === 0 || !spans[0]) {
       throw new ValidationError(
         "Cannot aggregate trace with no spans",

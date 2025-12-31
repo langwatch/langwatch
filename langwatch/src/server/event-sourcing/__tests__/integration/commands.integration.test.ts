@@ -32,7 +32,6 @@ describe("Command Processing - Integration Tests", () => {
 
     // Try to send invalid command (missing required fields)
     await expect(
-      // @ts-ignore - intentionally invalid payload for testing validation
       pipeline.commands.testCommand.send({
         tenantId: tenantIdString,
         aggregateId,
@@ -67,7 +66,9 @@ describe("Command Processing - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       1,
-      10000,
+      15000,
+      100,
+      pipeline.processorCheckpointStore,
     );
     await waitForCheckpoint(
       "test_pipeline",
@@ -75,7 +76,9 @@ describe("Command Processing - Integration Tests", () => {
       aggregateId,
       tenantIdString,
       2,
-      10000,
+      15000,
+      100,
+      pipeline.processorCheckpointStore,
     );
 
     // Verify events were stored (commands create events)
