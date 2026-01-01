@@ -8,9 +8,11 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import { memo, useState } from "react";
 import {
   LuChevronDown,
+  LuCircleAlert,
   LuCode,
   LuFileText,
   LuPencil,
@@ -23,6 +25,13 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { RunnerConfig } from "../../types";
+import { runnerHasMissingMappings } from "../../utils/mappingValidation";
+
+// Pulsing animation for missing mapping alert
+const pulseAnimation = keyframes`
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+`;
 
 type RunnerHeaderProps = {
   runner: RunnerConfig;
@@ -67,6 +76,10 @@ export const RunnerHeader = memo(function RunnerHeader({
 
   // Use prop value if available, otherwise use store value
   const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
+
+  // Check if there are missing mappings for the active dataset
+  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+  const hasMissingMappings = runnerHasMissingMappings(runner, activeDatasetId);
 
   // Controlled menu state to prevent closing on re-renders
   const [menuOpen, setMenuOpen] = useState(false);
@@ -113,7 +126,34 @@ export const RunnerHeader = memo(function RunnerHeader({
             <Text fontSize="13px" fontWeight="medium" truncate>
               {runner.name}
             </Text>
-            {hasUnpublishedChanges && (
+            {hasMissingMappings && (
+              <Tooltip
+                content="Missing variable mappings - Click to configure"
+                positioning={{ placement: "top" }}
+                openDelay={0}
+                showArrow
+              >
+                <Box
+                  css={{
+                    animation: `${pulseAnimation} 2s ease-in-out infinite`,
+                  }}
+                  flexShrink={0}
+                  data-testid="missing-mapping-alert"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent menu from opening
+                    e.preventDefault();
+                    setMenuOpen(false); // Close menu if somehow open
+                    onEdit?.(runner); // Open drawer directly
+                  }}
+                  cursor="pointer"
+                  _hover={{ transform: "scale(1.2)" }}
+                  transition="transform 0.15s"
+                >
+                  <Icon as={LuCircleAlert} color="orange.500" boxSize={4} />
+                </Box>
+              </Tooltip>
+            )}
+            {hasUnpublishedChanges && !hasMissingMappings && (
               <Tooltip
                 content="Unpublished modifications"
                 positioning={{ placement: "top" }}
@@ -157,21 +197,32 @@ export const RunnerHeader = memo(function RunnerHeader({
       <Spacer />
 
       {/* Play button on far right */}
-      <IconButton
-        aria-label="Run evaluation for this runner"
-        size="xs"
-        variant="ghost"
-        onClick={(e) => {
-          e.stopPropagation();
-          onRun?.(runner);
-        }}
-        data-testid="runner-play-button"
-        minWidth="auto"
-        height="auto"
-        padding={1}
+      <Tooltip
+        content={hasMissingMappings ? "Configure missing mappings first" : "Run evaluation"}
+        positioning={{ placement: "top" }}
+        openDelay={200}
       >
-        <LuPlay size={14} />
-      </IconButton>
+        <IconButton
+          aria-label="Run evaluation for this runner"
+          size="xs"
+          variant="ghost"
+          onClick={(e) => {
+            e.stopPropagation();
+            // If there are missing mappings, open the drawer instead of running
+            if (hasMissingMappings) {
+              onEdit?.(runner);
+            } else {
+              onRun?.(runner);
+            }
+          }}
+          data-testid="runner-play-button"
+          minWidth="auto"
+          height="auto"
+          padding={1}
+        >
+          <LuPlay size={14} />
+        </IconButton>
+      </Tooltip>
     </HStack>
   );
 });

@@ -167,7 +167,10 @@ describe("PromptListDrawer", () => {
       });
     });
 
-    it("closes drawer after selection", async () => {
+    it("does not auto-close drawer after selection (callback handles closing/navigation)", async () => {
+      // The onSelect callback is responsible for closing the drawer or navigating.
+      // This allows consumers to navigate to another drawer (e.g., promptEditor)
+      // without the flow callbacks being cleared by closeDrawer.
       const user = userEvent.setup();
       const onSelect = vi.fn();
       renderDrawer({ onSelect });
@@ -178,7 +181,8 @@ describe("PromptListDrawer", () => {
 
       await user.click(screen.getByTestId("prompt-card-prompt-1"));
 
-      expect(mockCloseDrawer).toHaveBeenCalled();
+      // closeDrawer is NOT called - the callback is responsible for closing/navigation
+      expect(mockCloseDrawer).not.toHaveBeenCalled();
     });
   });
 

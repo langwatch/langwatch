@@ -256,6 +256,9 @@ export const system = createSystem(defaultConfig, {
             outline: {
               bg: "white/65",
             },
+            flushed: {
+              borderRadius: "none",
+            },
           },
           size: {
             xs: {

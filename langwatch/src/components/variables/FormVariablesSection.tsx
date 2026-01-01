@@ -21,6 +21,8 @@ type FormVariablesSectionProps = {
   onMappingChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
   /** Whether in read-only mode */
   readOnly?: boolean;
+  /** Set of variable identifiers that are missing required mappings (for highlighting) */
+  missingMappingIds?: Set<string>;
 };
 
 // ============================================================================
@@ -48,6 +50,7 @@ export const FormVariablesSection = ({
   mappings = {},
   onMappingChange,
   readOnly = false,
+  missingMappingIds,
 }: FormVariablesSectionProps) => {
   const { control, getValues } = useFormContext<PromptConfigFormValues>();
 
@@ -130,6 +133,7 @@ export const FormVariablesSection = ({
       canAddRemove={!readOnly}
       readOnly={readOnly}
       title={title}
+      missingMappingIds={missingMappingIds}
     />
   );
 };

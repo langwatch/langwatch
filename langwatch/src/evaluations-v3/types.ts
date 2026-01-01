@@ -140,6 +140,13 @@ export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 /**
  * Zod schema for evaluator config validation.
+ *
+ * Mappings are stored per-dataset AND per-runner:
+ * mappings[datasetId][runnerId][inputFieldName] = FieldMapping
+ *
+ * This allows different mappings for:
+ * - Each dataset (same column might have different names)
+ * - Each runner (runner A outputs "output", runner B outputs "result")
  */
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
@@ -147,7 +154,11 @@ export const evaluatorConfigSchema = z.object({
   name: z.string(),
   settings: z.record(z.string(), z.unknown()),
   inputs: z.array(fieldSchema),
-  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
+  // Per-dataset, per-runner mappings: datasetId -> runnerId -> inputFieldName -> FieldMapping
+  mappings: z.record(
+    z.string(),
+    z.record(z.string(), z.record(z.string(), fieldMappingSchema))
+  ),
   dbEvaluatorId: z.string().optional(),
 });
 export type EvaluatorConfig = Omit<
@@ -160,6 +171,11 @@ export type EvaluatorConfig = Omit<
 
 /**
  * Zod schema for runner config validation.
+ *
+ * Mappings are stored per-dataset:
+ * mappings[datasetId][inputFieldName] = FieldMapping
+ *
+ * This allows different mappings for each dataset in the evaluation.
  */
 export const runnerConfigSchema = z.object({
   id: z.string(),
@@ -172,7 +188,8 @@ export const runnerConfigSchema = z.object({
   dbAgentId: z.string().optional(),
   inputs: z.array(fieldSchema).optional(),
   outputs: z.array(fieldSchema).optional(),
-  mappings: z.record(z.string(), fieldMappingSchema),
+  // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
+  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
   evaluatorIds: z.array(z.string()),
 });
 export type RunnerType = "prompt" | "agent";
@@ -341,10 +358,18 @@ export type EvaluationsV3Actions = {
   addRunner: (runner: RunnerConfig) => void;
   updateRunner: (runnerId: string, updates: Partial<RunnerConfig>) => void;
   removeRunner: (runnerId: string) => void;
+  /** Set a mapping for a runner input field for a specific dataset */
   setRunnerMapping: (
     runnerId: string,
+    datasetId: string,
     inputField: string,
     mapping: FieldMapping
+  ) => void;
+  /** Remove a mapping for a runner input field for a specific dataset */
+  removeRunnerMapping: (
+    runnerId: string,
+    datasetId: string,
+    inputField: string
   ) => void;
 
   // Global evaluator actions
@@ -359,12 +384,20 @@ export type EvaluationsV3Actions = {
   addEvaluatorToRunner: (runnerId: string, evaluatorId: string) => void;
   removeEvaluatorFromRunner: (runnerId: string, evaluatorId: string) => void;
 
-  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
+  /** Set a mapping for an evaluator input field for a specific dataset and runner */
   setEvaluatorMapping: (
     evaluatorId: string,
+    datasetId: string,
     runnerId: string,
     inputField: string,
     mapping: FieldMapping
+  ) => void;
+  /** Remove a mapping for an evaluator input field for a specific dataset and runner */
+  removeEvaluatorMapping: (
+    evaluatorId: string,
+    datasetId: string,
+    runnerId: string,
+    inputField: string
   ) => void;
 
   // Results actions

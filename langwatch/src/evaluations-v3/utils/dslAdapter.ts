@@ -68,7 +68,7 @@ export const stateToWorkflow = (
     }
 
     // For agent runners, check the underlying agent type
-    const runnerNode = createCodeNode(runner, runnerIndex);
+    const runnerNode = createCodeNode(runner, datasetId, runnerIndex);
     runnerNodes.push(runnerNode);
 
     // Create evaluator nodes for each evaluator this runner uses
@@ -79,6 +79,7 @@ export const stateToWorkflow = (
 
       const evaluatorNode = createEvaluatorNode(
         evaluator,
+        datasetId,
         runner.id,
         runnerIndex,
         evalIndex
@@ -158,12 +159,15 @@ const columnTypeToFieldType = (
  * Uses the `parameters` array structure expected by the DSL.
  * Sets default values on inputs that have value mappings.
  */
-const createCodeNode = (runner: RunnerConfig, index: number): Node<Code> => {
+const createCodeNode = (runner: RunnerConfig, activeDatasetId: string, index: number): Node<Code> => {
   const parameters: Field[] = [];
+
+  // Get mappings for the active dataset
+  const datasetMappings = runner.mappings[activeDatasetId] ?? {};
 
   // Apply value mappings as default values on inputs
   const inputs: Field[] = (runner.inputs ?? []).map((input) => {
-    const mapping = runner.mappings[input.identifier];
+    const mapping = datasetMappings[input.identifier];
     if (mapping?.type === "value") {
       return { ...input, value: mapping.value };
     }
@@ -190,12 +194,14 @@ const createCodeNode = (runner: RunnerConfig, index: number): Node<Code> => {
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
+  activeDatasetId: string,
   runnerId: string,
   runnerIndex: number,
   evalIndex: number
 ): Node<Evaluator> => {
-  // Get the mappings for this runner
-  const runnerMappings = evaluator.mappings[runnerId] ?? {};
+  // Get the mappings for this dataset and runner
+  const datasetMappings = evaluator.mappings[activeDatasetId];
+  const runnerMappings = datasetMappings?.[runnerId] ?? {};
 
   // Apply value mappings as default values on inputs
   const inputs: Field[] = evaluator.inputs.map((input) => {
@@ -223,6 +229,7 @@ const createEvaluatorNode = (
 
 /**
  * Build edges connecting entry to runners based on runner.mappings.
+ * With per-dataset structure: mappings[datasetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
 const buildRunnerEdges = (
@@ -232,9 +239,11 @@ const buildRunnerEdges = (
   const edges: Edge[] = [];
 
   for (const runner of runners) {
-    if (!runner.mappings) continue;
+    // Get mappings for the active dataset
+    const datasetMappings = runner.mappings[activeDatasetId];
+    if (!datasetMappings) continue;
 
-    for (const [inputField, mapping] of Object.entries(runner.mappings)) {
+    for (const [inputField, mapping] of Object.entries(datasetMappings)) {
       // Skip value mappings - they don't create edges
       if (mapping.type === "value") continue;
 
@@ -267,7 +276,7 @@ const buildRunnerEdges = (
 
 /**
  * Build edges connecting runners to their evaluators.
- * Mappings are stored inside evaluator.mappings[runnerId].
+ * With per-dataset, per-runner structure: mappings[datasetId][runnerId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
 const buildEvaluatorEdges = (
@@ -282,7 +291,9 @@ const buildEvaluatorEdges = (
       const evaluator = evaluators.find((e) => e.id === evaluatorId);
       if (!evaluator) continue;
 
-      const runnerMappings = evaluator.mappings[runner.id] ?? {};
+      // Get mappings for the active dataset and this runner
+      const datasetMappings = evaluator.mappings[activeDatasetId];
+      const runnerMappings = datasetMappings?.[runner.id] ?? {};
       const evaluatorNodeId = `${runner.id}.${evaluator.id}`;
 
       for (const [inputField, mapping] of Object.entries(runnerMappings)) {

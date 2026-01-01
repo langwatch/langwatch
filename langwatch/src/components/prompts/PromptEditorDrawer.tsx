@@ -21,6 +21,7 @@ import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 
 import { FormVariablesSection, type AvailableSource, type FieldMapping } from "~/components/variables";
+import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappings";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
@@ -112,30 +113,59 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
 
+  // Check if we're in evaluations context (runnerId in URL params)
+  const runnerId = drawerParams.runnerId as string | undefined;
+
+  // Use the reactive hook for evaluations context - this subscribes to store updates
+  // and automatically provides updated mappings when the active dataset changes
+  const evaluationData = useEvaluationMappings(runnerId);
+
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
     props.onSave ?? flowCallbacks?.onSave ?? (complexProps.onSave as PromptEditorDrawerProps["onSave"]);
   const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
-  // Data props come from complexProps (passed via openDrawer)
-  const availableSources = props.availableSources ?? (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
-  const inputMappingsProp = props.inputMappings ?? (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
-  // Callbacks can come from flowCallbacks (persisted across drawer nav) or complexProps
-  const onInputMappingsChangeProp = props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange ?? (complexProps.onInputMappingsChange as PromptEditorDrawerProps["onInputMappingsChange"]);
 
-  // Local state for mappings - allows immediate UI updates when mappings change
-  // This solves the "double update" problem where the prop comes from a snapshot
-  const [localInputMappings, setLocalInputMappings] = useState<Record<string, FieldMapping> | undefined>(inputMappingsProp);
+  // Data sources: In evaluations context, use reactive data from hook.
+  // Otherwise, fall back to props/complexProps (for standalone usage like prompt playground).
+  const availableSources = runnerId && evaluationData.isValid
+    ? evaluationData.availableSources
+    : props.availableSources ?? (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
 
-  // Sync local mappings when prop changes (e.g., drawer reopened with new data)
+  // ============================================================================
+  // INPUT MAPPINGS - Single Source of Truth Pattern
+  // ============================================================================
+  //
+  // ARCHITECTURE: `inputMappings` (local state) is THE source of truth inside this drawer.
+  // - Initialized from props/store when drawer opens
+  // - ALL reads inside this drawer use `inputMappings`
+  // - Changes update local state immediately (responsive UI)
+  // - Changes also flow OUT to store via callback (persistence)
+  // - External changes (e.g., dataset switch) sync back via useEffect
+  //
+  // DO NOT use `_mappingsFromProps` directly - it's only for initialization/sync.
+  // ============================================================================
+
+  // External source (only for initialization and sync)
+  const _mappingsFromProps = runnerId && evaluationData.isValid
+    ? evaluationData.inputMappings
+    : props.inputMappings ?? (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
+
+  // External callback to persist changes to store
+  const _onMappingsChangeProp = props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange ?? (complexProps.onInputMappingsChange as PromptEditorDrawerProps["onInputMappingsChange"]);
+
+  // THE source of truth for mappings inside this drawer
+  const [inputMappings, setInputMappings] = useState<Record<string, FieldMapping> | undefined>(_mappingsFromProps);
+
+  // Sync from external when props change (e.g., drawer reopened, dataset changed)
   useEffect(() => {
-    setLocalInputMappings(inputMappingsProp);
-  }, [inputMappingsProp]);
+    setInputMappings(_mappingsFromProps);
+  }, [_mappingsFromProps]);
 
-  // Wrapper that updates local state AND calls the external callback
+  // Handler that updates local state AND persists to store
   const onInputMappingsChange = useCallback(
     (identifier: string, mapping: FieldMapping | undefined) => {
       // Update local state immediately for responsive UI
-      setLocalInputMappings((prev) => {
+      setInputMappings((prev) => {
         const newMappings = { ...prev };
         if (mapping) {
           newMappings[identifier] = mapping;
@@ -144,10 +174,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         }
         return newMappings;
       });
-      // Call external callback to persist to store
-      onInputMappingsChangeProp?.(identifier, mapping);
+      // Persist to store via external callback
+      _onMappingsChangeProp?.(identifier, mapping);
     },
-    [onInputMappingsChangeProp]
+    [_onMappingsChangeProp]
   );
 
   const promptId =
@@ -480,7 +510,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const handleSetVariableMapping = useCallback(
     (identifier: string, sourceId: string, fieldName: string) => {
       // First, ensure the variable exists
-      const currentInputs = methods.getValues("version.configData.inputs") ?? [];
+      const rawInputs = methods.getValues("version.configData.inputs");
+      const currentInputs = Array.isArray(rawInputs) ? rawInputs : [];
       const variableExists = currentInputs.some(
         (input: { identifier: string }) => input.identifier === identifier
       );
@@ -526,12 +557,50 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   );
 
   // Get available fields for message editor (with type information)
-  const availableFields = (
-    methods.watch("version.configData.inputs") ?? []
-  ).map((input) => ({
+  const watchedInputs = methods.watch("version.configData.inputs");
+  const availableFields = (Array.isArray(watchedInputs) ? watchedInputs : []).map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
+
+  // Watch messages to calculate which variables are used
+  const watchedMessages = methods.watch("version.configData.messages");
+
+  // Calculate missing mapping IDs for highlighting in the variables section
+  // A variable is missing if it's BOTH used in the prompt AND in the inputs list, but has no mapping
+  // Uses `inputMappings` which is the single source of truth inside this drawer.
+  const missingMappingIds = useMemo(() => {
+    // Only show missing mappings if we're in evaluations context (have availableSources)
+    if (!availableSources || availableSources.length === 0) {
+      return new Set<string>();
+    }
+
+    // Extract variables used in messages
+    const usedVariables = new Set<string>();
+    const messages = Array.isArray(watchedMessages) ? watchedMessages : [];
+    for (const msg of messages) {
+      const content = msg?.content ?? "";
+      const pattern = /\{\{(\w+)\}\}/g;
+      let match;
+      while ((match = pattern.exec(content)) !== null) {
+        usedVariables.add(match[1]!);
+      }
+    }
+
+    // Get input identifiers
+    const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
+    const inputIds = new Set(inputs.map((i: { identifier: string }) => i.identifier));
+
+    // Find variables that are both used and defined but missing a mapping
+    const missing = new Set<string>();
+    for (const varId of usedVariables) {
+      if (inputIds.has(varId) && !inputMappings?.[varId]) {
+        missing.add(varId);
+      }
+    }
+
+    return missing;
+  }, [watchedMessages, watchedInputs, inputMappings, availableSources]);
 
   // Get configId for version history
   const configId = promptQuery.data?.id;
@@ -656,8 +725,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                       title="Variables"
                       showMappings={!!availableSources && availableSources.length > 0}
                       availableSources={availableSources}
-                      mappings={localInputMappings}
+                      mappings={inputMappings}
                       onMappingChange={onInputMappingsChange}
+                      missingMappingIds={missingMappingIds}
                     />
                     <OutputsFieldGroup />
                   </VStack>

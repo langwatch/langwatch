@@ -98,6 +98,7 @@ export function EvaluationsV3Table({
     updateRunner,
     removeRunner,
     setRunnerMapping,
+    removeRunnerMapping,
     addEvaluator,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
@@ -133,6 +134,7 @@ export function EvaluationsV3Table({
       updateRunner: state.updateRunner,
       removeRunner: state.removeRunner,
       setRunnerMapping: state.setRunnerMapping,
+      removeRunnerMapping: state.removeRunnerMapping,
       addEvaluator: state.addEvaluator,
     })),
   );
@@ -192,11 +194,13 @@ export function EvaluationsV3Table({
   );
 
   // Handler for when a prompt is selected from the drawer
+  // Adds the runner and immediately opens the prompt editor for configuration
   const handleSelectPrompt = useCallback(
     (prompt: { id: string; name: string; versionId?: string }) => {
       // Convert prompt to RunnerConfig format (prompt type)
+      const runnerId = `runner_${Date.now()}`;
       const runnerConfig: RunnerConfig = {
-        id: `runner_${Date.now()}`, // Generate unique ID for the workbench
+        id: runnerId,
         type: "prompt",
         name: prompt.name,
         promptId: prompt.id,
@@ -207,9 +211,48 @@ export function EvaluationsV3Table({
         evaluatorIds: [],
       };
       addRunner(runnerConfig);
-      closeDrawer();
+
+      // Set up flow callbacks for the prompt editor
+      setFlowCallbacks("promptEditor", {
+        onLocalConfigChange: (localConfig) => {
+          updateRunner(runnerId, { localPromptConfig: localConfig });
+        },
+        onSave: (savedPrompt) => {
+          updateRunner(runnerId, {
+            name: savedPrompt.name,
+            promptId: savedPrompt.id,
+            localPromptConfig: undefined,
+          });
+        },
+        onInputMappingsChange: (
+          identifier: string,
+          mapping: UIFieldMapping | undefined,
+        ) => {
+          // Get state at callback time to ensure freshness
+          const state = useEvaluationsV3Store.getState();
+          const checkIsDatasetSource = (sourceId: string) =>
+            state.datasets.some((d) => d.id === sourceId);
+
+          if (mapping) {
+            setRunnerMapping(
+              runnerId,
+              state.activeDatasetId,
+              identifier,
+              convertFromUIMapping(mapping, checkIsDatasetSource),
+            );
+          } else {
+            removeRunnerMapping(runnerId, state.activeDatasetId, identifier);
+          }
+        },
+      });
+
+      // Open the prompt editor drawer for the newly added runner
+      openDrawer("promptEditor", {
+        promptId: prompt.id,
+        urlParams: { runnerId },
+      });
     },
-    [addRunner, closeDrawer],
+    [addRunner, openDrawer, updateRunner, setRunnerMapping, removeRunnerMapping],
   );
 
   // Handler for opening the evaluator selector for a specific runner
@@ -223,18 +266,22 @@ export function EvaluationsV3Table({
   // tRPC utils for fetching agent data
   const trpcUtils = api.useContext();
 
-  // Build available sources from datasets for variable mapping
+  // Build available sources from the active dataset only for variable mapping
+  // Sources are scoped per-dataset - when switching datasets, the UI will update
   const buildAvailableSources = useCallback((): AvailableSource[] => {
-    return datasets.map((dataset) => ({
-      id: dataset.id,
-      name: dataset.name,
+    const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+    if (!activeDataset) return [];
+
+    return [{
+      id: activeDataset.id,
+      name: activeDataset.name,
       type: "dataset" as const,
-      fields: dataset.columns.map((col) => ({
+      fields: activeDataset.columns.map((col) => ({
         name: col.name,
         type: datasetColumnTypeToFieldType(col.type),
       })),
-    }));
-  }, [datasets]);
+    }];
+  }, [datasets, activeDatasetId]);
 
   // Helper to check if a source ID refers to a dataset
   const isDatasetSource = useCallback(
@@ -246,19 +293,20 @@ export function EvaluationsV3Table({
   const handleEditRunner = useCallback(
     async (runner: RunnerConfig) => {
       if (runner.type === "prompt") {
-        // Build available sources for variable mapping
+        // Build available sources for variable mapping (active dataset only)
         const availableSources = buildAvailableSources();
 
-        // Convert runner mappings to UI format
+        // Convert runner mappings for the active dataset to UI format
+        const datasetMappings = runner.mappings[activeDatasetId] ?? {};
         const uiMappings: Record<string, UIFieldMapping> = {};
-        for (const [key, mapping] of Object.entries(runner.mappings)) {
+        for (const [key, mapping] of Object.entries(datasetMappings)) {
           uiMappings[key] = convertToUIMapping(mapping);
         }
 
         // Set flow callbacks for the prompt editor
         // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
         // onSave: updates runner when prompt is published
-        // onInputMappingsChange: updates runner mappings when variable mappings change
+        // onInputMappingsChange: updates runner mappings when variable mappings change (for active dataset)
         setFlowCallbacks("promptEditor", {
           onLocalConfigChange: (localConfig) => {
             updateRunner(runner.id, { localPromptConfig: localConfig });
@@ -274,22 +322,17 @@ export function EvaluationsV3Table({
             identifier: string,
             mapping: UIFieldMapping | undefined,
           ) => {
+            // Get the current active dataset from store (it may have changed since drawer was opened)
+            const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
             if (mapping) {
               setRunnerMapping(
                 runner.id,
+                currentActiveDatasetId,
                 identifier,
                 convertFromUIMapping(mapping, isDatasetSource),
               );
             } else {
-              // Remove the mapping by updating runner without this key
-              const currentRunner = useEvaluationsV3Store
-                .getState()
-                .runners.find((r) => r.id === runner.id);
-              if (currentRunner) {
-                const newMappings = { ...currentRunner.mappings };
-                delete newMappings[identifier];
-                updateRunner(runner.id, { mappings: newMappings });
-              }
+              removeRunnerMapping(runner.id, currentActiveDatasetId, identifier);
             }
           },
         });

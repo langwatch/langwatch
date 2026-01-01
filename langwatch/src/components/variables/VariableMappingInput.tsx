@@ -52,6 +52,8 @@ type VariableMappingInputProps = {
   placeholder?: string;
   /** Whether the input is disabled */
   disabled?: boolean;
+  /** Whether this mapping is missing and should be highlighted */
+  isMissing?: boolean;
 };
 
 /** Represents a selectable option in the dropdown */
@@ -89,6 +91,7 @@ export const VariableMappingInput = ({
   availableSources,
   placeholder = "Enter value or select source...",
   disabled = false,
+  isMissing = false,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -291,8 +294,16 @@ export const VariableMappingInput = ({
       {/* Container with full-width bottom border */}
       <Box
         borderBottom="1px solid"
-        borderColor="gray.200"
-        _focusWithin={{ borderColor: "blue.500", boxShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px" }}
+        borderColor={isMissing ? "orange.400" : "gray.200"}
+        background={isMissing ? "orange.50" : undefined}
+        // borderRadius={isMissing ? "md" : undefined}
+        paddingX={isMissing ? 1 : undefined}
+        _focusWithin={{
+          borderColor: isMissing ? "orange.500" : "blue.500",
+          boxShadow: isMissing
+            ? "var(--chakra-colors-orange-500) 0px 1px 0px 0px"
+            : "var(--chakra-colors-blue-500) 0px 1px 0px 0px"
+        }}
         cursor={disabled ? "not-allowed" : "text"}
         onClick={() => {
           if (!disabled) {
@@ -300,6 +311,7 @@ export const VariableMappingInput = ({
             inputRef.current?.focus();
           }
         }}
+        data-testid={isMissing ? "missing-mapping-input" : undefined}
       >
         <HStack gap={1} paddingY={1} paddingX={1}>
           {/* Source mapping displayed as a closable tag */}
@@ -334,7 +346,8 @@ export const VariableMappingInput = ({
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder={isSourceMapping ? "" : placeholder}
+            placeholder={isMissing ? "Required" : isSourceMapping ? "" : placeholder}
+            _placeholder={{ color: isMissing ? "orange.500" : undefined }}
             size="sm"
             border="none"
             outline="none"

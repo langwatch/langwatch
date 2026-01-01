@@ -173,12 +173,15 @@ describe("useEvaluationsV3Store", () => {
         name: "Runner 1",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [],
+        // Per-dataset mappings: datasetId -> inputField -> FieldMapping
         mappings: {
-          input: {
-            type: "source",
-            source: "dataset",
-            sourceId: "ds-1",
-            sourceField: "col1",
+          "ds-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "ds-1",
+              sourceField: "col1",
+            },
           },
         },
         evaluatorIds: [],
@@ -187,7 +190,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.mappings?.["input"]).toBeUndefined();
+      // The entire dataset key should be removed
+      expect(runner?.mappings?.["ds-1"]).toBeUndefined();
     });
 
     it("cleans up evaluator mappings when removing dataset", () => {
@@ -199,13 +203,16 @@ describe("useEvaluationsV3Store", () => {
         name: "Evaluator 1",
         settings: {},
         inputs: [],
+        // Per-dataset, per-runner mappings: datasetId -> runnerId -> inputField -> FieldMapping
         mappings: {
-          "runner-1": {
-            output: {
-              type: "source",
-              source: "dataset",
-              sourceId: "ds-1",
-              sourceField: "col1",
+          "ds-1": {
+            "runner-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "ds-1",
+                sourceField: "col1",
+              },
             },
           },
         },
@@ -214,7 +221,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["runner-1"]?.["output"]).toBeUndefined();
+      // The entire dataset key should be removed
+      expect(evaluator?.mappings["ds-1"]).toBeUndefined();
     });
 
     it("updates dataset properties", () => {
@@ -267,6 +275,47 @@ describe("useEvaluationsV3Store", () => {
       expect(state.runners[0]?.name).toBe("Updated Runner");
     });
 
+    it("cleans up mappings when inputs are removed", () => {
+      const store = useEvaluationsV3Store.getState();
+      // Create runner with two inputs
+      store.addRunner({
+        ...createTestRunner("runner-1"),
+        inputs: [
+          { identifier: "question", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      });
+
+      // Add mappings for both inputs
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "context", {
+        type: "value",
+        value: "some context",
+      });
+
+      // Verify both mappings exist
+      let state = useEvaluationsV3Store.getState();
+      let runner = state.runners.find((r) => r.id === "runner-1");
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.question).toBeDefined();
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.context).toBeDefined();
+
+      // Remove "context" input - only keep "question"
+      store.updateRunner("runner-1", {
+        inputs: [{ identifier: "question", type: "str" }],
+      });
+
+      // "context" mapping should be cleaned up
+      state = useEvaluationsV3Store.getState();
+      runner = state.runners.find((r) => r.id === "runner-1");
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.question).toBeDefined();
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.context).toBeUndefined();
+    });
+
     it("removes a runner", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
@@ -276,10 +325,11 @@ describe("useEvaluationsV3Store", () => {
       expect(state.runners).toHaveLength(0);
     });
 
-    it("sets runner mapping inside runner with sourceId", () => {
+    it("sets runner mapping for specific dataset", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
-      store.setRunnerMapping("runner-1", "input", {
+      // setRunnerMapping now takes: runnerId, datasetId, inputField, mapping
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "input", {
         type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
@@ -288,7 +338,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.mappings?.["input"]).toEqual({
+      // Mappings are now per-dataset
+      expect(runner?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"]).toEqual({
         type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
@@ -301,7 +352,8 @@ describe("useEvaluationsV3Store", () => {
       store.addRunner(createTestRunner("runner-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
       store.addEvaluatorToRunner("runner-1", "eval-1");
-      store.setEvaluatorMapping("eval-1", "runner-1", "output", {
+      // setEvaluatorMapping now takes: evaluatorId, datasetId, runnerId, inputField, mapping
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
         type: "source",
         source: "runner",
         sourceId: "runner-1",
@@ -311,16 +363,17 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       expect(state.runners).toHaveLength(0);
-      // Evaluator still exists but runner's mappings should be removed
+      // Evaluator still exists but runner's mappings should be removed for all datasets
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["runner-1"]).toBeUndefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]).toBeUndefined();
     });
 
     it("removes mappings referencing removed runner from other runners", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
       store.addRunner(createTestRunner("runner-2"));
-      store.setRunnerMapping("runner-2", "input", {
+      // setRunnerMapping now takes: runnerId, datasetId, inputField, mapping
+      store.setRunnerMapping("runner-2", DEFAULT_TEST_DATA_ID, "input", {
         type: "source",
         source: "runner",
         sourceId: "runner-1",
@@ -330,7 +383,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const runner2 = state.runners.find((r) => r.id === "runner-2");
-      expect(runner2?.mappings?.["input"]).toBeUndefined();
+      // Mappings should be removed for the dataset that referenced the removed runner
+      expect(runner2?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"]).toBeUndefined();
     });
   });
 
@@ -450,7 +504,8 @@ describe("useEvaluationsV3Store", () => {
       store.addRunner(createTestRunner("runner-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
       store.addEvaluatorToRunner("runner-1", "eval-1");
-      store.setEvaluatorMapping("eval-1", "runner-1", "output", {
+      // setEvaluatorMapping now takes: evaluatorId, datasetId, runnerId, inputField, mapping
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
         type: "source",
         source: "runner",
         sourceId: "runner-1",
@@ -459,7 +514,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["runner-1"]?.["output"]).toEqual({
+      // Mappings are now per-dataset, per-runner
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]?.["output"]).toEqual({
         type: "source",
         source: "runner",
         sourceId: "runner-1",

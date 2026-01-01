@@ -1,0 +1,370 @@
+/**
+ * Tests for per-dataset mapping behavior in Evaluations V3.
+ *
+ * @vitest-environment jsdom
+ *
+ * These tests verify that:
+ * 1. Mappings are stored per-dataset
+ * 2. Store actions work correctly with per-dataset structure
+ * 3. The useEvaluationMappings hook returns correct data reactively
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { act, cleanup, renderHook } from "@testing-library/react";
+
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useEvaluationMappings } from "../hooks/useEvaluationMappings";
+import type { DatasetReference, RunnerConfig } from "../types";
+import { DEFAULT_TEST_DATA_ID, createInitialInlineDataset } from "../types";
+
+// ============================================================================
+// Test Data
+// ============================================================================
+
+const createTestDataset = (
+  id: string,
+  name: string,
+  columns: Array<{ name: string; type: "string" | "number" | "boolean" }>
+): DatasetReference => ({
+  id,
+  name,
+  type: "inline",
+  inline: createInitialInlineDataset(),
+  columns: columns.map((col) => ({
+    id: col.name,
+    name: col.name,
+    type: col.type,
+  })),
+});
+
+const createTestRunner = (id: string): RunnerConfig => ({
+  id,
+  type: "prompt",
+  name: `Runner ${id}`,
+  inputs: [
+    { identifier: "question", type: "str" },
+    { identifier: "context", type: "str" },
+  ],
+  outputs: [{ identifier: "output", type: "str" }],
+  mappings: {},
+  evaluatorIds: [],
+});
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+describe("Per-Dataset Mappings", () => {
+  beforeEach(() => {
+    // Reset store before each test
+    act(() => {
+      useEvaluationsV3Store.getState().reset();
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      useEvaluationsV3Store.getState().reset();
+    });
+  });
+
+  describe("setRunnerMapping stores mappings per dataset", () => {
+    it("stores mapping under the specified datasetId", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addRunner(createTestRunner("runner-1"));
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const runner = state.runners.find((r) => r.id === "runner-1");
+
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]).toBeDefined();
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.question).toEqual({
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+    });
+
+    it("stores different mappings for different datasets", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
+        { name: "foo", type: "string" },
+        { name: "bar", type: "string" },
+      ]));
+      store.addRunner(createTestRunner("runner-1"));
+
+      // Set mapping for default dataset
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+
+      // Set different mapping for dataset-2
+      store.setRunnerMapping("runner-1", "dataset-2", "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: "dataset-2",
+        sourceField: "foo",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const runner = state.runners.find((r) => r.id === "runner-1");
+
+      // Each dataset should have its own mapping
+      const mapping1 = runner?.mappings[DEFAULT_TEST_DATA_ID]?.question;
+      const mapping2 = runner?.mappings["dataset-2"]?.question;
+      expect(mapping1?.type).toBe("source");
+      expect(mapping1?.type === "source" && mapping1.sourceField).toBe("input");
+      expect(mapping2?.type).toBe("source");
+      expect(mapping2?.type === "source" && mapping2.sourceField).toBe("foo");
+    });
+  });
+
+  describe("removeRunnerMapping removes mapping for specific dataset", () => {
+    it("removes only the specified mapping", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addRunner(createTestRunner("runner-1"));
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "context", {
+        type: "value",
+        value: "some context",
+      });
+
+      store.removeRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question");
+
+      const state = useEvaluationsV3Store.getState();
+      const runner = state.runners.find((r) => r.id === "runner-1");
+
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.question).toBeUndefined();
+      expect(runner?.mappings[DEFAULT_TEST_DATA_ID]?.context).toBeDefined();
+    });
+  });
+
+  describe("useEvaluationMappings hook", () => {
+    it("returns available sources from active dataset only", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
+        { name: "foo", type: "string" },
+      ]));
+      store.addRunner(createTestRunner("runner-1"));
+
+      const { result } = renderHook(() => useEvaluationMappings("runner-1"));
+
+      // Should only have the active dataset (default)
+      expect(result.current.availableSources).toHaveLength(1);
+      expect(result.current.availableSources[0]?.id).toBe(DEFAULT_TEST_DATA_ID);
+    });
+
+    it("returns mappings for active dataset", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addRunner(createTestRunner("runner-1"));
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+
+      const { result } = renderHook(() => useEvaluationMappings("runner-1"));
+
+      const mapping = result.current.inputMappings.question;
+      expect(mapping).toBeDefined();
+      // UI mapping uses sourceId
+      expect(mapping?.type).toBe("source");
+      if (mapping?.type === "source") {
+        expect(mapping.sourceId).toBe(DEFAULT_TEST_DATA_ID);
+      }
+    });
+
+    it("updates when active dataset changes", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      // Setup: two datasets with different mappings
+      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
+        { name: "foo", type: "string" },
+      ]));
+      store.addRunner(createTestRunner("runner-1"));
+
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+      store.setRunnerMapping("runner-1", "dataset-2", "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: "dataset-2",
+        sourceField: "foo",
+      });
+
+      const { result, rerender } = renderHook(() => useEvaluationMappings("runner-1"));
+
+      // Initially shows default dataset mappings
+      const initialMapping = result.current.inputMappings.question;
+      expect(initialMapping?.type).toBe("source");
+      if (initialMapping?.type === "source") {
+        expect(initialMapping.sourceId).toBe(DEFAULT_TEST_DATA_ID);
+      }
+      expect(result.current.availableSources[0]?.id).toBe(DEFAULT_TEST_DATA_ID);
+
+      // Switch to dataset-2
+      act(() => {
+        useEvaluationsV3Store.getState().setActiveDataset("dataset-2");
+      });
+      rerender();
+
+      // Should now show dataset-2 mappings
+      const updatedMapping = result.current.inputMappings.question;
+      expect(updatedMapping?.type).toBe("source");
+      if (updatedMapping?.type === "source") {
+        expect(updatedMapping.sourceId).toBe("dataset-2");
+      }
+      expect(result.current.availableSources[0]?.id).toBe("dataset-2");
+    });
+
+    it("returns empty mappings for new dataset without mappings", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
+        { name: "foo", type: "string" },
+      ]));
+      store.addRunner(createTestRunner("runner-1"));
+
+      // Only add mapping for default dataset
+      store.setRunnerMapping("runner-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+
+      const { result, rerender } = renderHook(() => useEvaluationMappings("runner-1"));
+
+      // Default dataset has mapping
+      expect(result.current.inputMappings.question).toBeDefined();
+
+      // Switch to dataset-2 (no mappings defined)
+      act(() => {
+        useEvaluationsV3Store.getState().setActiveDataset("dataset-2");
+      });
+      rerender();
+
+      // Should have no mappings
+      expect(result.current.inputMappings.question).toBeUndefined();
+      expect(Object.keys(result.current.inputMappings)).toHaveLength(0);
+    });
+
+    it("returns isValid false when runner not found", () => {
+      const { result } = renderHook(() => useEvaluationMappings("non-existent"));
+
+      expect(result.current.isValid).toBe(false);
+      expect(result.current.availableSources).toHaveLength(1); // Still has active dataset
+      expect(result.current.inputMappings).toEqual({});
+    });
+
+    it("returns empty for undefined runnerId", () => {
+      const { result } = renderHook(() => useEvaluationMappings(undefined));
+
+      expect(result.current.isValid).toBe(false);
+    });
+  });
+
+  describe("evaluator mappings per-dataset per-runner", () => {
+    it("stores evaluator mapping with dataset and runner dimensions", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addRunner(createTestRunner("runner-1"));
+      store.addEvaluator({
+        id: "eval-1",
+        evaluatorType: "langevals/exact_match",
+        name: "Exact Match",
+        settings: {},
+        inputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+      });
+
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
+        type: "source",
+        source: "runner",
+        sourceId: "runner-1",
+        sourceField: "output",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]).toBeDefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]).toBeDefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]?.output).toEqual({
+        type: "source",
+        source: "runner",
+        sourceId: "runner-1",
+        sourceField: "output",
+      });
+    });
+
+    it("can have different evaluator mappings for different datasets", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createTestDataset("dataset-2", "Dataset 2", [
+        { name: "expected", type: "string" },
+      ]));
+      store.addRunner(createTestRunner("runner-1"));
+      store.addEvaluator({
+        id: "eval-1",
+        evaluatorType: "langevals/exact_match",
+        name: "Exact Match",
+        settings: {},
+        inputs: [
+          { identifier: "output", type: "str" },
+          { identifier: "expected", type: "str" },
+        ],
+        mappings: {},
+      });
+
+      // Different expected_output mappings for different datasets
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "expected", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "expected_output",
+      });
+      store.setEvaluatorMapping("eval-1", "dataset-2", "runner-1", "expected", {
+        type: "source",
+        source: "dataset",
+        sourceId: "dataset-2",
+        sourceField: "expected",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
+
+      const mapping1 = evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]?.expected;
+      const mapping2 = evaluator?.mappings["dataset-2"]?.["runner-1"]?.expected;
+
+      expect(mapping1?.type).toBe("source");
+      expect(mapping1?.type === "source" && mapping1.sourceField).toBe("expected_output");
+      expect(mapping2?.type).toBe("source");
+      expect(mapping2?.type === "source" && mapping2.sourceField).toBe("expected");
+    });
+  });
+});

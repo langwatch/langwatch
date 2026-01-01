@@ -132,7 +132,7 @@ describe("Drawer Navigation", () => {
       expect(mockOpenDrawer).toHaveBeenCalledWith("promptEditor");
     });
 
-    it("calls onSelect and closes when a prompt is selected", () => {
+    it("calls onSelect without closing (callback handles navigation)", () => {
       const onSelect = vi.fn();
       renderWithProviders(<PromptListDrawer open={true} onSelect={onSelect} />);
 
@@ -143,7 +143,10 @@ describe("Drawer Navigation", () => {
         id: "prompt-1",
         name: "test-prompt",
       });
-      expect(mockCloseDrawer).toHaveBeenCalled();
+      // closeDrawer is NOT called - the onSelect callback is responsible for navigation
+      // This allows the callback to navigate to another drawer (e.g., promptEditor)
+      // without the flow callbacks being cleared
+      expect(mockCloseDrawer).not.toHaveBeenCalled();
     });
   });
 

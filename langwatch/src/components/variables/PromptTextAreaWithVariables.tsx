@@ -50,7 +50,7 @@ type PromptTextAreaWithVariablesProps = {
   onSetVariableMapping?: (
     identifier: string,
     sourceId: string,
-    field: string
+    field: string,
   ) => void;
   /** Whether the textarea is disabled */
   disabled?: boolean;
@@ -69,7 +69,7 @@ type PromptTextAreaWithVariablesProps = {
   onAddEdge?: (
     nodeId: string,
     field: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => void;
   /**
    * Legacy: fields from other nodes in optimization studio.
@@ -93,7 +93,7 @@ const parseVariablesFromText = (text: string): string[] => {
 // Find unclosed {{ before cursor position
 const findUnclosedBraces = (
   text: string,
-  cursorPos: number
+  cursorPos: number,
 ): { start: number; query: string } | null => {
   // Look backwards from cursor for {{
   const textBeforeCursor = text.substring(0, cursorPos);
@@ -201,10 +201,14 @@ export const PromptTextAreaWithVariables = ({
   // Track latest caret position from RichTextarea
   const caretPositionRef = useRef<CaretPosition | null>(null);
 
+  // Track last user-set cursor position for "Add variable" button insertion
+  // -1 means user hasn't placed cursor yet (should insert at end)
+  const lastUserCursorPosRef = useRef(-1);
+
   // Get existing variable identifiers
   const existingVariableIds = useMemo(
     () => new Set(variables.map((v) => v.identifier)),
-    [variables]
+    [variables],
   );
 
   // Variables used in text but not defined
@@ -212,7 +216,7 @@ export const PromptTextAreaWithVariables = ({
 
   const invalidVariables = useMemo(
     () => usedVariables.filter((v) => !existingVariableIds.has(v)),
-    [usedVariables, existingVariableIds]
+    [usedVariables, existingVariableIds],
   );
 
   // Compute flattened options for keyboard selection (must match menu's logic)
@@ -224,18 +228,24 @@ export const PromptTextAreaWithVariables = ({
       .map((source) => ({
         ...source,
         fields: source.fields.filter((field) =>
-          field.name.toLowerCase().includes(menuQuery.toLowerCase())
+          field.name.toLowerCase().includes(menuQuery.toLowerCase()),
         ),
       }))
       .filter((source) => source.fields.length > 0);
 
     // Check for exact match
     const hasExactMatch = filteredSources.some((source) =>
-      source.fields.some((field) => field.name.toLowerCase() === normalizedQuery)
+      source.fields.some(
+        (field) => field.name.toLowerCase() === normalizedQuery,
+      ),
     );
 
     const options: Array<
-      | { type: "field"; source: AvailableSource; field: { name: string; type: FieldType } }
+      | {
+          type: "field";
+          source: AvailableSource;
+          field: { name: string; type: FieldType };
+        }
       | { type: "create"; name: string }
     > = [];
 
@@ -265,6 +275,13 @@ export const PromptTextAreaWithVariables = ({
   // Handle selection change from RichTextarea
   const handleSelectionChange = useCallback((pos: CaretPosition) => {
     caretPositionRef.current = pos;
+    // Track user cursor position for "Add variable" button via native textarea
+    if (pos.focused) {
+      const nativeTextarea = containerRef.current?.querySelector("textarea");
+      if (nativeTextarea?.selectionStart !== undefined) {
+        lastUserCursorPosRef.current = nativeTextarea.selectionStart;
+      }
+    }
   }, []);
 
   // Calculate caret position for menu
@@ -295,7 +312,7 @@ export const PromptTextAreaWithVariables = ({
       setHighlightedIndex(0);
       setMenuOpen(true);
     },
-    [getCaretCoordinates]
+    [getCaretCoordinates],
   );
 
   // Close the menu
@@ -321,7 +338,7 @@ export const PromptTextAreaWithVariables = ({
       // Check if this is a field from another node (for onAddEdge callback)
       const isOtherNodeField = Object.prototype.hasOwnProperty.call(
         otherNodesFields,
-        option.source.id
+        option.source.id,
       );
 
       if (isOtherNodeField && onAddEdge) {
@@ -350,7 +367,11 @@ export const PromptTextAreaWithVariables = ({
         });
 
         if (onSetVariableMapping) {
-          onSetVariableMapping(option.field.name, option.source.id, option.field.name);
+          onSetVariableMapping(
+            option.field.name,
+            option.source.id,
+            option.field.name,
+          );
         }
       }
 
@@ -434,7 +455,7 @@ export const PromptTextAreaWithVariables = ({
           break;
       }
     },
-    [menuOpen, optionCount, closeMenu, selectHighlightedOption]
+    [menuOpen, optionCount, closeMenu, selectHighlightedOption],
   );
 
   // Handle text change
@@ -463,7 +484,7 @@ export const PromptTextAreaWithVariables = ({
         closeMenu();
       }
     },
-    [onChange, menuOpen, openMenu, closeMenu]
+    [onChange, menuOpen, openMenu, closeMenu],
   );
 
   // Handle field selection from menu
@@ -477,7 +498,7 @@ export const PromptTextAreaWithVariables = ({
       // Check if this is a field from another node (for onAddEdge callback)
       const isOtherNodeField = Object.prototype.hasOwnProperty.call(
         otherNodesFields,
-        field.sourceId
+        field.sourceId,
       );
 
       if (isOtherNodeField && onAddEdge) {
@@ -524,7 +545,7 @@ export const PromptTextAreaWithVariables = ({
           onSetVariableMapping(
             field.fieldName,
             field.sourceId,
-            field.fieldName
+            field.fieldName,
           );
         }
       }
@@ -548,7 +569,7 @@ export const PromptTextAreaWithVariables = ({
       otherNodesFields,
       onAddEdge,
       closeMenu,
-    ]
+    ],
   );
 
   // Handle creating a new variable from menu
@@ -597,7 +618,14 @@ export const PromptTextAreaWithVariables = ({
         nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
       }, 0);
     },
-    [value, onChange, triggerStart, buttonMenuMode, onCreateVariable, closeMenu]
+    [
+      value,
+      onChange,
+      triggerStart,
+      buttonMenuMode,
+      onCreateVariable,
+      closeMenu,
+    ],
   );
 
   // Handle "Add variable" button click - toggles menu under button with search input
@@ -623,8 +651,11 @@ export const PromptTextAreaWithVariables = ({
       });
 
       // Store cursor position for later insertion
-      const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      // Use tracked position if user has clicked in textarea, otherwise insert at end
+      const cursorPos =
+        lastUserCursorPosRef.current >= 0
+          ? lastUserCursorPosRef.current
+          : value.length;
       setTriggerStart(cursorPos);
 
       setMenuQuery("");
@@ -632,7 +663,7 @@ export const PromptTextAreaWithVariables = ({
       setButtonMenuMode(true);
       setMenuOpen(true);
     },
-    [value, menuOpen, buttonMenuMode, closeMenu]
+    [value, menuOpen, buttonMenuMode, closeMenu],
   );
 
   // Render function for rich-textarea - highlights variables as styled spans
@@ -665,11 +696,15 @@ export const PromptTextAreaWithVariables = ({
                 ? "var(--chakra-colors-red-50)"
                 : "var(--chakra-colors-blue-50)",
               borderRadius: "4px",
-              boxShadow: `0 0 0 1px ${isInvalid ? "var(--chakra-colors-red-200)" : "var(--chakra-colors-blue-200)"}`,
+              boxShadow: `0 0 0 1px ${
+                isInvalid
+                  ? "var(--chakra-colors-red-200)"
+                  : "var(--chakra-colors-blue-200)"
+              }`,
             }}
           >
             {match[0]}
-          </span>
+          </span>,
         );
 
         lastIndex = regex.lastIndex;
@@ -682,97 +717,103 @@ export const PromptTextAreaWithVariables = ({
 
       return parts;
     },
-    [existingVariableIds]
+    [existingVariableIds],
   );
 
   return (
-    <Box
-      ref={containerRef}
-      position="relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      minHeight="120px"
-      {...boxProps}
-    >
-      <RichTextarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onSelectionChange={handleSelectionChange}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoHeight
-        style={{
-          width: "100%",
-          minHeight,
-          maxHeight,
-          fontFamily:
-            'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-          fontSize: "13px",
-          lineHeight: "1.5",
-          padding: "8px 10px",
-          border: `1px solid ${hasError ? "var(--chakra-colors-red-500)" : "var(--chakra-colors-gray-200)"}`,
-          borderRadius: "12px",
-          outline: "none",
-          resize: "vertical",
-          overflow: "auto",
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.borderColor = hasError
-            ? "var(--chakra-colors-red-500)"
-            : "var(--chakra-colors-blue-500)";
-          e.currentTarget.style.borderWidth = "2px";
-          e.currentTarget.style.padding = "7px 9px";
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.borderColor = hasError
-            ? "var(--chakra-colors-red-500)"
-            : "var(--chakra-colors-gray-200)";
-          e.currentTarget.style.borderWidth = "1px";
-          e.currentTarget.style.padding = "8px 10px";
-        }}
+    <>
+      <Box
+        ref={containerRef}
+        position="relative"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        minHeight="120px"
+        {...boxProps}
       >
-        {renderText}
-      </RichTextarea>
-
-      {/* Add variable button */}
-      {showAddContextButton && isHovered && !disabled && (
-        <Button
-          ref={addButtonRef}
-          position="absolute"
-          bottom={2.5}
-          right={2}
-          size="xs"
-          variant="ghost"
-          colorPalette="gray"
-          onClick={handleAddVariableClick}
-          onMouseDown={(e) => e.stopPropagation()} // Prevent click-outside from firing
-          opacity={0.7}
-          _hover={{ opacity: 1, background: "gray.100" }}
+        <RichTextarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          onSelectionChange={handleSelectionChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoHeight
+          style={{
+            width: "100%",
+            minHeight,
+            maxHeight,
+            fontFamily:
+              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+            fontSize: "13px",
+            lineHeight: "1.5",
+            padding: "8px 10px",
+            border: `1px solid ${
+              hasError
+                ? "var(--chakra-colors-red-500)"
+                : "var(--chakra-colors-gray-200)"
+            }`,
+            borderRadius: "12px",
+            outline: "none",
+            resize: "vertical",
+            overflow: "auto",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = hasError
+              ? "var(--chakra-colors-red-500)"
+              : "var(--chakra-colors-blue-500)";
+            e.currentTarget.style.borderWidth = "2px";
+            e.currentTarget.style.padding = "7px 9px";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = hasError
+              ? "var(--chakra-colors-red-500)"
+              : "var(--chakra-colors-gray-200)";
+            e.currentTarget.style.borderWidth = "1px";
+            e.currentTarget.style.padding = "8px 10px";
+          }}
         >
-          <Text fontSize="xs" marginRight={1} fontWeight="500">
-            Add variable
-          </Text>
-          <Braces size={14} />
-        </Button>
-      )}
+          {renderText}
+        </RichTextarea>
 
-      {/* Variable Insert Menu */}
-      <VariableInsertMenu
-        isOpen={menuOpen}
-        position={menuPosition}
-        availableSources={availableSources}
-        query={menuQuery}
-        onQueryChange={buttonMenuMode ? setMenuQuery : undefined}
-        highlightedIndex={highlightedIndex}
-        onHighlightChange={setHighlightedIndex}
-        isKeyboardNav={isKeyboardNav}
-        onKeyboardNavChange={setIsKeyboardNav}
-        onSelect={handleSelectField}
-        onCreateVariable={onCreateVariable ? handleCreateVariable : undefined}
-        onClose={closeMenu}
-      />
+        {/* Add variable button */}
+        {showAddContextButton && isHovered && !disabled && (
+          <Button
+            ref={addButtonRef}
+            position="absolute"
+            bottom={2.5}
+            right={2}
+            size="xs"
+            variant="ghost"
+            colorPalette="gray"
+            onClick={handleAddVariableClick}
+            onMouseDown={(e) => e.stopPropagation()} // Prevent click-outside from firing
+            opacity={0.7}
+            _hover={{ opacity: 1, background: "gray.100" }}
+          >
+            <Text fontSize="xs" marginRight={1} fontWeight="500">
+              Add variable
+            </Text>
+            <Braces size={14} />
+          </Button>
+        )}
+
+        {/* Variable Insert Menu */}
+        <VariableInsertMenu
+          isOpen={menuOpen}
+          position={menuPosition}
+          availableSources={availableSources}
+          query={menuQuery}
+          onQueryChange={buttonMenuMode ? setMenuQuery : undefined}
+          highlightedIndex={highlightedIndex}
+          onHighlightChange={setHighlightedIndex}
+          isKeyboardNav={isKeyboardNav}
+          onKeyboardNavChange={setIsKeyboardNav}
+          onSelect={handleSelectField}
+          onCreateVariable={onCreateVariable ? handleCreateVariable : undefined}
+          onClose={closeMenu}
+        />
+      </Box>
 
       {/* Invalid variables warning */}
       {invalidVariables.length > 0 && (
@@ -780,6 +821,6 @@ export const PromptTextAreaWithVariables = ({
           Undefined variables: {invalidVariables.join(", ")}
         </Text>
       )}
-    </Box>
+    </>
   );
 };

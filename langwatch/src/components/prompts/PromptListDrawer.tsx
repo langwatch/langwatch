@@ -85,11 +85,15 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   }, [prompts, searchQuery]);
 
   const handleSelectPrompt = (prompt: { id: string; handle: string | null }) => {
+    // Call onSelect and let the callback handle navigation if needed.
+    // Don't call onClose() here - the callback may navigate to another drawer,
+    // and closeDrawer would wipe the flow callbacks.
+    // If the callback doesn't navigate, the drawer will remain open but
+    // that's the expected behavior for selection-then-edit flows.
     onSelect?.({
       id: prompt.id,
       name: prompt.handle ?? "Untitled",
     });
-    onClose();
   };
 
   return (

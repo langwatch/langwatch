@@ -29,6 +29,8 @@ const mockDatasets: DatasetReference[] = [
   },
 ];
 
+const ACTIVE_DATASET_ID = "dataset-1";
+
 const mockRunner: RunnerConfig = {
   id: "runner-1",
   type: "prompt",
@@ -38,15 +40,30 @@ const mockRunner: RunnerConfig = {
     { identifier: "context", type: "str" },
   ],
   outputs: [{ identifier: "answer", type: "str" }],
+  // Per-dataset mappings: datasetId -> inputField -> FieldMapping
   mappings: {
-    question: {
-      type: "source",
-      source: "dataset",
-      sourceId: "dataset-1",
-      sourceField: "input_text",
+    [ACTIVE_DATASET_ID]: {
+      question: {
+        type: "source",
+        source: "dataset",
+        sourceId: "dataset-1",
+        sourceField: "input_text",
+      },
     },
   },
   evaluatorIds: [],
+  // localPromptConfig is needed to determine which fields are actually used
+  localPromptConfig: {
+    llm: { model: "gpt-4" },
+    messages: [
+      { role: "user", content: "Answer this: {{question}} with context: {{context}}" },
+    ],
+    inputs: [
+      { identifier: "question", type: "str" },
+      { identifier: "context", type: "str" },
+    ],
+    outputs: [{ identifier: "answer", type: "str" }],
+  },
 };
 
 const mockOtherRunner: RunnerConfig = {
@@ -64,10 +81,11 @@ const renderComponent = (
 ) => {
   const defaultProps = {
     runner: mockRunner,
+    activeDatasetId: ACTIVE_DATASET_ID,
     datasets: mockDatasets,
     otherRunners: [],
     onInputsChange: vi.fn(),
-    onMappingsChange: vi.fn(),
+    onMappingChange: vi.fn(),
   };
 
   return render(
@@ -122,18 +140,21 @@ describe("RunnerVariablesPanel", () => {
     it("does not show warning when all inputs are mapped", () => {
       const fullyMappedRunner: RunnerConfig = {
         ...mockRunner,
+        // Per-dataset mappings
         mappings: {
-          question: {
-            type: "source",
-            source: "dataset",
-            sourceId: "dataset-1",
-            sourceField: "input_text",
-          },
-          context: {
-            type: "source",
-            source: "dataset",
-            sourceId: "dataset-1",
-            sourceField: "expected_output",
+          [ACTIVE_DATASET_ID]: {
+            question: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "input_text",
+            },
+            context: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "expected_output",
+            },
           },
         },
       };
@@ -189,10 +210,10 @@ describe("RunnerVariablesPanel", () => {
   });
 
   describe("callbacks", () => {
-    it("calls onMappingsChange when mapping is selected", async () => {
+    it("calls onMappingChange when mapping is selected", async () => {
       const user = userEvent.setup();
-      const onMappingsChange = vi.fn();
-      renderComponent({ onMappingsChange });
+      const onMappingChange = vi.fn();
+      renderComponent({ onMappingChange });
 
       // Find the inputs - with the new Tag UI, the mapped variable (question) shows
       // a tag + empty input, while unmapped variable (context) shows just empty input
@@ -211,14 +232,14 @@ describe("RunnerVariablesPanel", () => {
 
       await user.click(screen.getByText("expected_output"));
 
-      // The callback should be called with the context mapping
-      expect(onMappingsChange).toHaveBeenCalledWith(
+      // The callback should be called with the field name and mapping
+      // onMappingChange(inputField, mapping | undefined)
+      expect(onMappingChange).toHaveBeenCalledWith(
+        "context",
         expect.objectContaining({
-          context: expect.objectContaining({
-            type: "source",
-            sourceId: "dataset-1",
-            sourceField: "expected_output",
-          }),
+          type: "source",
+          sourceId: "dataset-1",
+          sourceField: "expected_output",
         })
       );
     });

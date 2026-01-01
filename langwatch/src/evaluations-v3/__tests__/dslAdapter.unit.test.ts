@@ -137,16 +137,19 @@ describe("DSL Adapter", () => {
                 { identifier: "context", type: "str" },
               ],
               outputs: [{ identifier: "output", type: "str" }],
+              // Per-dataset mappings: datasetId -> inputField -> FieldMapping
               mappings: {
-                question: {
-                  type: "source",
-                  source: "dataset",
-                  sourceId: DEFAULT_TEST_DATA_ID,
-                  sourceField: "input",
-                },
-                context: {
-                  type: "value",
-                  value: "This is hardcoded context",
+                [DEFAULT_TEST_DATA_ID]: {
+                  question: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
+                  context: {
+                    type: "value",
+                    value: "This is hardcoded context",
+                  },
                 },
               },
               evaluatorIds: [],
@@ -186,16 +189,19 @@ describe("DSL Adapter", () => {
                 { identifier: "context", type: "str" },
               ],
               outputs: [{ identifier: "output", type: "str" }],
+              // Per-dataset mappings
               mappings: {
-                question: {
-                  type: "source",
-                  source: "dataset",
-                  sourceId: DEFAULT_TEST_DATA_ID,
-                  sourceField: "input",
-                },
-                context: {
-                  type: "value",
-                  value: "This is hardcoded context",
+                [DEFAULT_TEST_DATA_ID]: {
+                  question: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
+                  context: {
+                    type: "value",
+                    value: "This is hardcoded context",
+                  },
                 },
               },
               evaluatorIds: [],
@@ -220,12 +226,15 @@ describe("DSL Adapter", () => {
               name: "Code Runner",
               inputs: [{ identifier: "question", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
+              // Per-dataset mappings
               mappings: {
-                question: {
-                  type: "source",
-                  source: "dataset",
-                  sourceId: DEFAULT_TEST_DATA_ID,
-                  sourceField: "input",
+                [DEFAULT_TEST_DATA_ID]: {
+                  question: {
+                    type: "source",
+                    source: "dataset",
+                    sourceId: DEFAULT_TEST_DATA_ID,
+                    sourceField: "input",
+                  },
                 },
               },
               evaluatorIds: ["eval-1"],
@@ -241,17 +250,20 @@ describe("DSL Adapter", () => {
                 { identifier: "output", type: "str" },
                 { identifier: "expected", type: "str" },
               ],
+              // Per-dataset, per-runner mappings
               mappings: {
-                "runner-1": {
-                  output: {
-                    type: "source",
-                    source: "runner",
-                    sourceId: "runner-1",
-                    sourceField: "output",
-                  },
-                  expected: {
-                    type: "value",
-                    value: "expected result",
+                [DEFAULT_TEST_DATA_ID]: {
+                  "runner-1": {
+                    output: {
+                      type: "source",
+                      source: "runner",
+                      sourceId: "runner-1",
+                      sourceField: "output",
+                    },
+                    expected: {
+                      type: "value",
+                      value: "expected result",
+                    },
                   },
                 },
               },

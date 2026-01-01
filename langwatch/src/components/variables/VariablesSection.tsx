@@ -58,6 +58,9 @@ export type VariablesSectionProps = {
 
   /** Section title (defaults to "Variables") */
   title?: string;
+
+  /** Set of variable identifiers that are missing required mappings (for highlighting) */
+  missingMappingIds?: Set<string>;
 };
 
 // ============================================================================
@@ -99,6 +102,7 @@ export const VariablesSection = ({
   canAddRemove = true,
   readOnly = false,
   title = "Variables",
+  missingMappingIds = new Set(),
 }: VariablesSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -204,6 +208,7 @@ export const VariablesSection = ({
               canRemove={canAddRemove}
               readOnly={readOnly}
               isEditing={editingId === variable.identifier}
+              isMissing={missingMappingIds.has(variable.identifier)}
               onStartEdit={() => setEditingId(variable.identifier)}
               onEndEdit={() => setEditingId(null)}
               onUpdate={(updates) =>
@@ -251,6 +256,8 @@ type VariableRowProps = {
   canRemove: boolean;
   readOnly: boolean;
   isEditing: boolean;
+  /** Whether this field is missing a required mapping (for highlighting) */
+  isMissing?: boolean;
   onStartEdit: () => void;
   onEndEdit: () => void;
   onUpdate: (updates: Partial<Variable>) => boolean;
@@ -268,6 +275,7 @@ const VariableRow = ({
   canRemove,
   readOnly,
   isEditing,
+  isMissing = false,
   onStartEdit,
   onEndEdit,
   onUpdate,
@@ -397,6 +405,7 @@ const VariableRow = ({
             onMappingChange={onMappingChange}
             disabled={readOnly && !onMappingChange}
             placeholder=""
+            isMissing={isMissing}
           />
         </Box>
       ) : (
