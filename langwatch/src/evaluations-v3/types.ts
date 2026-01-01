@@ -473,7 +473,7 @@ export type TableMeta = {
   runners: RunnerConfig[];
   runnersMap: Map<string, RunnerConfig>;
   evaluatorsMap: Map<string, EvaluatorConfig>;
-  handleEditRunner: (runner: RunnerConfig) => void;
+  openRunnerEditor: (runner: RunnerConfig) => void;
   handleRemoveRunner: (runnerId: string) => void;
   handleAddEvaluatorForRunner: (runnerId: string) => void;
   // Selection data (for checkbox column)

@@ -14,6 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useOpenRunnerEditor } from "../hooks/useOpenRunnerEditor";
 import { validateWorkbench } from "../utils/mappingValidation";
 
 type RunEvaluationButtonProps = {
@@ -25,6 +26,7 @@ export const RunEvaluationButton = ({
   disabled = false,
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
+  const { openRunnerEditor } = useOpenRunnerEditor();
 
   const { runners, evaluators, activeDatasetId } = useEvaluationsV3Store(
     useShallow((state) => ({
@@ -50,15 +52,8 @@ export const RunEvaluationButton = ({
       // Open the drawer for the first entity with missing mappings
       if (validation.firstInvalidRunner) {
         const runner = validation.firstInvalidRunner.runner;
-        // Open prompt editor drawer for this runner
-        if (runner.type === "prompt") {
-          openDrawer("promptEditor", {
-            promptId: runner.promptId,
-            initialLocalConfig: runner.localPromptConfig,
-            urlParams: { runnerId: runner.id },
-          });
-        }
-        // TODO: Handle agent type runners
+        // Open runner editor with proper flow callbacks
+        void openRunnerEditor(runner);
       } else if (validation.firstInvalidEvaluator) {
         // TODO: Open evaluator drawer
         console.log("First invalid evaluator:", validation.firstInvalidEvaluator);

@@ -83,7 +83,7 @@ export const RunnerHeaderFromMeta = ({
   return (
     <RunnerHeader
       runner={runner}
-      onEdit={meta?.handleEditRunner}
+      onEdit={meta?.openRunnerEditor}
       onRemove={meta?.handleRemoveRunner}
     />
   );

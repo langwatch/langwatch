@@ -417,8 +417,10 @@ describe("Flow Callbacks", () => {
 
 describe("Complex Props (backward compatibility)", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mockQuery = {};
     clearDrawerStack();
+    clearFlowCallbacks();
   });
 
   it("extracts function props into complexProps", () => {
@@ -432,6 +434,59 @@ describe("Complex Props (backward compatibility)", () => {
     const complexProps = getComplexProps();
     expect(complexProps).toHaveProperty("onSave");
     expect(complexProps.onSave).toBe(onSave);
+  });
+
+  it("extracts object props into complexProps and excludes them from URL", () => {
+    const { result } = renderHook(() => useDrawer());
+    const availableSources = [
+      { id: "ds1", name: "Dataset 1", type: "dataset", fields: [{ name: "input", type: "string" }] },
+    ];
+    const inputMappings = { input: { type: "source", sourceId: "ds1", field: "input" } };
+
+    act(() => {
+      result.current.openDrawer("promptEditor", {
+        promptId: "test-123",
+        availableSources,
+        inputMappings,
+      } as never); // Use never to bypass type checking for test props
+    });
+
+    // Objects should be in complexProps
+    const complexProps = getComplexProps();
+    expect(complexProps).toHaveProperty("availableSources");
+    expect(complexProps).toHaveProperty("inputMappings");
+    expect(complexProps.availableSources).toBe(availableSources);
+    expect(complexProps.inputMappings).toBe(inputMappings);
+
+    // URL should NOT contain [object Object]
+    expect(mockPush).toHaveBeenCalled();
+    const pushCall = mockPush.mock.calls[0]?.[0] as string;
+    expect(pushCall).not.toContain("[object");
+    expect(pushCall).not.toContain("availableSources");
+    expect(pushCall).not.toContain("inputMappings");
+    // But should contain serializable props
+    expect(pushCall).toContain("drawer.promptId=test-123");
+  });
+
+  it("handles arrays in props by storing in complexProps", () => {
+    const { result } = renderHook(() => useDrawer());
+    const messages = [{ role: "user", content: "Hello" }];
+
+    act(() => {
+      result.current.openDrawer("promptEditor", {
+        promptId: "test-456",
+        initialLocalConfig: { messages },
+      } as never);
+    });
+
+    // Objects (including those containing arrays) should be in complexProps
+    const complexProps = getComplexProps();
+    expect(complexProps).toHaveProperty("initialLocalConfig");
+
+    // URL should NOT contain corrupted array string
+    const pushCall = mockPush.mock.calls[0]?.[0] as string;
+    expect(pushCall).not.toContain("[object");
+    expect(pushCall).toContain("drawer.promptId=test-456");
   });
 
   it("complexProps are replaced on each openDrawer", () => {

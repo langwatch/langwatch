@@ -657,7 +657,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   borderColor="gray.200"
                   paddingX={4}
                   paddingY={3}
-                  bg="white"
                   position="sticky"
                   top={0}
                   zIndex={1}

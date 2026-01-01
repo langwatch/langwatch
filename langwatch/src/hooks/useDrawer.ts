@@ -142,13 +142,21 @@ export const useDrawer = () => {
     props?: Record<string, unknown>,
     options: { replace?: boolean } = {},
   ) => {
-    // Extract non-serializable props into complexProps
-    complexProps = Object.fromEntries(
-      Object.entries(props ?? {}).filter(
-        ([_key, value]) =>
-          typeof value === "function" || typeof value === "object",
-      ),
-    );
+    // Separate serializable props (for URL) from complex props (kept in memory)
+    const serializableProps: Record<string, unknown> = {};
+    const nonSerializableProps: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(props ?? {})) {
+      if (typeof value === "function" || typeof value === "object") {
+        // Functions and objects go to complexProps (not URL)
+        nonSerializableProps[key] = value;
+      } else {
+        // Primitives (string, number, boolean, null, undefined) go to URL
+        serializableProps[key] = value;
+      }
+    }
+
+    complexProps = nonSerializableProps;
 
     void router[options.replace ? "replace" : "push"](
       "?" +
@@ -164,7 +172,7 @@ export const useDrawer = () => {
             ),
             drawer: {
               open: drawer,
-              ...props,
+              ...serializableProps, // Only serializable props go to URL
             },
           },
           {

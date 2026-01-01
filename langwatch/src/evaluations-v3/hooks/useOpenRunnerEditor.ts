@@ -1,0 +1,188 @@
+/**
+ * Hook to open the runner editor drawer with proper flow callbacks.
+ *
+ * This centralizes the logic for:
+ * 1. Building available sources for variable mapping
+ * 2. Converting mappings to UI format
+ * 3. Setting up flow callbacks (onLocalConfigChange, onSave, onInputMappingsChange)
+ * 4. Opening the drawer
+ *
+ * Used by both EvaluationsV3Table (header click) and RunEvaluationButton (validation).
+ */
+
+import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
+
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+import {
+  convertToUIMapping,
+  convertFromUIMapping,
+} from "../utils/fieldMappingConverters";
+import {
+  datasetColumnTypeToFieldType,
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+} from "~/components/variables";
+import type { RunnerConfig } from "../types";
+
+export const useOpenRunnerEditor = () => {
+  const { openDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
+  const trpcUtils = api.useContext();
+
+  const {
+    datasets,
+    activeDatasetId,
+    updateRunner,
+    setRunnerMapping,
+    removeRunnerMapping,
+  } = useEvaluationsV3Store(
+    useShallow((state) => ({
+      datasets: state.datasets,
+      activeDatasetId: state.activeDatasetId,
+      updateRunner: state.updateRunner,
+      setRunnerMapping: state.setRunnerMapping,
+      removeRunnerMapping: state.removeRunnerMapping,
+    }))
+  );
+
+  /**
+   * Check if a source ID refers to a dataset (vs a runner).
+   */
+  const isDatasetSource = useCallback(
+    (sourceId: string) => datasets.some((d) => d.id === sourceId),
+    [datasets]
+  );
+
+  /**
+   * Build available sources for variable mapping (active dataset only).
+   */
+  const buildAvailableSources = useCallback((): AvailableSource[] => {
+    const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+    if (!activeDataset) return [];
+
+    return [
+      {
+        id: activeDataset.id,
+        name: activeDataset.name,
+        type: "dataset" as const,
+        fields: activeDataset.columns.map((col) => ({
+          name: col.name,
+          type: datasetColumnTypeToFieldType(col.type),
+        })),
+      },
+    ];
+  }, [datasets, activeDatasetId]);
+
+  /**
+   * Open the runner editor drawer with proper flow callbacks.
+   */
+  const openRunnerEditor = useCallback(
+    async (runner: RunnerConfig) => {
+      if (runner.type === "prompt") {
+        // Build available sources for variable mapping (active dataset only)
+        const availableSources = buildAvailableSources();
+
+        // Convert runner mappings for the active dataset to UI format
+        const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+        const uiMappings: Record<string, UIFieldMapping> = {};
+        for (const [key, mapping] of Object.entries(datasetMappings)) {
+          uiMappings[key] = convertToUIMapping(mapping);
+        }
+
+        // Set flow callbacks for the prompt editor
+        // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
+        // onSave: updates runner when prompt is published
+        // onInputMappingsChange: updates runner mappings when variable mappings change (for active dataset)
+        setFlowCallbacks("promptEditor", {
+          onLocalConfigChange: (localConfig) => {
+            updateRunner(runner.id, { localPromptConfig: localConfig });
+          },
+          onSave: (savedPrompt) => {
+            updateRunner(runner.id, {
+              name: savedPrompt.name,
+              promptId: savedPrompt.id,
+              localPromptConfig: undefined, // Clear local config on save
+            });
+          },
+          onInputMappingsChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined
+          ) => {
+            // Get the current active dataset from store (it may have changed since drawer was opened)
+            const currentActiveDatasetId =
+              useEvaluationsV3Store.getState().activeDatasetId;
+            const currentDatasets = useEvaluationsV3Store.getState().datasets;
+            const checkIsDatasetSource = (sourceId: string) =>
+              currentDatasets.some((d) => d.id === sourceId);
+
+            if (mapping) {
+              setRunnerMapping(
+                runner.id,
+                currentActiveDatasetId,
+                identifier,
+                convertFromUIMapping(mapping, checkIsDatasetSource)
+              );
+            } else {
+              removeRunnerMapping(runner.id, currentActiveDatasetId, identifier);
+            }
+          },
+        });
+
+        // Open the drawer with initial config and available sources
+        const initialLocalConfig = runner.localPromptConfig;
+        openDrawer("promptEditor", {
+          promptId: runner.promptId,
+          initialLocalConfig,
+          availableSources,
+          inputMappings: uiMappings,
+          urlParams: { runnerId: runner.id },
+        });
+      } else if (runner.type === "agent" && runner.dbAgentId) {
+        // Fetch the agent to determine its type
+        try {
+          const agent = await trpcUtils.agents.getById.fetch({
+            projectId: project?.id ?? "",
+            id: runner.dbAgentId,
+          });
+
+          if (agent?.type === "workflow") {
+            // Open workflow in new tab
+            const config = agent.config as Record<string, unknown>;
+            const workflowId = config.workflowId as string | undefined;
+            if (workflowId) {
+              const workflowUrl = `/${project?.slug}/studio/${workflowId}`;
+              window.open(workflowUrl, "_blank");
+            }
+          } else {
+            // Code agent - open code editor drawer
+            openDrawer("agentCodeEditor", {
+              urlParams: {
+                runnerId: runner.id,
+                agentId: runner.dbAgentId ?? "",
+              },
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch agent:", error);
+        }
+      }
+    },
+    [
+      buildAvailableSources,
+      activeDatasetId,
+      updateRunner,
+      setRunnerMapping,
+      removeRunnerMapping,
+      openDrawer,
+      trpcUtils.agents.getById,
+      project?.id,
+      project?.slug,
+    ]
+  );
+
+  return { openRunnerEditor, buildAvailableSources, isDatasetSource };
+};
