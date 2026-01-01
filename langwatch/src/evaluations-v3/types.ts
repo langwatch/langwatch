@@ -412,6 +412,48 @@ export type EvaluationsV3Actions = {
 export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 
 // ============================================================================
+// Table Types (TanStack Table)
+// ============================================================================
+
+/**
+ * Row data structure for the evaluations table.
+ * Each row contains dataset values and runner outputs.
+ */
+export type TableRowData = {
+  rowIndex: number;
+  dataset: Record<string, string>;
+  runners: Record<
+    string,
+    { output: unknown; evaluators: Record<string, unknown> }
+  >;
+};
+
+/**
+ * Table meta - used to pass dynamic data to column headers/cells
+ * without causing column definition changes (which would remount components).
+ *
+ * IMPORTANT: All dynamic data must go through meta to keep columns stable.
+ * If columns change, TanStack Table will remount all headers.
+ */
+export type TableMeta = {
+  // Runner data
+  runners: RunnerConfig[];
+  runnersMap: Map<string, RunnerConfig>;
+  evaluatorsMap: Map<string, EvaluatorConfig>;
+  handleEditRunner: (runner: RunnerConfig) => void;
+  handleRemoveRunner: (runnerId: string) => void;
+  handleAddEvaluatorForRunner: (runnerId: string) => void;
+  // Selection data (for checkbox column)
+  selectedRows: Set<number>;
+  allSelected: boolean;
+  someSelected: boolean;
+  rowCount: number;
+  toggleRowSelection: (rowIndex: number) => void;
+  selectAllRows: (count: number) => void;
+  clearRowSelection: () => void;
+};
+
+// ============================================================================
 // Initial State
 // ============================================================================
 

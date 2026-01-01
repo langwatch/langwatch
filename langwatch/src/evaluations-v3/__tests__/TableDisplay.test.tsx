@@ -398,3 +398,107 @@ describe("Column resize handles", () => {
     expect(resizers.length).toBeGreaterThan(0);
   });
 });
+
+describe("RunnerHeader stability", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("does not remount RunnerHeader when unrelated state changes (cell selection)", async () => {
+    const store = useEvaluationsV3Store.getState();
+
+    // Add a runner
+    store.addRunner({
+      id: "test-runner",
+      type: "prompt",
+      name: "Test Prompt",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+      evaluatorIds: [],
+    });
+
+    // Track mount/unmount via console logs from RunnerHeader's debug useEffect
+    const mountCount = { current: 0 };
+    const unmountCount = { current: 0 };
+
+    const originalLog = console.log;
+    console.log = (...args) => {
+      if (args[0] === "mounted runner header") mountCount.current++;
+      if (args[0] === "unmounted runner header") unmountCount.current++;
+      originalLog(...args);
+    };
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    // Wait for initial render
+    await waitFor(() => {
+      expect(screen.getByText("Test Prompt")).toBeInTheDocument();
+    });
+
+    const initialMountCount = mountCount.current;
+    const initialUnmountCount = unmountCount.current;
+
+    // Trigger unrelated state change (select a cell)
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    // Wait a bit for any potential re-renders
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // RunnerHeader should NOT have been remounted
+    expect(unmountCount.current).toBe(initialUnmountCount);
+    expect(mountCount.current).toBe(initialMountCount);
+
+    console.log = originalLog;
+  });
+
+  it("does not remount RunnerHeader when row selection changes", async () => {
+    const store = useEvaluationsV3Store.getState();
+
+    // Add a runner
+    store.addRunner({
+      id: "test-runner-2",
+      type: "prompt",
+      name: "Test Prompt 2",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+      evaluatorIds: [],
+    });
+
+    const mountCount = { current: 0 };
+    const unmountCount = { current: 0 };
+
+    const originalLog = console.log;
+    console.log = (...args) => {
+      if (args[0] === "mounted runner header") mountCount.current++;
+      if (args[0] === "unmounted runner header") unmountCount.current++;
+      originalLog(...args);
+    };
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Prompt 2")).toBeInTheDocument();
+    });
+
+    const initialMountCount = mountCount.current;
+    const initialUnmountCount = unmountCount.current;
+
+    // Toggle row selection
+    store.toggleRowSelection(0);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // RunnerHeader should NOT have been remounted
+    expect(unmountCount.current).toBe(initialUnmountCount);
+    expect(mountCount.current).toBe(initialMountCount);
+
+    console.log = originalLog;
+  });
+});

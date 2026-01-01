@@ -1,4 +1,4 @@
-import { Box, Checkbox, HStack, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -17,14 +17,22 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
+import {
+  convertToUIMapping,
+  convertFromUIMapping,
+} from "../utils/fieldMappingConverters";
 import type {
   RunnerConfig,
   DatasetColumn,
   DatasetReference,
   SavedRecord,
   FieldMapping,
+  EvaluatorConfig,
+  TableRowData,
+  TableMeta,
 } from "../types";
 import {
   datasetColumnTypeToFieldType,
@@ -34,23 +42,17 @@ import {
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
-import { RunnerCellContent } from "./RunnerSection/RunnerCell";
-import { RunnerHeader } from "./RunnerSection/RunnerHeader";
 import { ColumnTypeIcon, SuperHeader } from "./TableUI";
 import { SelectionToolbar } from "./SelectionToolbar";
+import {
+  CheckboxHeaderFromMeta,
+  CheckboxCellFromMeta,
+  RunnerHeaderFromMeta,
+  RunnerCellFromMeta,
+} from "./TableMetaWrappers";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-type RowData = {
-  rowIndex: number;
-  dataset: Record<string, string>;
-  runners: Record<
-    string,
-    { output: unknown; evaluators: Record<string, unknown> }
-  >;
-};
+// Types are imported from ../types (TableRowData, TableMeta)
+// Meta wrappers are imported from ./TableMetaWrappers
 
 // ============================================================================
 // Main Component
@@ -135,73 +137,12 @@ export function EvaluationsV3Table({
     })),
   );
 
-  // State to track pending dataset loads
-  const [pendingDatasetLoad, setPendingDatasetLoad] = useState<{
-    datasetId: string;
-    name: string;
-    columnTypes: { name: string; type: DatasetColumnType }[];
-  } | null>(null);
-
-  // Query to load dataset records when adding a saved dataset
-  const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
-    {
-      projectId: project?.id ?? "",
-      datasetId: pendingDatasetLoad?.datasetId ?? "",
-    },
-    {
-      enabled: !!project?.id && !!pendingDatasetLoad,
-    },
-  );
-
-  // Effect to handle when saved dataset records finish loading
-  useEffect(() => {
-    if (
-      pendingDatasetLoad &&
-      savedDatasetRecords.data &&
-      !savedDatasetRecords.isLoading
-    ) {
-      const { datasetId, name, columnTypes } = pendingDatasetLoad;
-
-      // Build columns
-      const columns: DatasetColumn[] = columnTypes.map((col, index) => ({
-        id: `${col.name}_${index}`,
-        name: col.name,
-        type: col.type,
-      }));
-
-      // Transform records to SavedRecord format
-      const savedRecords: SavedRecord[] = (
-        savedDatasetRecords.data?.datasetRecords ?? []
-      ).map((record: { id: string; entry: unknown }) => ({
-        id: record.id,
-        ...Object.fromEntries(
-          columnTypes.map((col) => [
-            col.name,
-            (record.entry as Record<string, unknown>)?.[col.name] ?? "",
-          ]),
-        ),
-      }));
-
-      const newDataset: DatasetReference = {
-        id: `saved_${datasetId}`,
-        name,
-        type: "saved",
-        datasetId,
-        columns,
-        savedRecords,
-      };
-
-      addDataset(newDataset);
-      setActiveDataset(newDataset.id);
-      setPendingDatasetLoad(null);
-    }
-  }, [
-    pendingDatasetLoad,
-    savedDatasetRecords.data,
-    savedDatasetRecords.isLoading,
+  // Load saved datasets when selected from drawer
+  const { loadSavedDataset } = useDatasetSelectionLoader({
+    projectId: project?.id,
     addDataset,
     setActiveDataset,
-  ]);
+  });
 
   // Get the active dataset
   const activeDataset = useMemo(
@@ -295,36 +236,9 @@ export function EvaluationsV3Table({
     }));
   }, [datasets]);
 
-  // Convert store FieldMapping to UI FieldMapping
-  const convertToUIMapping = useCallback(
-    (mapping: FieldMapping): UIFieldMapping => {
-      if (mapping.type === "value") {
-        return { type: "value", value: mapping.value };
-      }
-      return {
-        type: "source",
-        sourceId: mapping.sourceId,
-        field: mapping.sourceField,
-      };
-    },
-    [],
-  );
-
-  // Convert UI FieldMapping to store FieldMapping
-  const convertFromUIMapping = useCallback(
-    (mapping: UIFieldMapping): FieldMapping => {
-      if (mapping.type === "value") {
-        return { type: "value", value: mapping.value };
-      }
-      // Determine if source is a dataset
-      const isDataset = datasets.some((d) => d.id === mapping.sourceId);
-      return {
-        type: "source",
-        source: isDataset ? "dataset" : "runner",
-        sourceId: mapping.sourceId,
-        sourceField: mapping.field,
-      };
-    },
+  // Helper to check if a source ID refers to a dataset
+  const isDatasetSource = useCallback(
+    (sourceId: string) => datasets.some((d) => d.id === sourceId),
     [datasets],
   );
 
@@ -364,7 +278,7 @@ export function EvaluationsV3Table({
               setRunnerMapping(
                 runner.id,
                 identifier,
-                convertFromUIMapping(mapping),
+                convertFromUIMapping(mapping, isDatasetSource),
               );
             } else {
               // Remove the mapping by updating runner without this key
@@ -440,7 +354,7 @@ export function EvaluationsV3Table({
             columnTypes: { name: string; type: DatasetColumnType }[];
           }) => {
             // Trigger loading of saved dataset records
-            setPendingDatasetLoad({
+            loadSavedDataset({
               datasetId: dataset.datasetId,
               name: dataset.name,
               columnTypes: dataset.columnTypes,
@@ -456,7 +370,7 @@ export function EvaluationsV3Table({
             columnTypes: { name: string; type: DatasetColumnType }[];
           }) => {
             // Trigger loading of uploaded dataset records
-            setPendingDatasetLoad({
+            loadSavedDataset({
               datasetId: params.datasetId,
               name: params.name,
               columnTypes: params.columnTypes,
@@ -488,7 +402,7 @@ export function EvaluationsV3Table({
         setSaveAsDatasetDrawerOpen(true);
       },
     }),
-    [openDrawer, addDataset, setActiveDataset],
+    [openDrawer, loadSavedDataset],
   );
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
@@ -549,7 +463,7 @@ export function EvaluationsV3Table({
 
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
-  const rowData = useMemo((): RowData[] => {
+  const rowData = useMemo((): TableRowData[] => {
     return Array.from({ length: displayRowCount }, (_, index) => ({
       rowIndex: index,
       dataset: Object.fromEntries(
@@ -585,42 +499,73 @@ export function EvaluationsV3Table({
     getCellValue,
   ]);
 
-  // Build columns
-  const columnHelper = createColumnHelper<RowData>();
+  // Build columns - columnHelper is stable (useMemo to prevent recreating)
+  const columnHelper = useMemo(() => createColumnHelper<TableRowData>(), []);
+
+  // Extract runner IDs for stable column structure
+  // Only recreate when the actual IDs change, not when runner data changes
+  const runnerIdsKey = runners.map((r) => r.id).join(",");
+  const runnerIds = useMemo(() => runners.map((r) => r.id), [runnerIdsKey]);
+
+  // Similarly stabilize dataset column IDs
+  const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
+  const stableDatasetColumns = useMemo(() => datasetColumns, [datasetColumnIdsKey]);
+
+  // Build table meta for passing dynamic data to headers/cells
+  // This allows column definitions to stay stable while data changes
+  const runnersMap = useMemo(
+    () => new Map(runners.map((r) => [r.id, r])),
+    [runners]
+  );
+
+  const tableMeta: TableMeta = useMemo(
+    () => ({
+      // Runner data
+      runners,
+      runnersMap,
+      evaluatorsMap,
+      handleEditRunner,
+      handleRemoveRunner,
+      handleAddEvaluatorForRunner,
+      // Selection data
+      selectedRows,
+      allSelected,
+      someSelected,
+      rowCount,
+      toggleRowSelection,
+      selectAllRows,
+      clearRowSelection,
+    }),
+    [
+      runners,
+      runnersMap,
+      evaluatorsMap,
+      handleEditRunner,
+      handleRemoveRunner,
+      handleAddEvaluatorForRunner,
+      selectedRows,
+      allSelected,
+      someSelected,
+      rowCount,
+      toggleRowSelection,
+      selectAllRows,
+      clearRowSelection,
+    ]
+  );
 
   const columns = useMemo(() => {
-    const cols: ColumnDef<RowData>[] = [];
+    const cols: ColumnDef<TableRowData>[] = [];
 
-    // Checkbox column
+    // Checkbox column - reads from meta to keep column definition stable
     cols.push(
       columnHelper.display({
         id: "select",
-        header: () => (
-          <Checkbox.Root
-            checked={
-              allSelected ? true : someSelected ? "indeterminate" : false
-            }
-            onCheckedChange={() => {
-              if (allSelected) {
-                clearRowSelection();
-              } else {
-                selectAllRows(rowCount);
-              }
-            }}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-          </Checkbox.Root>
-        ),
+        header: (context) => <CheckboxHeaderFromMeta context={context} />,
         cell: (info) => (
-          <Checkbox.Root
-            checked={selectedRows.has(info.row.index)}
-            onCheckedChange={() => toggleRowSelection(info.row.index)}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-          </Checkbox.Root>
+          <CheckboxCellFromMeta
+            rowIndex={info.row.index}
+            tableMeta={info.table.options.meta as TableMeta | undefined}
+          />
         ),
         size: 40,
         meta: {
@@ -631,7 +576,7 @@ export function EvaluationsV3Table({
     );
 
     // Dataset columns from active dataset
-    for (const column of datasetColumns) {
+    for (const column of stableDatasetColumns) {
       cols.push(
         columnHelper.accessor((row) => row.dataset[column.id], {
           id: `dataset.${column.id}`,
@@ -650,22 +595,18 @@ export function EvaluationsV3Table({
             columnId: column.id,
             dataType: column.type,
           },
-        }) as ColumnDef<RowData>,
+        }) as ColumnDef<TableRowData>,
       );
     }
 
-    // Runner columns (each runner is ONE column, with output + evaluators inside)
-    for (const runner of runners) {
+    // Runner columns - use IDs only for stable column structure
+    // Headers/cells read current data from table meta
+    for (const runnerId of runnerIds) {
       cols.push(
-        columnHelper.accessor((row) => row.runners[runner.id], {
-          id: `runner.${runner.id}`,
-          header: () => (
-            <RunnerHeader
-              key={`runner-header-${runner.id}`}
-              runner={runner}
-              onEdit={handleEditRunner}
-              onRemove={handleRemoveRunner}
-            />
+        columnHelper.accessor((row) => row.runners[runnerId], {
+          id: `runner.${runnerId}`,
+          header: (context) => (
+            <RunnerHeaderFromMeta runnerId={runnerId} context={context} />
           ),
           cell: (info) => {
             const data = info.getValue() as {
@@ -673,13 +614,11 @@ export function EvaluationsV3Table({
               evaluators: Record<string, unknown>;
             };
             return (
-              <RunnerCellContent
-                runner={runner}
-                output={data?.output}
-                evaluatorResults={data?.evaluators ?? {}}
-                row={info.row.index}
-                evaluatorsMap={evaluatorsMap}
-                onAddEvaluator={handleAddEvaluatorForRunner}
+              <RunnerCellFromMeta
+                runnerId={runnerId}
+                data={data}
+                rowIndex={info.row.index}
+                tableMeta={info.table.options.meta as TableMeta | undefined}
               />
             );
           },
@@ -687,28 +626,19 @@ export function EvaluationsV3Table({
           minSize: 200,
           meta: {
             columnType: "runner" as ColumnType,
-            columnId: `runner.${runner.id}`,
+            columnId: `runner.${runnerId}`,
           },
-        }) as ColumnDef<RowData>,
+        }) as ColumnDef<TableRowData>,
       );
     }
 
     return cols;
   }, [
-    datasetColumns,
-    runners,
-    evaluatorsMap,
+    // ONLY structural dependencies - columns should almost never change
+    // All dynamic data goes through tableMeta
+    runnerIds,
+    stableDatasetColumns,
     columnHelper,
-    selectedRows,
-    allSelected,
-    someSelected,
-    rowCount,
-    toggleRowSelection,
-    selectAllRows,
-    clearRowSelection,
-    handleAddEvaluatorForRunner,
-    handleEditRunner,
-    handleRemoveRunner,
   ]);
 
   // Column sizing state - initialize from store
@@ -750,6 +680,7 @@ export function EvaluationsV3Table({
       columnSizing,
     },
     onColumnSizingChange: handleColumnSizingChange,
+    meta: tableMeta,
   });
 
   // Calculate colspan for super headers

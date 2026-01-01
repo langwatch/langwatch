@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { DatasetColumn, DatasetReference, SavedRecord } from "../types";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 /**
@@ -77,5 +78,101 @@ export const useSavedDatasetLoader = () => {
     isLoading: savedDatasetsNeedingRecords.length > 0,
     loadingCount: savedDatasetsNeedingRecords.length,
     datasetsToLoad: savedDatasetsNeedingRecords,
+  };
+};
+
+// ============================================================================
+// New Dataset Selection Hook
+// ============================================================================
+
+type PendingDatasetLoad = {
+  datasetId: string;
+  name: string;
+  columnTypes: { name: string; type: DatasetColumnType }[];
+};
+
+type UseDatasetSelectionLoaderParams = {
+  projectId: string | undefined;
+  addDataset: (dataset: DatasetReference) => void;
+  setActiveDataset: (datasetId: string) => void;
+};
+
+/**
+ * Hook to handle loading a newly-selected saved dataset into the evaluations store.
+ * Use this when the user selects a dataset from the drawer to add to the workbench.
+ */
+export const useDatasetSelectionLoader = ({
+  projectId,
+  addDataset,
+  setActiveDataset,
+}: UseDatasetSelectionLoaderParams) => {
+  // State to track pending dataset loads
+  const [pendingDatasetLoad, setPendingDatasetLoad] =
+    useState<PendingDatasetLoad | null>(null);
+
+  // Query to load dataset records when adding a saved dataset
+  const savedDatasetRecords = api.datasetRecord.getAll.useQuery(
+    {
+      projectId: projectId ?? "",
+      datasetId: pendingDatasetLoad?.datasetId ?? "",
+    },
+    {
+      enabled: !!projectId && !!pendingDatasetLoad,
+    },
+  );
+
+  // Effect to handle when saved dataset records finish loading
+  useEffect(() => {
+    if (
+      pendingDatasetLoad &&
+      savedDatasetRecords.data &&
+      !savedDatasetRecords.isLoading
+    ) {
+      const { datasetId, name, columnTypes } = pendingDatasetLoad;
+
+      // Build columns
+      const columns: DatasetColumn[] = columnTypes.map((col, index) => ({
+        id: `${col.name}_${index}`,
+        name: col.name,
+        type: col.type,
+      }));
+
+      // Transform records to SavedRecord format
+      const savedRecords: SavedRecord[] = (
+        savedDatasetRecords.data?.datasetRecords ?? []
+      ).map((record: { id: string; entry: unknown }) => ({
+        id: record.id,
+        ...Object.fromEntries(
+          columnTypes.map((col) => [
+            col.name,
+            (record.entry as Record<string, unknown>)?.[col.name] ?? "",
+          ]),
+        ),
+      }));
+
+      const newDataset: DatasetReference = {
+        id: `saved_${datasetId}`,
+        name,
+        type: "saved",
+        datasetId,
+        columns,
+        savedRecords,
+      };
+
+      addDataset(newDataset);
+      setActiveDataset(newDataset.id);
+      setPendingDatasetLoad(null);
+    }
+  }, [
+    pendingDatasetLoad,
+    savedDatasetRecords.data,
+    savedDatasetRecords.isLoading,
+    addDataset,
+    setActiveDataset,
+  ]);
+
+  return {
+    loadSavedDataset: setPendingDatasetLoad,
+    isLoading: savedDatasetRecords.isLoading && !!pendingDatasetLoad,
   };
 };
