@@ -111,8 +111,6 @@ export default function EvaluationsV3Page() {
         </Box>
       </VStack>
 
-      <CurrentDrawer />
-
       {/* Load saved dataset records - renders nothing, just triggers fetches */}
       <SavedDatasetLoaders datasets={datasets} />
     </DashboardLayout>
