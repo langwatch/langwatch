@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { AlertTriangle, Plus } from "lucide-react";
+import { Database, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ComponentIcon,
@@ -17,7 +17,7 @@ import {
   VariableTypeIcon,
   VariableTypeBadge,
 } from "~/prompts/components/ui/VariableTypeIcon";
-import type { AvailableSource, SourceType } from "./VariableMappingInput";
+import type { AvailableSource, SourceType, FieldType } from "./VariableMappingInput";
 
 // ============================================================================
 // Types
@@ -28,7 +28,7 @@ export type SelectedField = {
   sourceName: string;
   sourceType: SourceType;
   fieldName: string;
-  fieldType: string;
+  fieldType: FieldType;
 };
 
 type VariableInsertMenuProps = {
@@ -46,6 +46,10 @@ type VariableInsertMenuProps = {
   highlightedIndex: number;
   /** Callback to update highlighted index */
   onHighlightChange: (index: number) => void;
+  /** Whether navigation is via keyboard (to prevent hover conflicts) */
+  isKeyboardNav?: boolean;
+  /** Callback to update keyboard nav mode */
+  onKeyboardNavChange?: (isKeyboard: boolean) => void;
   /** Callback when a field is selected */
   onSelect: (field: SelectedField) => void;
   /** Callback when "create new variable" is selected */
@@ -66,7 +70,7 @@ const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
       <ColorfulBlockIcon
         color="blue.400"
         size="xs"
-        icon={<Text fontSize="10px">📊</Text>}
+        icon={<Database size={12} />}
       />
     );
   }
@@ -90,6 +94,8 @@ export const VariableInsertMenu = ({
   onQueryChange,
   highlightedIndex,
   onHighlightChange,
+  isKeyboardNav: isKeyboardNavProp,
+  onKeyboardNavChange,
   onSelect,
   onCreateVariable,
   onClose,
@@ -97,6 +103,11 @@ export const VariableInsertMenu = ({
 }: VariableInsertMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  // Track if navigation is from keyboard (to avoid hover conflicts)
+  // Use prop if provided, otherwise use local state
+  const [localKeyboardNav, setLocalKeyboardNav] = useState(false);
+  const isKeyboardNav = isKeyboardNavProp ?? localKeyboardNav;
+  const setIsKeyboardNav = onKeyboardNavChange ?? setLocalKeyboardNav;
 
   // Adjusted position to keep menu within viewport
   const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -196,7 +207,7 @@ export const VariableInsertMenu = ({
       | {
           type: "field";
           source: AvailableSource;
-          field: { name: string; type: string };
+          field: { name: string; type: FieldType };
         }
       | { type: "create"; name: string }
     > = [];
@@ -277,7 +288,7 @@ export const VariableInsertMenu = ({
         boxShadow="lg"
         border="1px solid"
         borderColor="gray.200"
-        zIndex="popover"
+        zIndex={2000}
         overflow="hidden"
       >
         {/* Search input (editable) or Query display (readonly) */}
@@ -290,11 +301,13 @@ export const VariableInsertMenu = ({
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown") {
                   e.preventDefault();
+                  setIsKeyboardNav(true);
                   onHighlightChange(
                     Math.min(highlightedIndex + 1, flattenedOptions.length - 1)
                   );
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
+                  setIsKeyboardNav(true);
                   onHighlightChange(Math.max(highlightedIndex - 1, 0));
                 } else if (e.key === "Enter") {
                   e.preventDefault();
@@ -361,8 +374,6 @@ export const VariableInsertMenu = ({
                   {source.fields.map((field) => {
                     const optionIndex = currentFieldIndex++;
                     const isHighlighted = optionIndex === highlightedIndex;
-                    const isTypeMismatch =
-                      expectedType && field.type !== expectedType;
 
                     return (
                       <HStack
@@ -373,7 +384,12 @@ export const VariableInsertMenu = ({
                         cursor="pointer"
                         borderRadius="4px"
                         background={isHighlighted ? "blue.50" : undefined}
-                        _hover={{ background: "blue.50" }}
+                        onMouseMove={() => {
+                          if (isKeyboardNav || highlightedIndex !== optionIndex) {
+                            setIsKeyboardNav(false);
+                            onHighlightChange(optionIndex);
+                          }
+                        }}
                         onClick={() => handleSelect(optionIndex)}
                       >
                         <VariableTypeIcon type={field.type} size={12} />
@@ -381,12 +397,6 @@ export const VariableInsertMenu = ({
                           {field.name}
                         </Text>
                         <VariableTypeBadge type={field.type} size="xs" />
-                        {isTypeMismatch && (
-                          <AlertTriangle
-                            size={12}
-                            color="var(--chakra-colors-orange-500)"
-                          />
-                        )}
                       </HStack>
                     );
                   })}
@@ -404,7 +414,12 @@ export const VariableInsertMenu = ({
                   background={
                     highlightedIndex === createOptionIndex ? "blue.50" : undefined
                   }
-                  _hover={{ background: "blue.50" }}
+                  onMouseMove={() => {
+                    if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
+                      setIsKeyboardNav(false);
+                      onHighlightChange(createOptionIndex);
+                    }
+                  }}
                   borderTop="1px solid"
                   borderColor="gray.100"
                   marginTop={filteredSources.length > 0 ? 2 : 0}

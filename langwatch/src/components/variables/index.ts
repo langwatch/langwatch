@@ -7,6 +7,7 @@ export {
   type AvailableSource,
   type SourceType,
   type FieldMapping,
+  type FieldType,
 } from "./VariableMappingInput";
 
 export {
@@ -26,3 +27,6 @@ export {
 } from "./PromptTextAreaWithVariables";
 
 export { FormVariablesSection } from "./FormVariablesSection";
+
+// Re-export from datasetUtils for convenience
+export { datasetColumnTypeToFieldType } from "~/optimization_studio/utils/datasetUtils";

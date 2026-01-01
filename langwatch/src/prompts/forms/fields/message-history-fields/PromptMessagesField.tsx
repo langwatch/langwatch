@@ -19,6 +19,7 @@ import {
   PromptTextAreaWithVariables,
   type PromptTextAreaOnAddMention,
   type Variable,
+  type AvailableSource,
 } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
@@ -45,6 +46,8 @@ type MessageRowProps = {
   open: boolean;
   availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
+  /** Available sources for variable insertion (datasets, runners, etc.) */
+  availableSources?: AvailableSource[];
   messageErrors?: string;
   hasMessagesError: boolean;
   getMessageError: (
@@ -53,6 +56,12 @@ type MessageRowProps = {
   ) => { message?: string } | undefined;
   onRemove: () => void;
   onCreateVariable: (variable: Variable) => void;
+  /** Callback when a variable mapping should be set */
+  onSetVariableMapping?: (
+    identifier: string,
+    sourceId: string,
+    field: string,
+  ) => void;
   onAddEdge?: (
     id: string,
     handle: string,
@@ -70,22 +79,17 @@ function MessageRow({
   open,
   availableFields,
   otherNodesFields,
+  availableSources,
   messageErrors,
   hasMessagesError,
   getMessageError,
   onRemove,
   onCreateVariable,
+  onSetVariableMapping,
   onAddEdge,
 }: MessageRowProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
-
-  useEffect(() => {
-    console.log("mounting MessageRow");
-    return () => {
-      console.log("unmounting MessageRow");
-    };
-  }, []);
 
   return (
     <VerticalFormControl
@@ -112,10 +116,12 @@ function MessageRow({
           <PromptTextAreaWithVariables
             variables={availableFields}
             otherNodesFields={otherNodesFields}
+            availableSources={availableSources}
             value={controllerField.value ?? ""}
             onChange={controllerField.onChange}
             hasError={!!getMessageError(idx, "content")}
             onCreateVariable={onCreateVariable}
+            onSetVariableMapping={onSetVariableMapping}
             onAddEdge={(id, handle, content) => {
               onAddEdge?.(id, handle, content, idx);
             }}
@@ -139,6 +145,8 @@ export function PromptMessagesField({
   messageFields,
   availableFields,
   otherNodesFields,
+  availableSources,
+  onSetVariableMapping,
   onAddEdge,
 }: {
   messageFields: UseFieldArrayReturn<
@@ -149,6 +157,14 @@ export function PromptMessagesField({
   /** Available variables with their types */
   availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
+  /** Available sources for variable insertion (datasets, runners, etc.) */
+  availableSources?: AvailableSource[];
+  /** Callback when a variable mapping should be set */
+  onSetVariableMapping?: (
+    identifier: string,
+    sourceId: string,
+    field: string,
+  ) => void;
   onAddEdge?: (
     id: string,
     handle: string,
@@ -268,11 +284,13 @@ export function PromptMessagesField({
                 open={open}
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
+                availableSources={availableSources}
                 messageErrors={messageErrors}
                 hasMessagesError={hasMessagesError}
                 getMessageError={getMessageError}
                 onRemove={() => messageFields.remove(systemIndex)}
                 onCreateVariable={handleCreateVariable}
+                onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={onAddEdge}
               />
             ) : null;
@@ -287,11 +305,13 @@ export function PromptMessagesField({
                 open={open}
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
+                availableSources={availableSources}
                 messageErrors={messageErrors}
                 hasMessagesError={hasMessagesError}
                 getMessageError={getMessageError}
                 onRemove={() => messageFields.remove(idx)}
                 onCreateVariable={handleCreateVariable}
+                onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={onAddEdge}
               />
             );

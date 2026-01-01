@@ -2,9 +2,11 @@ import { VStack, Text, Box } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
   VariablesSection,
+  datasetColumnTypeToFieldType,
   type Variable,
   type AvailableSource,
   type FieldMapping as VariableFieldMapping,
+  type FieldType,
 } from "~/components/variables";
 import type { RunnerConfig, FieldMapping, DatasetReference } from "../../types";
 import type { Field } from "~/optimization_studio/types/dsl";
@@ -49,7 +51,8 @@ const buildAvailableSources = (
       type: "dataset",
       fields: dataset.columns.map((col) => ({
         name: col.name,
-        type: col.type,
+        // Convert DatasetColumnType to FieldType
+        type: datasetColumnTypeToFieldType(col.type),
       })),
     });
   }
@@ -63,7 +66,8 @@ const buildAvailableSources = (
       type: sourceType,
       fields: runner.outputs.map((output) => ({
         name: output.identifier,
-        type: output.type,
+        // Runner outputs already use FieldType
+        type: output.type as FieldType,
       })),
     });
   }
@@ -93,8 +97,7 @@ const variablesToFields = (variables: Variable[]): Field[] => {
 
 /**
  * Convert RunnerConfig mappings to VariablesSection format.
- * RunnerConfig uses: { source: "dataset" | "runner", sourceId, sourceField }
- * VariablesSection uses: { sourceId, field }
+ * Both support source and value mapping types.
  */
 const convertToVariableMappings = (
   mappings: Record<string, FieldMapping>
@@ -102,10 +105,15 @@ const convertToVariableMappings = (
   const result: Record<string, VariableFieldMapping> = {};
 
   for (const [key, mapping] of Object.entries(mappings)) {
-    result[key] = {
-      sourceId: mapping.sourceId,
-      field: mapping.sourceField,
-    };
+    if (mapping.type === "value") {
+      result[key] = { type: "value", value: mapping.value };
+    } else {
+      result[key] = {
+        type: "source",
+        sourceId: mapping.sourceId,
+        field: mapping.sourceField,
+      };
+    }
   }
 
   return result;
@@ -113,16 +121,21 @@ const convertToVariableMappings = (
 
 /**
  * Convert VariablesSection mapping back to RunnerConfig format.
- * Needs to determine if source is a dataset or runner.
+ * For source mappings, determines if source is a dataset or runner.
  */
 const convertFromVariableMapping = (
   mapping: VariableFieldMapping,
   datasets: DatasetReference[]
 ): FieldMapping => {
-  // Check if sourceId is a dataset
+  if (mapping.type === "value") {
+    return { type: "value", value: mapping.value };
+  }
+
+  // Source mapping - check if sourceId is a dataset
   const isDataset = datasets.some((d) => d.id === mapping.sourceId);
 
   return {
+    type: "source",
     source: isDataset ? "dataset" : "runner",
     sourceId: mapping.sourceId,
     sourceField: mapping.field,

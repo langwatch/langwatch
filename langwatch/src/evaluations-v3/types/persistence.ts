@@ -1,5 +1,10 @@
 import { z } from "zod";
 import type { EvaluationsV3State } from "../types";
+import {
+  datasetReferenceSchema,
+  evaluatorConfigSchema,
+  runnerConfigSchema,
+} from "../types";
 
 /**
  * The state that gets persisted to the database.
@@ -21,131 +26,8 @@ export const extractPersistedState = (
 };
 
 /**
- * Zod schema for field mapping validation.
- */
-const fieldMappingSchema = z.object({
-  source: z.enum(["dataset", "runner"]),
-  sourceId: z.string(),
-  sourceField: z.string(),
-});
-
-/**
- * Zod schema for dataset column validation.
- * Uses passthrough() to allow all DatasetColumnType values from the server.
- */
-const datasetColumnSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.string(), // Allow any string since DatasetColumnType has many values
-});
-
-/**
- * Zod schema for inline dataset validation.
- */
-const inlineDatasetSchema = z.object({
-  columns: z.array(datasetColumnSchema),
-  records: z.record(z.string(), z.array(z.string())),
-});
-
-/**
- * Zod schema for dataset reference validation.
- */
-const datasetReferenceSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  type: z.enum(["inline", "saved"]),
-  inline: inlineDatasetSchema.optional(),
-  datasetId: z.string().optional(),
-  columns: z.array(datasetColumnSchema),
-});
-
-/**
- * Zod schema for field validation (from optimization studio).
- */
-const fieldSchema = z.object({
-  identifier: z.string(),
-  type: z.string(),
-  value: z.unknown().optional(),
-});
-
-/**
- * Zod schema for evaluator config validation.
- */
-const evaluatorConfigSchema = z.object({
-  id: z.string(),
-  evaluatorType: z.string(),
-  name: z.string(),
-  settings: z.record(z.string(), z.unknown()),
-  inputs: z.array(fieldSchema),
-  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-});
-
-/**
- * Zod schema for local prompt config validation.
- * Stores unpublished prompt modifications for quick tinkering.
- */
-const localPromptConfigSchema = z.object({
-  llm: z.object({
-    model: z.string(),
-    temperature: z.number().optional(),
-    maxTokens: z.number().optional(),
-    litellmParams: z.record(z.string(), z.string()).optional(),
-  }),
-  messages: z.array(
-    z.object({
-      role: z.enum(["user", "assistant", "system"]),
-      content: z.string(),
-    })
-  ),
-  inputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.enum([
-        "str",
-        "float",
-        "bool",
-        "image",
-        "list[str]",
-        "list[float]",
-        "list[int]",
-        "list[bool]",
-        "dict",
-      ]),
-    })
-  ),
-  outputs: z.array(
-    z.object({
-      identifier: z.string(),
-      type: z.enum(["str", "float", "bool", "json_schema"]),
-      json_schema: z.unknown().optional(),
-    })
-  ),
-});
-
-/**
- * Zod schema for runner config validation.
- * Runners can be either prompts (referencing saved prompts) or agents (code/workflow).
- */
-const runnerConfigSchema = z.object({
-  id: z.string(),
-  type: z.enum(["prompt", "agent"]),
-  name: z.string(),
-  // For prompt type
-  promptId: z.string().optional(),
-  promptVersionId: z.string().optional(),
-  // For prompt type - local unpublished modifications
-  localPromptConfig: localPromptConfigSchema.optional(),
-  // For agent type
-  dbAgentId: z.string().optional(),
-  // Common fields
-  inputs: z.array(fieldSchema).optional(),
-  outputs: z.array(fieldSchema).optional(),
-  mappings: z.record(z.string(), fieldMappingSchema).optional(),
-  evaluatorIds: z.array(z.string()),
-});
-
-/**
  * Zod schema for persisted evaluations v3 state validation.
+ * Reuses schemas from types.ts (single source of truth).
  */
 export const persistedEvaluationsV3StateSchema = z.object({
   experimentId: z.string().optional(),

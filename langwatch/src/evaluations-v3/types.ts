@@ -1,12 +1,41 @@
+import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { Field } from "~/optimization_studio/types/dsl";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
-// Dataset Types
+// Zod Schemas (source of truth - types are inferred from these)
 // ============================================================================
 
+/**
+ * Zod schema for field mapping validation.
+ * Discriminated union: source mapping OR value mapping.
+ */
+export const fieldMappingSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("source"),
+    source: z.enum(["dataset", "runner"]),
+    sourceId: z.string(),
+    sourceField: z.string(),
+  }),
+  z.object({
+    type: z.literal("value"),
+    value: z.string(),
+  }),
+]);
+export type FieldMapping = z.infer<typeof fieldMappingSchema>;
+
+/**
+ * Zod schema for dataset column validation.
+ * Runtime validation is permissive (string), TypeScript type is strict.
+ */
+export const datasetColumnSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(), // Allow any string at runtime since DatasetColumnType has many values
+});
+// TypeScript type uses the strict DatasetColumnType
 export type DatasetColumn = {
   id: string;
   name: string;
@@ -14,143 +43,145 @@ export type DatasetColumn = {
 };
 
 /**
- * Inline dataset data - stored directly in state.
- * Used for the default "Test Data" or newly created datasets.
+ * Zod schema for inline dataset validation.
  */
+export const inlineDatasetSchema = z.object({
+  columns: z.array(datasetColumnSchema),
+  records: z.record(z.string(), z.array(z.string())),
+});
 export type InlineDataset = {
   columns: DatasetColumn[];
-  records: Record<string, string[]>; // columnId -> array of values per row
+  records: Record<string, string[]>;
 };
 
 /**
- * A single saved record from the database.
- * The `id` is the record ID from the DB, other fields are column values.
+ * Zod schema for saved record validation.
  */
-export type SavedRecord = {
-  id: string;
-} & Record<string, unknown>;
+export const savedRecordSchema = z
+  .object({
+    id: z.string(),
+  })
+  .passthrough();
+export type SavedRecord = { id: string } & Record<string, unknown>;
 
 /**
- * A dataset reference in the workbench.
- * Can be either inline (data stored here) or saved (reference to DB).
+ * Zod schema for dataset reference validation.
  */
+export const datasetReferenceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(["inline", "saved"]),
+  inline: inlineDatasetSchema.optional(),
+  datasetId: z.string().optional(),
+  columns: z.array(datasetColumnSchema),
+  savedRecords: z.array(savedRecordSchema).optional(),
+});
 export type DatasetReference = {
-  id: string; // Unique ID in workbench (e.g., "test-data" or ksuid)
-  name: string; // Display name (tab label)
+  id: string;
+  name: string;
   type: "inline" | "saved";
-  // For inline datasets - contains the actual data
   inline?: InlineDataset;
-  // For saved datasets - reference to DB dataset ID
   datasetId?: string;
-  // Cached columns for mapping UI (always present)
   columns: DatasetColumn[];
-  // For saved datasets - cached records from DB (loaded when added to workbench)
   savedRecords?: SavedRecord[];
 };
 
-// ============================================================================
-// Mapping Types (defined first as other types use them)
-// ============================================================================
+/**
+ * Zod schema for field validation (from optimization studio).
+ */
+export const fieldSchema = z.object({
+  identifier: z.string(),
+  type: z.string(),
+  value: z.unknown().optional(),
+});
 
 /**
- * Maps a target field to a source field.
- * Source can be "dataset" (with datasetId) or "runner" (with runnerId).
+ * Zod schema for local prompt config validation.
  */
-export type FieldMapping = {
-  source: "dataset" | "runner";
-  sourceId: string; // dataset ID or runner ID
-  sourceField: string;
-};
-
-// ============================================================================
-// Evaluator Types (global/shared, will be stored in DB in future)
-// ============================================================================
+export const localPromptConfigSchema = z.object({
+  llm: z.object({
+    model: z.string(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+    litellmParams: z.record(z.string(), z.string()).optional(),
+  }),
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant", "system"]),
+      content: z.string(),
+    })
+  ),
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum([
+        "str",
+        "float",
+        "bool",
+        "image",
+        "list[str]",
+        "list[float]",
+        "list[int]",
+        "list[bool]",
+        "dict",
+        "list",
+      ]),
+    })
+  ),
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum(["str", "float", "bool", "json_schema"]),
+      json_schema: z.unknown().optional(),
+    })
+  ),
+});
+export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 /**
- * Global evaluator configuration.
- * Evaluators are shared across runners - runners reference them by ID.
- * Per-runner mappings are stored inside the evaluator for easy access in the global panel.
- * When generating DSL, evaluators are duplicated per-runner with {runnerId}.{evaluatorId} naming.
+ * Zod schema for evaluator config validation.
  */
-export type EvaluatorConfig = {
-  id: string;
+export const evaluatorConfigSchema = z.object({
+  id: z.string(),
+  evaluatorType: z.string(),
+  name: z.string(),
+  settings: z.record(z.string(), z.unknown()),
+  inputs: z.array(fieldSchema),
+  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
+  dbEvaluatorId: z.string().optional(),
+});
+export type EvaluatorConfig = Omit<
+  z.infer<typeof evaluatorConfigSchema>,
+  "evaluatorType" | "inputs"
+> & {
   evaluatorType: EvaluatorTypes | `custom/${string}`;
-  name: string;
-  settings: Record<string, unknown>;
   inputs: Field[];
-  // Per-runner input mappings for this evaluator
-  // runnerId -> { inputFieldName -> mapping }
-  mappings: Record<string, Record<string, FieldMapping>>;
-  // Reference to database-backed evaluator (if using saved evaluator)
-  dbEvaluatorId?: string;
 };
 
-// ============================================================================
-// Runner Types
-// ============================================================================
-
 /**
- * Runner type - either a versioned prompt or an agent (code/workflow)
+ * Zod schema for runner config validation.
  */
+export const runnerConfigSchema = z.object({
+  id: z.string(),
+  type: z.enum(["prompt", "agent"]),
+  name: z.string(),
+  icon: z.string().optional(),
+  promptId: z.string().optional(),
+  promptVersionId: z.string().optional(),
+  localPromptConfig: localPromptConfigSchema.optional(),
+  dbAgentId: z.string().optional(),
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  mappings: z.record(z.string(), fieldMappingSchema),
+  evaluatorIds: z.array(z.string()),
+});
 export type RunnerType = "prompt" | "agent";
-
-/**
- * Local prompt configuration for unpublished modifications.
- * Stores the prompt config locally in the runner without publishing a new version.
- * Used for quick tinkering - allows running evaluations against modified prompts
- * without committing to the versioning system.
- */
-export type LocalPromptConfig = {
-  llm: {
-    model: string;
-    temperature?: number;
-    maxTokens?: number;
-    litellmParams?: Record<string, string>;
-  };
-  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  inputs: Array<{ identifier: string; type: LlmConfigInputType }>;
-  outputs: Array<{
-    identifier: string;
-    type: LlmConfigOutputType;
-    json_schema?: unknown;
-  }>;
-};
-
-/**
- * Runner configuration - unified type for prompts and agents in evaluations.
- * A runner can be either:
- * - A Prompt: references a versioned prompt from the Prompts system
- * - An Agent: references a saved agent (code or workflow type)
- */
-export type RunnerConfig = {
-  id: string;
-  type: RunnerType;
-  name: string;
-  icon?: string;
-
-  // For prompts - reference to versioned prompt from Prompts system
-  promptId?: string;
-  promptVersionId?: string;
-
-  // For prompts - local unpublished modifications
-  // When set, this config is used for evaluation instead of the published version.
-  // Allows quick tinkering without committing to the versioning system.
-  localPromptConfig?: LocalPromptConfig;
-
-  // For agents - reference to database-backed agent (code or workflow)
-  // Agent type and workflow ID are fetched at runtime via dbAgentId
-  dbAgentId?: string;
-
-  // Common fields
+export type RunnerConfig = Omit<
+  z.infer<typeof runnerConfigSchema>,
+  "inputs" | "outputs"
+> & {
   inputs: Field[];
   outputs: Field[];
-
-  // Runner input mappings (how runner inputs connect to dataset/other runners)
-  // inputFieldName -> mapping
-  mappings: Record<string, FieldMapping>;
-
-  // References to global evaluators by ID
-  evaluatorIds: string[];
 };
 
 // ============================================================================

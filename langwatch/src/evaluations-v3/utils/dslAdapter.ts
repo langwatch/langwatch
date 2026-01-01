@@ -156,16 +156,26 @@ const columnTypeToFieldType = (
 /**
  * Create a code node from a runner config.
  * Uses the `parameters` array structure expected by the DSL.
+ * Sets default values on inputs that have value mappings.
  */
 const createCodeNode = (runner: RunnerConfig, index: number): Node<Code> => {
   const parameters: Field[] = [];
+
+  // Apply value mappings as default values on inputs
+  const inputs: Field[] = (runner.inputs ?? []).map((input) => {
+    const mapping = runner.mappings[input.identifier];
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    return input;
+  });
 
   return {
     id: runner.id,
     type: "code",
     data: {
       name: runner.name,
-      inputs: runner.inputs ?? [],
+      inputs,
       outputs: runner.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
     },
@@ -176,6 +186,7 @@ const createCodeNode = (runner: RunnerConfig, index: number): Node<Code> => {
 /**
  * Create an evaluator node for a specific runner.
  * Node ID is {runnerId}.{evaluatorId} for clear result mapping back to the table.
+ * Sets default values on inputs that have value mappings.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
@@ -183,13 +194,25 @@ const createEvaluatorNode = (
   runnerIndex: number,
   evalIndex: number
 ): Node<Evaluator> => {
+  // Get the mappings for this runner
+  const runnerMappings = evaluator.mappings[runnerId] ?? {};
+
+  // Apply value mappings as default values on inputs
+  const inputs: Field[] = evaluator.inputs.map((input) => {
+    const mapping = runnerMappings[input.identifier];
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    return input;
+  });
+
   return {
     id: `${runnerId}.${evaluator.id}`,
     type: "evaluator",
     data: {
       name: `${evaluator.name}`,
       cls: "LangWatchEvaluator",
-      inputs: evaluator.inputs,
+      inputs,
       outputs: [{ identifier: "passed", type: "bool" }],
       evaluator: evaluator.evaluatorType,
       ...evaluator.settings,
@@ -212,6 +235,9 @@ const buildRunnerEdges = (
     if (!runner.mappings) continue;
 
     for (const [inputField, mapping] of Object.entries(runner.mappings)) {
+      // Skip value mappings - they don't create edges
+      if (mapping.type === "value") continue;
+
       if (
         mapping.source === "dataset" &&
         mapping.sourceId === activeDatasetId
@@ -260,6 +286,9 @@ const buildEvaluatorEdges = (
       const evaluatorNodeId = `${runner.id}.${evaluator.id}`;
 
       for (const [inputField, mapping] of Object.entries(runnerMappings)) {
+        // Skip value mappings - they don't create edges
+        if (mapping.type === "value") continue;
+
         if (
           mapping.source === "dataset" &&
           mapping.sourceId === activeDatasetId

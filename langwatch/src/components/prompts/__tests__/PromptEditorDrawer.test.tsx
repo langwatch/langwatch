@@ -29,6 +29,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
   getComplexProps: () => ({}),
   useDrawerParams: () => ({}),
+  getFlowCallbacks: () => undefined,
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -444,6 +445,116 @@ describe("PromptEditorDrawer", () => {
       expect(
         screen.queryByTestId("discard-local-changes-button")
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Variable mappings (evaluations context)", () => {
+    const mockOnInputMappingsChange = vi.fn();
+    const mockAvailableSources = [
+      {
+        id: "dataset-1",
+        name: "Test Dataset",
+        type: "dataset" as const,
+        fields: [
+          { name: "question", type: "str" as const },
+          { name: "expected_answer", type: "str" as const },
+        ],
+      },
+    ];
+
+    beforeEach(() => {
+      mockGetByIdOrHandle.mockReturnValue({
+        data: mockPromptDataWithMessages,
+        isLoading: false,
+      });
+      mockOnInputMappingsChange.mockClear();
+    });
+
+    it("shows mapping UI when availableSources is provided", () => {
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          availableSources={mockAvailableSources}
+        />
+      );
+
+      // Variables section should be present
+      expect(screen.getByText("Variables")).toBeInTheDocument();
+    });
+
+    it("shows simple inputs when no availableSources provided", () => {
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+        />
+      );
+
+      // Variables section should be present with simple inputs
+      expect(screen.getByText("Variables")).toBeInTheDocument();
+    });
+
+    it("accepts inputMappings and onInputMappingsChange props", () => {
+      const inputMappings = {
+        question: { type: "source" as const, sourceId: "dataset-1", field: "question" },
+      };
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          availableSources={mockAvailableSources}
+          inputMappings={inputMappings}
+          onInputMappingsChange={mockOnInputMappingsChange}
+        />
+      );
+
+      // The drawer should render without errors
+      expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+    });
+
+    it("sets mapping when selecting a source field from variable insert menu", async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          availableSources={mockAvailableSources}
+          onInputMappingsChange={mockOnInputMappingsChange}
+        />
+      );
+
+      // Find the prompt textarea and type {{ to trigger variable menu
+      const textareas = screen.getAllByRole("textbox");
+      const promptTextarea = textareas.find(t => t.getAttribute("data-testid")?.includes("textarea") || t.closest("[data-testid]")?.getAttribute("data-testid")?.includes("prompt"));
+
+      if (promptTextarea) {
+        await user.click(promptTextarea);
+        await user.type(promptTextarea, "{{");
+
+        // Wait for the variable insert menu to appear
+        await waitFor(() => {
+          expect(screen.getByText("Test Dataset")).toBeInTheDocument();
+        }, { timeout: 3000 });
+
+        // Click on the "question" field from the dataset
+        const questionOption = screen.getByText("question");
+        await user.click(questionOption);
+
+        // Verify onInputMappingsChange was called with the correct mapping
+        await waitFor(() => {
+          expect(mockOnInputMappingsChange).toHaveBeenCalledWith(
+            "question",
+            expect.objectContaining({
+              type: "source",
+              sourceId: "dataset-1",
+              field: "question",
+            })
+          );
+        }, { timeout: 3000 });
+      }
     });
   });
 

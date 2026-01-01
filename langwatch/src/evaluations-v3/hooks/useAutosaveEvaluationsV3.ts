@@ -9,6 +9,8 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
 
+const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
+
 const stringifiedInitialState = JSON.stringify(
   extractPersistedState(createInitialState())
 );
@@ -20,7 +22,7 @@ const stringifiedInitialState = JSON.stringify(
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
-  const lastAutosaveRef = useRef(0);
+  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasLoadedExistingRef = useRef(false);
 
@@ -136,11 +138,14 @@ export const useAutosaveEvaluationsV3 = () => {
     }
   }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
 
-  // Clear the saved timeout on unmount
+  // Clear timeouts on unmount
   useEffect(() => {
     return () => {
       if (savedTimeoutRef.current) {
         clearTimeout(savedTimeoutRef.current);
+      }
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
     };
   }, []);
@@ -156,7 +161,7 @@ export const useAutosaveEvaluationsV3 = () => {
     }, 2000);
   }, [setAutosaveStatus]);
 
-  // Autosave effect
+  // Autosave effect with debounce
   useEffect(() => {
     if (!project) return;
     // Only wait if we're actually trying to load an existing experiment
@@ -165,15 +170,18 @@ export const useAutosaveEvaluationsV3 = () => {
     if (existingExperiment.isLoading) return;
     if (!name) return;
 
-    const now = Date.now();
-    if (now - lastAutosaveRef.current < 100) return;
-    lastAutosaveRef.current = now;
-
     // Only save if we have an existing experiment OR there are actual changes from initial state
-    if (
-      !!experimentId ||
-      stringifiedState !== stringifiedInitialState
-    ) {
+    if (!experimentId && stringifiedState === stringifiedInitialState) {
+      return;
+    }
+
+    // Clear any existing debounce timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    // Set debounced save - waits until user stops making changes
+    debounceTimeoutRef.current = setTimeout(() => {
       setAutosaveStatus("evaluation", "saving");
 
       void (async () => {
@@ -211,7 +219,14 @@ export const useAutosaveEvaluationsV3 = () => {
           });
         }
       })();
-    }
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    // Cleanup on dependency change
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
 

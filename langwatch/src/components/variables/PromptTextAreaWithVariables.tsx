@@ -19,7 +19,7 @@ import {
   getMenuOptionCount,
   type SelectedField,
 } from "./VariableInsertMenu";
-import type { AvailableSource } from "./VariableMappingInput";
+import type { AvailableSource, FieldType } from "./VariableMappingInput";
 import type { Variable } from "./VariablesSection";
 
 // ============================================================================
@@ -188,6 +188,7 @@ export const PromptTextAreaWithVariables = ({
   const [menuQuery, setMenuQuery] = useState("");
   const [triggerStart, setTriggerStart] = useState<number | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // When true, menu was opened via button (shows search input, inserts full {{var}})
   const [buttonMenuMode, setButtonMenuMode] = useState(false);
 
@@ -234,7 +235,7 @@ export const PromptTextAreaWithVariables = ({
     );
 
     const options: Array<
-      | { type: "field"; source: AvailableSource; field: { name: string; type: string } }
+      | { type: "field"; source: AvailableSource; field: { name: string; type: FieldType } }
       | { type: "create"; name: string }
     > = [];
 
@@ -414,10 +415,12 @@ export const PromptTextAreaWithVariables = ({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
+          setIsKeyboardNav(true);
           setHighlightedIndex((prev) => Math.min(prev + 1, optionCount - 1));
           break;
         case "ArrowUp":
           e.preventDefault();
+          setIsKeyboardNav(true);
           setHighlightedIndex((prev) => Math.max(prev - 1, 0));
           break;
         case "Enter":
@@ -597,28 +600,40 @@ export const PromptTextAreaWithVariables = ({
     [value, onChange, triggerStart, buttonMenuMode, onCreateVariable, closeMenu]
   );
 
-  // Handle "Add variable" button click - opens menu under button with search input
-  const handleAddVariableClick = useCallback(() => {
-    const button = addButtonRef.current;
-    if (!button) return;
+  // Handle "Add variable" button click - toggles menu under button with search input
+  const handleAddVariableClick = useCallback(
+    (e: React.MouseEvent) => {
+      // Prevent the click from triggering the click-outside handler
+      e.stopPropagation();
 
-    // Position menu under the button
-    const rect = button.getBoundingClientRect();
-    setMenuPosition({
-      top: rect.bottom + 4,
-      left: rect.left,
-    });
+      // If menu is already open in button mode, close it (toggle behavior)
+      if (menuOpen && buttonMenuMode) {
+        closeMenu();
+        return;
+      }
 
-    // Store cursor position for later insertion
-    const nativeTextarea = containerRef.current?.querySelector("textarea");
-    const cursorPos = nativeTextarea?.selectionStart ?? value.length;
-    setTriggerStart(cursorPos);
+      const button = addButtonRef.current;
+      if (!button) return;
 
-    setMenuQuery("");
-    setHighlightedIndex(0);
-    setButtonMenuMode(true);
-    setMenuOpen(true);
-  }, [value]);
+      // Position menu under the button
+      const rect = button.getBoundingClientRect();
+      setMenuPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+      });
+
+      // Store cursor position for later insertion
+      const nativeTextarea = containerRef.current?.querySelector("textarea");
+      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      setTriggerStart(cursorPos);
+
+      setMenuQuery("");
+      setHighlightedIndex(0);
+      setButtonMenuMode(true);
+      setMenuOpen(true);
+    },
+    [value, menuOpen, buttonMenuMode, closeMenu]
+  );
 
   // Render function for rich-textarea - highlights variables as styled spans
   const renderText = useCallback(
@@ -732,6 +747,7 @@ export const PromptTextAreaWithVariables = ({
           variant="ghost"
           colorPalette="gray"
           onClick={handleAddVariableClick}
+          onMouseDown={(e) => e.stopPropagation()} // Prevent click-outside from firing
           opacity={0.7}
           _hover={{ opacity: 1, background: "gray.100" }}
         >
@@ -751,6 +767,8 @@ export const PromptTextAreaWithVariables = ({
         onQueryChange={buttonMenuMode ? setMenuQuery : undefined}
         highlightedIndex={highlightedIndex}
         onHighlightChange={setHighlightedIndex}
+        isKeyboardNav={isKeyboardNav}
+        onKeyboardNavChange={setIsKeyboardNav}
         onSelect={handleSelectField}
         onCreateVariable={onCreateVariable ? handleCreateVariable : undefined}
         onClose={closeMenu}

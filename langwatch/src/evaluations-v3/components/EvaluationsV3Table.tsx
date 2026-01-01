@@ -24,7 +24,13 @@ import type {
   DatasetColumn,
   DatasetReference,
   SavedRecord,
+  FieldMapping,
 } from "../types";
+import {
+  datasetColumnTypeToFieldType,
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+} from "~/components/variables";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
@@ -89,6 +95,7 @@ export function EvaluationsV3Table({
     addRunner,
     updateRunner,
     removeRunner,
+    setRunnerMapping,
     addEvaluator,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
@@ -123,6 +130,7 @@ export function EvaluationsV3Table({
       addRunner: state.addRunner,
       updateRunner: state.updateRunner,
       removeRunner: state.removeRunner,
+      setRunnerMapping: state.setRunnerMapping,
       addEvaluator: state.addEvaluator,
     })),
   );
@@ -274,13 +282,69 @@ export function EvaluationsV3Table({
   // tRPC utils for fetching agent data
   const trpcUtils = api.useContext();
 
+  // Build available sources from datasets for variable mapping
+  const buildAvailableSources = useCallback((): AvailableSource[] => {
+    return datasets.map((dataset) => ({
+      id: dataset.id,
+      name: dataset.name,
+      type: "dataset" as const,
+      fields: dataset.columns.map((col) => ({
+        name: col.name,
+        type: datasetColumnTypeToFieldType(col.type),
+      })),
+    }));
+  }, [datasets]);
+
+  // Convert store FieldMapping to UI FieldMapping
+  const convertToUIMapping = useCallback(
+    (mapping: FieldMapping): UIFieldMapping => {
+      if (mapping.type === "value") {
+        return { type: "value", value: mapping.value };
+      }
+      return {
+        type: "source",
+        sourceId: mapping.sourceId,
+        field: mapping.sourceField,
+      };
+    },
+    [],
+  );
+
+  // Convert UI FieldMapping to store FieldMapping
+  const convertFromUIMapping = useCallback(
+    (mapping: UIFieldMapping): FieldMapping => {
+      if (mapping.type === "value") {
+        return { type: "value", value: mapping.value };
+      }
+      // Determine if source is a dataset
+      const isDataset = datasets.some((d) => d.id === mapping.sourceId);
+      return {
+        type: "source",
+        source: isDataset ? "dataset" : "runner",
+        sourceId: mapping.sourceId,
+        sourceField: mapping.field,
+      };
+    },
+    [datasets],
+  );
+
   // Handler for editing a runner (clicking on the header)
   const handleEditRunner = useCallback(
     async (runner: RunnerConfig) => {
       if (runner.type === "prompt") {
+        // Build available sources for variable mapping
+        const availableSources = buildAvailableSources();
+
+        // Convert runner mappings to UI format
+        const uiMappings: Record<string, UIFieldMapping> = {};
+        for (const [key, mapping] of Object.entries(runner.mappings)) {
+          uiMappings[key] = convertToUIMapping(mapping);
+        }
+
         // Set flow callbacks for the prompt editor
         // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
         // onSave: updates runner when prompt is published
+        // onInputMappingsChange: updates runner mappings when variable mappings change
         setFlowCallbacks("promptEditor", {
           onLocalConfigChange: (localConfig) => {
             updateRunner(runner.id, { localPromptConfig: localConfig });
@@ -292,12 +356,36 @@ export function EvaluationsV3Table({
               localPromptConfig: undefined, // Clear local config on save
             });
           },
+          onInputMappingsChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
+            if (mapping) {
+              setRunnerMapping(
+                runner.id,
+                identifier,
+                convertFromUIMapping(mapping),
+              );
+            } else {
+              // Remove the mapping by updating runner without this key
+              const currentRunner = useEvaluationsV3Store
+                .getState()
+                .runners.find((r) => r.id === runner.id);
+              if (currentRunner) {
+                const newMappings = { ...currentRunner.mappings };
+                delete newMappings[identifier];
+                updateRunner(runner.id, { mappings: newMappings });
+              }
+            }
+          },
         });
-        // Pass initialLocalConfig as a complex prop (object gets extracted to complexProps)
+        // Pass initialLocalConfig and available sources as complex props
         const initialLocalConfig = runner.localPromptConfig;
         openDrawer("promptEditor", {
           promptId: runner.promptId,
           initialLocalConfig,
+          availableSources,
+          inputMappings: uiMappings,
           urlParams: { runnerId: runner.id },
         });
       } else if (runner.type === "agent" && runner.dbAgentId) {
@@ -318,7 +406,12 @@ export function EvaluationsV3Table({
             }
           } else {
             // Code agent - open code editor drawer
-            openDrawer("agentCodeEditor", { urlParams: { runnerId: runner.id, agentId: runner.dbAgentId ?? "" } });
+            openDrawer("agentCodeEditor", {
+              urlParams: {
+                runnerId: runner.id,
+                agentId: runner.dbAgentId ?? "",
+              },
+            });
           }
         } catch (error) {
           console.error("Failed to fetch agent:", error);
@@ -568,6 +661,7 @@ export function EvaluationsV3Table({
           id: `runner.${runner.id}`,
           header: () => (
             <RunnerHeader
+              key={`runner-header-${runner.id}`}
               runner={runner}
               onEdit={handleEditRunner}
               onRemove={handleRemoveRunner}
@@ -770,11 +864,21 @@ export function EvaluationsV3Table({
               colSpan={runnersColSpan}
               onAddClick={() => {
                 // Set flow callbacks for the entire add-runner flow
-                setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
-                setFlowCallbacks("promptEditor", { onSave: handleSelectPrompt });
-                setFlowCallbacks("agentList", { onSelect: handleSelectSavedAgent });
-                setFlowCallbacks("agentCodeEditor", { onSave: handleSelectSavedAgent });
-                setFlowCallbacks("workflowSelector", { onSave: handleSelectSavedAgent });
+                setFlowCallbacks("promptList", {
+                  onSelect: handleSelectPrompt,
+                });
+                setFlowCallbacks("promptEditor", {
+                  onSave: handleSelectPrompt,
+                });
+                setFlowCallbacks("agentList", {
+                  onSelect: handleSelectSavedAgent,
+                });
+                setFlowCallbacks("agentCodeEditor", {
+                  onSave: handleSelectSavedAgent,
+                });
+                setFlowCallbacks("workflowSelector", {
+                  onSave: handleSelectSavedAgent,
+                });
                 openDrawer("runnerTypeSelector");
               }}
               showWarning={runners.length === 0}
@@ -806,14 +910,21 @@ export function EvaluationsV3Table({
               ))}
               {runners.length === 0 ? (
                 // Spacer column to match drawer width + default runner column width
-                <th style={{ width: DRAWER_WIDTH + 280, minWidth: DRAWER_WIDTH + 280 }}>
+                <th
+                  style={{
+                    width: DRAWER_WIDTH + 280,
+                    minWidth: DRAWER_WIDTH + 280,
+                  }}
+                >
                   <Text fontSize="xs" color="gray.400" fontStyle="italic">
                     Click "+ Add" above to get started
                   </Text>
                 </th>
               ) : (
                 // Spacer column to match drawer width
-                <th style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}></th>
+                <th
+                  style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
+                ></th>
               )}
             </tr>
           ))}

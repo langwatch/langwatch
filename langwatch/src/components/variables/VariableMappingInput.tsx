@@ -3,14 +3,15 @@ import {
   HStack,
   Input,
   Portal,
+  Tag,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, Database } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Database, Type } from "lucide-react";
 import { VariableTypeIcon, VariableTypeBadge } from "~/prompts/components/ui/VariableTypeIcon";
 import { ComponentIcon, ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
-import type { ComponentType } from "~/optimization_studio/types/dsl";
+import type { ComponentType, Field } from "~/optimization_studio/types/dsl";
 
 // ============================================================================
 // Types
@@ -19,40 +20,44 @@ import type { ComponentType } from "~/optimization_studio/types/dsl";
 /** Source types aligned with DSL ComponentType + dataset */
 export type SourceType = ComponentType | "dataset";
 
+/** Field type - uses DSL Field type for strong typing */
+export type FieldType = Field["type"];
+
 export type AvailableSource = {
   id: string;
   name: string;
   type: SourceType;
   fields: Array<{
     name: string;
-    type: string; // "str", "float", "json", etc.
+    type: FieldType;
     path?: string; // For nested fields: "output_parsed.company_name"
   }>;
 };
 
-export type FieldMapping = {
-  sourceId: string;
-  field: string;
-};
+/**
+ * Field mapping - either to a source field or a hardcoded value.
+ */
+export type FieldMapping =
+  | { type: "source"; sourceId: string; field: string }
+  | { type: "value"; value: string };
 
 type VariableMappingInputProps = {
-  /** Current mapping value, if mapped to a source */
+  /** Current mapping (source or value) */
   mapping?: FieldMapping;
-  /** Default/fallback value when not mapped */
-  defaultValue?: string;
   /** Callback when mapping changes */
   onMappingChange?: (mapping: FieldMapping | undefined) => void;
-  /** Callback when default value changes */
-  onDefaultValueChange?: (value: string) => void;
   /** Available sources to map from */
   availableSources: AvailableSource[];
-  /** Expected type for this variable (for type mismatch warnings) */
-  expectedType?: string;
   /** Placeholder text */
   placeholder?: string;
   /** Whether the input is disabled */
   disabled?: boolean;
 };
+
+/** Represents a selectable option in the dropdown */
+type DropdownOption =
+  | { type: "field"; sourceId: string; sourceName: string; sourceType: SourceType; fieldName: string; fieldType: string }
+  | { type: "value"; value: string };
 
 // ============================================================================
 // Source Type Icons
@@ -80,77 +85,172 @@ const SourceTypeIconComponent = ({ type }: { type: SourceType }) => {
 
 export const VariableMappingInput = ({
   mapping,
-  defaultValue = "",
   onMappingChange,
-  onDefaultValueChange,
   availableSources,
-  expectedType,
   placeholder = "Enter value or select source...",
   disabled = false,
 }: VariableMappingInputProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [inputValue, setInputValue] = useState(defaultValue);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
+  // Local state to track the current value - prevents stale prop issues
+  const [localMapping, setLocalMapping] = useState<FieldMapping | undefined>(mapping);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Get display value for the input
-  const getDisplayValue = useCallback(() => {
-    if (mapping) {
-      const source = availableSources.find((s) => s.id === mapping.sourceId);
-      if (source) {
-        return `${source.name}.${mapping.field}`;
-      }
-    }
-    return inputValue;
-  }, [mapping, availableSources, inputValue]);
+  // Sync local mapping when prop changes (e.g., from external updates)
+  useEffect(() => {
+    setLocalMapping(mapping);
+  }, [mapping]);
 
-  // Check if there's a type mismatch
-  const getTypeMismatch = useCallback(() => {
-    if (!mapping || !expectedType) return false;
-    const source = availableSources.find((s) => s.id === mapping.sourceId);
-    if (!source) return false;
-    const field = source.fields.find((f) => f.name === mapping.field);
-    if (!field) return false;
-    // Simple type comparison - could be more sophisticated
-    return field.type !== expectedType;
-  }, [mapping, expectedType, availableSources]);
+  // Helper to check if mapping is a source mapping
+  const isSourceMapping = localMapping?.type === "source";
+  const isValueMapping = localMapping?.type === "value";
+
+  // Get source info for the current mapping
+  const sourceInfo = useMemo(() => {
+    if (isSourceMapping && localMapping) {
+      const source = availableSources.find((s) => s.id === localMapping.sourceId);
+      return source ? { source, field: localMapping.field } : null;
+    }
+    return null;
+  }, [localMapping, isSourceMapping, availableSources]);
+
+  // Get display value for the input (only for value mappings now)
+  const getDisplayValue = useCallback(() => {
+    if (isValueMapping && localMapping) {
+      return localMapping.value;
+    }
+    return "";
+  }, [localMapping, isValueMapping]);
 
   // Filter sources based on search query
-  const filteredSources = availableSources
-    .map((source) => ({
-      ...source,
-      fields: source.fields.filter((field) =>
-        field.name.toLowerCase().includes(searchQuery.toLowerCase())
-      ),
-    }))
-    .filter((source) => source.fields.length > 0);
+  const filteredSources = useMemo(() =>
+    availableSources
+      .map((source) => ({
+        ...source,
+        fields: source.fields.filter((field) =>
+          field.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ),
+      }))
+      .filter((source) => source.fields.length > 0),
+    [availableSources, searchQuery]
+  );
 
-  // Handle input change
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setInputValue(value);
-    setSearchQuery(value);
+  // Build flat list of options for keyboard navigation
+  const allOptions: DropdownOption[] = useMemo(() => {
+    const options: DropdownOption[] = [];
 
-    // If there was a mapping, clear it when user types
-    if (mapping && onMappingChange) {
-      onMappingChange(undefined);
+    // Add all source fields
+    for (const source of filteredSources) {
+      for (const field of source.fields) {
+        options.push({
+          type: "field",
+          sourceId: source.id,
+          sourceName: source.name,
+          sourceType: source.type,
+          fieldName: field.name,
+          fieldType: field.type,
+        });
+      }
     }
 
-    if (onDefaultValueChange) {
-      onDefaultValueChange(value);
+    // Add "use as value" option if user typed something
+    if (searchQuery.trim()) {
+      options.push({ type: "value", value: searchQuery.trim() });
+    }
+
+    return options;
+  }, [filteredSources, searchQuery]);
+
+  // Reset highlighted index when options change
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [allOptions.length]);
+
+  // Clear the current mapping
+  const handleClearMapping = useCallback(() => {
+    setLocalMapping(undefined);
+    onMappingChange?.(undefined);
+    setSearchQuery("");
+    // Re-focus the input after clearing
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [onMappingChange]);
+
+  // Handle input change - updates search query
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchQuery(value);
+    setHighlightedIndex(0);
+    setIsOpen(true); // Open dropdown when typing
+    // If user starts typing while having a value mapping, clear it
+    if (isValueMapping && localMapping) {
+      setLocalMapping(undefined);
+      onMappingChange?.(undefined);
     }
   };
 
-  // Handle field selection
-  const handleSelectField = (sourceId: string, fieldName: string) => {
-    if (onMappingChange) {
-      onMappingChange({ sourceId, field: fieldName });
+  // Handle option selection
+  const handleSelectOption = useCallback((option: DropdownOption) => {
+    if (option.type === "field") {
+      const newMapping: FieldMapping = { type: "source", sourceId: option.sourceId, field: option.fieldName };
+      setLocalMapping(newMapping);
+      onMappingChange?.(newMapping);
+    } else {
+      const newMapping: FieldMapping = { type: "value", value: option.value };
+      setLocalMapping(newMapping);
+      onMappingChange?.(newMapping);
     }
     setIsOpen(false);
     setSearchQuery("");
-  };
+  }, [onMappingChange]);
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Handle backspace to clear source mapping when input is empty
+    if (e.key === "Backspace" && isSourceMapping && searchQuery === "") {
+      e.preventDefault();
+      handleClearMapping();
+      return;
+    }
+
+    if (!isOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        setIsOpen(true);
+        setIsKeyboardNav(true);
+        e.preventDefault();
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setIsKeyboardNav(true);
+        setHighlightedIndex((prev) =>
+          prev < allOptions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setIsKeyboardNav(true);
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (allOptions[highlightedIndex]) {
+          handleSelectOption(allOptions[highlightedIndex]);
+        }
+        break;
+      case "Escape":
+        e.preventDefault();
+        setIsOpen(false);
+        setSearchQuery("");
+        break;
+    }
+  }, [isOpen, allOptions, highlightedIndex, handleSelectOption, isSourceMapping, searchQuery, handleClearMapping]);
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -183,18 +283,16 @@ export const VariableMappingInput = ({
     }
   }, [isOpen]);
 
-  const hasTypeMismatch = getTypeMismatch();
+  // Track current option index for highlighting
+  let currentOptionIndex = -1;
 
   return (
     <Box position="relative" ref={containerRef} width="full">
-      <HStack
-        background={mapping ? "blue.50" : "gray.50"}
-        borderRadius="6px"
-        paddingX={2}
-        paddingY={1}
-        border="1px solid"
-        borderColor={hasTypeMismatch ? "orange.300" : mapping ? "blue.200" : "gray.200"}
-        _hover={{ borderColor: disabled ? undefined : "gray.400" }}
+      {/* Container with full-width bottom border */}
+      <Box
+        borderBottom="1px solid"
+        borderColor="gray.200"
+        _focusWithin={{ borderColor: "blue.500", boxShadow: "var(--chakra-colors-blue-500) 0px 1px 0px 0px" }}
         cursor={disabled ? "not-allowed" : "text"}
         onClick={() => {
           if (!disabled) {
@@ -203,38 +301,56 @@ export const VariableMappingInput = ({
           }
         }}
       >
-        {mapping && (
-          <Box flexShrink={0}>
-            <SourceTypeIconComponent
-              type={
-                availableSources.find((s) => s.id === mapping.sourceId)?.type ||
-                "entry"
-              }
-            />
-          </Box>
-        )}
+        <HStack gap={1} paddingY={1} paddingX={1}>
+          {/* Source mapping displayed as a closable tag */}
+          {isSourceMapping && sourceInfo && (
+            <Tag.Root
+              size="md"
+              colorPalette="blue"
+              variant="subtle"
+              data-testid="source-mapping-tag"
+            >
+              <SourceTypeIconComponent type={sourceInfo.source.type} />
+              <Tag.Label fontFamily="mono" fontSize="12px">
+                {sourceInfo.field}
+              </Tag.Label>
+              <Tag.EndElement>
+                <Tag.CloseTrigger
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!disabled) {
+                      handleClearMapping();
+                    }
+                  }}
+                  data-testid="clear-mapping-button"
+                />
+              </Tag.EndElement>
+            </Tag.Root>
+          )}
 
-        <Input
-          ref={inputRef}
-          value={isOpen ? searchQuery : getDisplayValue()}
-          onChange={handleInputChange}
-          onFocus={() => setIsOpen(true)}
-          placeholder={placeholder}
-          size="sm"
-          variant="flushed"
-          border="none"
-          fontFamily={mapping ? "mono" : undefined}
-          fontSize="13px"
-          disabled={disabled}
-          flex={1}
-        />
-
-        {hasTypeMismatch && (
-          <AlertTriangle size={14} color="var(--chakra-colors-orange-500)" />
-        )}
-
-        <ChevronDown size={14} color="var(--chakra-colors-gray-400)" />
-      </HStack>
+          <Input
+            ref={inputRef}
+            value={isOpen ? searchQuery : (isSourceMapping ? "" : getDisplayValue())}
+            onChange={handleInputChange}
+            onFocus={() => setIsOpen(true)}
+            onKeyDown={handleKeyDown}
+            placeholder={isSourceMapping ? "" : placeholder}
+            size="sm"
+            border="none"
+            outline="none"
+            borderRadius="none"
+            background="transparent"
+            _focus={{ boxShadow: "none", border: "none" }}
+            _hover={{ border: "none" }}
+            fontSize="13px"
+            disabled={disabled}
+            flex={1}
+            minWidth={isSourceMapping ? "20px" : undefined}
+            height="24px"
+            paddingX={0}
+          />
+        </HStack>
+      </Box>
 
       {/* Dropdown */}
       {isOpen && !disabled && (
@@ -252,14 +368,12 @@ export const VariableMappingInput = ({
             boxShadow="lg"
             border="1px solid"
             borderColor="gray.200"
-            zIndex={1000}
+            zIndex={2000}
           >
-            {filteredSources.length === 0 ? (
+            {allOptions.length === 0 ? (
               <Box padding={3}>
                 <Text fontSize="sm" color="gray.500">
-                  {searchQuery
-                    ? "No matching fields found"
-                    : "No available sources"}
+                  No available sources
                 </Text>
               </Box>
             ) : (
@@ -283,8 +397,9 @@ export const VariableMappingInput = ({
 
                     {/* Fields */}
                     {source.fields.map((field) => {
-                      const isTypeMismatch =
-                        expectedType && field.type !== expectedType;
+                      currentOptionIndex++;
+                      const optionIdx = currentOptionIndex;
+                      const isHighlighted = optionIdx === highlightedIndex;
 
                       return (
                         <HStack
@@ -294,8 +409,22 @@ export const VariableMappingInput = ({
                           gap={2}
                           cursor="pointer"
                           borderRadius="4px"
-                          _hover={{ background: "blue.50" }}
-                          onClick={() => handleSelectField(source.id, field.name)}
+                          background={isHighlighted ? "blue.50" : "transparent"}
+                          onMouseMove={() => {
+                            if (isKeyboardNav || highlightedIndex !== optionIdx) {
+                              setIsKeyboardNav(false);
+                              setHighlightedIndex(optionIdx);
+                            }
+                          }}
+                          onClick={() => handleSelectOption({
+                            type: "field",
+                            sourceId: source.id,
+                            sourceName: source.name,
+                            sourceType: source.type,
+                            fieldName: field.name,
+                            fieldType: field.type,
+                          })}
+                          data-highlighted={isHighlighted}
                         >
                           <VariableTypeIcon type={field.type} size={12} />
                           <Text
@@ -306,17 +435,42 @@ export const VariableMappingInput = ({
                             {field.name}
                           </Text>
                           <VariableTypeBadge type={field.type} size="xs" />
-                          {isTypeMismatch && (
-                            <AlertTriangle
-                              size={12}
-                              color="var(--chakra-colors-orange-500)"
-                            />
-                          )}
                         </HStack>
                       );
                     })}
                   </Box>
                 ))}
+
+                {/* "Use as value" option when user typed something */}
+                {searchQuery.trim() && (
+                  <div data-testid="use-as-value-option">
+                    {filteredSources.length > 0 && (
+                      <Box height="1px" background="gray.200" marginY={1} />
+                    )}
+                    <HStack
+                      paddingX={3}
+                      paddingY={2}
+                      gap={2}
+                      cursor="pointer"
+                      borderRadius="4px"
+                      background={highlightedIndex === allOptions.length - 1 ? "blue.50" : "transparent"}
+                      onMouseMove={() => {
+                        const valueOptionIdx = allOptions.length - 1;
+                        if (isKeyboardNav || highlightedIndex !== valueOptionIdx) {
+                          setIsKeyboardNav(false);
+                          setHighlightedIndex(valueOptionIdx);
+                        }
+                      }}
+                      onClick={() => handleSelectOption({ type: "value", value: searchQuery.trim() })}
+                      data-highlighted={highlightedIndex === allOptions.length - 1}
+                    >
+                      <Type size={14} color="var(--chakra-colors-gray-500)" />
+                      <Text fontSize="13px" color="gray.600">
+                        Use "<Text as="span" fontWeight="medium" color="gray.800">{searchQuery.trim()}</Text>" as value
+                      </Text>
+                    </HStack>
+                  </div>
+                )}
               </VStack>
             )}
           </Box>

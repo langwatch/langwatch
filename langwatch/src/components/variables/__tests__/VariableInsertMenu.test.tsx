@@ -25,7 +25,7 @@ const mockSources: AvailableSource[] = [
     type: "signature",
     fields: [
       { name: "output", type: "str" },
-      { name: "parsed_result", type: "json" },
+      { name: "parsed_result", type: "dict" },
     ],
   },
 ];
@@ -155,7 +155,7 @@ describe("VariableInsertMenu", () => {
         sourceName: "GPT-4o Runner",
         sourceType: "signature",
         fieldName: "parsed_result",
-        fieldType: "json",
+        fieldType: "dict",
       });
     });
   });

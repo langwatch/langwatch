@@ -16,6 +16,7 @@ import {
   VariableMappingInput,
   type AvailableSource,
   type FieldMapping,
+  type FieldType,
 } from "./VariableMappingInput";
 
 // ============================================================================
@@ -24,7 +25,7 @@ import {
 
 export type Variable = {
   identifier: string;
-  type: string;
+  type: FieldType;
 };
 
 export type VariablesSectionProps = {
@@ -188,7 +189,7 @@ export const VariablesSection = ({
 
       {/* Variables List */}
       {variables.length === 0 ? (
-        <Text fontSize="sm" color="gray.400" fontStyle="italic">
+        <Text fontSize="13px" color="gray.400">
           No variables defined
         </Text>
       ) : (
@@ -315,7 +316,7 @@ const VariableRow = ({
         <NativeSelect.Root size="xs" width="30px" marginX={-2} flexShrink={0}>
           <NativeSelect.Field
             value={variable.type}
-            onChange={(e) => onUpdate({ type: e.target.value })}
+            onChange={(e) => onUpdate({ type: e.target.value as FieldType })}
             border="1px solid"
             borderColor="transparent"
             borderRadius="lg"
@@ -393,10 +394,9 @@ const VariableRow = ({
           <VariableMappingInput
             mapping={mapping}
             availableSources={availableSources}
-            expectedType={variable.type}
             onMappingChange={onMappingChange}
             disabled={readOnly && !onMappingChange}
-            placeholder="Select source or enter value..."
+            placeholder=""
           />
         </Box>
       ) : (

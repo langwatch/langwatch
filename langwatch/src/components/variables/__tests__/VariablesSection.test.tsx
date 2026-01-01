@@ -323,7 +323,7 @@ describe("VariablesSection", () => {
     it("displays mapping value when mapped", () => {
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
       const mappings: Record<string, FieldMapping> = {
-        question: { sourceId: "dataset-1", field: "input" },
+        question: { type: "source", sourceId: "dataset-1", field: "input" },
       };
       renderComponent({
         variables,
@@ -333,7 +333,9 @@ describe("VariablesSection", () => {
         mappings,
       });
 
-      expect(screen.getByDisplayValue("Test Data.input")).toBeInTheDocument();
+      // Should show a tag with the field name
+      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+      expect(screen.getByText("input")).toBeInTheDocument();
     });
   });
 

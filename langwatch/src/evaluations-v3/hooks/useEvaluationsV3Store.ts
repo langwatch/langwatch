@@ -34,7 +34,9 @@ const removeMappingsForDataset = (
   const runners = state.runners.map((runner) => {
     const newMappings: Record<string, FieldMapping> = {};
     for (const [field, mapping] of Object.entries(runner.mappings)) {
-      if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
+      // Keep value mappings and source mappings that don't reference the removed dataset
+      const isDatasetMapping = mapping.type === "source" && mapping.source === "dataset" && mapping.sourceId === datasetId;
+      if (!isDatasetMapping) {
         newMappings[field] = mapping;
       }
     }
@@ -47,7 +49,9 @@ const removeMappingsForDataset = (
     for (const [runnerId, runnerMappings] of Object.entries(evaluator.mappings)) {
       const newRunnerMappings: Record<string, FieldMapping> = {};
       for (const [field, mapping] of Object.entries(runnerMappings)) {
-        if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
+        // Keep value mappings and source mappings that don't reference the removed dataset
+        const isDatasetMapping = mapping.type === "source" && mapping.source === "dataset" && mapping.sourceId === datasetId;
+        if (!isDatasetMapping) {
           newRunnerMappings[field] = mapping;
         }
       }
@@ -501,9 +505,9 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         .map((runner) => {
           const newMappings: Record<string, FieldMapping> = {};
           for (const [field, mapping] of Object.entries(runner.mappings)) {
-            if (
-              !(mapping.source === "runner" && mapping.sourceId === runnerId)
-            ) {
+            // Keep value mappings and source mappings that don't reference the removed runner
+            const isRunnerMapping = mapping.type === "source" && mapping.source === "runner" && mapping.sourceId === runnerId;
+            if (!isRunnerMapping) {
               newMappings[field] = mapping;
             }
           }

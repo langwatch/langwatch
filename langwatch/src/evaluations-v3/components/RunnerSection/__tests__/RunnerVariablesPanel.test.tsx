@@ -40,6 +40,7 @@ const mockRunner: RunnerConfig = {
   outputs: [{ identifier: "answer", type: "str" }],
   mappings: {
     question: {
+      type: "source",
       source: "dataset",
       sourceId: "dataset-1",
       sourceField: "input_text",
@@ -93,10 +94,11 @@ describe("RunnerVariablesPanel", () => {
       expect(screen.getByText("context")).toBeInTheDocument();
     });
 
-    it("shows mapped variable value", () => {
+    it("shows mapped variable as a tag", () => {
       renderComponent();
-      // The mapped field should show in the mapping input
-      expect(screen.getByDisplayValue("Test Dataset.input_text")).toBeInTheDocument();
+      // The mapped field should show as a closable tag with just the field name
+      expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
+      expect(screen.getByText("input_text")).toBeInTheDocument();
     });
 
     it("shows helper text", () => {
@@ -122,11 +124,13 @@ describe("RunnerVariablesPanel", () => {
         ...mockRunner,
         mappings: {
           question: {
+            type: "source",
             source: "dataset",
             sourceId: "dataset-1",
             sourceField: "input_text",
           },
           context: {
+            type: "source",
             source: "dataset",
             sourceId: "dataset-1",
             sourceField: "expected_output",
@@ -190,34 +194,33 @@ describe("RunnerVariablesPanel", () => {
       const onMappingsChange = vi.fn();
       renderComponent({ onMappingsChange });
 
-      // Find the unmapped input (context)
+      // Find the inputs - with the new Tag UI, the mapped variable (question) shows
+      // a tag + empty input, while unmapped variable (context) shows just empty input
+      // We need to click the input that doesn't have a tag next to it
       const inputs = screen.getAllByRole("textbox");
-      const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value
-      );
 
-      if (emptyInput) {
-        await user.click(emptyInput);
+      // The second input should be for "context" (unmapped variable)
+      const contextInput = inputs[1];
+      expect(contextInput).toBeDefined();
 
-        await waitFor(() => {
-          expect(screen.getByText("expected_output")).toBeInTheDocument();
-        });
+      await user.click(contextInput!);
 
-        await user.click(screen.getByText("expected_output"));
+      await waitFor(() => {
+        expect(screen.getByText("expected_output")).toBeInTheDocument();
+      });
 
-        expect(onMappingsChange).toHaveBeenCalledWith({
-          question: {
-            source: "dataset",
-            sourceId: "dataset-1",
-            sourceField: "input_text",
-          },
-          context: {
-            source: "dataset",
+      await user.click(screen.getByText("expected_output"));
+
+      // The callback should be called with the context mapping
+      expect(onMappingsChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: expect.objectContaining({
+            type: "source",
             sourceId: "dataset-1",
             sourceField: "expected_output",
-          },
-        });
-      }
+          }),
+        })
+      );
     });
   });
 

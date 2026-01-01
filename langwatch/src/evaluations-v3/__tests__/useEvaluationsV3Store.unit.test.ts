@@ -175,6 +175,7 @@ describe("useEvaluationsV3Store", () => {
         outputs: [],
         mappings: {
           input: {
+            type: "source",
             source: "dataset",
             sourceId: "ds-1",
             sourceField: "col1",
@@ -201,6 +202,7 @@ describe("useEvaluationsV3Store", () => {
         mappings: {
           "runner-1": {
             output: {
+              type: "source",
               source: "dataset",
               sourceId: "ds-1",
               sourceField: "col1",
@@ -278,6 +280,7 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
       store.setRunnerMapping("runner-1", "input", {
+        type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
         sourceField: "input",
@@ -286,6 +289,7 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       const runner = state.runners.find((r) => r.id === "runner-1");
       expect(runner?.mappings?.["input"]).toEqual({
+        type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
         sourceField: "input",
@@ -298,6 +302,7 @@ describe("useEvaluationsV3Store", () => {
       store.addEvaluator(createTestEvaluator("eval-1"));
       store.addEvaluatorToRunner("runner-1", "eval-1");
       store.setEvaluatorMapping("eval-1", "runner-1", "output", {
+        type: "source",
         source: "runner",
         sourceId: "runner-1",
         sourceField: "output",
@@ -316,6 +321,7 @@ describe("useEvaluationsV3Store", () => {
       store.addRunner(createTestRunner("runner-1"));
       store.addRunner(createTestRunner("runner-2"));
       store.setRunnerMapping("runner-2", "input", {
+        type: "source",
         source: "runner",
         sourceId: "runner-1",
         sourceField: "output",
@@ -445,6 +451,7 @@ describe("useEvaluationsV3Store", () => {
       store.addEvaluator(createTestEvaluator("eval-1"));
       store.addEvaluatorToRunner("runner-1", "eval-1");
       store.setEvaluatorMapping("eval-1", "runner-1", "output", {
+        type: "source",
         source: "runner",
         sourceId: "runner-1",
         sourceField: "output",
@@ -453,6 +460,7 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
       expect(evaluator?.mappings["runner-1"]?.["output"]).toEqual({
+        type: "source",
         source: "runner",
         sourceId: "runner-1",
         sourceField: "output",
