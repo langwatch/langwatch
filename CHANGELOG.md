@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.11.0...langwatch@v1.12.0) (2026-01-02)
+
+
+### Features
+
+* add custom dashboards with drag-drop and resizable graphs ([#996](https://github.com/langwatch/langwatch/issues/996)) ([1e4721c](https://github.com/langwatch/langwatch/commit/1e4721c66b969f8f84b513ac3728ad77820bc3c2))
+* add database-backed agents and evaluators management ([#1032](https://github.com/langwatch/langwatch/issues/1032)) ([2758a0a](https://github.com/langwatch/langwatch/commit/2758a0a938aefd29eb62ef2e168dec6590fb489c))
+* add GDPR user deletion script for compliance ([#1034](https://github.com/langwatch/langwatch/issues/1034)) ([089cb2b](https://github.com/langwatch/langwatch/commit/089cb2b614bdb7be9e8470a067cd7e0edd252540))
+* add keyword subfield to metadata.name for sorting support ([#1007](https://github.com/langwatch/langwatch/issues/1007)) ([0a2559e](https://github.com/langwatch/langwatch/commit/0a2559e8f6639280d69179a2abb5794a67c8d10c))
+* replicate evaluations ([#1004](https://github.com/langwatch/langwatch/issues/1004)) ([98d2166](https://github.com/langwatch/langwatch/commit/98d2166ad32232fa3c64f561e80e13dbe8fa0867))
+* **ui:** langwatch 2026 design ([#1025](https://github.com/langwatch/langwatch/issues/1025)) ([61d53b6](https://github.com/langwatch/langwatch/commit/61d53b656a383708e59ccd667771e81af207c229))
+
+
+### Bug Fixes
+
+* 2026 redesign patches 1 ([#1027](https://github.com/langwatch/langwatch/issues/1027)) ([dbe118d](https://github.com/langwatch/langwatch/commit/dbe118def9c72e9622c1786f693a105361c44907))
+* 2026 redesign patches 2 ([#1028](https://github.com/langwatch/langwatch/issues/1028)) ([e7499ef](https://github.com/langwatch/langwatch/commit/e7499effa4f9b0d9ee9370161720917d05a3a5f5))
+* copy workflow bug ([#1003](https://github.com/langwatch/langwatch/issues/1003)) ([b64a051](https://github.com/langwatch/langwatch/commit/b64a0516ec6a132c007a8dbb2032cf77459c9a99))
+* types ([e4ecb11](https://github.com/langwatch/langwatch/commit/e4ecb11c6df6044dcd9ab68d809c41a0eb588d80))
+
+
+### Miscellaneous
+
+* move GDPR deletion tasks to langwatch-saas ([#1038](https://github.com/langwatch/langwatch/issues/1038)) ([b8d2aa8](https://github.com/langwatch/langwatch/commit/b8d2aa8138b255265fb6818ee1c014ea10ff42a8))
+
 ## [1.11.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.10.0...langwatch@v1.11.0) (2025-12-16)
 
 
