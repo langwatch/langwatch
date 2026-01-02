@@ -97,8 +97,10 @@ export const useOpenRunnerEditor = () => {
         // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
         // onSave: updates runner when prompt is published
         // onInputMappingsChange: updates runner mappings when variable mappings change (for active dataset)
+        // NOTE: No onInputsInitialized here - inputs are already initialized when runner was added
         setFlowCallbacks("promptEditor", {
           onLocalConfigChange: (localConfig) => {
+            // Only update localPromptConfig for tracking unsaved changes
             updateRunner(runner.id, { localPromptConfig: localConfig });
           },
           onSave: (savedPrompt) => {

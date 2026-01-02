@@ -113,8 +113,7 @@ export const RunnerCellFromMeta = ({
       output={data?.output}
       evaluatorResults={data?.evaluators ?? {}}
       row={rowIndex}
-      evaluatorsMap={tableMeta?.evaluatorsMap ?? new Map()}
-      onAddEvaluator={tableMeta?.handleAddEvaluatorForRunner}
+      onAddEvaluator={tableMeta?.handleAddEvaluator}
     />
   );
 };

@@ -47,7 +47,6 @@ const createTestRunner = (id: string): RunnerConfig => ({
   ],
   outputs: [{ identifier: "output", type: "str" }],
   mappings: {},
-  evaluatorIds: [],
 });
 
 // ============================================================================
@@ -365,6 +364,46 @@ describe("Per-Dataset Mappings", () => {
       expect(mapping1?.type === "source" && mapping1.sourceField).toBe("expected_output");
       expect(mapping2?.type).toBe("source");
       expect(mapping2?.type === "source" && mapping2.sourceField).toBe("expected");
+    });
+  });
+
+  describe("Mapping preservation on runner updates", () => {
+    it("preserves existing mappings when runner is updated", () => {
+      const store = useEvaluationsV3Store.getState();
+
+      store.addDataset(createTestDataset("ds-1", "Dataset 1", [
+        { name: "input", type: "string" },
+        { name: "context", type: "string" },
+      ]));
+      store.setActiveDataset("ds-1");
+
+      // Add runner with one input
+      store.addRunner({
+        id: "runner-1",
+        type: "prompt",
+        name: "Test Runner",
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+      });
+
+      // Manually set a custom mapping for "question"
+      store.setRunnerMapping("runner-1", "ds-1", "question", {
+        type: "value",
+        value: "hardcoded value",
+      });
+
+      // Update runner name (doesn't touch inputs)
+      store.updateRunner("runner-1", {
+        name: "Updated Runner",
+      });
+
+      const state = useEvaluationsV3Store.getState();
+      const runner = state.runners.find((r) => r.id === "runner-1");
+
+      // Existing mapping should be preserved
+      expect(runner?.mappings["ds-1"]?.question?.type).toBe("value");
+      expect(runner?.name).toBe("Updated Runner");
     });
   });
 });

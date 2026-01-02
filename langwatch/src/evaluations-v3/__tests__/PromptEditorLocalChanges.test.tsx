@@ -154,7 +154,6 @@ describe("Prompt Editor Local Changes", () => {
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},
-          evaluatorIds: [],
           localPromptConfig: undefined,
         },
       ],

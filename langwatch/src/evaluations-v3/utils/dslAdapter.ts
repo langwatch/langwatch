@@ -71,12 +71,9 @@ export const stateToWorkflow = (
     const runnerNode = createCodeNode(runner, datasetId, runnerIndex);
     runnerNodes.push(runnerNode);
 
-    // Create evaluator nodes for each evaluator this runner uses
+    // Create evaluator nodes for ALL evaluators (they apply to all runners)
     // Evaluators are duplicated per-runner in the DSL
-    runner.evaluatorIds.forEach((evaluatorId, evalIndex) => {
-      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) return;
-
+    state.evaluators.forEach((evaluator, evalIndex) => {
       const evaluatorNode = createEvaluatorNode(
         evaluator,
         datasetId,
@@ -286,11 +283,9 @@ const buildEvaluatorEdges = (
 ): Edge[] => {
   const edges: Edge[] = [];
 
+  // All evaluators apply to all runners
   for (const runner of runners) {
-    for (const evaluatorId of runner.evaluatorIds) {
-      const evaluator = evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) continue;
-
+    for (const evaluator of evaluators) {
       // Get mappings for the active dataset and this runner
       const datasetMappings = evaluator.mappings[activeDatasetId];
       const runnerMappings = datasetMappings?.[runner.id] ?? {};

@@ -50,7 +50,6 @@ const createTestRunner = (
   inputs,
   outputs,
   mappings,
-  evaluatorIds: [],
 });
 
 const createTestEvaluator = (
@@ -123,6 +122,16 @@ describe("findMatchingColumn", () => {
     const columns = [createTestColumn("input"), createTestColumn("question")];
     expect(findMatchingColumn("input", columns)).toBe("input");
     expect(findMatchingColumn("question", columns)).toBe("question");
+  });
+
+  it("matches user_input field to user_input column exactly", () => {
+    const columns = [createTestColumn("user_input"), createTestColumn("expected_output")];
+    expect(findMatchingColumn("user_input", columns)).toBe("user_input");
+  });
+
+  it("matches user_input field to input column via semantic equivalent", () => {
+    const columns = [createTestColumn("input"), createTestColumn("expected_output")];
+    expect(findMatchingColumn("user_input", columns)).toBe("input");
   });
 });
 
@@ -409,6 +418,46 @@ describe("inferEvaluatorMappings", () => {
     const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, runner, existingMappings);
 
     expect(mappings.output).toBeUndefined(); // Should not override
+  });
+
+  it("prioritizes dataset column over runner output for expected_output field", () => {
+    const dataset = createTestDataset("ds-1", "Dataset 1", [
+      createTestColumn("expected_output"),
+    ]);
+    const runner = createTestRunner("runner-1", [{ identifier: "input", type: "str" }], [
+      { identifier: "output", type: "str" },
+      { identifier: "expected_output", type: "str" }, // Runner also has "expected_output"
+    ]);
+    const evaluatorInputs: Field[] = [{ identifier: "expected_output", type: "str" }];
+
+    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, runner);
+
+    // Should map to dataset, not runner
+    expect(mappings.expected_output?.type).toBe("source");
+    if (mappings.expected_output?.type === "source") {
+      expect(mappings.expected_output.source).toBe("dataset");
+      expect(mappings.expected_output.sourceId).toBe("ds-1");
+    }
+  });
+
+  it("prioritizes dataset column over runner output for input field", () => {
+    const dataset = createTestDataset("ds-1", "Dataset 1", [
+      createTestColumn("input"),
+    ]);
+    const runner = createTestRunner("runner-1", [{ identifier: "input", type: "str" }], [
+      { identifier: "output", type: "str" },
+      { identifier: "input", type: "str" }, // Runner also has "input" as output
+    ]);
+    const evaluatorInputs: Field[] = [{ identifier: "input", type: "str" }];
+
+    const mappings = inferEvaluatorMappings(evaluatorInputs, dataset, runner);
+
+    // Should map to dataset, not runner output
+    expect(mappings.input?.type).toBe("source");
+    if (mappings.input?.type === "source") {
+      expect(mappings.input.source).toBe("dataset");
+      expect(mappings.input.sourceId).toBe("ds-1");
+    }
   });
 });
 

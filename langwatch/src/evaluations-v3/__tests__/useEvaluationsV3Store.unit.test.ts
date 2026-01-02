@@ -184,7 +184,6 @@ describe("useEvaluationsV3Store", () => {
             },
           },
         },
-        evaluatorIds: [],
       });
       store.removeDataset("ds-1");
 
@@ -254,7 +253,6 @@ describe("useEvaluationsV3Store", () => {
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
-      evaluatorIds: [],
     });
 
     it("adds a runner", () => {
@@ -351,7 +349,6 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
       // setEvaluatorMapping now takes: evaluatorId, datasetId, runnerId, inputField, mapping
       store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
         type: "source",
@@ -416,7 +413,7 @@ describe("useEvaluationsV3Store", () => {
       expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
     });
 
-    it("removes a global evaluator and cleans up runner references", () => {
+    it("removes a global evaluator", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner({
         id: "runner-1",
@@ -425,20 +422,16 @@ describe("useEvaluationsV3Store", () => {
         inputs: [],
         outputs: [],
         mappings: {},
-        evaluatorIds: [],
       });
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
       store.removeEvaluator("eval-1");
 
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators).toHaveLength(0);
-      const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.evaluatorIds).not.toContain("eval-1");
     });
   });
 
-  describe("Runner-evaluator relationship operations", () => {
+  describe("Evaluator mapping operations (evaluators apply to all runners)", () => {
     const createTestRunner = (id: string): RunnerConfig => ({
       id,
       type: "prompt",
@@ -446,7 +439,6 @@ describe("useEvaluationsV3Store", () => {
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
-      evaluatorIds: [],
     });
 
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
@@ -458,52 +450,10 @@ describe("useEvaluationsV3Store", () => {
       mappings: {},
     });
 
-    it("adds an evaluator reference to a runner", () => {
+    it("sets evaluator mapping for a specific dataset and runner", () => {
       const store = useEvaluationsV3Store.getState();
       store.addRunner(createTestRunner("runner-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
-
-      const state = useEvaluationsV3Store.getState();
-      const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.evaluatorIds).toContain("eval-1");
-      // Evaluator should have initialized mappings for this runner
-      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["runner-1"]).toBeDefined();
-    });
-
-    it("does not add duplicate evaluator reference", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addRunner(createTestRunner("runner-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
-      store.addEvaluatorToRunner("runner-1", "eval-1"); // duplicate
-
-      const state = useEvaluationsV3Store.getState();
-      const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.evaluatorIds).toHaveLength(1);
-    });
-
-    it("removes an evaluator reference from a runner", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addRunner(createTestRunner("runner-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
-      store.removeEvaluatorFromRunner("runner-1", "eval-1");
-
-      const state = useEvaluationsV3Store.getState();
-      const runner = state.runners.find((r) => r.id === "runner-1");
-      expect(runner?.evaluatorIds).not.toContain("eval-1");
-      // Evaluator should have removed mappings for this runner
-      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["runner-1"]).toBeUndefined();
-    });
-
-    it("sets evaluator mapping for a runner with sourceId", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addRunner(createTestRunner("runner-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToRunner("runner-1", "eval-1");
       // setEvaluatorMapping now takes: evaluatorId, datasetId, runnerId, inputField, mapping
       store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
         type: "source",
@@ -514,13 +464,43 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      // Mappings are now per-dataset, per-runner
+      // Mappings are per-dataset, per-runner
       expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]?.["output"]).toEqual({
         type: "source",
         source: "runner",
         sourceId: "runner-1",
         sourceField: "output",
       });
+    });
+
+    it("evaluators apply to all runners automatically", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addRunner(createTestRunner("runner-1"));
+      store.addRunner(createTestRunner("runner-2"));
+      store.addEvaluator(createTestEvaluator("eval-1"));
+
+      const state = useEvaluationsV3Store.getState();
+      // Evaluator exists globally and applies to all runners
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.runners).toHaveLength(2);
+      // Both runners can have mappings set for this evaluator
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-1", "output", {
+        type: "source",
+        source: "runner",
+        sourceId: "runner-1",
+        sourceField: "output",
+      });
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "runner-2", "output", {
+        type: "source",
+        source: "runner",
+        sourceId: "runner-2",
+        sourceField: "output",
+      });
+
+      const updatedState = useEvaluationsV3Store.getState();
+      const evaluator = updatedState.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-1"]).toBeDefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["runner-2"]).toBeDefined();
     });
   });
 
@@ -674,7 +654,6 @@ describe("useEvaluationsV3Store", () => {
         inputs: [],
         outputs: [],
         mappings: {},
-        evaluatorIds: [],
       });
       store.reset();
 

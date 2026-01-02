@@ -86,7 +86,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       datasets: [...state.datasets, dataset],
     }));
 
-    // Then auto-infer mappings for all runners for this new dataset
+    // Then auto-map fields for all runners for this new dataset
     // Uses cross-dataset propagation: if field X is mapped to "input" on existing dataset,
     // and new dataset has "input", map field X to "input" on new dataset
     const state = get();
@@ -111,7 +111,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       return runner;
     });
 
-    // Also infer evaluator mappings for the new dataset
+    // Also auto-map evaluator fields for the new dataset
     const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
       const newMappings = inferAllEvaluatorMappings(
         evaluator,
@@ -525,17 +525,44 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
   addRunner: (runner) => {
     set((state) => {
-      // Auto-infer mappings for all datasets
-      const inferredMappings = inferAllRunnerMappings(runner, state.datasets);
-      const runnerWithMappings: RunnerConfig = {
+      // Ensure inputs is always an array (defensive)
+      const runnerWithInputs = {
         ...runner,
+        inputs: runner.inputs ?? [],
+      };
+
+      // Auto-map runner inputs to dataset columns based on name matching
+      // This only happens when the runner is ADDED - not on subsequent edits
+      const autoMappings = inferAllRunnerMappings(runnerWithInputs, state.datasets);
+      const runnerWithMappings: RunnerConfig = {
+        ...runnerWithInputs,
         mappings: {
-          ...runner.mappings,
-          ...inferredMappings,
+          ...runnerWithInputs.mappings,
+          ...autoMappings,
         },
       };
+
+      // Also auto-map evaluator inputs for this new runner
+      const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
+        const newMappings = inferAllEvaluatorMappings(
+          evaluator,
+          state.datasets,
+          [runnerWithMappings] // Only auto-map for the new runner
+        );
+        // Merge new runner mappings into existing evaluator mappings
+        const mergedMappings = { ...evaluator.mappings };
+        for (const [datasetId, runnerMappings] of Object.entries(newMappings)) {
+          if (!mergedMappings[datasetId]) {
+            mergedMappings[datasetId] = {};
+          }
+          Object.assign(mergedMappings[datasetId]!, runnerMappings);
+        }
+        return { ...evaluator, mappings: mergedMappings };
+      });
+
       return {
         runners: [...state.runners, runnerWithMappings],
+        evaluators: evaluatorsWithNewMappings,
       };
     });
   },
@@ -545,24 +572,20 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       const existingRunner = state.runners.find((r) => r.id === runnerId);
       if (!existingRunner) return state;
 
-      // Check if inputs are changing
-      const newInputs = updates.inputs;
       let finalUpdates = { ...updates };
 
+      // Clean up mappings when inputs are removed (but NO auto-mapping)
+      const newInputs = updates.inputs;
       if (newInputs) {
-        const existingInputIds = new Set(existingRunner.inputs.map((i) => i.identifier));
+        const existingInputs = existingRunner.inputs ?? [];
         const newInputIds = new Set(newInputs.map((i) => i.identifier));
-
-        // Find newly added inputs (need auto-inference)
-        const addedInputs = newInputs.filter((i) => !existingInputIds.has(i.identifier));
+        const existingInputIds = new Set(existingInputs.map((i) => i.identifier));
 
         // Find removed inputs (need to clean up mappings)
         const removedInputIds = [...existingInputIds].filter((id) => !newInputIds.has(id));
 
-        let mergedMappings = { ...existingRunner.mappings };
-
-        // Clean up mappings for removed inputs across all datasets
         if (removedInputIds.length > 0) {
+          const mergedMappings = { ...existingRunner.mappings };
           for (const datasetId of Object.keys(mergedMappings)) {
             const datasetMappings = { ...mergedMappings[datasetId] };
             for (const inputId of removedInputIds) {
@@ -570,31 +593,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
             }
             mergedMappings[datasetId] = datasetMappings;
           }
+          finalUpdates = { ...finalUpdates, mappings: mergedMappings };
         }
-
-        // Auto-infer mappings for new inputs
-        if (addedInputs.length > 0) {
-          const tempRunner: RunnerConfig = {
-            ...existingRunner,
-            ...updates,
-          };
-          const inferredMappings = inferAllRunnerMappings(
-            { ...tempRunner, inputs: addedInputs },
-            state.datasets
-          );
-
-          for (const [datasetId, fieldMappings] of Object.entries(inferredMappings)) {
-            mergedMappings[datasetId] = {
-              ...(mergedMappings[datasetId] ?? {}),
-              ...fieldMappings,
-            };
-          }
-        }
-
-        finalUpdates = {
-          ...finalUpdates,
-          mappings: mergedMappings,
-        };
       }
 
       return {
@@ -684,9 +684,24 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   addEvaluator: (evaluator) => {
-    set((state) => ({
-      evaluators: [...state.evaluators, evaluator],
-    }));
+    set((state) => {
+      // Auto-map fields for all datasets and runners
+      const autoMappings = inferAllEvaluatorMappings(
+        evaluator,
+        state.datasets,
+        state.runners
+      );
+      const evaluatorWithMappings = {
+        ...evaluator,
+        mappings: {
+          ...evaluator.mappings,
+          ...autoMappings,
+        },
+      };
+      return {
+        evaluators: [...state.evaluators, evaluatorWithMappings],
+      };
+    });
   },
 
   updateEvaluator: (evaluatorId, updates) => {
@@ -700,74 +715,11 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeEvaluator: (evaluatorId) => {
     set((state) => ({
       evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
-      // Also remove this evaluator from all runners' evaluatorIds
-      runners: state.runners.map((r) => ({
-        ...r,
-        evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
-      })),
     }));
   },
 
   // -------------------------------------------------------------------------
-  // Runner-evaluator relationship actions
-  // -------------------------------------------------------------------------
-
-  addEvaluatorToRunner: (runnerId, evaluatorId) => {
-    set((state) => {
-      const runner = state.runners.find((r) => r.id === runnerId);
-      if (!runner) return state;
-
-      // Check if evaluator exists
-      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) return state;
-
-      // Don't add if already exists
-      if (runner.evaluatorIds.includes(evaluatorId)) return state;
-
-      return {
-        runners: state.runners.map((r) =>
-          r.id === runnerId
-            ? { ...r, evaluatorIds: [...r.evaluatorIds, evaluatorId] }
-            : r
-        ),
-        // Initialize empty mappings for this runner in the evaluator
-        evaluators: state.evaluators.map((e) =>
-          e.id === evaluatorId
-            ? {
-                ...e,
-                mappings: {
-                  ...e.mappings,
-                  [runnerId]: e.mappings[runnerId] ?? {},
-                },
-              }
-            : e
-        ),
-      };
-    });
-  },
-
-  removeEvaluatorFromRunner: (runnerId, evaluatorId) => {
-    set((state) => ({
-      runners: state.runners.map((r) =>
-        r.id === runnerId
-          ? {
-              ...r,
-              evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
-            }
-          : r
-      ),
-      // Remove this runner's mappings from the evaluator
-      evaluators: state.evaluators.map((e) => {
-        if (e.id !== evaluatorId) return e;
-        const mappings = { ...e.mappings };
-        delete mappings[runnerId];
-        return { ...e, mappings };
-      }),
-    }));
-  },
-
-  // -------------------------------------------------------------------------
-  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
+  // Evaluator mapping actions (per-dataset, per-runner mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
   setEvaluatorMapping: (evaluatorId, datasetId, runnerId, inputField, mapping) => {

@@ -14,6 +14,21 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
+import type { Evaluator } from "@prisma/client";
+
+/**
+ * Type for the config stored in DB Evaluator.config field.
+ * The DB stores evaluatorType and settings - inputs are derived from
+ * the evaluator definition at runtime, not stored in DB.
+ */
+type EvaluatorDbConfig = {
+  evaluatorType?: EvaluatorTypes;
+  settings?: Record<string, unknown>;
+};
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useOpenRunnerEditor } from "../hooks/useOpenRunnerEditor";
@@ -34,6 +49,7 @@ import type {
   TableRowData,
   TableMeta,
 } from "../types";
+import type { Field } from "~/optimization_studio/types/dsl";
 import { type FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
@@ -184,7 +200,6 @@ export function EvaluationsV3Table({
           { identifier: "output", type: "str" },
         ],
         mappings: {},
-        evaluatorIds: [],
       };
       addRunner(runnerConfig);
       closeDrawer();
@@ -195,8 +210,15 @@ export function EvaluationsV3Table({
   // Handler for when a prompt is selected from the drawer
   // Adds the runner and immediately opens the prompt editor for configuration
   const handleSelectPrompt = useCallback(
-    (prompt: { id: string; name: string; versionId?: string }) => {
+    (prompt: {
+      id: string;
+      name: string;
+      versionId?: string;
+      inputs?: Array<{ identifier: string; type: string }>;
+      outputs?: Array<{ identifier: string; type: string }>;
+    }) => {
       // Convert prompt to RunnerConfig format (prompt type)
+      // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
       const runnerId = `runner_${Date.now()}`;
       const runnerConfig: RunnerConfig = {
         id: runnerId,
@@ -204,16 +226,23 @@ export function EvaluationsV3Table({
         name: prompt.name,
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
+        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
+          identifier: i.identifier,
+          type: i.type as Field["type"],
+        })),
+        outputs: (prompt.outputs ?? [{ identifier: "output", type: "str" }]).map((o) => ({
+          identifier: o.identifier,
+          type: o.type as Field["type"],
+        })),
         mappings: {},
-        evaluatorIds: [],
       };
+      // addRunner will auto-map based on the real inputs
       addRunner(runnerConfig);
 
       // Set up flow callbacks for the prompt editor
       setFlowCallbacks("promptEditor", {
         onLocalConfigChange: (localConfig) => {
+          // Only update localPromptConfig for tracking unsaved changes
           updateRunner(runnerId, { localPromptConfig: localConfig });
         },
         onSave: (savedPrompt) => {
@@ -254,12 +283,59 @@ export function EvaluationsV3Table({
     [addRunner, openDrawer, updateRunner, setRunnerMapping, removeRunnerMapping],
   );
 
-  // Handler for opening the evaluator selector for a specific runner
-  const handleAddEvaluatorForRunner = useCallback(
-    (runnerId: string) => {
-      openDrawer("evaluatorList", { urlParams: { runnerId } });
+  // Handler for opening the evaluator selector (evaluators apply to ALL runners)
+  const handleAddEvaluator = useCallback(
+    () => {
+      // Set up flow callback to handle evaluator selection
+      setFlowCallbacks("evaluatorList", {
+        onSelect: (evaluator: Evaluator) => {
+          // Extract evaluator config from the Prisma evaluator
+          const config = evaluator.config as EvaluatorDbConfig | null;
+
+          // Check if this evaluator is already added globally
+          const existingEvaluator = evaluators.find(
+            (e) => e.dbEvaluatorId === evaluator.id
+          );
+
+          // If already exists, no need to add again (it applies to all runners)
+          if (existingEvaluator) {
+            return;
+          }
+
+          // Get the evaluator definition to derive inputs from requiredFields/optionalFields
+          const evaluatorType = config?.evaluatorType;
+          const evaluatorDef = evaluatorType
+            ? AVAILABLE_EVALUATORS[evaluatorType]
+            : undefined;
+
+          // Derive inputs from evaluator definition's required and optional fields
+          const inputFields = [
+            ...(evaluatorDef?.requiredFields ?? []),
+            ...(evaluatorDef?.optionalFields ?? []),
+          ];
+
+          // Create a new EvaluatorConfig from the Prisma evaluator
+          const evaluatorConfig: EvaluatorConfig = {
+            id: `evaluator_${Date.now()}`,
+            evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
+            name: evaluator.name,
+            settings: config?.settings ?? {},
+            inputs: inputFields.map((field) => ({
+              identifier: field,
+              type: "str" as const, // Default all evaluator inputs to string
+            })),
+            mappings: {},
+            dbEvaluatorId: evaluator.id,
+          };
+
+          // Add the evaluator globally (applies to all runners automatically)
+          addEvaluator(evaluatorConfig);
+        },
+      });
+
+      openDrawer("evaluatorList");
     },
-    [openDrawer],
+    [openDrawer, evaluators, addEvaluator],
   );
 
   // Handler for removing a runner from the workbench
@@ -404,10 +480,11 @@ export function EvaluationsV3Table({
           runner.id,
           {
             output: results.runnerOutputs[runner.id]?.[index] ?? null,
+            // All evaluators apply to all runners
             evaluators: Object.fromEntries(
-              runner.evaluatorIds.map((evaluatorId) => [
-                evaluatorId,
-                results.evaluatorResults[runner.id]?.[evaluatorId]?.[index] ??
+              evaluators.map((evaluator) => [
+                evaluator.id,
+                results.evaluatorResults[runner.id]?.[evaluator.id]?.[index] ??
                   null,
               ]),
             ),
@@ -421,6 +498,7 @@ export function EvaluationsV3Table({
     activeDataset,
     datasetColumns,
     runners,
+    evaluators,
     results,
     displayRowCount,
     getCellValue,
@@ -453,7 +531,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openRunnerEditor,
       handleRemoveRunner,
-      handleAddEvaluatorForRunner,
+      handleAddEvaluator,
       // Selection data
       selectedRows,
       allSelected,
@@ -469,7 +547,7 @@ export function EvaluationsV3Table({
       evaluatorsMap,
       openRunnerEditor,
       handleRemoveRunner,
-      handleAddEvaluatorForRunner,
+      handleAddEvaluator,
       selectedRows,
       allSelected,
       someSelected,

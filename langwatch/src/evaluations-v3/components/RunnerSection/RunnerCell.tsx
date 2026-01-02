@@ -1,221 +1,168 @@
-import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
-import { LuCheck, LuChevronDown, LuChevronUp, LuPlus, LuX } from "react-icons/lu";
+import { useCallback, useMemo } from "react";
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { LuPlus } from "react-icons/lu";
 
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { useEvaluatorMappings } from "../../hooks/useEvaluatorMappings";
+import { convertFromUIMapping, convertToUIMapping } from "../../utils/fieldMappingConverters";
+import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
 import type { RunnerConfig, EvaluatorConfig } from "../../types";
-
-// ============================================================================
-// Evaluator Chip Component
-// ============================================================================
-
-type EvaluatorChipProps = {
-  evaluator: EvaluatorConfig;
-  result: unknown;
-  runnerId: string;
-  row: number;
-  isExpanded: boolean;
-  onToggleExpand: () => void;
-  onEdit: () => void;
-};
-
-export function EvaluatorChip({
-  evaluator,
-  result,
-  isExpanded,
-  onToggleExpand,
-  onEdit,
-}: EvaluatorChipProps) {
-  // Determine pass/fail status from result
-  let status: "pending" | "passed" | "failed" | "error" = "pending";
-  let score: number | undefined;
-
-  if (result !== null && result !== undefined) {
-    if (typeof result === "boolean") {
-      status = result ? "passed" : "failed";
-    } else if (typeof result === "object") {
-      const obj = result as Record<string, unknown>;
-      if ("passed" in obj) {
-        status = obj.passed ? "passed" : "failed";
-      }
-      if ("score" in obj && typeof obj.score === "number") {
-        score = obj.score;
-      }
-      if ("error" in obj) {
-        status = "error";
-      }
-    }
-  }
-
-  const statusColors = {
-    pending: { bg: "gray.100", color: "gray.600", icon: null },
-    passed: { bg: "green.100", color: "green.700", icon: <LuCheck size={10} /> },
-    failed: { bg: "red.100", color: "red.700", icon: <LuX size={10} /> },
-    error: { bg: "orange.100", color: "orange.700", icon: <LuX size={10} /> },
-  };
-
-  const statusConfig = statusColors[status];
-
-  return (
-    <Box>
-      <HStack
-        as="button"
-        onClick={onToggleExpand}
-        bg={statusConfig.bg}
-        color={statusConfig.color}
-        paddingX={2}
-        paddingY={1}
-        borderRadius="md"
-        fontSize="11px"
-        fontWeight="medium"
-        gap={1}
-        _hover={{ opacity: 0.8 }}
-        cursor="pointer"
-      >
-        {statusConfig.icon}
-        <Text>{evaluator.name}</Text>
-        {score !== undefined && <Text>({score.toFixed(2)})</Text>}
-        {isExpanded ? <LuChevronUp size={10} /> : <LuChevronDown size={10} />}
-      </HStack>
-
-      {isExpanded && (
-        <Box
-          marginTop={2}
-          padding={2}
-          bg="gray.50"
-          borderRadius="md"
-          fontSize="12px"
-        >
-          <VStack align="stretch" gap={1}>
-            <Text fontWeight="medium">Result:</Text>
-            <Text color="gray.600" whiteSpace="pre-wrap">
-              {result === null || result === undefined
-                ? "No result yet"
-                : typeof result === "object"
-                  ? JSON.stringify(result, null, 2)
-                  : String(result)}
-            </Text>
-            <Button
-              size="xs"
-              variant="ghost"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-              marginTop={1}
-            >
-              Edit Configuration
-            </Button>
-          </VStack>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-// ============================================================================
-// Runner Cell Content Component
-// ============================================================================
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { EvaluatorChip } from "./EvaluatorChip";
 
 type RunnerCellContentProps = {
   runner: RunnerConfig;
   output: unknown;
   evaluatorResults: Record<string, unknown>;
   row: number;
-  evaluatorsMap: Map<string, EvaluatorConfig>;
-  onAddEvaluator?: (runnerId: string) => void;
+  onAddEvaluator?: () => void;
 };
 
 export function RunnerCellContent({
   runner,
   output,
   evaluatorResults,
-  row,
-  evaluatorsMap,
   onAddEvaluator,
 }: RunnerCellContentProps) {
-  const { ui, openOverlay, setExpandedEvaluator } = useEvaluationsV3Store(
-    (state) => ({
-      ui: state.ui,
-      openOverlay: state.openOverlay,
-      setExpandedEvaluator: state.setExpandedEvaluator,
-    })
+  const { openDrawer } = useDrawer();
+  const {
+    evaluators,
+    activeDatasetId,
+    datasets,
+    removeEvaluator,
+    setEvaluatorMapping,
+    removeEvaluatorMapping,
+  } = useEvaluationsV3Store((state) => ({
+    evaluators: state.evaluators,
+    activeDatasetId: state.activeDatasetId,
+    datasets: state.datasets,
+    removeEvaluator: state.removeEvaluator,
+    setEvaluatorMapping: state.setEvaluatorMapping,
+    removeEvaluatorMapping: state.removeEvaluatorMapping,
+  }));
+
+  // Calculate which evaluators have missing mappings for this runner
+  const missingMappingsSet = useMemo(() => {
+    const missing = new Set<string>();
+    for (const evaluator of evaluators) {
+      if (evaluatorHasMissingMappings(evaluator, activeDatasetId, runner.id)) {
+        missing.add(evaluator.id);
+      }
+    }
+    return missing;
+  }, [evaluators, activeDatasetId, runner.id]);
+
+  // Helper to create mappingsConfig for an evaluator
+  const createMappingsConfig = useCallback(
+    (evaluator: EvaluatorConfig) => {
+      const datasetIds = new Set(datasets.map((d) => d.id));
+      const isDatasetSource = (sourceId: string) => datasetIds.has(sourceId);
+
+      // Build available sources
+      const activeDataset = datasets.find((d) => d.id === activeDatasetId);
+      const availableSources = [];
+      if (activeDataset) {
+        availableSources.push({
+          id: activeDataset.id,
+          name: activeDataset.name,
+          type: "dataset" as const,
+          fields: activeDataset.columns.map((col) => ({
+            name: col.name,
+            type: "str" as const,
+          })),
+        });
+      }
+      availableSources.push({
+        id: runner.id,
+        name: runner.name,
+        type: "signature" as const,
+        fields: runner.outputs.map((o) => ({
+          name: o.identifier,
+          type: o.type as "str" | "float" | "bool",
+        })),
+      });
+
+      // Get current mappings in UI format (used as initial state in the drawer)
+      const storeMappings = evaluator.mappings[activeDatasetId]?.[runner.id] ?? {};
+      const initialMappings: Record<string, UIFieldMapping> = {};
+      for (const [key, mapping] of Object.entries(storeMappings)) {
+        initialMappings[key] = convertToUIMapping(mapping);
+      }
+
+      return {
+        availableSources,
+        initialMappings,
+        onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
+          if (mapping) {
+            const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
+            setEvaluatorMapping(evaluator.id, activeDatasetId, runner.id, identifier, storeMapping);
+          } else {
+            removeEvaluatorMapping(evaluator.id, activeDatasetId, runner.id, identifier);
+          }
+        },
+      };
+    },
+    [datasets, activeDatasetId, runner, setEvaluatorMapping, removeEvaluatorMapping]
   );
 
   const displayOutput =
     output === null || output === undefined
       ? ""
       : typeof output === "object"
-        ? JSON.stringify(output)
-        : String(output);
-
-  // Get evaluator configs for this runner's evaluatorIds
-  const runnerEvaluators = runner.evaluatorIds
-    .map((id: string) => evaluatorsMap.get(id))
-    .filter((e): e is EvaluatorConfig => e !== undefined);
+      ? JSON.stringify(output)
+      : String(output);
 
   return (
     <VStack align="stretch" gap={2}>
       {/* Runner output */}
       <Text fontSize="13px" lineClamp={3}>
-        {displayOutput || <Text as="span" color="gray.400">No output yet</Text>}
+        {displayOutput || (
+          <Text as="span" color="gray.400">
+            No output yet
+          </Text>
+        )}
       </Text>
 
-      {/* Evaluator chips */}
-      {runnerEvaluators.length > 0 && (
-        <HStack flexWrap="wrap" gap={1}>
-          {runnerEvaluators.map((evaluator: EvaluatorConfig) => {
-            const isExpanded =
-              ui.expandedEvaluator?.runnerId === runner.id &&
-              ui.expandedEvaluator?.evaluatorId === evaluator.id &&
-              ui.expandedEvaluator?.row === row;
+      <HStack flexWrap="wrap" gap={1.5}>
+        {evaluators.map((evaluator: EvaluatorConfig) => (
+          <EvaluatorChip
+            key={evaluator.id}
+            evaluator={evaluator}
+            result={evaluatorResults[evaluator.id]}
+            hasMissingMappings={missingMappingsSet.has(evaluator.id)}
+            onEdit={() => {
+              // Create mappingsConfig and pass it to the drawer
+              const mappingsConfig = createMappingsConfig(evaluator);
 
-            return (
-              <EvaluatorChip
-                key={evaluator.id}
-                evaluator={evaluator}
-                result={evaluatorResults[evaluator.id]}
-                runnerId={runner.id}
-                row={row}
-                isExpanded={isExpanded}
-                onToggleExpand={() => {
-                  if (isExpanded) {
-                    setExpandedEvaluator(undefined);
-                  } else {
-                    setExpandedEvaluator({
-                      runnerId: runner.id,
-                      evaluatorId: evaluator.id,
-                      row,
-                    });
-                  }
-                }}
-                onEdit={() => openOverlay("evaluator", runner.id, evaluator.id)}
-              />
-            );
-          })}
-        </HStack>
-      )}
-
-      {/* Add evaluator button */}
-      <Button
-        size="xs"
-        variant="ghost"
-        color="gray.500"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (onAddEvaluator) {
-            onAddEvaluator(runner.id);
-          } else {
-            // Fallback to overlay if no callback provided
-            openOverlay("evaluator", runner.id);
-          }
-        }}
-        justifyContent="flex-start"
-        paddingX={1}
-        data-testid={`add-evaluator-button-${runner.id}`}
-      >
-        <LuPlus size={10} />
-        <Text marginLeft={1}>Add evaluator</Text>
-      </Button>
+              // Open the evaluator editor drawer with the DB evaluator ID
+              // mappingsConfig is an object so it goes to complexProps automatically
+              openDrawer("evaluatorEditor", {
+                evaluatorId: evaluator.dbEvaluatorId,
+                evaluatorType: evaluator.evaluatorType,
+                mappingsConfig,
+              });
+            }}
+            onRemove={() => removeEvaluator(evaluator.id)}
+          />
+        ))}
+        {/* Add evaluator button */}
+        <Button
+          size="xs"
+          variant="outline"
+          color="gray.500"
+          fontWeight="500"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddEvaluator?.();
+          }}
+          justifyContent="flex-start"
+          data-testid={`add-evaluator-button-${runner.id}`}
+        >
+          <LuPlus />
+          {evaluators.length === 0 && <Text>Add evaluator</Text>}
+        </Button>
+      </HStack>
     </VStack>
   );
 }

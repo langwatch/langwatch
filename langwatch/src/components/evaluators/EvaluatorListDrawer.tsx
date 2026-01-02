@@ -17,7 +17,7 @@ import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import type { Evaluator } from "@prisma/client";
-import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "../ui/menu";
+import { Menu } from "../ui/menu";
 
 export type EvaluatorListDrawerProps = {
   open?: boolean;
@@ -105,7 +105,12 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
             </Button>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             {/* Evaluator list - scrollable */}
             <VStack
@@ -153,12 +158,7 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
   return (
     <VStack paddingY={24} gap={4} textAlign="center">
-      <Box
-        padding={4}
-        borderRadius="full"
-        bg="green.100"
-        color="green.600"
-      >
+      <Box padding={4} borderRadius="full" bg="green.100" color="green.600">
         <CheckCircle size={32} />
       </Box>
       <VStack gap={1}>
@@ -223,49 +223,49 @@ function EvaluatorCard({
       data-testid={`evaluator-card-${evaluator.id}`}
       position="relative"
     >
-      <HStack gap={3}>
-        <Box color="green.500">
+      <HStack gap={3} align="start">
+        <Box color="green.500" paddingTop={1}>
           {evaluator.type === "workflow" ? (
-            <Workflow size={20} />
+            <Workflow size={16} />
           ) : (
-            <CheckCircle size={20} />
+            <CheckCircle size={16} />
           )}
         </Box>
         <VStack align="start" gap={0} flex={1}>
-          <Text fontWeight="medium" fontSize="sm">
+          <Text fontWeight="medium" fontSize="13px">
             {evaluator.name}
           </Text>
-          <HStack gap={2} fontSize="xs" color="gray.500">
-            <Text>{typeLabel}</Text>
+          <Text fontSize="xs" color="gray.500" lineClamp={1}>
+            <span>{typeLabel}</span>
             {evaluatorType && (
               <>
-                <Text>•</Text>
-                <Text>{evaluatorType}</Text>
+                <span style={{ margin: "0 4px" }}>{" • "}</span>
+                <span>{evaluatorType}</span>
               </>
             )}
-            <Text>•</Text>
-            <Text>
+            <span style={{ margin: "0 4px" }}>{" • "}</span>
+            <span>
               Updated{" "}
               {formatDistanceToNow(new Date(evaluator.updatedAt), {
                 addSuffix: true,
               })}
-            </Text>
-          </HStack>
+            </span>
+          </Text>
         </VStack>
-        <MenuRoot>
-          <MenuTrigger asChild>
+        <Menu.Root>
+          <Menu.Trigger asChild>
             <IconButton
               variant="ghost"
-              size="sm"
+              size="xs"
               aria-label="Actions"
               onClick={(e) => e.stopPropagation()}
               data-testid={`evaluator-menu-${evaluator.id}`}
             >
-              <LuEllipsisVertical size={16} />
+              <LuEllipsisVertical />
             </IconButton>
-          </MenuTrigger>
-          <MenuContent>
-            <MenuItem
+          </Menu.Trigger>
+          <Menu.Content zIndex="popover">
+            <Menu.Item
               value="edit"
               onClick={(e) => {
                 e.stopPropagation();
@@ -275,8 +275,8 @@ function EvaluatorCard({
             >
               <LuPencil size={14} />
               Edit
-            </MenuItem>
-            <MenuItem
+            </Menu.Item>
+            <Menu.Item
               value="delete"
               onClick={(e) => {
                 e.stopPropagation();
@@ -287,9 +287,9 @@ function EvaluatorCard({
             >
               <LuTrash2 size={14} />
               Delete
-            </MenuItem>
-          </MenuContent>
-        </MenuRoot>
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
       </HStack>
     </Box>
   );

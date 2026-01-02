@@ -51,7 +51,6 @@ const mockRunner: RunnerConfig = {
       },
     },
   },
-  evaluatorIds: [],
   // localPromptConfig is needed to determine which fields are actually used
   localPromptConfig: {
     llm: { model: "gpt-4" },
@@ -73,7 +72,6 @@ const mockOtherRunner: RunnerConfig = {
   inputs: [{ identifier: "query", type: "str" }],
   outputs: [{ identifier: "search_results", type: "str" }],
   mappings: {},
-  evaluatorIds: [],
 };
 
 const renderComponent = (

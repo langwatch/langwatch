@@ -176,6 +176,9 @@ export type EvaluatorConfig = Omit<
  * mappings[datasetId][inputFieldName] = FieldMapping
  *
  * This allows different mappings for each dataset in the evaluation.
+ *
+ * Note: Evaluators are NOT tied to runners. All evaluators in the store
+ * apply to ALL runners. Only the mappings differ per runner (and per dataset).
  */
 export const runnerConfigSchema = z.object({
   id: z.string(),
@@ -190,7 +193,6 @@ export const runnerConfigSchema = z.object({
   outputs: z.array(fieldSchema).optional(),
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
-  evaluatorIds: z.array(z.string()),
 });
 export type RunnerType = "prompt" | "agent";
 export type RunnerConfig = Omit<
@@ -372,17 +374,13 @@ export type EvaluationsV3Actions = {
     inputField: string
   ) => void;
 
-  // Global evaluator actions
+  // Global evaluator actions (evaluators apply to ALL runners automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
   updateEvaluator: (
     evaluatorId: string,
     updates: Partial<EvaluatorConfig>
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
-
-  // Runner-evaluator relationship actions
-  addEvaluatorToRunner: (runnerId: string, evaluatorId: string) => void;
-  removeEvaluatorFromRunner: (runnerId: string, evaluatorId: string) => void;
 
   /** Set a mapping for an evaluator input field for a specific dataset and runner */
   setEvaluatorMapping: (
@@ -475,7 +473,7 @@ export type TableMeta = {
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openRunnerEditor: (runner: RunnerConfig) => void;
   handleRemoveRunner: (runnerId: string) => void;
-  handleAddEvaluatorForRunner: (runnerId: string) => void;
+  handleAddEvaluator: () => void;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;

@@ -41,7 +41,13 @@ import type { LlmConfigInputType } from "~/types";
 export type PromptEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (prompt: { id: string; name: string; versionId?: string }) => void;
+  onSave?: (prompt: {
+    id: string;
+    name: string;
+    versionId?: string;
+    inputs?: Array<{ identifier: string; type: string }>;
+    outputs?: Array<{ identifier: string; type: string }>;
+  }) => void;
   /** If provided, loads an existing prompt for editing */
   promptId?: string;
   /**
@@ -323,6 +329,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Initialize form from prompt data
   useEffect(() => {
     if (promptQuery.data) {
+      let formValues: PromptConfigFormValues;
+
       // Reset form with loaded data to ensure it's properly populated
       if (props.initialLocalConfig) {
         // Use local config if available
@@ -330,7 +338,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           versionedPromptToPromptConfigFormValuesWithSystemMessage(
             promptQuery.data,
           );
-        methods.reset({
+        formValues = {
           ...baseValues,
           version: {
             ...baseValues.version,
@@ -349,13 +357,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 .outputs as typeof baseValues.version.configData.outputs,
             },
           },
-        });
+        };
+        methods.reset(formValues);
       } else {
-        methods.reset(
-          versionedPromptToPromptConfigFormValuesWithSystemMessage(
-            promptQuery.data,
-          ),
+        formValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(
+          promptQuery.data,
         );
+        methods.reset(formValues);
       }
     } else if (!promptId && isOpen) {
       // Reset form for new prompt
@@ -378,6 +386,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onSave?.({
         id: prompt.id,
         name: prompt.handle ?? "Untitled",
+        versionId: prompt.versionId,
+        inputs: prompt.inputs,
+        outputs: prompt.outputs,
       });
       onClose();
     },
@@ -402,6 +413,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onSave?.({
         id: prompt.id,
         name: prompt.handle ?? "Untitled",
+        versionId: prompt.versionId,
+        inputs: prompt.inputs,
+        outputs: prompt.outputs,
       });
       // Don't close - let user continue editing or close manually
     },

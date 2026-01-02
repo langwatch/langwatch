@@ -22,7 +22,13 @@ import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 export type PromptListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (prompt: { id: string; name: string; versionId?: string }) => void;
+  onSelect?: (prompt: {
+    id: string;
+    name: string;
+    versionId?: string;
+    inputs?: Array<{ identifier: string; type: string }>;
+    outputs?: Array<{ identifier: string; type: string }>;
+  }) => void;
   onCreateNew?: () => void;
 };
 
@@ -85,6 +91,9 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   }, [prompts, searchQuery]);
 
   const handleSelectPrompt = (prompt: { id: string; handle: string | null }) => {
+    // Find the full prompt data to get inputs/outputs
+    const fullPrompt = prompts?.find((p) => p.id === prompt.id);
+
     // Call onSelect and let the callback handle navigation if needed.
     // Don't call onClose() here - the callback may navigate to another drawer,
     // and closeDrawer would wipe the flow callbacks.
@@ -93,6 +102,9 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
     onSelect?.({
       id: prompt.id,
       name: prompt.handle ?? "Untitled",
+      versionId: fullPrompt?.versionId,
+      inputs: fullPrompt?.inputs,
+      outputs: fullPrompt?.outputs,
     });
   };
 

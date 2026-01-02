@@ -420,7 +420,6 @@ describe("RunnerHeader stability", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     });
 
     // Track mount/unmount via console logs from RunnerHeader's debug useEffect
@@ -468,7 +467,6 @@ describe("RunnerHeader stability", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     });
 
     const mountCount = { current: 0 };

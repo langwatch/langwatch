@@ -152,7 +152,6 @@ describe("DSL Adapter", () => {
                   },
                 },
               },
-              evaluatorIds: [],
             },
           ],
         };
@@ -204,7 +203,6 @@ describe("DSL Adapter", () => {
                   },
                 },
               },
-              evaluatorIds: [],
             },
           ],
         };
@@ -237,7 +235,6 @@ describe("DSL Adapter", () => {
                   },
                 },
               },
-              evaluatorIds: ["eval-1"],
             },
           ],
           evaluators: [

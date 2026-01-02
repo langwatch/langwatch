@@ -12,6 +12,10 @@ import type {
   FieldMapping,
 } from "../types";
 import type { Field } from "~/optimization_studio/types/dsl";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 
 // ============================================================================
 // Types
@@ -91,7 +95,7 @@ export const getUsedFields = (runner: RunnerConfig): Set<string> => {
   const usedFields = new Set<string>();
 
   if (runner.type === "prompt") {
-    // For prompt runners, only check localPromptConfig if available
+    // For prompt runners, check localPromptConfig if available (has actual content)
     if (runner.localPromptConfig) {
       for (const message of runner.localPromptConfig.messages) {
         const fieldsInMessage = extractFieldsFromContent(message.content);
@@ -99,13 +103,16 @@ export const getUsedFields = (runner: RunnerConfig): Set<string> => {
           usedFields.add(field);
         }
       }
+    } else {
+      // If no localPromptConfig yet, fall back to runner.inputs
+      // These are the explicitly defined variables that need mappings
+      for (const input of runner.inputs ?? []) {
+        usedFields.add(input.identifier);
+      }
     }
-    // If no localPromptConfig, we can't determine used fields yet
-    // (prompt content will be loaded when drawer opens)
-    // Return empty set - no fields are known to be used
   } else {
     // For code runners, all inputs are used
-    for (const input of runner.inputs) {
+    for (const input of runner.inputs ?? []) {
       usedFields.add(input.identifier);
     }
   }
@@ -144,7 +151,7 @@ export const getRunnerMissingMappings = (
   // Get the set of input identifiers (fields explicitly defined by user)
   // Use localPromptConfig.inputs if available (has latest form state),
   // otherwise fall back to runner.inputs
-  const inputs = runner.localPromptConfig?.inputs ?? runner.inputs;
+  const inputs = runner.localPromptConfig?.inputs ?? runner.inputs ?? [];
   const inputIds = new Set(inputs.map((i) => i.identifier));
 
   // A field is required if it's BOTH used AND in the inputs list
@@ -192,10 +199,11 @@ export const runnerHasMissingMappings = (
 /**
  * Check if an evaluator has all required mappings for a specific runner and dataset.
  *
- * Evaluators have standard inputs like:
- * - input: Usually from dataset
- * - output: Usually from runner
- * - expected_output: Usually from dataset
+ * Validation rules:
+ * 1. ALL required fields MUST have mappings
+ * 2. Optional fields MAY have mappings
+ * 3. BUT if ALL fields (required + optional) are empty, that's also invalid
+ *    (at least one field must be mapped)
  *
  * @param evaluator - The evaluator to validate
  * @param datasetId - The dataset to validate against
@@ -210,20 +218,58 @@ export const getEvaluatorMissingMappings = (
   const missingMappings: MissingMapping[] = [];
   const runnerMappings = evaluator.mappings[datasetId]?.[runnerId] ?? {};
 
+  // Get the evaluator definition to know which fields are required vs optional
+  const evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
+  const optionalFieldsArr = evaluatorDef?.optionalFields ?? [];
+
+  // Build sets from string arrays for easy lookup
+  const requiredFieldsSet = new Set<string>(requiredFieldsArr);
+  const optionalFieldsSet = new Set<string>(optionalFieldsArr);
+
+  let hasAnyMapping = false;
+  let missingRequiredCount = 0;
+
   for (const input of evaluator.inputs) {
     const hasMapping = runnerMappings[input.identifier] !== undefined;
 
-    if (!hasMapping) {
-      missingMappings.push({
-        fieldId: input.identifier,
-        fieldName: input.identifier,
-        isRequired: true, // All evaluator inputs are typically required
-      });
+    if (hasMapping) {
+      hasAnyMapping = true;
+    } else {
+      const isRequired = requiredFieldsSet.has(input.identifier);
+      const isOptional = optionalFieldsSet.has(input.identifier);
+
+      // Only add to missing if it's a required field
+      if (isRequired) {
+        missingRequiredCount++;
+        missingMappings.push({
+          fieldId: input.identifier,
+          fieldName: input.identifier,
+          isRequired: true,
+        });
+      } else if (isOptional) {
+        // Optional fields are not added to missingMappings
+        // They don't block validation
+      } else {
+        // Unknown field (not in either list) - treat as required for safety
+        missingRequiredCount++;
+        missingMappings.push({
+          fieldId: input.identifier,
+          fieldName: input.identifier,
+          isRequired: true,
+        });
+      }
     }
   }
 
+  // Invalid if:
+  // 1. Any required field is missing, OR
+  // 2. ALL fields are empty (must have at least one mapping)
+  const allFieldsCount = evaluator.inputs.length;
+  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
+
   return {
-    isValid: missingMappings.filter((m) => m.isRequired).length === 0,
+    isValid,
     missingMappings,
   };
 };
@@ -276,11 +322,8 @@ export const validateWorkbench = (
       };
     }
 
-    // Check evaluators for this runner
-    for (const evaluatorId of runner.evaluatorIds) {
-      const evaluator = evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) continue;
-
+    // Check all evaluators for this runner (evaluators apply to all runners)
+    for (const evaluator of evaluators) {
       const evalValidation = getEvaluatorMissingMappings(
         evaluator,
         activeDatasetId,

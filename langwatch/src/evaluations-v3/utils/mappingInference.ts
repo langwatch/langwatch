@@ -241,11 +241,21 @@ export const propagateMappingsToNewDataset = (
 };
 
 /**
+ * Fields that should primarily come from the runner output.
+ * "output" is the most common evaluator input that should connect to runner.
+ */
+const RUNNER_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
+
+/**
  * Infer mappings for an evaluator's inputs.
  *
  * Evaluator inputs can map to:
- * - Dataset columns (e.g., expected_output)
+ * - Dataset columns (e.g., input, expected_output)
  * - Runner outputs (e.g., output)
+ *
+ * Heuristic:
+ * - "output" and similar fields PRIORITIZE runner outputs
+ * - "input", "expected_output" and similar PRIORITIZE dataset columns
  *
  * @param evaluatorInputs - The evaluator's input fields
  * @param dataset - The dataset to infer from
@@ -267,33 +277,62 @@ export const inferEvaluatorMappings = (
       continue;
     }
 
-    // First, try to match against runner outputs
-    // This is prioritized for fields like "output" that should come from the runner
-    const runnerOutputMatch = findMatchingColumn(
-      input.identifier,
-      runner.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
-    );
+    const fieldLower = input.identifier.toLowerCase();
+    const shouldPrioritizeRunner = RUNNER_OUTPUT_FIELDS.has(fieldLower);
 
-    if (runnerOutputMatch) {
-      newMappings[input.identifier] = {
-        type: "source",
-        source: "runner",
-        sourceId: runner.id,
-        sourceField: runnerOutputMatch,
-      };
-      continue;
-    }
+    if (shouldPrioritizeRunner) {
+      // For "output" and similar: try runner FIRST, then dataset
+      const runnerOutputMatch = findMatchingColumn(
+        input.identifier,
+        runner.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+      );
 
-    // Then, try to match against dataset columns
-    // This is for fields like "expected_output" that come from the dataset
-    const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
-    if (datasetColumnMatch) {
-      newMappings[input.identifier] = {
-        type: "source",
-        source: "dataset",
-        sourceId: dataset.id,
-        sourceField: datasetColumnMatch,
-      };
+      if (runnerOutputMatch) {
+        newMappings[input.identifier] = {
+          type: "source",
+          source: "runner",
+          sourceId: runner.id,
+          sourceField: runnerOutputMatch,
+        };
+        continue;
+      }
+
+      // Fallback to dataset if no runner match
+      const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
+      if (datasetColumnMatch) {
+        newMappings[input.identifier] = {
+          type: "source",
+          source: "dataset",
+          sourceId: dataset.id,
+          sourceField: datasetColumnMatch,
+        };
+      }
+    } else {
+      // For "input", "expected_output", etc: try dataset FIRST, then runner
+      const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
+      if (datasetColumnMatch) {
+        newMappings[input.identifier] = {
+          type: "source",
+          source: "dataset",
+          sourceId: dataset.id,
+          sourceField: datasetColumnMatch,
+        };
+        continue;
+      }
+
+      // Fallback to runner if no dataset match
+      const runnerOutputMatch = findMatchingColumn(
+        input.identifier,
+        runner.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+      );
+      if (runnerOutputMatch) {
+        newMappings[input.identifier] = {
+          type: "source",
+          source: "runner",
+          sourceId: runner.id,
+          sourceField: runnerOutputMatch,
+        };
+      }
     }
   }
 
@@ -347,13 +386,9 @@ export const inferAllEvaluatorMappings = (
 ): Record<string, Record<string, Record<string, FieldMapping>>> => {
   const result = { ...evaluator.mappings };
 
-  // Only infer for runners that have this evaluator
-  const relatedRunners = runners.filter((r) =>
-    r.evaluatorIds.includes(evaluator.id)
-  );
-
+  // All evaluators apply to all runners, so infer for every combination
   for (const dataset of datasets) {
-    for (const runner of relatedRunners) {
+    for (const runner of runners) {
       const existingMappings = result[dataset.id]?.[runner.id] ?? {};
       const newMappings = inferEvaluatorMappings(
         evaluator.inputs,

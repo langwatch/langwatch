@@ -145,7 +145,6 @@ describe("Add Evaluator Button", () => {
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},
-          evaluatorIds: [],
         },
       ],
       datasets: [

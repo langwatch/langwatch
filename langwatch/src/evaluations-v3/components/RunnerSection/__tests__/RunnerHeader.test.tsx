@@ -44,7 +44,6 @@ describe("RunnerHeader", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     };
 
     it("renders prompt runner with name and icon", () => {
@@ -144,7 +143,6 @@ describe("RunnerHeader", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     };
 
     const promptRunnerWithoutLocalConfig: RunnerConfig = {
@@ -156,7 +154,6 @@ describe("RunnerHeader", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     };
 
     it("does not show orange dot when no localPromptConfig", () => {
@@ -193,7 +190,6 @@ describe("RunnerHeader", () => {
         inputs: [],
         outputs: [],
         mappings: {},
-        evaluatorIds: [],
       };
 
       renderWithProviders(
@@ -217,7 +213,6 @@ describe("RunnerHeader", () => {
       inputs: [],
       outputs: [],
       mappings: {},
-      evaluatorIds: [],
     };
 
     it("renders agent runner with name", () => {
