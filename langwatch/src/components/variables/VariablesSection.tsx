@@ -184,7 +184,12 @@ export const VariablesSection = ({
         </Text>
         <Spacer />
         {canAddRemove && !readOnly && (
-          <Button size="xs" variant="outline" onClick={handleAddVariable}>
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={handleAddVariable}
+            data-testid="add-variable-button"
+          >
             <Plus size={14} />
             Add
           </Button>
@@ -370,6 +375,7 @@ const VariableRow = ({
           fontSize="13px"
           autoFocus
           borderColor={hasError ? "red.500" : undefined}
+          data-testid={`variable-name-input-${variable.identifier}`}
         />
       ) : (
         <Text
@@ -386,6 +392,7 @@ const VariableRow = ({
           borderRadius="lg"
           _hover={readOnly ? undefined : { borderColor: "gray.200" }}
           minWidth="60px"
+          data-testid={`variable-name-${variable.identifier}`}
         >
           {variable.identifier}
         </Text>
@@ -433,6 +440,7 @@ const VariableRow = ({
             onClick={onRemove}
             flexShrink={0}
             color="gray.400"
+            data-testid={`remove-variable-${variable.identifier}`}
           >
             <X size={14} />
           </Button>

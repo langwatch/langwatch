@@ -250,6 +250,15 @@ export function EvaluationsV3Table({
             name: savedPrompt.name,
             promptId: savedPrompt.id,
             localPromptConfig: undefined,
+            // Update inputs/outputs from saved prompt to keep validation working
+            inputs: savedPrompt.inputs?.map((i) => ({
+              identifier: i.identifier,
+              type: i.type as Field["type"],
+            })),
+            outputs: savedPrompt.outputs?.map((o) => ({
+              identifier: o.identifier,
+              type: o.type as Field["type"],
+            })),
           });
         },
         onInputMappingsChange: (

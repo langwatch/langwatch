@@ -29,8 +29,8 @@ import { runnerHasMissingMappings } from "../../utils/mappingValidation";
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.1); }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 `;
 
 type RunnerHeaderProps = {
@@ -149,7 +149,7 @@ export const RunnerHeader = memo(function RunnerHeader({
                   _hover={{ transform: "scale(1.2)" }}
                   transition="transform 0.15s"
                 >
-                  <Icon as={LuCircleAlert} color="orange.500" boxSize={4} />
+                  <Icon as={LuCircleAlert} color="yellow.500" boxSize={4} />
                 </Box>
               </Tooltip>
             )}

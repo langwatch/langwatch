@@ -294,14 +294,14 @@ export const VariableMappingInput = ({
       {/* Container with full-width bottom border */}
       <Box
         borderBottom="1px solid"
-        borderColor={isMissing ? "orange.400" : "gray.200"}
+        borderColor={isMissing ? "yellow.500" : "gray.200"}
         background={isMissing ? "orange.50" : undefined}
         // borderRadius={isMissing ? "md" : undefined}
         paddingX={isMissing ? 1 : undefined}
         _focusWithin={{
-          borderColor: isMissing ? "orange.500" : "blue.500",
+          borderColor: isMissing ? "yellow.600" : "blue.500",
           boxShadow: isMissing
-            ? "var(--chakra-colors-orange-500) 0px 1px 0px 0px"
+            ? "var(--chakra-colors-yellow-400) 0px 1px 0px 0px"
             : "var(--chakra-colors-blue-500) 0px 1px 0px 0px"
         }}
         cursor={disabled ? "not-allowed" : "text"}
@@ -347,7 +347,7 @@ export const VariableMappingInput = ({
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
             placeholder={isMissing ? "Required" : isSourceMapping ? "" : placeholder}
-            _placeholder={{ color: isMissing ? "orange.500" : undefined }}
+            _placeholder={{ color: isMissing ? "yellow.600" : undefined }}
             size="sm"
             border="none"
             outline="none"

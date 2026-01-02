@@ -27,6 +27,7 @@ import {
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
 import type { RunnerConfig } from "../types";
+import type { Field } from "~/optimization_studio/types/dsl";
 
 export const useOpenRunnerEditor = () => {
   const { openDrawer } = useDrawer();
@@ -108,6 +109,15 @@ export const useOpenRunnerEditor = () => {
               name: savedPrompt.name,
               promptId: savedPrompt.id,
               localPromptConfig: undefined, // Clear local config on save
+              // Update inputs/outputs from saved prompt to keep validation working
+              inputs: savedPrompt.inputs?.map((i) => ({
+                identifier: i.identifier,
+                type: i.type as Field["type"],
+              })),
+              outputs: savedPrompt.outputs?.map((o) => ({
+                identifier: o.identifier,
+                type: o.type as Field["type"],
+              })),
             });
           },
           onInputMappingsChange: (

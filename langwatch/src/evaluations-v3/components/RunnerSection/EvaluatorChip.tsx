@@ -1,5 +1,18 @@
-import { Box, Button, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import { LuCircleAlert, LuChevronDown, LuPencil, LuTrash2 } from "react-icons/lu";
+import {
+  Box,
+  Button,
+  Circle,
+  HStack,
+  Icon,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import {
+  LuCircleAlert,
+  LuChevronDown,
+  LuPencil,
+  LuTrash2,
+} from "react-icons/lu";
 import { keyframes } from "@emotion/react";
 
 import { Menu } from "~/components/ui/menu";
@@ -12,9 +25,8 @@ import type { EvaluatorConfig } from "../../types";
 
 // Pulsing animation for alert icon
 const pulseAnimation = keyframes`
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
 `;
 
 type EvaluatorChipProps = {
@@ -49,7 +61,13 @@ export function EvaluatorChip({
     }
     if (label) {
       return (
-        <Text fontSize="10px" fontWeight="medium" color={statusColor} maxWidth="60px" truncate>
+        <Text
+          fontSize="10px"
+          fontWeight="medium"
+          color={statusColor}
+          maxWidth="60px"
+          truncate
+        >
           {label}
         </Text>
       );
@@ -85,7 +103,7 @@ export function EvaluatorChip({
             {hasMissingMappings && (
               <Icon
                 as={LuCircleAlert}
-                color="orange.500"
+                color="yellow.500"
                 boxSize="14px"
                 css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
                 onClick={(e) => {
@@ -106,36 +124,67 @@ export function EvaluatorChip({
         {status !== "pending" && (
           <>
             <Box paddingX={3} paddingY={2}>
-              <Text fontSize="11px" fontWeight="semibold" color="gray.500" marginBottom={1}>
+              <Text
+                fontSize="11px"
+                fontWeight="semibold"
+                color="gray.500"
+                marginBottom={1}
+              >
                 Result
               </Text>
               <VStack align="stretch" gap={1}>
                 {score !== undefined && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">Score:</Text>
-                    <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
+                    <Text fontSize="12px" color="gray.600">
+                      Score:
+                    </Text>
+                    <Text
+                      fontSize="12px"
+                      fontWeight="semibold"
+                      color={statusColor}
+                    >
                       {score.toFixed(2)}
                     </Text>
                   </HStack>
                 )}
                 {label && (
                   <HStack justify="space-between">
-                    <Text fontSize="12px" color="gray.600">Label:</Text>
-                    <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
+                    <Text fontSize="12px" color="gray.600">
+                      Label:
+                    </Text>
+                    <Text
+                      fontSize="12px"
+                      fontWeight="semibold"
+                      color={statusColor}
+                    >
                       {label}
                     </Text>
                   </HStack>
                 )}
                 <HStack justify="space-between">
-                  <Text fontSize="12px" color="gray.600">Status:</Text>
-                  <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
+                  <Text fontSize="12px" color="gray.600">
+                    Status:
+                  </Text>
+                  <Text
+                    fontSize="12px"
+                    fontWeight="semibold"
+                    color={statusColor}
+                  >
                     {getStatusLabel(status)}
                   </Text>
                 </HStack>
                 {details && (
                   <Box marginTop={1}>
-                    <Text fontSize="11px" color="gray.500" marginBottom={0.5}>Details:</Text>
-                    <Text fontSize="11px" color="gray.600" whiteSpace="pre-wrap" maxHeight="100px" overflow="auto">
+                    <Text fontSize="11px" color="gray.500" marginBottom={0.5}>
+                      Details:
+                    </Text>
+                    <Text
+                      fontSize="11px"
+                      color="gray.600"
+                      whiteSpace="pre-wrap"
+                      maxHeight="100px"
+                      overflow="auto"
+                    >
                       {details}
                     </Text>
                   </Box>

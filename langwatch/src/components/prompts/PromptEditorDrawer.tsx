@@ -211,54 +211,90 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     return undefined;
   }, [promptQuery.data]);
 
-  // Build initial values from prompt data, local config, or defaults
-  const initialConfigValues = useMemo(() => {
-    // If we have local config (unpublished changes), use that
-    if (props.initialLocalConfig && savedFormValues) {
-      // Merge local config over base values
-      return {
-        ...savedFormValues,
-        version: {
-          ...savedFormValues.version,
-          configData: {
-            ...savedFormValues.version.configData,
-            llm: {
-              model: props.initialLocalConfig.llm.model,
-              temperature: props.initialLocalConfig.llm.temperature,
-              maxTokens: props.initialLocalConfig.llm.maxTokens,
-              litellmParams: props.initialLocalConfig.llm.litellmParams,
-            },
-            messages: props.initialLocalConfig.messages,
-            inputs: props.initialLocalConfig
-              .inputs as typeof savedFormValues.version.configData.inputs,
-            outputs: props.initialLocalConfig
-              .outputs as typeof savedFormValues.version.configData.outputs,
-          },
-        },
-      };
-    }
-    if (savedFormValues) {
-      return savedFormValues;
-    }
-    return buildDefaultFormValues();
-  }, [savedFormValues, props.initialLocalConfig]);
+  // ============================================================================
+  // CONFIG VALUES STATE - Single Source of Truth for Form Initialization
+  // ============================================================================
+  //
+  // configValues: The baseline config that the form uses. Updated on:
+  //   1. Initialization (when drawer opens)
+  //   2. After save (with fresh server data)
+  //
+  // isFormInitialized: Tracks whether we've done the initial setup for this
+  //   drawer session. Prevents re-initialization when deps change.
+  //
+  const [configValues, setConfigValues] = useState<PromptConfigFormValues>(buildDefaultFormValues);
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   // Form setup using the prompts module hook
   const { methods } = usePromptConfigForm({
-    initialConfigValues,
+    initialConfigValues: configValues,
   });
 
   // Track unsaved changes state - updated via subscription, not watch()
-  // This avoids re-rendering the entire component on every keystroke
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Create stable refs for callbacks and values
+  // Refs for callbacks (these need to be refs because they're used in subscriptions)
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
   onLocalConfigChangeRef.current = onLocalConfigChange;
   const savedFormValuesRef = useRef(savedFormValues);
   savedFormValuesRef.current = savedFormValues;
   const promptIdRef = useRef(promptId);
   promptIdRef.current = promptId;
+
+  // Initialize form when drawer opens and data is available
+  useEffect(() => {
+    if (isFormInitialized) return;
+    if (!isOpen) return;
+
+    if (promptQuery.data) {
+      const serverValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(promptQuery.data);
+
+      // Merge local config over server data if present
+      const formValues = props.initialLocalConfig
+        ? {
+            ...serverValues,
+            version: {
+              ...serverValues.version,
+              configData: {
+                ...serverValues.version.configData,
+                llm: {
+                  model: props.initialLocalConfig.llm.model,
+                  temperature: props.initialLocalConfig.llm.temperature,
+                  maxTokens: props.initialLocalConfig.llm.maxTokens,
+                  litellmParams: props.initialLocalConfig.llm.litellmParams,
+                },
+                messages: props.initialLocalConfig.messages,
+                inputs: props.initialLocalConfig.inputs as typeof serverValues.version.configData.inputs,
+                outputs: props.initialLocalConfig.outputs as typeof serverValues.version.configData.outputs,
+              },
+            },
+          }
+        : serverValues;
+
+      setConfigValues(formValues);
+      savedFormValuesRef.current = formValues;
+      methods.reset(formValues);
+      setIsFormInitialized(true);
+    } else if (!promptId) {
+      // New prompt - use defaults
+      const defaults = buildDefaultFormValues();
+      setConfigValues(defaults);
+      methods.reset(defaults);
+      setIsFormInitialized(true);
+    }
+  }, [isOpen, promptQuery.data, promptId, props.initialLocalConfig, methods, isFormInitialized]);
+
+  // Reset when drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsFormInitialized(false);
+    }
+  }, [isOpen]);
+
+  // Reset when switching prompts
+  useEffect(() => {
+    setIsFormInitialized(false);
+  }, [promptId]);
 
   // Debounced function to update local config (avoids flooding store on every keystroke)
   const debouncedUpdateLocalConfig = useMemo(
@@ -326,51 +362,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     }
   }, [savedFormValues, methods]);
 
-  // Initialize form from prompt data
-  useEffect(() => {
-    if (promptQuery.data) {
-      let formValues: PromptConfigFormValues;
-
-      // Reset form with loaded data to ensure it's properly populated
-      if (props.initialLocalConfig) {
-        // Use local config if available
-        const baseValues =
-          versionedPromptToPromptConfigFormValuesWithSystemMessage(
-            promptQuery.data,
-          );
-        formValues = {
-          ...baseValues,
-          version: {
-            ...baseValues.version,
-            configData: {
-              ...baseValues.version.configData,
-              llm: {
-                model: props.initialLocalConfig.llm.model,
-                temperature: props.initialLocalConfig.llm.temperature,
-                maxTokens: props.initialLocalConfig.llm.maxTokens,
-                litellmParams: props.initialLocalConfig.llm.litellmParams,
-              },
-              messages: props.initialLocalConfig.messages,
-              inputs: props.initialLocalConfig
-                .inputs as typeof baseValues.version.configData.inputs,
-              outputs: props.initialLocalConfig
-                .outputs as typeof baseValues.version.configData.outputs,
-            },
-          },
-        };
-        methods.reset(formValues);
-      } else {
-        formValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(
-          promptQuery.data,
-        );
-        methods.reset(formValues);
-      }
-    } else if (!promptId && isOpen) {
-      // Reset form for new prompt
-      methods.reset(buildDefaultFormValues());
-    }
-  }, [promptQuery.data, promptId, isOpen, methods, props.initialLocalConfig]);
-
   // Message fields array for PromptMessagesField
   const messageFields = useFieldArray({
     control: methods.control,
@@ -403,6 +394,23 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   const updateMutation = api.prompts.update.useMutation({
     onSuccess: (prompt) => {
+      // Build fresh form values from server response
+      const freshFormValues =
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+
+      // Update configValues state - this is THE key fix!
+      // This ensures the forward sync in usePromptConfigForm sees form matches configValues
+      // and doesn't restore stale data from props.initialLocalConfig
+      setConfigValues(freshFormValues);
+
+      // Update savedFormValuesRef BEFORE resetting the form.
+      // This ensures the form subscription sees the correct "saved" values
+      // and doesn't incorrectly think there are unsaved changes.
+      savedFormValuesRef.current = freshFormValues;
+
+      // Reset form to match the fresh values
+      methods.reset(freshFormValues);
+
       void utils.prompts.getAllPromptsForProject.invalidate({
         projectId: project?.id ?? "",
       });
