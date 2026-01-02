@@ -100,11 +100,10 @@ export class PromptsApiService {
       {
         params: { 
           path: { id },
-          ...(options?.version && {
-            query: { version: parseInt(options.version, 10) }
-          }),
-        },
-        
+          ...(options?.version && options.version !== "latest" && !isNaN(parseInt(options.version, 10)) && {
+              query: { version: parseInt(options.version, 10) }
+            }),
+          },
       },
     );
 
