@@ -886,7 +886,20 @@ export const PromptTextAreaWithVariables = ({
 
       {/* Invalid variables warning */}
       {invalidVariables.length > 0 && (
-        <Text fontSize="xs" color="red.500" marginTop={1}>
+        <Text
+          fontSize="xs"
+          color="red.800"
+          backgroundColor="red.50"
+          borderRadius="lg"
+          padding={1}
+          marginBottom={1}
+          paddingLeft={2}
+          position="absolute"
+          transform="translateY(-100%)"
+          marginTop={-2}
+          marginLeft={1}
+          width="calc(100% - 8px)"
+        >
           Undefined variables: {invalidVariables.join(", ")}
         </Text>
       )}

@@ -171,7 +171,44 @@ export const useOpenRunnerEditor = () => {
             }
           } else {
             // Code agent - open code editor drawer
+            // Build available sources for variable mapping (active dataset only)
+            const availableSources = buildAvailableSources();
+
+            // Convert runner mappings for the active dataset to UI format
+            const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+            const uiMappings: Record<string, UIFieldMapping> = {};
+            for (const [key, mapping] of Object.entries(datasetMappings)) {
+              uiMappings[key] = convertToUIMapping(mapping);
+            }
+
+            // Set flow callbacks for the code editor
+            setFlowCallbacks("agentCodeEditor", {
+              onInputMappingsChange: (
+                identifier: string,
+                mapping: UIFieldMapping | undefined
+              ) => {
+                const currentActiveDatasetId =
+                  useEvaluationsV3Store.getState().activeDatasetId;
+                const currentDatasets = useEvaluationsV3Store.getState().datasets;
+                const checkIsDatasetSource = (sourceId: string) =>
+                  currentDatasets.some((d) => d.id === sourceId);
+
+                if (mapping) {
+                  setRunnerMapping(
+                    runner.id,
+                    currentActiveDatasetId,
+                    identifier,
+                    convertFromUIMapping(mapping, checkIsDatasetSource)
+                  );
+                } else {
+                  removeRunnerMapping(runner.id, currentActiveDatasetId, identifier);
+                }
+              },
+            });
+
             openDrawer("agentCodeEditor", {
+              availableSources,
+              inputMappings: uiMappings,
               urlParams: {
                 runnerId: runner.id,
                 agentId: runner.dbAgentId ?? "",

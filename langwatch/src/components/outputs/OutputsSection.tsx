@@ -19,6 +19,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
+import type { Field } from "~/optimization_studio/types/dsl";
 import { outputsSchema } from "~/prompts/schemas";
 import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
 
@@ -26,7 +27,8 @@ import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableT
 // Types
 // ============================================================================
 
-export type OutputType = "str" | "float" | "bool" | "json_schema";
+/** Output type - uses DSL Field type for consistency */
+export type OutputType = Field["type"];
 
 export type Output = {
   identifier: string;
@@ -45,18 +47,29 @@ export type OutputsSectionProps = {
   readOnly?: boolean;
   /** Section title */
   title?: string;
+  /** Which output types are available (defaults to LLM types: str, float, bool, json_schema) */
+  availableTypes?: OutputType[];
 };
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-const OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
+const ALL_OUTPUT_TYPE_OPTIONS: Array<{ value: OutputType; label: string }> = [
   { value: "str", label: TYPE_LABELS["str"] ?? "Text" },
   { value: "float", label: TYPE_LABELS["float"] ?? "Number" },
   { value: "bool", label: TYPE_LABELS["bool"] ?? "Boolean" },
   { value: "json_schema", label: TYPE_LABELS["json_schema"] ?? "JSON Schema" },
+  { value: "dict", label: TYPE_LABELS["dict"] ?? "Object" },
+  { value: "list", label: TYPE_LABELS["list"] ?? "List" },
+  { value: "image", label: TYPE_LABELS["image"] ?? "Image" },
 ];
+
+/** Default types for LLM outputs (with structured output support) */
+export const LLM_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "json_schema"];
+
+/** Types for code block outputs */
+export const CODE_OUTPUT_TYPES: OutputType[] = ["str", "float", "bool", "dict", "list", "image"];
 
 const DEFAULT_JSON_SCHEMA = {
   type: "object",
@@ -101,10 +114,16 @@ export const OutputsSection = ({
   canAddRemove = true,
   readOnly = false,
   title = "Outputs",
+  availableTypes = LLM_OUTPUT_TYPES,
 }: OutputsSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const jsonSchemaDialog = useDisclosure();
   const [editingJsonSchemaIndex, setEditingJsonSchemaIndex] = useState<number | null>(null);
+
+  // Filter type options based on availableTypes prop
+  const typeOptions = ALL_OUTPUT_TYPE_OPTIONS.filter((opt) =>
+    availableTypes.includes(opt.value)
+  );
 
   const handleAddOutput = useCallback(
     (type: OutputType) => {
@@ -211,7 +230,7 @@ export const OutputsSection = ({
               </Button>
             </Menu.Trigger>
             <Menu.Content portalled={false}>
-              {OUTPUT_TYPE_OPTIONS.map((option) => (
+              {typeOptions.map((option) => (
                 <Menu.Item
                   key={option.value}
                   value={option.value}
@@ -247,6 +266,7 @@ export const OutputsSection = ({
               onUpdate={(updates) => handleUpdateOutput(output.identifier, updates)}
               onRemove={() => handleRemoveOutput(output.identifier)}
               onEditJsonSchema={() => handleEditJsonSchema(index)}
+              typeOptions={typeOptions}
             />
           ))}
         </VStack>
@@ -280,6 +300,7 @@ type OutputRowProps = {
   onUpdate: (updates: Partial<Output>) => boolean;
   onRemove: () => void;
   onEditJsonSchema: () => void;
+  typeOptions: Array<{ value: OutputType; label: string }>;
 };
 
 const OutputRow = ({
@@ -291,6 +312,7 @@ const OutputRow = ({
   onEndEdit,
   onUpdate,
   onRemove,
+  typeOptions,
   onEditJsonSchema,
 }: OutputRowProps) => {
   const [editValue, setEditValue] = useState(output.identifier);
@@ -367,7 +389,7 @@ const OutputRow = ({
             }}
             background="transparent"
           >
-            {OUTPUT_TYPE_OPTIONS.map((opt) => (
+            {typeOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

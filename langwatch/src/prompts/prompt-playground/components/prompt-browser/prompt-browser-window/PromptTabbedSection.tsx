@@ -175,6 +175,7 @@ export function PromptTabbedSection() {
               title="Variables"
               lockedVariables={LOCKED_VARIABLES}
               variableInfo={VARIABLE_INFO}
+              disabledMappings={LOCKED_VARIABLES}
             />
           </Box>
         </Tabs.Content>

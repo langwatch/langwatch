@@ -13,16 +13,28 @@ import { LuArrowLeft } from "react-icons/lu";
 import { useState, useCallback, useEffect } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
+import { useDrawer, getComplexProps, useDrawerParams, getFlowCallbacks } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
 import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
+import {
+  VariablesSection,
+  type Variable,
+  type AvailableSource,
+  type FieldMapping,
+} from "~/components/variables";
+import {
+  OutputsSection,
+  CODE_OUTPUT_TYPES,
+  type Output,
+  type OutputType,
+} from "~/components/outputs/OutputsSection";
 import type {
   TypedAgent,
   AgentComponentConfig,
 } from "~/server/agents/agent.repository";
-import type { CodeComponentConfig } from "~/optimization_studio/types/dsl";
+import type { CodeComponentConfig, Field as DSLField } from "~/optimization_studio/types/dsl";
 
 const DEFAULT_CODE = `import dspy
 
@@ -32,6 +44,9 @@ class Code(dspy.Module):
 
         return {"output": input.upper()}
 `;
+
+const DEFAULT_INPUTS: DSLField[] = [{ identifier: "input", type: "str" }];
+const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
 
 /**
  * Extract code value from CodeComponentConfig parameters
@@ -45,9 +60,29 @@ const getCodeFromConfig = (config: AgentComponentConfig): string => {
 };
 
 /**
+ * Extract inputs from CodeComponentConfig
+ */
+const getInputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
+  const codeConfig = config as CodeComponentConfig;
+  return codeConfig.inputs ?? DEFAULT_INPUTS;
+};
+
+/**
+ * Extract outputs from CodeComponentConfig
+ */
+const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
+  const codeConfig = config as CodeComponentConfig;
+  return codeConfig.outputs ?? DEFAULT_OUTPUTS;
+};
+
+/**
  * Build DSL-compatible config for code agent
  */
-const buildCodeConfig = (code: string): CodeComponentConfig => ({
+const buildCodeConfig = (
+  code: string,
+  inputs: DSLField[],
+  outputs: DSLField[]
+): CodeComponentConfig => ({
   name: "Code",
   description: "Python code block",
   parameters: [
@@ -57,18 +92,8 @@ const buildCodeConfig = (code: string): CodeComponentConfig => ({
       value: code,
     },
   ],
-  inputs: [
-    {
-      identifier: "input",
-      type: "str",
-    },
-  ],
-  outputs: [
-    {
-      identifier: "output",
-      type: "str",
-    },
-  ],
+  inputs: inputs as CodeComponentConfig["inputs"],
+  outputs: outputs as CodeComponentConfig["outputs"],
 });
 
 export type AgentCodeEditorDrawerProps = {
@@ -77,6 +102,12 @@ export type AgentCodeEditorDrawerProps = {
   onSave?: (agent: TypedAgent) => void;
   /** If provided, loads an existing agent for editing */
   agentId?: string;
+  /** Available sources for variable mapping (from Evaluations V3) */
+  availableSources?: AvailableSource[];
+  /** Current input mappings (from Evaluations V3) */
+  inputMappings?: Record<string, FieldMapping>;
+  /** Callback when input mappings change (for Evaluations V3) */
+  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
 };
 
 /**
@@ -88,6 +119,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
+  const flowCallbacks = getFlowCallbacks("agentCodeEditor");
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
@@ -100,9 +132,27 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
+  // Props from drawer params or direct props (for Evaluations V3)
+  const availableSources =
+    props.availableSources ??
+    (complexProps.availableSources as AvailableSource[] | undefined);
+  const inputMappings =
+    props.inputMappings ??
+    (complexProps.inputMappings as Record<string, FieldMapping> | undefined);
+  const onInputMappingsChange =
+    props.onInputMappingsChange ??
+    (flowCallbacks?.onInputMappingsChange as
+      | ((identifier: string, mapping: FieldMapping | undefined) => void)
+      | undefined);
+
+  // Show mappings only when we have available sources (i.e., in Evaluations V3 context)
+  const showMappings = !!availableSources && availableSources.length > 0;
+
   // Form state
   const [name, setName] = useState("");
   const [code, setCode] = useState(DEFAULT_CODE);
+  const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
+  const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Track when code modal is open - we hide the drawer to avoid focus conflicts
@@ -119,11 +169,15 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     if (agentQuery.data) {
       setName(agentQuery.data.name);
       setCode(getCodeFromConfig(agentQuery.data.config));
+      setInputs(getInputsFromConfig(agentQuery.data.config));
+      setOutputs(getOutputsFromConfig(agentQuery.data.config));
       setHasUnsavedChanges(false);
     } else if (!agentId) {
       // Reset form for new agent
       setName("");
       setCode(DEFAULT_CODE);
+      setInputs(DEFAULT_INPUTS);
+      setOutputs(DEFAULT_OUTPUTS);
       setHasUnsavedChanges(false);
     }
   }, [agentQuery.data, agentId, isOpen]);
@@ -155,8 +209,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    // Build DSL-compatible config
-    const config = buildCodeConfig(code);
+    // Build DSL-compatible config with current inputs/outputs
+    const config = buildCodeConfig(code, inputs, outputs);
 
     if (agentId) {
       updateMutation.mutate({
@@ -178,6 +232,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     agentId,
     name,
     code,
+    inputs,
+    outputs,
     isValid,
     createMutation,
     updateMutation,
@@ -192,6 +248,46 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     setCode(value);
     setHasUnsavedChanges(true);
   };
+
+  // Handle inputs change from VariablesSection
+  const handleInputsChange = useCallback((newVariables: Variable[]) => {
+    const newInputs: DSLField[] = newVariables.map((v) => ({
+      identifier: v.identifier,
+      type: v.type as DSLField["type"],
+    }));
+    setInputs(newInputs);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Handle outputs change from OutputsSection
+  const handleOutputsChange = useCallback((newOutputs: Output[]) => {
+    const newFields: DSLField[] = newOutputs.map((o) => ({
+      identifier: o.identifier,
+      type: o.type as DSLField["type"],
+    }));
+    setOutputs(newFields);
+    setHasUnsavedChanges(true);
+  }, []);
+
+  // Handle mapping change (for Evaluations V3)
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      onInputMappingsChange?.(identifier, mapping);
+    },
+    [onInputMappingsChange]
+  );
+
+  // Convert DSL inputs to Variable[] for VariablesSection
+  const variablesForUI: Variable[] = inputs.map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
+
+  // Convert DSL outputs to Output[] for OutputsSection
+  const outputsForUI: Output[] = outputs.map((output) => ({
+    identifier: output.identifier,
+    type: output.type as OutputType,
+  }));
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
@@ -254,6 +350,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 flex={1}
                 paddingX={6}
                 paddingY={4}
+                overflowY="auto"
               >
                 {/* Name field */}
                 <Field.Root required>
@@ -267,7 +364,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                 </Field.Root>
 
                 {/* Code editor */}
-                <Box flex={1}>
+                <Box>
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
                     <Text fontSize="sm" color="gray.500" marginBottom={2}>
@@ -281,6 +378,33 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                       onEditClick={() => setIsCodeModalOpen(true)}
                     />
                   </Field.Root>
+                </Box>
+
+                {/* Inputs (Variables) */}
+                <Box>
+                  <VariablesSection
+                    variables={variablesForUI}
+                    onChange={handleInputsChange}
+                    showMappings={showMappings}
+                    availableSources={availableSources}
+                    mappings={inputMappings}
+                    onMappingChange={handleMappingChange}
+                    canAddRemove={true}
+                    readOnly={false}
+                    title="Inputs"
+                  />
+                </Box>
+
+                {/* Outputs */}
+                <Box>
+                  <OutputsSection
+                    outputs={outputsForUI}
+                    onChange={handleOutputsChange}
+                    canAddRemove={true}
+                    readOnly={false}
+                    title="Outputs"
+                    availableTypes={CODE_OUTPUT_TYPES}
+                  />
                 </Box>
               </VStack>
             )}

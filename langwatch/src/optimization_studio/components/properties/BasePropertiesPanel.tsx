@@ -25,7 +25,6 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
 
-import { CodeBlockEditor } from "../../../components/blocks/CodeBlockEditor";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
@@ -408,24 +407,9 @@ export function FieldsForm({
           );
         }
 
+        // Skip code fields - they're handled by CodePropertiesPanel
         if (field.type === "code") {
-          const stateField = parameters?.find(
-            (p) => p.identifier === field.identifier,
-          );
-          return (
-            <CodeBlockEditor
-              key={field.id}
-              code={(stateField?.value ?? "") as string}
-              onChange={(code) => {
-                setNodeParameter(node.id, {
-                  identifier: field.identifier,
-                  type: "code",
-                  value: code,
-                });
-              }}
-              language="python"
-            />
-          );
+          return null;
         }
 
         return (

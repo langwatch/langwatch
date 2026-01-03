@@ -137,7 +137,8 @@ export function LLMConfigPopover({
   };
 
   return (
-    <Popover.Content minWidth="500px" zIndex={1400}>
+    // zIndex is 1401 to be above the variable insert menu (1400) but below the json schema editor
+    <Popover.Content minWidth="500px" zIndex={1401}>
       <HStack
         width="full"
         paddingX={4}

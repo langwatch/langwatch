@@ -11,7 +11,10 @@ import {
 import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
+import {
+  VariableTypeIcon,
+  TYPE_LABELS,
+} from "~/prompts/components/ui/VariableTypeIcon";
 import {
   VariableMappingInput,
   type AvailableSource,
@@ -234,7 +237,9 @@ export const VariablesSection = ({
                 readOnly={readOnly || isLocked}
                 isEditing={editingId === variable.identifier}
                 isMissing={missingMappingIds.has(variable.identifier)}
-                onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
+                onStartEdit={() =>
+                  !isLocked && setEditingId(variable.identifier)
+                }
                 onEndEdit={() => setEditingId(null)}
                 onUpdate={(updates) =>
                   handleUpdateVariable(variable.identifier, updates)
@@ -351,7 +356,7 @@ const VariableRow = ({
     <HStack gap={2} width="full">
       {/* Type Icon with selector */}
       {readOnly ? (
-        <Box flexShrink={0} padding={1}>
+        <Box flexShrink={0} padding={0}>
           <VariableTypeIcon type={variable.type} size={14} />
         </Box>
       ) : (
@@ -371,6 +376,7 @@ const VariableRow = ({
               "& option": { color: "black" },
             }}
             background="transparent"
+            cursor="pointer"
           >
             {INPUT_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -440,50 +446,40 @@ const VariableRow = ({
         </HStack>
       )}
 
-      {/* = sign and value/mapping input */}
-      <Text color="gray.400" fontSize="sm" flexShrink={0}>
-        =
-      </Text>
+      {!isMappingDisabled && (
+        <>
+          {/* = sign and value/mapping input */}
+          <Text color="gray.400" fontSize="sm" flexShrink={0}>
+            =
+          </Text>
 
-      {showMappings ? (
-        // Mapping input with source dropdown
-        <Box flex={1} minWidth={0}>
-          {isMappingDisabled ? (
-            // Show disabled info instead of mapping input
-            <Text
-              fontSize="13px"
-              color="gray.400"
-              fontStyle="italic"
-              paddingX={2}
-              paddingY={1}
-              data-testid={`mapping-disabled-${variable.identifier}`}
-            >
-              {infoTooltip ?? "Mapping disabled"}
-            </Text>
+          {showMappings ? (
+            // Mapping input with source dropdown
+            <Box flex={1} minWidth={0}>
+              <VariableMappingInput
+                mapping={mapping}
+                availableSources={availableSources}
+                onMappingChange={onMappingChange}
+                disabled={readOnly && !onMappingChange}
+                placeholder=""
+                isMissing={isMissing}
+              />
+            </Box>
           ) : (
-            <VariableMappingInput
-              mapping={mapping}
-              availableSources={availableSources}
-              onMappingChange={onMappingChange}
-              disabled={readOnly && !onMappingChange}
-              placeholder=""
-              isMissing={isMissing}
+            // Simple value input (for Prompt Playground)
+            <Input
+              value={defaultValue ?? ""}
+              onChange={(e) => onDefaultValueChange?.(e.target.value)}
+              size="sm"
+              flex={1}
+              minWidth={0}
+              fontFamily="mono"
+              fontSize="13px"
+              variant="flushed"
+              borderColor="gray.200"
             />
           )}
-        </Box>
-      ) : (
-        // Simple value input (for Prompt Playground)
-        <Input
-          value={defaultValue ?? ""}
-          onChange={(e) => onDefaultValueChange?.(e.target.value)}
-          size="sm"
-          flex={1}
-          minWidth={0}
-          fontFamily="mono"
-          fontSize="13px"
-          variant="flushed"
-          borderColor="gray.200"
-        />
+        </>
       )}
 
       {/* Delete Button */}

@@ -363,7 +363,7 @@ export function PromptMessagesField({
               );
               return (
                 <MessageRow
-                  key={`message-row-${field.id}`}
+                  key={`message-row-${idx}`}
                   field={field}
                   idx={idx}
                   availableFields={availableFields}
