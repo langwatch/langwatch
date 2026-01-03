@@ -18,7 +18,8 @@ export function AddMessageButton(props: {
           <Plus size={16} />
         </Button>
       </Menu.Trigger>
-      <Menu.Content>
+      {/* portalled={false} to avoid z-index issues when inside drawers */}
+      <Menu.Content portalled={false}>
         <Menu.Item value="add-user" onClick={() => onAdd("user")}>
           User
         </Menu.Item>

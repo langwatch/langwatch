@@ -281,8 +281,37 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       setConfigValues(defaults);
       methods.reset(defaults);
       setIsFormInitialized(true);
+
+      // Auto-map default inputs to matching dataset columns
+      if (availableSources && availableSources.length > 0 && _onMappingsChangeProp) {
+        const allFields = availableSources.flatMap((source) =>
+          source.fields.map((f) => ({ ...f, sourceId: source.id }))
+        );
+
+        for (const input of defaults.version.configData.inputs) {
+          // Find a matching field by name (case-insensitive)
+          const matchingField = allFields.find(
+            (f) => f.name.toLowerCase() === input.identifier.toLowerCase()
+          );
+
+          if (matchingField) {
+            const mapping: FieldMapping = {
+              type: "source",
+              sourceId: matchingField.sourceId,
+              field: matchingField.name,
+            };
+            // Update local state
+            setInputMappings((prev) => ({
+              ...prev,
+              [input.identifier]: mapping,
+            }));
+            // Persist to store
+            _onMappingsChangeProp(input.identifier, mapping);
+          }
+        }
+      }
     }
-  }, [isOpen, promptQuery.data, promptId, props.initialLocalConfig, methods, isFormInitialized]);
+  }, [isOpen, promptQuery.data, promptId, props.initialLocalConfig, methods, isFormInitialized, availableSources, _onMappingsChangeProp]);
 
   // Reset when drawer closes
   useEffect(() => {
