@@ -1,19 +1,11 @@
-import {
-  Box,
-  Field,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { useCallback, useMemo, useState } from "react";
+import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
   type UseFieldArrayReturn,
   useFieldArray,
   useFormContext,
 } from "react-hook-form";
-import { LuChevronDown } from "react-icons/lu";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import {
   PromptTextAreaWithVariables,
@@ -22,18 +14,17 @@ import {
   type AvailableSource,
 } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
-import { Menu } from "~/components/ui/menu";
 import { AddMessageButton } from "./AddMessageButton";
+import {
+  EditingModeTitle,
+  getDefaultEditingMode,
+  type PromptEditingMode,
+} from "./EditingModeTitle";
 import { MessageRoleLabel } from "./MessageRoleLabel";
 import { RemoveMessageButton } from "./RemoveMessageButton";
 
-/**
- * Editing mode for the prompt messages field.
- * - "prompt": Simple view showing only the system prompt
- * - "messages": Full view showing all messages with role labels
- */
-export type PromptEditingMode = "prompt" | "messages";
+// Re-export for backwards compatibility
+export type { PromptEditingMode } from "./EditingModeTitle";
 
 /**
  * Type for message field errors
@@ -76,8 +67,6 @@ type MessageRowProps = {
   ) => string | void;
   /** Whether to show role label and remove button */
   showControls?: boolean;
-  /** Whether to render the textarea without borders */
-  borderless?: boolean;
 };
 
 /**
@@ -97,7 +86,6 @@ function MessageRow({
   onSetVariableMapping,
   onAddEdge,
   showControls = true,
-  borderless = false,
 }: MessageRowProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
@@ -139,7 +127,6 @@ function MessageRow({
               return onAddEdge?.(id, handle, content, idx);
             }}
             showAddContextButton
-            borderless={borderless}
           />
         )}
       />
@@ -149,65 +136,6 @@ function MessageRow({
         </Field.ErrorText>
       )}
     </VerticalFormControl>
-  );
-}
-
-/**
- * Title with dropdown menu for switching between Prompt and Messages modes.
- */
-function EditingModeTitle({
-  mode,
-  onChange,
-}: {
-  mode: PromptEditingMode;
-  onChange: (mode: PromptEditingMode) => void;
-}) {
-  const [isHovered, setIsHovered] = useState(false);
-
-  return (
-    <Menu.Root>
-      <Menu.Trigger asChild>
-        <HStack
-          gap={1}
-          cursor="pointer"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-          role="button"
-          _hover={{ opacity: 0.8 }}
-        >
-          <PropertySectionTitle padding={0}>
-            {mode === "prompt" ? "Prompt" : "Messages"}
-          </PropertySectionTitle>
-          <Box
-            opacity={isHovered ? 1 : 0}
-            transition="opacity 0.15s"
-            color="gray.500"
-          >
-            <LuChevronDown size={14} />
-          </Box>
-        </HStack>
-      </Menu.Trigger>
-      <Menu.Content portalled={false} zIndex={10}>
-        <Menu.Item
-          value="prompt"
-          onClick={() => onChange("prompt")}
-          data-testid="editing-mode-prompt"
-        >
-          <Text fontWeight={mode === "prompt" ? "medium" : "normal"}>
-            Prompt
-          </Text>
-        </Menu.Item>
-        <Menu.Item
-          value="messages"
-          onClick={() => onChange("messages")}
-          data-testid="editing-mode-messages"
-        >
-          <Text fontWeight={mode === "messages" ? "medium" : "normal"}>
-            Messages
-          </Text>
-        </Menu.Item>
-      </Menu.Content>
-    </Menu.Root>
   );
 }
 
@@ -225,7 +153,6 @@ export function PromptMessagesField({
   availableSources,
   onSetVariableMapping,
   onAddEdge,
-  defaultMode = "prompt",
 }: {
   messageFields: UseFieldArrayReturn<
     PromptConfigFormValues,
@@ -249,15 +176,43 @@ export function PromptMessagesField({
     content: PromptTextAreaOnAddMention,
     idx: number,
   ) => string | void;
-  /** Default editing mode */
-  defaultMode?: PromptEditingMode;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState, control } = form;
   const { errors } = formState;
 
-  // Editing mode state
-  const [editingMode, setEditingMode] = useState<PromptEditingMode>(defaultMode);
+  // Editing mode state - initialize to "prompt", then update based on messages
+  const [editingMode, setEditingMode] = useState<PromptEditingMode>("prompt");
+  const [hasUserChangedMode, setHasUserChangedMode] = useState(false);
+
+  // Track the last messages signature we computed mode from
+  // This allows us to re-compute when messages change (e.g., form reset)
+  const lastMessagesSignatureRef = useRef<string>("");
+
+  // Compute a signature from messages to detect changes
+  const computeMessagesSignature = (
+    messages: Array<{ role?: string; content?: string }>,
+  ): string => {
+    return messages
+      .map((m) => `${m.role}:${m.content ?? ""}`)
+      .join("|");
+  };
+
+  // Update editing mode when messages change (and user hasn't manually changed it)
+  useEffect(() => {
+    if (messageFields.fields.length === 0) return;
+
+    const currentSignature = computeMessagesSignature(messageFields.fields);
+
+    // Only re-compute mode if:
+    // 1. User hasn't manually changed it, AND
+    // 2. Messages have actually changed from what we last computed from
+    if (!hasUserChangedMode && currentSignature !== lastMessagesSignatureRef.current) {
+      const computedMode = getDefaultEditingMode(messageFields.fields);
+      setEditingMode(computedMode);
+      lastMessagesSignatureRef.current = currentSignature;
+    }
+  }, [messageFields.fields, hasUserChangedMode]);
 
   // Access inputs field array to add new variables
   const inputsFieldArray = useFieldArray({
@@ -325,6 +280,8 @@ export function PromptMessagesField({
         messageFields.prepend({ role: "system", content: "" });
       }
       setEditingMode(newMode);
+      // Mark that user has manually changed the mode, so we don't override it
+      setHasUserChangedMode(true);
     },
     [systemIndex, messageFields],
   );
@@ -342,17 +299,16 @@ export function PromptMessagesField({
 
   return (
     <Box width="full" padding={0}>
-      <HStack width="full" marginBottom={2}>
+      <HStack width="full">
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
-        {editingMode === "messages" && <AddMessageButton onAdd={handleAdd} />}
       </HStack>
 
-      <VStack gap={0} align="stretch" width="full" borderBottomWidth="1px" borderColor="gray.200">
+      <VStack gap={2} align="stretch" width="full">
         {editingMode === "prompt" ? (
           // Prompt mode: Only show system message without controls
           systemField ? (
-            <Box paddingBottom={3}>
+            <Box>
               <MessageRow
                 key="system-message-row"
                 field={systemField}
@@ -368,7 +324,6 @@ export function PromptMessagesField({
                 onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={onAddEdge}
                 showControls={false}
-                borderless
               />
             </Box>
           ) : null
@@ -376,19 +331,14 @@ export function PromptMessagesField({
           // Messages mode: Show all messages with controls
           <>
             {systemField && (
-              <Box
-                paddingBottom={3}
-                borderBottomWidth="1px"
-                borderColor="gray.200"
-              >
-                <PropertySectionTitle
-                  padding={0}
-                  fontSize="xs"
-                  color="gray.500"
-                  marginBottom={1}
-                >
-                  System prompt
-                </PropertySectionTitle>
+              <Box marginTop={2}>
+                <HStack width="full">
+                  <MessageRoleLabel role="system" />
+                  <Spacer />
+                  {editingMode === "messages" && (
+                    <AddMessageButton onAdd={handleAdd} />
+                  )}
+                </HStack>
                 <MessageRow
                   key="system-message-row"
                   field={systemField}
@@ -404,39 +354,30 @@ export function PromptMessagesField({
                   onSetVariableMapping={onSetVariableMapping}
                   onAddEdge={onAddEdge}
                   showControls={false}
-                  borderless
                 />
               </Box>
             )}
-            {nonSystemMessages.map((field, arrayIndex) => {
+            {nonSystemMessages.map((field) => {
               const idx = messageFields.fields.findIndex(
                 (f) => f.id === field.id,
               );
-              const isLast = arrayIndex === nonSystemMessages.length - 1;
               return (
-                <Box
+                <MessageRow
                   key={`message-row-${field.id}`}
-                  paddingY={3}
-                  borderBottomWidth={isLast ? 0 : "1px"}
-                  borderColor="gray.200"
-                >
-                  <MessageRow
-                    field={field}
-                    idx={idx}
-                    availableFields={availableFields}
-                    otherNodesFields={otherNodesFields}
-                    availableSources={availableSources}
-                    messageErrors={messageErrors}
-                    hasMessagesError={hasMessagesError}
-                    getMessageError={getMessageError}
-                    onRemove={() => messageFields.remove(idx)}
-                    onCreateVariable={handleCreateVariable}
-                    onSetVariableMapping={onSetVariableMapping}
-                    onAddEdge={onAddEdge}
-                    showControls={true}
-                    borderless
-                  />
-                </Box>
+                  field={field}
+                  idx={idx}
+                  availableFields={availableFields}
+                  otherNodesFields={otherNodesFields}
+                  availableSources={availableSources}
+                  messageErrors={messageErrors}
+                  hasMessagesError={hasMessagesError}
+                  getMessageError={getMessageError}
+                  onRemove={() => messageFields.remove(idx)}
+                  onCreateVariable={handleCreateVariable}
+                  onSetVariableMapping={onSetVariableMapping}
+                  onAddEdge={onAddEdge}
+                  showControls={true}
+                />
               );
             })}
           </>

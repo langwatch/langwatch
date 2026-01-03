@@ -29,6 +29,8 @@ type FormVariablesSectionProps = {
   variableInfo?: Record<string, string>;
   /** Set of variable identifiers whose mapping input is disabled */
   disabledMappings?: Set<string>;
+  /** Whether to show the Add button (defaults to true) */
+  showAddButton?: boolean;
 };
 
 // ============================================================================
@@ -60,6 +62,7 @@ export const FormVariablesSection = ({
   lockedVariables,
   variableInfo,
   disabledMappings,
+  showAddButton = true,
 }: FormVariablesSectionProps) => {
   const { control, getValues } = useFormContext<PromptConfigFormValues>();
 
@@ -141,6 +144,7 @@ export const FormVariablesSection = ({
       showMappings={showMappings}
       canAddRemove={!readOnly}
       readOnly={readOnly}
+      showAddButton={showAddButton}
       title={title}
       missingMappingIds={missingMappingIds}
       lockedVariables={lockedVariables}

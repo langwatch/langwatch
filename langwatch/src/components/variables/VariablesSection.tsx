@@ -55,6 +55,8 @@ export type VariablesSectionProps = {
   canAddRemove?: boolean;
   /** Whether variables are read-only (true for evaluator fields) */
   readOnly?: boolean;
+  /** Whether to show the Add button (defaults to canAddRemove) */
+  showAddButton?: boolean;
 
   /** Section title (defaults to "Variables") */
   title?: string;
@@ -108,12 +110,15 @@ export const VariablesSection = ({
   showMappings = true,
   canAddRemove = true,
   readOnly = false,
+  showAddButton,
   title = "Variables",
   missingMappingIds = new Set(),
   lockedVariables = new Set(),
   variableInfo = {},
   disabledMappings = new Set(),
 }: VariablesSectionProps) => {
+  // Default showAddButton to canAddRemove if not specified
+  const shouldShowAddButton = showAddButton ?? canAddRemove;
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const handleAddVariable = useCallback(() => {
@@ -193,7 +198,7 @@ export const VariablesSection = ({
           {title}
         </Text>
         <Spacer />
-        {canAddRemove && !readOnly && (
+        {shouldShowAddButton && !readOnly && (
           <Button
             size="xs"
             variant="outline"

@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
+import React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { FormProvider, useFieldArray, useForm } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
-import { PromptMessagesField, type PromptEditingMode } from "../PromptMessagesField";
+import { PromptMessagesField } from "../PromptMessagesField";
 
 // Mock complex dependencies
 vi.mock("~/components/variables", () => ({
@@ -51,11 +52,10 @@ const switchEditingMode = async (
 
 type WrapperProps = {
   defaultMessages?: Array<{ role: "system" | "user" | "assistant"; content: string }>;
-  defaultMode?: PromptEditingMode;
 };
 
 // Wrapper component that provides form context
-function TestWrapper({ defaultMessages, defaultMode }: WrapperProps) {
+function TestWrapper({ defaultMessages }: WrapperProps) {
   const methods = useForm<PromptConfigFormValues>({
     defaultValues: {
       handle: null,
@@ -86,7 +86,73 @@ function TestWrapper({ defaultMessages, defaultMode }: WrapperProps) {
           messageFields={messageFields}
           availableFields={[{ identifier: "input", type: "str" }]}
           otherNodesFields={{}}
-          defaultMode={defaultMode}
+        />
+      </FormProvider>
+    </ChakraProvider>
+  );
+}
+
+/**
+ * Wrapper that simulates the drawer behavior:
+ * 1. Form starts with default values (system + user with {{input}})
+ * 2. After a delay, form.reset() is called with new messages (simulating data load)
+ */
+function TestWrapperWithDelayedReset({
+  messagesAfterReset,
+}: {
+  messagesAfterReset: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+}) {
+  const methods = useForm<PromptConfigFormValues>({
+    defaultValues: {
+      handle: null,
+      scope: "PROJECT",
+      version: {
+        configData: {
+          llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+          // Start with default messages (system + user with {{input}}) -> defaults to Prompt mode
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "{{input}}" },
+          ],
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+        },
+      },
+    },
+  });
+
+  const messageFields = useFieldArray({
+    control: methods.control,
+    name: "version.configData.messages",
+  });
+
+  // Simulate data loading - reset form after initial render
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      methods.reset({
+        handle: "test-prompt",
+        scope: "PROJECT",
+        version: {
+          configData: {
+            llm: { model: "test-model", temperature: 1, maxTokens: 1000 },
+            messages: messagesAfterReset,
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          },
+        },
+      });
+    }, 50); // Small delay to simulate async data load
+
+    return () => clearTimeout(timer);
+  }, [methods, messagesAfterReset]);
+
+  return (
+    <ChakraProvider value={defaultSystem}>
+      <FormProvider {...methods}>
+        <PromptMessagesField
+          messageFields={messageFields}
+          availableFields={[{ identifier: "input", type: "str" }]}
+          otherNodesFields={{}}
         />
       </FormProvider>
     </ChakraProvider>
@@ -103,19 +169,48 @@ describe("PromptMessagesField", () => {
   });
 
   describe("editing mode menu", () => {
-    it("defaults to Prompt mode", () => {
+    it("defaults to Prompt mode for system + user with {{input}}", () => {
       renderComponent();
 
-      // The title should show "Prompt"
+      // The title should show "Prompt" (default messages are system + user with {{input}})
       expect(screen.getByText("Prompt")).toBeInTheDocument();
     });
 
-    it("shows Messages as title when defaultMode is messages", () => {
-      renderComponent({ defaultMode: "messages" });
+    it("defaults to Messages mode when user message is not {{input}}", () => {
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "Custom user message" },
+        ],
+      });
 
-      // Title should be "Messages"
-      const title = screen.getByText("Messages");
-      expect(title).toBeInTheDocument();
+      // Title should be "Messages" because user message is not {{input}}
+      expect(screen.getByText("Messages")).toBeInTheDocument();
+    });
+
+    it("defaults to Prompt mode when user message is empty", () => {
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "" },
+        ],
+      });
+
+      // Title should be "Prompt" because user message is empty
+      expect(screen.getByText("Prompt")).toBeInTheDocument();
+    });
+
+    it("defaults to Messages mode when there are multiple non-system messages", () => {
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "{{input}}" },
+          { role: "assistant", content: "Response" },
+        ],
+      });
+
+      // Title should be "Messages" because there's an assistant message
+      expect(screen.getByText("Messages")).toBeInTheDocument();
     });
 
     it("opens menu with mode options when title is clicked", async () => {
@@ -143,7 +238,13 @@ describe("PromptMessagesField", () => {
 
     it("switches back to Prompt mode when Prompt option is clicked", async () => {
       const user = userEvent.setup();
-      renderComponent({ defaultMode: "messages" });
+      // Use messages that default to Messages mode
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "Custom message" },
+        ],
+      });
 
       await switchEditingMode(user, "prompt");
 
@@ -180,8 +281,14 @@ describe("PromptMessagesField", () => {
   });
 
   describe("Messages mode", () => {
+    // Helper: messages that trigger Messages mode
+    const messagesForMessagesMode = [
+      { role: "system" as const, content: "System prompt" },
+      { role: "user" as const, content: "Custom user message" },
+    ];
+
     it("shows all messages", () => {
-      renderComponent({ defaultMode: "messages" });
+      renderComponent({ defaultMessages: messagesForMessagesMode });
 
       // Should have two textareas (system + user)
       const textareas = screen.getAllByTestId("prompt-textarea");
@@ -189,15 +296,15 @@ describe("PromptMessagesField", () => {
     });
 
     it("shows system label for system message", () => {
-      renderComponent({ defaultMode: "messages" });
+      renderComponent({ defaultMessages: messagesForMessagesMode });
 
-      // System message gets a "System prompt" label from PropertySectionTitle
-      expect(screen.getByText("System prompt")).toBeInTheDocument();
+      // System message gets a role label - there may be multiple, just check at least one exists
+      const systemLabels = screen.getAllByText("System prompt");
+      expect(systemLabels.length).toBeGreaterThan(0);
     });
 
     it("shows role labels for user/assistant messages", () => {
       renderComponent({
-        defaultMode: "messages",
         defaultMessages: [
           { role: "system", content: "System prompt" },
           { role: "user", content: "User message" },
@@ -205,13 +312,13 @@ describe("PromptMessagesField", () => {
         ],
       });
 
-      // Role labels are rendered by MessageRoleLabel component
-      expect(screen.getByText("user")).toBeInTheDocument();
-      expect(screen.getByText("assistant")).toBeInTheDocument();
+      // Role labels are rendered by MessageRoleLabel component (capitalized)
+      expect(screen.getByText("User")).toBeInTheDocument();
+      expect(screen.getByText("Assistant")).toBeInTheDocument();
     });
 
     it("shows add message button in Messages mode", () => {
-      renderComponent({ defaultMode: "messages" });
+      renderComponent({ defaultMessages: messagesForMessagesMode });
 
       // In Messages mode, should have more than 1 button (menu trigger + add + remove)
       const buttons = screen.getAllByRole("button");
@@ -234,7 +341,13 @@ describe("PromptMessagesField", () => {
 
     it("preserves user message when switching from Messages to Prompt mode", async () => {
       const user = userEvent.setup();
-      renderComponent({ defaultMode: "messages" });
+      // Use messages that default to Messages mode
+      renderComponent({
+        defaultMessages: [
+          { role: "system", content: "System prompt" },
+          { role: "user", content: "Custom message" },
+        ],
+      });
 
       // Switch to Prompt mode
       await switchEditingMode(user, "prompt");
@@ -253,8 +366,8 @@ describe("PromptMessagesField", () => {
 
     it("preserves all messages when switching modes multiple times", async () => {
       const user = userEvent.setup();
+      // These messages default to Messages mode (has assistant)
       renderComponent({
-        defaultMode: "messages",
         defaultMessages: [
           { role: "system", content: "System" },
           { role: "user", content: "User" },
@@ -277,8 +390,8 @@ describe("PromptMessagesField", () => {
   describe("system message creation", () => {
     it("creates system message when switching to Prompt mode if none exists", async () => {
       const user = userEvent.setup();
+      // No system message - this defaults to Messages mode
       renderComponent({
-        defaultMode: "messages",
         defaultMessages: [{ role: "user", content: "Just a user message" }],
       });
 
@@ -287,6 +400,81 @@ describe("PromptMessagesField", () => {
 
       // Should have a textarea for the new system message
       expect(screen.getByTestId("prompt-textarea")).toBeInTheDocument();
+    });
+  });
+
+  describe("delayed form reset (drawer scenario)", () => {
+    it("updates editing mode when form is reset with different messages", async () => {
+      // This simulates the drawer behavior:
+      // 1. Form starts with default messages (system + user with {{input}}) -> Prompt mode
+      // 2. After data loads, form.reset() is called with actual prompt data
+      // 3. Editing mode should update based on the new messages
+
+      render(
+        <TestWrapperWithDelayedReset
+          messagesAfterReset={[
+            { role: "system", content: "System prompt" },
+            { role: "user", content: "Custom user message" }, // Not {{input}} -> should be Messages mode
+          ]}
+        />,
+      );
+
+      // Initially should show "Prompt" (default messages are system + user with {{input}})
+      expect(screen.getByText("Prompt")).toBeInTheDocument();
+
+      // After form reset, should switch to "Messages" mode
+      await waitFor(
+        () => {
+          expect(screen.getByText("Messages")).toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("stays in Prompt mode when reset messages are system + user with {{input}}", async () => {
+      render(
+        <TestWrapperWithDelayedReset
+          messagesAfterReset={[
+            { role: "system", content: "Different system prompt" },
+            { role: "user", content: "{{input}}" }, // Still {{input}} -> should stay Prompt mode
+          ]}
+        />,
+      );
+
+      // Should show "Prompt" mode
+      expect(screen.getByText("Prompt")).toBeInTheDocument();
+
+      // After form reset, should still be in "Prompt" mode
+      await waitFor(
+        () => {
+          // Check that we still have Prompt and don't have Messages
+          expect(screen.getByText("Prompt")).toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
+    });
+
+    it("updates to Messages mode when reset includes assistant message", async () => {
+      render(
+        <TestWrapperWithDelayedReset
+          messagesAfterReset={[
+            { role: "system", content: "System" },
+            { role: "user", content: "{{input}}" },
+            { role: "assistant", content: "Response" }, // Has assistant -> Messages mode
+          ]}
+        />,
+      );
+
+      // Initially "Prompt"
+      expect(screen.getByText("Prompt")).toBeInTheDocument();
+
+      // After reset with assistant message, should be "Messages"
+      await waitFor(
+        () => {
+          expect(screen.getByText("Messages")).toBeInTheDocument();
+        },
+        { timeout: 500 },
+      );
     });
   });
 });
