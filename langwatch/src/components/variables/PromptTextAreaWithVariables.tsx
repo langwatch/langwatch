@@ -62,6 +62,8 @@ type PromptTextAreaWithVariablesProps = {
   maxHeight?: string;
   /** Whether the field has an error (shows red border) */
   hasError?: boolean;
+  /** Whether to render without borders (open editor style) */
+  borderless?: boolean;
   /**
    * Legacy callback for optimization studio edge connections.
    * Called when a user selects a field from another node (otherNodesFields).
@@ -148,6 +150,7 @@ export const PromptTextAreaWithVariables = ({
   minHeight = "120px",
   maxHeight = "300px",
   hasError = false,
+  borderless = false,
   onAddEdge,
   otherNodesFields = {},
   ...boxProps
@@ -810,36 +813,43 @@ export const PromptTextAreaWithVariables = ({
           autoHeight
           style={{
             width: "100%",
-            minHeight,
+            minHeight: borderless ? "80px" : minHeight,
             maxHeight,
             fontFamily:
               'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             fontSize: "13px",
             lineHeight: "1.5",
-            padding: "8px 10px",
-            border: `1px solid ${
-              hasError
-                ? "var(--chakra-colors-red-500)"
-                : "var(--chakra-colors-gray-200)"
-            }`,
-            borderRadius: "12px",
+            padding: borderless ? "0" : "8px 10px",
+            border: borderless
+              ? "none"
+              : `1px solid ${
+                  hasError
+                    ? "var(--chakra-colors-red-500)"
+                    : "var(--chakra-colors-gray-200)"
+                }`,
+            borderRadius: borderless ? "0" : "12px",
             outline: "none",
-            resize: "vertical",
+            resize: borderless ? "none" : "vertical",
             overflow: "auto",
+            background: "transparent",
           }}
           onFocus={(e) => {
-            e.currentTarget.style.borderColor = hasError
-              ? "var(--chakra-colors-red-500)"
-              : "var(--chakra-colors-blue-500)";
-            e.currentTarget.style.borderWidth = "2px";
-            e.currentTarget.style.padding = "7px 9px";
+            if (!borderless) {
+              e.currentTarget.style.borderColor = hasError
+                ? "var(--chakra-colors-red-500)"
+                : "var(--chakra-colors-blue-500)";
+              e.currentTarget.style.borderWidth = "2px";
+              e.currentTarget.style.padding = "7px 9px";
+            }
           }}
           onBlur={(e) => {
-            e.currentTarget.style.borderColor = hasError
-              ? "var(--chakra-colors-red-500)"
-              : "var(--chakra-colors-gray-200)";
-            e.currentTarget.style.borderWidth = "1px";
-            e.currentTarget.style.padding = "8px 10px";
+            if (!borderless) {
+              e.currentTarget.style.borderColor = hasError
+                ? "var(--chakra-colors-red-500)"
+                : "var(--chakra-colors-gray-200)";
+              e.currentTarget.style.borderWidth = "1px";
+              e.currentTarget.style.padding = "8px 10px";
+            }
           }}
         >
           {renderText}

@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
@@ -61,6 +61,13 @@ export type VariablesSectionProps = {
 
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
   missingMappingIds?: Set<string>;
+
+  /** Set of variable identifiers that cannot be removed (locked variables) */
+  lockedVariables?: Set<string>;
+  /** Custom info tooltips for specific variables (identifier -> tooltip text) */
+  variableInfo?: Record<string, string>;
+  /** Set of variable identifiers whose mapping input is disabled (shows info instead) */
+  disabledMappings?: Set<string>;
 };
 
 // ============================================================================
@@ -103,6 +110,9 @@ export const VariablesSection = ({
   readOnly = false,
   title = "Variables",
   missingMappingIds = new Set(),
+  lockedVariables = new Set(),
+  variableInfo = {},
+  disabledMappings = new Set(),
 }: VariablesSectionProps) => {
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -203,36 +213,44 @@ export const VariablesSection = ({
         </Text>
       ) : (
         <VStack align="stretch" gap={2}>
-          {variables.map((variable) => (
-            <VariableRow
-              key={variable.identifier}
-              variable={variable}
-              mapping={mappings[variable.identifier]}
-              availableSources={availableSources}
-              showMappings={showMappings}
-              canRemove={canAddRemove}
-              readOnly={readOnly}
-              isEditing={editingId === variable.identifier}
-              isMissing={missingMappingIds.has(variable.identifier)}
-              onStartEdit={() => setEditingId(variable.identifier)}
-              onEndEdit={() => setEditingId(null)}
-              onUpdate={(updates) =>
-                handleUpdateVariable(variable.identifier, updates)
-              }
-              onRemove={() => handleRemoveVariable(variable.identifier)}
-              onMappingChange={
-                onMappingChange
-                  ? (mapping) => onMappingChange(variable.identifier, mapping)
-                  : undefined
-              }
-              defaultValue={values[variable.identifier]}
-              onDefaultValueChange={
-                onValueChange
-                  ? (value) => onValueChange(variable.identifier, value)
-                  : undefined
-              }
-            />
-          ))}
+          {variables.map((variable) => {
+            const isLocked = lockedVariables.has(variable.identifier);
+            const infoTooltip = variableInfo[variable.identifier];
+            const isMappingDisabled = disabledMappings.has(variable.identifier);
+
+            return (
+              <VariableRow
+                key={variable.identifier}
+                variable={variable}
+                mapping={mappings[variable.identifier]}
+                availableSources={availableSources}
+                showMappings={showMappings}
+                canRemove={canAddRemove && !isLocked}
+                readOnly={readOnly || isLocked}
+                isEditing={editingId === variable.identifier}
+                isMissing={missingMappingIds.has(variable.identifier)}
+                onStartEdit={() => !isLocked && setEditingId(variable.identifier)}
+                onEndEdit={() => setEditingId(null)}
+                onUpdate={(updates) =>
+                  handleUpdateVariable(variable.identifier, updates)
+                }
+                onRemove={() => handleRemoveVariable(variable.identifier)}
+                onMappingChange={
+                  onMappingChange
+                    ? (mapping) => onMappingChange(variable.identifier, mapping)
+                    : undefined
+                }
+                defaultValue={values[variable.identifier]}
+                onDefaultValueChange={
+                  onValueChange
+                    ? (value) => onValueChange(variable.identifier, value)
+                    : undefined
+                }
+                infoTooltip={infoTooltip}
+                isMappingDisabled={isMappingDisabled}
+              />
+            );
+          })}
         </VStack>
       )}
     </VStack>
@@ -270,6 +288,10 @@ type VariableRowProps = {
   onMappingChange?: (mapping: FieldMapping | undefined) => void;
   defaultValue?: string;
   onDefaultValueChange?: (value: string) => void;
+  /** Custom tooltip text to show next to the variable */
+  infoTooltip?: string;
+  /** Whether the mapping input is disabled (shows info instead) */
+  isMappingDisabled?: boolean;
 };
 
 const VariableRow = ({
@@ -288,6 +310,8 @@ const VariableRow = ({
   onMappingChange,
   defaultValue,
   onDefaultValueChange,
+  infoTooltip,
+  isMappingDisabled = false,
 }: VariableRowProps) => {
   const [editValue, setEditValue] = useState(variable.identifier);
   const [hasError, setHasError] = useState(false);
@@ -378,24 +402,37 @@ const VariableRow = ({
           data-testid={`variable-name-input-${variable.identifier}`}
         />
       ) : (
-        <Text
-          fontFamily="mono"
-          fontSize="13px"
-          cursor={readOnly ? "default" : "pointer"}
-          onClick={readOnly ? undefined : onStartEdit}
-          border="1px solid"
-          borderColor="transparent"
-          paddingX={2}
-          paddingY={1}
-          marginX={-2}
-          marginY={-1}
-          borderRadius="lg"
-          _hover={readOnly ? undefined : { borderColor: "gray.200" }}
-          minWidth="60px"
-          data-testid={`variable-name-${variable.identifier}`}
-        >
-          {variable.identifier}
-        </Text>
+        <HStack gap={1}>
+          <Text
+            fontFamily="mono"
+            fontSize="13px"
+            cursor={readOnly ? "default" : "pointer"}
+            onClick={readOnly ? undefined : onStartEdit}
+            border="1px solid"
+            borderColor="transparent"
+            paddingX={2}
+            paddingY={1}
+            marginX={-2}
+            marginY={-1}
+            borderRadius="lg"
+            _hover={readOnly ? undefined : { borderColor: "gray.200" }}
+            minWidth="60px"
+            data-testid={`variable-name-${variable.identifier}`}
+          >
+            {variable.identifier}
+          </Text>
+          {infoTooltip && (
+            <Tooltip content={infoTooltip} positioning={{ placement: "top" }}>
+              <Box
+                color="gray.400"
+                cursor="help"
+                data-testid={`variable-info-${variable.identifier}`}
+              >
+                <Info size={14} />
+              </Box>
+            </Tooltip>
+          )}
+        </HStack>
       )}
 
       {/* = sign and value/mapping input */}
@@ -406,14 +443,28 @@ const VariableRow = ({
       {showMappings ? (
         // Mapping input with source dropdown
         <Box flex={1} minWidth={0}>
-          <VariableMappingInput
-            mapping={mapping}
-            availableSources={availableSources}
-            onMappingChange={onMappingChange}
-            disabled={readOnly && !onMappingChange}
-            placeholder=""
-            isMissing={isMissing}
-          />
+          {isMappingDisabled ? (
+            // Show disabled info instead of mapping input
+            <Text
+              fontSize="13px"
+              color="gray.400"
+              fontStyle="italic"
+              paddingX={2}
+              paddingY={1}
+              data-testid={`mapping-disabled-${variable.identifier}`}
+            >
+              {infoTooltip ?? "Mapping disabled"}
+            </Text>
+          ) : (
+            <VariableMappingInput
+              mapping={mapping}
+              availableSources={availableSources}
+              onMappingChange={onMappingChange}
+              disabled={readOnly && !onMappingChange}
+              placeholder=""
+              isMissing={isMissing}
+            />
+          )}
         </Box>
       ) : (
         // Simple value input (for Prompt Playground)

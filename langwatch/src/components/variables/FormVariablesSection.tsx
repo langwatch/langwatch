@@ -23,6 +23,12 @@ type FormVariablesSectionProps = {
   readOnly?: boolean;
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
   missingMappingIds?: Set<string>;
+  /** Set of variable identifiers that cannot be removed (locked variables) */
+  lockedVariables?: Set<string>;
+  /** Custom info tooltips for specific variables (identifier -> tooltip text) */
+  variableInfo?: Record<string, string>;
+  /** Set of variable identifiers whose mapping input is disabled */
+  disabledMappings?: Set<string>;
 };
 
 // ============================================================================
@@ -51,6 +57,9 @@ export const FormVariablesSection = ({
   onMappingChange,
   readOnly = false,
   missingMappingIds,
+  lockedVariables,
+  variableInfo,
+  disabledMappings,
 }: FormVariablesSectionProps) => {
   const { control, getValues } = useFormContext<PromptConfigFormValues>();
 
@@ -134,6 +143,9 @@ export const FormVariablesSection = ({
       readOnly={readOnly}
       title={title}
       missingMappingIds={missingMappingIds}
+      lockedVariables={lockedVariables}
+      variableInfo={variableInfo}
+      disabledMappings={disabledMappings}
     />
   );
 };

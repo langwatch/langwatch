@@ -15,7 +15,7 @@ import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { useDrawer, getComplexProps, getFlowCallbacks } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
@@ -52,10 +52,12 @@ const getDisplayHandle = (handle?: string | null): string => {
 export function PromptListDrawer(props: PromptListDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const flowCallbacks = getFlowCallbacks("promptList");
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
-  const onCreateNew = props.onCreateNew ?? (() => openDrawer("promptEditor"));
+  const onSelect = props.onSelect ?? flowCallbacks?.onSelect ?? (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
+  // Use flowCallbacks.onCreateNew if available (for evaluations context with availableSources)
+  const onCreateNew = props.onCreateNew ?? flowCallbacks?.onCreateNew ?? (() => openDrawer("promptEditor"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const { data: prompts, isLoading } = useAllPromptsForProject();

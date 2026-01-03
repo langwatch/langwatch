@@ -451,4 +451,117 @@ describe("VariablesSection", () => {
       expect(inputs.length).toBeGreaterThan(0);
     });
   });
+
+  describe("locked variables", () => {
+    it("hides delete button for locked variables", () => {
+      const variables: Variable[] = [
+        { identifier: "input", type: "str" },
+        { identifier: "context", type: "str" },
+      ];
+      renderComponent({
+        variables,
+        lockedVariables: new Set(["input"]),
+        canAddRemove: true,
+      });
+
+      // Input should not have a delete button
+      expect(
+        screen.queryByTestId("remove-variable-input")
+      ).not.toBeInTheDocument();
+
+      // Context should still have a delete button
+      expect(screen.getByTestId("remove-variable-context")).toBeInTheDocument();
+    });
+
+    it("prevents editing locked variable name", () => {
+      const variables: Variable[] = [{ identifier: "input", type: "str" }];
+      renderComponent({
+        variables,
+        lockedVariables: new Set(["input"]),
+      });
+
+      // The variable name should not be clickable (readOnly)
+      const nameElement = screen.getByTestId("variable-name-input");
+      // It should have default cursor since it's locked
+      expect(nameElement).toHaveStyle({ cursor: "default" });
+    });
+
+    it("shows info icon for variables with info tooltip", async () => {
+      const variables: Variable[] = [{ identifier: "input", type: "str" }];
+      renderComponent({
+        variables,
+        variableInfo: {
+          input: "This is the user message input",
+        },
+      });
+
+      // Should show info icon
+      expect(screen.getByTestId("variable-info-input")).toBeInTheDocument();
+    });
+
+    it("does not show info icon when no tooltip provided", () => {
+      const variables: Variable[] = [{ identifier: "input", type: "str" }];
+      renderComponent({
+        variables,
+        variableInfo: {},
+      });
+
+      // Should not show info icon
+      expect(screen.queryByTestId("variable-info-input")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("disabled mappings", () => {
+    it("shows disabled text instead of mapping input", () => {
+      const variables: Variable[] = [{ identifier: "input", type: "str" }];
+      renderComponent({
+        variables,
+        showMappings: true,
+        disabledMappings: new Set(["input"]),
+        availableSources: mockSources,
+      });
+
+      // Should show disabled mapping text
+      expect(screen.getByTestId("mapping-disabled-input")).toBeInTheDocument();
+    });
+
+    it("shows custom tooltip as disabled text when provided", () => {
+      const variables: Variable[] = [{ identifier: "input", type: "str" }];
+      renderComponent({
+        variables,
+        showMappings: true,
+        disabledMappings: new Set(["input"]),
+        variableInfo: {
+          input: "Value comes from conversation tab",
+        },
+        availableSources: mockSources,
+      });
+
+      // Should show the custom tooltip text as the disabled text
+      expect(
+        screen.getByText("Value comes from conversation tab")
+      ).toBeInTheDocument();
+    });
+
+    it("shows mapping input for non-disabled variables", () => {
+      const variables: Variable[] = [
+        { identifier: "input", type: "str" },
+        { identifier: "context", type: "str" },
+      ];
+      renderComponent({
+        variables,
+        showMappings: true,
+        disabledMappings: new Set(["input"]),
+        availableSources: mockSources,
+      });
+
+      // Input should have disabled mapping
+      expect(screen.getByTestId("mapping-disabled-input")).toBeInTheDocument();
+
+      // Context should not have disabled mapping text
+      expect(
+        screen.queryByTestId("mapping-disabled-context")
+      ).not.toBeInTheDocument();
+    });
+  });
 });

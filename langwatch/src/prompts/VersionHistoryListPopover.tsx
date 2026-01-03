@@ -204,7 +204,12 @@ function VersionHistoryTrigger({
 }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button variant="ghost" color="gray.500" minWidth={0}>
+      <Button
+        variant="ghost"
+        color="gray.500"
+        minWidth={0}
+        data-testid="version-history-button"
+      >
         <HistoryIcon size={16} />
         {label && <Text>{label}</Text>}
       </Button>

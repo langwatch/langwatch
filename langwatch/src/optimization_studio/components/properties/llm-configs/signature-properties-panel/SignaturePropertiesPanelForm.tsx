@@ -17,7 +17,6 @@ import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import { OutputsFieldGroup } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
@@ -377,7 +376,6 @@ export function SignaturePropertiesPanelForm({
             mappings={variableMappings}
             onMappingChange={onMappingChange}
           />
-          <OutputsFieldGroup />
           {!isInsideWizard && <DemonstrationsField />}
         </VStack>
       </form>

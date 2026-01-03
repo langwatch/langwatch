@@ -1,14 +1,13 @@
 import {
   Box,
   Button,
-  Field,
   Heading,
   HStack,
-  Input,
   Spinner,
+  Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuArrowLeft } from "react-icons/lu";
+import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import debounce from "lodash-es/debounce";
@@ -24,9 +23,10 @@ import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappi
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import { OutputsFieldGroup } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { SaveVersionDialog, type SaveDialogFormValues } from "~/prompts/forms/SaveVersionDialog";
+import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
+import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
@@ -190,9 +190,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     drawerParams.promptId ??
     (complexProps.promptId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
-
-  // Handle state for new prompts
-  const [handle, setHandle] = useState("");
 
   // Load existing prompt if editing
   const promptQuery = api.prompts.getByIdOrHandle.useQuery(
@@ -469,17 +466,43 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     },
   });
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
-  // For editing, we don't need a new handle since the prompt already has one
-  const isValid = promptId ? true : handle.trim().length > 0;
+  const updateHandleMutation = api.prompts.updateHandle.useMutation({
+    onSuccess: (prompt) => {
+      // Refetch the prompt query to get the updated handle
+      void promptQuery.refetch();
+      void utils.prompts.getAllPromptsForProject.invalidate({
+        projectId: project?.id ?? "",
+      });
+      toaster.create({
+        title: "Prompt renamed",
+        description: `Prompt handle changed to "${prompt.handle}"`,
+        type: "success",
+      });
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Error renaming prompt",
+        description: error.message,
+        type: "error",
+      });
+    },
+  });
 
-  // State for save version dialog (asks for commit message)
+  const isSaving = createMutation.isPending || updateMutation.isPending;
+  // Form is always valid for the save button - actual validation happens when saving
+  const isValid = true;
+
+  // State for save version dialog (asks for commit message when updating existing prompt)
   const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
+  // State for save prompt dialog (asks for handle when creating new prompt)
+  const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
+  // State for change handle dialog (for renaming existing prompts)
+  const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
   const pendingSaveDataRef = useRef<ReturnType<typeof formValuesToTriggerSaveVersionParams> | null>(null);
 
   // Validate and prepare save data, returns true if ready to save
   const validateAndPrepare = useCallback(async () => {
-    if (!project?.id || !isValid) return false;
+    if (!project?.id) return false;
 
     // Validate form
     const formValid = await methods.trigger("version.configData.llm");
@@ -495,10 +518,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     const formValues = methods.getValues();
     pendingSaveDataRef.current = formValuesToTriggerSaveVersionParams(formValues);
     return true;
-  }, [project?.id, isValid, methods]);
+  }, [project?.id, methods]);
 
-  // Execute the save with a commit message
-  const executeSave = useCallback((commitMessage: string) => {
+  // Execute the save with a commit message (and optional handle/scope for new prompts)
+  const executeSave = useCallback((
+    commitMessage: string,
+    newPromptData?: { handle: string; scope: "PROJECT" | "ORGANIZATION" }
+  ) => {
     if (!project?.id || !pendingSaveDataRef.current) return;
 
     const saveData = pendingSaveDataRef.current;
@@ -513,14 +539,14 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           commitMessage,
         },
       });
-    } else {
+    } else if (newPromptData) {
       // Create new prompt
       createMutation.mutate({
         projectId: project.id,
         data: {
           ...saveData,
-          handle: handle.trim(),
-          scope: "PROJECT",
+          handle: newPromptData.handle,
+          scope: newPromptData.scope,
           commitMessage,
         },
       });
@@ -529,7 +555,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     project?.id,
     promptId,
     promptQuery.data?.id,
-    handle,
     createMutation,
     updateMutation,
   ]);
@@ -543,20 +568,36 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // For existing prompts, show the save version dialog to get commit message
       setSaveVersionDialogOpen(true);
     } else {
-      // For new prompts, save directly with default message
-      executeSave("Initial version");
+      // For new prompts, show the save prompt dialog to get handle
+      setSavePromptDialogOpen(true);
     }
-  }, [validateAndPrepare, executeSave, promptId, promptQuery.data?.id]);
+  }, [validateAndPrepare, promptId, promptQuery.data?.id]);
 
-  // Handle save version dialog submit
+  // Handle save version dialog submit (for existing prompts)
   const handleSaveVersionSubmit = useCallback(async (formValues: SaveDialogFormValues) => {
     executeSave(formValues.commitMessage);
     setSaveVersionDialogOpen(false);
   }, [executeSave]);
 
-  const handleHandleChange = (value: string) => {
-    setHandle(value);
-  };
+  // Handle save prompt dialog submit (for new prompts)
+  const handleSavePromptSubmit = useCallback(async (formValues: ChangeHandleFormValues) => {
+    executeSave("Initial version", {
+      handle: formValues.handle,
+      scope: formValues.scope,
+    });
+    setSavePromptDialogOpen(false);
+  }, [executeSave]);
+
+  // Handle change handle dialog submit (for renaming existing prompts)
+  const handleChangeHandleSubmit = useCallback(async (formValues: ChangeHandleFormValues) => {
+    if (!project?.id || !promptQuery.data?.id) return;
+    updateHandleMutation.mutate({
+      projectId: project.id,
+      id: promptQuery.data.id,
+      data: formValues,
+    });
+    setChangeHandleDialogOpen(false);
+  }, [project?.id, promptQuery.data?.id, updateHandleMutation]);
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
@@ -715,7 +756,33 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>{promptId ? "Edit Prompt" : "New Prompt"}</Heading>
+            {promptId && promptQuery.data?.handle ? (
+              <HStack
+                gap={1}
+                cursor="pointer"
+                onClick={() => setChangeHandleDialogOpen(true)}
+                _hover={{ "& .edit-icon": { opacity: 1 } }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    setChangeHandleDialogOpen(true);
+                  }
+                }}
+              >
+                <Heading>{promptQuery.data.handle}</Heading>
+                <Box
+                  className="edit-icon"
+                  opacity={0}
+                  transition="opacity 0.2s"
+                  color="gray.500"
+                >
+                  <LuPencil size={16} />
+                </Box>
+              </HStack>
+            ) : (
+              <Heading>New Prompt</Heading>
+            )}
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -765,24 +832,21 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   onSubmit={handleSaveVersionSubmit}
                 />
 
-                {/* Handle/name field - only for new prompts */}
-                {!promptId && (
-                  <Box paddingX={4}>
-                    <Field.Root required>
-                      <Field.Label>Prompt Name (Handle)</Field.Label>
-                      <Input
-                        value={handle}
-                        onChange={(e) => handleHandleChange(e.target.value)}
-                        placeholder="my-assistant"
-                        data-testid="prompt-handle-input"
-                      />
-                      <Field.HelperText>
-                        Use lowercase letters, numbers, and hyphens. Can include
-                        folder prefix like "shared/my-prompt"
-                      </Field.HelperText>
-                    </Field.Root>
-                  </Box>
-                )}
+                {/* Save Prompt Dialog - asks for handle when creating new prompt */}
+                <ChangeHandleDialog
+                  isOpen={savePromptDialogOpen}
+                  onClose={() => setSavePromptDialogOpen(false)}
+                  onSubmit={handleSavePromptSubmit}
+                />
+
+                {/* Change Handle Dialog - for renaming existing prompts */}
+                <ChangeHandleDialog
+                  isOpen={changeHandleDialogOpen}
+                  onClose={() => setChangeHandleDialogOpen(false)}
+                  currentHandle={promptQuery.data?.handle}
+                  currentScope={promptQuery.data?.scope}
+                  onSubmit={handleChangeHandleSubmit}
+                />
 
                 {/* Messages (includes system prompt + user messages) */}
                 <Box paddingX={4}>
@@ -795,19 +859,20 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   />
                 </Box>
 
-                {/* Variables and Outputs */}
+                {/* Variables */}
                 <Box paddingX={4} paddingBottom={4}>
-                  <VStack gap={4} align="stretch">
-                    <FormVariablesSection
-                      title="Variables"
-                      showMappings={!!availableSources && availableSources.length > 0}
-                      availableSources={availableSources}
-                      mappings={inputMappings}
-                      onMappingChange={onInputMappingsChange}
-                      missingMappingIds={missingMappingIds}
-                    />
-                    <OutputsFieldGroup />
-                  </VStack>
+                  <FormVariablesSection
+                    title="Variables"
+                    showMappings={!!availableSources && availableSources.length > 0}
+                    availableSources={availableSources}
+                    mappings={inputMappings}
+                    onMappingChange={onInputMappingsChange}
+                    missingMappingIds={missingMappingIds}
+                    lockedVariables={new Set(["input"])}
+                    variableInfo={{
+                      input: "This is the user message input. It will be sent as the user message to the LLM.",
+                    }}
+                  />
                 </Box>
               </VStack>
             </FormProvider>

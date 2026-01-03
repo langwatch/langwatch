@@ -179,7 +179,10 @@ export function EvaluationsV3Table({
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
   // Hook for opening runner editor with proper flow callbacks
-  const { openRunnerEditor } = useOpenRunnerEditor();
+  const { openRunnerEditor, buildAvailableSources, isDatasetSource } = useOpenRunnerEditor();
+
+  // Track pending mappings for new prompts (before they become runners)
+  const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
   // Handler for when a saved agent is selected from the drawer
   const handleSelectSavedAgent = useCallback(
@@ -808,12 +811,84 @@ export function EvaluationsV3Table({
               type="runners"
               colSpan={runnersColSpan}
               onAddClick={() => {
+                // Clear any pending mappings from previous flows
+                pendingMappingsRef.current = {};
+
+                // Build available sources for variable mapping (for new prompts)
+                const availableSources = buildAvailableSources();
+
+                // Handler to open promptEditor for new prompts with proper props
+                const openNewPromptEditor = () => {
+                  openDrawer("promptEditor", {
+                    // Pass available sources via complexProps
+                    availableSources,
+                    inputMappings: {},
+                    onInputMappingsChange: (
+                      identifier: string,
+                      mapping: UIFieldMapping | undefined,
+                    ) => {
+                      if (mapping) {
+                        pendingMappingsRef.current[identifier] = mapping;
+                      } else {
+                        delete pendingMappingsRef.current[identifier];
+                      }
+                    },
+                  });
+                };
+
                 // Set flow callbacks for the entire add-runner flow
                 setFlowCallbacks("promptList", {
                   onSelect: handleSelectPrompt,
+                  // Custom onCreateNew to open promptEditor with availableSources
+                  onCreateNew: openNewPromptEditor,
                 });
                 setFlowCallbacks("promptEditor", {
-                  onSave: handleSelectPrompt,
+                  // For new prompts: track mappings in pendingMappingsRef, then apply when saved
+                  onInputMappingsChange: (
+                    identifier: string,
+                    mapping: UIFieldMapping | undefined,
+                  ) => {
+                    if (mapping) {
+                      pendingMappingsRef.current[identifier] = mapping;
+                    } else {
+                      delete pendingMappingsRef.current[identifier];
+                    }
+                  },
+                  onSave: (savedPrompt) => {
+                    // Apply pending mappings when creating the runner
+                    const storeMappings: Record<string, FieldMapping> = {};
+                    for (const [key, uiMapping] of Object.entries(pendingMappingsRef.current)) {
+                      storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
+                    }
+
+                    // Get current state for active dataset
+                    const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
+
+                    // Create runner with pending mappings
+                    const runnerId = `runner_${Date.now()}`;
+                    const runnerConfig: RunnerConfig = {
+                      id: runnerId,
+                      type: "prompt",
+                      name: savedPrompt.name,
+                      promptId: savedPrompt.id,
+                      promptVersionId: savedPrompt.versionId,
+                      inputs: (savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
+                        identifier: i.identifier,
+                        type: i.type as Field["type"],
+                      })),
+                      outputs: (savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]).map((o) => ({
+                        identifier: o.identifier,
+                        type: o.type as Field["type"],
+                      })),
+                      mappings: Object.keys(storeMappings).length > 0
+                        ? { [currentActiveDatasetId]: storeMappings }
+                        : {},
+                    };
+                    addRunner(runnerConfig);
+
+                    // Clear pending mappings
+                    pendingMappingsRef.current = {};
+                  },
                 });
                 setFlowCallbacks("agentList", {
                   onSelect: handleSelectSavedAgent,

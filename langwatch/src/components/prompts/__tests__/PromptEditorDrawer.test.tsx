@@ -178,6 +178,10 @@ vi.mock("~/prompts/forms/fields/PromptConfigVersionFieldGroup", () => ({
   OutputsFieldGroup: () => <div data-testid="outputs-field">Outputs</div>,
 }));
 
+vi.mock("~/components/outputs", () => ({
+  FormOutputsSection: () => <div data-testid="outputs-field">Outputs</div>,
+}));
+
 // Mock buildDefaultFormValues
 vi.mock("~/prompts/utils/buildDefaultFormValues", () => ({
   buildDefaultFormValues: () => mockDefaultFormValues,
@@ -188,6 +192,8 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
   formValuesToTriggerSaveVersionParams: vi.fn((values) => values),
   versionedPromptToPromptConfigFormValuesWithSystemMessage: vi.fn((prompt) => ({
     isNew: false,
+    configId: prompt.id,
+    handle: prompt.handle,
     version: {
       versionId: prompt.versionId,
       configData: {
@@ -252,10 +258,7 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByText("Variables")).toBeInTheDocument();
     });
 
-    it("shows outputs field group", () => {
-      renderWithProviders(<PromptEditorDrawer open={true} />);
-      expect(screen.getByTestId("outputs-field")).toBeInTheDocument();
-    });
+    // Outputs are now in the LLM config popover, not as a separate field group
 
     it("shows Saved button initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);

@@ -19,7 +19,6 @@ import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
 import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
-import { OutputsFieldGroup } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
@@ -126,7 +125,6 @@ function InnerPromptConfigForm() {
             otherNodesFields={{}}
           />
           <FormVariablesSection showMappings={false} title="Variables" />
-          <OutputsFieldGroup />
           {hasDemonstrations && <DemonstrationsField />}
         </VStack>
         <HStack

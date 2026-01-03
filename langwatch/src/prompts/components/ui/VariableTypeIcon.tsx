@@ -79,7 +79,7 @@ export const TYPE_LABELS: Record<string, string> = {
   "list[bool]": "List",
   dict: "Object",
   json: "Object",
-  json_schema: "Schema",
+  json_schema: "JSON Schema",
   chat_messages: "Messages",
 };
 

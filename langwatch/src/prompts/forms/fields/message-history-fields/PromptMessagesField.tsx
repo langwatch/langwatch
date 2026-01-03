@@ -1,19 +1,19 @@
 import {
   Box,
-  Collapsible,
   Field,
   HStack,
-  Icon,
   Spacer,
-  useDisclosure,
+  Text,
+  VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Controller,
   type UseFieldArrayReturn,
   useFieldArray,
   useFormContext,
 } from "react-hook-form";
+import { LuChevronDown } from "react-icons/lu";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import {
   PromptTextAreaWithVariables,
@@ -23,10 +23,17 @@ import {
 } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
+import { Menu } from "~/components/ui/menu";
 import { AddMessageButton } from "./AddMessageButton";
 import { MessageRoleLabel } from "./MessageRoleLabel";
 import { RemoveMessageButton } from "./RemoveMessageButton";
-import { LuChevronDown } from "react-icons/lu";
+
+/**
+ * Editing mode for the prompt messages field.
+ * - "prompt": Simple view showing only the system prompt
+ * - "messages": Full view showing all messages with role labels
+ */
+export type PromptEditingMode = "prompt" | "messages";
 
 /**
  * Type for message field errors
@@ -43,7 +50,6 @@ type MessageRowProps = {
     content?: string;
   };
   idx: number;
-  open: boolean;
   availableFields: Variable[];
   otherNodesFields: Record<string, string[]>;
   /** Available sources for variable insertion (datasets, runners, etc.) */
@@ -68,6 +74,10 @@ type MessageRowProps = {
     content: PromptTextAreaOnAddMention,
     idx: number,
   ) => string | void;
+  /** Whether to show role label and remove button */
+  showControls?: boolean;
+  /** Whether to render the textarea without borders */
+  borderless?: boolean;
 };
 
 /**
@@ -76,7 +86,6 @@ type MessageRowProps = {
 function MessageRow({
   field,
   idx,
-  open,
   availableFields,
   otherNodesFields,
   availableSources,
@@ -87,6 +96,8 @@ function MessageRow({
   onCreateVariable,
   onSetVariableMapping,
   onAddEdge,
+  showControls = true,
+  borderless = false,
 }: MessageRowProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
@@ -95,18 +106,20 @@ function MessageRow({
     <VerticalFormControl
       width="full"
       label={
-        <HStack width="full" align="center">
-          {role !== "system" && open && (
-            <MessageRoleLabel role={role} marginLeft={-1} />
-          )}
-          <Spacer />
-          {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
-        </HStack>
+        showControls ? (
+          <HStack width="full" align="center">
+            {role !== "system" && (
+              <MessageRoleLabel role={role} marginLeft={-1} />
+            )}
+            <Spacer />
+            {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
+          </HStack>
+        ) : undefined
       }
       invalid={hasMessagesError}
       error={messageErrors}
       size="sm"
-      marginTop={idx === 0 ? 0 : 2}
+      marginTop={0}
     >
       <Controller
         key={`message-row-${idx}-content`}
@@ -126,6 +139,7 @@ function MessageRow({
               return onAddEdge?.(id, handle, content, idx);
             }}
             showAddContextButton
+            borderless={borderless}
           />
         )}
       />
@@ -139,7 +153,70 @@ function MessageRow({
 }
 
 /**
+ * Title with dropdown menu for switching between Prompt and Messages modes.
+ */
+function EditingModeTitle({
+  mode,
+  onChange,
+}: {
+  mode: PromptEditingMode;
+  onChange: (mode: PromptEditingMode) => void;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <HStack
+          gap={1}
+          cursor="pointer"
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          role="button"
+          _hover={{ opacity: 0.8 }}
+        >
+          <PropertySectionTitle padding={0}>
+            {mode === "prompt" ? "Prompt" : "Messages"}
+          </PropertySectionTitle>
+          <Box
+            opacity={isHovered ? 1 : 0}
+            transition="opacity 0.15s"
+            color="gray.500"
+          >
+            <LuChevronDown size={14} />
+          </Box>
+        </HStack>
+      </Menu.Trigger>
+      <Menu.Content portalled={false} zIndex={10}>
+        <Menu.Item
+          value="prompt"
+          onClick={() => onChange("prompt")}
+          data-testid="editing-mode-prompt"
+        >
+          <Text fontWeight={mode === "prompt" ? "medium" : "normal"}>
+            Prompt
+          </Text>
+        </Menu.Item>
+        <Menu.Item
+          value="messages"
+          onClick={() => onChange("messages")}
+          data-testid="editing-mode-messages"
+        >
+          <Text fontWeight={mode === "messages" ? "medium" : "normal"}>
+            Messages
+          </Text>
+        </Menu.Item>
+      </Menu.Content>
+    </Menu.Root>
+  );
+}
+
+/**
  * Single Responsibility: Render and manage the configurable prompt message list.
+ *
+ * Supports two editing modes:
+ * - "prompt": Simple view showing only the system prompt (default)
+ * - "messages": Full view showing all messages with role labels and controls
  */
 export function PromptMessagesField({
   messageFields,
@@ -148,6 +225,7 @@ export function PromptMessagesField({
   availableSources,
   onSetVariableMapping,
   onAddEdge,
+  defaultMode = "prompt",
 }: {
   messageFields: UseFieldArrayReturn<
     PromptConfigFormValues,
@@ -171,10 +249,15 @@ export function PromptMessagesField({
     content: PromptTextAreaOnAddMention,
     idx: number,
   ) => string | void;
+  /** Default editing mode */
+  defaultMode?: PromptEditingMode;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState, control } = form;
   const { errors } = formState;
+
+  // Editing mode state
+  const [editingMode, setEditingMode] = useState<PromptEditingMode>(defaultMode);
 
   // Access inputs field array to add new variables
   const inputsFieldArray = useFieldArray({
@@ -204,9 +287,6 @@ export function PromptMessagesField({
 
   /**
    * Get the error for a specific message field
-   * @param index - The index of the message field
-   * @param key - The key of the message field to get the error for
-   * @returns The error for the message field
    */
   const getMessageError = (index: number, key: "role" | "content") => {
     const messageErrors =
@@ -217,7 +297,6 @@ export function PromptMessagesField({
 
   /**
    * Get the error for the messages field group
-   * @returns The error for the messages field group
    */
   const messageErrors = useMemo(() => {
     return Array.isArray(errors.version?.configData?.messages)
@@ -228,11 +307,6 @@ export function PromptMessagesField({
       ? errors.version?.configData?.messages
       : undefined;
   }, [errors]);
-  const { open, setOpen } = useDisclosure();
-
-  useEffect(() => {
-    setOpen(true);
-  }, [setOpen]);
 
   const systemIndex = useMemo(
     () => messageFields.fields.findIndex((m) => m.role === "system"),
@@ -243,45 +317,46 @@ export function PromptMessagesField({
     messageFields.append({ role, content: "" });
   };
 
+  // Ensure system message exists when switching to prompt mode
+  const handleModeChange = useCallback(
+    (newMode: PromptEditingMode) => {
+      if (newMode === "prompt" && systemIndex < 0) {
+        // Create a system message if it doesn't exist
+        messageFields.prepend({ role: "system", content: "" });
+      }
+      setEditingMode(newMode);
+    },
+    [systemIndex, messageFields],
+  );
+
   const hasMessagesError = !!errors.version?.configData?.messages;
+
+  // Get the system message field
+  const systemField =
+    systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
+
+  // Get non-system messages
+  const nonSystemMessages = messageFields.fields.filter(
+    (_, idx) => idx !== systemIndex,
+  );
 
   return (
     <Box width="full" padding={0}>
-      <HStack width="full">
-        <HStack
-          gap={2}
-          cursor="pointer"
-          onClick={() => setOpen(!open)}
-          align="center"
-        >
-          <PropertySectionTitle transition="opacity 0.15s ease" padding={0}>
-            {open ? "System prompt" : "Prompt"}
-          </PropertySectionTitle>
-          <Icon
-            asChild
-            transform={open ? "rotate(0deg)" : "rotate(-90deg)"}
-            transition="transform 0.15s ease"
-            color="gray.700"
-            marginBottom="-2px"
-          >
-            <LuChevronDown size={16} />
-          </Icon>
-        </HStack>
+      <HStack width="full" marginBottom={2}>
+        <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
-        <AddMessageButton onAdd={handleAdd} />
+        {editingMode === "messages" && <AddMessageButton onAdd={handleAdd} />}
       </HStack>
 
-      <Collapsible.Root open={open}>
-        <Collapsible.Content>
-          {(() => {
-            const systemField =
-              systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
-            return systemField ? (
+      <VStack gap={0} align="stretch" width="full" borderBottomWidth="1px" borderColor="gray.200">
+        {editingMode === "prompt" ? (
+          // Prompt mode: Only show system message without controls
+          systemField ? (
+            <Box paddingBottom={3}>
               <MessageRow
                 key="system-message-row"
                 field={systemField}
                 idx={systemIndex}
-                open={open}
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
                 availableSources={availableSources}
@@ -292,32 +367,81 @@ export function PromptMessagesField({
                 onCreateVariable={handleCreateVariable}
                 onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={onAddEdge}
+                showControls={false}
+                borderless
               />
-            ) : null;
-          })()}
-          {messageFields.fields.map((field, idx) => {
-            if (idx === systemIndex) return null;
-            return (
-              <MessageRow
-                key={`message-row-${idx}`}
-                field={field}
-                idx={idx}
-                open={open}
-                availableFields={availableFields}
-                otherNodesFields={otherNodesFields}
-                availableSources={availableSources}
-                messageErrors={messageErrors}
-                hasMessagesError={hasMessagesError}
-                getMessageError={getMessageError}
-                onRemove={() => messageFields.remove(idx)}
-                onCreateVariable={handleCreateVariable}
-                onSetVariableMapping={onSetVariableMapping}
-                onAddEdge={onAddEdge}
-              />
-            );
-          })}
-        </Collapsible.Content>
-      </Collapsible.Root>
+            </Box>
+          ) : null
+        ) : (
+          // Messages mode: Show all messages with controls
+          <>
+            {systemField && (
+              <Box
+                paddingBottom={3}
+                borderBottomWidth="1px"
+                borderColor="gray.200"
+              >
+                <PropertySectionTitle
+                  padding={0}
+                  fontSize="xs"
+                  color="gray.500"
+                  marginBottom={1}
+                >
+                  System prompt
+                </PropertySectionTitle>
+                <MessageRow
+                  key="system-message-row"
+                  field={systemField}
+                  idx={systemIndex}
+                  availableFields={availableFields}
+                  otherNodesFields={otherNodesFields}
+                  availableSources={availableSources}
+                  messageErrors={messageErrors}
+                  hasMessagesError={hasMessagesError}
+                  getMessageError={getMessageError}
+                  onRemove={() => messageFields.remove(systemIndex)}
+                  onCreateVariable={handleCreateVariable}
+                  onSetVariableMapping={onSetVariableMapping}
+                  onAddEdge={onAddEdge}
+                  showControls={false}
+                  borderless
+                />
+              </Box>
+            )}
+            {nonSystemMessages.map((field, arrayIndex) => {
+              const idx = messageFields.fields.findIndex(
+                (f) => f.id === field.id,
+              );
+              const isLast = arrayIndex === nonSystemMessages.length - 1;
+              return (
+                <Box
+                  key={`message-row-${field.id}`}
+                  paddingY={3}
+                  borderBottomWidth={isLast ? 0 : "1px"}
+                  borderColor="gray.200"
+                >
+                  <MessageRow
+                    field={field}
+                    idx={idx}
+                    availableFields={availableFields}
+                    otherNodesFields={otherNodesFields}
+                    availableSources={availableSources}
+                    messageErrors={messageErrors}
+                    hasMessagesError={hasMessagesError}
+                    getMessageError={getMessageError}
+                    onRemove={() => messageFields.remove(idx)}
+                    onCreateVariable={handleCreateVariable}
+                    onSetVariableMapping={onSetVariableMapping}
+                    onAddEdge={onAddEdge}
+                    showControls={true}
+                    borderless
+                  />
+                </Box>
+              );
+            })}
+          </>
+        )}
+      </VStack>
     </Box>
   );
 }

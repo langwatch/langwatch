@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Field,
   HStack,
@@ -7,13 +8,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useState, useEffect } from "react";
 import { Settings, X } from "react-feather";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
+import { OutputsSection, type Output, type OutputType } from "../outputs/OutputsSection";
 import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
+import { Switch } from "../ui/switch";
 import { Tooltip } from "../ui/tooltip";
 
 export type LLMConfigValues = {
@@ -24,6 +28,9 @@ export type LLMConfigValues = {
   | { max_tokens?: number; maxTokens?: never }
   | { maxTokens?: number; max_tokens?: never }
 );
+
+// Default output when structured outputs is disabled
+const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };
 
 /**
  * Ensures only one of maxTokens or max_tokens is set
@@ -47,6 +54,21 @@ const normalizeMaxTokens = (
   }
 };
 
+type LLMConfigPopoverProps = {
+  values: LLMConfigValues;
+  onChange: (params: LLMConfigValues) => void;
+  errors?: {
+    temperature?: { message?: string };
+    maxTokens?: { message?: string };
+  };
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
+};
+
 /**
  * LLM Config Popover Content
  *
@@ -57,23 +79,23 @@ const normalizeMaxTokens = (
  * - Model selector
  * - Temperature control (disabled for GPT-5)
  * - Max tokens control with dynamic limits
+ * - Structured outputs toggle and configuration
  *
  * @param values - Current LLM configuration values
  * @param onChange - Callback when values change
  * @param errors - Validation errors from form schema
+ * @param outputs - Current outputs configuration
+ * @param onOutputsChange - Callback when outputs change
+ * @param showStructuredOutputs - Whether to show structured outputs section
  */
 export function LLMConfigPopover({
   values,
   onChange,
   errors,
-}: {
-  values: LLMConfigValues;
-  onChange: (params: LLMConfigValues) => void;
-  errors?: {
-    temperature?: { message?: string };
-    maxTokens?: { message?: string };
-  };
-}) {
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
+}: LLMConfigPopoverProps) {
   const maxTokens = values.maxTokens ?? values.max_tokens;
   const isGpt5 = values?.model?.includes("gpt-5");
 
@@ -84,8 +106,38 @@ export function LLMConfigPopover({
     modelLimits?.maxTokens ??
     FALLBACK_MAX_TOKENS;
 
+  // Determine initial state for structured outputs
+  // It's initially enabled if there's more than one output, or if the single output is non-default
+  const hasNonDefaultOutputs =
+    outputs &&
+    (outputs.length !== 1 ||
+      outputs[0]?.identifier !== "output" ||
+      outputs[0]?.type !== "str");
+
+  const [isStructuredOutputsEnabled, setIsStructuredOutputsEnabled] = useState(
+    hasNonDefaultOutputs ?? false
+  );
+
+  // Sync state when outputs change externally (e.g., loading a prompt)
+  useEffect(() => {
+    if (hasNonDefaultOutputs && !isStructuredOutputsEnabled) {
+      setIsStructuredOutputsEnabled(true);
+    }
+  }, [hasNonDefaultOutputs, isStructuredOutputsEnabled]);
+
+  const handleStructuredOutputsToggle = (checked: boolean) => {
+    if (!onOutputsChange) return;
+
+    setIsStructuredOutputsEnabled(checked);
+
+    if (!checked) {
+      // Disable: reset to default single output
+      onOutputsChange([DEFAULT_OUTPUT]);
+    }
+  };
+
   return (
-    <Popover.Content minWidth="500px">
+    <Popover.Content minWidth="500px" zIndex={1400}>
       <HStack
         width="full"
         paddingX={4}
@@ -191,7 +243,39 @@ export function LLMConfigPopover({
             )}
           </VStack>
         </HorizontalFormControl>
+
+        {/* Structured Outputs Section */}
+        {showStructuredOutputs && onOutputsChange && (
+          <>
+            <HorizontalFormControl
+              label="Structured Outputs"
+              helper="Define custom output fields and types"
+              inputWidth="10%"
+            >
+              <HStack width="full" justify="flex-end">
+                <Switch
+                  checked={isStructuredOutputsEnabled}
+                  onCheckedChange={({ checked }) =>
+                    handleStructuredOutputsToggle(checked)
+                  }
+                />
+              </HStack>
+            </HorizontalFormControl>
+
+            {isStructuredOutputsEnabled && outputs && (
+              <Box width="full" paddingTop={2}>
+                <OutputsSection
+                  outputs={outputs}
+                  onChange={onOutputsChange}
+                  title="Outputs"
+                />
+              </Box>
+            )}
+          </>
+        )}
       </VStack>
     </Popover.Content>
   );
 }
+
+export type { Output, OutputType };

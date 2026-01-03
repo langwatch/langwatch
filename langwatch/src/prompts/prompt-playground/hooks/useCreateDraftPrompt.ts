@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { PromptConfigFormValues } from "~/prompts/types";
-import { DEFAULT_MAX_TOKENS, DEFAULT_MODEL } from "~/utils/constants";
+import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
@@ -16,33 +15,18 @@ export function useCreateDraftPrompt() {
   /**
    * createDraftPrompt
    * Single Responsibility: Creates a new draft prompt tab with default configuration values.
+   * Uses buildDefaultFormValues for consistency across all contexts.
    * @returns Promise resolving to object with defaultValues
    */
   const createDraftPrompt = useCallback(async () => {
     const projectDefaultModel = project?.defaultModel;
-    const normalizedDefaultModel =
-      typeof projectDefaultModel === "string"
-        ? projectDefaultModel
-        : DEFAULT_MODEL;
 
-    const defaultValues: PromptConfigFormValues = {
-      handle: null,
-      scope: "PROJECT",
-      version: {
-        configData: {
-          llm: {
-            model: normalizedDefaultModel,
-            maxTokens: DEFAULT_MAX_TOKENS,
-            temperature: 1,
-          },
-          inputs: [],
-          outputs: [{ identifier: "output", type: "str" }],
-          messages: [
-            { role: "system", content: "You are a helpful assistant." },
-          ],
-        },
-      },
-    };
+    // Use unified defaults with project model override if available
+    const defaultValues = buildDefaultFormValues(
+      typeof projectDefaultModel === "string"
+        ? { version: { configData: { llm: { model: projectDefaultModel } } } }
+        : undefined
+    );
 
     addTab({
       data: {

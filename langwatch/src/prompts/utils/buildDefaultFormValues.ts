@@ -6,22 +6,28 @@ import type { DeepPartial } from "~/utils/types";
 
 import type { PromptConfigFormValues } from "../types";
 
-const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
+/**
+ * Single source of truth for default prompt configuration.
+ * Used by Playground, Evaluations V3, and Optimization Studio.
+ */
+export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   handle: null,
   scope: PromptScope.PROJECT,
   version: {
     configData: {
       llm: {
         model: DEFAULT_MODEL,
-        temperature: 0.5,
+        // GPT-5 models require temperature 1, so we use 1 as the default
+        // since DEFAULT_MODEL is openai/gpt-5
+        temperature: 1,
         maxTokens: 1000,
       },
       messages: [
-        { role: "system" as const, content: "You are a helpful assistant." },
-        { role: "user" as const, content: "{{input}}" },
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: "{{input}}" },
       ],
-      inputs: [{ identifier: "input", type: "str" as const }],
-      outputs: [{ identifier: "output", type: "str" as const }],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
     },
   },
 };

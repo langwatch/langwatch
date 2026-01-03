@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Tabs } from "@chakra-ui/react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useFormContext } from "react-hook-form";
 import { LuSquarePen } from "react-icons/lu";
 import { VariablesSection, type Variable } from "~/components/variables";
@@ -11,6 +11,14 @@ import {
   type PromptPlaygroundChatRef,
 } from "../../chat/PromptPlaygroundChat";
 import { SettingsTabContent } from "./SettingsTabContent";
+
+/** The default "input" variable is locked - cannot be removed or renamed */
+const LOCKED_VARIABLES = new Set(["input"]);
+
+/** Info tooltips for special variables */
+const VARIABLE_INFO: Record<string, string> = {
+  input: "This value comes from the Conversation tab input",
+};
 
 enum PromptTab {
   Conversation = "conversation",
@@ -165,6 +173,8 @@ export function PromptTabbedSection() {
               canAddRemove={true}
               readOnly={false}
               title="Variables"
+              lockedVariables={LOCKED_VARIABLES}
+              variableInfo={VARIABLE_INFO}
             />
           </Box>
         </Tabs.Content>
