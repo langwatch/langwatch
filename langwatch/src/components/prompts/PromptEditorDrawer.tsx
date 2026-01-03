@@ -5,7 +5,6 @@ import {
   Heading,
   HStack,
   Input,
-  Spacer,
   Spinner,
   VStack,
 } from "@chakra-ui/react";
@@ -26,8 +25,8 @@ import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { OutputsFieldGroup } from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
-import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
-import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
+import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
+import { SaveVersionDialog, type SaveDialogFormValues } from "~/prompts/forms/SaveVersionDialog";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
@@ -447,6 +446,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         idOrHandle: promptId ?? "",
         projectId: project?.id ?? "",
       });
+      // Invalidate version history so the history button shows the new version
+      void utils.prompts.getAllVersionsForPrompt.invalidate({
+        idOrHandle: promptId ?? "",
+        projectId: project?.id ?? "",
+      });
       onSave?.({
         id: prompt.id,
         name: prompt.handle ?? "Untitled",
@@ -469,8 +473,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // For editing, we don't need a new handle since the prompt already has one
   const isValid = promptId ? true : handle.trim().length > 0;
 
-  const handleSave = useCallback(async () => {
-    if (!project?.id || !isValid) return;
+  // State for save version dialog (asks for commit message)
+  const [saveVersionDialogOpen, setSaveVersionDialogOpen] = useState(false);
+  const pendingSaveDataRef = useRef<ReturnType<typeof formValuesToTriggerSaveVersionParams> | null>(null);
+
+  // Validate and prepare save data, returns true if ready to save
+  const validateAndPrepare = useCallback(async () => {
+    if (!project?.id || !isValid) return false;
 
     // Validate form
     const formValid = await methods.trigger("version.configData.llm");
@@ -480,11 +489,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         description: "Please fix the LLM configuration errors before saving",
         type: "error",
       });
-      return;
+      return false;
     }
 
     const formValues = methods.getValues();
-    const saveData = formValuesToTriggerSaveVersionParams(formValues);
+    pendingSaveDataRef.current = formValuesToTriggerSaveVersionParams(formValues);
+    return true;
+  }, [project?.id, isValid, methods]);
+
+  // Execute the save with a commit message
+  const executeSave = useCallback((commitMessage: string) => {
+    if (!project?.id || !pendingSaveDataRef.current) return;
+
+    const saveData = pendingSaveDataRef.current;
 
     if (promptId && promptQuery.data?.id) {
       // Update existing prompt
@@ -493,7 +510,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         id: promptQuery.data.id,
         data: {
           ...saveData,
-          commitMessage: "Updated via drawer",
+          commitMessage,
         },
       });
     } else {
@@ -504,7 +521,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           ...saveData,
           handle: handle.trim(),
           scope: "PROJECT",
-          commitMessage: "Initial version",
+          commitMessage,
         },
       });
     }
@@ -513,11 +530,29 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     promptId,
     promptQuery.data?.id,
     handle,
-    isValid,
-    methods,
     createMutation,
     updateMutation,
   ]);
+
+  // Handle save button click
+  const handleSave = useCallback(async () => {
+    const isReady = await validateAndPrepare();
+    if (!isReady) return;
+
+    if (promptId && promptQuery.data?.id) {
+      // For existing prompts, show the save version dialog to get commit message
+      setSaveVersionDialogOpen(true);
+    } else {
+      // For new prompts, save directly with default message
+      executeSave("Initial version");
+    }
+  }, [validateAndPrepare, executeSave, promptId, promptQuery.data?.id]);
+
+  // Handle save version dialog submit
+  const handleSaveVersionSubmit = useCallback(async (formValues: SaveDialogFormValues) => {
+    executeSave(formValues.commitMessage);
+    setSaveVersionDialogOpen(false);
+  }, [executeSave]);
 
   const handleHandleChange = (value: string) => {
     setHandle(value);
@@ -702,7 +737,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 flex={1}
                 overflowY="auto"
               >
-                {/* Header bar - matches prompt playground */}
+                {/* Header bar - shared with prompt playground */}
                 <Box
                   borderBottomWidth="1px"
                   borderColor="gray.200"
@@ -711,32 +746,24 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   position="sticky"
                   top={0}
                   zIndex={1}
+                  background="white"
                 >
-                  <HStack width="full">
-                    <ModelSelectFieldMini />
-                    <Spacer />
-                    <HStack gap={2}>
-                      {configId && (
-                        <VersionHistoryButton
-                          configId={configId}
-                          onRestoreSuccess={handleVersionRestore}
-                          onDiscardChanges={handleDiscardChanges}
-                          hasUnsavedChanges={hasUnsavedChanges}
-                        />
-                      )}
-                      <Button
-                        colorPalette="blue"
-                        size="sm"
-                        onClick={() => void handleSave()}
-                        disabled={!hasUnsavedChanges || !isValid || isSaving}
-                        loading={isSaving}
-                        data-testid="save-prompt-button"
-                      >
-                        {hasUnsavedChanges ? "Save" : "Saved"}
-                      </Button>
-                    </HStack>
-                  </HStack>
+                  <PromptEditorHeader
+                    onSave={() => void handleSave()}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    isValid={isValid}
+                    isSaving={isSaving}
+                    onVersionRestore={handleVersionRestore}
+                    onDiscardChanges={handleDiscardChanges}
+                  />
                 </Box>
+
+                {/* Save Version Dialog - asks for commit message when updating */}
+                <SaveVersionDialog
+                  isOpen={saveVersionDialogOpen}
+                  onClose={() => setSaveVersionDialogOpen(false)}
+                  onSubmit={handleSaveVersionSubmit}
+                />
 
                 {/* Handle/name field - only for new prompts */}
                 {!promptId && (

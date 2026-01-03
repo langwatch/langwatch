@@ -1,24 +1,25 @@
-import { HStack, Spacer } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
-import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
-import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
-import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
+import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
+import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
+import { useTabId } from "../ui/TabContext";
 import { SavePromptButton } from "./SavePromptButton";
 
 /**
  * Header bar for the prompt browser with handle, model selector, and action buttons.
  * Single Responsibility: Renders the top control bar for editing and managing prompt configurations.
+ *
+ * Uses the shared PromptEditorHeader component for consistency with the drawer.
  */
 export function PromptBrowserHeader() {
-  const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
-  const handle = formMethods.watch("handle");
-  const configId = formMethods.watch("configId");
+  const { handleSaveVersion } = useHandleSavePrompt();
+  const tabId = useTabId();
+  const hasUnsavedChanges = useHasUnsavedChanges(tabId);
 
   /**
    * handleOnRestore
@@ -32,28 +33,13 @@ export function PromptBrowserHeader() {
   };
 
   return (
-    <HStack width="full" bg="white" display="flex" flexDirection="row">
-      <HStack>
-        <ModelSelectFieldMini />
-      </HStack>
-      <Spacer />
-      <HStack>
-        {configId && (
-          <VersionHistoryButton
-            configId={configId}
-            onRestoreSuccess={(params) => handleOnRestore(params)}
-          />
-        )}
-        <GeneratePromptApiSnippetDialog
-          promptHandle={handle}
-          apiKey={project?.apiKey}
-        >
-          <GeneratePromptApiSnippetDialog.Trigger>
-            <GenerateApiSnippetButton hasHandle={!!handle} />
-          </GeneratePromptApiSnippetDialog.Trigger>
-        </GeneratePromptApiSnippetDialog>
-        <SavePromptButton />
-      </HStack>
-    </HStack>
+    <Box width="full" bg="white">
+      <PromptEditorHeader
+        onSave={handleSaveVersion}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onVersionRestore={handleOnRestore}
+        customSaveButton={<SavePromptButton />}
+      />
+    </Box>
   );
 }
