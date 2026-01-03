@@ -65,12 +65,13 @@ type PromptTextAreaWithVariablesProps = {
   /**
    * Legacy callback for optimization studio edge connections.
    * Called when a user selects a field from another node (otherNodesFields).
+   * Returns the new handle name that was created (may differ from field if handle already exists).
    */
   onAddEdge?: (
     nodeId: string,
     field: string,
     content: PromptTextAreaOnAddMention,
-  ) => void;
+  ) => string | void;
   /**
    * Legacy: fields from other nodes in optimization studio.
    * Each key is a nodeId, value is array of field names.
@@ -153,11 +154,11 @@ export const PromptTextAreaWithVariables = ({
 }: PromptTextAreaWithVariablesProps) => {
   // Merge variables, otherNodesFields into availableSources
   const availableSources = useMemo(() => {
-    const sources = [...externalSources];
+    const sources: AvailableSource[] = [];
 
     // Add existing variables as a "Variables" source so users can select them
     if (variables.length > 0) {
-      sources.unshift({
+      sources.push({
         id: "__variables__",
         name: "Variables",
         type: "signature", // Use signature type for variables
@@ -165,17 +166,44 @@ export const PromptTextAreaWithVariables = ({
       });
     }
 
-    // Convert otherNodesFields to AvailableSource format
+    // Track which node IDs we've added from externalSources
+    const addedNodeIds = new Set<string>();
+
+    // Use externalSources for proper node names and types
+    // Filter fields based on otherNodesFields if available
+    for (const source of externalSources) {
+      const availableFields = otherNodesFields[source.id];
+      if (availableFields !== undefined) {
+        // Filter to only show unconnected fields
+        const filteredFields = source.fields.filter((f) =>
+          availableFields.includes(f.name),
+        );
+        if (filteredFields.length > 0) {
+          sources.push({
+            ...source,
+            fields: filteredFields,
+          });
+          addedNodeIds.add(source.id);
+        }
+      } else {
+        // No filtering info, show all fields
+        sources.push(source);
+        addedNodeIds.add(source.id);
+      }
+    }
+
+    // Add any nodes from otherNodesFields not in externalSources (fallback)
     for (const [nodeId, fields] of Object.entries(otherNodesFields)) {
-      if (fields.length > 0) {
+      if (!addedNodeIds.has(nodeId) && fields.length > 0) {
         sources.push({
           id: nodeId,
           name: nodeId,
-          type: "signature", // Assume these are from other nodes in workflow
+          type: "signature", // Fallback type
           fields: fields.map((f) => ({ name: f, type: "str" })),
         });
       }
     }
+
     return sources;
   }, [externalSources, otherNodesFields, variables]);
 
@@ -342,12 +370,28 @@ export const PromptTextAreaWithVariables = ({
       );
 
       if (isOtherNodeField && onAddEdge) {
-        onAddEdge(option.source.id, option.field.name, {
+        const newHandle = onAddEdge(option.source.id, option.field.name, {
           value,
           display: `${option.source.id}.${option.field.name}`,
           startPos: triggerStart - 2,
           endPos: cursorPos,
         });
+
+        // If onAddEdge returns the new handle, update the text
+        if (newHandle) {
+          const before = value.substring(0, triggerStart - 2);
+          const after = value.substring(cursorPos);
+          const newValue = `${before}{{${newHandle}}}${after}`;
+          onChange(newValue);
+
+          // Set cursor position after the inserted variable
+          setTimeout(() => {
+            const newCursorPos = before.length + newHandle.length + 4;
+            nativeTextarea?.focus();
+            nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
+          }, 0);
+        }
+
         closeMenu();
         return;
       }
@@ -503,12 +547,37 @@ export const PromptTextAreaWithVariables = ({
 
       if (isOtherNodeField && onAddEdge) {
         // Call onAddEdge for optimization studio compatibility
-        onAddEdge(field.sourceId, field.fieldName, {
+        const newHandle = onAddEdge(field.sourceId, field.fieldName, {
           value,
           display: `${field.sourceId}.${field.fieldName}`,
           startPos: buttonMenuMode ? triggerStart : triggerStart - 2,
           endPos: cursorPos,
         });
+
+        // If onAddEdge returns the new handle, update the text
+        if (newHandle) {
+          let newValue: string;
+          let newCursorPos: number;
+
+          if (buttonMenuMode) {
+            const before = value.substring(0, triggerStart);
+            const after = value.substring(triggerStart);
+            newValue = `${before}{{${newHandle}}}${after}`;
+            newCursorPos = before.length + newHandle.length + 4;
+          } else {
+            const before = value.substring(0, triggerStart - 2);
+            const after = value.substring(cursorPos);
+            newValue = `${before}{{${newHandle}}}${after}`;
+            newCursorPos = before.length + newHandle.length + 4;
+          }
+
+          onChange(newValue);
+
+          setTimeout(() => {
+            nativeTextarea?.focus();
+            nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
+          }, 0);
+        }
 
         closeMenu();
         return;

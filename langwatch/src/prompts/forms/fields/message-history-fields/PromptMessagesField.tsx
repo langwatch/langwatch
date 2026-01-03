@@ -67,7 +67,7 @@ type MessageRowProps = {
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => void;
+  ) => string | void;
 };
 
 /**
@@ -123,7 +123,7 @@ function MessageRow({
             onCreateVariable={onCreateVariable}
             onSetVariableMapping={onSetVariableMapping}
             onAddEdge={(id, handle, content) => {
-              onAddEdge?.(id, handle, content, idx);
+              return onAddEdge?.(id, handle, content, idx);
             }}
             showAddContextButton
           />
@@ -170,7 +170,7 @@ export function PromptMessagesField({
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => void;
+  ) => string | void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
   const { formState, control } = form;

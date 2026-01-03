@@ -1,13 +1,15 @@
 import { VStack } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import debounce from "lodash.debounce";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
 import { toaster } from "~/components/ui/toaster";
 import {
   FormVariablesSection,
+  type AvailableSource,
+  type FieldMapping,
   type PromptTextAreaOnAddMention,
 } from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -51,6 +53,7 @@ export function SignaturePropertiesPanelForm({
     edgeConnectToNewHandle,
     getWorkflow,
     setNodeParameter,
+    setEdges,
   } = useWorkflowStore(
     useShallow((state) => ({
       templateAdapter: state.getWorkflow().template_adapter,
@@ -60,6 +63,7 @@ export function SignaturePropertiesPanelForm({
       setNode: state.setNode,
       getWorkflow: state.getWorkflow,
       setNodeParameter: state.setNodeParameter,
+      setEdges: state.setEdges,
     })),
   );
 
@@ -197,6 +201,98 @@ export function SignaturePropertiesPanelForm({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
+  // Build availableSources for variable mappings
+  const availableSources: AvailableSource[] = useMemo(() => {
+    const dependentNodes: string[] = [];
+    const toVisit = [node.id];
+    while (toVisit.length > 0) {
+      const currentNode = toVisit.shift();
+      if (!currentNode) continue;
+      dependentNodes.push(currentNode);
+      toVisit.push(
+        ...edges
+          .filter((edge) => edge.source === currentNode)
+          .map((edge) => edge.target),
+      );
+    }
+
+    return nodes
+      .filter((n) => !dependentNodes.includes(n.id) && n.id !== "end")
+      .map((n) => {
+        const isEntry = n.type === "entry";
+        // For entry nodes, get dataset name from data.dataset
+        const entryDataset = isEntry
+          ? (n.data as { dataset?: { name?: string } }).dataset
+          : undefined;
+        return {
+          id: n.id,
+          name: isEntry ? entryDataset?.name ?? "Dataset" : n.data.name ?? n.id,
+          type: isEntry ? "dataset" : (n.type as AvailableSource["type"]),
+          fields:
+            n.data.outputs?.map((output) => ({
+              name: output.identifier,
+              type: output.type,
+            })) ?? [],
+        };
+      })
+      .filter((source) => source.fields.length > 0);
+  }, [edges, nodes, node.id]);
+
+  // Build mappings from edges
+  const variableMappings: Record<string, FieldMapping> = useMemo(() => {
+    const mappings: Record<string, FieldMapping> = {};
+    edges
+      .filter((edge) => edge.target === node.id)
+      .forEach((edge) => {
+        // Parse targetHandle (e.g., "inputs.question") to get the input identifier
+        const targetHandle = edge.targetHandle?.split(".")[1];
+        // Parse sourceHandle (e.g., "outputs.answer") to get the source field
+        const sourceField = edge.sourceHandle?.split(".")[1];
+        if (targetHandle && sourceField && edge.source) {
+          mappings[targetHandle] = {
+            type: "source",
+            sourceId: edge.source,
+            field: sourceField,
+          };
+        }
+      });
+    return mappings;
+  }, [edges, node.id]);
+
+  // Handle mapping changes by creating/removing edges
+  const onMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      const currentEdges = getWorkflow().edges;
+
+      // Remove existing edge for this input
+      const filteredEdges = currentEdges.filter(
+        (edge) =>
+          !(
+            edge.target === node.id &&
+            edge.targetHandle === `inputs.${identifier}`
+          ),
+      );
+
+      if (mapping && mapping.type === "source") {
+        // Add new edge
+        const newEdge = {
+          id: `edge-${identifier}-${Date.now()}`,
+          source: mapping.sourceId,
+          target: node.id,
+          sourceHandle: `outputs.${mapping.field}`,
+          targetHandle: `inputs.${identifier}`,
+          type: "default",
+        };
+        setEdges([...filteredEdges, newEdge]);
+      } else {
+        setEdges(filteredEdges);
+      }
+
+      updateNodeInternals(node.id);
+    },
+    [getWorkflow, node.id, setEdges, updateNodeInternals],
+  );
+
   const onAddEdge = (
     id: string,
     handle: string,
@@ -212,7 +308,7 @@ export function SignaturePropertiesPanelForm({
       content.value.substring(content.endPos);
 
     const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
-    return { node: stateNode, newPrompt: content_ };
+    return { node: stateNode, newPrompt: content_, newHandle };
   };
 
   const onAddPromptEdge = (
@@ -220,13 +316,15 @@ export function SignaturePropertiesPanelForm({
     handle: string,
     content: PromptTextAreaOnAddMention,
   ) => {
-    const { node, newPrompt } = onAddEdge(id, handle, content);
+    const { node, newPrompt, newHandle } = onAddEdge(id, handle, content);
 
     setNodeParameter(node.id, {
       identifier: "instructions",
       type: "str",
       value: newPrompt,
     });
+
+    return newHandle;
   };
 
   const onAddMessageEdge = (
@@ -234,8 +332,8 @@ export function SignaturePropertiesPanelForm({
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => {
-    const { node, newPrompt } = onAddEdge(id, handle, content);
+  ): string | undefined => {
+    const { node, newPrompt, newHandle } = onAddEdge(id, handle, content);
     const messagesParam = node.data.parameters?.find(
       (param) => param.identifier === "messages",
     );
@@ -248,6 +346,8 @@ export function SignaturePropertiesPanelForm({
         i === idx ? { ...field, content: newPrompt } : field,
       ),
     });
+
+    return newHandle;
   };
 
   return (
@@ -266,10 +366,17 @@ export function SignaturePropertiesPanelForm({
               messageFields={messageFields}
               availableFields={availableFields}
               otherNodesFields={otherNodesFields}
+              availableSources={availableSources}
               onAddEdge={onAddMessageEdge}
             />
           )}
-          <FormVariablesSection showMappings={false} title="Variables" />
+          <FormVariablesSection
+            showMappings={true}
+            title="Variables"
+            availableSources={availableSources}
+            mappings={variableMappings}
+            onMappingChange={onMappingChange}
+          />
           <OutputsFieldGroup />
           {!isInsideWizard && <DemonstrationsField />}
         </VStack>
