@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import userEvent from "@testing-library/user-event";
 import { forwardRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { PromptTextAreaWithVariables } from "../PromptTextAreaWithVariables";
+import { PromptTextAreaWithVariables } from "../prompt-textarea";
 import type { AvailableSource } from "../VariableMappingInput";
 import type { Variable } from "../VariablesSection";
 

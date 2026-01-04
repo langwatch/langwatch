@@ -24,7 +24,7 @@ export {
 export {
   PromptTextAreaWithVariables,
   type PromptTextAreaOnAddMention,
-} from "./PromptTextAreaWithVariables";
+} from "./prompt-textarea";
 
 export { FormVariablesSection } from "./FormVariablesSection";
 
