@@ -13,18 +13,30 @@ import { FormProvider, useFieldArray } from "react-hook-form";
 import debounce from "lodash-es/debounce";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps, useDrawerParams, getFlowCallbacks } from "~/hooks/useDrawer";
+import {
+  useDrawer,
+  getComplexProps,
+  useDrawerParams,
+  getFlowCallbacks,
+} from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 
-import { FormVariablesSection, type AvailableSource, type FieldMapping } from "~/components/variables";
+import {
+  FormVariablesSection,
+  type AvailableSource,
+  type FieldMapping,
+} from "~/components/variables";
 import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappings";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
-import { SaveVersionDialog, type SaveDialogFormValues } from "~/prompts/forms/SaveVersionDialog";
+import {
+  SaveVersionDialog,
+  type SaveDialogFormValues,
+} from "~/prompts/forms/SaveVersionDialog";
 import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
 import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
@@ -71,7 +83,10 @@ export type PromptEditorDrawerProps = {
   /**
    * Callback when input mappings change.
    */
-  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
+  onInputMappingsChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -127,14 +142,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
-    props.onSave ?? flowCallbacks?.onSave ?? (complexProps.onSave as PromptEditorDrawerProps["onSave"]);
-  const onLocalConfigChange = props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+    props.onSave ??
+    flowCallbacks?.onSave ??
+    (complexProps.onSave as PromptEditorDrawerProps["onSave"]);
+  const onLocalConfigChange =
+    props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
 
   // Data sources: In evaluations context, use reactive data from hook.
   // Otherwise, fall back to props/complexProps (for standalone usage like prompt playground).
-  const availableSources = targetId && evaluationData.isValid
-    ? evaluationData.availableSources
-    : props.availableSources ?? (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
+  const availableSources =
+    targetId && evaluationData.isValid
+      ? evaluationData.availableSources
+      : props.availableSources ??
+        (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
 
   // ============================================================================
   // INPUT MAPPINGS - Single Source of Truth Pattern
@@ -151,15 +171,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // ============================================================================
 
   // External source (only for initialization and sync)
-  const _mappingsFromProps = targetId && evaluationData.isValid
-    ? evaluationData.inputMappings
-    : props.inputMappings ?? (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
+  const _mappingsFromProps =
+    targetId && evaluationData.isValid
+      ? evaluationData.inputMappings
+      : props.inputMappings ??
+        (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
 
   // External callback to persist changes to store
-  const _onMappingsChangeProp = props.onInputMappingsChange ?? flowCallbacks?.onInputMappingsChange ?? (complexProps.onInputMappingsChange as PromptEditorDrawerProps["onInputMappingsChange"]);
+  const _onMappingsChangeProp =
+    props.onInputMappingsChange ??
+    flowCallbacks?.onInputMappingsChange ??
+    (complexProps.onInputMappingsChange as PromptEditorDrawerProps["onInputMappingsChange"]);
 
   // THE source of truth for mappings inside this drawer
-  const [inputMappings, setInputMappings] = useState<Record<string, FieldMapping> | undefined>(_mappingsFromProps);
+  const [inputMappings, setInputMappings] = useState<
+    Record<string, FieldMapping> | undefined
+  >(_mappingsFromProps);
 
   // Sync from external when props change (e.g., drawer reopened, dataset changed)
   useEffect(() => {
@@ -182,7 +209,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Persist to store via external callback
       _onMappingsChangeProp?.(identifier, mapping);
     },
-    [_onMappingsChangeProp]
+    [_onMappingsChangeProp],
   );
 
   const promptId =
@@ -194,7 +221,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Load existing prompt if editing
   const promptQuery = api.prompts.getByIdOrHandle.useQuery(
     { idOrHandle: promptId ?? "", projectId: project?.id ?? "" },
-    { enabled: !!promptId && !!project?.id && isOpen, refetchOnWindowFocus: false },
+    {
+      enabled: !!promptId && !!project?.id && isOpen,
+      refetchOnWindowFocus: false,
+    },
   );
 
   // Compute saved form values from the published prompt
@@ -218,7 +248,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // isFormInitialized: Tracks whether we've done the initial setup for this
   //   drawer session. Prevents re-initialization when deps change.
   //
-  const [configValues, setConfigValues] = useState<PromptConfigFormValues>(buildDefaultFormValues);
+  const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
+    buildDefaultFormValues,
+  );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
 
   // Form setup using the prompts module hook
@@ -243,7 +275,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     if (!isOpen) return;
 
     if (promptQuery.data) {
-      const serverValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(promptQuery.data);
+      const serverValues =
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(
+          promptQuery.data,
+        );
 
       // Merge local config over server data if present
       const formValues = props.initialLocalConfig
@@ -260,8 +295,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   litellmParams: props.initialLocalConfig.llm.litellmParams,
                 },
                 messages: props.initialLocalConfig.messages,
-                inputs: props.initialLocalConfig.inputs as typeof serverValues.version.configData.inputs,
-                outputs: props.initialLocalConfig.outputs as typeof serverValues.version.configData.outputs,
+                inputs: props.initialLocalConfig
+                  .inputs as typeof serverValues.version.configData.inputs,
+                outputs: props.initialLocalConfig
+                  .outputs as typeof serverValues.version.configData.outputs,
               },
             },
           }
@@ -279,15 +316,19 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       setIsFormInitialized(true);
 
       // Auto-map default inputs to matching dataset columns
-      if (availableSources && availableSources.length > 0 && _onMappingsChangeProp) {
+      if (
+        availableSources &&
+        availableSources.length > 0 &&
+        _onMappingsChangeProp
+      ) {
         const allFields = availableSources.flatMap((source) =>
-          source.fields.map((f) => ({ ...f, sourceId: source.id }))
+          source.fields.map((f) => ({ ...f, sourceId: source.id })),
         );
 
         for (const input of defaults.version.configData.inputs) {
           // Find a matching field by name (case-insensitive)
           const matchingField = allFields.find(
-            (f) => f.name.toLowerCase() === input.identifier.toLowerCase()
+            (f) => f.name.toLowerCase() === input.identifier.toLowerCase(),
           );
 
           if (matchingField) {
@@ -307,7 +348,16 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         }
       }
     }
-  }, [isOpen, promptQuery.data, promptId, props.initialLocalConfig, methods, isFormInitialized, availableSources, _onMappingsChangeProp]);
+  }, [
+    isOpen,
+    promptQuery.data,
+    promptId,
+    props.initialLocalConfig,
+    methods,
+    isFormInitialized,
+    availableSources,
+    _onMappingsChangeProp,
+  ]);
 
   // Reset when drawer closes
   useEffect(() => {
@@ -498,7 +548,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const [savePromptDialogOpen, setSavePromptDialogOpen] = useState(false);
   // State for change handle dialog (for renaming existing prompts)
   const [changeHandleDialogOpen, setChangeHandleDialogOpen] = useState(false);
-  const pendingSaveDataRef = useRef<ReturnType<typeof formValuesToTriggerSaveVersionParams> | null>(null);
+  const pendingSaveDataRef = useRef<ReturnType<
+    typeof formValuesToTriggerSaveVersionParams
+  > | null>(null);
 
   // Validate and prepare save data, returns true if ready to save
   const validateAndPrepare = useCallback(async () => {
@@ -516,48 +568,52 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     }
 
     const formValues = methods.getValues();
-    pendingSaveDataRef.current = formValuesToTriggerSaveVersionParams(formValues);
+    pendingSaveDataRef.current =
+      formValuesToTriggerSaveVersionParams(formValues);
     return true;
   }, [project?.id, methods]);
 
   // Execute the save with a commit message (and optional handle/scope for new prompts)
-  const executeSave = useCallback((
-    commitMessage: string,
-    newPromptData?: { handle: string; scope: "PROJECT" | "ORGANIZATION" }
-  ) => {
-    if (!project?.id || !pendingSaveDataRef.current) return;
+  const executeSave = useCallback(
+    (
+      commitMessage: string,
+      newPromptData?: { handle: string; scope: "PROJECT" | "ORGANIZATION" },
+    ) => {
+      if (!project?.id || !pendingSaveDataRef.current) return;
 
-    const saveData = pendingSaveDataRef.current;
+      const saveData = pendingSaveDataRef.current;
 
-    if (promptId && promptQuery.data?.id) {
-      // Update existing prompt
-      updateMutation.mutate({
-        projectId: project.id,
-        id: promptQuery.data.id,
-        data: {
-          ...saveData,
-          commitMessage,
-        },
-      });
-    } else if (newPromptData) {
-      // Create new prompt
-      createMutation.mutate({
-        projectId: project.id,
-        data: {
-          ...saveData,
-          handle: newPromptData.handle,
-          scope: newPromptData.scope,
-          commitMessage,
-        },
-      });
-    }
-  }, [
-    project?.id,
-    promptId,
-    promptQuery.data?.id,
-    createMutation,
-    updateMutation,
-  ]);
+      if (promptId && promptQuery.data?.id) {
+        // Update existing prompt
+        updateMutation.mutate({
+          projectId: project.id,
+          id: promptQuery.data.id,
+          data: {
+            ...saveData,
+            commitMessage,
+          },
+        });
+      } else if (newPromptData) {
+        // Create new prompt
+        createMutation.mutate({
+          projectId: project.id,
+          data: {
+            ...saveData,
+            handle: newPromptData.handle,
+            scope: newPromptData.scope,
+            commitMessage,
+          },
+        });
+      }
+    },
+    [
+      project?.id,
+      promptId,
+      promptQuery.data?.id,
+      createMutation,
+      updateMutation,
+    ],
+  );
 
   // Handle save button click
   const handleSave = useCallback(async () => {
@@ -574,30 +630,39 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   }, [validateAndPrepare, promptId, promptQuery.data?.id]);
 
   // Handle save version dialog submit (for existing prompts)
-  const handleSaveVersionSubmit = useCallback(async (formValues: SaveDialogFormValues) => {
-    executeSave(formValues.commitMessage);
-    setSaveVersionDialogOpen(false);
-  }, [executeSave]);
+  const handleSaveVersionSubmit = useCallback(
+    async (formValues: SaveDialogFormValues) => {
+      executeSave(formValues.commitMessage);
+      setSaveVersionDialogOpen(false);
+    },
+    [executeSave],
+  );
 
   // Handle save prompt dialog submit (for new prompts)
-  const handleSavePromptSubmit = useCallback(async (formValues: ChangeHandleFormValues) => {
-    executeSave("Initial version", {
-      handle: formValues.handle,
-      scope: formValues.scope,
-    });
-    setSavePromptDialogOpen(false);
-  }, [executeSave]);
+  const handleSavePromptSubmit = useCallback(
+    async (formValues: ChangeHandleFormValues) => {
+      executeSave("Initial version", {
+        handle: formValues.handle,
+        scope: formValues.scope,
+      });
+      setSavePromptDialogOpen(false);
+    },
+    [executeSave],
+  );
 
   // Handle change handle dialog submit (for renaming existing prompts)
-  const handleChangeHandleSubmit = useCallback(async (formValues: ChangeHandleFormValues) => {
-    if (!project?.id || !promptQuery.data?.id) return;
-    updateHandleMutation.mutate({
-      projectId: project.id,
-      id: promptQuery.data.id,
-      data: formValues,
-    });
-    setChangeHandleDialogOpen(false);
-  }, [project?.id, promptQuery.data?.id, updateHandleMutation]);
+  const handleChangeHandleSubmit = useCallback(
+    async (formValues: ChangeHandleFormValues) => {
+      if (!project?.id || !promptQuery.data?.id) return;
+      updateHandleMutation.mutate({
+        projectId: project.id,
+        id: promptQuery.data.id,
+        data: formValues,
+      });
+      setChangeHandleDialogOpen(false);
+    },
+    [project?.id, promptQuery.data?.id, updateHandleMutation],
+  );
 
   const handleClose = () => {
     if (hasUnsavedChanges) {
@@ -640,7 +705,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       const rawInputs = methods.getValues("version.configData.inputs");
       const currentInputs = Array.isArray(rawInputs) ? rawInputs : [];
       const variableExists = currentInputs.some(
-        (input: { identifier: string }) => input.identifier === identifier
+        (input: { identifier: string }) => input.identifier === identifier,
       );
 
       if (!variableExists) {
@@ -680,12 +745,14 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         });
       }
     },
-    [methods, availableSources, onInputMappingsChange]
+    [methods, availableSources, onInputMappingsChange],
   );
 
   // Get available fields for message editor (with type information)
   const watchedInputs = methods.watch("version.configData.inputs");
-  const availableFields = (Array.isArray(watchedInputs) ? watchedInputs : []).map((input) => ({
+  const availableFields = (
+    Array.isArray(watchedInputs) ? watchedInputs : []
+  ).map((input) => ({
     identifier: input.identifier,
     type: input.type,
   }));
@@ -716,7 +783,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
     // Get input identifiers
     const inputs = Array.isArray(watchedInputs) ? watchedInputs : [];
-    const inputIds = new Set(inputs.map((i: { identifier: string }) => i.identifier));
+    const inputIds = new Set(
+      inputs.map((i: { identifier: string }) => i.identifier),
+    );
 
     // Find variables that are both used and defined but missing a mapping
     const missing = new Set<string>();
@@ -849,28 +918,29 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 />
 
                 {/* Messages (includes system prompt + user messages) */}
-                <Box paddingX={4}>
-                  <PromptMessagesField
-                    messageFields={messageFields}
-                    availableFields={availableFields}
-                    otherNodesFields={{}}
-                    availableSources={availableSources}
-                    onSetVariableMapping={handleSetVariableMapping}
-                  />
-                </Box>
+                <PromptMessagesField
+                  messageFields={messageFields}
+                  availableFields={availableFields}
+                  otherNodesFields={{}}
+                  availableSources={availableSources}
+                  onSetVariableMapping={handleSetVariableMapping}
+                />
 
                 {/* Variables */}
                 <Box paddingX={4} paddingBottom={4}>
                   <FormVariablesSection
                     title="Variables"
-                    showMappings={!!availableSources && availableSources.length > 0}
+                    showMappings={
+                      !!availableSources && availableSources.length > 0
+                    }
                     availableSources={availableSources}
                     mappings={inputMappings}
                     onMappingChange={onInputMappingsChange}
                     missingMappingIds={missingMappingIds}
                     lockedVariables={new Set(["input"])}
                     variableInfo={{
-                      input: "This is the user message input. It will be sent as the user message to the LLM.",
+                      input:
+                        "This is the user message input. It will be sent as the user message to the LLM.",
                     }}
                     showAddButton={false}
                   />

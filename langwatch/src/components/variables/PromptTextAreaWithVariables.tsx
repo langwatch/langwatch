@@ -1,5 +1,5 @@
 import { Box, type BoxProps, Button, Text } from "@chakra-ui/react";
-import { Braces } from "lucide-react";
+import { Braces, GripVertical } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -8,12 +8,14 @@ import {
   useState,
   type ChangeEvent,
   type KeyboardEvent,
+  type DragEvent,
 } from "react";
 import {
   RichTextarea,
   type RichTextareaHandle,
   type CaretPosition,
 } from "rich-textarea";
+import { useDebounceCallback } from "usehooks-ts";
 import {
   VariableInsertMenu,
   getMenuOptionCount,
@@ -78,6 +80,8 @@ type PromptTextAreaWithVariablesProps = {
    * Each key is a nodeId, value is array of field names.
    */
   otherNodesFields?: Record<string, string[]>;
+  /** Borderless mode for cleaner integration (e.g., in Messages mode) */
+  borderless?: boolean;
 } & Omit<BoxProps, "onChange">;
 
 // ============================================================================
@@ -151,6 +155,7 @@ export const PromptTextAreaWithVariables = ({
   hasError = false,
   onAddEdge,
   otherNodesFields = {},
+  borderless = false,
   ...boxProps
 }: PromptTextAreaWithVariablesProps) => {
   // In horizontal layout mode, allow unlimited height (container scrolls)
@@ -214,6 +219,24 @@ export const PromptTextAreaWithVariables = ({
   const textareaRef = useRef<RichTextareaHandle>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Local value state for immediate UI updates (debounced sync to parent)
+  const [localValue, setLocalValue] = useState(value);
+  const debouncedOnChange = useDebounceCallback(onChange, 500);
+
+  // Sync local value when prop changes from outside (e.g., form reset)
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  // Helper for programmatic changes (variable insertion) - updates immediately without debounce
+  const setValueImmediate = useCallback(
+    (newValue: string) => {
+      setLocalValue(newValue);
+      onChange(newValue);
+    },
+    [onChange],
+  );
+
   // Menu state
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
@@ -226,6 +249,16 @@ export const PromptTextAreaWithVariables = ({
 
   // Hover state for "Add variable" button
   const [isHovered, setIsHovered] = useState(false);
+
+  // Paragraph drag and drop state
+  const [hoveredParagraph, setHoveredParagraph] = useState<number | null>(null);
+  const [gripHoveredParagraph, setGripHoveredParagraph] = useState<
+    number | null
+  >(null);
+  const [draggedParagraph, setDraggedParagraph] = useState<number | null>(null);
+  const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(
+    null,
+  );
 
   // Ref to the add variable button for positioning
   const addButtonRef = useRef<HTMLButtonElement>(null);
@@ -244,7 +277,7 @@ export const PromptTextAreaWithVariables = ({
   );
 
   // Variables used in text but not defined
-  const usedVariables = useMemo(() => parseVariablesFromText(value), [value]);
+  const usedVariables = useMemo(() => parseVariablesFromText(localValue), [localValue]);
 
   const invalidVariables = useMemo(
     () => usedVariables.filter((v) => !existingVariableIds.has(v)),
@@ -365,7 +398,7 @@ export const PromptTextAreaWithVariables = ({
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
 
       // Check if this is a field from another node (for onAddEdge callback)
       const isOtherNodeField = Object.prototype.hasOwnProperty.call(
@@ -375,7 +408,7 @@ export const PromptTextAreaWithVariables = ({
 
       if (isOtherNodeField && onAddEdge) {
         const newHandle = onAddEdge(option.source.id, option.field.name, {
-          value,
+          value: localValue,
           display: `${option.source.id}.${option.field.name}`,
           startPos: triggerStart - 2,
           endPos: cursorPos,
@@ -383,10 +416,10 @@ export const PromptTextAreaWithVariables = ({
 
         // If onAddEdge returns the new handle, update the text
         if (newHandle) {
-          const before = value.substring(0, triggerStart - 2);
-          const after = value.substring(cursorPos);
+          const before = localValue.substring(0, triggerStart - 2);
+          const after = localValue.substring(cursorPos);
           const newValue = `${before}{{${newHandle}}}${after}`;
-          onChange(newValue);
+          setValueImmediate(newValue);
 
           // Set cursor position after the inserted variable
           setTimeout(() => {
@@ -401,11 +434,11 @@ export const PromptTextAreaWithVariables = ({
       }
 
       // Replace the {{ and any query with {{field_name}}
-      const before = value.substring(0, triggerStart - 2);
-      const after = value.substring(cursorPos);
+      const before = localValue.substring(0, triggerStart - 2);
+      const after = localValue.substring(cursorPos);
       const newValue = `${before}{{${option.field.name}}}${after}`;
 
-      onChange(newValue);
+      setValueImmediate(newValue);
 
       // Create variable if it doesn't exist
       if (!existingVariableIds.has(option.field.name) && onCreateVariable) {
@@ -435,15 +468,15 @@ export const PromptTextAreaWithVariables = ({
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
 
       const normalizedName = option.name.replace(/ /g, "_").toLowerCase();
 
-      const before = value.substring(0, triggerStart - 2);
-      const after = value.substring(cursorPos);
+      const before = localValue.substring(0, triggerStart - 2);
+      const after = localValue.substring(cursorPos);
       const newValue = `${before}{{${normalizedName}}}${after}`;
 
-      onChange(newValue);
+      setValueImmediate(newValue);
 
       onCreateVariable({
         identifier: normalizedName,
@@ -461,9 +494,9 @@ export const PromptTextAreaWithVariables = ({
   }, [
     flattenedOptions,
     highlightedIndex,
+    localValue,
+    setValueImmediate,
     triggerStart,
-    value,
-    onChange,
     closeMenu,
     existingVariableIds,
     onCreateVariable,
@@ -506,12 +539,16 @@ export const PromptTextAreaWithVariables = ({
     [menuOpen, optionCount, closeMenu, selectHighlightedOption],
   );
 
-  // Handle text change
+  // Handle text change - update local state immediately, debounce parent callback
   const handleChange = useCallback(
     (e: ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       const cursorPos = e.target.selectionStart;
-      onChange(newValue);
+
+      // Update local state immediately for responsive typing
+      setLocalValue(newValue);
+      // Debounce the parent onChange to prevent excessive re-renders
+      debouncedOnChange(newValue);
 
       // Check for unclosed {{ before cursor
       const unclosed = findUnclosedBraces(newValue, cursorPos);
@@ -532,7 +569,7 @@ export const PromptTextAreaWithVariables = ({
         closeMenu();
       }
     },
-    [onChange, menuOpen, openMenu, closeMenu],
+    [debouncedOnChange, menuOpen, openMenu, closeMenu],
   );
 
   // Handle field selection from menu
@@ -541,7 +578,7 @@ export const PromptTextAreaWithVariables = ({
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
 
       // Check if this is a field from another node (for onAddEdge callback)
       const isOtherNodeField = Object.prototype.hasOwnProperty.call(
@@ -552,7 +589,7 @@ export const PromptTextAreaWithVariables = ({
       if (isOtherNodeField && onAddEdge) {
         // Call onAddEdge for optimization studio compatibility
         const newHandle = onAddEdge(field.sourceId, field.fieldName, {
-          value,
+          value: localValue,
           display: `${field.sourceId}.${field.fieldName}`,
           startPos: buttonMenuMode ? triggerStart : triggerStart - 2,
           endPos: cursorPos,
@@ -564,18 +601,18 @@ export const PromptTextAreaWithVariables = ({
           let newCursorPos: number;
 
           if (buttonMenuMode) {
-            const before = value.substring(0, triggerStart);
-            const after = value.substring(triggerStart);
+            const before = localValue.substring(0, triggerStart);
+            const after = localValue.substring(triggerStart);
             newValue = `${before}{{${newHandle}}}${after}`;
             newCursorPos = before.length + newHandle.length + 4;
           } else {
-            const before = value.substring(0, triggerStart - 2);
-            const after = value.substring(cursorPos);
+            const before = localValue.substring(0, triggerStart - 2);
+            const after = localValue.substring(cursorPos);
             newValue = `${before}{{${newHandle}}}${after}`;
             newCursorPos = before.length + newHandle.length + 4;
           }
 
-          onChange(newValue);
+          setValueImmediate(newValue);
 
           setTimeout(() => {
             nativeTextarea?.focus();
@@ -592,19 +629,19 @@ export const PromptTextAreaWithVariables = ({
 
       if (buttonMenuMode) {
         // Button mode: Insert full {{field_name}} at cursor position
-        const before = value.substring(0, triggerStart);
-        const after = value.substring(triggerStart);
+        const before = localValue.substring(0, triggerStart);
+        const after = localValue.substring(triggerStart);
         newValue = `${before}{{${field.fieldName}}}${after}`;
         newCursorPos = before.length + field.fieldName.length + 4;
       } else {
         // Typing mode: Replace the {{ and any query with {{field_name}}
-        const before = value.substring(0, triggerStart - 2); // Before {{
-        const after = value.substring(cursorPos);
+        const before = localValue.substring(0, triggerStart - 2); // Before {{
+        const after = localValue.substring(cursorPos);
         newValue = `${before}{{${field.fieldName}}}${after}`;
         newCursorPos = before.length + field.fieldName.length + 4;
       }
 
-      onChange(newValue);
+      setValueImmediate(newValue);
 
       // Create variable if it doesn't exist
       if (!existingVariableIds.has(field.fieldName) && onCreateVariable) {
@@ -632,8 +669,8 @@ export const PromptTextAreaWithVariables = ({
       }, 0);
     },
     [
-      value,
-      onChange,
+      localValue,
+      setValueImmediate,
       triggerStart,
       buttonMenuMode,
       existingVariableIds,
@@ -651,7 +688,7 @@ export const PromptTextAreaWithVariables = ({
       if (triggerStart === null) return;
 
       const nativeTextarea = containerRef.current?.querySelector("textarea");
-      const cursorPos = nativeTextarea?.selectionStart ?? value.length;
+      const cursorPos = nativeTextarea?.selectionStart ?? localValue.length;
 
       // Normalize the name
       const normalizedName = name.replace(/ /g, "_").toLowerCase();
@@ -661,19 +698,19 @@ export const PromptTextAreaWithVariables = ({
 
       if (buttonMenuMode) {
         // Button mode: Insert full {{name}} at cursor position
-        const before = value.substring(0, triggerStart);
-        const after = value.substring(triggerStart);
+        const before = localValue.substring(0, triggerStart);
+        const after = localValue.substring(triggerStart);
         newValue = `${before}{{${normalizedName}}}${after}`;
         newCursorPos = before.length + normalizedName.length + 4;
       } else {
         // Typing mode: Replace the {{ and any query with {{name}}
-        const before = value.substring(0, triggerStart - 2);
-        const after = value.substring(cursorPos);
+        const before = localValue.substring(0, triggerStart - 2);
+        const after = localValue.substring(cursorPos);
         newValue = `${before}{{${normalizedName}}}${after}`;
         newCursorPos = before.length + normalizedName.length + 4;
       }
 
-      onChange(newValue);
+      setValueImmediate(newValue);
 
       // Create the variable
       if (onCreateVariable) {
@@ -692,8 +729,8 @@ export const PromptTextAreaWithVariables = ({
       }, 0);
     },
     [
-      value,
-      onChange,
+      localValue,
+      setValueImmediate,
       triggerStart,
       buttonMenuMode,
       onCreateVariable,
@@ -728,7 +765,7 @@ export const PromptTextAreaWithVariables = ({
       const cursorPos =
         lastUserCursorPosRef.current >= 0
           ? lastUserCursorPosRef.current
-          : value.length;
+          : localValue.length;
       setTriggerStart(cursorPos);
 
       setMenuQuery("");
@@ -736,7 +773,7 @@ export const PromptTextAreaWithVariables = ({
       setButtonMenuMode(true);
       setMenuOpen(true);
     },
-    [value, menuOpen, buttonMenuMode, closeMenu],
+    [localValue, menuOpen, buttonMenuMode, closeMenu],
   );
 
   // Render function for rich-textarea - highlights variables as styled spans
@@ -755,25 +792,18 @@ export const PromptTextAreaWithVariables = ({
           parts.push(text.substring(lastIndex, match.index));
         }
 
-        // Add the variable chip
+        // Add the variable with teal color and medium weight
         const varName = match[1] ?? "";
         const isInvalid = varName ? !existingVariableIds.has(varName) : true;
 
-        // Use box-shadow for visual border effect without changing dimensions
-        // This keeps cursor position accurate
         parts.push(
           <span
             key={`var-${match.index}`}
             style={{
-              backgroundColor: isInvalid
-                ? "var(--chakra-colors-red-50)"
-                : "var(--chakra-colors-blue-50)",
-              borderRadius: "4px",
-              boxShadow: `0 0 0 1px ${
-                isInvalid
-                  ? "var(--chakra-colors-red-200)"
-                  : "var(--chakra-colors-blue-200)"
-              }`,
+              color: isInvalid
+                ? "var(--chakra-colors-red-500)"
+                : "var(--chakra-colors-blue-500)", // teal-600
+              fontWeight: 600,
             }}
           >
             {match[0]}
@@ -857,19 +887,258 @@ export const PromptTextAreaWithVariables = ({
   // Determine if we should use autoHeight
   const useAutoHeight = userResizedHeight === null;
 
+  // Parse text into paragraphs - only when hovering to avoid performance issues
+  const parseParagraphs = useCallback(() => {
+    const lines: Array<{ text: string; startIndex: number; endIndex: number }> =
+      [];
+    let currentIndex = 0;
+
+    const parts = localValue.split(/(\n)/);
+    let lineText = "";
+    let lineStart = 0;
+
+    for (const part of parts) {
+      if (part === "\n") {
+        lines.push({
+          text: lineText,
+          startIndex: lineStart,
+          endIndex: currentIndex,
+        });
+        currentIndex += 1;
+        lineText = "";
+        lineStart = currentIndex;
+      } else {
+        lineText += part;
+        currentIndex += part.length;
+      }
+    }
+
+    if (lineText || lineStart < localValue.length) {
+      lines.push({
+        text: lineText,
+        startIndex: lineStart,
+        endIndex: currentIndex,
+      });
+    }
+
+    return lines;
+  }, [localValue]);
+
+  // Calculate paragraph positions only when hovering (lazy calculation)
+  // Uses fixed 28px line height matching the borderless mode styling
+  const BORDERLESS_LINE_HEIGHT = 28;
+  const calculateParagraphPositions = useCallback(() => {
+    if (!containerRef.current || !borderless) return [];
+
+    const paragraphs = parseParagraphs();
+    return paragraphs.map((para, idx) => ({
+      top: idx * BORDERLESS_LINE_HEIGHT,
+      height: BORDERLESS_LINE_HEIGHT,
+      text: para.text,
+    }));
+  }, [borderless, parseParagraphs]);
+
+  // Handle paragraph drag start
+  const handleParagraphDragStart = useCallback(
+    (e: DragEvent, paragraphIndex: number) => {
+      setDraggedParagraph(paragraphIndex);
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(paragraphIndex));
+    },
+    [],
+  );
+
+  // Handle paragraph drag over
+  const handleParagraphDragOver = useCallback(
+    (e: DragEvent, paragraphIndex: number) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      if (draggedParagraph !== null && draggedParagraph !== paragraphIndex) {
+        setDropTargetParagraph(paragraphIndex);
+      }
+    },
+    [draggedParagraph],
+  );
+
+  // Handle paragraph drop
+  const handleParagraphDrop = useCallback(
+    (e: DragEvent, targetIndex: number) => {
+      e.preventDefault();
+
+      if (draggedParagraph === null || draggedParagraph === targetIndex) {
+        setDraggedParagraph(null);
+        setDropTargetParagraph(null);
+        return;
+      }
+
+      // Parse paragraphs fresh for the drop
+      const currentParagraphs = parseParagraphs();
+      const newParagraphs = [...currentParagraphs];
+      const [removed] = newParagraphs.splice(draggedParagraph, 1);
+      if (removed) {
+        newParagraphs.splice(targetIndex, 0, removed);
+      }
+
+      const newText = newParagraphs.map((p) => p.text).join("\n");
+      onChange(newText);
+
+      setDraggedParagraph(null);
+      setDropTargetParagraph(null);
+    },
+    [draggedParagraph, parseParagraphs, onChange],
+  );
+
+  // Handle drag end (cleanup)
+  const handleParagraphDragEnd = useCallback(() => {
+    setDraggedParagraph(null);
+    setDropTargetParagraph(null);
+  }, []);
+
+  // Store paragraph positions in a ref to avoid re-renders during typing
+  const paragraphPositionsRef = useRef<Array<{ top: number; height: number }>>([]);
+
+  // Update positions only when needed (not on every render)
+  const updateParagraphPositions = useCallback(() => {
+    if (!borderless) {
+      paragraphPositionsRef.current = [];
+      return;
+    }
+    paragraphPositionsRef.current = calculateParagraphPositions();
+  }, [borderless, calculateParagraphPositions]);
+
+  // Handle mouse move to detect which line is being hovered
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      if (!borderless) return;
+
+      // Lazily update positions on mouse move
+      updateParagraphPositions();
+
+      const positions = paragraphPositionsRef.current;
+      if (positions.length <= 1) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+
+      // Find which line the mouse is over
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i];
+        if (pos && relativeY >= pos.top && relativeY < pos.top + pos.height) {
+          setHoveredParagraph(i);
+          return;
+        }
+      }
+      setHoveredParagraph(null);
+    },
+    [borderless, updateParagraphPositions],
+  );
+
+  // Calculate drop target index based on mouse Y position during drag
+  const handleDragOverContainer = useCallback(
+    (e: React.DragEvent) => {
+      if (draggedParagraph === null || !borderless) return;
+      e.preventDefault();
+
+      const positions = paragraphPositionsRef.current;
+      const container = containerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+
+      // Find the closest drop position
+      for (let i = 0; i < positions.length; i++) {
+        const pos = positions[i];
+        if (pos && relativeY < pos.top + pos.height / 2) {
+          setDropTargetParagraph(i);
+          return;
+        }
+      }
+      // If past all lines, drop at the end
+      setDropTargetParagraph(positions.length);
+    },
+    [draggedParagraph, borderless],
+  );
+
+  // Get positions for rendering (only when hovered and needed for UI)
+  const visibleParagraphPositions =
+    (isHovered || draggedParagraph !== null) && borderless
+      ? paragraphPositionsRef.current
+      : [];
+
   return (
     <>
       <Box
         ref={containerRef}
         position="relative"
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        minHeight="120px"
+        onMouseLeave={() => {
+          setIsHovered(false);
+          setHoveredParagraph(null);
+          setGripHoveredParagraph(null);
+        }}
+        onMouseMove={handleMouseMove}
+        onDragOver={handleDragOverContainer}
+        onDrop={(e) => {
+          if (dropTargetParagraph !== null) {
+            handleParagraphDrop(e as unknown as DragEvent, dropTargetParagraph);
+          }
+        }}
+        minHeight={borderless ? undefined : "120px"}
+        height={borderless ? "100%" : undefined}
         {...boxProps}
       >
+        {/* Line highlights - rendered before textarea so they appear behind text */}
+        {borderless && visibleParagraphPositions.length > 1 && (
+          <>
+            {/* Line highlight on hover (full width) - only when hovering grip */}
+            {gripHoveredParagraph !== null &&
+              draggedParagraph === null &&
+              visibleParagraphPositions[gripHoveredParagraph] && (
+                <Box
+                  position="absolute"
+                  top={`${
+                    visibleParagraphPositions[gripHoveredParagraph]?.top ?? 0
+                  }px`}
+                  left={0}
+                  right={0}
+                  height={`${
+                    visibleParagraphPositions[gripHoveredParagraph]?.height ?? 0
+                  }px`}
+                  background="gray.100"
+                  pointerEvents="none"
+                  borderRadius="md"
+                />
+              )}
+
+            {/* Dragged line highlight (reduced opacity) */}
+            {draggedParagraph !== null &&
+              visibleParagraphPositions[draggedParagraph] && (
+                <Box
+                  position="absolute"
+                  top={`${
+                    visibleParagraphPositions[draggedParagraph]?.top ?? 0
+                  }px`}
+                  left={0}
+                  right={0}
+                  height={`${
+                    visibleParagraphPositions[draggedParagraph]?.height ?? 0
+                  }px`}
+                  background="blue.50"
+                  opacity={0.5}
+                  pointerEvents="none"
+                  borderRadius="md"
+                />
+              )}
+          </>
+        )}
+
         <RichTextarea
           ref={textareaRef}
-          value={value}
+          value={localValue}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onSelectionChange={handleSelectionChange}
@@ -878,25 +1147,33 @@ export const PromptTextAreaWithVariables = ({
           autoHeight={useAutoHeight}
           style={{
             width: "100%",
-            minHeight,
-            maxHeight,
-            height: userResizedHeight ? `${userResizedHeight}px` : undefined,
+            minHeight: borderless ? "100%" : minHeight,
+            maxHeight: borderless ? undefined : maxHeight,
+            height: borderless ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
             fontFamily:
               'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
-            fontSize: "13px",
-            lineHeight: "1.5",
-            padding: "8px 10px",
-            border: `1px solid ${
-              hasError
-                ? "var(--chakra-colors-red-500)"
-                : "var(--chakra-colors-gray-200)"
-            }`,
-            borderRadius: "12px",
+            // Borderless mode: 14px font with 28px line height for clean paragraph alignment
+            fontSize: borderless ? "14px" : "13px",
+            lineHeight: borderless ? "28px" : "1.5",
+            // In borderless mode, add left padding for grip handles
+            padding: borderless ? "0 0 0 24px" : "8px 10px",
+            border: borderless
+              ? "none"
+              : `1px solid ${
+                  hasError
+                    ? "var(--chakra-colors-red-500)"
+                    : "var(--chakra-colors-gray-200)"
+                }`,
+            borderRadius: borderless ? "0" : "12px",
             outline: "none",
-            resize: "vertical",
+            resize: borderless ? "none" : "vertical",
             overflow: "auto",
+            // Transparent background in borderless mode so line highlights show through
+            background: borderless ? "transparent" : undefined,
           }}
           onFocus={(e) => {
+            // Only apply focus styles in bordered mode
+            if (borderless) return;
             e.currentTarget.style.borderColor = hasError
               ? "var(--chakra-colors-red-500)"
               : "var(--chakra-colors-blue-500)";
@@ -904,6 +1181,8 @@ export const PromptTextAreaWithVariables = ({
             e.currentTarget.style.padding = "7px 9px";
           }}
           onBlur={(e) => {
+            // Only apply blur styles in bordered mode
+            if (borderless) return;
             e.currentTarget.style.borderColor = hasError
               ? "var(--chakra-colors-red-500)"
               : "var(--chakra-colors-gray-200)";
@@ -913,6 +1192,84 @@ export const PromptTextAreaWithVariables = ({
         >
           {renderText}
         </RichTextarea>
+
+        {/* Paragraph drag handles and visual feedback overlay - only in borderless mode */}
+        {visibleParagraphPositions.length > 1 && (
+          <>
+            {/* Grip handles */}
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              width="24px"
+              height="100%"
+              pointerEvents="none"
+            >
+              {visibleParagraphPositions.map((pos, idx) => (
+                <Box
+                  key={`grip-${idx}`}
+                  position="absolute"
+                  top={`${pos.top}px`}
+                  left={0}
+                  height={`${pos.height}px`}
+                  width="24px"
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  pointerEvents="auto"
+                  cursor={draggedParagraph === idx ? "grabbing" : "grab"}
+                  opacity={
+                    hoveredParagraph === idx || draggedParagraph === idx ? 1 : 0
+                  }
+                  transition="opacity 0.1s"
+                  draggable
+                  onMouseEnter={() => setGripHoveredParagraph(idx)}
+                  onMouseLeave={() => setGripHoveredParagraph(null)}
+                  onDragStart={(e) =>
+                    handleParagraphDragStart(e as unknown as DragEvent, idx)
+                  }
+                  onDragEnd={handleParagraphDragEnd}
+                  borderRadius="md"
+                  _hover={{
+                    background: "gray.100",
+                  }}
+                >
+                  <Box color="gray.400">
+                    <GripVertical size={14} />
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+
+            {/* Drop indicator line */}
+            {draggedParagraph !== null &&
+              dropTargetParagraph !== null &&
+              dropTargetParagraph !== draggedParagraph && (
+                <Box
+                  position="absolute"
+                  top={`${
+                    dropTargetParagraph < visibleParagraphPositions.length
+                      ? (visibleParagraphPositions[dropTargetParagraph]?.top ??
+                          0) - 1
+                      : (visibleParagraphPositions[
+                          visibleParagraphPositions.length - 1
+                        ]?.top ?? 0) +
+                        (visibleParagraphPositions[
+                          visibleParagraphPositions.length - 1
+                        ]?.height ?? 0) -
+                        1
+                  }px`}
+                  left={0}
+                  right={0}
+                  height="2px"
+                  background="blue.500"
+                  pointerEvents="none"
+                  zIndex={10}
+                  borderRadius="full"
+                />
+              )}
+          </>
+        )}
 
         {/* Add variable button */}
         {showAddContextButton && isHovered && !disabled && (

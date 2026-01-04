@@ -231,14 +231,24 @@ function PromptBrowserWindowInner(props: {
               borderRight="1px solid"
               borderColor="gray.100"
               overflow="hidden"
+              boxShadow="md"
             >
               <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
                 <Box width="full" paddingX={3}>
                   <PromptBrowserHeader />
                 </Box>
               </Box>
-              <Box flex={1} overflow="auto" paddingX={3} paddingBottom={3}>
-                <PromptMessagesEditor />
+              <Box
+                flex={1}
+                overflow="auto"
+                paddingX={1}
+                paddingBottom={3}
+                display="flex"
+                flexDirection="column"
+              >
+                <Box flex={1} minHeight={0} height="100%">
+                  <PromptMessagesEditor />
+                </Box>
               </Box>
             </Box>
 

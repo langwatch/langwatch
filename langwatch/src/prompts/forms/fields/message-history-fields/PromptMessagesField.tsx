@@ -1,5 +1,6 @@
 import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   Controller,
   type UseFieldArrayReturn,
@@ -67,6 +68,8 @@ type MessageRowProps = {
   ) => string | void;
   /** Whether to show role label and remove button */
   showControls?: boolean;
+  /** Whether to render textarea in borderless mode (for horizontal layout) */
+  borderless?: boolean;
 };
 
 /**
@@ -86,16 +89,65 @@ function MessageRow({
   onSetVariableMapping,
   onAddEdge,
   showControls = true,
+  borderless = false,
 }: MessageRowProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
 
+  // Borderless mode: render simplified structure with flex support
+  if (borderless) {
+    return (
+      <Box width="full" height="100%" display="flex" flexDirection="column">
+        {showControls && (
+          <HStack
+            width="full"
+            align="center"
+            fontWeight="normal"
+            textTransform="none"
+            flexShrink={0}
+          >
+            {role !== "system" && (
+              <MessageRoleLabel role={role} marginLeft={-1} />
+            )}
+            <Spacer />
+            {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
+          </HStack>
+        )}
+        <Box flex={1} minHeight={0}>
+          <Controller
+            key={`message-row-${idx}-content`}
+            control={form.control}
+            name={`version.configData.messages.${idx}.content`}
+            render={({ field: controllerField }) => (
+              <PromptTextAreaWithVariables
+                variables={availableFields}
+                otherNodesFields={otherNodesFields}
+                availableSources={availableSources}
+                value={controllerField.value ?? ""}
+                onChange={controllerField.onChange}
+                hasError={!!getMessageError(idx, "content")}
+                onCreateVariable={onCreateVariable}
+                onSetVariableMapping={onSetVariableMapping}
+                onAddEdge={(id, handle, content) => {
+                  return onAddEdge?.(id, handle, content, idx);
+                }}
+                showAddContextButton
+                borderless={borderless}
+              />
+            )}
+          />
+        </Box>
+      </Box>
+    );
+  }
+
+  // Standard mode: use VerticalFormControl
   return (
     <VerticalFormControl
       width="full"
       label={
         showControls ? (
-          <HStack width="full" align="center">
+          <HStack width="full" align="center" fontWeight="normal" textTransform="none">
             {role !== "system" && (
               <MessageRoleLabel role={role} marginLeft={-1} />
             )}
@@ -127,6 +179,7 @@ function MessageRow({
               return onAddEdge?.(id, handle, content, idx);
             }}
             showAddContextButton
+            borderless={borderless}
           />
         )}
       />
@@ -288,6 +341,10 @@ export function PromptMessagesField({
 
   const hasMessagesError = !!errors.version?.configData?.messages;
 
+  // Determine if we should use borderless mode (horizontal layout)
+  const layoutMode = useLayoutMode();
+  const borderless = layoutMode === "horizontal";
+
   // Get the system message field
   const systemField =
     systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
@@ -298,17 +355,29 @@ export function PromptMessagesField({
   );
 
   return (
-    <Box width="full" padding={0}>
-      <HStack width="full">
+    <Box
+      width="full"
+      padding={0}
+      height={borderless ? "100%" : undefined}
+      display={borderless ? "flex" : undefined}
+      flexDirection={borderless ? "column" : undefined}
+    >
+      <HStack width="full" flexShrink={0}>
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
       </HStack>
 
-      <VStack gap={2} align="stretch" width="full">
+      <VStack
+        gap={2}
+        align="stretch"
+        width="full"
+        flex={borderless ? 1 : undefined}
+        height={borderless ? "100%" : undefined}
+      >
         {editingMode === "prompt" ? (
           // Prompt mode: Only show system message without controls
           systemField ? (
-            <Box>
+            <Box flex={borderless ? 1 : undefined} height={borderless ? "100%" : undefined}>
               <MessageRow
                 key="system-message-row"
                 field={systemField}
@@ -324,6 +393,7 @@ export function PromptMessagesField({
                 onSetVariableMapping={onSetVariableMapping}
                 onAddEdge={onAddEdge}
                 showControls={false}
+                borderless={borderless}
               />
             </Box>
           ) : null
@@ -331,7 +401,12 @@ export function PromptMessagesField({
           // Messages mode: Show all messages with controls
           <>
             {systemField && (
-              <Box marginTop={2}>
+              <Box
+                marginTop={2}
+                paddingBottom={borderless ? 3 : 0}
+                borderBottomWidth={borderless ? "1px" : 0}
+                borderColor="gray.200"
+              >
                 <HStack width="full">
                   <MessageRoleLabel role="system" />
                   <Spacer />
@@ -354,30 +429,40 @@ export function PromptMessagesField({
                   onSetVariableMapping={onSetVariableMapping}
                   onAddEdge={onAddEdge}
                   showControls={false}
+                  borderless={borderless}
                 />
               </Box>
             )}
-            {nonSystemMessages.map((field) => {
+            {nonSystemMessages.map((field, mapIdx) => {
               const idx = messageFields.fields.findIndex(
                 (f) => f.id === field.id,
               );
+              const isLast = mapIdx === nonSystemMessages.length - 1;
               return (
-                <MessageRow
-                  key={`message-row-${idx}`}
-                  field={field}
-                  idx={idx}
-                  availableFields={availableFields}
-                  otherNodesFields={otherNodesFields}
-                  availableSources={availableSources}
-                  messageErrors={messageErrors}
-                  hasMessagesError={hasMessagesError}
-                  getMessageError={getMessageError}
-                  onRemove={() => messageFields.remove(idx)}
-                  onCreateVariable={handleCreateVariable}
-                  onSetVariableMapping={onSetVariableMapping}
-                  onAddEdge={onAddEdge}
-                  showControls={true}
-                />
+                <Box
+                  key={`message-box-${idx}`}
+                  paddingBottom={borderless && !isLast ? 3 : 0}
+                  borderBottomWidth={borderless && !isLast ? "1px" : 0}
+                  borderColor="gray.200"
+                >
+                  <MessageRow
+                    key={`message-row-${idx}`}
+                    field={field}
+                    idx={idx}
+                    availableFields={availableFields}
+                    otherNodesFields={otherNodesFields}
+                    availableSources={availableSources}
+                    messageErrors={messageErrors}
+                    hasMessagesError={hasMessagesError}
+                    getMessageError={getMessageError}
+                    onRemove={() => messageFields.remove(idx)}
+                    onCreateVariable={handleCreateVariable}
+                    onSetVariableMapping={onSetVariableMapping}
+                    onAddEdge={onAddEdge}
+                    showControls={true}
+                    borderless={borderless}
+                  />
+                </Box>
               );
             })}
           </>
