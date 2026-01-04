@@ -2,7 +2,6 @@ import {
   Box,
   HStack,
   Input,
-  Portal,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -18,6 +17,7 @@ import {
   VariableTypeBadge,
 } from "~/prompts/components/ui/VariableTypeIcon";
 import type { AvailableSource, SourceType, FieldType } from "./VariableMappingInput";
+import { Popover } from "../ui/popover";
 
 // ============================================================================
 // Types
@@ -81,10 +81,9 @@ const SourceTypeIconSmall = ({ type }: { type: SourceType }) => {
 // Main Component
 // ============================================================================
 
-// Menu dimensions (approximate)
+// Menu dimensions
 const MENU_WIDTH = 300;
 const MENU_MAX_HEIGHT = 350;
-const VIEWPORT_PADDING = 8;
 
 export const VariableInsertMenu = ({
   isOpen,
@@ -108,39 +107,6 @@ export const VariableInsertMenu = ({
   const [localKeyboardNav, setLocalKeyboardNav] = useState(false);
   const isKeyboardNav = isKeyboardNavProp ?? localKeyboardNav;
   const setIsKeyboardNav = onKeyboardNavChange ?? setLocalKeyboardNav;
-
-  // Adjusted position to keep menu within viewport
-  const [adjustedPosition, setAdjustedPosition] = useState(position);
-
-  // Adjust position to keep menu within viewport bounds
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    let adjustedLeft = position.left;
-    let adjustedTop = position.top;
-
-    // Adjust horizontal position if menu would go off right edge
-    if (position.left + MENU_WIDTH > viewportWidth - VIEWPORT_PADDING) {
-      adjustedLeft = Math.max(
-        VIEWPORT_PADDING,
-        viewportWidth - MENU_WIDTH - VIEWPORT_PADDING
-      );
-    }
-
-    // Adjust vertical position if menu would go off bottom edge
-    if (position.top + MENU_MAX_HEIGHT > viewportHeight - VIEWPORT_PADDING) {
-      // Try positioning above the cursor instead
-      adjustedTop = Math.max(
-        VIEWPORT_PADDING,
-        position.top - MENU_MAX_HEIGHT - 20 // 20px offset for cursor
-      );
-    }
-
-    setAdjustedPosition({ top: adjustedTop, left: adjustedLeft });
-  }, [isOpen, position]);
 
   // Handle click outside
   useEffect(() => {
@@ -269,18 +235,42 @@ export const VariableInsertMenu = ({
   // Attach keyboard handlers to parent (via ref or expose)
   // Actually, the parent will handle keyboard events and call these
 
-  if (!isOpen) return null;
-
   // Track current field index for highlighting
   let currentFieldIndex = 0;
 
   return (
-    <Portal>
-      <Box
+    <Popover.Root
+      open={isOpen}
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
+      positioning={{
+        // Use a virtual anchor at the given position
+        getAnchorRect: () => ({
+          x: position.left,
+          y: position.top - 32,
+          width: 0,
+          height: 32,
+        }),
+        placement: "bottom-start",
+        flip: true,
+        slide: true,
+        // Different offset depending on placement:
+        // - When below cursor (normal): small offset
+        // - When above cursor (flipped): larger offset to not cover text
+        // offset: (({ placement }: { placement: string }) => ({
+        //   mainAxis: placement.startsWith("top") ? 36 : 4,
+        //   crossAxis: 0,
+        // })) as { mainAxis?: number; crossAxis?: number },
+      }}
+      // Only allow auto-focus when in editable mode (has search input)
+      // When onQueryChange is NOT provided (readonly mode), don't steal focus
+      autoFocus={!!onQueryChange}
+      lazyMount
+      unmountOnExit
+    >
+      <Popover.Content
         ref={menuRef}
-        position="fixed"
-        top={`${adjustedPosition.top}px`}
-        left={`${adjustedPosition.left}px`}
         width={`${MENU_WIDTH}px`}
         maxHeight={`${MENU_MAX_HEIGHT}px`}
         background="white"
@@ -288,8 +278,12 @@ export const VariableInsertMenu = ({
         boxShadow="lg"
         border="1px solid"
         borderColor="gray.200"
-        zIndex={2000}
         overflow="hidden"
+        padding={0}
+        // Prevent focus on container in readonly mode
+        tabIndex={onQueryChange ? undefined : -1}
+        // Prevent popover from closing when clicking inside
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Search input (editable) or Query display (readonly) */}
         {onQueryChange ? (
@@ -434,8 +428,8 @@ export const VariableInsertMenu = ({
             </VStack>
           )}
         </Box>
-      </Box>
-    </Portal>
+      </Popover.Content>
+    </Popover.Root>
   );
 };
 
