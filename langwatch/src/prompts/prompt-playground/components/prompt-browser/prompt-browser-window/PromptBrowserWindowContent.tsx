@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, HStack } from "@chakra-ui/react";
 import cloneDeep from "lodash.clonedeep";
 import debounce from "lodash.debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -20,6 +20,8 @@ const MIN_CHAT_AREA = 200;
 
 export { useTabId } from "../ui/TabContext";
 
+export type LayoutMode = "vertical" | "horizontal";
+
 /**
  * Window content for a prompt tab.
  * Single Responsibility: Initialize form for the active tab and render header, messages, and tabbed sections.
@@ -27,9 +29,13 @@ export { useTabId } from "../ui/TabContext";
  */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
-  const tab = useDraggableTabsBrowserStore(({ windows }) =>
-    windows.flatMap((w) => w.tabs).find((t) => t.id === tabId),
-  );
+  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(({ windows }) => {
+    const allTabs = windows.flatMap((w) => w.tabs);
+    return {
+      tab: allTabs.find((t) => t.id === tabId),
+      isSingleWindow: windows.length === 1,
+    };
+  });
   const currentValues = tab?.data.form.currentValues;
   const initialConfigValues = useMemo(
     () => cloneDeep(currentValues),
@@ -38,10 +44,14 @@ export function PromptBrowserWindowContent() {
 
   if (!initialConfigValues) return null;
 
+  // Use horizontal layout when there's only one window
+  const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
+
   return (
     <PromptBrowserWindowInner
       initialConfigValues={initialConfigValues}
       tabId={tabId}
+      layoutMode={layoutMode}
     />
   );
 }
@@ -52,10 +62,12 @@ export function PromptBrowserWindowContent() {
  * @param props - Component props
  * @param props.initialConfigValues - Initial form values for the prompt configuration
  * @param props.tabId - ID of the tab to sync form data with
+ * @param props.layoutMode - Layout mode: "vertical" (stacked) or "horizontal" (side-by-side)
  */
 function PromptBrowserWindowInner(props: {
   initialConfigValues: DeepPartial<PromptConfigFormValues>;
   tabId: string;
+  layoutMode: LayoutMode;
 }) {
   const form = usePromptConfigForm(props);
   const { updateTabData } = useDraggableTabsBrowserStore(
@@ -182,6 +194,55 @@ function PromptBrowserWindowInner(props: {
       ? userMaxHeight
       : getMaxAllowedHeight();
 
+  // Horizontal layout: side-by-side (single window mode)
+  if (props.layoutMode === "horizontal") {
+    return (
+      <FormProvider {...form.methods}>
+        <HStack
+          ref={containerRef}
+          height="full"
+          width="full"
+          overflow="hidden"
+          gap={0}
+          alignItems="stretch"
+        >
+          {/* Left panel: Header + Prompt */}
+          <Box
+            display="flex"
+            flexDirection="column"
+            width="50%"
+            minWidth="300px"
+            maxWidth="600px"
+            borderRight="1px solid"
+            borderColor="gray.100"
+            overflow="hidden"
+          >
+            <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
+              <Box width="full" paddingX={3}>
+                <PromptBrowserHeader />
+              </Box>
+            </Box>
+            <Box flex={1} overflow="auto" paddingX={3} paddingBottom={3}>
+              <PromptMessagesEditor />
+            </Box>
+          </Box>
+
+          {/* Right panel: Tabbed section (conversation/variables) */}
+          <Box flex={1} display="flex" flexDirection="column" overflow="hidden" paddingTop={2}>
+            <PromptTabbedSection
+              layoutMode="horizontal"
+              isPromptExpanded={true}
+              onPositionChange={() => {}}
+              onDragEnd={() => {}}
+              onToggle={() => {}}
+            />
+          </Box>
+        </HStack>
+      </FormProvider>
+    );
+  }
+
+  // Vertical layout: stacked (multi-window mode)
   return (
     <FormProvider {...form.methods}>
       <Box
@@ -193,7 +254,7 @@ function PromptBrowserWindowInner(props: {
         overflow="hidden"
       >
         {/* Header - always visible, with bottom padding for spacing from tabs when collapsed */}
-        <Box ref={headerRef} flexShrink={0} paddingTop={0} paddingBottom={3}>
+        <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
           <Box width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
             <PromptBrowserHeader />
           </Box>
@@ -234,6 +295,7 @@ function PromptBrowserWindowInner(props: {
 
         {/* Tabbed section with divider */}
         <PromptTabbedSection
+          layoutMode="vertical"
           isPromptExpanded={isPromptExpanded}
           onPositionChange={handlePositionChange}
           onDragEnd={handleDragEnd}

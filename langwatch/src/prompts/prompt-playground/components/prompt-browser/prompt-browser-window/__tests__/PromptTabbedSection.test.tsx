@@ -5,6 +5,7 @@
  * - Locked input variable handling
  * - Demonstrations tab visibility
  * - Variable values persistence
+ * - Layout mode switching (horizontal/vertical)
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -16,6 +17,9 @@ import {
   getStoreForTesting,
   type TabData,
 } from "../../../../prompt-playground-store/DraggableTabsBrowserStore";
+import { PromptTabbedSection } from "../PromptTabbedSection";
+import { FormProvider, useForm } from "react-hook-form";
+import type { PromptConfigFormValues } from "~/prompts/types";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -369,6 +373,140 @@ describe("PromptTabbedSection Store Integration", () => {
       expect(result).toHaveLength(2);
       expect(result[0]).toHaveProperty("input", "hello");
       expect(result[0]).toHaveProperty("output", "hi");
+    });
+  });
+});
+
+// Mock TabIdContext
+vi.mock("../../ui/TabContext", () => ({
+  useTabId: () => "test-tab-id",
+}));
+
+// Mock CopilotKit
+vi.mock("@copilotkit/react-core", () => ({
+  CopilotKit: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useCopilotChat: () => ({
+    visibleMessages: [],
+    appendMessage: vi.fn(),
+    setMessages: vi.fn(),
+    isLoading: false,
+  }),
+  useCopilotContext: () => ({
+    chatComponentsCache: { current: {} },
+  }),
+}));
+
+vi.mock("@copilotkit/react-ui", () => ({
+  CopilotChat: () => <div data-testid="copilot-chat">CopilotChat</div>,
+}));
+
+/**
+ * Wrapper component that provides FormContext
+ */
+function FormWrapper({ children }: { children: React.ReactNode }) {
+  const methods = useForm<PromptConfigFormValues>({
+    defaultValues: {
+      version: {
+        configData: {
+          inputs: [],
+          demonstrations: { inline: { records: {} } },
+        },
+      },
+    },
+  });
+
+  return <FormProvider {...methods}>{children}</FormProvider>;
+}
+
+const renderPromptTabbedSection = (
+  props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {}
+) => {
+  const defaultProps = {
+    layoutMode: "vertical" as const,
+    isPromptExpanded: true,
+    onPositionChange: vi.fn(),
+    onDragEnd: vi.fn(),
+    onToggle: vi.fn(),
+    ...props,
+  };
+
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <FormWrapper>
+        <PromptTabbedSection {...defaultProps} />
+      </FormWrapper>
+    </ChakraProvider>
+  );
+};
+
+describe("PromptTabbedSection Layout Modes", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    // Initialize store with a tab
+    const store = getStoreForTesting(TEST_PROJECT_ID);
+    store.getState().addTab({ data: createTabData() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+  });
+
+  describe("vertical layout mode", () => {
+    it("shows resizable divider in vertical mode", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
+    });
+
+    it("does not show border-bottom on tabs in vertical mode", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      // Tabs should not have explicit border-bottom (divider handles it)
+      const tabsList = screen.getByRole("tablist");
+      expect(tabsList).not.toHaveStyle({ borderBottom: "1px solid" });
+    });
+  });
+
+  describe("horizontal layout mode", () => {
+    it("hides resizable divider in horizontal mode", () => {
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+
+      expect(screen.queryByTestId("resizable-divider")).not.toBeInTheDocument();
+    });
+
+    it("shows border-bottom on tabs in horizontal mode", () => {
+      const { container } = renderPromptTabbedSection({ layoutMode: "horizontal" });
+
+      // Tabs should have border-bottom in horizontal mode
+      const tabsList = container.querySelector('[role="tablist"]');
+      expect(tabsList).toBeInTheDocument();
+      // Check the computed style or CSS class
+      expect(tabsList).toHaveStyle({ borderBottomStyle: "solid" });
+    });
+  });
+
+  describe("common features", () => {
+    it("shows Conversation tab in both modes", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+
+      cleanup();
+
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+    });
+
+    it("shows Reset chat button in both modes", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+
+      cleanup();
+
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
     });
   });
 });

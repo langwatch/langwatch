@@ -16,6 +16,7 @@ import { useDraggableTabsBrowserStore } from "../../../prompt-playground-store/D
 import { useTabId } from "../ui/TabContext";
 import { DemonstrationsTabContent } from "./DemonstrationsTabContent";
 import { ResizableDivider } from "./ResizableDivider";
+import type { LayoutMode } from "./PromptBrowserWindowContent";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);
@@ -32,6 +33,8 @@ enum PromptTab {
 }
 
 export type PromptTabbedSectionProps = {
+  /** Layout mode: "vertical" shows resizable divider, "horizontal" shows border-bottom */
+  layoutMode: LayoutMode;
   /** Whether the prompt area above is expanded */
   isPromptExpanded: boolean;
   /** Callback when position changes (absolute Y) */
@@ -46,6 +49,7 @@ export type PromptTabbedSectionProps = {
  * Tabbed section of the prompt browser window that contains the conversation, variables, and demonstrations tabs.
  */
 export function PromptTabbedSection({
+  layoutMode,
   isPromptExpanded,
   onPositionChange,
   onDragEnd,
@@ -151,8 +155,16 @@ export function PromptTabbedSection({
         alignItems="center"
         flexShrink={0}
         minHeight="32px"
+        borderBottom={layoutMode === "horizontal" ? "1px solid" : undefined}
+        borderColor={layoutMode === "horizontal" ? "gray.100" : undefined}
+        paddingBottom={2}
       >
-        <HStack width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
+        <HStack
+          width="full"
+          maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
+          margin="0 auto"
+          paddingX={3}
+        >
           <Tabs.Trigger value={PromptTab.Conversation}>
             Conversation
           </Tabs.Trigger>
@@ -194,13 +206,15 @@ export function PromptTabbedSection({
         </HStack>
       </Tabs.List>
 
-      {/* Resizable divider - below tab buttons */}
-      <ResizableDivider
-        isExpanded={isPromptExpanded}
-        onPositionChange={onPositionChange}
-        onDragEnd={onDragEnd}
-        onToggle={onToggle}
-      />
+      {/* Resizable divider - only in vertical mode */}
+      {layoutMode === "vertical" && (
+        <ResizableDivider
+          isExpanded={isPromptExpanded}
+          onPositionChange={onPositionChange}
+          onDragEnd={onDragEnd}
+          onToggle={onToggle}
+        />
+      )}
 
       <HStack flex={1} width="full" margin="0 auto" overflow="hidden">
         <Tabs.Content
@@ -230,7 +244,7 @@ export function PromptTabbedSection({
           <Box
             height="full"
             width="full"
-            maxWidth="768px"
+            maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
             margin="0 auto"
             padding={3}
           >
@@ -256,7 +270,12 @@ export function PromptTabbedSection({
             width="full"
             height="full"
           >
-            <Box height="full" width="full" maxWidth="768px" margin="0 auto">
+            <Box
+              height="full"
+              width="full"
+              maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
+              margin="0 auto"
+            >
               <DemonstrationsTabContent />
             </Box>
           </Tabs.Content>
