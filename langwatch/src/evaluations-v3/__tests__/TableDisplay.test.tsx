@@ -16,6 +16,17 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
+  }),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 
@@ -54,6 +65,11 @@ vi.mock("~/utils/api", () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
+        },
+      },
+      prompts: {
+        getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
         },
       },
     }),
@@ -396,5 +412,107 @@ describe("Column resize handles", () => {
 
     const resizers = document.querySelectorAll(".resizer");
     expect(resizers.length).toBeGreaterThan(0);
+  });
+});
+
+describe("TargetHeader stability", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("does not remount TargetHeader when unrelated state changes (cell selection)", async () => {
+    const store = useEvaluationsV3Store.getState();
+
+    // Add a target
+    store.addTarget({
+      id: "test-target",
+      type: "prompt",
+      name: "Test Prompt",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    // Track mount/unmount via console logs from TargetHeader's debug useEffect
+    const mountCount = { current: 0 };
+    const unmountCount = { current: 0 };
+
+    const originalLog = console.log;
+    console.log = (...args) => {
+      if (args[0] === "mounted target header") mountCount.current++;
+      if (args[0] === "unmounted target header") unmountCount.current++;
+      originalLog(...args);
+    };
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    // Wait for initial render
+    await waitFor(() => {
+      expect(screen.getByText("Test Prompt")).toBeInTheDocument();
+    });
+
+    const initialMountCount = mountCount.current;
+    const initialUnmountCount = unmountCount.current;
+
+    // Trigger unrelated state change (select a cell)
+    store.setSelectedCell({ row: 0, columnId: "input" });
+
+    // Wait a bit for any potential re-renders
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // TargetHeader should NOT have been remounted
+    expect(unmountCount.current).toBe(initialUnmountCount);
+    expect(mountCount.current).toBe(initialMountCount);
+
+    console.log = originalLog;
+  });
+
+  it("does not remount TargetHeader when row selection changes", async () => {
+    const store = useEvaluationsV3Store.getState();
+
+    // Add a target
+    store.addTarget({
+      id: "test-target-2",
+      type: "prompt",
+      name: "Test Prompt 2",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    const mountCount = { current: 0 };
+    const unmountCount = { current: 0 };
+
+    const originalLog = console.log;
+    console.log = (...args) => {
+      if (args[0] === "mounted target header") mountCount.current++;
+      if (args[0] === "unmounted target header") unmountCount.current++;
+      originalLog(...args);
+    };
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Test Prompt 2")).toBeInTheDocument();
+    });
+
+    const initialMountCount = mountCount.current;
+    const initialUnmountCount = unmountCount.current;
+
+    // Toggle row selection
+    store.toggleRowSelection(0);
+
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // TargetHeader should NOT have been remounted
+    expect(unmountCount.current).toBe(initialUnmountCount);
+    expect(mountCount.current).toBe(initialMountCount);
+
+    console.log = originalLog;
   });
 });

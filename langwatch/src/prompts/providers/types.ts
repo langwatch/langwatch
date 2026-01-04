@@ -26,6 +26,8 @@ export type ChangeHandleParams = {
 export type SaveVersionParams = {
   id: RouterInputs["prompts"]["update"]["id"];
   data: Omit<RouterInputs["prompts"]["update"]["data"], "commitMessage">;
+  /** Next version number to display in dialog (e.g., "Update to v5") */
+  nextVersion?: number;
   onSuccess?: (prompt: VersionedPrompt) => void;
   onError?: (error: Error) => void;
 };

@@ -1,12 +1,41 @@
+import { z } from "zod";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { Field } from "~/optimization_studio/types/dsl";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
-// Dataset Types
+// Zod Schemas (source of truth - types are inferred from these)
 // ============================================================================
 
+/**
+ * Zod schema for field mapping validation.
+ * Discriminated union: source mapping OR value mapping.
+ */
+export const fieldMappingSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("source"),
+    source: z.enum(["dataset", "target"]),
+    sourceId: z.string(),
+    sourceField: z.string(),
+  }),
+  z.object({
+    type: z.literal("value"),
+    value: z.string(),
+  }),
+]);
+export type FieldMapping = z.infer<typeof fieldMappingSchema>;
+
+/**
+ * Zod schema for dataset column validation.
+ * Runtime validation is permissive (string), TypeScript type is strict.
+ */
+export const datasetColumnSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.string(), // Allow any string at runtime since DatasetColumnType has many values
+});
+// TypeScript type uses the strict DatasetColumnType
 export type DatasetColumn = {
   id: string;
   name: string;
@@ -14,143 +43,173 @@ export type DatasetColumn = {
 };
 
 /**
- * Inline dataset data - stored directly in state.
- * Used for the default "Test Data" or newly created datasets.
+ * Zod schema for inline dataset validation.
  */
+export const inlineDatasetSchema = z.object({
+  columns: z.array(datasetColumnSchema),
+  records: z.record(z.string(), z.array(z.string())),
+});
 export type InlineDataset = {
   columns: DatasetColumn[];
-  records: Record<string, string[]>; // columnId -> array of values per row
+  records: Record<string, string[]>;
 };
 
 /**
- * A single saved record from the database.
- * The `id` is the record ID from the DB, other fields are column values.
+ * Zod schema for saved record validation.
  */
-export type SavedRecord = {
-  id: string;
-} & Record<string, unknown>;
+export const savedRecordSchema = z
+  .object({
+    id: z.string(),
+  })
+  .passthrough();
+export type SavedRecord = { id: string } & Record<string, unknown>;
 
 /**
- * A dataset reference in the workbench.
- * Can be either inline (data stored here) or saved (reference to DB).
+ * Zod schema for dataset reference validation.
  */
+export const datasetReferenceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  type: z.enum(["inline", "saved"]),
+  inline: inlineDatasetSchema.optional(),
+  datasetId: z.string().optional(),
+  columns: z.array(datasetColumnSchema),
+  savedRecords: z.array(savedRecordSchema).optional(),
+});
 export type DatasetReference = {
-  id: string; // Unique ID in workbench (e.g., "test-data" or ksuid)
-  name: string; // Display name (tab label)
+  id: string;
+  name: string;
   type: "inline" | "saved";
-  // For inline datasets - contains the actual data
   inline?: InlineDataset;
-  // For saved datasets - reference to DB dataset ID
   datasetId?: string;
-  // Cached columns for mapping UI (always present)
   columns: DatasetColumn[];
-  // For saved datasets - cached records from DB (loaded when added to workbench)
   savedRecords?: SavedRecord[];
 };
 
-// ============================================================================
-// Mapping Types (defined first as other types use them)
-// ============================================================================
+/**
+ * Zod schema for field validation (from optimization studio).
+ */
+export const fieldSchema = z.object({
+  identifier: z.string(),
+  type: z.string(),
+  value: z.unknown().optional(),
+});
 
 /**
- * Maps a target field to a source field.
- * Source can be "dataset" (with datasetId) or "runner" (with runnerId).
+ * Zod schema for local prompt config validation.
  */
-export type FieldMapping = {
-  source: "dataset" | "runner";
-  sourceId: string; // dataset ID or runner ID
-  sourceField: string;
-};
-
-// ============================================================================
-// Evaluator Types (global/shared, will be stored in DB in future)
-// ============================================================================
+export const localPromptConfigSchema = z.object({
+  llm: z.object({
+    model: z.string(),
+    temperature: z.number().optional(),
+    maxTokens: z.number().optional(),
+    litellmParams: z.record(z.string(), z.string()).optional(),
+  }),
+  messages: z.array(
+    z.object({
+      role: z.enum(["user", "assistant", "system"]),
+      content: z.string(),
+    })
+  ),
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum([
+        "str",
+        "float",
+        "bool",
+        "image",
+        "list[str]",
+        "list[float]",
+        "list[int]",
+        "list[bool]",
+        "dict",
+        "list",
+      ]),
+    })
+  ),
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.enum(["str", "float", "bool", "json_schema"]),
+      json_schema: z.unknown().optional(),
+    })
+  ),
+});
+export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
 /**
- * Global evaluator configuration.
- * Evaluators are shared across runners - runners reference them by ID.
- * Per-runner mappings are stored inside the evaluator for easy access in the global panel.
- * When generating DSL, evaluators are duplicated per-runner with {runnerId}.{evaluatorId} naming.
+ * Zod schema for evaluator config validation.
+ *
+ * Mappings are stored per-dataset AND per-target:
+ * mappings[datasetId][targetId][inputFieldName] = FieldMapping
+ *
+ * This allows different mappings for:
+ * - Each dataset (same column might have different names)
+ * - Each target (target A outputs "output", target B outputs "result")
  */
-export type EvaluatorConfig = {
-  id: string;
+export const evaluatorConfigSchema = z.object({
+  id: z.string(),
+  evaluatorType: z.string(),
+  name: z.string(),
+  settings: z.record(z.string(), z.unknown()),
+  inputs: z.array(fieldSchema),
+  // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
+  mappings: z.record(
+    z.string(),
+    z.record(z.string(), z.record(z.string(), fieldMappingSchema))
+  ),
+  dbEvaluatorId: z.string().optional(),
+});
+export type EvaluatorConfig = Omit<
+  z.infer<typeof evaluatorConfigSchema>,
+  "evaluatorType" | "inputs"
+> & {
   evaluatorType: EvaluatorTypes | `custom/${string}`;
-  name: string;
-  settings: Record<string, unknown>;
   inputs: Field[];
-  // Per-runner input mappings for this evaluator
-  // runnerId -> { inputFieldName -> mapping }
-  mappings: Record<string, Record<string, FieldMapping>>;
-  // Reference to database-backed evaluator (if using saved evaluator)
-  dbEvaluatorId?: string;
-};
-
-// ============================================================================
-// Runner Types
-// ============================================================================
-
-/**
- * Runner type - either a versioned prompt or an agent (code/workflow)
- */
-export type RunnerType = "prompt" | "agent";
-
-/**
- * Local prompt configuration for unpublished modifications.
- * Stores the prompt config locally in the runner without publishing a new version.
- * Used for quick tinkering - allows running evaluations against modified prompts
- * without committing to the versioning system.
- */
-export type LocalPromptConfig = {
-  llm: {
-    model: string;
-    temperature?: number;
-    maxTokens?: number;
-    litellmParams?: Record<string, string>;
-  };
-  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>;
-  inputs: Array<{ identifier: string; type: LlmConfigInputType }>;
-  outputs: Array<{
-    identifier: string;
-    type: LlmConfigOutputType;
-    json_schema?: unknown;
-  }>;
 };
 
 /**
- * Runner configuration - unified type for prompts and agents in evaluations.
- * A runner can be either:
- * - A Prompt: references a versioned prompt from the Prompts system
- * - An Agent: references a saved agent (code or workflow type)
+ * Zod schema for target config validation.
+ *
+ * Mappings are stored per-dataset:
+ * mappings[datasetId][inputFieldName] = FieldMapping
+ *
+ * This allows different mappings for each dataset in the evaluation.
+ *
+ * Note: Evaluators are NOT tied to targets. All evaluators in the store
+ * apply to ALL targets. Only the mappings differ per target (and per dataset).
  */
-export type RunnerConfig = {
-  id: string;
-  type: RunnerType;
-  name: string;
-  icon?: string;
-
-  // For prompts - reference to versioned prompt from Prompts system
-  promptId?: string;
-  promptVersionId?: string;
-
-  // For prompts - local unpublished modifications
-  // When set, this config is used for evaluation instead of the published version.
-  // Allows quick tinkering without committing to the versioning system.
-  localPromptConfig?: LocalPromptConfig;
-
-  // For agents - reference to database-backed agent (code or workflow)
-  // Agent type and workflow ID are fetched at runtime via dbAgentId
-  dbAgentId?: string;
-
-  // Common fields
+export const targetConfigSchema = z.object({
+  id: z.string(),
+  type: z.enum(["prompt", "agent"]),
+  name: z.string(),
+  icon: z.string().optional(),
+  promptId: z.string().optional(),
+  promptVersionId: z.string().optional(),
+  /**
+   * The version number currently loaded for this target.
+   * Used for:
+   * - Displaying version badge in UI
+   * - Comparing with latest DB version to detect outdated status
+   * - When undefined + no localPromptConfig, target "follows latest" automatically
+   * - When set + has localPromptConfig, target is "pinned" to this version
+   */
+  promptVersionNumber: z.number().optional(),
+  localPromptConfig: localPromptConfigSchema.optional(),
+  dbAgentId: z.string().optional(),
+  inputs: z.array(fieldSchema).optional(),
+  outputs: z.array(fieldSchema).optional(),
+  // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
+  mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
+});
+export type TargetType = "prompt" | "agent";
+export type TargetConfig = Omit<
+  z.infer<typeof targetConfigSchema>,
+  "inputs" | "outputs"
+> & {
   inputs: Field[];
   outputs: Field[];
-
-  // Runner input mappings (how runner inputs connect to dataset/other runners)
-  // inputFieldName -> mapping
-  mappings: Record<string, FieldMapping>;
-
-  // References to global evaluators by ID
-  evaluatorIds: string[];
 };
 
 // ============================================================================
@@ -166,10 +225,10 @@ export type EvaluationResults = {
   progress?: number;
   total?: number;
   // Per-row results
-  runnerOutputs: Record<string, unknown[]>; // runnerId -> array of outputs per row
-  // Evaluator results nested by runner
-  evaluatorResults: Record<string, Record<string, unknown[]>>; // runnerId -> evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // runnerId -> array of errors per row
+  targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
+  // Evaluator results nested by target
+  evaluatorResults: Record<string, Record<string, unknown[]>>; // targetId -> evaluatorId -> array of results per row
+  errors: Record<string, string[]>; // targetId -> array of errors per row
 };
 
 // ============================================================================
@@ -177,7 +236,7 @@ export type EvaluationResults = {
 // ============================================================================
 
 export type OverlayType =
-  | "runner"
+  | "target"
   | "evaluator"
   | "dataset-columns"
   | "dataset-switch"
@@ -201,13 +260,13 @@ export type AutosaveStatus = {
 
 export type UIState = {
   openOverlay?: OverlayType;
-  overlayTargetId?: string; // which runner is being configured
-  overlayEvaluatorId?: string; // which evaluator within the runner (for evaluator overlay)
+  overlayTargetId?: string; // which target is being configured
+  overlayEvaluatorId?: string; // which evaluator within the target (for evaluator overlay)
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   selectedRows: Set<number>;
   expandedEvaluator?: {
-    runnerId: string;
+    targetId: string;
     evaluatorId: string;
     row: number;
   };
@@ -238,12 +297,12 @@ export type EvaluationsV3State = {
   activeDatasetId: string;
 
   // Global evaluators (shared definitions, will be stored in DB in future)
-  // Each evaluator contains per-runner mappings inside it
+  // Each evaluator contains per-target mappings inside it
   evaluators: EvaluatorConfig[];
 
-  // Runners (multiple for comparison) - reference evaluators by ID
-  // Runner mappings are inside each runner
-  runners: RunnerConfig[];
+  // Targets (multiple for comparison) - reference evaluators by ID
+  // Target mappings are inside each target
+  targets: TargetConfig[];
 
   // Execution results (populated after run)
   results: EvaluationResults;
@@ -306,17 +365,25 @@ export type EvaluationsV3Actions = {
     type: DatasetColumnType
   ) => void;
 
-  // Runner actions
-  addRunner: (runner: RunnerConfig) => void;
-  updateRunner: (runnerId: string, updates: Partial<RunnerConfig>) => void;
-  removeRunner: (runnerId: string) => void;
-  setRunnerMapping: (
-    runnerId: string,
+  // Target actions
+  addTarget: (target: TargetConfig) => void;
+  updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
+  removeTarget: (targetId: string) => void;
+  /** Set a mapping for a target input field for a specific dataset */
+  setTargetMapping: (
+    targetId: string,
+    datasetId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
+  /** Remove a mapping for a target input field for a specific dataset */
+  removeTargetMapping: (
+    targetId: string,
+    datasetId: string,
+    inputField: string
+  ) => void;
 
-  // Global evaluator actions
+  // Global evaluator actions (evaluators apply to ALL targets automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
   updateEvaluator: (
     evaluatorId: string,
@@ -324,16 +391,20 @@ export type EvaluationsV3Actions = {
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
 
-  // Runner-evaluator relationship actions
-  addEvaluatorToRunner: (runnerId: string, evaluatorId: string) => void;
-  removeEvaluatorFromRunner: (runnerId: string, evaluatorId: string) => void;
-
-  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
+  /** Set a mapping for an evaluator input field for a specific dataset and target */
   setEvaluatorMapping: (
     evaluatorId: string,
-    runnerId: string,
+    datasetId: string,
+    targetId: string,
     inputField: string,
     mapping: FieldMapping
+  ) => void;
+  /** Remove a mapping for an evaluator input field for a specific dataset and target */
+  removeEvaluatorMapping: (
+    evaluatorId: string,
+    datasetId: string,
+    targetId: string,
+    inputField: string
   ) => void;
 
   // Results actions
@@ -354,7 +425,7 @@ export type EvaluationsV3Actions = {
   clearRowSelection: () => void;
   deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
-    expanded: { runnerId: string; evaluatorId: string; row: number } | undefined
+    expanded: { targetId: string; evaluatorId: string; row: number } | undefined
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
@@ -379,6 +450,48 @@ export type EvaluationsV3Actions = {
 };
 
 export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
+
+// ============================================================================
+// Table Types (TanStack Table)
+// ============================================================================
+
+/**
+ * Row data structure for the evaluations table.
+ * Each row contains dataset values and target outputs.
+ */
+export type TableRowData = {
+  rowIndex: number;
+  dataset: Record<string, string>;
+  targets: Record<
+    string,
+    { output: unknown; evaluators: Record<string, unknown> }
+  >;
+};
+
+/**
+ * Table meta - used to pass dynamic data to column headers/cells
+ * without causing column definition changes (which would remount components).
+ *
+ * IMPORTANT: All dynamic data must go through meta to keep columns stable.
+ * If columns change, TanStack Table will remount all headers.
+ */
+export type TableMeta = {
+  // Target data
+  targets: TargetConfig[];
+  targetsMap: Map<string, TargetConfig>;
+  evaluatorsMap: Map<string, EvaluatorConfig>;
+  openTargetEditor: (target: TargetConfig) => void;
+  handleRemoveTarget: (targetId: string) => void;
+  handleAddEvaluator: () => void;
+  // Selection data (for checkbox column)
+  selectedRows: Set<number>;
+  allSelected: boolean;
+  someSelected: boolean;
+  rowCount: number;
+  toggleRowSelection: (rowIndex: number) => void;
+  selectAllRows: (count: number) => void;
+  clearRowSelection: () => void;
+};
 
 // ============================================================================
 // Initial State
@@ -410,7 +523,7 @@ export const createInitialDataset = (): DatasetReference => ({
 
 export const createInitialResults = (): EvaluationResults => ({
   status: "idle",
-  runnerOutputs: {},
+  targetOutputs: {},
   evaluatorResults: {},
   errors: {},
 });
@@ -432,7 +545,7 @@ export const createInitialState = (): EvaluationsV3State => ({
   datasets: [createInitialDataset()],
   activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],
-  runners: [],
+  targets: [],
   results: createInitialResults(),
   pendingSavedChanges: {},
   ui: createInitialUIState(),

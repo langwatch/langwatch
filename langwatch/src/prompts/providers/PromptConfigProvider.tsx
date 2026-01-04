@@ -76,7 +76,7 @@ export function PromptConfigProvider({
 
   const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
     useCallback(
-      ({ id, data, onSuccess, onError }) => {
+      ({ id, data, nextVersion, onSuccess, onError }) => {
         const onSubmit = async (formValues: SaveDialogFormValues) => {
           try {
             const prompt = await updatePrompt({
@@ -99,6 +99,7 @@ export function PromptConfigProvider({
           isOpen: true,
           onClose: () => setSaveVersionDialogProps(null),
           onSubmit,
+          nextVersion,
         });
       },
       [updatePrompt, projectId],
@@ -182,7 +183,7 @@ export function PromptConfigProvider({
     >
       {children}
 
-      {/* 
+      {/*
       We cannot render the dialogs conditionally - doing so will break the state machine of chakra dialogs
       ie: index.mjs:321 [@zag-js/core > transition] Cannot transition a stopped machine
        */}

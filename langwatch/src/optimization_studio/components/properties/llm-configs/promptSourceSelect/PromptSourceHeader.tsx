@@ -16,7 +16,7 @@ import { VersionSaveButton } from "~/prompts/forms/prompt-config-form/components
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
   formValuesToTriggerSaveVersionParams,
-  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
@@ -54,7 +54,8 @@ export function PromptSourceHeader({
         type: "success",
         duration: 2000,
       });
-      formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
+      // IMPORTANT: Use WithSystemMessage to include the system prompt in messages array
+      formProps.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
     };
 
     const onError = () => {
@@ -87,7 +88,8 @@ export function PromptSourceHeader({
    */
   const handleOnRestore = async (params: VersionedPrompt) => {
     // Update the form with the new values
-    const newFormValues = versionedPromptToPromptConfigFormValues(params);
+    // IMPORTANT: Use WithSystemMessage to include the system prompt in messages array
+    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
     formProps.reset(newFormValues);
   };
 
@@ -128,6 +130,7 @@ export function PromptSourceHeader({
           {configId && (
             <VersionHistoryButton
               configId={configId}
+              currentVersionId={formProps.getValues("versionMetadata")?.versionId}
               onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}

@@ -1,7 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
+import { useTabId } from "../prompt-browser/ui/TabContext";
 import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
@@ -31,6 +33,10 @@ export function SyncedChatInput({
     submitTrigger,
     triggerSubmit,
   } = usePromptPlaygroundChatSync();
+  const tabId = useTabId();
+  const totalTabCount = useDraggableTabsBrowserStore((state) =>
+    state.windows.reduce((count, window) => count + window.tabs.length, 0),
+  );
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -96,6 +102,9 @@ export function SyncedChatInput({
         setCurrentInput(message);
       }
     }
+
+    // Keep focus on the textarea after sending
+    textareaRef.current?.focus();
   };
 
   /**
@@ -116,7 +125,6 @@ export function SyncedChatInput({
       width="full"
       paddingX={4}
       paddingBottom={3}
-      bg="white"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -130,6 +138,7 @@ export function SyncedChatInput({
         width="full"
         maxWidth="768px"
         margin="0 auto"
+        background="white"
       >
         <ChatTextArea
           borderRadius="xl"
@@ -138,6 +147,7 @@ export function SyncedChatInput({
           onChange={(e) => setCurrentInput(e.target.value)}
           onKeyDown={handleKeyDown}
           ref={textareaRef}
+          data-tab-id={tabId}
         />
         <HStack
           width="full"
@@ -145,7 +155,8 @@ export function SyncedChatInput({
           padding={2}
           position="relative"
         >
-          {/* Bottom left - Sync checkbox (shows on hover) */}
+          {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
+          {totalTabCount > 1 && (
           <ChatSyncCheckbox
             position="absolute"
             left="50%"
@@ -155,6 +166,7 @@ export function SyncedChatInput({
             onChange={setIsSynced}
             visible={isHovered}
           />
+          )}
 
           {/* Right icon - Send button */}
           <ChatSendButton

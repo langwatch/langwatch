@@ -4,14 +4,15 @@ import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
 export function VersionHistoryButton({
   configId,
+  currentVersionId,
   onRestoreSuccess,
-  onDiscardChanges,
   hasUnsavedChanges,
   label,
 }: {
   configId: string;
+  /** The versionId of the version currently being edited. If not provided, defaults to latest. */
+  currentVersionId?: string;
   onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
-  onDiscardChanges?: () => void;
   hasUnsavedChanges?: boolean;
   label?: string;
 }) {
@@ -24,8 +25,8 @@ export function VersionHistoryButton({
     >
       <VersionHistoryListPopover
         configId={configId}
+        currentVersionId={currentVersionId}
         onRestoreSuccess={onRestoreSuccess}
-        onDiscardChanges={onDiscardChanges}
         hasUnsavedChanges={hasUnsavedChanges}
         label={label}
       />

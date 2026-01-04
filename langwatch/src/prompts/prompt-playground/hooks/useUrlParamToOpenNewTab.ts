@@ -62,6 +62,7 @@ export function useUrlParamToOpenNewTab() {
             versionNumber: defaultValues.versionMetadata?.versionNumber,
             scope: defaultValues.scope,
           },
+          variableValues: {},
         },
       });
     }

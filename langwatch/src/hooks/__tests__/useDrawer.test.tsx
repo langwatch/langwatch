@@ -77,14 +77,14 @@ describe("useDrawer", () => {
       act(() => {
         result.current.openDrawer("promptEditor", {
           promptId: "test-id",
-          urlParams: { runnerId: "runner-123" },
+          urlParams: { targetId: "runner-123" },
         });
       });
 
       expect(mockPush).toHaveBeenCalled();
       const pushCall = mockPush.mock.calls[0]?.[0] as string;
       expect(pushCall).toContain("drawer.promptId=test-id");
-      expect(pushCall).toContain("drawer.runnerId=runner-123");
+      expect(pushCall).toContain("drawer.targetId=runner-123");
     });
 
     it("uses replace when replace option is true", () => {
@@ -99,7 +99,7 @@ describe("useDrawer", () => {
     });
 
     it("builds drawer stack on navigation", () => {
-      mockQuery = { "drawer.open": "runnerTypeSelector" };
+      mockQuery = { "drawer.open": "targetTypeSelector" };
       const { result } = renderHook(() => useDrawer());
 
       // First drawer opens
@@ -193,13 +193,13 @@ describe("useDrawer", () => {
       const { result } = renderHook(() => useDrawer());
 
       act(() => {
-        result.current.openDrawer("runnerTypeSelector");
+        result.current.openDrawer("targetTypeSelector");
       });
 
       expect(getDrawerStack()).toHaveLength(1);
 
-      // Simulate URL updated to runnerTypeSelector
-      mockQuery = { "drawer.open": "runnerTypeSelector" };
+      // Simulate URL updated to targetTypeSelector
+      mockQuery = { "drawer.open": "targetTypeSelector" };
 
       // Open second drawer from a fresh hook (simulating new component rendering)
       const { result: result2 } = renderHook(() => useDrawer());
@@ -217,7 +217,7 @@ describe("useDrawer", () => {
       expect(getDrawerStack()).toHaveLength(1);
       expect(mockReplace).toHaveBeenCalled();
       const replaceCall = mockReplace.mock.calls[0]?.[0] as string;
-      expect(replaceCall).toContain("drawer.open=runnerTypeSelector");
+      expect(replaceCall).toContain("drawer.open=targetTypeSelector");
     });
   });
 
@@ -256,11 +256,11 @@ describe("useDrawer", () => {
       const { result } = renderHook(() => useDrawer());
 
       act(() => {
-        result.current.openDrawer("runnerTypeSelector");
+        result.current.openDrawer("targetTypeSelector");
       });
 
-      // Now simulate that runnerTypeSelector is open in the URL
-      mockQuery = { "drawer.open": "runnerTypeSelector" };
+      // Now simulate that targetTypeSelector is open in the URL
+      mockQuery = { "drawer.open": "targetTypeSelector" };
 
       // Open a second drawer (which will add to stack since currentDrawer exists)
       const { result: result2 } = renderHook(() => useDrawer());
@@ -293,7 +293,7 @@ describe("useDrawerParams", () => {
     mockQuery = {
       "drawer.open": "promptEditor",
       "drawer.promptId": "test-123",
-      "drawer.runnerId": "runner-456",
+      "drawer.targetId": "runner-456",
       "otherParam": "ignored",
     };
 
@@ -301,7 +301,7 @@ describe("useDrawerParams", () => {
 
     expect(result.current).toEqual({
       promptId: "test-123",
-      runnerId: "runner-456",
+      targetId: "runner-456",
     });
     expect(result.current).not.toHaveProperty("open");
     expect(result.current).not.toHaveProperty("otherParam");
@@ -381,11 +381,11 @@ describe("Flow Callbacks", () => {
       // Set callbacks before opening drawer flow
       act(() => {
         setFlowCallbacks("promptList", { onSelect });
-        result.current.openDrawer("runnerTypeSelector");
+        result.current.openDrawer("targetTypeSelector");
       });
 
       // Simulate navigating to child drawer
-      mockQuery = { "drawer.open": "runnerTypeSelector" };
+      mockQuery = { "drawer.open": "targetTypeSelector" };
 
       act(() => {
         result.current.openDrawer("promptList");
@@ -417,8 +417,10 @@ describe("Flow Callbacks", () => {
 
 describe("Complex Props (backward compatibility)", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mockQuery = {};
     clearDrawerStack();
+    clearFlowCallbacks();
   });
 
   it("extracts function props into complexProps", () => {
@@ -432,6 +434,59 @@ describe("Complex Props (backward compatibility)", () => {
     const complexProps = getComplexProps();
     expect(complexProps).toHaveProperty("onSave");
     expect(complexProps.onSave).toBe(onSave);
+  });
+
+  it("extracts object props into complexProps and excludes them from URL", () => {
+    const { result } = renderHook(() => useDrawer());
+    const availableSources = [
+      { id: "ds1", name: "Dataset 1", type: "dataset", fields: [{ name: "input", type: "string" }] },
+    ];
+    const inputMappings = { input: { type: "source", sourceId: "ds1", field: "input" } };
+
+    act(() => {
+      result.current.openDrawer("promptEditor", {
+        promptId: "test-123",
+        availableSources,
+        inputMappings,
+      } as never); // Use never to bypass type checking for test props
+    });
+
+    // Objects should be in complexProps
+    const complexProps = getComplexProps();
+    expect(complexProps).toHaveProperty("availableSources");
+    expect(complexProps).toHaveProperty("inputMappings");
+    expect(complexProps.availableSources).toBe(availableSources);
+    expect(complexProps.inputMappings).toBe(inputMappings);
+
+    // URL should NOT contain [object Object]
+    expect(mockPush).toHaveBeenCalled();
+    const pushCall = mockPush.mock.calls[0]?.[0] as string;
+    expect(pushCall).not.toContain("[object");
+    expect(pushCall).not.toContain("availableSources");
+    expect(pushCall).not.toContain("inputMappings");
+    // But should contain serializable props
+    expect(pushCall).toContain("drawer.promptId=test-123");
+  });
+
+  it("handles arrays in props by storing in complexProps", () => {
+    const { result } = renderHook(() => useDrawer());
+    const messages = [{ role: "user", content: "Hello" }];
+
+    act(() => {
+      result.current.openDrawer("promptEditor", {
+        promptId: "test-456",
+        initialLocalConfig: { messages },
+      } as never);
+    });
+
+    // Objects (including those containing arrays) should be in complexProps
+    const complexProps = getComplexProps();
+    expect(complexProps).toHaveProperty("initialLocalConfig");
+
+    // URL should NOT contain corrupted array string
+    const pushCall = mockPush.mock.calls[0]?.[0] as string;
+    expect(pushCall).not.toContain("[object");
+    expect(pushCall).toContain("drawer.promptId=test-456");
   });
 
   it("complexProps are replaced on each openDrawer", () => {

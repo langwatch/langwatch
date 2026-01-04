@@ -31,7 +31,7 @@ export const getComplexProps = () => complexProps;
  * Flow callbacks registry - persists across drawer navigation.
  * Use this for callbacks that need to survive navigation between drawers
  * (e.g., onSelectPrompt callback that should work in promptList even when
- * opened from runnerTypeSelector).
+ * opened from targetTypeSelector).
  *
  * Cleared automatically when closeDrawer() is called.
  */
@@ -45,7 +45,7 @@ let flowCallbacks: Record<string, Record<string, unknown>> = {};
  * // In EvaluationsV3Table:
  * setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
  * setFlowCallbacks("agentList", { onSelect: handleSelectAgent });
- * openDrawer("runnerTypeSelector");
+ * openDrawer("targetTypeSelector");
  *
  * // Later, in PromptListDrawer, callbacks are available via getFlowCallbacks
  */
@@ -142,13 +142,21 @@ export const useDrawer = () => {
     props?: Record<string, unknown>,
     options: { replace?: boolean } = {},
   ) => {
-    // Extract non-serializable props into complexProps
-    complexProps = Object.fromEntries(
-      Object.entries(props ?? {}).filter(
-        ([_key, value]) =>
-          typeof value === "function" || typeof value === "object",
-      ),
-    );
+    // Separate serializable props (for URL) from complex props (kept in memory)
+    const serializableProps: Record<string, unknown> = {};
+    const nonSerializableProps: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(props ?? {})) {
+      if (typeof value === "function" || typeof value === "object") {
+        // Functions and objects go to complexProps (not URL)
+        nonSerializableProps[key] = value;
+      } else {
+        // Primitives (string, number, boolean, null, undefined) go to URL
+        serializableProps[key] = value;
+      }
+    }
+
+    complexProps = nonSerializableProps;
 
     void router[options.replace ? "replace" : "push"](
       "?" +
@@ -164,7 +172,7 @@ export const useDrawer = () => {
             ),
             drawer: {
               open: drawer,
-              ...props,
+              ...serializableProps, // Only serializable props go to URL
             },
           },
           {
@@ -185,31 +193,35 @@ export const useDrawer = () => {
    * @param drawer - The drawer type to open
    * @param props - Props for the drawer component (type-checked against drawer props).
    *                Can also include additional URL params via the `urlParams` property.
-   * @param options - Options like { replace: true } to replace URL instead of push
+   * @param options - Options like { replace: true } to replace URL instead of push,
+   *                   or { resetStack: true } to reset navigation stack (no back button)
    *
    * @example
    * // Type-safe drawer props
    * openDrawer("promptEditor", { promptId: "abc" });
    *
    * // With additional URL params for context
-   * openDrawer("promptEditor", { promptId: "abc", urlParams: { runnerId: "123" } });
+   * openDrawer("promptEditor", { promptId: "abc", urlParams: { targetId: "123" } });
+   *
+   * // Reset stack to prevent back button (useful when switching contexts)
+   * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
    */
   const openDrawer = <T extends DrawerType>(
     drawer: T,
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
-    { replace }: { replace?: boolean } = {},
+    { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
   ) => {
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
     const allParams = { ...drawerProps, ...urlParams } as Record<string, unknown>;
 
     // Manage drawer stack for navigation history
-    if (currentDrawer) {
+    if (resetStack || !currentDrawer) {
+      // Reset stack - fresh start with no back navigation
+      drawerStack = [{ drawer, params: allParams }];
+    } else {
       // A drawer is already open - navigating forward, push to stack
       drawerStack.push({ drawer, params: allParams });
-    } else {
-      // No drawer open - fresh start, reset stack
-      drawerStack = [{ drawer, params: allParams }];
     }
 
     const badKeys = Object.entries(allParams)

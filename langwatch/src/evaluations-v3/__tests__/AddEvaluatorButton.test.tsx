@@ -37,6 +37,17 @@ vi.mock("~/hooks/useDrawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
+  }),
+}));
+
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
@@ -44,6 +55,11 @@ vi.mock("~/utils/api", () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
+        },
+      },
+      prompts: {
+        getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
         },
       },
     }),
@@ -76,7 +92,7 @@ vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
   AddOrEditDatasetDrawer: () => null,
 }));
 
-// Mock Agent and Runner Drawers
+// Mock Agent and Target Drawers
 vi.mock("~/components/agents/AgentListDrawer", () => ({
   AgentListDrawer: () => null,
 }));
@@ -89,8 +105,8 @@ vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
 vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
   WorkflowSelectorDrawer: () => null,
 }));
-vi.mock("~/components/runners/RunnerTypeSelectorDrawer", () => ({
-  RunnerTypeSelectorDrawer: () => null,
+vi.mock("~/components/targets/TargetTypeSelectorDrawer", () => ({
+  TargetTypeSelectorDrawer: () => null,
 }));
 vi.mock("~/components/prompts/PromptListDrawer", () => ({
   PromptListDrawer: () => null,
@@ -135,17 +151,16 @@ describe("Add Evaluator Button", () => {
     const store = useEvaluationsV3Store.getState();
     store.reset();
 
-    // Set up test data with a runner
+    // Set up test data with a target
     useEvaluationsV3Store.setState({
-      runners: [
+      targets: [
         {
-          id: "runner-1",
+          id: "target-1",
           type: "prompt",
-          name: "Test Runner",
+          name: "Test Target",
           inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           mappings: {},
-          evaluatorIds: [],
         },
       ],
       datasets: [
@@ -168,12 +183,12 @@ describe("Add Evaluator Button", () => {
     cleanup();
   });
 
-  it("renders Add evaluator button for each runner", async () => {
+  it("renders Add evaluator button for each target", async () => {
     render(<EvaluationsV3Table />, { wrapper: Wrapper });
 
     await waitFor(() => {
       // There should be at least one add evaluator button
-      expect(screen.getAllByTestId("add-evaluator-button-runner-1").length).toBeGreaterThan(0);
+      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
     });
   });
 
@@ -182,11 +197,11 @@ describe("Add Evaluator Button", () => {
     render(<EvaluationsV3Table />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      expect(screen.getAllByTestId("add-evaluator-button-runner-1").length).toBeGreaterThan(0);
+      expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);
     });
 
     // Click the first Add evaluator button (there's one per row)
-    const buttons = screen.getAllByTestId("add-evaluator-button-runner-1");
+    const buttons = screen.getAllByTestId("add-evaluator-button-target-1");
     await user.click(buttons[0]!);
 
     // Verify openDrawer was called - the actual drawer rendering is tested in drawer integration tests

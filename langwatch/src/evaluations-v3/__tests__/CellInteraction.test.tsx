@@ -25,7 +25,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-type ColumnType = "checkbox" | "dataset" | "runner";
+type ColumnType = "checkbox" | "dataset" | "target";
 
 type CellMeta = {
   columnType: ColumnType;
@@ -120,9 +120,9 @@ const CellTestHarness = () => {
               value="expected"
             />
             <TableCell
-              cellId="runner-0"
+              cellId="target-0"
               rowIndex={0}
-              meta={{ columnType: "runner", columnId: "runner.runner-1" }}
+              meta={{ columnType: "target", columnId: "target.target-1" }}
             />
           </tr>
           <tr>
@@ -144,9 +144,9 @@ const CellTestHarness = () => {
               value="expected 2"
             />
             <TableCell
-              cellId="runner-1"
+              cellId="target-1"
               rowIndex={1}
-              meta={{ columnType: "runner", columnId: "runner.runner-1" }}
+              meta={{ columnType: "target", columnId: "target.target-1" }}
             />
           </tr>
         </tbody>
@@ -203,11 +203,11 @@ describe("Cell interaction", () => {
     it("selects an agent cell on click", async () => {
       render(<CellTestHarness />, { wrapper: Wrapper });
 
-      const cell = screen.getByTestId("runner-0");
+      const cell = screen.getByTestId("target-0");
       fireEvent.click(cell);
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:runner.runner-1");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:target.target-1");
       });
     });
 
@@ -254,7 +254,7 @@ describe("Cell interaction", () => {
     it("does not enter edit mode for agent cell on double-click", async () => {
       render(<CellTestHarness />, { wrapper: Wrapper });
 
-      const cell = screen.getByTestId("runner-0");
+      const cell = screen.getByTestId("target-0");
       fireEvent.doubleClick(cell);
 
       await waitFor(() => {

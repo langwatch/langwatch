@@ -1,5 +1,5 @@
 import { Button } from "@chakra-ui/react";
-import { Minus } from "react-feather";
+import { LuMinus } from "react-icons/lu";
 
 /**
  * RemoveMessageButton
@@ -18,7 +18,7 @@ export function RemoveMessageButton(props: {
       type="button"
       disabled={disabled}
     >
-      <Minus size={16} />
+      <LuMinus />
     </Button>
   );
 }

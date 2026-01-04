@@ -15,14 +15,21 @@ import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { useDrawer, getComplexProps, getFlowCallbacks } from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 export type PromptListDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (prompt: { id: string; name: string; versionId?: string }) => void;
+  onSelect?: (prompt: {
+    id: string;
+    name: string;
+    version?: number;
+    versionId?: string;
+    inputs?: Array<{ identifier: string; type: string }>;
+    outputs?: Array<{ identifier: string; type: string }>;
+  }) => void;
   onCreateNew?: () => void;
 };
 
@@ -46,10 +53,12 @@ const getDisplayHandle = (handle?: string | null): string => {
 export function PromptListDrawer(props: PromptListDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
+  const flowCallbacks = getFlowCallbacks("promptList");
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
-  const onCreateNew = props.onCreateNew ?? (() => openDrawer("promptEditor"));
+  const onSelect = props.onSelect ?? flowCallbacks?.onSelect ?? (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
+  // Use flowCallbacks.onCreateNew if available (for evaluations context with availableSources)
+  const onCreateNew = props.onCreateNew ?? flowCallbacks?.onCreateNew ?? (() => openDrawer("promptEditor"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const { data: prompts, isLoading } = useAllPromptsForProject();
@@ -85,11 +94,22 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   }, [prompts, searchQuery]);
 
   const handleSelectPrompt = (prompt: { id: string; handle: string | null }) => {
+    // Find the full prompt data to get inputs/outputs
+    const fullPrompt = prompts?.find((p) => p.id === prompt.id);
+
+    // Call onSelect and let the callback handle navigation if needed.
+    // Don't call onClose() here - the callback may navigate to another drawer,
+    // and closeDrawer would wipe the flow callbacks.
+    // If the callback doesn't navigate, the drawer will remain open but
+    // that's the expected behavior for selection-then-edit flows.
     onSelect?.({
       id: prompt.id,
       name: prompt.handle ?? "Untitled",
+      version: fullPrompt?.version,
+      versionId: fullPrompt?.versionId,
+      inputs: fullPrompt?.inputs,
+      outputs: fullPrompt?.outputs,
     });
-    onClose();
   };
 
   return (

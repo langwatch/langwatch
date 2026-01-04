@@ -260,14 +260,14 @@ export function inputsAndOutputsToDemostrationColumns(
   outputs: PromptConfigFormValues["version"]["configData"]["outputs"],
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
-    ...inputs
+    ...(inputs ?? [])
       .filter(({ type }) => type !== "image")
       .map((input) => ({
         id: input.identifier,
         name: input.identifier,
         type: inputOutputTypeToDatasetColumnType(input.type),
       })),
-    ...outputs.map((output) => ({
+    ...(outputs ?? []).map((output) => ({
       id: output.identifier,
       name: output.identifier,
       type: inputOutputTypeToDatasetColumnType(output.type),
@@ -396,18 +396,61 @@ export function formValuesToTriggerSaveVersionParams(
 }
 
 /**
+ * Extracts the short handle from a potentially full handle path.
+ * Full handles may include scope prefixes that need to be stripped:
+ * - project_XXX/ (project prefix)
+ * - organization_XXX/ (organization prefix, long form)
+ * - XXXXXXXXXXXXXXXXXXXXX/ (21-char nanoid prefix)
+ *
+ * This strips only the scope prefix, preserving folder structure in handles.
+ *
+ * Examples:
+ * - "project_ABC123/gato" -> "gato"
+ * - "organization_ABC123/folder/gato" -> "folder/gato"
+ * - "iuc4aYIoL5YcI7imutYvl/gato" -> "gato" (nanoid prefix)
+ * - "gato" -> "gato" (no change if no prefix)
+ * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
+ */
+const extractShortHandle = (handle: string | null | undefined): string | null => {
+  if (!handle) return null;
+
+  // Check for known prefixes: project_, org_, organization_
+  const knownPrefixMatch = handle.match(/^(?:project_|organization_)[^/]+\//);
+  if (knownPrefixMatch) {
+    return handle.slice(knownPrefixMatch[0].length);
+  }
+
+  // Check for 21-character nanoid prefix (e.g., "iuc4aYIoL5YcI7imutYvl/gato")
+  // Nanoids are alphanumeric, 21 chars, followed by /
+  const nanoidPrefixMatch = handle.match(/^[a-zA-Z0-9_-]{21}\//);
+  if (nanoidPrefixMatch) {
+    return handle.slice(nanoidPrefixMatch[0].length);
+  }
+
+  // No scope prefix, return as-is
+  return handle;
+};
+
+/**
  * Converts the versioned prompt to form values without the system message.
  */
 export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt,
 ): PromptConfigFormValues {
   /**
+   * Extract short handle from full path (e.g., "project_ABC/gato" -> "gato")
+   * The API may return full paths in some contexts (like version history)
+   * but forms should use the short handle.
+   */
+  const shortHandle = extractShortHandle(prompt.handle);
+
+  /**
    * Because we have old handles that are not valid,
    * we don't include them in the form values so it
    * basically forces them to be a "draft" and then the user
    * must resave the prompt to make it valid.
    */
-  const isHandleValid = handleSchema.safeParse(prompt.handle).success;
+  const isHandleValid = handleSchema.safeParse(shortHandle).success;
 
   return formSchema.parse({
     configId: prompt.id,
@@ -416,8 +459,8 @@ export function versionedPromptToPromptConfigFormValues(
       versionNumber: prompt.version,
       versionCreatedAt: prompt.versionCreatedAt,
     },
-    // Coerce old handles to lowercase -- will then save correctly in the DB
-    handle: isHandleValid ? prompt.handle : null,
+    // Use short handle for form display
+    handle: isHandleValid ? shortHandle : null,
     scope: prompt.scope,
     version: {
       configData: {

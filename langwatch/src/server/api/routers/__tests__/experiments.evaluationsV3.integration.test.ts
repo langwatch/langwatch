@@ -28,7 +28,7 @@ const createValidState = (overrides: Record<string, unknown> = {}) => ({
   ],
   activeDatasetId: "test-data",
   evaluators: [],
-  runners: [],
+  targets: [],
   ...overrides,
 });
 

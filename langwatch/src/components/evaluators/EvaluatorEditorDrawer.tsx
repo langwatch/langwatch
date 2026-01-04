@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Field,
   Heading,
@@ -25,6 +26,21 @@ import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated"
 import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
+import { VariablesSection, type FieldMapping as UIFieldMapping, type AvailableSource } from "~/components/variables";
+
+/**
+ * Mapping configuration for showing evaluator input mappings.
+ * This is provided by the caller (e.g., Evaluations V3, Optimization Studio)
+ * to enable context-specific mapping UI without this component knowing the details.
+ */
+export type EvaluatorMappingsConfig = {
+  /** Available sources for variable mapping */
+  availableSources: AvailableSource[];
+  /** Initial mappings in UI format - used to seed local state */
+  initialMappings: Record<string, UIFieldMapping>;
+  /** Callback when a mapping changes - used to persist to store */
+  onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+};
 
 export type EvaluatorEditorDrawerProps = {
   open?: boolean;
@@ -36,6 +52,12 @@ export type EvaluatorEditorDrawerProps = {
   evaluatorId?: string;
   /** Category for back navigation (informational only) */
   category?: EvaluatorCategoryId;
+  /**
+   * Optional mapping configuration for showing evaluator input mappings.
+   * When provided, the drawer shows a mappings section.
+   * The caller is responsible for providing sources, current mappings, and missing field IDs.
+   */
+  mappingsConfig?: EvaluatorMappingsConfig;
 };
 
 /**
@@ -59,6 +81,11 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     props.evaluatorId ??
     drawerParams.evaluatorId ??
     (complexProps.evaluatorId as string | undefined);
+
+  // Get mappingsConfig from props or complexProps
+  const mappingsConfig =
+    props.mappingsConfig ??
+    (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
 
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -218,6 +245,8 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       open={isOpen}
       onOpenChange={({ open }) => !open && handleClose()}
       size="lg"
+      closeOnInteractOutside={false}
+      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
@@ -288,10 +317,22 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   />
                 )}
 
-                {!hasSettings && (
+                {!hasSettings && !mappingsConfig && (
                   <Text fontSize="sm" color="gray.500">
                     This evaluator does not have any settings to configure.
                   </Text>
+                )}
+
+                {/* Mappings section - shown when caller provides mappingsConfig */}
+                {mappingsConfig && mappingsConfig.availableSources.length > 0 && (
+                  <Box paddingTop={4}>
+                    <EvaluatorMappingsSection
+                      evaluatorDef={evaluatorDef}
+                      availableSources={mappingsConfig.availableSources}
+                      initialMappings={mappingsConfig.initialMappings}
+                      onMappingChange={mappingsConfig.onMappingChange}
+                    />
+                  </Box>
                 )}
               </VStack>
             </FormProvider>
@@ -315,5 +356,134 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+// ============================================================================
+// Evaluator Mappings Section
+// ============================================================================
+
+type EvaluatorMappingsSectionProps = {
+  evaluatorDef:
+    | {
+        requiredFields?: string[];
+        optionalFields?: string[];
+      }
+    | undefined;
+  availableSources: AvailableSource[];
+  /** Initial mappings - used to seed local state */
+  initialMappings: Record<string, UIFieldMapping>;
+  /** Callback to persist changes to store */
+  onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+};
+
+/**
+ * Sub-component for evaluator input mappings.
+ * Manages local state for immediate UI feedback, persists via onMappingChange.
+ * Computes missingMappingIds reactively from local state.
+ */
+function EvaluatorMappingsSection({
+  evaluatorDef,
+  availableSources,
+  initialMappings,
+  onMappingChange,
+}: EvaluatorMappingsSectionProps) {
+  // Local state for mappings - source of truth for UI
+  const [localMappings, setLocalMappings] = useState<Record<string, UIFieldMapping>>(initialMappings);
+
+  // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
+  useEffect(() => {
+    setLocalMappings(initialMappings);
+  }, [initialMappings]);
+
+  // Compute missingMappingIds REACTIVELY from local state
+  // Uses same logic as getEvaluatorMissingMappings in mappingValidation.ts
+  const missingMappingIds = useMemo(() => {
+    const requiredFields = evaluatorDef?.requiredFields ?? [];
+    const optionalFields = evaluatorDef?.optionalFields ?? [];
+    const allFields = [...requiredFields, ...optionalFields];
+
+    const missing = new Set<string>();
+
+    // Check if ANY field has a valid mapping
+    let hasAnyMapping = false;
+    for (const field of allFields) {
+      const mapping = localMappings[field];
+      if (mapping && (mapping.type === "value" || (mapping.type === "source" && mapping.field))) {
+        hasAnyMapping = true;
+        break;
+      }
+    }
+
+    // Required fields that are missing
+    for (const field of requiredFields) {
+      const mapping = localMappings[field];
+      // A mapping is missing if undefined or if it's a source mapping with no field selected
+      if (!mapping || (mapping.type === "source" && !mapping.field)) {
+        missing.add(field);
+      }
+    }
+
+    // Special case: if ALL fields are empty and there are no required fields,
+    // highlight the first field to indicate something is needed
+    if (!hasAnyMapping && requiredFields.length === 0 && allFields.length > 0) {
+      missing.add(allFields[0]!);
+    }
+
+    return missing;
+  }, [evaluatorDef?.requiredFields, evaluatorDef?.optionalFields, localMappings]);
+
+  // Handler that updates local state AND persists to store
+  const handleMappingChange = useCallback(
+    (identifier: string, mapping: UIFieldMapping | undefined) => {
+      // Update local state immediately for responsive UI
+      setLocalMappings((prev) => {
+        const next = { ...prev };
+        if (mapping) {
+          next[identifier] = mapping;
+        } else {
+          delete next[identifier];
+        }
+        return next;
+      });
+
+      // Persist to store
+      onMappingChange(identifier, mapping);
+    },
+    [onMappingChange]
+  );
+
+  // Build variables from evaluator definition's required/optional fields
+  const variables = useMemo(() => {
+    const allFields = [
+      ...(evaluatorDef?.requiredFields ?? []),
+      ...(evaluatorDef?.optionalFields ?? []),
+    ];
+    return allFields.map((field) => ({
+      identifier: field,
+      type: "str" as const,
+    }));
+  }, [evaluatorDef]);
+
+  if (variables.length === 0) {
+    return (
+      <Text fontSize="sm" color="gray.500">
+        This evaluator does not require any input mappings.
+      </Text>
+    );
+  }
+
+  return (
+    <VariablesSection
+      title="Variables"
+      variables={variables}
+      onChange={() => {}} // No-op: evaluator inputs are read-only
+      showMappings={true}
+      availableSources={availableSources}
+      mappings={localMappings}
+      onMappingChange={handleMappingChange}
+      readOnly={true} // Can't add/remove evaluator inputs
+      missingMappingIds={missingMappingIds}
+    />
   );
 }

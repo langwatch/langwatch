@@ -7,7 +7,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 
 import {
   createInitialState,
-  type RunnerConfig,
+  type TargetConfig,
   type CellPosition,
   type DatasetColumn,
   type DatasetReference,
@@ -18,45 +18,39 @@ import {
   type FieldMapping,
   type OverlayType,
 } from "../types";
+import {
+  inferAllTargetMappings,
+  inferAllEvaluatorMappings,
+  propagateMappingsToNewDataset,
+} from "../utils/mappingInference";
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
 /**
- * Remove all mappings that reference a specific dataset from runners and evaluators.
+ * Remove all mappings for a specific dataset from targets and evaluators.
+ * With the new per-dataset structure, we simply delete the dataset key from mappings.
  */
 const removeMappingsForDataset = (
   state: EvaluationsV3State,
   datasetId: string
-): { runners: RunnerConfig[]; evaluators: EvaluatorConfig[] } => {
-  // Remove dataset mappings from runners
-  const runners = state.runners.map((runner) => {
-    const newMappings: Record<string, FieldMapping> = {};
-    for (const [field, mapping] of Object.entries(runner.mappings)) {
-      if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
-        newMappings[field] = mapping;
-      }
-    }
-    return { ...runner, mappings: newMappings };
+): { targets: TargetConfig[]; evaluators: EvaluatorConfig[] } => {
+  // Remove dataset mappings from targets (delete the dataset key)
+  const targets = state.targets.map((target) => {
+    const newMappings = { ...target.mappings };
+    delete newMappings[datasetId];
+    return { ...target, mappings: newMappings };
   });
 
-  // Remove dataset mappings from evaluators
+  // Remove dataset mappings from evaluators (delete the dataset key)
   const evaluators = state.evaluators.map((evaluator) => {
-    const newMappings: Record<string, Record<string, FieldMapping>> = {};
-    for (const [runnerId, runnerMappings] of Object.entries(evaluator.mappings)) {
-      const newRunnerMappings: Record<string, FieldMapping> = {};
-      for (const [field, mapping] of Object.entries(runnerMappings)) {
-        if (!(mapping.source === "dataset" && mapping.sourceId === datasetId)) {
-          newRunnerMappings[field] = mapping;
-        }
-      }
-      newMappings[runnerId] = newRunnerMappings;
-    }
+    const newMappings = { ...evaluator.mappings };
+    delete newMappings[datasetId];
     return { ...evaluator, mappings: newMappings };
   });
 
-  return { runners, evaluators };
+  return { targets, evaluators };
 };
 
 // ============================================================================
@@ -87,9 +81,66 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   addDataset: (dataset) => {
+    // First add the dataset
     set((state) => ({
       datasets: [...state.datasets, dataset],
     }));
+
+    // Then auto-map fields for all targets for this new dataset
+    // Uses cross-dataset propagation: if field X is mapped to "input" on existing dataset,
+    // and new dataset has "input", map field X to "input" on new dataset
+    const state = get();
+    const targetsWithNewMappings = state.targets.map((target) => {
+      const newDatasetMappings = propagateMappingsToNewDataset(
+        target.inputs,
+        target.mappings,
+        dataset
+      );
+      if (Object.keys(newDatasetMappings).length > 0) {
+        return {
+          ...target,
+          mappings: {
+            ...target.mappings,
+            [dataset.id]: {
+              ...(target.mappings[dataset.id] ?? {}),
+              ...newDatasetMappings,
+            },
+          },
+        };
+      }
+      return target;
+    });
+
+    // Also auto-map evaluator fields for the new dataset
+    const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
+      const newMappings = inferAllEvaluatorMappings(
+        evaluator,
+        [dataset],
+        targetsWithNewMappings
+      );
+      const datasetMappings = newMappings[dataset.id];
+      if (datasetMappings && Object.keys(datasetMappings).length > 0) {
+        return {
+          ...evaluator,
+          mappings: {
+            ...evaluator.mappings,
+            [dataset.id]: datasetMappings,
+          },
+        };
+      }
+      return evaluator;
+    });
+
+    // Update targets and evaluators with new mappings if any changed
+    const targetsChanged = targetsWithNewMappings.some((r, i) => r !== state.targets[i]);
+    const evaluatorsChanged = evaluatorsWithNewMappings.some((e, i) => e !== state.evaluators[i]);
+
+    if (targetsChanged || evaluatorsChanged) {
+      set({
+        targets: targetsWithNewMappings,
+        evaluators: evaluatorsWithNewMappings,
+      });
+    }
   },
 
   removeDataset: (datasetId) => {
@@ -107,12 +158,12 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
           : state.activeDatasetId;
 
       // Clean up mappings pointing to this dataset
-      const { runners, evaluators } = removeMappingsForDataset(state, datasetId);
+      const { targets, evaluators } = removeMappingsForDataset(state, datasetId);
 
       return {
         datasets: newDatasets,
         activeDatasetId: newActiveDatasetId,
-        runners,
+        targets,
         evaluators,
       };
     });
@@ -469,64 +520,162 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   },
 
   // -------------------------------------------------------------------------
-  // Runner actions
+  // Target actions
   // -------------------------------------------------------------------------
 
-  addRunner: (runner) => {
-    set((state) => ({
-      runners: [...state.runners, runner],
-    }));
-  },
-
-  updateRunner: (runnerId, updates) => {
-    set((state) => ({
-      runners: state.runners.map((r) =>
-        r.id === runnerId ? { ...r, ...updates } : r
-      ),
-    }));
-  },
-
-  removeRunner: (runnerId) => {
+  addTarget: (target) => {
     set((state) => {
-      // Also remove this runner's mappings from all evaluators
-      const evaluators = state.evaluators.map((e) => {
-        const mappings = { ...e.mappings };
-        delete mappings[runnerId];
-        return { ...e, mappings };
+      // Ensure inputs is always an array (defensive)
+      const targetWithInputs = {
+        ...target,
+        inputs: target.inputs ?? [],
+      };
+
+      // Auto-map target inputs to dataset columns based on name matching
+      // This only happens when the target is ADDED - not on subsequent edits
+      const autoMappings = inferAllTargetMappings(targetWithInputs, state.datasets);
+      const targetWithMappings: TargetConfig = {
+        ...targetWithInputs,
+        mappings: {
+          ...targetWithInputs.mappings,
+          ...autoMappings,
+        },
+      };
+
+      // Also auto-map evaluator inputs for this new target
+      const evaluatorsWithNewMappings = state.evaluators.map((evaluator) => {
+        const newMappings = inferAllEvaluatorMappings(
+          evaluator,
+          state.datasets,
+          [targetWithMappings] // Only auto-map for the new target
+        );
+        // Merge new target mappings into existing evaluator mappings
+        const mergedMappings = { ...evaluator.mappings };
+        for (const [datasetId, targetMappings] of Object.entries(newMappings)) {
+          if (!mergedMappings[datasetId]) {
+            mergedMappings[datasetId] = {};
+          }
+          Object.assign(mergedMappings[datasetId]!, targetMappings);
+        }
+        return { ...evaluator, mappings: mergedMappings };
       });
 
-      // Also remove mappings that reference this runner from other runners
-      const runners = state.runners
-        .filter((r) => r.id !== runnerId)
-        .map((runner) => {
-          const newMappings: Record<string, FieldMapping> = {};
-          for (const [field, mapping] of Object.entries(runner.mappings)) {
-            if (
-              !(mapping.source === "runner" && mapping.sourceId === runnerId)
-            ) {
-              newMappings[field] = mapping;
-            }
-          }
-          return { ...runner, mappings: newMappings };
-        });
-
-      return { runners, evaluators };
+      return {
+        targets: [...state.targets, targetWithMappings],
+        evaluators: evaluatorsWithNewMappings,
+      };
     });
   },
 
-  setRunnerMapping: (runnerId, inputField, mapping) => {
+  updateTarget: (targetId, updates) => {
+    set((state) => {
+      const existingTarget = state.targets.find((r) => r.id === targetId);
+      if (!existingTarget) return state;
+
+      let finalUpdates = { ...updates };
+
+      // Clean up mappings when inputs are removed (but NO auto-mapping)
+      const newInputs = updates.inputs;
+      if (newInputs) {
+        const existingInputs = existingTarget.inputs ?? [];
+        const newInputIds = new Set(newInputs.map((i) => i.identifier));
+        const existingInputIds = new Set(existingInputs.map((i) => i.identifier));
+
+        // Find removed inputs (need to clean up mappings)
+        const removedInputIds = [...existingInputIds].filter((id) => !newInputIds.has(id));
+
+        if (removedInputIds.length > 0) {
+          const mergedMappings = { ...existingTarget.mappings };
+          for (const datasetId of Object.keys(mergedMappings)) {
+            const datasetMappings = { ...mergedMappings[datasetId] };
+            for (const inputId of removedInputIds) {
+              delete datasetMappings[inputId];
+            }
+            mergedMappings[datasetId] = datasetMappings;
+          }
+          finalUpdates = { ...finalUpdates, mappings: mergedMappings };
+        }
+      }
+
+      return {
+        targets: state.targets.map((r) =>
+          r.id === targetId ? { ...r, ...finalUpdates } : r
+        ),
+      };
+    });
+  },
+
+  removeTarget: (targetId) => {
+    set((state) => {
+      // Also remove this target's mappings from all evaluators
+      // With per-dataset structure: mappings[datasetId][targetId][inputField]
+      const evaluators = state.evaluators.map((e) => {
+        const newMappings: typeof e.mappings = {};
+        for (const [datasetId, targetMappings] of Object.entries(e.mappings)) {
+          const newTargetMappings = { ...targetMappings };
+          delete newTargetMappings[targetId];
+          newMappings[datasetId] = newTargetMappings;
+        }
+        return { ...e, mappings: newMappings };
+      });
+
+      // Also remove mappings that reference this target from other targets
+      // With per-dataset structure: mappings[datasetId][inputField]
+      const targets = state.targets
+        .filter((r) => r.id !== targetId)
+        .map((target) => {
+          const newMappings: typeof target.mappings = {};
+          for (const [datasetId, fieldMappings] of Object.entries(target.mappings)) {
+            const newFieldMappings: Record<string, FieldMapping> = {};
+            for (const [field, mapping] of Object.entries(fieldMappings)) {
+              // Keep value mappings and source mappings that don't reference the removed target
+              const isTargetMapping = mapping.type === "source" && mapping.source === "target" && mapping.sourceId === targetId;
+              if (!isTargetMapping) {
+                newFieldMappings[field] = mapping;
+              }
+            }
+            newMappings[datasetId] = newFieldMappings;
+          }
+          return { ...target, mappings: newMappings };
+        });
+
+      return { targets, evaluators };
+    });
+  },
+
+  setTargetMapping: (targetId, datasetId, inputField, mapping) => {
     set((state) => ({
-      runners: state.runners.map((r) =>
-        r.id === runnerId
+      targets: state.targets.map((r) =>
+        r.id === targetId
           ? {
               ...r,
               mappings: {
                 ...r.mappings,
-                [inputField]: mapping,
+                [datasetId]: {
+                  ...(r.mappings[datasetId] ?? {}),
+                  [inputField]: mapping,
+                },
               },
             }
           : r
       ),
+    }));
+  },
+
+  removeTargetMapping: (targetId, datasetId, inputField) => {
+    set((state) => ({
+      targets: state.targets.map((r) => {
+        if (r.id !== targetId) return r;
+        const datasetMappings = { ...(r.mappings[datasetId] ?? {}) };
+        delete datasetMappings[inputField];
+        return {
+          ...r,
+          mappings: {
+            ...r.mappings,
+            [datasetId]: datasetMappings,
+          },
+        };
+      }),
     }));
   },
 
@@ -535,9 +684,24 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   addEvaluator: (evaluator) => {
-    set((state) => ({
-      evaluators: [...state.evaluators, evaluator],
-    }));
+    set((state) => {
+      // Auto-map fields for all datasets and targets
+      const autoMappings = inferAllEvaluatorMappings(
+        evaluator,
+        state.datasets,
+        state.targets
+      );
+      const evaluatorWithMappings = {
+        ...evaluator,
+        mappings: {
+          ...evaluator.mappings,
+          ...autoMappings,
+        },
+      };
+      return {
+        evaluators: [...state.evaluators, evaluatorWithMappings],
+      };
+    });
   },
 
   updateEvaluator: (evaluatorId, updates) => {
@@ -551,77 +715,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   removeEvaluator: (evaluatorId) => {
     set((state) => ({
       evaluators: state.evaluators.filter((e) => e.id !== evaluatorId),
-      // Also remove this evaluator from all runners' evaluatorIds
-      runners: state.runners.map((r) => ({
-        ...r,
-        evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
-      })),
     }));
   },
 
   // -------------------------------------------------------------------------
-  // Runner-evaluator relationship actions
+  // Evaluator mapping actions (per-dataset, per-target mappings stored inside evaluator)
   // -------------------------------------------------------------------------
 
-  addEvaluatorToRunner: (runnerId, evaluatorId) => {
-    set((state) => {
-      const runner = state.runners.find((r) => r.id === runnerId);
-      if (!runner) return state;
-
-      // Check if evaluator exists
-      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) return state;
-
-      // Don't add if already exists
-      if (runner.evaluatorIds.includes(evaluatorId)) return state;
-
-      return {
-        runners: state.runners.map((r) =>
-          r.id === runnerId
-            ? { ...r, evaluatorIds: [...r.evaluatorIds, evaluatorId] }
-            : r
-        ),
-        // Initialize empty mappings for this runner in the evaluator
-        evaluators: state.evaluators.map((e) =>
-          e.id === evaluatorId
-            ? {
-                ...e,
-                mappings: {
-                  ...e.mappings,
-                  [runnerId]: e.mappings[runnerId] ?? {},
-                },
-              }
-            : e
-        ),
-      };
-    });
-  },
-
-  removeEvaluatorFromRunner: (runnerId, evaluatorId) => {
-    set((state) => ({
-      runners: state.runners.map((r) =>
-        r.id === runnerId
-          ? {
-              ...r,
-              evaluatorIds: r.evaluatorIds.filter((id) => id !== evaluatorId),
-            }
-          : r
-      ),
-      // Remove this runner's mappings from the evaluator
-      evaluators: state.evaluators.map((e) => {
-        if (e.id !== evaluatorId) return e;
-        const mappings = { ...e.mappings };
-        delete mappings[runnerId];
-        return { ...e, mappings };
-      }),
-    }));
-  },
-
-  // -------------------------------------------------------------------------
-  // Evaluator mapping actions (per-runner mappings stored inside evaluator)
-  // -------------------------------------------------------------------------
-
-  setEvaluatorMapping: (evaluatorId, runnerId, inputField, mapping) => {
+  setEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField, mapping) => {
     set((state) => ({
       evaluators: state.evaluators.map((e) =>
         e.id === evaluatorId
@@ -629,14 +730,36 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
               ...e,
               mappings: {
                 ...e.mappings,
-                [runnerId]: {
-                  ...e.mappings[runnerId],
-                  [inputField]: mapping,
+                [datasetId]: {
+                  ...(e.mappings[datasetId] ?? {}),
+                  [targetId]: {
+                    ...(e.mappings[datasetId]?.[targetId] ?? {}),
+                    [inputField]: mapping,
+                  },
                 },
               },
             }
           : e
       ),
+    }));
+  },
+
+  removeEvaluatorMapping: (evaluatorId, datasetId, targetId, inputField) => {
+    set((state) => ({
+      evaluators: state.evaluators.map((e) => {
+        if (e.id !== evaluatorId) return e;
+        const datasetMappings = { ...(e.mappings[datasetId] ?? {}) };
+        const targetMappings = { ...(datasetMappings[targetId] ?? {}) };
+        delete targetMappings[inputField];
+        datasetMappings[targetId] = targetMappings;
+        return {
+          ...e,
+          mappings: {
+            ...e.mappings,
+            [datasetId]: datasetMappings,
+          },
+        };
+      }),
     }));
   },
 
@@ -657,7 +780,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     set({
       results: {
         status: "idle",
-        runnerOutputs: {},
+        targetOutputs: {},
         evaluatorResults: {},
         errors: {},
       },
@@ -976,8 +1099,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
       activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
       evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-      // Support loading old state format (agents) and new format (runners)
-      runners: (state.runners as typeof current.runners) ?? (state.agents as typeof current.runners) ?? current.runners,
+      // Support loading old state format (agents) and new format (targets)
+      targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
     }));
   },
 
@@ -1006,7 +1129,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
  */
 type PartializedState = Pick<
   EvaluationsV3State,
-  "name" | "datasets" | "activeDatasetId" | "evaluators" | "runners"
+  "name" | "datasets" | "activeDatasetId" | "evaluators" | "targets"
 >;
 
 /**
@@ -1019,7 +1142,7 @@ const partializeState = (state: EvaluationsV3Store): PartializedState => ({
   datasets: state.datasets,
   activeDatasetId: state.activeDatasetId,
   evaluators: state.evaluators,
-  runners: state.runners,
+  targets: state.targets,
 });
 
 /**

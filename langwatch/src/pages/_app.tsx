@@ -256,6 +256,9 @@ export const system = createSystem(defaultConfig, {
             outline: {
               bg: "white/65",
             },
+            flushed: {
+              borderRadius: "none",
+            },
           },
           size: {
             xs: {
@@ -285,6 +288,11 @@ export const system = createSystem(defaultConfig, {
           "& .dot": {
             backgroundColor: "white/65",
           },
+        },
+      }),
+      badge: defineRecipe({
+        base: {
+          borderRadius: "lg",
         },
       }),
     },
