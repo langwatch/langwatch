@@ -1,6 +1,0 @@
-{
-  "version": 1,
-  "hooks": {
-    "afterFileEdit": [{ "command": "./hooks/agent-done.sh" }]
-  }
-}

@@ -148,6 +148,7 @@ function MessageRow({
                 showAddContextButton
                 borderless={borderless}
                 fillHeight={fillHeight}
+                role={role}
               />
             )}
           />
@@ -200,6 +201,7 @@ function MessageRow({
             }}
             showAddContextButton
             borderless={borderless}
+            role={role}
           />
         )}
       />
@@ -383,7 +385,7 @@ export function PromptMessagesField({
       display={borderless ? "flex" : undefined}
       flexDirection={borderless ? "column" : undefined}
     >
-      <HStack width="full" flexShrink={0} paddingX={3}>
+      <HStack width="full" flexShrink={0} paddingX={borderless ? 3 : 1}>
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
       </HStack>
@@ -401,8 +403,8 @@ export function PromptMessagesField({
             <Box
               flex={borderless ? 1 : undefined}
               height={borderless ? "100%" : undefined}
-              paddingX={1}
-              paddingTop={2}
+              paddingX={borderless ? 1 : 0}
+              paddingTop={borderless ? 2 : 0}
             >
               <MessageRow
                 key="system-message-row"
@@ -435,7 +437,7 @@ export function PromptMessagesField({
                 borderBottomWidth={borderless ? "1px" : 0}
                 borderColor="gray.200"
               >
-                <HStack width="full" paddingX={2} paddingBottom={2}>
+                <HStack width="full" paddingX={borderless ? 2 : 0} paddingBottom={borderless ? 2 : 0}>
                   <MessageRoleLabel role="system" />
                   <Spacer />
                   {editingMode === "messages" && (
@@ -473,7 +475,7 @@ export function PromptMessagesField({
                   borderBottomWidth={borderless && !isLast ? "1px" : 0}
                   borderColor="gray.200"
                   flex={borderless && isLast ? 1 : undefined}
-                  paddingX={1}
+                  paddingX={borderless ? 1 : 0}
                 >
                   <MessageRow
                     key={`message-row-${idx}`}

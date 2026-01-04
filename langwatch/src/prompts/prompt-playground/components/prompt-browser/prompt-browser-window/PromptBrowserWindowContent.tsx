@@ -241,7 +241,6 @@ function PromptBrowserWindowInner(props: {
               <Box
                 flex={1}
                 overflow="auto"
-                paddingX={1}
                 paddingBottom={3}
                 display="flex"
                 flexDirection="column"
@@ -313,7 +312,7 @@ function PromptBrowserWindowInner(props: {
                 bottom={0}
                 left={0}
                 right={0}
-                height="30px"
+                height="12px"
                 background="linear-gradient(to bottom, transparent, white)"
                 pointerEvents="none"
               />

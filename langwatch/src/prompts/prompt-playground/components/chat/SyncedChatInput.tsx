@@ -102,6 +102,9 @@ export function SyncedChatInput({
         setCurrentInput(message);
       }
     }
+
+    // Keep focus on the textarea after sending
+    textareaRef.current?.focus();
   };
 
   /**
@@ -122,7 +125,6 @@ export function SyncedChatInput({
       width="full"
       paddingX={4}
       paddingBottom={3}
-      bg="white"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -136,6 +138,7 @@ export function SyncedChatInput({
         width="full"
         maxWidth="768px"
         margin="0 auto"
+        background="white"
       >
         <ChatTextArea
           borderRadius="xl"

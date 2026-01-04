@@ -85,7 +85,7 @@ export function ResizableDivider({
       alignItems="center"
       justifyContent="center"
       flexShrink={0}
-      marginTop={-0.5}
+      marginTop={-2.5}
       _before={{
         content: '""',
         position: "absolute",

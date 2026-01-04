@@ -84,6 +84,8 @@ type PromptTextAreaWithVariablesProps = {
   borderless?: boolean;
   /** Whether to fill remaining height (only applies in borderless mode) */
   fillHeight?: boolean;
+  /** Role identifier for focusing (e.g., "system" for system prompt) */
+  role?: string;
 } & Omit<BoxProps, "onChange">;
 
 // ============================================================================
@@ -159,6 +161,7 @@ export const PromptTextAreaWithVariables = ({
   otherNodesFields = {},
   borderless = false,
   fillHeight = false,
+  role,
   ...boxProps
 }: PromptTextAreaWithVariablesProps) => {
   // In horizontal layout mode, allow unlimited height (container scrolls)
@@ -296,7 +299,10 @@ export const PromptTextAreaWithVariables = ({
   );
 
   // Variables used in text but not defined
-  const usedVariables = useMemo(() => parseVariablesFromText(localValue), [localValue]);
+  const usedVariables = useMemo(
+    () => parseVariablesFromText(localValue),
+    [localValue],
+  );
 
   const invalidVariables = useMemo(
     () => usedVariables.filter((v) => !existingVariableIds.has(v)),
@@ -1018,7 +1024,9 @@ export const PromptTextAreaWithVariables = ({
   }, []);
 
   // Store paragraph positions in a ref to avoid re-renders during typing
-  const paragraphPositionsRef = useRef<Array<{ top: number; height: number }>>([]);
+  const paragraphPositionsRef = useRef<Array<{ top: number; height: number }>>(
+    [],
+  );
 
   // Update positions only when needed (not on every render)
   const updateParagraphPositions = useCallback(() => {
@@ -1168,13 +1176,19 @@ export const PromptTextAreaWithVariables = ({
           placeholder={placeholder}
           disabled={disabled}
           autoHeight={useAutoHeight}
+          data-role={role}
           style={{
             width: "100%",
             minHeight: fillHeight ? "100%" : minHeight,
             maxHeight: fillHeight ? undefined : maxHeight,
-            height: fillHeight ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
-            fontFamily:
-              'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+            height: fillHeight
+              ? "100%"
+              : userResizedHeight
+              ? `${userResizedHeight}px`
+              : undefined,
+            fontFamily: borderless
+              ? undefined
+              : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             // Borderless mode: 14px font with 28px line height for clean paragraph alignment
             fontSize: borderless ? "14px" : "13px",
             lineHeight: borderless ? "28px" : "1.5",

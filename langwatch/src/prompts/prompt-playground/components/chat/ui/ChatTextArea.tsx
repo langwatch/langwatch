@@ -7,23 +7,23 @@ export interface ChatTextAreaProps extends TextareaProps {
 }
 
 /**
- * A chat-specific textarea component with auto-growing height and in-progress state.
+ * A chat-specific textarea component with auto-growing height.
  *
  * Single Responsibility: Provides a styled, accessible textarea for chat message input
- * with automatic height adjustment and disabled state during message processing.
+ * with automatic height adjustment. Stays enabled during message processing so users
+ * can continue typing their next message.
  *
- * @param inProgress - When true, disables the textarea during message processing
+ * @param inProgress - Currently unused, kept for API compatibility
  * @param props - Standard Chakra UI Textarea props
  * @param ref - Forwarded ref to the underlying textarea element
  */
 export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
-  ({ inProgress, ...props }, ref) => {
+  ({ inProgress: _inProgress, ...props }, ref) => {
     return (
       <Textarea
         {...props}
         ref={ref}
         placeholder="Type your message here. Shift+Enter for new line."
-        disabled={inProgress}
         resize="none"
         rows={1}
         minHeight="60px"
@@ -31,7 +31,6 @@ export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
         autoresize
         border="none"
         outline="none"
-        _disabled={{ opacity: 0.6, cursor: "not-allowed" }}
       />
     );
   },

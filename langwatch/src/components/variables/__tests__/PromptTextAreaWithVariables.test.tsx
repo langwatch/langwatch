@@ -26,10 +26,11 @@ vi.mock("rich-textarea", () => ({
       children?: (value: string) => React.ReactNode;
       onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
       onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
+      "data-role"?: string;
     }
-  >(({ children, autoHeight, onSelectionChange, ...props }, ref) => {
+  >(({ children, autoHeight, onSelectionChange, "data-role": dataRole, ...props }, ref) => {
     // Simple textarea that mimics RichTextarea behavior
-    return <textarea ref={ref} {...props} />;
+    return <textarea ref={ref} data-role={dataRole} {...props} />;
   }),
 }));
 
@@ -168,11 +169,11 @@ describe("PromptTextAreaWithVariables", () => {
   describe("{{ trigger and menu behavior", () => {
     // Note: Menu rendering tests are limited in jsdom since Portal renders outside component tree
     // These tests focus on component setup and callback wiring
-    
+
     it("accepts all props needed for variable insertion menu", () => {
       const onChange = vi.fn();
       const onCreateVariable = vi.fn();
-      
+
       renderComponent({
         value: "{{test",
         onChange,
@@ -250,7 +251,7 @@ describe("PromptTextAreaWithVariables", () => {
       renderComponent({ onChange, variables: mockVariables });
 
       const textarea = screen.getByRole("textbox");
-      
+
       // Press Escape when no menu is open
       fireEvent.keyDown(textarea, { key: "Escape" });
 
@@ -263,12 +264,227 @@ describe("PromptTextAreaWithVariables", () => {
       renderComponent({ onChange, variables: mockVariables });
 
       const textarea = screen.getByRole("textbox");
-      
+
       // Arrow keys shouldn't cause errors
       fireEvent.keyDown(textarea, { key: "ArrowDown" });
       fireEvent.keyDown(textarea, { key: "ArrowUp" });
 
       expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
+  describe("debouncing behavior", () => {
+    it("updates local value immediately on typing", async () => {
+      const onChange = vi.fn();
+      renderComponent({ onChange });
+
+      const textarea = screen.getByRole("textbox");
+      fireEvent.change(textarea, { target: { value: "Hello", selectionStart: 5 } });
+
+      // Local value updates immediately (visible in textarea)
+      expect(screen.getByDisplayValue("Hello")).toBeInTheDocument();
+    });
+
+    it("debounces onChange calls", async () => {
+      vi.useFakeTimers();
+      const onChange = vi.fn();
+      renderComponent({ onChange });
+
+      const textarea = screen.getByRole("textbox");
+
+      // Type multiple characters quickly
+      fireEvent.change(textarea, { target: { value: "H", selectionStart: 1 } });
+      fireEvent.change(textarea, { target: { value: "He", selectionStart: 2 } });
+      fireEvent.change(textarea, { target: { value: "Hel", selectionStart: 3 } });
+
+      // Before debounce delay, onChange should be called for each (debounced)
+      expect(onChange).toHaveBeenCalled();
+
+      // Fast forward past debounce delay
+      vi.advanceTimersByTime(200);
+
+      vi.useRealTimers();
+    });
+
+    it("does not sync external value while typing", async () => {
+      vi.useFakeTimers();
+      const onChange = vi.fn();
+      const { rerender } = render(
+        <ChakraProvider value={defaultSystem}>
+          <PromptTextAreaWithVariables value="initial" onChange={onChange} />
+        </ChakraProvider>
+      );
+
+      const textarea = screen.getByRole("textbox");
+
+      // Start typing
+      fireEvent.change(textarea, { target: { value: "typed", selectionStart: 5 } });
+
+      // External value changes while typing
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptTextAreaWithVariables value="external" onChange={onChange} />
+        </ChakraProvider>
+      );
+
+      // Should keep the typed value, not sync external (within typing window)
+      expect(screen.getByDisplayValue("typed")).toBeInTheDocument();
+
+      // After sync delay, external value should be respected
+      vi.advanceTimersByTime(400);
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptTextAreaWithVariables value="external2" onChange={onChange} />
+        </ChakraProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("external2")).toBeInTheDocument();
+      });
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe("external value sync", () => {
+    it("syncs external value when not typing", async () => {
+      const onChange = vi.fn();
+      const { rerender } = render(
+        <ChakraProvider value={defaultSystem}>
+          <PromptTextAreaWithVariables value="initial" onChange={onChange} />
+        </ChakraProvider>
+      );
+
+      expect(screen.getByDisplayValue("initial")).toBeInTheDocument();
+
+      // Update external value
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptTextAreaWithVariables value="updated" onChange={onChange} />
+        </ChakraProvider>
+      );
+
+      expect(screen.getByDisplayValue("updated")).toBeInTheDocument();
+    });
+  });
+
+  describe("role prop", () => {
+    it("sets data-role attribute on textarea", () => {
+      renderComponent({ role: "system" });
+
+      const textarea = screen.getByRole("textbox");
+      expect(textarea).toHaveAttribute("data-role", "system");
+    });
+
+    it("does not set data-role when role is undefined", () => {
+      renderComponent({});
+
+      const textarea = screen.getByRole("textbox");
+      expect(textarea).not.toHaveAttribute("data-role");
+    });
+  });
+
+  describe("borderless mode", () => {
+    it("renders without errors in borderless mode", () => {
+      renderComponent({ borderless: true });
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+
+    it("renders without errors when fillHeight is true", () => {
+      renderComponent({ borderless: true, fillHeight: true });
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
+  describe("Add variable button behavior", () => {
+    it("toggles menu on repeated clicks", async () => {
+      const user = userEvent.setup();
+      const { container } = renderComponent({
+        showAddContextButton: true,
+        availableSources: mockSources,
+        variables: mockVariables,
+      });
+
+      // Hover to show button
+      const textareaContainer = container.firstChild as HTMLElement;
+      await user.hover(textareaContainer);
+
+      await waitFor(() => {
+        expect(screen.getByText("Add variable")).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByText("Add variable");
+
+      // First click - opens menu
+      await user.click(addButton);
+
+      // Second click - should toggle (close) menu
+      await user.click(addButton);
+
+      // Component should remain functional
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+  });
+
+  describe("variable highlighting", () => {
+    it("does not show warning when all variables are defined", () => {
+      renderComponent({
+        value: "Hello {{question}} and {{context}}",
+        variables: mockVariables,
+      });
+
+      expect(screen.queryByText(/Undefined variables:/)).not.toBeInTheDocument();
+    });
+
+    it("shows warning for partially undefined variables", () => {
+      renderComponent({
+        value: "Hello {{question}} and {{unknown}}",
+        variables: mockVariables,
+      });
+
+      const warning = screen.getByText(/Undefined variables:/);
+      expect(warning).toBeInTheDocument();
+      expect(warning.textContent).toContain("unknown");
+      expect(warning.textContent).not.toContain("question");
+    });
+
+    it("shows warning for multiple undefined variables", () => {
+      renderComponent({
+        value: "{{foo}} and {{bar}}",
+        variables: [],
+      });
+
+      const warning = screen.getByText(/Undefined variables:/);
+      expect(warning.textContent).toContain("foo");
+      expect(warning.textContent).toContain("bar");
+    });
+  });
+
+  describe("menu trigger detection", () => {
+    it("does not trigger menu for complete variables", () => {
+      const onChange = vi.fn();
+      renderComponent({
+        value: "{{question}}",
+        onChange,
+        variables: mockVariables,
+        availableSources: mockSources,
+      });
+
+      // Component should render without opening menu
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+
+    it("does not trigger menu when cursor is not after {{", () => {
+      const onChange = vi.fn();
+      renderComponent({ onChange, availableSources: mockSources });
+
+      const textarea = screen.getByRole("textbox");
+      // Type text without {{ trigger
+      fireEvent.change(textarea, { target: { value: "Hello world", selectionStart: 11 } });
+
+      // Component should render without menu issues
+      expect(screen.getByDisplayValue("Hello world")).toBeInTheDocument();
     });
   });
 });

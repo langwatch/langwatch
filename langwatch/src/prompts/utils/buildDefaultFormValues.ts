@@ -42,5 +42,6 @@ export const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
 export const buildDefaultFormValues = (
   overrides?: DeepPartial<PromptConfigFormValues>,
 ): PromptConfigFormValues => {
-  return merge(DEFAULT_FORM_VALUES, overrides ?? {});
+  // Pass empty object first so merge doesn't mutate the frozen DEFAULT_FORM_VALUES
+  return merge({}, DEFAULT_FORM_VALUES, overrides ?? {});
 };
