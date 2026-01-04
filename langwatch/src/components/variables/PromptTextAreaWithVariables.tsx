@@ -789,6 +789,46 @@ export const PromptTextAreaWithVariables = ({
     [existingVariableIds],
   );
 
+  // Track if user has manually resized the textarea
+  const [userResizedHeight, setUserResizedHeight] = useState<number | null>(
+    null,
+  );
+  const isResizingRef = useRef(false);
+  const minHeightPx = parseInt(minHeight ?? "120", 10);
+
+  // Detect manual resize via ResizeObserver
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    let lastHeight = textarea.clientHeight;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      const newHeight = entry.contentRect.height;
+
+      // Only track resize if height changed significantly (user drag, not content change)
+      // and the resize is happening during a mouse interaction
+      if (Math.abs(newHeight - lastHeight) > 2) {
+        // If resized close to minimum, reset to auto-height mode
+        if (newHeight <= minHeightPx + 10) {
+          setUserResizedHeight(null);
+        } else {
+          setUserResizedHeight(newHeight);
+        }
+      }
+      lastHeight = newHeight;
+    });
+
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, [minHeightPx]);
+
+  // Determine if we should use autoHeight
+  const useAutoHeight = userResizedHeight === null;
+
   return (
     <>
       <Box
@@ -807,11 +847,12 @@ export const PromptTextAreaWithVariables = ({
           onSelectionChange={handleSelectionChange}
           placeholder={placeholder}
           disabled={disabled}
-          autoHeight
+          autoHeight={useAutoHeight}
           style={{
             width: "100%",
             minHeight,
             maxHeight,
+            height: userResizedHeight ? `${userResizedHeight}px` : undefined,
             fontFamily:
               'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             fontSize: "13px",
