@@ -1,14 +1,64 @@
-import { Badge } from "@chakra-ui/react";
+import { Badge, HStack, Text } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
+
+type VersionBadgeProps = {
+  /** Current version number */
+  version: number;
+  /** Latest version from DB (if provided, enables outdated detection) */
+  latestVersion?: number;
+  /** Callback when user clicks to upgrade to latest */
+  onUpgrade?: () => void;
+};
 
 /**
- * Single Responsibility: Displays a version number in a styled badge component.
- *
- * @param version - The version number to display
- * @returns A Badge component displaying the version number with a green color scheme
+ * Displays a version badge with optional outdated detection.
+ * When latestVersion > version, shows an upgrade prompt with arrow transition.
  */
-export function VersionBadge({ version }: { version: number }) {
+export function VersionBadge({
+  version,
+  latestVersion,
+  onUpgrade,
+}: VersionBadgeProps) {
+  const isOutdated =
+    latestVersion !== undefined && latestVersion > version;
+
+  if (isOutdated && onUpgrade) {
+    return (
+      <Tooltip
+        content="This prompt is outdated, click to update to latest version"
+        positioning={{ placement: "top" }}
+        showArrow
+      >
+        <HStack
+          gap={1}
+          fontSize="sm"
+          flexWrap="nowrap"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUpgrade();
+          }}
+          cursor="pointer"
+          _hover={{ opacity: 0.8 }}
+          data-testid="version-badge-outdated"
+          role="button"
+        >
+          <Badge colorPalette="gray" textTransform="none">
+            v{version}
+          </Badge>
+          <Text>→</Text>
+          <Badge colorPalette="green" textTransform="none">
+            v{latestVersion}
+          </Badge>
+        </HStack>
+      </Tooltip>
+    );
+  }
+
   return (
-    <Badge colorPalette="green" border="1px solid" borderColor="green.200">
+    <Badge
+      colorPalette="gray"
+      data-testid="version-badge"
+    >
       v{version}
     </Badge>
   );
