@@ -70,6 +70,8 @@ type MessageRowProps = {
   showControls?: boolean;
   /** Whether to render textarea in borderless mode (for horizontal layout) */
   borderless?: boolean;
+  /** Whether this message should fill remaining height (only for last message in borderless mode) */
+  fillHeight?: boolean;
 };
 
 /**
@@ -90,6 +92,7 @@ function MessageRow({
   onAddEdge,
   showControls = true,
   borderless = false,
+  fillHeight = false,
 }: MessageRowProps) {
   const form = useFormContext<PromptConfigFormValues>();
   const role = field.role;
@@ -97,7 +100,13 @@ function MessageRow({
   // Borderless mode: render simplified structure with flex support
   if (borderless) {
     return (
-      <Box width="full" height="100%" display="flex" flexDirection="column">
+      <Box
+        width="full"
+        height={fillHeight ? "100%" : undefined}
+        display="flex"
+        flexDirection="column"
+        flex={fillHeight ? 1 : undefined}
+      >
         {showControls && (
           <HStack
             width="full"
@@ -105,6 +114,8 @@ function MessageRow({
             fontWeight="normal"
             textTransform="none"
             flexShrink={0}
+            paddingX={3}
+            paddingBottom={2}
           >
             {role !== "system" && (
               <MessageRoleLabel role={role} marginLeft={-1} />
@@ -113,7 +124,10 @@ function MessageRow({
             {role !== "system" && <RemoveMessageButton onRemove={onRemove} />}
           </HStack>
         )}
-        <Box flex={1} minHeight={0}>
+        <Box
+          flex={fillHeight ? 1 : undefined}
+          minHeight={fillHeight ? 0 : undefined}
+        >
           <Controller
             key={`message-row-${idx}-content`}
             control={form.control}
@@ -133,6 +147,7 @@ function MessageRow({
                 }}
                 showAddContextButton
                 borderless={borderless}
+                fillHeight={fillHeight}
               />
             )}
           />
@@ -147,7 +162,12 @@ function MessageRow({
       width="full"
       label={
         showControls ? (
-          <HStack width="full" align="center" fontWeight="normal" textTransform="none">
+          <HStack
+            width="full"
+            align="center"
+            fontWeight="normal"
+            textTransform="none"
+          >
             {role !== "system" && (
               <MessageRoleLabel role={role} marginLeft={-1} />
             )}
@@ -246,9 +266,7 @@ export function PromptMessagesField({
   const computeMessagesSignature = (
     messages: Array<{ role?: string; content?: string }>,
   ): string => {
-    return messages
-      .map((m) => `${m.role}:${m.content ?? ""}`)
-      .join("|");
+    return messages.map((m) => `${m.role}:${m.content ?? ""}`).join("|");
   };
 
   // Update editing mode when messages change (and user hasn't manually changed it)
@@ -260,7 +278,10 @@ export function PromptMessagesField({
     // Only re-compute mode if:
     // 1. User hasn't manually changed it, AND
     // 2. Messages have actually changed from what we last computed from
-    if (!hasUserChangedMode && currentSignature !== lastMessagesSignatureRef.current) {
+    if (
+      !hasUserChangedMode &&
+      currentSignature !== lastMessagesSignatureRef.current
+    ) {
       const computedMode = getDefaultEditingMode(messageFields.fields);
       setEditingMode(computedMode);
       lastMessagesSignatureRef.current = currentSignature;
@@ -362,7 +383,7 @@ export function PromptMessagesField({
       display={borderless ? "flex" : undefined}
       flexDirection={borderless ? "column" : undefined}
     >
-      <HStack width="full" flexShrink={0}>
+      <HStack width="full" flexShrink={0} paddingX={3}>
         <EditingModeTitle mode={editingMode} onChange={handleModeChange} />
         <Spacer />
       </HStack>
@@ -377,7 +398,12 @@ export function PromptMessagesField({
         {editingMode === "prompt" ? (
           // Prompt mode: Only show system message without controls
           systemField ? (
-            <Box flex={borderless ? 1 : undefined} height={borderless ? "100%" : undefined}>
+            <Box
+              flex={borderless ? 1 : undefined}
+              height={borderless ? "100%" : undefined}
+              paddingX={1}
+              paddingTop={2}
+            >
               <MessageRow
                 key="system-message-row"
                 field={systemField}
@@ -394,6 +420,7 @@ export function PromptMessagesField({
                 onAddEdge={onAddEdge}
                 showControls={false}
                 borderless={borderless}
+                fillHeight={borderless}
               />
             </Box>
           ) : null
@@ -402,12 +429,13 @@ export function PromptMessagesField({
           <>
             {systemField && (
               <Box
+                paddingX={1}
                 marginTop={2}
                 paddingBottom={borderless ? 3 : 0}
                 borderBottomWidth={borderless ? "1px" : 0}
                 borderColor="gray.200"
               >
-                <HStack width="full">
+                <HStack width="full" paddingX={2} paddingBottom={2}>
                   <MessageRoleLabel role="system" />
                   <Spacer />
                   {editingMode === "messages" && (
@@ -444,6 +472,8 @@ export function PromptMessagesField({
                   paddingBottom={borderless && !isLast ? 3 : 0}
                   borderBottomWidth={borderless && !isLast ? "1px" : 0}
                   borderColor="gray.200"
+                  flex={borderless && isLast ? 1 : undefined}
+                  paddingX={1}
                 >
                   <MessageRow
                     key={`message-row-${idx}`}
@@ -461,6 +491,7 @@ export function PromptMessagesField({
                     onAddEdge={onAddEdge}
                     showControls={true}
                     borderless={borderless}
+                    fillHeight={borderless && isLast}
                   />
                 </Box>
               );

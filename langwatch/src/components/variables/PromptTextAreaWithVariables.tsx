@@ -82,6 +82,8 @@ type PromptTextAreaWithVariablesProps = {
   otherNodesFields?: Record<string, string[]>;
   /** Borderless mode for cleaner integration (e.g., in Messages mode) */
   borderless?: boolean;
+  /** Whether to fill remaining height (only applies in borderless mode) */
+  fillHeight?: boolean;
 } & Omit<BoxProps, "onChange">;
 
 // ============================================================================
@@ -156,6 +158,7 @@ export const PromptTextAreaWithVariables = ({
   onAddEdge,
   otherNodesFields = {},
   borderless = false,
+  fillHeight = false,
   ...boxProps
 }: PromptTextAreaWithVariablesProps) => {
   // In horizontal layout mode, allow unlimited height (container scrolls)
@@ -221,12 +224,28 @@ export const PromptTextAreaWithVariables = ({
 
   // Local value state for immediate UI updates (debounced sync to parent)
   const [localValue, setLocalValue] = useState(value);
-  const debouncedOnChange = useDebounceCallback(onChange, 500);
 
-  // Sync local value when prop changes from outside (e.g., form reset)
+  // Flag to disable external sync while user is actively typing
+  const isTypingRef = useRef(false);
+
+  // Debounced callback to re-enable sync after typing stops
+  const enableSyncAfterTyping = useDebounceCallback(() => {
+    isTypingRef.current = false;
+  }, 300);
+
+  // Debounced onChange to parent
+  const debouncedOnChange = useDebounceCallback(onChange, 150);
+
+  // Sync local value ONLY when prop changes from outside AND user is not typing
   useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+    // Skip sync while user is actively typing to avoid race conditions
+    if (isTypingRef.current) return;
+
+    // Only sync if the external value is different from local
+    if (value !== localValue) {
+      setLocalValue(value);
+    }
+  }, [value, localValue]);
 
   // Helper for programmatic changes (variable insertion) - updates immediately without debounce
   const setValueImmediate = useCallback(
@@ -545,6 +564,10 @@ export const PromptTextAreaWithVariables = ({
       const newValue = e.target.value;
       const cursorPos = e.target.selectionStart;
 
+      // Disable external sync while typing to prevent race conditions
+      isTypingRef.current = true;
+      enableSyncAfterTyping();
+
       // Update local state immediately for responsive typing
       setLocalValue(newValue);
       // Debounce the parent onChange to prevent excessive re-renders
@@ -569,7 +592,7 @@ export const PromptTextAreaWithVariables = ({
         closeMenu();
       }
     },
-    [debouncedOnChange, menuOpen, openMenu, closeMenu],
+    [debouncedOnChange, enableSyncAfterTyping, menuOpen, openMenu, closeMenu],
   );
 
   // Handle field selection from menu
@@ -1087,8 +1110,8 @@ export const PromptTextAreaWithVariables = ({
             handleParagraphDrop(e as unknown as DragEvent, dropTargetParagraph);
           }
         }}
-        minHeight={borderless ? undefined : "120px"}
-        height={borderless ? "100%" : undefined}
+        minHeight={fillHeight ? undefined : "120px"}
+        height={fillHeight ? "100%" : undefined}
         {...boxProps}
       >
         {/* Line highlights - rendered before textarea so they appear behind text */}
@@ -1147,9 +1170,9 @@ export const PromptTextAreaWithVariables = ({
           autoHeight={useAutoHeight}
           style={{
             width: "100%",
-            minHeight: borderless ? "100%" : minHeight,
-            maxHeight: borderless ? undefined : maxHeight,
-            height: borderless ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
+            minHeight: fillHeight ? "100%" : minHeight,
+            maxHeight: fillHeight ? undefined : maxHeight,
+            height: fillHeight ? "100%" : userResizedHeight ? `${userResizedHeight}px` : undefined,
             fontFamily:
               'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
             // Borderless mode: 14px font with 28px line height for clean paragraph alignment
