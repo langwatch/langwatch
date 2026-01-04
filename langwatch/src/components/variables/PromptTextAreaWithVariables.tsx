@@ -21,6 +21,7 @@ import {
 } from "./VariableInsertMenu";
 import type { AvailableSource, FieldType } from "./VariableMappingInput";
 import type { Variable } from "./VariablesSection";
+import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 
 // ============================================================================
 // Types
@@ -146,12 +147,15 @@ export const PromptTextAreaWithVariables = ({
   disabled = false,
   showAddContextButton = true,
   minHeight = "120px",
-  maxHeight = "300px",
+  maxHeight: maxHeightProp = "300px",
   hasError = false,
   onAddEdge,
   otherNodesFields = {},
   ...boxProps
 }: PromptTextAreaWithVariablesProps) => {
+  // In horizontal layout mode, allow unlimited height (container scrolls)
+  const layoutMode = useLayoutMode();
+  const maxHeight = layoutMode === "horizontal" ? undefined : maxHeightProp;
   // Merge variables, otherNodesFields into availableSources
   const availableSources = useMemo(() => {
     const sources: AvailableSource[] = [];
@@ -793,37 +797,61 @@ export const PromptTextAreaWithVariables = ({
   const [userResizedHeight, setUserResizedHeight] = useState<number | null>(
     null,
   );
-  const isResizingRef = useRef(false);
+  const isUserResizingRef = useRef(false);
+  const pendingHeightRef = useRef<number | null>(null);
   const minHeightPx = parseInt(minHeight ?? "120", 10);
 
-  // Detect manual resize via ResizeObserver
+  // Detect manual resize - only commit height on mouseup to avoid re-renders during drag
   useEffect(() => {
-    const textarea = textareaRef.current;
+    const textarea = containerRef.current?.querySelector("textarea");
     if (!textarea) return;
 
-    let lastHeight = textarea.clientHeight;
+    // Track mouse state to know if user is actively resizing
+    const handleMouseDown = (e: MouseEvent) => {
+      // Check if mouse is near the resize handle (bottom-right corner)
+      const rect = textarea.getBoundingClientRect();
+      const isNearResizeHandle =
+        e.clientX > rect.right - 20 && e.clientY > rect.bottom - 20;
+      if (isNearResizeHandle) {
+        isUserResizingRef.current = true;
+        pendingHeightRef.current = null;
+      }
+    };
+
+    const handleMouseUp = () => {
+      // Commit the final height when user releases mouse
+      if (isUserResizingRef.current && pendingHeightRef.current !== null) {
+        const finalHeight = pendingHeightRef.current;
+        // If resized close to minimum, reset to auto-height mode
+        if (finalHeight <= minHeightPx + 10) {
+          setUserResizedHeight(null);
+        } else {
+          setUserResizedHeight(finalHeight);
+        }
+      }
+      isUserResizingRef.current = false;
+      pendingHeightRef.current = null;
+    };
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
 
-      const newHeight = entry.contentRect.height;
-
-      // Only track resize if height changed significantly (user drag, not content change)
-      // and the resize is happening during a mouse interaction
-      if (Math.abs(newHeight - lastHeight) > 2) {
-        // If resized close to minimum, reset to auto-height mode
-        if (newHeight <= minHeightPx + 10) {
-          setUserResizedHeight(null);
-        } else {
-          setUserResizedHeight(newHeight);
-        }
+      // Only track height changes during active resize (don't update state yet)
+      if (isUserResizingRef.current) {
+        pendingHeightRef.current = entry.contentRect.height;
       }
-      lastHeight = newHeight;
     });
 
+    textarea.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup", handleMouseUp);
     observer.observe(textarea);
-    return () => observer.disconnect();
+
+    return () => {
+      textarea.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup", handleMouseUp);
+      observer.disconnect();
+    };
   }, [minHeightPx]);
 
   // Determine if we should use autoHeight

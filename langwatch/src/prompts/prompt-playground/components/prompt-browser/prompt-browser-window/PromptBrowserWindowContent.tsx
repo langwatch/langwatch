@@ -1,7 +1,15 @@
 import { Box, HStack } from "@chakra-ui/react";
 import cloneDeep from "lodash.clonedeep";
 import debounce from "lodash.debounce";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { type DeepPartial, FormProvider } from "react-hook-form";
 import { usePromptConfigForm } from "~/prompts/hooks";
 import {
@@ -21,6 +29,12 @@ const MIN_CHAT_AREA = 200;
 export { useTabId } from "../ui/TabContext";
 
 export type LayoutMode = "vertical" | "horizontal";
+
+/** Context for sharing layout mode with nested components */
+const LayoutModeContext = createContext<LayoutMode>("vertical");
+
+/** Hook to get the current layout mode */
+export const useLayoutMode = () => useContext(LayoutModeContext);
 
 /**
  * Window content for a prompt tab.
@@ -197,111 +211,115 @@ function PromptBrowserWindowInner(props: {
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
     return (
-      <FormProvider {...form.methods}>
-        <HStack
-          ref={containerRef}
-          height="full"
-          width="full"
-          overflow="hidden"
-          gap={0}
-          alignItems="stretch"
-        >
-          {/* Left panel: Header + Prompt */}
-          <Box
-            display="flex"
-            flexDirection="column"
-            width="50%"
-            minWidth="300px"
-            maxWidth="600px"
-            borderRight="1px solid"
-            borderColor="gray.100"
+      <LayoutModeContext.Provider value="horizontal">
+        <FormProvider {...form.methods}>
+          <HStack
+            ref={containerRef}
+            height="full"
+            width="full"
             overflow="hidden"
+            gap={0}
+            alignItems="stretch"
           >
-            <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
-              <Box width="full" paddingX={3}>
-                <PromptBrowserHeader />
+            {/* Left panel: Header + Prompt */}
+            <Box
+              display="flex"
+              flexDirection="column"
+              width="50%"
+              minWidth="300px"
+              maxWidth="600px"
+              borderRight="1px solid"
+              borderColor="gray.100"
+              overflow="hidden"
+            >
+              <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
+                <Box width="full" paddingX={3}>
+                  <PromptBrowserHeader />
+                </Box>
+              </Box>
+              <Box flex={1} overflow="auto" paddingX={3} paddingBottom={3}>
+                <PromptMessagesEditor />
               </Box>
             </Box>
-            <Box flex={1} overflow="auto" paddingX={3} paddingBottom={3}>
-              <PromptMessagesEditor />
-            </Box>
-          </Box>
 
-          {/* Right panel: Tabbed section (conversation/variables) */}
-          <Box flex={1} display="flex" flexDirection="column" overflow="hidden" paddingTop={2}>
-            <PromptTabbedSection
-              layoutMode="horizontal"
-              isPromptExpanded={true}
-              onPositionChange={() => {}}
-              onDragEnd={() => {}}
-              onToggle={() => {}}
-            />
-          </Box>
-        </HStack>
-      </FormProvider>
+            {/* Right panel: Tabbed section (conversation/variables) */}
+            <Box flex={1} display="flex" flexDirection="column" overflow="hidden" paddingTop={2}>
+              <PromptTabbedSection
+                layoutMode="horizontal"
+                isPromptExpanded={true}
+                onPositionChange={() => {}}
+                onDragEnd={() => {}}
+                onToggle={() => {}}
+              />
+            </Box>
+          </HStack>
+        </FormProvider>
+      </LayoutModeContext.Provider>
     );
   }
 
   // Vertical layout: stacked (multi-window mode)
   return (
-    <FormProvider {...form.methods}>
-      <Box
-        ref={containerRef}
-        height="full"
-        width="full"
-        display="flex"
-        flexDirection="column"
-        overflow="hidden"
-      >
-        {/* Header - always visible, with bottom padding for spacing from tabs when collapsed */}
-        <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
-          <Box width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
-            <PromptBrowserHeader />
-          </Box>
-        </Box>
-
-        {/* Prompt messages area - collapsible, auto-grows with content */}
+    <LayoutModeContext.Provider value="vertical">
+      <FormProvider {...form.methods}>
         <Box
-          ref={messagesWrapperRef}
-          maxHeight={isCollapsed ? 0 : `${messagesMaxHeight}px`}
+          ref={containerRef}
+          height="full"
+          width="full"
+          display="flex"
+          flexDirection="column"
           overflow="hidden"
-          position="relative"
-          flexShrink={0}
-          transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
         >
-          <Box
-            paddingBottom={2}
-            width="full"
-            maxWidth="768px"
-            margin="0 auto"
-            paddingX={3}
-          >
-            <PromptMessagesEditor />
+          {/* Header - always visible, with bottom padding for spacing from tabs when collapsed */}
+          <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
+            <Box width="full" maxWidth="768px" margin="0 auto" paddingX={3}>
+              <PromptBrowserHeader />
+            </Box>
           </Box>
 
-          {/* Fade overlay at bottom */}
-          {!isCollapsed && (
+          {/* Prompt messages area - collapsible, auto-grows with content */}
+          <Box
+            ref={messagesWrapperRef}
+            maxHeight={isCollapsed ? 0 : `${messagesMaxHeight}px`}
+            overflow="hidden"
+            position="relative"
+            flexShrink={0}
+            transition={isCollapsed ? "max-height 0.15s ease-out" : undefined}
+          >
             <Box
-              position="absolute"
-              bottom={0}
-              left={0}
-              right={0}
-              height="30px"
-              background="linear-gradient(to bottom, transparent, white)"
-              pointerEvents="none"
-            />
-          )}
-        </Box>
+              paddingBottom={2}
+              width="full"
+              maxWidth="768px"
+              margin="0 auto"
+              paddingX={3}
+            >
+              <PromptMessagesEditor />
+            </Box>
 
-        {/* Tabbed section with divider */}
-        <PromptTabbedSection
-          layoutMode="vertical"
-          isPromptExpanded={isPromptExpanded}
-          onPositionChange={handlePositionChange}
-          onDragEnd={handleDragEnd}
-          onToggle={handleToggle}
-        />
-      </Box>
-    </FormProvider>
+            {/* Fade overlay at bottom */}
+            {!isCollapsed && (
+              <Box
+                position="absolute"
+                bottom={0}
+                left={0}
+                right={0}
+                height="30px"
+                background="linear-gradient(to bottom, transparent, white)"
+                pointerEvents="none"
+              />
+            )}
+          </Box>
+
+          {/* Tabbed section with divider */}
+          <PromptTabbedSection
+            layoutMode="vertical"
+            isPromptExpanded={isPromptExpanded}
+            onPositionChange={handlePositionChange}
+            onDragEnd={handleDragEnd}
+            onToggle={handleToggle}
+          />
+        </Box>
+      </FormProvider>
+    </LayoutModeContext.Provider>
   );
 }
