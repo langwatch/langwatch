@@ -1,7 +1,7 @@
 /**
  * Mapping Inference Utility for Evaluations V3
  *
- * Provides automatic inference of mappings between runner/evaluator inputs
+ * Provides automatic inference of mappings between target/evaluator inputs
  * and dataset columns based on name matching and semantic equivalents.
  *
  * This implements a heuristic-based approach:
@@ -14,7 +14,7 @@ import type {
   DatasetColumn,
   DatasetReference,
   FieldMapping,
-  RunnerConfig,
+  TargetConfig,
   EvaluatorConfig,
 } from "../types";
 import type { Field } from "~/optimization_studio/types/dsl";
@@ -143,14 +143,14 @@ export const findMatchingColumn = (
 };
 
 /**
- * Infer mappings for a runner's input fields from a dataset.
+ * Infer mappings for a target's input fields from a dataset.
  *
- * @param inputFields - The runner's input fields
+ * @param inputFields - The target's input fields
  * @param dataset - The dataset to infer from
  * @param existingMappings - Any existing mappings to preserve
  * @returns New mappings to apply (only for fields that don't already have mappings)
  */
-export const inferRunnerMappings = (
+export const inferTargetMappings = (
   inputFields: Field[],
   dataset: DatasetReference,
   existingMappings: Record<string, FieldMapping> = {}
@@ -184,7 +184,7 @@ export const inferRunnerMappings = (
  * If field "question" is mapped to "input" on dataset A,
  * and dataset B has "input" or a semantic equivalent, propagate the mapping.
  *
- * @param inputFields - The runner's input fields
+ * @param inputFields - The target's input fields
  * @param existingMappings - Mappings from another dataset (datasetId -> fieldName -> mapping)
  * @param newDataset - The new dataset to propagate to
  * @returns New mappings for the new dataset
@@ -241,32 +241,32 @@ export const propagateMappingsToNewDataset = (
 };
 
 /**
- * Fields that should primarily come from the runner output.
- * "output" is the most common evaluator input that should connect to runner.
+ * Fields that should primarily come from the target output.
+ * "output" is the most common evaluator input that should connect to target.
  */
-const RUNNER_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
+const TARGET_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
 
 /**
  * Infer mappings for an evaluator's inputs.
  *
  * Evaluator inputs can map to:
  * - Dataset columns (e.g., input, expected_output)
- * - Runner outputs (e.g., output)
+ * - Target outputs (e.g., output)
  *
  * Heuristic:
- * - "output" and similar fields PRIORITIZE runner outputs
+ * - "output" and similar fields PRIORITIZE target outputs
  * - "input", "expected_output" and similar PRIORITIZE dataset columns
  *
  * @param evaluatorInputs - The evaluator's input fields
  * @param dataset - The dataset to infer from
- * @param runner - The runner whose outputs can be used
+ * @param target - The target whose outputs can be used
  * @param existingMappings - Any existing mappings to preserve
  * @returns New mappings to apply
  */
 export const inferEvaluatorMappings = (
   evaluatorInputs: Field[],
   dataset: DatasetReference,
-  runner: RunnerConfig,
+  target: TargetConfig,
   existingMappings: Record<string, FieldMapping> = {}
 ): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
@@ -278,26 +278,26 @@ export const inferEvaluatorMappings = (
     }
 
     const fieldLower = input.identifier.toLowerCase();
-    const shouldPrioritizeRunner = RUNNER_OUTPUT_FIELDS.has(fieldLower);
+    const shouldPrioritizeTarget = TARGET_OUTPUT_FIELDS.has(fieldLower);
 
-    if (shouldPrioritizeRunner) {
-      // For "output" and similar: try runner FIRST, then dataset
-      const runnerOutputMatch = findMatchingColumn(
+    if (shouldPrioritizeTarget) {
+      // For "output" and similar: try target FIRST, then dataset
+      const targetOutputMatch = findMatchingColumn(
         input.identifier,
-        runner.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+        target.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
       );
 
-      if (runnerOutputMatch) {
+      if (targetOutputMatch) {
         newMappings[input.identifier] = {
           type: "source",
-          source: "runner",
-          sourceId: runner.id,
-          sourceField: runnerOutputMatch,
+          source: "target",
+          sourceId: target.id,
+          sourceField: targetOutputMatch,
         };
         continue;
       }
 
-      // Fallback to dataset if no runner match
+      // Fallback to dataset if no target match
       const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
       if (datasetColumnMatch) {
         newMappings[input.identifier] = {
@@ -308,7 +308,7 @@ export const inferEvaluatorMappings = (
         };
       }
     } else {
-      // For "input", "expected_output", etc: try dataset FIRST, then runner
+      // For "input", "expected_output", etc: try dataset FIRST, then target
       const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
       if (datasetColumnMatch) {
         newMappings[input.identifier] = {
@@ -320,17 +320,17 @@ export const inferEvaluatorMappings = (
         continue;
       }
 
-      // Fallback to runner if no dataset match
-      const runnerOutputMatch = findMatchingColumn(
+      // Fallback to target if no dataset match
+      const targetOutputMatch = findMatchingColumn(
         input.identifier,
-        runner.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+        target.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
       );
-      if (runnerOutputMatch) {
+      if (targetOutputMatch) {
         newMappings[input.identifier] = {
           type: "source",
-          source: "runner",
-          sourceId: runner.id,
-          sourceField: runnerOutputMatch,
+          source: "target",
+          sourceId: target.id,
+          sourceField: targetOutputMatch,
         };
       }
     }
@@ -340,22 +340,22 @@ export const inferEvaluatorMappings = (
 };
 
 /**
- * Infer all mappings for a runner across all datasets.
+ * Infer all mappings for a target across all datasets.
  *
- * @param runner - The runner to infer mappings for
+ * @param target - The target to infer mappings for
  * @param datasets - All available datasets
- * @returns Updated mappings for the runner (merged with existing)
+ * @returns Updated mappings for the target (merged with existing)
  */
-export const inferAllRunnerMappings = (
-  runner: RunnerConfig,
+export const inferAllTargetMappings = (
+  target: TargetConfig,
   datasets: DatasetReference[]
 ): Record<string, Record<string, FieldMapping>> => {
-  const result = { ...runner.mappings };
+  const result = { ...target.mappings };
 
   for (const dataset of datasets) {
     const existingDatasetMappings = result[dataset.id] ?? {};
-    const newMappings = inferRunnerMappings(
-      runner.inputs,
+    const newMappings = inferTargetMappings(
+      target.inputs,
       dataset,
       existingDatasetMappings
     );
@@ -372,28 +372,28 @@ export const inferAllRunnerMappings = (
 };
 
 /**
- * Infer all mappings for an evaluator across all datasets and runners.
+ * Infer all mappings for an evaluator across all datasets and targets.
  *
  * @param evaluator - The evaluator to infer mappings for
  * @param datasets - All available datasets
- * @param runners - All runners that use this evaluator
+ * @param targets - All targets that use this evaluator
  * @returns Updated mappings for the evaluator (merged with existing)
  */
 export const inferAllEvaluatorMappings = (
   evaluator: EvaluatorConfig,
   datasets: DatasetReference[],
-  runners: RunnerConfig[]
+  targets: TargetConfig[]
 ): Record<string, Record<string, Record<string, FieldMapping>>> => {
   const result = { ...evaluator.mappings };
 
-  // All evaluators apply to all runners, so infer for every combination
+  // All evaluators apply to all targets, so infer for every combination
   for (const dataset of datasets) {
-    for (const runner of runners) {
-      const existingMappings = result[dataset.id]?.[runner.id] ?? {};
+    for (const target of targets) {
+      const existingMappings = result[dataset.id]?.[target.id] ?? {};
       const newMappings = inferEvaluatorMappings(
         evaluator.inputs,
         dataset,
-        runner,
+        target,
         existingMappings
       );
 
@@ -401,7 +401,7 @@ export const inferAllEvaluatorMappings = (
         if (!result[dataset.id]) {
           result[dataset.id] = {};
         }
-        result[dataset.id]![runner.id] = {
+        result[dataset.id]![target.id] = {
           ...existingMappings,
           ...newMappings,
         };

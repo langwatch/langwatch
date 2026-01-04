@@ -15,7 +15,7 @@ import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 export const fieldMappingSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("source"),
-    source: z.enum(["dataset", "runner"]),
+    source: z.enum(["dataset", "target"]),
     sourceId: z.string(),
     sourceField: z.string(),
   }),
@@ -141,12 +141,12 @@ export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 /**
  * Zod schema for evaluator config validation.
  *
- * Mappings are stored per-dataset AND per-runner:
- * mappings[datasetId][runnerId][inputFieldName] = FieldMapping
+ * Mappings are stored per-dataset AND per-target:
+ * mappings[datasetId][targetId][inputFieldName] = FieldMapping
  *
  * This allows different mappings for:
  * - Each dataset (same column might have different names)
- * - Each runner (runner A outputs "output", runner B outputs "result")
+ * - Each target (target A outputs "output", target B outputs "result")
  */
 export const evaluatorConfigSchema = z.object({
   id: z.string(),
@@ -154,7 +154,7 @@ export const evaluatorConfigSchema = z.object({
   name: z.string(),
   settings: z.record(z.string(), z.unknown()),
   inputs: z.array(fieldSchema),
-  // Per-dataset, per-runner mappings: datasetId -> runnerId -> inputFieldName -> FieldMapping
+  // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
   mappings: z.record(
     z.string(),
     z.record(z.string(), z.record(z.string(), fieldMappingSchema))
@@ -170,17 +170,17 @@ export type EvaluatorConfig = Omit<
 };
 
 /**
- * Zod schema for runner config validation.
+ * Zod schema for target config validation.
  *
  * Mappings are stored per-dataset:
  * mappings[datasetId][inputFieldName] = FieldMapping
  *
  * This allows different mappings for each dataset in the evaluation.
  *
- * Note: Evaluators are NOT tied to runners. All evaluators in the store
- * apply to ALL runners. Only the mappings differ per runner (and per dataset).
+ * Note: Evaluators are NOT tied to targets. All evaluators in the store
+ * apply to ALL targets. Only the mappings differ per target (and per dataset).
  */
-export const runnerConfigSchema = z.object({
+export const targetConfigSchema = z.object({
   id: z.string(),
   type: z.enum(["prompt", "agent"]),
   name: z.string(),
@@ -194,9 +194,9 @@ export const runnerConfigSchema = z.object({
   // Per-dataset mappings: datasetId -> inputFieldName -> FieldMapping
   mappings: z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
 });
-export type RunnerType = "prompt" | "agent";
-export type RunnerConfig = Omit<
-  z.infer<typeof runnerConfigSchema>,
+export type TargetType = "prompt" | "agent";
+export type TargetConfig = Omit<
+  z.infer<typeof targetConfigSchema>,
   "inputs" | "outputs"
 > & {
   inputs: Field[];
@@ -216,10 +216,10 @@ export type EvaluationResults = {
   progress?: number;
   total?: number;
   // Per-row results
-  runnerOutputs: Record<string, unknown[]>; // runnerId -> array of outputs per row
-  // Evaluator results nested by runner
-  evaluatorResults: Record<string, Record<string, unknown[]>>; // runnerId -> evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // runnerId -> array of errors per row
+  targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
+  // Evaluator results nested by target
+  evaluatorResults: Record<string, Record<string, unknown[]>>; // targetId -> evaluatorId -> array of results per row
+  errors: Record<string, string[]>; // targetId -> array of errors per row
 };
 
 // ============================================================================
@@ -227,7 +227,7 @@ export type EvaluationResults = {
 // ============================================================================
 
 export type OverlayType =
-  | "runner"
+  | "target"
   | "evaluator"
   | "dataset-columns"
   | "dataset-switch"
@@ -251,13 +251,13 @@ export type AutosaveStatus = {
 
 export type UIState = {
   openOverlay?: OverlayType;
-  overlayTargetId?: string; // which runner is being configured
-  overlayEvaluatorId?: string; // which evaluator within the runner (for evaluator overlay)
+  overlayTargetId?: string; // which target is being configured
+  overlayEvaluatorId?: string; // which evaluator within the target (for evaluator overlay)
   selectedCell?: CellPosition;
   editingCell?: CellPosition;
   selectedRows: Set<number>;
   expandedEvaluator?: {
-    runnerId: string;
+    targetId: string;
     evaluatorId: string;
     row: number;
   };
@@ -288,12 +288,12 @@ export type EvaluationsV3State = {
   activeDatasetId: string;
 
   // Global evaluators (shared definitions, will be stored in DB in future)
-  // Each evaluator contains per-runner mappings inside it
+  // Each evaluator contains per-target mappings inside it
   evaluators: EvaluatorConfig[];
 
-  // Runners (multiple for comparison) - reference evaluators by ID
-  // Runner mappings are inside each runner
-  runners: RunnerConfig[];
+  // Targets (multiple for comparison) - reference evaluators by ID
+  // Target mappings are inside each target
+  targets: TargetConfig[];
 
   // Execution results (populated after run)
   results: EvaluationResults;
@@ -356,25 +356,25 @@ export type EvaluationsV3Actions = {
     type: DatasetColumnType
   ) => void;
 
-  // Runner actions
-  addRunner: (runner: RunnerConfig) => void;
-  updateRunner: (runnerId: string, updates: Partial<RunnerConfig>) => void;
-  removeRunner: (runnerId: string) => void;
-  /** Set a mapping for a runner input field for a specific dataset */
-  setRunnerMapping: (
-    runnerId: string,
+  // Target actions
+  addTarget: (target: TargetConfig) => void;
+  updateTarget: (targetId: string, updates: Partial<TargetConfig>) => void;
+  removeTarget: (targetId: string) => void;
+  /** Set a mapping for a target input field for a specific dataset */
+  setTargetMapping: (
+    targetId: string,
     datasetId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
-  /** Remove a mapping for a runner input field for a specific dataset */
-  removeRunnerMapping: (
-    runnerId: string,
+  /** Remove a mapping for a target input field for a specific dataset */
+  removeTargetMapping: (
+    targetId: string,
     datasetId: string,
     inputField: string
   ) => void;
 
-  // Global evaluator actions (evaluators apply to ALL runners automatically)
+  // Global evaluator actions (evaluators apply to ALL targets automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
   updateEvaluator: (
     evaluatorId: string,
@@ -382,19 +382,19 @@ export type EvaluationsV3Actions = {
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
 
-  /** Set a mapping for an evaluator input field for a specific dataset and runner */
+  /** Set a mapping for an evaluator input field for a specific dataset and target */
   setEvaluatorMapping: (
     evaluatorId: string,
     datasetId: string,
-    runnerId: string,
+    targetId: string,
     inputField: string,
     mapping: FieldMapping
   ) => void;
-  /** Remove a mapping for an evaluator input field for a specific dataset and runner */
+  /** Remove a mapping for an evaluator input field for a specific dataset and target */
   removeEvaluatorMapping: (
     evaluatorId: string,
     datasetId: string,
-    runnerId: string,
+    targetId: string,
     inputField: string
   ) => void;
 
@@ -416,7 +416,7 @@ export type EvaluationsV3Actions = {
   clearRowSelection: () => void;
   deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
-    expanded: { runnerId: string; evaluatorId: string; row: number } | undefined
+    expanded: { targetId: string; evaluatorId: string; row: number } | undefined
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
@@ -448,12 +448,12 @@ export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 
 /**
  * Row data structure for the evaluations table.
- * Each row contains dataset values and runner outputs.
+ * Each row contains dataset values and target outputs.
  */
 export type TableRowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  runners: Record<
+  targets: Record<
     string,
     { output: unknown; evaluators: Record<string, unknown> }
   >;
@@ -467,12 +467,12 @@ export type TableRowData = {
  * If columns change, TanStack Table will remount all headers.
  */
 export type TableMeta = {
-  // Runner data
-  runners: RunnerConfig[];
-  runnersMap: Map<string, RunnerConfig>;
+  // Target data
+  targets: TargetConfig[];
+  targetsMap: Map<string, TargetConfig>;
   evaluatorsMap: Map<string, EvaluatorConfig>;
-  openRunnerEditor: (runner: RunnerConfig) => void;
-  handleRemoveRunner: (runnerId: string) => void;
+  openTargetEditor: (target: TargetConfig) => void;
+  handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
@@ -514,7 +514,7 @@ export const createInitialDataset = (): DatasetReference => ({
 
 export const createInitialResults = (): EvaluationResults => ({
   status: "idle",
-  runnerOutputs: {},
+  targetOutputs: {},
   evaluatorResults: {},
   errors: {},
 });
@@ -536,7 +536,7 @@ export const createInitialState = (): EvaluationsV3State => ({
   datasets: [createInitialDataset()],
   activeDatasetId: DEFAULT_TEST_DATA_ID,
   evaluators: [],
-  runners: [],
+  targets: [],
   results: createInitialResults(),
   pendingSavedChanges: {},
   ui: createInitialUIState(),

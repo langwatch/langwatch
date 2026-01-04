@@ -22,7 +22,7 @@ import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 // Evaluations V3 drawers
-import { RunnerTypeSelectorDrawer } from "./runners/RunnerTypeSelectorDrawer";
+import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
@@ -52,7 +52,7 @@ export const drawers = {
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
   // Evaluations V3 drawers
-  runnerTypeSelector: RunnerTypeSelectorDrawer,
+  targetTypeSelector: TargetTypeSelectorDrawer,
   promptList: PromptListDrawer,
   promptEditor: PromptEditorDrawer,
   agentList: AgentListDrawer,

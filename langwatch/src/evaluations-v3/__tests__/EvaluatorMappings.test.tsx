@@ -16,7 +16,7 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import { RunEvaluationButton } from "../components/RunEvaluationButton";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { EvaluatorConfig, RunnerConfig, DatasetReference } from "../types";
+import type { EvaluatorConfig, TargetConfig, DatasetReference } from "../types";
 
 // Track opened drawer
 let openedDrawerType: string | null = null;
@@ -93,8 +93,8 @@ vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
 vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
   WorkflowSelectorDrawer: () => null,
 }));
-vi.mock("~/components/runners/RunnerTypeSelectorDrawer", () => ({
-  RunnerTypeSelectorDrawer: () => null,
+vi.mock("~/components/targets/TargetTypeSelectorDrawer", () => ({
+  TargetTypeSelectorDrawer: () => null,
 }));
 vi.mock("~/components/prompts/PromptListDrawer", () => ({
   PromptListDrawer: () => null,
@@ -117,10 +117,10 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Helper to create test data
-const createTestRunner = (overrides?: Partial<RunnerConfig>): RunnerConfig => ({
-  id: "runner-1",
+const createTestTarget = (overrides?: Partial<TargetConfig>): TargetConfig => ({
+  id: "target-1",
   type: "prompt",
-  name: "Test Runner",
+  name: "Test Target",
   inputs: [{ identifier: "input", type: "str" }],
   outputs: [{ identifier: "output", type: "str" }],
   mappings: {},
@@ -176,9 +176,9 @@ describe("Evaluator Mappings", () => {
 
   describe("Auto-inference of mappings", () => {
     it("auto-infers evaluator mappings when evaluator is added", async () => {
-      // Set up store with runner and dataset
+      // Set up store with target and dataset
       useEvaluationsV3Store.setState({
-        runners: [createTestRunner()],
+        targets: [createTestTarget()],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [],
@@ -193,14 +193,14 @@ describe("Evaluator Mappings", () => {
       const evaluator = updatedStore.evaluators[0];
       expect(evaluator).toBeDefined();
 
-      const datasetMappings = evaluator?.mappings["test-data"]?.["runner-1"];
+      const datasetMappings = evaluator?.mappings["test-data"]?.["target-1"];
 
-      // "output" should be mapped to runner output (prioritized for "output" field)
+      // "output" should be mapped to target output (prioritized for "output" field)
       const outputMapping = datasetMappings?.output;
       expect(outputMapping).toBeDefined();
       expect(outputMapping?.type).toBe("source");
       if (outputMapping?.type === "source") {
-        expect(outputMapping.source).toBe("runner");
+        expect(outputMapping.source).toBe("target");
         expect(outputMapping.sourceField).toBe("output");
       }
 
@@ -214,34 +214,34 @@ describe("Evaluator Mappings", () => {
       }
     });
 
-    it("auto-infers evaluator mappings when new runner is added", async () => {
+    it("auto-infers evaluator mappings when new target is added", async () => {
       // Set up store with dataset and evaluator
       useEvaluationsV3Store.setState({
-        runners: [],
+        targets: [],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [createTestEvaluator()],
       });
 
-      // Add a runner
+      // Add a target
       const store = useEvaluationsV3Store.getState();
-      store.addRunner(createTestRunner());
+      store.addTarget(createTestTarget());
 
-      // Check that evaluator mappings were inferred for the new runner
+      // Check that evaluator mappings were inferred for the new target
       const updatedStore = useEvaluationsV3Store.getState();
       const evaluator = updatedStore.evaluators[0];
       expect(evaluator).toBeDefined();
 
-      const datasetMappings = evaluator?.mappings["test-data"]?.["runner-1"];
+      const datasetMappings = evaluator?.mappings["test-data"]?.["target-1"];
       expect(datasetMappings?.expected_output).toBeDefined();
     });
   });
 
   describe("Missing mapping alert icon", () => {
     it("shows alert icon when evaluator has missing mappings", async () => {
-      // Set up store with runner, dataset, and evaluator WITHOUT auto-inferred mappings
+      // Set up store with target, dataset, and evaluator WITHOUT auto-inferred mappings
       useEvaluationsV3Store.setState({
-        runners: [createTestRunner()],
+        targets: [createTestTarget()],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [
@@ -267,18 +267,18 @@ describe("Evaluator Mappings", () => {
     it("hides alert icon when evaluator has all mappings", async () => {
       // Set up store with complete mappings
       useEvaluationsV3Store.setState({
-        runners: [createTestRunner()],
+        targets: [createTestTarget()],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [
           createTestEvaluator({
             mappings: {
               "test-data": {
-                "runner-1": {
+                "target-1": {
                   output: {
                     type: "source",
-                    source: "runner",
-                    sourceId: "runner-1",
+                    source: "target",
+                    sourceId: "target-1",
                     sourceField: "output",
                   },
                   expected_output: {
@@ -310,7 +310,7 @@ describe("Evaluator Mappings", () => {
       // langevals/llm_answer_match has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
       // Both required fields are mapped, optional "input" is not - should be valid
       useEvaluationsV3Store.setState({
-        runners: [createTestRunner()],
+        targets: [createTestTarget()],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [
@@ -326,12 +326,12 @@ describe("Evaluator Mappings", () => {
             ],
             mappings: {
               "test-data": {
-                "runner-1": {
+                "target-1": {
                   // Required fields are mapped
                   output: {
                     type: "source",
-                    source: "runner",
-                    sourceId: "runner-1",
+                    source: "target",
+                    sourceId: "target-1",
                     sourceField: "output",
                   },
                   expected_output: {
@@ -365,9 +365,9 @@ describe("Evaluator Mappings", () => {
     it("opens evaluator editor drawer when Edit Configuration is clicked", async () => {
       const user = userEvent.setup();
 
-      // Set up store with runner and evaluator
+      // Set up store with target and evaluator
       useEvaluationsV3Store.setState({
-        runners: [createTestRunner()],
+        targets: [createTestTarget()],
         datasets: [createTestDataset()],
         activeDatasetId: "test-data",
         evaluators: [createTestEvaluator()],
@@ -403,10 +403,10 @@ describe("Evaluator Mappings", () => {
     it("opens evaluator drawer when Run Evaluation is clicked with missing evaluator mappings", async () => {
       const user = userEvent.setup();
 
-      // Set up store with complete runner mappings but incomplete evaluator mappings
+      // Set up store with complete target mappings but incomplete evaluator mappings
       useEvaluationsV3Store.setState({
-        runners: [
-          createTestRunner({
+        targets: [
+          createTestTarget({
             mappings: {
               "test-data": {
                 input: {
@@ -447,14 +447,14 @@ describe("Evaluator Mappings", () => {
       expect(openedDrawerParams.mappingsConfig).toBeDefined();
     });
 
-    it("validates runners before evaluators", async () => {
+    it("validates targets before evaluators", async () => {
       const user = userEvent.setup();
 
-      // Set up store with incomplete runner AND evaluator mappings
+      // Set up store with incomplete target AND evaluator mappings
       // Add localPromptConfig with message using {{input}} so the field is considered "used"
       useEvaluationsV3Store.setState({
-        runners: [
-          createTestRunner({
+        targets: [
+          createTestTarget({
             // No mappings - will fail validation first
             mappings: {},
             // Add localPromptConfig with a message that uses the "input" field
@@ -486,8 +486,8 @@ describe("Evaluator Mappings", () => {
       // Click Run Evaluation
       await user.click(screen.getByTestId("run-evaluation-button"));
 
-      // Verify runner (prompt) drawer was opened first, not evaluator
-      // Since the runner uses {{input}} but has no mapping for it, it should fail first
+      // Verify target (prompt) drawer was opened first, not evaluator
+      // Since the target uses {{input}} but has no mapping for it, it should fail first
       expect(openedDrawerType).toBe("promptEditor");
     });
   });

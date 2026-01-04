@@ -6,8 +6,8 @@ import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
 import type { TableRowData, TableMeta } from "../types";
-import { RunnerHeader } from "./RunnerSection/RunnerHeader";
-import { RunnerCellContent } from "./RunnerSection/RunnerCell";
+import { TargetHeader } from "./TargetSection/TargetHeader";
+import { TargetCellContent } from "./TargetSection/TargetCell";
 
 /**
  * Checkbox header that reads selection state from table meta.
@@ -64,52 +64,52 @@ export const CheckboxCellFromMeta = ({
 };
 
 /**
- * Wrapper component for RunnerHeader that reads from table meta.
+ * Wrapper component for TargetHeader that reads from table meta.
  * This allows us to have stable column definitions that don't change
- * when runner data changes, preventing unnecessary remounts.
+ * when target data changes, preventing unnecessary remounts.
  */
-export const RunnerHeaderFromMeta = ({
-  runnerId,
+export const TargetHeaderFromMeta = ({
+  targetId,
   context,
 }: {
-  runnerId: string;
+  targetId: string;
   context: HeaderContext<TableRowData, unknown>;
 }) => {
   const meta = context.table.options.meta as TableMeta | undefined;
-  const runner = meta?.runnersMap.get(runnerId);
+  const target = meta?.targetsMap.get(targetId);
 
-  if (!runner) return null;
+  if (!target) return null;
 
   return (
-    <RunnerHeader
-      runner={runner}
-      onEdit={meta?.openRunnerEditor}
-      onRemove={meta?.handleRemoveRunner}
+    <TargetHeader
+      target={target}
+      onEdit={meta?.openTargetEditor}
+      onRemove={meta?.handleRemoveTarget}
     />
   );
 };
 
 /**
- * Wrapper component for RunnerCellContent that reads from table meta.
+ * Wrapper component for TargetCellContent that reads from table meta.
  */
-export const RunnerCellFromMeta = ({
-  runnerId,
+export const TargetCellFromMeta = ({
+  targetId,
   data,
   rowIndex,
   tableMeta,
 }: {
-  runnerId: string;
+  targetId: string;
   data: { output: unknown; evaluators: Record<string, unknown> } | undefined;
   rowIndex: number;
   tableMeta: TableMeta | undefined;
 }) => {
-  const runner = tableMeta?.runnersMap.get(runnerId);
+  const target = tableMeta?.targetsMap.get(targetId);
 
-  if (!runner) return null;
+  if (!target) return null;
 
   return (
-    <RunnerCellContent
-      runner={runner}
+    <TargetCellContent
+      target={target}
       output={data?.output}
       evaluatorResults={data?.evaluators ?? {}}
       row={rowIndex}

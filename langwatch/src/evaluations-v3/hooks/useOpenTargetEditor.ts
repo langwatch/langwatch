@@ -1,5 +1,5 @@
 /**
- * Hook to open the runner editor drawer with proper flow callbacks.
+ * Hook to open the target editor drawer with proper flow callbacks.
  *
  * This centralizes the logic for:
  * 1. Building available sources for variable mapping
@@ -26,10 +26,10 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
-import type { RunnerConfig } from "../types";
+import type { TargetConfig } from "../types";
 import type { Field } from "~/optimization_studio/types/dsl";
 
-export const useOpenRunnerEditor = () => {
+export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useContext();
@@ -37,21 +37,21 @@ export const useOpenRunnerEditor = () => {
   const {
     datasets,
     activeDatasetId,
-    updateRunner,
-    setRunnerMapping,
-    removeRunnerMapping,
+    updateTarget,
+    setTargetMapping,
+    removeTargetMapping,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
-      updateRunner: state.updateRunner,
-      setRunnerMapping: state.setRunnerMapping,
-      removeRunnerMapping: state.removeRunnerMapping,
+      updateTarget: state.updateTarget,
+      setTargetMapping: state.setTargetMapping,
+      removeTargetMapping: state.removeTargetMapping,
     }))
   );
 
   /**
-   * Check if a source ID refers to a dataset (vs a runner).
+   * Check if a source ID refers to a dataset (vs a target).
    */
   const isDatasetSource = useCallback(
     (sourceId: string) => datasets.some((d) => d.id === sourceId),
@@ -79,16 +79,16 @@ export const useOpenRunnerEditor = () => {
   }, [datasets, activeDatasetId]);
 
   /**
-   * Open the runner editor drawer with proper flow callbacks.
+   * Open the target editor drawer with proper flow callbacks.
    */
-  const openRunnerEditor = useCallback(
-    async (runner: RunnerConfig) => {
-      if (runner.type === "prompt") {
+  const openTargetEditor = useCallback(
+    async (target: TargetConfig) => {
+      if (target.type === "prompt") {
         // Build available sources for variable mapping (active dataset only)
         const availableSources = buildAvailableSources();
 
-        // Convert runner mappings for the active dataset to UI format
-        const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+        // Convert target mappings for the active dataset to UI format
+        const datasetMappings = target.mappings[activeDatasetId] ?? {};
         const uiMappings: Record<string, UIFieldMapping> = {};
         for (const [key, mapping] of Object.entries(datasetMappings)) {
           uiMappings[key] = convertToUIMapping(mapping);
@@ -96,16 +96,16 @@ export const useOpenRunnerEditor = () => {
 
         // Set flow callbacks for the prompt editor
         // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
-        // onSave: updates runner when prompt is published
-        // onInputMappingsChange: updates runner mappings when variable mappings change (for active dataset)
-        // NOTE: No onInputsInitialized here - inputs are already initialized when runner was added
+        // onSave: updates target when prompt is published
+        // onInputMappingsChange: updates target mappings when variable mappings change (for active dataset)
+        // NOTE: No onInputsInitialized here - inputs are already initialized when target was added
         setFlowCallbacks("promptEditor", {
           onLocalConfigChange: (localConfig) => {
             // Only update localPromptConfig for tracking unsaved changes
-            updateRunner(runner.id, { localPromptConfig: localConfig });
+            updateTarget(target.id, { localPromptConfig: localConfig });
           },
           onSave: (savedPrompt) => {
-            updateRunner(runner.id, {
+            updateTarget(target.id, {
               name: savedPrompt.name,
               promptId: savedPrompt.id,
               localPromptConfig: undefined, // Clear local config on save
@@ -132,33 +132,33 @@ export const useOpenRunnerEditor = () => {
               currentDatasets.some((d) => d.id === sourceId);
 
             if (mapping) {
-              setRunnerMapping(
-                runner.id,
+              setTargetMapping(
+                target.id,
                 currentActiveDatasetId,
                 identifier,
                 convertFromUIMapping(mapping, checkIsDatasetSource)
               );
             } else {
-              removeRunnerMapping(runner.id, currentActiveDatasetId, identifier);
+              removeTargetMapping(target.id, currentActiveDatasetId, identifier);
             }
           },
         });
 
         // Open the drawer with initial config and available sources
-        const initialLocalConfig = runner.localPromptConfig;
+        const initialLocalConfig = target.localPromptConfig;
         openDrawer("promptEditor", {
-          promptId: runner.promptId,
+          promptId: target.promptId,
           initialLocalConfig,
           availableSources,
           inputMappings: uiMappings,
-          urlParams: { runnerId: runner.id },
+          urlParams: { targetId: target.id },
         });
-      } else if (runner.type === "agent" && runner.dbAgentId) {
+      } else if (target.type === "agent" && target.dbAgentId) {
         // Fetch the agent to determine its type
         try {
           const agent = await trpcUtils.agents.getById.fetch({
             projectId: project?.id ?? "",
-            id: runner.dbAgentId,
+            id: target.dbAgentId,
           });
 
           if (agent?.type === "workflow") {
@@ -174,8 +174,8 @@ export const useOpenRunnerEditor = () => {
             // Build available sources for variable mapping (active dataset only)
             const availableSources = buildAvailableSources();
 
-            // Convert runner mappings for the active dataset to UI format
-            const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+            // Convert target mappings for the active dataset to UI format
+            const datasetMappings = target.mappings[activeDatasetId] ?? {};
             const uiMappings: Record<string, UIFieldMapping> = {};
             for (const [key, mapping] of Object.entries(datasetMappings)) {
               uiMappings[key] = convertToUIMapping(mapping);
@@ -194,14 +194,14 @@ export const useOpenRunnerEditor = () => {
                   currentDatasets.some((d) => d.id === sourceId);
 
                 if (mapping) {
-                  setRunnerMapping(
-                    runner.id,
+                  setTargetMapping(
+                    target.id,
                     currentActiveDatasetId,
                     identifier,
                     convertFromUIMapping(mapping, checkIsDatasetSource)
                   );
                 } else {
-                  removeRunnerMapping(runner.id, currentActiveDatasetId, identifier);
+                  removeTargetMapping(target.id, currentActiveDatasetId, identifier);
                 }
               },
             });
@@ -210,8 +210,8 @@ export const useOpenRunnerEditor = () => {
               availableSources,
               inputMappings: uiMappings,
               urlParams: {
-                runnerId: runner.id,
-                agentId: runner.dbAgentId ?? "",
+                targetId: target.id,
+                agentId: target.dbAgentId ?? "",
               },
             });
           }
@@ -223,9 +223,9 @@ export const useOpenRunnerEditor = () => {
     [
       buildAvailableSources,
       activeDatasetId,
-      updateRunner,
-      setRunnerMapping,
-      removeRunnerMapping,
+      updateTarget,
+      setTargetMapping,
+      removeTargetMapping,
       openDrawer,
       trpcUtils.agents.getById,
       project?.id,
@@ -233,5 +233,5 @@ export const useOpenRunnerEditor = () => {
     ]
   );
 
-  return { openRunnerEditor, buildAvailableSources, isDatasetSource };
+  return { openTargetEditor, buildAvailableSources, isDatasetSource };
 };

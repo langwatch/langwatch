@@ -9,12 +9,12 @@ import { act, render, screen, cleanup } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { RunnerHeader } from "../components/RunnerSection/RunnerHeader";
-import type { RunnerConfig, DatasetReference, EvaluatorConfig } from "../types";
+import { TargetHeader } from "../components/TargetSection/TargetHeader";
+import type { TargetConfig, DatasetReference, EvaluatorConfig } from "../types";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 import {
-  getRunnerMissingMappings,
-  runnerHasMissingMappings,
+  getTargetMissingMappings,
+  targetHasMissingMappings,
   getEvaluatorMissingMappings,
   evaluatorHasMissingMappings,
   validateWorkbench,
@@ -36,14 +36,14 @@ const createTestDataset = (
   columns: columns.map((c) => ({ id: c.name, ...c })),
 });
 
-const createTestRunner = (
+const createTestTarget = (
   id: string,
   inputs: Array<{ identifier: string; type: string }> = [{ identifier: "question", type: "str" }],
-  mappings: RunnerConfig["mappings"] = {}
-): RunnerConfig => ({
+  mappings: TargetConfig["mappings"] = {}
+): TargetConfig => ({
   id,
   type: "prompt",
-  name: `Runner ${id}`,
+  name: `Target ${id}`,
   inputs: inputs.map((i) => ({ ...i, type: i.type as "str" })),
   outputs: [{ identifier: "output", type: "str" }],
   mappings,
@@ -111,30 +111,30 @@ describe("mappingValidation utility", () => {
 
   describe("getUsedFields", () => {
     it("extracts used fields from prompt messages", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }]);
-      const fields = getUsedFields(runner);
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }]);
+      const fields = getUsedFields(target);
       expect(fields.has("question")).toBe(true);
     });
 
-    it("returns all inputs for code runners", () => {
-      const runner: RunnerConfig = {
-        ...createTestRunner("r1", [
+    it("returns all inputs for code targets", () => {
+      const target: TargetConfig = {
+        ...createTestTarget("r1", [
           { identifier: "input1", type: "str" },
           { identifier: "input2", type: "str" },
         ]),
         type: "agent",
         localPromptConfig: undefined,
       };
-      const fields = getUsedFields(runner);
+      const fields = getUsedFields(target);
       expect(fields.has("input1")).toBe(true);
       expect(fields.has("input2")).toBe(true);
     });
   });
 
-  describe("getRunnerMissingMappings", () => {
+  describe("getTargetMissingMappings", () => {
     it("identifies missing mappings for used fields", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {});
-      const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+      const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
       expect(result.isValid).toBe(false);
       expect(result.missingMappings.length).toBe(1);
@@ -142,7 +142,7 @@ describe("mappingValidation utility", () => {
     });
 
     it("returns valid when all used fields are mapped", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
         [DEFAULT_TEST_DATA_ID]: {
           question: {
             type: "source",
@@ -152,13 +152,13 @@ describe("mappingValidation utility", () => {
           },
         },
       });
-      const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+      const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
       expect(result.isValid).toBe(true);
       expect(result.missingMappings.length).toBe(0);
     });
 
     it("considers value mappings as valid", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
         [DEFAULT_TEST_DATA_ID]: {
           question: {
             type: "value",
@@ -166,19 +166,19 @@ describe("mappingValidation utility", () => {
           },
         },
       });
-      const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+      const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
       expect(result.isValid).toBe(true);
     });
   });
 
-  describe("runnerHasMissingMappings", () => {
+  describe("targetHasMissingMappings", () => {
     it("returns true when mappings are missing", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {});
-      expect(runnerHasMissingMappings(runner, DEFAULT_TEST_DATA_ID)).toBe(true);
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+      expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(true);
     });
 
     it("returns false when all mappings are set", () => {
-      const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
         [DEFAULT_TEST_DATA_ID]: {
           question: {
             type: "source",
@@ -188,14 +188,14 @@ describe("mappingValidation utility", () => {
           },
         },
       });
-      expect(runnerHasMissingMappings(runner, DEFAULT_TEST_DATA_ID)).toBe(false);
+      expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(false);
     });
   });
 
   describe("validateWorkbench", () => {
-    it("returns valid when all runners have mappings", () => {
-      const runners = [
-        createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+    it("returns valid when all targets have mappings", () => {
+      const targets = [
+        createTestTarget("r1", [{ identifier: "question", type: "str" }], {
           [DEFAULT_TEST_DATA_ID]: {
             question: {
               type: "source",
@@ -206,13 +206,13 @@ describe("mappingValidation utility", () => {
           },
         }),
       ];
-      const result = validateWorkbench(runners, [], DEFAULT_TEST_DATA_ID);
+      const result = validateWorkbench(targets, [], DEFAULT_TEST_DATA_ID);
       expect(result.isValid).toBe(true);
     });
 
-    it("returns first invalid runner", () => {
-      const runners = [
-        createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+    it("returns first invalid target", () => {
+      const targets = [
+        createTestTarget("r1", [{ identifier: "question", type: "str" }], {
           [DEFAULT_TEST_DATA_ID]: {
             question: {
               type: "source",
@@ -222,27 +222,27 @@ describe("mappingValidation utility", () => {
             },
           },
         }),
-        createTestRunner("r2", [{ identifier: "context", type: "str" }], {}),
+        createTestTarget("r2", [{ identifier: "context", type: "str" }], {}),
       ];
-      const result = validateWorkbench(runners, [], DEFAULT_TEST_DATA_ID);
+      const result = validateWorkbench(targets, [], DEFAULT_TEST_DATA_ID);
 
       expect(result.isValid).toBe(false);
-      expect(result.firstInvalidRunner?.runner.id).toBe("r2");
+      expect(result.firstInvalidTarget?.target.id).toBe("r2");
     });
   });
 });
 
 // ============================================================================
-// Tests: RunnerHeader alert icon
+// Tests: TargetHeader alert icon
 // ============================================================================
 
-describe("RunnerHeader alert icon", () => {
-  it("shows alert icon when runner has missing mappings", () => {
-    const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {});
+describe("TargetHeader alert icon", () => {
+  it("shows alert icon when target has missing mappings", () => {
+    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
 
     renderWithProviders(
-      <RunnerHeader
-        runner={runner}
+      <TargetHeader
+        target={target}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -253,7 +253,7 @@ describe("RunnerHeader alert icon", () => {
   });
 
   it("does not show alert icon when all mappings are set", () => {
-    const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
       [DEFAULT_TEST_DATA_ID]: {
         question: {
           type: "source",
@@ -265,8 +265,8 @@ describe("RunnerHeader alert icon", () => {
     });
 
     renderWithProviders(
-      <RunnerHeader
-        runner={runner}
+      <TargetHeader
+        target={target}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -277,8 +277,8 @@ describe("RunnerHeader alert icon", () => {
   });
 
   it("shows unpublished indicator when no missing mappings but has local changes", () => {
-    const runner: RunnerConfig = {
-      ...createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+    const target: TargetConfig = {
+      ...createTestTarget("r1", [{ identifier: "question", type: "str" }], {
         [DEFAULT_TEST_DATA_ID]: {
           question: {
             type: "source",
@@ -297,8 +297,8 @@ describe("RunnerHeader alert icon", () => {
     };
 
     renderWithProviders(
-      <RunnerHeader
-        runner={runner}
+      <TargetHeader
+        target={target}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -315,34 +315,34 @@ describe("RunnerHeader alert icon", () => {
 // ============================================================================
 
 describe("Validation edge cases", () => {
-  it("falls back to runner.inputs for validation when no localPromptConfig", () => {
+  it("falls back to target.inputs for validation when no localPromptConfig", () => {
     // When prompt content isn't loaded yet (no localPromptConfig),
-    // we use runner.inputs as the source of fields that need mapping.
+    // we use target.inputs as the source of fields that need mapping.
     // This ensures the alert icon shows even before the drawer is opened.
-    const runner: RunnerConfig = {
-      ...createTestRunner("r1", [{ identifier: "input", type: "str" }]),
+    const target: TargetConfig = {
+      ...createTestTarget("r1", [{ identifier: "input", type: "str" }]),
       localPromptConfig: undefined, // Explicitly no localPromptConfig - prompt not loaded yet
     };
 
-    const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
-    // Should be INVALID because "input" is in runner.inputs but has no mapping
+    // Should be INVALID because "input" is in target.inputs but has no mapping
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
     expect(result.missingMappings[0]?.fieldId).toBe("input");
   });
 
-  it("uses localPromptConfig.inputs when it differs from runner.inputs (form-added variables)", () => {
+  it("uses localPromptConfig.inputs when it differs from target.inputs (form-added variables)", () => {
     // CRITICAL: This tests the real-world scenario where:
-    // 1. Runner was created with initial inputs (e.g., just "input")
+    // 1. Target was created with initial inputs (e.g., just "input")
     // 2. User opens drawer and adds {{foo}} via the form
-    // 3. Form adds "foo" to localPromptConfig.inputs, but runner.inputs stays unchanged
-    // The validation must use localPromptConfig.inputs, not runner.inputs!
-    const runner: RunnerConfig = {
+    // 3. Form adds "foo" to localPromptConfig.inputs, but target.inputs stays unchanged
+    // The validation must use localPromptConfig.inputs, not target.inputs!
+    const target: TargetConfig = {
       id: "r1",
       type: "prompt",
-      name: "Test Runner",
-      // Original runner.inputs - only has "input"
+      name: "Test Target",
+      // Original target.inputs - only has "input"
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
@@ -358,10 +358,10 @@ describe("Validation edge cases", () => {
       },
     };
 
-    const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // Both "input" and "foo" should be detected as missing
-    // If this only detects "input", the bug is that we're using runner.inputs
+    // If this only detects "input", the bug is that we're using target.inputs
     // instead of localPromptConfig.inputs
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(2);
@@ -372,8 +372,8 @@ describe("Validation edge cases", () => {
   it("only detects missing mapping for fields that are BOTH used AND in inputs list", () => {
     // Fields used in prompt but NOT in inputs list ("Undefined variables") are NOT required.
     // Only fields that are both used AND defined in inputs require mappings.
-    const runner: RunnerConfig = {
-      ...createTestRunner("r1", [{ identifier: "question", type: "str" }]),
+    const target: TargetConfig = {
+      ...createTestTarget("r1", [{ identifier: "question", type: "str" }]),
       localPromptConfig: {
         llm: { model: "gpt-4" },
         messages: [{ role: "user", content: "Hello {{question}} and {{foo}}" }], // foo used but not in inputs
@@ -382,7 +382,7 @@ describe("Validation edge cases", () => {
       },
     };
 
-    const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // Only "question" should be detected as missing (it's both used AND in inputs)
     // "foo" is used but NOT in inputs - this is fine ("Undefined variables" warning, not mapping error)
@@ -395,8 +395,8 @@ describe("Validation edge cases", () => {
   it("does not report missing for field deleted from inputs but mapped in other dataset", () => {
     // Issue 4: Field "input" was deleted, but mapping still exists in another dataset
     // The field is NOT used in the prompt anymore, so it should NOT be reported
-    const runner: RunnerConfig = {
-      ...createTestRunner("r1", []), // Empty inputs - field was deleted
+    const target: TargetConfig = {
+      ...createTestTarget("r1", []), // Empty inputs - field was deleted
       localPromptConfig: {
         llm: { model: "gpt-4" },
         messages: [{ role: "user", content: "Hello world" }], // No fields used
@@ -416,7 +416,7 @@ describe("Validation edge cases", () => {
       },
     };
 
-    const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // No missing mappings because no fields are used in the prompt
     expect(result.isValid).toBe(true);
@@ -425,8 +425,8 @@ describe("Validation edge cases", () => {
 
   it("correctly validates when field is removed from prompt but still in inputs", () => {
     // Field "context" is in inputs but not used in prompt
-    const runner: RunnerConfig = {
-      ...createTestRunner("r1", [
+    const target: TargetConfig = {
+      ...createTestTarget("r1", [
         { identifier: "question", type: "str" },
         { identifier: "context", type: "str" }, // In inputs but not used
       ]),
@@ -442,7 +442,7 @@ describe("Validation edge cases", () => {
     };
 
     // Only map "question", leave "context" unmapped
-    runner.mappings = {
+    target.mappings = {
       [DEFAULT_TEST_DATA_ID]: {
         question: {
           type: "source",
@@ -453,7 +453,7 @@ describe("Validation edge cases", () => {
       },
     };
 
-    const result = getRunnerMissingMappings(runner, DEFAULT_TEST_DATA_ID);
+    const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
     // Should be valid because "context" is not used in the prompt
     expect(result.isValid).toBe(true);
@@ -462,23 +462,23 @@ describe("Validation edge cases", () => {
 });
 
 // ============================================================================
-// Tests: Runner alert icon for missing mappings (Integration)
+// Tests: Target alert icon for missing mappings (Integration)
 // ============================================================================
 
-describe("Runner header alert icon integration", () => {
-  it("shows alert icon when store runner has localPromptConfig with unmapped variables", () => {
+describe("Target header alert icon integration", () => {
+  it("shows alert icon when store target has localPromptConfig with unmapped variables", () => {
     // This reproduces the actual bug:
-    // 1. Runner is in the store with localPromptConfig (prompt was loaded)
+    // 1. Target is in the store with localPromptConfig (prompt was loaded)
     // 2. localPromptConfig has variables that aren't mapped
     // 3. Alert icon should show
 
-    // First, add the runner to the store
-    const runnerId = "runner-integration-1";
+    // First, add the target to the store
+    const targetId = "target-integration-1";
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
-        name: "Test Runner",
+        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }], // Initial placeholder
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -498,7 +498,7 @@ describe("Runner header alert icon integration", () => {
     // Simulate what happens when the prompt editor loads: localPromptConfig gets set
     // with the actual prompt variables
     act(() => {
-      useEvaluationsV3Store.getState().updateRunner(runnerId, {
+      useEvaluationsV3Store.getState().updateTarget(targetId, {
         localPromptConfig: {
           llm: { model: "gpt-4" },
           messages: [
@@ -513,12 +513,12 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    // Get the runner FROM THE STORE (like the real component does)
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    // Get the target FROM THE STORE (like the real component does)
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -531,12 +531,12 @@ describe("Runner header alert icon integration", () => {
   });
 
   it("hides alert icon when all variables from localPromptConfig are mapped", () => {
-    const runnerId = "runner-integration-2";
+    const targetId = "target-integration-2";
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
-        name: "Test Runner",
+        name: "Test Target",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
@@ -561,7 +561,7 @@ describe("Runner header alert icon integration", () => {
 
     // Set localPromptConfig with the prompt content
     act(() => {
-      useEvaluationsV3Store.getState().updateRunner(runnerId, {
+      useEvaluationsV3Store.getState().updateTarget(targetId, {
         localPromptConfig: {
           llm: { model: "gpt-4" },
           messages: [
@@ -576,11 +576,11 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -592,7 +592,7 @@ describe("Runner header alert icon integration", () => {
     expect(alertIcon).not.toBeInTheDocument();
   });
 
-  it("shows alert icon when runner has variable that cannot be auto-inferred", () => {
+  it("shows alert icon when target has variable that cannot be auto-inferred", () => {
     // This tests the real scenario:
     // 1. Dataset has columns: foo, bar (nothing that matches "my_custom_var")
     // 2. Prompt has variable: my_custom_var
@@ -613,13 +613,13 @@ describe("Runner header alert icon integration", () => {
       useEvaluationsV3Store.getState().setActiveDataset("dataset-no-match");
     });
 
-    const runnerId = "runner-integration-3";
+    const targetId = "target-integration-3";
     act(() => {
-      // addRunner will try to auto-infer but find nothing
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      // addTarget will try to auto-infer but find nothing
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
-        name: "Test Runner",
+        name: "Test Target",
         inputs: [
           { identifier: "my_custom_var", type: "str" }, // No matching column at all!
         ],
@@ -628,18 +628,18 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     // Verify "my_custom_var" was NOT auto-inferred (no matching column)
-    expect(storeRunner.mappings["dataset-no-match"]?.my_custom_var).toBeUndefined();
+    expect(storeTarget.mappings["dataset-no-match"]?.my_custom_var).toBeUndefined();
 
     // Test the validation function directly
-    const hasMissing = runnerHasMissingMappings(storeRunner, "dataset-no-match");
+    const hasMissing = targetHasMissingMappings(storeTarget, "dataset-no-match");
     expect(hasMissing).toBe(true); // Should have missing mappings
 
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -653,19 +653,19 @@ describe("Runner header alert icon integration", () => {
 
   it("shows alert when prompt has variable that cannot be auto-mapped", () => {
     // This simulates the flow when a prompt is loaded:
-    // 1. Runner is created with placeholder inputs
+    // 1. Target is created with placeholder inputs
     // 2. Drawer opens and loads prompt content
     // 3. onLocalConfigChange is called with the real inputs
     // 4. Inference runs for new inputs
     // 5. Variables that CAN be mapped (e.g., user_input → input) are mapped
     // 6. Variables that CANNOT be mapped show alert icon
 
-    const runnerId = "runner-drawer-flow";
+    const targetId = "target-drawer-flow";
 
-    // Step 1: Runner created with placeholder
+    // Step 1: Target created with placeholder
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
         name: "my-first-prompt",
         promptId: "some-prompt-id",
@@ -679,7 +679,7 @@ describe("Runner header alert icon integration", () => {
     // The onLocalConfigChange callback runs inference for new inputs
     // "custom_context" has NO matching column in dataset, so it won't be mapped
     act(() => {
-      useEvaluationsV3Store.getState().updateRunner(runnerId, {
+      useEvaluationsV3Store.getState().updateTarget(targetId, {
         localPromptConfig: {
           llm: { model: "gpt-5" },
           messages: [
@@ -694,20 +694,20 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    // Get updated runner
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    // Get updated target
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     // "input" should be mapped (exact match)
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.input).toBeDefined();
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.input).toBeDefined();
 
     // "custom_context" should NOT be mapped (no matching column)
     // So validation should detect it as missing
-    const hasMissing = runnerHasMissingMappings(storeRunner, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
     expect(hasMissing).toBe(true);
 
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -722,20 +722,20 @@ describe("Runner header alert icon integration", () => {
     // Test that user-cleared mappings persist across drawer opens.
     //
     // Flow:
-    // 1. Add runner with inputs (auto-mapping happens in addRunner)
+    // 1. Add target with inputs (auto-mapping happens in addTarget)
     // 2. User clears a mapping
     // 3. User closes and reopens drawer
     // 4. Mapping should STILL be cleared (no re-auto-mapping)
     //
-    // FIX: Auto-mapping only happens when runner is ADDED to workbench.
+    // FIX: Auto-mapping only happens when target is ADDED to workbench.
     // The drawer does NOT re-run auto-mapping on open.
 
-    const runnerId = "runner-cleared-mapping";
+    const targetId = "target-cleared-mapping";
 
-    // Step 1: Add runner with real inputs - auto-mapping happens here
+    // Step 1: Add target with real inputs - auto-mapping happens here
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
         name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
@@ -745,18 +745,18 @@ describe("Runner header alert icon integration", () => {
     });
 
     // Verify auto-mapping worked (user_input -> input via semantic equivalents)
-    let storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input?.type).toBe("source");
+    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input?.type).toBe("source");
 
     // Step 2: User clears the mapping (clicks X on the tag)
     act(() => {
-      useEvaluationsV3Store.getState().removeRunnerMapping(runnerId, DEFAULT_TEST_DATA_ID, "user_input");
+      useEvaluationsV3Store.getState().removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
     });
 
     // Verify mapping is cleared
-    storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
 
     // Step 3 & 4: User closes and reopens drawer
     // With the fix, reopening the drawer does NOT re-run auto-mapping.
@@ -764,8 +764,8 @@ describe("Runner header alert icon integration", () => {
     // initialization function. The mapping should remain cleared.
 
     // Final check: mapping is STILL cleared
-    storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
   });
 
   it("auto-maps user_input to input column via semantic equivalents", () => {
@@ -773,15 +773,15 @@ describe("Runner header alert icon integration", () => {
     // user_input: ["input", ...] means user_input field can map to input column
     //
     // The flow:
-    // 1. Add runner with real inputs (addRunner auto-maps)
+    // 1. Add target with real inputs (addTarget auto-maps)
     // 2. user_input gets mapped to input column via semantic equivalents
 
-    const runnerId = "runner-semantic";
+    const targetId = "target-semantic";
 
-    // Add runner with the real inputs - auto-mapping happens in addRunner
+    // Add target with the real inputs - auto-mapping happens in addTarget
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
         name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
@@ -790,11 +790,11 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     // user_input SHOULD be auto-mapped to input column via SEMANTIC_EQUIVALENTS
     // user_input: ["input", ...] means user_input field maps to input column
-    const userInputMapping = storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
+    const userInputMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
     expect(userInputMapping).toBeDefined();
     expect(userInputMapping?.type).toBe("source");
     if (userInputMapping?.type === "source") {
@@ -802,12 +802,12 @@ describe("Runner header alert icon integration", () => {
     }
 
     // No missing mappings - user_input was successfully mapped
-    const hasMissing = runnerHasMissingMappings(storeRunner, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
     expect(hasMissing).toBe(false);
 
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -819,25 +819,25 @@ describe("Runner header alert icon integration", () => {
     expect(alertIcon).not.toBeInTheDocument();
   });
 
-  it("does not crash when updateRunner is called with inputs on a runner that has inputs undefined", () => {
+  it("does not crash when updateTarget is called with inputs on a target that has inputs undefined", () => {
     // BUG REPRO: This reproduces the exact crash:
-    // "can't access property 'map', existingRunner.inputs is undefined"
+    // "can't access property 'map', existingTarget.inputs is undefined"
     //
     // This happens when:
-    // 1. A runner exists in the store without inputs (or with inputs: undefined)
-    // 2. updateRunner is called with new inputs
-    // 3. The store tries to do: existingRunner.inputs.map(...)
+    // 1. A target exists in the store without inputs (or with inputs: undefined)
+    // 2. updateTarget is called with new inputs
+    // 3. The store tries to do: existingTarget.inputs.map(...)
     // 4. CRASH because inputs is undefined
 
-    const runnerId = "runner-crash-test";
+    const targetId = "target-crash-test";
 
-    // Step 1: Create a runner WITHOUT inputs (simulating a bug or edge case)
+    // Step 1: Create a target WITHOUT inputs (simulating a bug or edge case)
     act(() => {
       const store = useEvaluationsV3Store.getState();
-      // Directly set state to simulate a runner without inputs
+      // Directly set state to simulate a target without inputs
       // This is the buggy state that causes the crash
-      store.addRunner({
-        id: runnerId,
+      store.addTarget({
+        id: targetId,
         type: "prompt",
         name: "test-prompt",
         inputs: undefined as any, // Simulating the bug - inputs is undefined
@@ -846,35 +846,35 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    // Step 2: Try to update the runner with inputs - this should NOT crash
+    // Step 2: Try to update the target with inputs - this should NOT crash
     expect(() => {
       act(() => {
-        useEvaluationsV3Store.getState().updateRunner(runnerId, {
+        useEvaluationsV3Store.getState().updateTarget(targetId, {
           inputs: [{ identifier: "user_input", type: "str" }],
         });
       });
     }).not.toThrow();
 
-    // Step 3: Verify the runner now has the correct inputs
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId);
-    expect(storeRunner?.inputs).toHaveLength(1);
-    expect(storeRunner?.inputs?.[0]?.identifier).toBe("user_input");
+    // Step 3: Verify the target now has the correct inputs
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    expect(storeTarget?.inputs).toHaveLength(1);
+    expect(storeTarget?.inputs?.[0]?.identifier).toBe("user_input");
   });
 
   it("handles the exact flow when handleSelectPrompt callback fires", () => {
     // This reproduces the EXACT flow that causes the crash:
-    // 1. handleSelectPrompt creates runner with placeholder inputs
+    // 1. handleSelectPrompt creates target with placeholder inputs
     // 2. Opens drawer
     // 3. Drawer's form subscription fires onLocalConfigChange
-    // 4. onLocalConfigChange calls updateRunner with new inputs
-    // 5. CRASH if existingRunner.inputs is undefined
+    // 4. onLocalConfigChange calls updateTarget with new inputs
+    // 5. CRASH if existingTarget.inputs is undefined
 
-    const runnerId = "runner-select-prompt-flow";
+    const targetId = "target-select-prompt-flow";
 
-    // Step 1: Simulate handleSelectPrompt creating a runner
+    // Step 1: Simulate handleSelectPrompt creating a target
     // This is what handleSelectPrompt does:
-    const runnerConfig: RunnerConfig = {
-      id: runnerId,
+    const targetConfig: TargetConfig = {
+      id: targetId,
       type: "prompt",
       name: "my-first-prompt",
       promptId: "some-prompt-id",
@@ -884,19 +884,19 @@ describe("Runner header alert icon integration", () => {
     };
 
     act(() => {
-      useEvaluationsV3Store.getState().addRunner(runnerConfig);
+      useEvaluationsV3Store.getState().addTarget(targetConfig);
     });
 
-    // Verify runner was created with inputs
-    let storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId);
-    expect(storeRunner?.inputs).toBeDefined();
-    expect(storeRunner?.inputs).toHaveLength(1);
+    // Verify target was created with inputs
+    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    expect(storeTarget?.inputs).toBeDefined();
+    expect(storeTarget?.inputs).toHaveLength(1);
 
     // Step 2: Simulate what onLocalConfigChange does when drawer loads
     // This should NOT crash
     expect(() => {
       act(() => {
-        useEvaluationsV3Store.getState().updateRunner(runnerId, {
+        useEvaluationsV3Store.getState().updateTarget(targetId, {
           localPromptConfig: {
             llm: { model: "gpt-5" },
             messages: [{ role: "system", content: "You are helpful. {{foobar}}" }],
@@ -909,27 +909,27 @@ describe("Runner header alert icon integration", () => {
     }).not.toThrow();
 
     // Step 3: Verify state is correct
-    storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId);
-    expect(storeRunner?.inputs).toHaveLength(1);
-    expect(storeRunner?.inputs?.[0]?.identifier).toBe("foobar");
+    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    expect(storeTarget?.inputs).toHaveLength(1);
+    expect(storeTarget?.inputs?.[0]?.identifier).toBe("foobar");
   });
 
   it("shows alert icon when prompt has unmapped variable after drawer loads", () => {
     // Flow:
     // 1. User adds prompt "my-first-prompt" to workbench
-    // 2. handleSelectPrompt creates runner with REAL inputs from prompt list data
-    // 3. addRunner auto-maps based on real inputs
+    // 2. handleSelectPrompt creates target with REAL inputs from prompt list data
+    // 3. addTarget auto-maps based on real inputs
     // 4. user_input gets auto-mapped to input column (via semantic equiv)
     // 5. foobar has NO mapping (no matching column)
     // 6. Alert icon SHOULD show because foobar is unmapped
 
-    const runnerId = "runner-alert-test";
+    const targetId = "target-alert-test";
 
     // handleSelectPrompt now gets real inputs from PromptListDrawer
-    // and passes them directly to addRunner (no more placeholder inputs)
+    // and passes them directly to addTarget (no more placeholder inputs)
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
         name: "my-first-prompt",
         promptId: "some-prompt-id",
@@ -942,30 +942,30 @@ describe("Runner header alert icon integration", () => {
       });
     });
 
-    // Get runner - auto-mapping already happened in addRunner
-    const storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
+    // Get target - auto-mapping already happened in addTarget
+    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
 
     // Verify inputs are set
-    expect(storeRunner.inputs).toHaveLength(2);
-    expect(storeRunner.inputs.map(i => i.identifier)).toContain("foobar");
-    expect(storeRunner.inputs.map(i => i.identifier)).toContain("user_input");
+    expect(storeTarget.inputs).toHaveLength(2);
+    expect(storeTarget.inputs.map(i => i.identifier)).toContain("foobar");
+    expect(storeTarget.inputs.map(i => i.identifier)).toContain("user_input");
 
     // user_input should be mapped (via semantic equivalents user_input -> input)
-    const userInputMapping = storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
+    const userInputMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
     expect(userInputMapping).toBeDefined(); // Should be auto-mapped
 
     // foobar should NOT be mapped (no matching column)
-    const foobarMapping = storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.foobar;
+    const foobarMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.foobar;
     expect(foobarMapping).toBeUndefined();
 
     // Validation should detect foobar is missing
-    const hasMissing = runnerHasMissingMappings(storeRunner, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
     expect(hasMissing).toBe(true); // foobar has no mapping!
 
-    // Render RunnerHeader and check for alert icon
+    // Render TargetHeader and check for alert icon
     renderWithProviders(
-      <RunnerHeader
-        runner={storeRunner}
+      <TargetHeader
+        target={storeTarget}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
@@ -979,16 +979,16 @@ describe("Runner header alert icon integration", () => {
 
   it("does NOT re-infer mappings when user clears a mapping manually", () => {
     // BUG: When user clears a mapping (e.g., user_input), then makes any change,
-    // the mapping comes back because inference runs on every updateRunner.
+    // the mapping comes back because inference runs on every updateTarget.
     //
-    // Expected: Inference should only run on addRunner/addDataset, not on updates.
+    // Expected: Inference should only run on addTarget/addDataset, not on updates.
 
-    const runnerId = "runner-no-reinfer";
+    const targetId = "target-no-reinfer";
 
-    // Step 1: Add runner with user_input (will be auto-inferred to input column)
+    // Step 1: Add target with user_input (will be auto-inferred to input column)
     act(() => {
-      useEvaluationsV3Store.getState().addRunner({
-        id: runnerId,
+      useEvaluationsV3Store.getState().addTarget({
+        id: targetId,
         type: "prompt",
         name: "test-prompt",
         inputs: [{ identifier: "user_input", type: "str" }],
@@ -998,22 +998,22 @@ describe("Runner header alert icon integration", () => {
     });
 
     // Verify user_input was auto-inferred
-    let storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
+    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
 
     // Step 2: User manually clears the mapping
     act(() => {
-      useEvaluationsV3Store.getState().removeRunnerMapping(runnerId, DEFAULT_TEST_DATA_ID, "user_input");
+      useEvaluationsV3Store.getState().removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
     });
 
     // Verify mapping was removed
-    storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
 
     // Step 3: User makes some other change (e.g., updates localPromptConfig)
     // This should NOT re-infer the mapping!
     act(() => {
-      useEvaluationsV3Store.getState().updateRunner(runnerId, {
+      useEvaluationsV3Store.getState().updateTarget(targetId, {
         localPromptConfig: {
           llm: { model: "gpt-4" },
           messages: [{ role: "user", content: "Hello {{user_input}}" }],
@@ -1026,40 +1026,40 @@ describe("Runner header alert icon integration", () => {
     });
 
     // Verify mapping is STILL removed - not re-inferred
-    storeRunner = useEvaluationsV3Store.getState().runners.find(r => r.id === runnerId)!;
-    expect(storeRunner.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
   });
 });
 
 // ============================================================================
-// Tests: Runner play button validation
+// Tests: Target play button validation
 // ============================================================================
 
-describe("Runner play button validation", () => {
+describe("Target play button validation", () => {
   it("calls onEdit instead of onRun when mappings are missing", async () => {
-    const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {});
+    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
     const onEdit = vi.fn();
     const onRun = vi.fn();
 
     renderWithProviders(
-      <RunnerHeader
-        runner={runner}
+      <TargetHeader
+        target={target}
         onEdit={onEdit}
         onRemove={vi.fn()}
         onRun={onRun}
       />
     );
 
-    const playButton = screen.getByTestId("runner-play-button");
+    const playButton = screen.getByTestId("target-play-button");
     playButton.click();
 
     // Should call onEdit (to open drawer) instead of onRun
-    expect(onEdit).toHaveBeenCalledWith(runner);
+    expect(onEdit).toHaveBeenCalledWith(target);
     expect(onRun).not.toHaveBeenCalled();
   });
 
   it("calls onRun when all mappings are set", async () => {
-    const runner = createTestRunner("r1", [{ identifier: "question", type: "str" }], {
+    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
       [DEFAULT_TEST_DATA_ID]: {
         question: {
           type: "source",
@@ -1073,19 +1073,19 @@ describe("Runner play button validation", () => {
     const onRun = vi.fn();
 
     renderWithProviders(
-      <RunnerHeader
-        runner={runner}
+      <TargetHeader
+        target={target}
         onEdit={onEdit}
         onRemove={vi.fn()}
         onRun={onRun}
       />
     );
 
-    const playButton = screen.getByTestId("runner-play-button");
+    const playButton = screen.getByTestId("target-play-button");
     playButton.click();
 
     // Should call onRun since all mappings are set
-    expect(onRun).toHaveBeenCalledWith(runner);
+    expect(onRun).toHaveBeenCalledWith(target);
     expect(onEdit).not.toHaveBeenCalled();
   });
 });
@@ -1109,7 +1109,7 @@ const createTestEvaluator = (
 });
 
 describe("Evaluator validation with required/optional fields", () => {
-  const runnerId = "runner-1";
+  const targetId = "target-1";
 
   it("marks evaluator as valid when all required fields are mapped", () => {
     // langevals/llm_answer_match has requiredFields: ["output", "expected_output"], optionalFields: ["input"]
@@ -1123,8 +1123,8 @@ describe("Evaluator validation with required/optional fields", () => {
       ],
       {
         [DEFAULT_TEST_DATA_ID]: {
-          [runnerId]: {
-            output: { type: "source", source: "runner", sourceId: runnerId, sourceField: "output" },
+          [targetId]: {
+            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
             expected_output: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "expected_output" },
             // "input" is optional and not mapped - should still be valid
           },
@@ -1132,7 +1132,7 @@ describe("Evaluator validation with required/optional fields", () => {
       }
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId);
+    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
 
     expect(result.isValid).toBe(true);
     expect(result.missingMappings.length).toBe(0);
@@ -1149,15 +1149,15 @@ describe("Evaluator validation with required/optional fields", () => {
       ],
       {
         [DEFAULT_TEST_DATA_ID]: {
-          [runnerId]: {
-            output: { type: "source", source: "runner", sourceId: runnerId, sourceField: "output" },
+          [targetId]: {
+            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
             // "expected_output" is required but missing
           },
         },
       }
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId);
+    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
 
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
@@ -1177,16 +1177,16 @@ describe("Evaluator validation with required/optional fields", () => {
       ],
       {
         [DEFAULT_TEST_DATA_ID]: {
-          [runnerId]: {
+          [targetId]: {
             input: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "input" },
-            output: { type: "source", source: "runner", sourceId: runnerId, sourceField: "output" },
+            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
             // "contexts" is optional and not mapped - should still be valid
           },
         },
       }
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId);
+    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
 
     expect(result.isValid).toBe(true);
     expect(result.missingMappings.length).toBe(0);
@@ -1207,7 +1207,7 @@ describe("Evaluator validation with required/optional fields", () => {
       }
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId);
+    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
 
     // Invalid because ALL fields are empty - need at least one mapping
     expect(result.isValid).toBe(false);
@@ -1227,15 +1227,15 @@ describe("Evaluator validation with required/optional fields", () => {
       ],
       {
         [DEFAULT_TEST_DATA_ID]: {
-          [runnerId]: {
+          [targetId]: {
             input: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "input" },
-            output: { type: "source", source: "runner", sourceId: runnerId, sourceField: "output" },
+            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
           },
         },
       }
     );
 
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId)).toBe(false);
+    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(false);
   });
 
   it("evaluatorHasMissingMappings returns true when all fields empty", () => {
@@ -1249,6 +1249,6 @@ describe("Evaluator validation with required/optional fields", () => {
       {}
     );
 
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, runnerId)).toBe(true);
+    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(true);
   });
 });

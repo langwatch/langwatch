@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { DatasetColumn, RunnerConfig } from "../types";
+import type { DatasetColumn, TargetConfig } from "../types";
 
-type ColumnType = "checkbox" | "dataset" | "runner";
+type ColumnType = "checkbox" | "dataset" | "target";
 
 type NavigableColumn = {
   id: string;
@@ -10,7 +10,7 @@ type NavigableColumn = {
 
 type UseTableKeyboardNavigationParams = {
   datasetColumns: DatasetColumn[];
-  runners: RunnerConfig[];
+  targets: TargetConfig[];
   displayRowCount: number;
   editingCell: { row: number; columnId: string } | undefined;
   selectedCell: { row: number; columnId: string } | undefined;
@@ -20,11 +20,11 @@ type UseTableKeyboardNavigationParams = {
 };
 
 /**
- * Builds the list of navigable columns in order: checkbox, dataset columns, runner columns
+ * Builds the list of navigable columns in order: checkbox, dataset columns, target columns
  */
 export const buildNavigableColumns = (
   datasetColumns: DatasetColumn[],
-  runners: RunnerConfig[]
+  targets: TargetConfig[]
 ): NavigableColumn[] => {
   const cols: NavigableColumn[] = [];
 
@@ -36,9 +36,9 @@ export const buildNavigableColumns = (
     cols.push({ id: col.id, type: "dataset" });
   }
 
-  // Runner columns
-  for (const runner of runners) {
-    cols.push({ id: `runner.${runner.id}`, type: "runner" });
+  // Target columns
+  for (const target of targets) {
+    cols.push({ id: `target.${target.id}`, type: "target" });
   }
 
   return cols;
@@ -50,7 +50,7 @@ export const buildNavigableColumns = (
  */
 export const useTableKeyboardNavigation = ({
   datasetColumns,
-  runners,
+  targets,
   displayRowCount,
   editingCell,
   selectedCell,
@@ -58,7 +58,7 @@ export const useTableKeyboardNavigation = ({
   setEditingCell,
   toggleRowSelection,
 }: UseTableKeyboardNavigationParams): NavigableColumn[] => {
-  const allColumns = buildNavigableColumns(datasetColumns, runners);
+  const allColumns = buildNavigableColumns(datasetColumns, targets);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

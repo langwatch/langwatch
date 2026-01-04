@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { RunnerTypeSelectorDrawer } from "../RunnerTypeSelectorDrawer";
+import { TargetTypeSelectorDrawer } from "../../targets/TargetTypeSelectorDrawer";
 
 // Mock dependencies
 vi.mock("next/router", () => ({
@@ -36,7 +36,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-describe("RunnerTypeSelectorDrawer", () => {
+describe("TargetTypeSelectorDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -45,8 +45,8 @@ describe("RunnerTypeSelectorDrawer", () => {
     cleanup();
   });
 
-  const renderDrawer = (props: Partial<React.ComponentProps<typeof RunnerTypeSelectorDrawer>> = {}) => {
-    return render(<RunnerTypeSelectorDrawer open={true} {...props} />, { wrapper: Wrapper });
+  const renderDrawer = (props: Partial<React.ComponentProps<typeof TargetTypeSelectorDrawer>> = {}) => {
+    return render(<TargetTypeSelectorDrawer open={true} {...props} />, { wrapper: Wrapper });
   };
 
   describe("Basic rendering", () => {
@@ -57,11 +57,11 @@ describe("RunnerTypeSelectorDrawer", () => {
       });
     });
 
-    it("shows two runner type options", async () => {
+    it("shows two target type options", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByTestId("runner-type-prompt")).toBeInTheDocument();
-        expect(screen.getByTestId("runner-type-agent")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-prompt")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-agent")).toBeInTheDocument();
       });
     });
 
@@ -89,10 +89,10 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer({ onSelect });
 
       await waitFor(() => {
-        expect(screen.getByTestId("runner-type-prompt")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-prompt")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId("runner-type-prompt"));
+      await user.click(screen.getByTestId("target-type-prompt"));
 
       expect(onSelect).toHaveBeenCalledWith("prompt");
     });
@@ -103,10 +103,10 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer({ onSelect });
 
       await waitFor(() => {
-        expect(screen.getByTestId("runner-type-agent")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-agent")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId("runner-type-agent"));
+      await user.click(screen.getByTestId("target-type-agent"));
 
       expect(onSelect).toHaveBeenCalledWith("agent");
     });
@@ -116,10 +116,10 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("runner-type-prompt")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-prompt")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId("runner-type-prompt"));
+      await user.click(screen.getByTestId("target-type-prompt"));
 
       expect(mockOpenDrawer).toHaveBeenCalledWith("promptList", {}, { replace: true });
     });
@@ -129,10 +129,10 @@ describe("RunnerTypeSelectorDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("runner-type-agent")).toBeInTheDocument();
+        expect(screen.getByTestId("target-type-agent")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId("runner-type-agent"));
+      await user.click(screen.getByTestId("target-type-agent"));
 
       expect(mockOpenDrawer).toHaveBeenCalledWith("agentList", {}, { replace: true });
     });

@@ -7,7 +7,7 @@ import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { ReactElement } from "react";
 
-import { RunnerTypeSelectorDrawer } from "~/components/runners/RunnerTypeSelectorDrawer";
+import { TargetTypeSelectorDrawer } from "~/components/targets/TargetTypeSelectorDrawer";
 import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
@@ -80,11 +80,11 @@ describe("Drawer Navigation", () => {
     cleanup();
   });
 
-  describe("RunnerTypeSelectorDrawer", () => {
+  describe("TargetTypeSelectorDrawer", () => {
     it("navigates to promptList when prompt is selected", () => {
-      renderWithProviders(<RunnerTypeSelectorDrawer open={true} />);
+      renderWithProviders(<TargetTypeSelectorDrawer open={true} />);
 
-      const promptCard = screen.getByTestId("runner-type-prompt");
+      const promptCard = screen.getByTestId("target-type-prompt");
       fireEvent.click(promptCard);
 
       expect(mockOpenDrawer).toHaveBeenCalledWith(
@@ -95,9 +95,9 @@ describe("Drawer Navigation", () => {
     });
 
     it("navigates to agentList when agent is selected", () => {
-      renderWithProviders(<RunnerTypeSelectorDrawer open={true} />);
+      renderWithProviders(<TargetTypeSelectorDrawer open={true} />);
 
-      const agentCard = screen.getByTestId("runner-type-agent");
+      const agentCard = screen.getByTestId("target-type-agent");
       fireEvent.click(agentCard);
 
       expect(mockOpenDrawer).toHaveBeenCalledWith(
@@ -110,10 +110,10 @@ describe("Drawer Navigation", () => {
     it("calls custom onSelect callback when provided", () => {
       const customOnSelect = vi.fn();
       renderWithProviders(
-        <RunnerTypeSelectorDrawer open={true} onSelect={customOnSelect} />,
+        <TargetTypeSelectorDrawer open={true} onSelect={customOnSelect} />,
       );
 
-      const promptCard = screen.getByTestId("runner-type-prompt");
+      const promptCard = screen.getByTestId("target-type-prompt");
       fireEvent.click(promptCard);
 
       expect(customOnSelect).toHaveBeenCalledWith("prompt");

@@ -34,7 +34,7 @@ const KeyboardNavigationTestComponent = () => {
   const {
     datasets,
     activeDatasetId,
-    runners,
+    targets,
     ui,
     setSelectedCell,
     setEditingCell,
@@ -43,7 +43,7 @@ const KeyboardNavigationTestComponent = () => {
   } = useEvaluationsV3Store((state) => ({
     datasets: state.datasets,
     activeDatasetId: state.activeDatasetId,
-    runners: state.runners,
+    targets: state.targets,
     ui: state.ui,
     setSelectedCell: state.setSelectedCell,
     setEditingCell: state.setEditingCell,
@@ -59,7 +59,7 @@ const KeyboardNavigationTestComponent = () => {
   // Use the extracted keyboard navigation hook
   const allColumns = useTableKeyboardNavigation({
     datasetColumns,
-    runners,
+    targets,
     displayRowCount,
     editingCell: ui.editingCell,
     selectedCell: ui.selectedCell,

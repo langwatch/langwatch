@@ -7,24 +7,24 @@ import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useEvaluatorMappings } from "../../hooks/useEvaluatorMappings";
 import { convertFromUIMapping, convertToUIMapping } from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
-import type { RunnerConfig, EvaluatorConfig } from "../../types";
+import type { TargetConfig, EvaluatorConfig } from "../../types";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
-import { EvaluatorChip } from "./EvaluatorChip";
+import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
-type RunnerCellContentProps = {
-  runner: RunnerConfig;
+type TargetCellContentProps = {
+  target: TargetConfig;
   output: unknown;
   evaluatorResults: Record<string, unknown>;
   row: number;
   onAddEvaluator?: () => void;
 };
 
-export function RunnerCellContent({
-  runner,
+export function TargetCellContent({
+  target,
   output,
   evaluatorResults,
   onAddEvaluator,
-}: RunnerCellContentProps) {
+}: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const {
     evaluators,
@@ -42,16 +42,16 @@ export function RunnerCellContent({
     removeEvaluatorMapping: state.removeEvaluatorMapping,
   }));
 
-  // Calculate which evaluators have missing mappings for this runner
+  // Calculate which evaluators have missing mappings for this target
   const missingMappingsSet = useMemo(() => {
     const missing = new Set<string>();
     for (const evaluator of evaluators) {
-      if (evaluatorHasMissingMappings(evaluator, activeDatasetId, runner.id)) {
+      if (evaluatorHasMissingMappings(evaluator, activeDatasetId, target.id)) {
         missing.add(evaluator.id);
       }
     }
     return missing;
-  }, [evaluators, activeDatasetId, runner.id]);
+  }, [evaluators, activeDatasetId, target.id]);
 
   // Helper to create mappingsConfig for an evaluator
   const createMappingsConfig = useCallback(
@@ -74,17 +74,17 @@ export function RunnerCellContent({
         });
       }
       availableSources.push({
-        id: runner.id,
-        name: runner.name,
+        id: target.id,
+        name: target.name,
         type: "signature" as const,
-        fields: runner.outputs.map((o) => ({
+        fields: target.outputs.map((o) => ({
           name: o.identifier,
           type: o.type as "str" | "float" | "bool",
         })),
       });
 
       // Get current mappings in UI format (used as initial state in the drawer)
-      const storeMappings = evaluator.mappings[activeDatasetId]?.[runner.id] ?? {};
+      const storeMappings = evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
       const initialMappings: Record<string, UIFieldMapping> = {};
       for (const [key, mapping] of Object.entries(storeMappings)) {
         initialMappings[key] = convertToUIMapping(mapping);
@@ -96,14 +96,14 @@ export function RunnerCellContent({
         onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
           if (mapping) {
             const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-            setEvaluatorMapping(evaluator.id, activeDatasetId, runner.id, identifier, storeMapping);
+            setEvaluatorMapping(evaluator.id, activeDatasetId, target.id, identifier, storeMapping);
           } else {
-            removeEvaluatorMapping(evaluator.id, activeDatasetId, runner.id, identifier);
+            removeEvaluatorMapping(evaluator.id, activeDatasetId, target.id, identifier);
           }
         },
       };
     },
-    [datasets, activeDatasetId, runner, setEvaluatorMapping, removeEvaluatorMapping]
+    [datasets, activeDatasetId, target, setEvaluatorMapping, removeEvaluatorMapping]
   );
 
   const displayOutput =
@@ -115,7 +115,7 @@ export function RunnerCellContent({
 
   return (
     <VStack align="stretch" gap={2}>
-      {/* Runner output */}
+      {/* Target output */}
       <Text fontSize="13px" lineClamp={3}>
         {displayOutput || (
           <Text as="span" color="gray.400">
@@ -157,7 +157,7 @@ export function RunnerCellContent({
             onAddEvaluator?.();
           }}
           justifyContent="flex-start"
-          data-testid={`add-evaluator-button-${runner.id}`}
+          data-testid={`add-evaluator-button-${target.id}`}
         >
           <LuPlus />
           {evaluators.length === 0 && <Text>Add evaluator</Text>}

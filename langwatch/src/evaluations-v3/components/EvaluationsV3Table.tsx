@@ -31,7 +31,7 @@ type EvaluatorDbConfig = {
 };
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { useOpenRunnerEditor } from "../hooks/useOpenRunnerEditor";
+import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
@@ -40,7 +40,7 @@ import {
   convertFromUIMapping,
 } from "../utils/fieldMappingConverters";
 import type {
-  RunnerConfig,
+  TargetConfig,
   DatasetColumn,
   DatasetReference,
   SavedRecord,
@@ -59,8 +59,8 @@ import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxHeaderFromMeta,
   CheckboxCellFromMeta,
-  RunnerHeaderFromMeta,
-  RunnerCellFromMeta,
+  TargetHeaderFromMeta,
+  TargetCellFromMeta,
 } from "./TableMetaWrappers";
 
 // Types are imported from ../types (TableRowData, TableMeta)
@@ -89,7 +89,7 @@ export function EvaluationsV3Table({
     datasets,
     activeDatasetId,
     evaluators,
-    runners,
+    targets,
     results,
     ui,
     openOverlay,
@@ -106,18 +106,18 @@ export function EvaluationsV3Table({
     updateDataset,
     setColumnWidths,
     toggleColumnVisibility,
-    addRunner,
-    updateRunner,
-    removeRunner,
-    setRunnerMapping,
-    removeRunnerMapping,
+    addTarget,
+    updateTarget,
+    removeTarget,
+    setTargetMapping,
+    removeTargetMapping,
     addEvaluator,
   } = useEvaluationsV3Store(
     useShallow((state) => ({
       datasets: state.datasets,
       activeDatasetId: state.activeDatasetId,
       evaluators: state.evaluators,
-      runners: state.runners,
+      targets: state.targets,
       results: state.results,
       // Only subscribe to specific UI properties we need (not the entire ui object)
       ui: {
@@ -142,11 +142,11 @@ export function EvaluationsV3Table({
       updateDataset: state.updateDataset,
       setColumnWidths: state.setColumnWidths,
       toggleColumnVisibility: state.toggleColumnVisibility,
-      addRunner: state.addRunner,
-      updateRunner: state.updateRunner,
-      removeRunner: state.removeRunner,
-      setRunnerMapping: state.setRunnerMapping,
-      removeRunnerMapping: state.removeRunnerMapping,
+      addTarget: state.addTarget,
+      updateTarget: state.updateTarget,
+      removeTarget: state.removeTarget,
+      setTargetMapping: state.setTargetMapping,
+      removeTargetMapping: state.removeTargetMapping,
       addEvaluator: state.addEvaluator,
     })),
   );
@@ -178,10 +178,10 @@ export function EvaluationsV3Table({
   // State for editing dataset columns
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
-  // Hook for opening runner editor with proper flow callbacks
-  const { openRunnerEditor, buildAvailableSources, isDatasetSource } = useOpenRunnerEditor();
+  // Hook for opening target editor with proper flow callbacks
+  const { openTargetEditor, buildAvailableSources, isDatasetSource } = useOpenTargetEditor();
 
-  // Track pending mappings for new prompts (before they become runners)
+  // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
 
   // Handler for when a saved agent is selected from the drawer
@@ -189,29 +189,29 @@ export function EvaluationsV3Table({
     (savedAgent: TypedAgent) => {
       const config = savedAgent.config as Record<string, unknown>;
 
-      // Convert TypedAgent to RunnerConfig format (agent type)
+      // Convert TypedAgent to TargetConfig format (agent type)
       // Agent type and workflow ID are fetched at runtime via dbAgentId when needed
-      const runnerConfig: RunnerConfig = {
-        id: `runner_${Date.now()}`, // Generate unique ID for the workbench
-        type: "agent", // This is a runner of type "agent" (code/workflow)
+      const targetConfig: TargetConfig = {
+        id: `target_${Date.now()}`, // Generate unique ID for the workbench
+        type: "agent", // This is a target of type "agent" (code/workflow)
         name: savedAgent.name,
         dbAgentId: savedAgent.id, // Reference to the database agent
-        inputs: (config.inputs as RunnerConfig["inputs"]) ?? [
+        inputs: (config.inputs as TargetConfig["inputs"]) ?? [
           { identifier: "input", type: "str" },
         ],
-        outputs: (config.outputs as RunnerConfig["outputs"]) ?? [
+        outputs: (config.outputs as TargetConfig["outputs"]) ?? [
           { identifier: "output", type: "str" },
         ],
         mappings: {},
       };
-      addRunner(runnerConfig);
+      addTarget(targetConfig);
       closeDrawer();
     },
-    [addRunner, closeDrawer],
+    [addTarget, closeDrawer],
   );
 
   // Handler for when a prompt is selected from the drawer
-  // Adds the runner and immediately opens the prompt editor for configuration
+  // Adds the target and immediately opens the prompt editor for configuration
   const handleSelectPrompt = useCallback(
     (prompt: {
       id: string;
@@ -220,11 +220,11 @@ export function EvaluationsV3Table({
       inputs?: Array<{ identifier: string; type: string }>;
       outputs?: Array<{ identifier: string; type: string }>;
     }) => {
-      // Convert prompt to RunnerConfig format (prompt type)
+      // Convert prompt to TargetConfig format (prompt type)
       // Use the actual inputs/outputs from the prompt data (already fetched in PromptListDrawer)
-      const runnerId = `runner_${Date.now()}`;
-      const runnerConfig: RunnerConfig = {
-        id: runnerId,
+      const targetId = `target_${Date.now()}`;
+      const targetConfig: TargetConfig = {
+        id: targetId,
         type: "prompt",
         name: prompt.name,
         promptId: prompt.id,
@@ -239,17 +239,17 @@ export function EvaluationsV3Table({
         })),
         mappings: {},
       };
-      // addRunner will auto-map based on the real inputs
-      addRunner(runnerConfig);
+      // addTarget will auto-map based on the real inputs
+      addTarget(targetConfig);
 
       // Set up flow callbacks for the prompt editor
       setFlowCallbacks("promptEditor", {
         onLocalConfigChange: (localConfig) => {
           // Only update localPromptConfig for tracking unsaved changes
-          updateRunner(runnerId, { localPromptConfig: localConfig });
+          updateTarget(targetId, { localPromptConfig: localConfig });
         },
         onSave: (savedPrompt) => {
-          updateRunner(runnerId, {
+          updateTarget(targetId, {
             name: savedPrompt.name,
             promptId: savedPrompt.id,
             localPromptConfig: undefined,
@@ -274,28 +274,28 @@ export function EvaluationsV3Table({
             state.datasets.some((d) => d.id === sourceId);
 
           if (mapping) {
-            setRunnerMapping(
-              runnerId,
+            setTargetMapping(
+              targetId,
               state.activeDatasetId,
               identifier,
               convertFromUIMapping(mapping, checkIsDatasetSource),
             );
           } else {
-            removeRunnerMapping(runnerId, state.activeDatasetId, identifier);
+            removeTargetMapping(targetId, state.activeDatasetId, identifier);
           }
         },
       });
 
-      // Open the prompt editor drawer for the newly added runner
+      // Open the prompt editor drawer for the newly added target
       openDrawer("promptEditor", {
         promptId: prompt.id,
-        urlParams: { runnerId },
+        urlParams: { targetId },
       });
     },
-    [addRunner, openDrawer, updateRunner, setRunnerMapping, removeRunnerMapping],
+    [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
   );
 
-  // Handler for opening the evaluator selector (evaluators apply to ALL runners)
+  // Handler for opening the evaluator selector (evaluators apply to ALL targets)
   const handleAddEvaluator = useCallback(
     () => {
       // Set up flow callback to handle evaluator selection
@@ -309,7 +309,7 @@ export function EvaluationsV3Table({
             (e) => e.dbEvaluatorId === evaluator.id
           );
 
-          // If already exists, no need to add again (it applies to all runners)
+          // If already exists, no need to add again (it applies to all targets)
           if (existingEvaluator) {
             return;
           }
@@ -340,7 +340,7 @@ export function EvaluationsV3Table({
             dbEvaluatorId: evaluator.id,
           };
 
-          // Add the evaluator globally (applies to all runners automatically)
+          // Add the evaluator globally (applies to all targets automatically)
           addEvaluator(evaluatorConfig);
         },
       });
@@ -350,12 +350,12 @@ export function EvaluationsV3Table({
     [openDrawer, evaluators, addEvaluator],
   );
 
-  // Handler for removing a runner from the workbench
-  const handleRemoveRunner = useCallback(
-    (runnerId: string) => {
-      removeRunner(runnerId);
+  // Handler for removing a target from the workbench
+  const handleRemoveTarget = useCallback(
+    (targetId: string) => {
+      removeTarget(targetId);
     },
-    [removeRunner],
+    [removeTarget],
   );
 
   // Dataset handlers for drawer integration
@@ -462,7 +462,7 @@ export function EvaluationsV3Table({
   // Keyboard navigation hook - handles arrow keys, Tab, Enter, Escape
   useTableKeyboardNavigation({
     datasetColumns,
-    runners,
+    targets,
     displayRowCount,
     editingCell: ui.editingCell,
     selectedCell: ui.selectedCell,
@@ -487,16 +487,16 @@ export function EvaluationsV3Table({
           getCellValue(activeDatasetId, index, col.id),
         ]),
       ),
-      runners: Object.fromEntries(
-        runners.map((runner) => [
-          runner.id,
+      targets: Object.fromEntries(
+        targets.map((target) => [
+          target.id,
           {
-            output: results.runnerOutputs[runner.id]?.[index] ?? null,
-            // All evaluators apply to all runners
+            output: results.targetOutputs[target.id]?.[index] ?? null,
+            // All evaluators apply to all targets
             evaluators: Object.fromEntries(
               evaluators.map((evaluator) => [
                 evaluator.id,
-                results.evaluatorResults[runner.id]?.[evaluator.id]?.[index] ??
+                results.evaluatorResults[target.id]?.[evaluator.id]?.[index] ??
                   null,
               ]),
             ),
@@ -509,7 +509,7 @@ export function EvaluationsV3Table({
     activeDatasetId,
     activeDataset,
     datasetColumns,
-    runners,
+    targets,
     evaluators,
     results,
     displayRowCount,
@@ -519,10 +519,10 @@ export function EvaluationsV3Table({
   // Build columns - columnHelper is stable (useMemo to prevent recreating)
   const columnHelper = useMemo(() => createColumnHelper<TableRowData>(), []);
 
-  // Extract runner IDs for stable column structure
-  // Only recreate when the actual IDs change, not when runner data changes
-  const runnerIdsKey = runners.map((r) => r.id).join(",");
-  const runnerIds = useMemo(() => runners.map((r) => r.id), [runnerIdsKey]);
+  // Extract target IDs for stable column structure
+  // Only recreate when the actual IDs change, not when target data changes
+  const targetIdsKey = targets.map((r) => r.id).join(",");
+  const targetIds = useMemo(() => targets.map((r) => r.id), [targetIdsKey]);
 
   // Similarly stabilize dataset column IDs
   const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
@@ -530,19 +530,19 @@ export function EvaluationsV3Table({
 
   // Build table meta for passing dynamic data to headers/cells
   // This allows column definitions to stay stable while data changes
-  const runnersMap = useMemo(
-    () => new Map(runners.map((r) => [r.id, r])),
-    [runners]
+  const targetsMap = useMemo(
+    () => new Map(targets.map((r) => [r.id, r])),
+    [targets]
   );
 
   const tableMeta: TableMeta = useMemo(
     () => ({
-      // Runner data
-      runners,
-      runnersMap,
+      // Target data
+      targets,
+      targetsMap,
       evaluatorsMap,
-      openRunnerEditor,
-      handleRemoveRunner,
+      openTargetEditor,
+      handleRemoveTarget,
       handleAddEvaluator,
       // Selection data
       selectedRows,
@@ -554,11 +554,11 @@ export function EvaluationsV3Table({
       clearRowSelection,
     }),
     [
-      runners,
-      runnersMap,
+      targets,
+      targetsMap,
       evaluatorsMap,
-      openRunnerEditor,
-      handleRemoveRunner,
+      openTargetEditor,
+      handleRemoveTarget,
       handleAddEvaluator,
       selectedRows,
       allSelected,
@@ -616,14 +616,14 @@ export function EvaluationsV3Table({
       );
     }
 
-    // Runner columns - use IDs only for stable column structure
+    // Target columns - use IDs only for stable column structure
     // Headers/cells read current data from table meta
-    for (const runnerId of runnerIds) {
+    for (const targetId of targetIds) {
       cols.push(
-        columnHelper.accessor((row) => row.runners[runnerId], {
-          id: `runner.${runnerId}`,
+        columnHelper.accessor((row) => row.targets[targetId], {
+          id: `target.${targetId}`,
           header: (context) => (
-            <RunnerHeaderFromMeta runnerId={runnerId} context={context} />
+            <TargetHeaderFromMeta targetId={targetId} context={context} />
           ),
           cell: (info) => {
             const data = info.getValue() as {
@@ -631,8 +631,8 @@ export function EvaluationsV3Table({
               evaluators: Record<string, unknown>;
             };
             return (
-              <RunnerCellFromMeta
-                runnerId={runnerId}
+              <TargetCellFromMeta
+                targetId={targetId}
                 data={data}
                 rowIndex={info.row.index}
                 tableMeta={info.table.options.meta as TableMeta | undefined}
@@ -642,8 +642,8 @@ export function EvaluationsV3Table({
           size: 280,
           minSize: 200,
           meta: {
-            columnType: "runner" as ColumnType,
-            columnId: `runner.${runnerId}`,
+            columnType: "target" as ColumnType,
+            columnId: `target.${targetId}`,
           },
         }) as ColumnDef<TableRowData>,
       );
@@ -653,7 +653,7 @@ export function EvaluationsV3Table({
   }, [
     // ONLY structural dependencies - columns should almost never change
     // All dynamic data goes through tableMeta
-    runnerIds,
+    targetIds,
     stableDatasetColumns,
     columnHelper,
   ]);
@@ -703,7 +703,7 @@ export function EvaluationsV3Table({
   // Calculate colspan for super headers
   const datasetColSpan = 1 + datasetColumns.length;
   // +1 for the spacer column that's always present
-  const runnersColSpan = runners.length + 1;
+  const targetsColSpan = targets.length + 1;
 
   // Height of the super header row (Dataset/Agents row)
   const SUPER_HEADER_HEIGHT = 51;
@@ -808,8 +808,8 @@ export function EvaluationsV3Table({
               isLoading={isLoadingExperiment}
             />
             <SuperHeader
-              type="runners"
-              colSpan={runnersColSpan}
+              type="targets"
+              colSpan={targetsColSpan}
               onAddClick={() => {
                 // Clear any pending mappings from previous flows
                 pendingMappingsRef.current = {};
@@ -836,7 +836,7 @@ export function EvaluationsV3Table({
                   });
                 };
 
-                // Set flow callbacks for the entire add-runner flow
+                // Set flow callbacks for the entire add-target flow
                 setFlowCallbacks("promptList", {
                   onSelect: handleSelectPrompt,
                   // Custom onCreateNew to open promptEditor with availableSources
@@ -855,7 +855,7 @@ export function EvaluationsV3Table({
                     }
                   },
                   onSave: (savedPrompt) => {
-                    // Apply pending mappings when creating the runner
+                    // Apply pending mappings when creating the target
                     const storeMappings: Record<string, FieldMapping> = {};
                     for (const [key, uiMapping] of Object.entries(pendingMappingsRef.current)) {
                       storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
@@ -864,10 +864,10 @@ export function EvaluationsV3Table({
                     // Get current state for active dataset
                     const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
 
-                    // Create runner with pending mappings
-                    const runnerId = `runner_${Date.now()}`;
-                    const runnerConfig: RunnerConfig = {
-                      id: runnerId,
+                    // Create target with pending mappings
+                    const targetId = `target_${Date.now()}`;
+                    const targetConfig: TargetConfig = {
+                      id: targetId,
                       type: "prompt",
                       name: savedPrompt.name,
                       promptId: savedPrompt.id,
@@ -884,7 +884,7 @@ export function EvaluationsV3Table({
                         ? { [currentActiveDatasetId]: storeMappings }
                         : {},
                     };
-                    addRunner(runnerConfig);
+                    addTarget(targetConfig);
 
                     // Clear pending mappings
                     pendingMappingsRef.current = {};
@@ -899,10 +899,10 @@ export function EvaluationsV3Table({
                 setFlowCallbacks("workflowSelector", {
                   onSave: handleSelectSavedAgent,
                 });
-                openDrawer("runnerTypeSelector");
+                openDrawer("targetTypeSelector");
               }}
-              showWarning={runners.length === 0}
-              hasComparison={runners.length > 0}
+              showWarning={targets.length === 0}
+              hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
             />
           </tr>
@@ -928,8 +928,8 @@ export function EvaluationsV3Table({
                   )}
                 </th>
               ))}
-              {runners.length === 0 ? (
-                // Spacer column to match drawer width + default runner column width
+              {targets.length === 0 ? (
+                // Spacer column to match drawer width + default target column width
                 <th
                   style={{
                     width: DRAWER_WIDTH + 280,

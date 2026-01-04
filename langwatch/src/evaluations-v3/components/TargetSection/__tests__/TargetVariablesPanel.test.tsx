@@ -5,8 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RunnerVariablesPanel } from "../RunnerVariablesPanel";
-import type { RunnerConfig, DatasetReference } from "../../../types";
+import { TargetVariablesPanel } from "../../TargetSection/TargetVariablesPanel";
+import type { TargetConfig, DatasetReference } from "../../../types";
 
 // Mock components with complex dependencies
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
@@ -31,8 +31,8 @@ const mockDatasets: DatasetReference[] = [
 
 const ACTIVE_DATASET_ID = "dataset-1";
 
-const mockRunner: RunnerConfig = {
-  id: "runner-1",
+const mockTarget: TargetConfig = {
+  id: "target-1",
   type: "prompt",
   name: "GPT-4o Prompt",
   inputs: [
@@ -65,8 +65,8 @@ const mockRunner: RunnerConfig = {
   },
 };
 
-const mockOtherRunner: RunnerConfig = {
-  id: "runner-2",
+const mockOtherTarget: TargetConfig = {
+  id: "target-2",
   type: "prompt",
   name: "Web Search",
   inputs: [{ identifier: "query", type: "str" }],
@@ -75,25 +75,25 @@ const mockOtherRunner: RunnerConfig = {
 };
 
 const renderComponent = (
-  props: Partial<Parameters<typeof RunnerVariablesPanel>[0]> = {}
+  props: Partial<Parameters<typeof TargetVariablesPanel>[0]> = {}
 ) => {
   const defaultProps = {
-    runner: mockRunner,
+    target: mockTarget,
     activeDatasetId: ACTIVE_DATASET_ID,
     datasets: mockDatasets,
-    otherRunners: [],
+    otherTargets: [],
     onInputsChange: vi.fn(),
     onMappingChange: vi.fn(),
   };
 
   return render(
     <ChakraProvider value={defaultSystem}>
-      <RunnerVariablesPanel {...defaultProps} {...props} />
+      <TargetVariablesPanel {...defaultProps} {...props} />
     </ChakraProvider>
   );
 };
 
-describe("RunnerVariablesPanel", () => {
+describe("TargetVariablesPanel", () => {
   afterEach(() => {
     cleanup();
   });
@@ -104,7 +104,7 @@ describe("RunnerVariablesPanel", () => {
       expect(screen.getByText("Input Variables")).toBeInTheDocument();
     });
 
-    it("shows runner input variables", () => {
+    it("shows target input variables", () => {
       renderComponent();
       expect(screen.getByText("question")).toBeInTheDocument();
       expect(screen.getByText("context")).toBeInTheDocument();
@@ -136,8 +136,8 @@ describe("RunnerVariablesPanel", () => {
     });
 
     it("does not show warning when all inputs are mapped", () => {
-      const fullyMappedRunner: RunnerConfig = {
-        ...mockRunner,
+      const fullyMappedTarget: TargetConfig = {
+        ...mockTarget,
         // Per-dataset mappings
         mappings: {
           [ACTIVE_DATASET_ID]: {
@@ -157,7 +157,7 @@ describe("RunnerVariablesPanel", () => {
         },
       };
 
-      renderComponent({ runner: fullyMappedRunner });
+      renderComponent({ target: fullyMappedTarget });
       expect(screen.queryByText(/input.*not mapped/i)).not.toBeInTheDocument();
     });
 
@@ -187,9 +187,9 @@ describe("RunnerVariablesPanel", () => {
       }
     });
 
-    it("includes other runners as mapping sources", async () => {
+    it("includes other targets as mapping sources", async () => {
       const user = userEvent.setup();
-      renderComponent({ otherRunners: [mockOtherRunner] });
+      renderComponent({ otherTargets: [mockOtherTarget] });
 
       // Click on an empty mapping input
       const inputs = screen.getAllByRole("textbox");

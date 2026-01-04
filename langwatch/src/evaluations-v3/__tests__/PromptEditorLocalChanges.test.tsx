@@ -3,7 +3,7 @@
  *
  * Integration test for prompt editor local changes in evaluations context.
  * Tests that:
- * 1. Flow callbacks are properly set when editing a runner's prompt
+ * 1. Flow callbacks are properly set when editing a target's prompt
  * 2. Changes to prompts are saved locally via onLocalConfigChange callback
  * 3. Closing the drawer does NOT prompt for save when onLocalConfigChange is set
  */
@@ -169,11 +169,11 @@ describe("Prompt Editor Local Changes", () => {
     mockRouterQuery = {};
     useEvaluationsV3Store.getState().reset();
 
-    // Set up a runner with a prompt
+    // Set up a target with a prompt
     useEvaluationsV3Store.setState({
-      runners: [
+      targets: [
         {
-          id: "runner-1",
+          id: "target-1",
           type: "prompt",
           name: "test-prompt",
           promptId: "prompt-1",
@@ -202,7 +202,7 @@ describe("Prompt Editor Local Changes", () => {
       mockRouterQuery = {
         "drawer.open": "promptEditor",
         "drawer.promptId": "prompt-1",
-        "drawer.runnerId": "runner-1",
+        "drawer.targetId": "target-1",
       };
 
       // Render PromptEditorDrawer with onLocalConfigChange (as CurrentDrawer would via flow callbacks)
@@ -328,20 +328,20 @@ describe("Prompt Editor Local Changes", () => {
       // BUG: When user ADDS a new field (wtf) via the drawer and saves, the alert icon disappears.
       //
       // The exact flow:
-      // 1. Runner has inputs: [input] - all mapped, no alert
+      // 1. Target has inputs: [input] - all mapped, no alert
       // 2. User edits prompt, adds "wtf" variable - now localPromptConfig.inputs has [input, wtf]
       // 3. Alert icon shows because wtf (from localPromptConfig) is unmapped
       // 4. User saves - onSave clears localPromptConfig
-      // 5. BUG: Alert icon disappears because runner.inputs still only has [input]!
-      //    The saved prompt has [input, wtf] but runner.inputs wasn't updated
+      // 5. BUG: Alert icon disappears because target.inputs still only has [input]!
+      //    The saved prompt has [input, wtf] but target.inputs wasn't updated
 
       const user = userEvent.setup();
 
-      // Set up runner with only "input" field - all mapped, NO alert initially
+      // Set up target with only "input" field - all mapped, NO alert initially
       useEvaluationsV3Store.setState({
-        runners: [
+        targets: [
           {
-            id: "runner-1",
+            id: "target-1",
             type: "prompt",
             name: "test-prompt",
             promptId: "prompt-1",
@@ -376,12 +376,12 @@ describe("Prompt Editor Local Changes", () => {
         activeDatasetId: "test-data",
       });
 
-      const { RunnerHeader } = await import("../components/RunnerSection/RunnerHeader");
+      const { TargetHeader } = await import("../components/TargetSection/TargetHeader");
 
       // Step 1: Initially NO alert - all fields are mapped
-      let runner = useEvaluationsV3Store.getState().runners[0]!;
+      let target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <RunnerHeader runner={runner} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
         { wrapper: Wrapper },
       );
       expect(screen.queryByTestId("missing-mapping-alert")).not.toBeInTheDocument();
@@ -389,7 +389,7 @@ describe("Prompt Editor Local Changes", () => {
 
       // Step 2: User edits prompt and adds "wtf" field via localPromptConfig
       // This simulates what happens when user types {{wtf}} in the prompt
-      useEvaluationsV3Store.getState().updateRunner("runner-1", {
+      useEvaluationsV3Store.getState().updateTarget("target-1", {
         localPromptConfig: {
           llm: { model: "gpt-4" },
           messages: [{ role: "user", content: "Hello {{input}} {{wtf}}" }],
@@ -402,19 +402,19 @@ describe("Prompt Editor Local Changes", () => {
       });
 
       // Step 3: Alert icon should NOW show because wtf is unmapped
-      runner = useEvaluationsV3Store.getState().runners[0]!;
+      target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <RunnerHeader runner={runner} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
         { wrapper: Wrapper },
       );
       expect(screen.queryByTestId("missing-mapping-alert")).toBeInTheDocument();
       cleanup();
 
       // Step 4: Simulate what happens when user saves the prompt
-      // In the real app, onSave callback updates runner.inputs from the saved prompt
+      // In the real app, onSave callback updates target.inputs from the saved prompt
       // and clears localPromptConfig. We simulate this directly since the drawer's
       // save flow works (verified manually) but is complex to mock.
-      useEvaluationsV3Store.getState().updateRunner("runner-1", {
+      useEvaluationsV3Store.getState().updateTarget("target-1", {
         localPromptConfig: undefined, // Clear local config (save completed)
         // Update inputs from the "saved" prompt - now includes wtf
         inputs: [
@@ -424,14 +424,14 @@ describe("Prompt Editor Local Changes", () => {
       });
 
       // Step 5: Verify alert icon STILL shows
-      runner = useEvaluationsV3Store.getState().runners[0]!;
+      target = useEvaluationsV3Store.getState().targets[0]!;
       render(
-        <RunnerHeader runner={runner} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
+        <TargetHeader target={target} onEdit={vi.fn()} onRemove={vi.fn()} onRun={vi.fn()} />,
         { wrapper: Wrapper },
       );
 
       // KEY ASSERTION: Alert icon should STILL be visible because wtf is still unmapped!
-      // BUG: This FAILS because runner.inputs is [input] not [input, wtf]
+      // BUG: This FAILS because target.inputs is [input] not [input, wtf]
       expect(screen.queryByTestId("missing-mapping-alert")).toBeInTheDocument();
     }, 25000);
   });
@@ -457,9 +457,9 @@ describe("Prompt Editor Local Changes", () => {
       };
 
       useEvaluationsV3Store.setState({
-        runners: [
+        targets: [
           {
-            id: "runner-1",
+            id: "target-1",
             type: "prompt",
             name: "test-prompt",
             promptId: "prompt-1",
@@ -495,7 +495,7 @@ describe("Prompt Editor Local Changes", () => {
       let saveWasCalled = false;
       const handleSave = () => {
         saveWasCalled = true;
-        useEvaluationsV3Store.getState().updateRunner("runner-1", {
+        useEvaluationsV3Store.getState().updateTarget("target-1", {
           localPromptConfig: undefined,
         });
       };
@@ -555,14 +555,14 @@ describe("Prompt Editor Local Changes", () => {
 
 
   describe("flow callbacks integration", () => {
-    it("updateRunner is called when onLocalConfigChange fires with config", async () => {
+    it("updateTarget is called when onLocalConfigChange fires with config", async () => {
       const user = userEvent.setup();
 
       // Create a mock that simulates what EvaluationsV3Table does
-      const updateRunner = useEvaluationsV3Store.getState().updateRunner;
+      const updateTarget = useEvaluationsV3Store.getState().updateTarget;
       const mockOnLocalConfigChange = vi.fn((localConfig) => {
         if (localConfig) {
-          updateRunner("runner-1", { localPromptConfig: localConfig });
+          updateTarget("target-1", { localPromptConfig: localConfig });
         }
       });
 
@@ -596,10 +596,10 @@ describe("Prompt Editor Local Changes", () => {
       // Wait for the store to be updated
       await waitFor(
         () => {
-          const runner = useEvaluationsV3Store
+          const target = useEvaluationsV3Store
             .getState()
-            .runners.find((r) => r.id === "runner-1");
-          expect(runner?.localPromptConfig).toBeDefined();
+            .targets.find((r) => r.id === "target-1");
+          expect(target?.localPromptConfig).toBeDefined();
         },
         { timeout: 2000 },
       );

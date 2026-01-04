@@ -5,9 +5,9 @@
  * This is a one-way conversion - state is persisted via wizardState, not DSL.
  *
  * Key concepts:
- * - Evaluators are global/shared in state - runners reference them by ID
- * - When generating DSL, evaluators are duplicated per-runner with {runnerId}.{evaluatorId} naming
- * - Mappings: runner.mappings for runner inputs, evaluator.mappings[runnerId] for evaluator inputs
+ * - Evaluators are global/shared in state - targets reference them by ID
+ * - When generating DSL, evaluators are duplicated per-target with {targetId}.{evaluatorId} naming
+ * - Mappings: target.mappings for target inputs, evaluator.mappings[targetId] for evaluator inputs
  * - Multi-dataset: DSL is generated for the active dataset only
  */
 
@@ -22,7 +22,7 @@ import type {
   Field,
 } from "~/optimization_studio/types/dsl";
 import type {
-  RunnerConfig,
+  TargetConfig,
   DatasetColumn,
   DatasetReference,
   EvaluationsV3State,
@@ -37,7 +37,7 @@ import type {
 /**
  * Convert V3 state to workflow DSL for execution.
  * Uses the active dataset for generating the entry node.
- * Evaluators are duplicated per-runner with clear naming for result mapping.
+ * Evaluators are duplicated per-target with clear naming for result mapping.
  *
  * @param state - The current evaluations V3 state
  * @param datasetIdOverride - Optional dataset ID to use instead of activeDatasetId
@@ -56,38 +56,38 @@ export const stateToWorkflow = (
 
   const entryNode = createEntryNode(activeDataset);
 
-  const runnerNodes: Array<Node<Signature> | Node<Code>> = [];
+  const targetNodes: Array<Node<Signature> | Node<Code>> = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
-  // Create runner nodes
-  state.runners.forEach((runner, runnerIndex) => {
-    // Skip prompt runners - they need different handling via API calls
-    if (runner.type === "prompt") {
+  // Create target nodes
+  state.targets.forEach((target, targetIndex) => {
+    // Skip prompt targets - they need different handling via API calls
+    if (target.type === "prompt") {
       // For now, skip prompts - they would be handled differently
       return;
     }
 
-    // For agent runners, check the underlying agent type
-    const runnerNode = createCodeNode(runner, datasetId, runnerIndex);
-    runnerNodes.push(runnerNode);
+    // For agent targets, check the underlying agent type
+    const targetNode = createCodeNode(target, datasetId, targetIndex);
+    targetNodes.push(targetNode);
 
-    // Create evaluator nodes for ALL evaluators (they apply to all runners)
-    // Evaluators are duplicated per-runner in the DSL
+    // Create evaluator nodes for ALL evaluators (they apply to all targets)
+    // Evaluators are duplicated per-target in the DSL
     state.evaluators.forEach((evaluator, evalIndex) => {
       const evaluatorNode = createEvaluatorNode(
         evaluator,
         datasetId,
-        runner.id,
-        runnerIndex,
+        target.id,
+        targetIndex,
         evalIndex
       );
       evaluatorNodes.push(evaluatorNode);
     });
   });
 
-  const runnerEdges = buildRunnerEdges(state.runners, datasetId);
+  const targetEdges = buildTargetEdges(state.targets, datasetId);
   const evaluatorEdges = buildEvaluatorEdges(
-    state.runners,
+    state.targets,
     state.evaluators,
     datasetId
   );
@@ -105,8 +105,8 @@ export const stateToWorkflow = (
     },
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, ...runnerNodes, ...evaluatorNodes] as Workflow["nodes"],
-    edges: [...runnerEdges, ...evaluatorEdges],
+    nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as Workflow["nodes"],
+    edges: [...targetEdges, ...evaluatorEdges],
     state: {},
   };
 };
@@ -152,18 +152,18 @@ const columnTypeToFieldType = (
 };
 
 /**
- * Create a code node from a runner config.
+ * Create a code node from a target config.
  * Uses the `parameters` array structure expected by the DSL.
  * Sets default values on inputs that have value mappings.
  */
-const createCodeNode = (runner: RunnerConfig, activeDatasetId: string, index: number): Node<Code> => {
+const createCodeNode = (target: TargetConfig, activeDatasetId: string, index: number): Node<Code> => {
   const parameters: Field[] = [];
 
   // Get mappings for the active dataset
-  const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+  const datasetMappings = target.mappings[activeDatasetId] ?? {};
 
   // Apply value mappings as default values on inputs
-  const inputs: Field[] = (runner.inputs ?? []).map((input) => {
+  const inputs: Field[] = (target.inputs ?? []).map((input) => {
     const mapping = datasetMappings[input.identifier];
     if (mapping?.type === "value") {
       return { ...input, value: mapping.value };
@@ -172,12 +172,12 @@ const createCodeNode = (runner: RunnerConfig, activeDatasetId: string, index: nu
   });
 
   return {
-    id: runner.id,
+    id: target.id,
     type: "code",
     data: {
-      name: runner.name,
+      name: target.name,
       inputs,
-      outputs: runner.outputs ?? [{ identifier: "output", type: "str" }],
+      outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
     },
     position: { x: 300, y: index * 200 },
@@ -185,24 +185,24 @@ const createCodeNode = (runner: RunnerConfig, activeDatasetId: string, index: nu
 };
 
 /**
- * Create an evaluator node for a specific runner.
- * Node ID is {runnerId}.{evaluatorId} for clear result mapping back to the table.
+ * Create an evaluator node for a specific target.
+ * Node ID is {targetId}.{evaluatorId} for clear result mapping back to the table.
  * Sets default values on inputs that have value mappings.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
   activeDatasetId: string,
-  runnerId: string,
-  runnerIndex: number,
+  targetId: string,
+  targetIndex: number,
   evalIndex: number
 ): Node<Evaluator> => {
-  // Get the mappings for this dataset and runner
+  // Get the mappings for this dataset and target
   const datasetMappings = evaluator.mappings[activeDatasetId];
-  const runnerMappings = datasetMappings?.[runnerId] ?? {};
+  const targetMappings = datasetMappings?.[targetId] ?? {};
 
   // Apply value mappings as default values on inputs
   const inputs: Field[] = evaluator.inputs.map((input) => {
-    const mapping = runnerMappings[input.identifier];
+    const mapping = targetMappings[input.identifier];
     if (mapping?.type === "value") {
       return { ...input, value: mapping.value };
     }
@@ -210,7 +210,7 @@ const createEvaluatorNode = (
   });
 
   return {
-    id: `${runnerId}.${evaluator.id}`,
+    id: `${targetId}.${evaluator.id}`,
     type: "evaluator",
     data: {
       name: `${evaluator.name}`,
@@ -220,24 +220,24 @@ const createEvaluatorNode = (
       evaluator: evaluator.evaluatorType,
       ...evaluator.settings,
     },
-    position: { x: 600, y: runnerIndex * 200 + evalIndex * 100 },
+    position: { x: 600, y: targetIndex * 200 + evalIndex * 100 },
   };
 };
 
 /**
- * Build edges connecting entry to runners based on runner.mappings.
+ * Build edges connecting entry to targets based on target.mappings.
  * With per-dataset structure: mappings[datasetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
-const buildRunnerEdges = (
-  runners: RunnerConfig[],
+const buildTargetEdges = (
+  targets: TargetConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const runner of runners) {
+  for (const target of targets) {
     // Get mappings for the active dataset
-    const datasetMappings = runner.mappings[activeDatasetId];
+    const datasetMappings = target.mappings[activeDatasetId];
     if (!datasetMappings) continue;
 
     for (const [inputField, mapping] of Object.entries(datasetMappings)) {
@@ -249,19 +249,19 @@ const buildRunnerEdges = (
         mapping.sourceId === activeDatasetId
       ) {
         edges.push({
-          id: `entry->${runner.id}.${inputField}`,
+          id: `entry->${target.id}.${inputField}`,
           source: "entry",
           sourceHandle: `output-${mapping.sourceField}`,
-          target: runner.id,
+          target: target.id,
           targetHandle: `input-${inputField}`,
         });
-      } else if (mapping.source === "runner") {
-        // Runner-to-runner mapping
+      } else if (mapping.source === "target") {
+        // Target-to-target mapping
         edges.push({
-          id: `${mapping.sourceId}->${runner.id}.${inputField}`,
+          id: `${mapping.sourceId}->${target.id}.${inputField}`,
           source: mapping.sourceId,
           sourceHandle: `output-${mapping.sourceField}`,
-          target: runner.id,
+          target: target.id,
           targetHandle: `input-${inputField}`,
         });
       }
@@ -272,26 +272,26 @@ const buildRunnerEdges = (
 };
 
 /**
- * Build edges connecting runners to their evaluators.
- * With per-dataset, per-runner structure: mappings[datasetId][runnerId][inputField]
+ * Build edges connecting targets to their evaluators.
+ * With per-dataset, per-target structure: mappings[datasetId][targetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
 const buildEvaluatorEdges = (
-  runners: RunnerConfig[],
+  targets: TargetConfig[],
   evaluators: EvaluatorConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  // All evaluators apply to all runners
-  for (const runner of runners) {
+  // All evaluators apply to all targets
+  for (const target of targets) {
     for (const evaluator of evaluators) {
-      // Get mappings for the active dataset and this runner
+      // Get mappings for the active dataset and this target
       const datasetMappings = evaluator.mappings[activeDatasetId];
-      const runnerMappings = datasetMappings?.[runner.id] ?? {};
-      const evaluatorNodeId = `${runner.id}.${evaluator.id}`;
+      const targetMappings = datasetMappings?.[target.id] ?? {};
+      const evaluatorNodeId = `${target.id}.${evaluator.id}`;
 
-      for (const [inputField, mapping] of Object.entries(runnerMappings)) {
+      for (const [inputField, mapping] of Object.entries(targetMappings)) {
         // Skip value mappings - they don't create edges
         if (mapping.type === "value") continue;
 
@@ -308,13 +308,13 @@ const buildEvaluatorEdges = (
             targetHandle: `input-${inputField}`,
           });
         } else if (
-          mapping.source === "runner" &&
-          mapping.sourceId === runner.id
+          mapping.source === "target" &&
+          mapping.sourceId === target.id
         ) {
-          // From this runner's output
+          // From this target's output
           edges.push({
-            id: `${runner.id}->${evaluatorNodeId}.${inputField}`,
-            source: runner.id,
+            id: `${target.id}->${evaluatorNodeId}.${inputField}`,
+            source: target.id,
             sourceHandle: `output-${mapping.sourceField}`,
             target: evaluatorNodeId,
             targetHandle: `input-${inputField}`,

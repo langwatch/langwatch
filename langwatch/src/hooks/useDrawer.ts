@@ -31,7 +31,7 @@ export const getComplexProps = () => complexProps;
  * Flow callbacks registry - persists across drawer navigation.
  * Use this for callbacks that need to survive navigation between drawers
  * (e.g., onSelectPrompt callback that should work in promptList even when
- * opened from runnerTypeSelector).
+ * opened from targetTypeSelector).
  *
  * Cleared automatically when closeDrawer() is called.
  */
@@ -45,7 +45,7 @@ let flowCallbacks: Record<string, Record<string, unknown>> = {};
  * // In EvaluationsV3Table:
  * setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
  * setFlowCallbacks("agentList", { onSelect: handleSelectAgent });
- * openDrawer("runnerTypeSelector");
+ * openDrawer("targetTypeSelector");
  *
  * // Later, in PromptListDrawer, callbacks are available via getFlowCallbacks
  */
@@ -200,7 +200,7 @@ export const useDrawer = () => {
    * openDrawer("promptEditor", { promptId: "abc" });
    *
    * // With additional URL params for context
-   * openDrawer("promptEditor", { promptId: "abc", urlParams: { runnerId: "123" } });
+   * openDrawer("promptEditor", { promptId: "abc", urlParams: { targetId: "123" } });
    */
   const openDrawer = <T extends DrawerType>(
     drawer: T,

@@ -24,8 +24,8 @@ import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
-import type { RunnerConfig } from "../../types";
-import { runnerHasMissingMappings } from "../../utils/mappingValidation";
+import type { TargetConfig } from "../../types";
+import { targetHasMissingMappings } from "../../utils/mappingValidation";
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -33,16 +33,16 @@ const pulseAnimation = keyframes`
   50% { transform: scale(1.2); }
 `;
 
-type RunnerHeaderProps = {
-  runner: RunnerConfig;
-  onEdit?: (runner: RunnerConfig) => void;
-  onRemove?: (runnerId: string) => void;
-  onRun?: (runner: RunnerConfig) => void;
+type TargetHeaderProps = {
+  target: TargetConfig;
+  onEdit?: (target: TargetConfig) => void;
+  onRemove?: (targetId: string) => void;
+  onRun?: (target: TargetConfig) => void;
 };
 
 /**
- * Header component for runner columns in the evaluations table.
- * Shows runner name with icon, a play button, and a dropdown menu on click.
+ * Header component for target columns in the evaluations table.
+ * Shows target name with icon, a play button, and a dropdown menu on click.
  *
  * Menu options:
  * - For prompts: "Edit Prompt", "Remove from Workbench"
@@ -51,26 +51,26 @@ type RunnerHeaderProps = {
  * Note: For workflow agents, clicking "Edit Agent" opens the workflow in a new tab.
  * This is determined at runtime by fetching the agent data via tRPC.
  *
- * Memoized to prevent unnecessary re-renders when other runners' config changes.
+ * Memoized to prevent unnecessary re-renders when other targets' config changes.
  */
-export const RunnerHeader = memo(function RunnerHeader({
-  runner,
+export const TargetHeader = memo(function TargetHeader({
+  target,
   onEdit,
   onRemove,
   onRun,
-}: RunnerHeaderProps) {
+}: TargetHeaderProps) {
   // First check if prop has localPromptConfig (for direct prop usage)
   const propHasUnpublished =
-    runner.type === "prompt" && !!runner.localPromptConfig;
+    target.type === "prompt" && !!target.localPromptConfig;
 
-  // Subscribe directly to just this runner's unpublished state from store
-  // This is used when the table passes runners without localPromptConfig in props
+  // Subscribe directly to just this target's unpublished state from store
+  // This is used when the table passes targets without localPromptConfig in props
   // (e.g., when using useShallow which doesn't deep-compare)
   const storeHasUnpublished = useEvaluationsV3Store((state) => {
-    if (runner.type !== "prompt") return false;
-    const currentRunner = state.runners.find((r) => r.id === runner.id);
+    if (target.type !== "prompt") return false;
+    const currentTarget = state.targets.find((r) => r.id === target.id);
     return (
-      currentRunner?.type === "prompt" && !!currentRunner.localPromptConfig
+      currentTarget?.type === "prompt" && !!currentTarget.localPromptConfig
     );
   });
 
@@ -79,24 +79,24 @@ export const RunnerHeader = memo(function RunnerHeader({
 
   // Check if there are missing mappings for the active dataset
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
-  const hasMissingMappings = runnerHasMissingMappings(runner, activeDatasetId);
+  const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
 
   // Controlled menu state to prevent closing on re-renders
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Determine icon based on runner type
-  const getRunnerIcon = () => {
-    if (runner.type === "prompt") {
+  // Determine icon based on target type
+  const getTargetIcon = () => {
+    if (target.type === "prompt") {
       return <LuFileText size={12} />;
     }
     return <LuCode size={12} />;
   };
 
-  const getRunnerColor = () => {
-    return runner.type === "prompt" ? "green.400" : "#3E5A60";
+  const getTargetColor = () => {
+    return target.type === "prompt" ? "green.400" : "#3E5A60";
   };
 
-  const editLabel = runner.type === "prompt" ? "Edit Prompt" : "Edit Agent";
+  const editLabel = target.type === "prompt" ? "Edit Prompt" : "Edit Agent";
 
   return (
     <HStack gap={2} width="full" marginY={-2}>
@@ -116,15 +116,15 @@ export const RunnerHeader = memo(function RunnerHeader({
             marginX={-2}
             marginY={-2}
             className="group"
-            data-testid="runner-header-button"
+            data-testid="target-header-button"
           >
             <ColorfulBlockIcon
-              color={getRunnerColor()}
+              color={getTargetColor()}
               size="xs"
-              icon={getRunnerIcon()}
+              icon={getTargetIcon()}
             />
             <Text fontSize="13px" fontWeight="medium" truncate>
-              {runner.name}
+              {target.name}
             </Text>
             {hasMissingMappings && (
               <Tooltip
@@ -143,7 +143,7 @@ export const RunnerHeader = memo(function RunnerHeader({
                     e.stopPropagation(); // Prevent menu from opening
                     e.preventDefault();
                     setMenuOpen(false); // Close menu if somehow open
-                    onEdit?.(runner); // Open drawer directly
+                    onEdit?.(target); // Open drawer directly
                   }}
                   cursor="pointer"
                   _hover={{ transform: "scale(1.2)" }}
@@ -178,14 +178,14 @@ export const RunnerHeader = memo(function RunnerHeader({
           </Button>
         </Menu.Trigger>
         <Menu.Content minWidth="200px">
-          <Menu.Item value="edit" onClick={() => onEdit?.(runner)}>
+          <Menu.Item value="edit" onClick={() => onEdit?.(target)}>
             <HStack gap={2}>
               <LuPencil size={14} />
               <Text>{editLabel}</Text>
             </HStack>
           </Menu.Item>
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
-          <Menu.Item value="remove" onClick={() => onRemove?.(runner.id)}>
+          <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
             <HStack gap={2} color="red.600">
               <LuTrash2 size={14} />
               <Text>Remove from Workbench</Text>
@@ -203,19 +203,19 @@ export const RunnerHeader = memo(function RunnerHeader({
         openDelay={200}
       >
         <IconButton
-          aria-label="Run evaluation for this runner"
+          aria-label="Run evaluation for this target"
           size="xs"
           variant="ghost"
           onClick={(e) => {
             e.stopPropagation();
             // If there are missing mappings, open the drawer instead of running
             if (hasMissingMappings) {
-              onEdit?.(runner);
+              onEdit?.(target);
             } else {
-              onRun?.(runner);
+              onRun?.(target);
             }
           }}
-          data-testid="runner-play-button"
+          data-testid="target-play-button"
           minWidth="auto"
           height="auto"
           padding={1}

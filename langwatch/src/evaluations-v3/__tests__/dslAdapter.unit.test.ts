@@ -108,30 +108,30 @@ describe("DSL Adapter", () => {
       );
     });
 
-    // Note: The following tests are skipped because the new runner architecture
-    // handles prompts and agents differently. Prompt runners are handled via API
-    // calls, not DSL nodes. Agent runners (code/workflow) would need updated tests.
-    it.skip("creates code node for agent runner", () => {
-      // TODO: Update for new runner architecture
+    // Note: The following tests are skipped because the new target architecture
+    // handles prompts and agents differently. Prompt targets are handled via API
+    // calls, not DSL nodes. Agent targets (code/workflow) would need updated tests.
+    it.skip("creates code node for agent target", () => {
+      // TODO: Update for new target architecture
     });
 
-    it.skip("creates evaluator nodes duplicated per-runner", () => {
-      // TODO: Update for new runner architecture
+    it.skip("creates evaluator nodes duplicated per-target", () => {
+      // TODO: Update for new target architecture
     });
 
-    it.skip("creates edges from runner mappings with sourceId matching active dataset", () => {
-      // TODO: Update for new runner architecture
+    it.skip("creates edges from target mappings with sourceId matching active dataset", () => {
+      // TODO: Update for new target architecture
     });
 
     describe("value mappings", () => {
-      it("sets value on runner input when mapping type is value", () => {
+      it("sets value on target input when mapping type is value", () => {
         const state: EvaluationsV3State = {
           ...createInitialState(),
-          runners: [
+          targets: [
             {
-              id: "runner-1",
+              id: "target-1",
               type: "agent",
-              name: "Code Runner",
+              name: "Code Target",
               inputs: [
                 { identifier: "question", type: "str" },
                 { identifier: "context", type: "str" },
@@ -158,7 +158,7 @@ describe("DSL Adapter", () => {
 
         const workflow = stateToWorkflow(state);
 
-        const codeNode = workflow.nodes.find((n) => n.id === "runner-1");
+        const codeNode = workflow.nodes.find((n) => n.id === "target-1");
         expect(codeNode).toBeDefined();
         expect(codeNode?.data.inputs).toHaveLength(2);
 
@@ -178,11 +178,11 @@ describe("DSL Adapter", () => {
       it("creates edges only for source mappings, not value mappings", () => {
         const state: EvaluationsV3State = {
           ...createInitialState(),
-          runners: [
+          targets: [
             {
-              id: "runner-1",
+              id: "target-1",
               type: "agent",
-              name: "Code Runner",
+              name: "Code Target",
               inputs: [
                 { identifier: "question", type: "str" },
                 { identifier: "context", type: "str" },
@@ -217,11 +217,11 @@ describe("DSL Adapter", () => {
       it("sets value on evaluator input when mapping type is value", () => {
         const state: EvaluationsV3State = {
           ...createInitialState(),
-          runners: [
+          targets: [
             {
-              id: "runner-1",
+              id: "target-1",
               type: "agent",
-              name: "Code Runner",
+              name: "Code Target",
               inputs: [{ identifier: "question", type: "str" }],
               outputs: [{ identifier: "output", type: "str" }],
               // Per-dataset mappings
@@ -247,14 +247,14 @@ describe("DSL Adapter", () => {
                 { identifier: "output", type: "str" },
                 { identifier: "expected", type: "str" },
               ],
-              // Per-dataset, per-runner mappings
+              // Per-dataset, per-target mappings
               mappings: {
                 [DEFAULT_TEST_DATA_ID]: {
-                  "runner-1": {
+                  "target-1": {
                     output: {
                       type: "source",
-                      source: "runner",
-                      sourceId: "runner-1",
+                      source: "target",
+                      sourceId: "target-1",
                       sourceField: "output",
                     },
                     expected: {
@@ -271,11 +271,11 @@ describe("DSL Adapter", () => {
         const workflow = stateToWorkflow(state);
 
         const evaluatorNode = workflow.nodes.find(
-          (n) => n.id === "runner-1.eval-1"
+          (n) => n.id === "target-1.eval-1"
         );
         expect(evaluatorNode).toBeDefined();
 
-        // Output should NOT have a value (it's mapped to runner)
+        // Output should NOT have a value (it's mapped to target)
         const outputInput = evaluatorNode?.data.inputs?.find(
           (i) => i.identifier === "output"
         );

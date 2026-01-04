@@ -2,8 +2,8 @@
  * Hook for deriving mappings and sources for evaluators in evaluations context.
  *
  * When the evaluator editor drawer is opened from evaluations V3, this hook provides:
- * - availableSources derived from the active dataset AND the specific runner's outputs
- * - inputMappings derived from the evaluator's mappings for the active dataset and runner
+ * - availableSources derived from the active dataset AND the specific target's outputs
+ * - inputMappings derived from the evaluator's mappings for the active dataset and target
  *
  * This enables the drawer to reactively update when the active dataset changes.
  */
@@ -20,9 +20,9 @@ import {
 } from "~/components/variables";
 
 type UseEvaluatorMappingsResult = {
-  /** Available sources for variable mapping (active dataset columns + runner outputs) */
+  /** Available sources for variable mapping (active dataset columns + target outputs) */
   availableSources: AvailableSource[];
-  /** Input mappings in UI format for the evaluator on the active dataset/runner */
+  /** Input mappings in UI format for the evaluator on the active dataset/target */
   inputMappings: Record<string, UIFieldMapping>;
   /** Current active dataset ID */
   activeDatasetId: string;
@@ -34,25 +34,25 @@ type UseEvaluatorMappingsResult = {
  * Hook to get reactive mappings and sources for an evaluator in evaluations context.
  *
  * @param evaluatorId - The evaluator ID (from the V3 store) to get mappings for.
- * @param runnerId - The runner ID to get mappings for.
+ * @param targetId - The target ID to get mappings for.
  * @returns Reactive mappings and sources that update when the active dataset changes.
  */
 export const useEvaluatorMappings = (
   evaluatorId: string | undefined,
-  runnerId: string | undefined
+  targetId: string | undefined
 ): UseEvaluatorMappingsResult => {
-  const { activeDatasetId, datasets, evaluator, runner } = useEvaluationsV3Store(
+  const { activeDatasetId, datasets, evaluator, target } = useEvaluationsV3Store(
     useShallow((state) => ({
       activeDatasetId: state.activeDatasetId,
       datasets: state.datasets,
       evaluator: evaluatorId
         ? state.evaluators.find((e) => e.id === evaluatorId || e.dbEvaluatorId === evaluatorId)
         : undefined,
-      runner: runnerId ? state.runners.find((r) => r.id === runnerId) : undefined,
+      target: targetId ? state.targets.find((r) => r.id === targetId) : undefined,
     }))
   );
 
-  // Build available sources from the active dataset AND the runner's outputs
+  // Build available sources from the active dataset AND the target's outputs
   const availableSources = useMemo((): AvailableSource[] => {
     const sources: AvailableSource[] = [];
 
@@ -70,13 +70,13 @@ export const useEvaluatorMappings = (
       });
     }
 
-    // Add runner outputs (use "signature" type as it represents a prompt/runner node)
-    if (runner) {
+    // Add target outputs (use "signature" type as it represents a prompt/target node)
+    if (target) {
       sources.push({
-        id: runner.id,
-        name: runner.name,
+        id: target.id,
+        name: target.name,
         type: "signature" as const,
-        fields: runner.outputs.map((output) => ({
+        fields: target.outputs.map((output) => ({
           name: output.identifier,
           type: output.type as "str" | "float" | "bool" | "image" | "list" | "dict",
         })),
@@ -84,25 +84,25 @@ export const useEvaluatorMappings = (
     }
 
     return sources;
-  }, [datasets, activeDatasetId, runner]);
+  }, [datasets, activeDatasetId, target]);
 
-  // Convert evaluator mappings for the active dataset and runner to UI format
+  // Convert evaluator mappings for the active dataset and target to UI format
   const inputMappings = useMemo((): Record<string, UIFieldMapping> => {
-    if (!evaluator || !runnerId) return {};
+    if (!evaluator || !targetId) return {};
 
     const datasetMappings = evaluator.mappings[activeDatasetId];
-    const runnerMappings = datasetMappings?.[runnerId] ?? {};
+    const targetMappings = datasetMappings?.[targetId] ?? {};
     const uiMappings: Record<string, UIFieldMapping> = {};
-    for (const [key, mapping] of Object.entries(runnerMappings)) {
+    for (const [key, mapping] of Object.entries(targetMappings)) {
       uiMappings[key] = convertToUIMapping(mapping);
     }
     return uiMappings;
-  }, [evaluator, runnerId, activeDatasetId]);
+  }, [evaluator, targetId, activeDatasetId]);
 
   return {
     availableSources,
     inputMappings,
     activeDatasetId,
-    isValid: !!evaluatorId && !!evaluator && !!runnerId && !!runner,
+    isValid: !!evaluatorId && !!evaluator && !!targetId && !!target,
   };
 };

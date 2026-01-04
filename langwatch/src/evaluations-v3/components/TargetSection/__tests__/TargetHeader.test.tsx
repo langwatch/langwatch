@@ -4,8 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
-import { RunnerHeader } from "../RunnerHeader";
-import type { RunnerConfig } from "../../../types";
+import { TargetHeader } from "../../TargetSection/TargetHeader";
+import type { TargetConfig } from "../../../types";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -22,7 +22,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 };
 
-describe("RunnerHeader", () => {
+describe("TargetHeader", () => {
   const mockOnEdit = vi.fn();
   const mockOnRemove = vi.fn();
 
@@ -34,9 +34,9 @@ describe("RunnerHeader", () => {
     cleanup();
   });
 
-  describe("Prompt runner", () => {
-    const promptRunner: RunnerConfig = {
-      id: "runner-1",
+  describe("Prompt target", () => {
+    const promptTarget: TargetConfig = {
+      id: "target-1",
       name: "my-assistant",
       type: "prompt",
       promptId: "prompt-123",
@@ -46,10 +46,10 @@ describe("RunnerHeader", () => {
       mappings: {},
     };
 
-    it("renders prompt runner with name and icon", () => {
+    it("renders prompt target with name and icon", () => {
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunner}
+        <TargetHeader
+          target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
@@ -60,27 +60,27 @@ describe("RunnerHeader", () => {
 
     it("shows play button on the far right", () => {
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunner}
+        <TargetHeader
+          target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      expect(screen.getByTestId("runner-play-button")).toBeInTheDocument();
+      expect(screen.getByTestId("target-play-button")).toBeInTheDocument();
     });
 
     it("opens menu when clicking on the header", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunner}
+        <TargetHeader
+          target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      await user.click(screen.getByTestId("runner-header-button"));
+      await user.click(screen.getByTestId("target-header-button"));
 
       await waitFor(() => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
@@ -91,45 +91,45 @@ describe("RunnerHeader", () => {
     it("calls onEdit when clicking Edit Prompt", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunner}
+        <TargetHeader
+          target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      await user.click(screen.getByTestId("runner-header-button"));
+      await user.click(screen.getByTestId("target-header-button"));
       await waitFor(() => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
       });
       await user.click(screen.getByText("Edit Prompt"));
 
-      expect(mockOnEdit).toHaveBeenCalledWith(promptRunner);
+      expect(mockOnEdit).toHaveBeenCalledWith(promptTarget);
     });
 
     it("calls onRemove when clicking Remove from Workbench", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunner}
+        <TargetHeader
+          target={promptTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      await user.click(screen.getByTestId("runner-header-button"));
+      await user.click(screen.getByTestId("target-header-button"));
       await waitFor(() => {
         expect(screen.getByText("Remove from Workbench")).toBeInTheDocument();
       });
       await user.click(screen.getByText("Remove from Workbench"));
 
-      expect(mockOnRemove).toHaveBeenCalledWith(promptRunner.id);
+      expect(mockOnRemove).toHaveBeenCalledWith(promptTarget.id);
     });
   });
 
   describe("Unpublished modifications indicator", () => {
-    const promptRunnerWithLocalConfig: RunnerConfig = {
-      id: "runner-3",
+    const promptTargetWithLocalConfig: TargetConfig = {
+      id: "target-3",
       name: "modified-prompt",
       type: "prompt",
       promptId: "prompt-123",
@@ -145,8 +145,8 @@ describe("RunnerHeader", () => {
       mappings: {},
     };
 
-    const promptRunnerWithoutLocalConfig: RunnerConfig = {
-      id: "runner-4",
+    const promptTargetWithoutLocalConfig: TargetConfig = {
+      id: "target-4",
       name: "published-prompt",
       type: "prompt",
       promptId: "prompt-456",
@@ -158,8 +158,8 @@ describe("RunnerHeader", () => {
 
     it("does not show orange dot when no localPromptConfig", () => {
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunnerWithoutLocalConfig}
+        <TargetHeader
+          target={promptTargetWithoutLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
@@ -170,8 +170,8 @@ describe("RunnerHeader", () => {
 
     it("shows orange dot when localPromptConfig exists", () => {
       renderWithProviders(
-        <RunnerHeader
-          runner={promptRunnerWithLocalConfig}
+        <TargetHeader
+          target={promptTargetWithLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
@@ -180,9 +180,9 @@ describe("RunnerHeader", () => {
       expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
     });
 
-    it("does not show orange dot for agent runners even with localPromptConfig", () => {
-      const agentWithLocalConfig: RunnerConfig = {
-        id: "runner-5",
+    it("does not show orange dot for agent targets even with localPromptConfig", () => {
+      const agentWithLocalConfig: TargetConfig = {
+        id: "target-5",
         name: "Agent",
         type: "agent",
         dbAgentId: "agent-123",
@@ -193,8 +193,8 @@ describe("RunnerHeader", () => {
       };
 
       renderWithProviders(
-        <RunnerHeader
-          runner={agentWithLocalConfig}
+        <TargetHeader
+          target={agentWithLocalConfig}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
@@ -204,9 +204,9 @@ describe("RunnerHeader", () => {
     });
   });
 
-  describe("Agent runner", () => {
-    const agentRunner: RunnerConfig = {
-      id: "runner-2",
+  describe("Agent target", () => {
+    const agentTarget: TargetConfig = {
+      id: "target-2",
       name: "Python Processor",
       type: "agent",
       dbAgentId: "agent-123",
@@ -215,10 +215,10 @@ describe("RunnerHeader", () => {
       mappings: {},
     };
 
-    it("renders agent runner with name", () => {
+    it("renders agent target with name", () => {
       renderWithProviders(
-        <RunnerHeader
-          runner={agentRunner}
+        <TargetHeader
+          target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
@@ -230,14 +230,14 @@ describe("RunnerHeader", () => {
     it("shows Edit Agent option for agents", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <RunnerHeader
-          runner={agentRunner}
+        <TargetHeader
+          target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      await user.click(screen.getByTestId("runner-header-button"));
+      await user.click(screen.getByTestId("target-header-button"));
 
       await waitFor(() => {
         expect(screen.getByText("Edit Agent")).toBeInTheDocument();
@@ -248,20 +248,20 @@ describe("RunnerHeader", () => {
     it("calls onEdit when clicking Edit Agent", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <RunnerHeader
-          runner={agentRunner}
+        <TargetHeader
+          target={agentTarget}
           onEdit={mockOnEdit}
           onRemove={mockOnRemove}
         />
       );
 
-      await user.click(screen.getByTestId("runner-header-button"));
+      await user.click(screen.getByTestId("target-header-button"));
       await waitFor(() => {
         expect(screen.getByText("Edit Agent")).toBeInTheDocument();
       });
       await user.click(screen.getByText("Edit Agent"));
 
-      expect(mockOnEdit).toHaveBeenCalledWith(agentRunner);
+      expect(mockOnEdit).toHaveBeenCalledWith(agentTarget);
     });
   });
 });

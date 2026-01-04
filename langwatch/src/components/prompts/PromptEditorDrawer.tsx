@@ -118,12 +118,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const drawerParams = useDrawerParams();
   const utils = api.useContext();
 
-  // Check if we're in evaluations context (runnerId in URL params)
-  const runnerId = drawerParams.runnerId as string | undefined;
+  // Check if we're in evaluations context (targetId in URL params)
+  const targetId = drawerParams.targetId as string | undefined;
 
   // Use the reactive hook for evaluations context - this subscribes to store updates
   // and automatically provides updated mappings when the active dataset changes
-  const evaluationData = useEvaluationMappings(runnerId);
+  const evaluationData = useEvaluationMappings(targetId);
 
   const onClose = props.onClose ?? closeDrawer;
   const onSave =
@@ -132,7 +132,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Data sources: In evaluations context, use reactive data from hook.
   // Otherwise, fall back to props/complexProps (for standalone usage like prompt playground).
-  const availableSources = runnerId && evaluationData.isValid
+  const availableSources = targetId && evaluationData.isValid
     ? evaluationData.availableSources
     : props.availableSources ?? (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
 
@@ -151,7 +151,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // ============================================================================
 
   // External source (only for initialization and sync)
-  const _mappingsFromProps = runnerId && evaluationData.isValid
+  const _mappingsFromProps = targetId && evaluationData.isValid
     ? evaluationData.inputMappings
     : props.inputMappings ?? (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
 

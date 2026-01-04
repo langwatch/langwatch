@@ -8,7 +8,7 @@ import {
   type FieldMapping as VariableFieldMapping,
   type FieldType,
 } from "~/components/variables";
-import type { RunnerConfig, FieldMapping, DatasetReference } from "../../types";
+import type { TargetConfig, FieldMapping, DatasetReference } from "../../types";
 import type { Field } from "~/optimization_studio/types/dsl";
 import { getUsedFields } from "../../utils/mappingValidation";
 
@@ -16,15 +16,15 @@ import { getUsedFields } from "../../utils/mappingValidation";
 // Types
 // ============================================================================
 
-type RunnerVariablesPanelProps = {
-  /** The runner being configured */
-  runner: RunnerConfig;
+type TargetVariablesPanelProps = {
+  /** The target being configured */
+  target: TargetConfig;
   /** The currently active dataset ID (mappings are stored per-dataset) */
   activeDatasetId: string;
   /** All datasets in the workbench (for mapping sources) */
   datasets: DatasetReference[];
-  /** Other runners that can be sources (for chaining outputs) */
-  otherRunners: RunnerConfig[];
+  /** Other targets that can be sources (for chaining outputs) */
+  otherTargets: TargetConfig[];
   /** Callback when inputs change */
   onInputsChange: (inputs: Field[]) => void;
   /** Callback when a single mapping changes for the active dataset */
@@ -38,12 +38,12 @@ type RunnerVariablesPanelProps = {
 // ============================================================================
 
 /**
- * Convert the active dataset and runners to AvailableSource format for the VariablesSection.
+ * Convert the active dataset and targets to AvailableSource format for the VariablesSection.
  * Only the active dataset is included as a source - sources are scoped per-dataset.
  */
 const buildAvailableSources = (
   activeDataset: DatasetReference | undefined,
-  otherRunners: RunnerConfig[]
+  otherTargets: TargetConfig[]
 ): AvailableSource[] => {
   const sources: AvailableSource[] = [];
 
@@ -61,16 +61,16 @@ const buildAvailableSources = (
     });
   }
 
-  // Add other runners as sources (their outputs can be inputs to this runner)
-  for (const runner of otherRunners) {
-    const sourceType = runner.type === "prompt" ? "signature" : "code";
+  // Add other targets as sources (their outputs can be inputs to this target)
+  for (const target of otherTargets) {
+    const sourceType = target.type === "prompt" ? "signature" : "code";
     sources.push({
-      id: runner.id,
-      name: runner.name,
+      id: target.id,
+      name: target.name,
       type: sourceType,
-      fields: runner.outputs.map((output) => ({
+      fields: target.outputs.map((output) => ({
         name: output.identifier,
-        // Runner outputs already use FieldType
+        // Target outputs already use FieldType
         type: output.type as FieldType,
       })),
     });
@@ -100,7 +100,7 @@ const variablesToFields = (variables: Variable[]): Field[] => {
 };
 
 /**
- * Convert RunnerConfig mappings to VariablesSection format.
+ * Convert TargetConfig mappings to VariablesSection format.
  * Both support source and value mapping types.
  */
 const convertToVariableMappings = (
@@ -124,8 +124,8 @@ const convertToVariableMappings = (
 };
 
 /**
- * Convert VariablesSection mapping back to RunnerConfig format.
- * For source mappings, determines if source is a dataset or runner.
+ * Convert VariablesSection mapping back to TargetConfig format.
+ * For source mappings, determines if source is a dataset or target.
  */
 const convertFromVariableMapping = (
   mapping: VariableFieldMapping,
@@ -140,7 +140,7 @@ const convertFromVariableMapping = (
 
   return {
     type: "source",
-    source: isDataset ? "dataset" : "runner",
+    source: isDataset ? "dataset" : "target",
     sourceId: mapping.sourceId,
     sourceField: mapping.field,
   };
@@ -151,23 +151,23 @@ const convertFromVariableMapping = (
 // ============================================================================
 
 /**
- * Panel for configuring runner input variables and their mappings.
+ * Panel for configuring target input variables and their mappings.
  *
  * Features:
  * - Shows list of input variables with type icons
- * - Each variable has a mapping dropdown to connect to dataset columns or other runner outputs
+ * - Each variable has a mapping dropdown to connect to dataset columns or other target outputs
  * - Can add/remove/rename variables (unless readOnly)
  * - Indicates when required mappings are missing
  */
-export const RunnerVariablesPanel = ({
-  runner,
+export const TargetVariablesPanel = ({
+  target,
   activeDatasetId,
   datasets,
-  otherRunners,
+  otherTargets,
   onInputsChange,
   onMappingChange,
   readOnly = false,
-}: RunnerVariablesPanelProps) => {
+}: TargetVariablesPanelProps) => {
   // Find the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
@@ -176,36 +176,36 @@ export const RunnerVariablesPanel = ({
 
   // Build available sources for mapping (only active dataset)
   const availableSources = useMemo(
-    () => buildAvailableSources(activeDataset, otherRunners),
-    [activeDataset, otherRunners]
+    () => buildAvailableSources(activeDataset, otherTargets),
+    [activeDataset, otherTargets]
   );
 
-  // Convert runner inputs to variables
+  // Convert target inputs to variables
   const variables = useMemo(
-    () => fieldsToVariables(runner.inputs),
-    [runner.inputs]
+    () => fieldsToVariables(target.inputs),
+    [target.inputs]
   );
 
   // Get mappings for the active dataset
-  const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+  const datasetMappings = target.mappings[activeDatasetId] ?? {};
 
-  // Convert runner mappings to variable mappings for display
+  // Convert target mappings to variable mappings for display
   const mappings = useMemo(
     () => convertToVariableMappings(datasetMappings),
     [datasetMappings]
   );
 
   // Get fields that are actually used in the prompt (for validation)
-  const usedFields = useMemo(() => getUsedFields(runner), [runner]);
+  const usedFields = useMemo(() => getUsedFields(target), [target]);
 
   // Check for missing mappings for the active dataset
   // Only check fields that are BOTH used in the prompt AND in the inputs list
   // "Undefined variables" (used but not in inputs) don't require mappings
   const missingMappings = useMemo(() => {
-    return runner.inputs.filter(
+    return target.inputs.filter(
       (input) => usedFields.has(input.identifier) && !datasetMappings[input.identifier]
     );
-  }, [runner.inputs, datasetMappings, usedFields]);
+  }, [target.inputs, datasetMappings, usedFields]);
 
   // Create a set of missing mapping identifiers for highlighting
   const missingMappingIds = useMemo(() => {
@@ -268,7 +268,7 @@ export const RunnerVariablesPanel = ({
       {!readOnly && (
         <Text fontSize="xs" color="gray.500">
           Connect each input variable to a data source. Use the dropdown to map
-          to dataset columns or outputs from other runners.
+          to dataset columns or outputs from other targets.
         </Text>
       )}
     </VStack>

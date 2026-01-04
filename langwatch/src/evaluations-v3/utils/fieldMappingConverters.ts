@@ -35,7 +35,7 @@ export const convertFromUIMapping = (
   }
   return {
     type: "source",
-    source: isDatasetSource(mapping.sourceId) ? "dataset" : "runner",
+    source: isDatasetSource(mapping.sourceId) ? "dataset" : "target",
     sourceId: mapping.sourceId,
     sourceField: mapping.field,
   };

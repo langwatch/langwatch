@@ -3,7 +3,7 @@
  *
  * When the drawer is opened from evaluations V3, this hook provides:
  * - availableSources derived from the active dataset
- * - inputMappings derived from the runner's mappings for the active dataset
+ * - inputMappings derived from the target's mappings for the active dataset
  *
  * This enables the drawer to reactively update when the active dataset changes.
  */
@@ -18,7 +18,7 @@ import { datasetColumnTypeToFieldType, type AvailableSource, type FieldMapping a
 type UseEvaluationMappingsResult = {
   /** Available sources for variable mapping (active dataset columns) */
   availableSources: AvailableSource[];
-  /** Input mappings in UI format for the runner on the active dataset */
+  /** Input mappings in UI format for the target on the active dataset */
   inputMappings: Record<string, UIFieldMapping>;
   /** Current active dataset ID */
   activeDatasetId: string;
@@ -27,17 +27,17 @@ type UseEvaluationMappingsResult = {
 };
 
 /**
- * Hook to get reactive mappings and sources for a runner in evaluations context.
+ * Hook to get reactive mappings and sources for a target in evaluations context.
  *
- * @param runnerId - The runner ID to get mappings for. If undefined, returns empty data.
+ * @param targetId - The target ID to get mappings for. If undefined, returns empty data.
  * @returns Reactive mappings and sources that update when the active dataset changes.
  */
-export const useEvaluationMappings = (runnerId: string | undefined): UseEvaluationMappingsResult => {
-  const { activeDatasetId, datasets, runner } = useEvaluationsV3Store(
+export const useEvaluationMappings = (targetId: string | undefined): UseEvaluationMappingsResult => {
+  const { activeDatasetId, datasets, target } = useEvaluationsV3Store(
     useShallow((state) => ({
       activeDatasetId: state.activeDatasetId,
       datasets: state.datasets,
-      runner: runnerId ? state.runners.find((r) => r.id === runnerId) : undefined,
+      target: targetId ? state.targets.find((r) => r.id === targetId) : undefined,
     }))
   );
 
@@ -57,22 +57,22 @@ export const useEvaluationMappings = (runnerId: string | undefined): UseEvaluati
     }];
   }, [datasets, activeDatasetId]);
 
-  // Convert runner mappings for the active dataset to UI format
+  // Convert target mappings for the active dataset to UI format
   const inputMappings = useMemo((): Record<string, UIFieldMapping> => {
-    if (!runner) return {};
+    if (!target) return {};
 
-    const datasetMappings = runner.mappings[activeDatasetId] ?? {};
+    const datasetMappings = target.mappings[activeDatasetId] ?? {};
     const uiMappings: Record<string, UIFieldMapping> = {};
     for (const [key, mapping] of Object.entries(datasetMappings)) {
       uiMappings[key] = convertToUIMapping(mapping);
     }
     return uiMappings;
-  }, [runner, activeDatasetId]);
+  }, [target, activeDatasetId]);
 
   return {
     availableSources,
     inputMappings,
     activeDatasetId,
-    isValid: !!runnerId && !!runner,
+    isValid: !!targetId && !!target,
   };
 };

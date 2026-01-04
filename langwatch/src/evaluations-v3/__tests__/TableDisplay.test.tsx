@@ -399,7 +399,7 @@ describe("Column resize handles", () => {
   });
 });
 
-describe("RunnerHeader stability", () => {
+describe("TargetHeader stability", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();
   });
@@ -409,12 +409,12 @@ describe("RunnerHeader stability", () => {
     vi.clearAllMocks();
   });
 
-  it("does not remount RunnerHeader when unrelated state changes (cell selection)", async () => {
+  it("does not remount TargetHeader when unrelated state changes (cell selection)", async () => {
     const store = useEvaluationsV3Store.getState();
 
-    // Add a runner
-    store.addRunner({
-      id: "test-runner",
+    // Add a target
+    store.addTarget({
+      id: "test-target",
       type: "prompt",
       name: "Test Prompt",
       inputs: [],
@@ -422,14 +422,14 @@ describe("RunnerHeader stability", () => {
       mappings: {},
     });
 
-    // Track mount/unmount via console logs from RunnerHeader's debug useEffect
+    // Track mount/unmount via console logs from TargetHeader's debug useEffect
     const mountCount = { current: 0 };
     const unmountCount = { current: 0 };
 
     const originalLog = console.log;
     console.log = (...args) => {
-      if (args[0] === "mounted runner header") mountCount.current++;
-      if (args[0] === "unmounted runner header") unmountCount.current++;
+      if (args[0] === "mounted target header") mountCount.current++;
+      if (args[0] === "unmounted target header") unmountCount.current++;
       originalLog(...args);
     };
 
@@ -449,19 +449,19 @@ describe("RunnerHeader stability", () => {
     // Wait a bit for any potential re-renders
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // RunnerHeader should NOT have been remounted
+    // TargetHeader should NOT have been remounted
     expect(unmountCount.current).toBe(initialUnmountCount);
     expect(mountCount.current).toBe(initialMountCount);
 
     console.log = originalLog;
   });
 
-  it("does not remount RunnerHeader when row selection changes", async () => {
+  it("does not remount TargetHeader when row selection changes", async () => {
     const store = useEvaluationsV3Store.getState();
 
-    // Add a runner
-    store.addRunner({
-      id: "test-runner-2",
+    // Add a target
+    store.addTarget({
+      id: "test-target-2",
       type: "prompt",
       name: "Test Prompt 2",
       inputs: [],
@@ -474,8 +474,8 @@ describe("RunnerHeader stability", () => {
 
     const originalLog = console.log;
     console.log = (...args) => {
-      if (args[0] === "mounted runner header") mountCount.current++;
-      if (args[0] === "unmounted runner header") unmountCount.current++;
+      if (args[0] === "mounted target header") mountCount.current++;
+      if (args[0] === "unmounted target header") unmountCount.current++;
       originalLog(...args);
     };
 
@@ -493,7 +493,7 @@ describe("RunnerHeader stability", () => {
 
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // RunnerHeader should NOT have been remounted
+    // TargetHeader should NOT have been remounted
     expect(unmountCount.current).toBe(initialUnmountCount);
     expect(mountCount.current).toBe(initialMountCount);
 

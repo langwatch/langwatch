@@ -3,7 +3,7 @@ import type { EvaluationsV3State } from "../types";
 import {
   datasetReferenceSchema,
   evaluatorConfigSchema,
-  runnerConfigSchema,
+  targetConfigSchema,
 } from "../types";
 
 /**
@@ -36,7 +36,7 @@ export const persistedEvaluationsV3StateSchema = z.object({
   datasets: z.array(datasetReferenceSchema),
   activeDatasetId: z.string(),
   evaluators: z.array(evaluatorConfigSchema),
-  runners: z.array(runnerConfigSchema),
+  targets: z.array(targetConfigSchema),
 });
 
 export type ValidatedPersistedState = z.infer<

@@ -224,12 +224,13 @@ describe("AgentCodeEditorDrawer", () => {
       },
     ];
 
-    const mockMappings: FieldMapping[] = [
-      {
-        source: { id: "dataset-1", field: "question" },
-        target: { id: "runner-1", field: "input" },
+    const mockMappings: Record<string, FieldMapping> = {
+      input: {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "question",
       },
-    ];
+    };
 
     it("shows mappings section when availableSources provided", async () => {
       renderDrawer({

@@ -11,19 +11,19 @@ import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
-import { type RunnerType } from "~/evaluations-v3/types";
+import { type TargetType } from "~/evaluations-v3/types";
 
 // Re-export for backward compatibility
-export type { RunnerType };
+export type { TargetType };
 
-export type RunnerTypeSelectorDrawerProps = {
+export type TargetTypeSelectorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSelect?: (type: RunnerType) => void;
+  onSelect?: (type: TargetType) => void;
 };
 
-const runnerTypes: Array<{
-  type: RunnerType;
+const targetTypes: Array<{
+  type: TargetType;
   icon: typeof FileText;
   title: string;
   description: string;
@@ -43,18 +43,18 @@ const runnerTypes: Array<{
 ];
 
 /**
- * Drawer for selecting the type of runner to add to an evaluation.
+ * Drawer for selecting the type of target to add to an evaluation.
  * Shows cards for Prompt vs Agent with icons and descriptions.
  */
-export function RunnerTypeSelectorDrawer(props: RunnerTypeSelectorDrawerProps) {
+export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   const { closeDrawer, openDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as RunnerTypeSelectorDrawerProps["onSelect"]);
+  const onSelect = props.onSelect ?? (complexProps.onSelect as TargetTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
-  const handleSelectType = (type: RunnerType) => {
+  const handleSelectType = (type: TargetType) => {
     // Navigate to appropriate drawer based on type
     if (onSelect) {
       // Parent handles navigation (backward compat)
@@ -100,18 +100,18 @@ export function RunnerTypeSelectorDrawer(props: RunnerTypeSelectorDrawerProps) {
               Choose what you want to evaluate - a prompt from your library or a custom agent.
             </Text>
 
-            {/* Runner type cards */}
+            {/* Target type cards */}
             <VStack
               gap={3}
               align="stretch"
               paddingX={6}
               paddingBottom={4}
             >
-              {runnerTypes.map((runnerType) => (
-                <RunnerTypeCard
-                  key={runnerType.type}
-                  {...runnerType}
-                  onClick={() => handleSelectType(runnerType.type)}
+              {targetTypes.map((targetType) => (
+                <TargetTypeCard
+                  key={targetType.type}
+                  {...targetType}
+                  onClick={() => handleSelectType(targetType.type)}
                 />
               ))}
             </VStack>
@@ -128,18 +128,18 @@ export function RunnerTypeSelectorDrawer(props: RunnerTypeSelectorDrawerProps) {
 }
 
 // ============================================================================
-// Runner Type Card Component
+// Target Type Card Component
 // ============================================================================
 
-type RunnerTypeCardProps = {
-  type: RunnerType;
+type TargetTypeCardProps = {
+  type: TargetType;
   icon: typeof FileText;
   title: string;
   description: string;
   onClick: () => void;
 };
 
-function RunnerTypeCard({ type, icon: Icon, title, description, onClick }: RunnerTypeCardProps) {
+function TargetTypeCard({ type, icon: Icon, title, description, onClick }: TargetTypeCardProps) {
   const iconColor = type === "prompt" ? "green" : "blue";
   const iconBg = type === "prompt" ? "green.50" : "blue.50";
 
@@ -156,7 +156,7 @@ function RunnerTypeCard({ type, icon: Icon, title, description, onClick }: Runne
       width="full"
       _hover={{ borderColor: `${iconColor}.400`, bg: `${iconColor}.50` }}
       transition="all 0.15s"
-      data-testid={`runner-type-${type}`}
+      data-testid={`target-type-${type}`}
     >
       <HStack gap={4} align="start">
         <Box

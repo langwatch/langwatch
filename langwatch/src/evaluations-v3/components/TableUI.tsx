@@ -10,7 +10,7 @@ import { DatasetTabs } from "./DatasetSection/DatasetTabs";
 // Types
 // ============================================================================
 
-export type SuperHeaderType = "dataset" | "runners";
+export type SuperHeaderType = "dataset" | "targets";
 
 export type DatasetHandlers = {
   onSelectExisting: () => void;
@@ -113,7 +113,7 @@ const superHeaderConfig: Record<
     color: "blue.400",
     icon: <Database size={14} />,
   },
-  runners: {
+  targets: {
     title: "Prompts or Agents",
     color: "green.400",
     icon: <LLMIcon />,
@@ -131,7 +131,7 @@ export function SuperHeader({
   isLoading,
 }: SuperHeaderProps) {
   const config = superHeaderConfig[type];
-  const addButtonText = type === "runners"
+  const addButtonText = type === "targets"
     ? (hasComparison ? "Add Comparison" : "Add")
     : "Add";
 
