@@ -99,7 +99,19 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         messagesHistory,
       });
 
-      // Build execute_flow event (inputs must be an array)
+      // Convert variables array to dict: { identifier: value }
+      // The Python backend expects inputs as Dict[str, Any]
+      const variablesDict = (variables ?? []).reduce(
+        (acc, v) => {
+          if (v.value !== undefined) {
+            acc[v.identifier] = v.value;
+          }
+          return acc;
+        },
+        {} as Record<string, unknown>,
+      );
+
+      // Build execute_flow event (inputs must be a dict)
       const rawEvent: StudioClientEvent = {
         type: "execute_component",
         payload: {
@@ -108,7 +120,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           workflow,
           node_id: nodeId,
           inputs: {
-            ...variables,
+            ...variablesDict,
             messages: messagesHistory,
           },
         },

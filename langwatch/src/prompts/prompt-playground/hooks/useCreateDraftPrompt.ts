@@ -39,6 +39,7 @@ export function useCreateDraftPrompt() {
         meta: {
           title: defaultValues.handle,
         },
+        variableValues: {},
       },
     });
 

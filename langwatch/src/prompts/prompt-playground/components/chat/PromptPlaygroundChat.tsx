@@ -26,10 +26,11 @@ interface PromptPlaygroundChatProps extends BoxProps {
 
 /**
  * PromptPlaygroundChatRef
- * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset).
+ * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset, focus).
  */
 export interface PromptPlaygroundChatRef {
   resetChat: () => void;
+  focusInput: () => void;
 }
 
 const PromptPlaygroundChat = forwardRef<
@@ -86,6 +87,12 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
     useImperativeHandle(ref, () => ({
       resetChat: () => {
         void setMessages([]);
+      },
+      focusInput: () => {
+        const textarea = document.querySelector<HTMLTextAreaElement>(
+          `textarea[data-tab-id="${tabId}"]`,
+        );
+        textarea?.focus();
       },
     }));
 

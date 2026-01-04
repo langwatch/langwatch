@@ -3,7 +3,7 @@
  * LSP Rename Utility
  *
  * Uses TypeScript Language Server to perform intelligent renames.
- * Supports both symbol renaming and file renaming.
+ * Supports symbol renaming, file renaming, and combined renames.
  *
  * Usage:
  *   Symbol rename:
@@ -13,16 +13,23 @@
  *   File rename:
  *     node lsp-rename.mjs file <oldPath> <newPath>
  *     Example: node lsp-rename.mjs file src/old-name.ts src/new-name.ts
+ *
+ *   Combined rename (symbol + file):
+ *     node lsp-rename.mjs combined <file> <line> <column> <newSymbolName> <newFilePath>
+ *     Example: node lsp-rename.mjs combined src/OldComponent.tsx 5 17 NewComponent src/NewComponent.tsx
+ *     This renames the symbol first (updating all references), then renames the file.
  */
 
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { glob } from 'fs/promises';
 
 const SERVER_PATH = '/Users/rchaves/Library/pnpm/typescript-language-server';
 const WORKSPACE_PATH = '/Users/rchaves/Projects/langwatch-saas/langwatch/langwatch';
-const TIMEOUT_MS = 60000;
-const PROCESS_DELAY_MS = 3000;
+const TIMEOUT_MS = 120000;
+const PROCESS_DELAY_MS = 1000;
+const INDEX_DELAY_MS = 5000;
 
 class LSPClient {
   constructor(workspacePath) {
@@ -31,6 +38,7 @@ class LSPClient {
     this.buffer = '';
     this.pendingRequests = new Map();
     this.server = null;
+    this.openedDocuments = new Set();
   }
 
   async start() {
@@ -70,6 +78,9 @@ class LSPClient {
               willSaveWaitUntil: true,
               didSave: true,
             },
+            references: {
+              dynamicRegistration: true,
+            },
           },
           workspace: {
             workspaceFolders: true,
@@ -78,7 +89,11 @@ class LSPClient {
             },
           },
         },
-        initializationOptions: {},
+        initializationOptions: {
+          preferences: {
+            includePackageJsonAutoImports: 'auto',
+          },
+        },
       }).then((result) => {
         this.sendNotification('initialized', {});
         resolve(result);
@@ -164,6 +179,10 @@ class LSPClient {
   }
 
   async openDocument(filePath) {
+    if (this.openedDocuments.has(filePath)) {
+      return;
+    }
+
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     this.sendNotification('textDocument/didOpen', {
       textDocument: {
@@ -173,8 +192,73 @@ class LSPClient {
         text: fileContent,
       },
     });
-    // Wait for server to process
-    await new Promise(r => setTimeout(r, PROCESS_DELAY_MS));
+    this.openedDocuments.add(filePath);
+  }
+
+  /**
+   * Find all TypeScript/JavaScript files that might import from the target file
+   * and open them so the LSP server can index references
+   */
+  async indexProjectReferences(targetFile) {
+    console.log('Indexing project references...');
+
+    const targetBasename = path.basename(targetFile, path.extname(targetFile));
+    const extensions = ['ts', 'tsx', 'js', 'jsx', 'mts', 'mjs'];
+
+    // Find files that might import from the target
+    const filesToOpen = [];
+
+    for (const ext of extensions) {
+      try {
+        const pattern = `**/*.${ext}`;
+        for await (const file of glob(pattern, {
+          cwd: this.workspacePath,
+          ignore: ['**/node_modules/**', '**/dist/**', '**/.next/**', '**/coverage/**']
+        })) {
+          const fullPath = path.join(this.workspacePath, file);
+
+          // Skip the target file itself
+          if (fullPath === targetFile) continue;
+
+          // Quick check if the file might import from target
+          try {
+            const content = fs.readFileSync(fullPath, 'utf-8');
+            // Check if file might reference our target (by filename or export name)
+            if (content.includes(targetBasename)) {
+              filesToOpen.push(fullPath);
+            }
+          } catch (e) {
+            // Skip files we can't read
+          }
+        }
+      } catch (e) {
+        if (process.env.DEBUG) {
+          console.error(`Error globbing ${ext}:`, e.message);
+        }
+      }
+    }
+
+    // Always open the target file first
+    await this.openDocument(targetFile);
+
+    // Open files that might have references (batch for speed)
+    const batchSize = 20;
+    for (let i = 0; i < filesToOpen.length; i += batchSize) {
+      const batch = filesToOpen.slice(i, i + batchSize);
+      for (const file of batch) {
+        await this.openDocument(file);
+      }
+      // Small delay between batches
+      if (i + batchSize < filesToOpen.length) {
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
+    console.log(`Opened ${filesToOpen.length + 1} file(s) for indexing.`);
+
+    // Wait for the server to process all documents
+    console.log('Waiting for LSP server to index...');
+    await new Promise(r => setTimeout(r, INDEX_DELAY_MS));
   }
 
   getLanguageId(filePath) {
@@ -192,10 +276,16 @@ class LSPClient {
     return langMap[ext] || 'typescript';
   }
 
-  async renameSymbol(filePath, line, character, newName) {
+  async renameSymbol(filePath, line, character, newName, skipIndexing = false) {
     console.log(`Renaming symbol at ${filePath}:${line + 1}:${character + 1} to "${newName}"...`);
 
-    await this.openDocument(filePath);
+    // Index the project first to find all references
+    if (!skipIndexing) {
+      await this.indexProjectReferences(filePath);
+    } else {
+      await this.openDocument(filePath);
+      await new Promise(r => setTimeout(r, PROCESS_DELAY_MS));
+    }
 
     // First, prepare rename to verify position
     const prepareResult = await this.sendRequest('textDocument/prepareRename', {
@@ -207,7 +297,8 @@ class LSPClient {
       throw new Error('Cannot rename at this position');
     }
 
-    console.log(`Found symbol from ${prepareResult.start.character} to ${prepareResult.end.character}`);
+    const range = prepareResult.range || prepareResult;
+    console.log(`Found symbol: "${prepareResult.placeholder || 'unknown'}" at character ${range.start?.character ?? prepareResult.start?.character}`);
 
     // Perform the rename
     const result = await this.sendRequest('textDocument/rename', {
@@ -219,11 +310,16 @@ class LSPClient {
     return result;
   }
 
-  async renameFile(oldPath, newPath) {
+  async renameFile(oldPath, newPath, skipIndexing = false) {
     console.log(`Renaming file from ${oldPath} to ${newPath}...`);
 
-    // Open the document first so the server knows about it
-    await this.openDocument(oldPath);
+    // Index the project first to find all import references
+    if (!skipIndexing) {
+      await this.indexProjectReferences(oldPath);
+    } else {
+      await this.openDocument(oldPath);
+      await new Promise(r => setTimeout(r, PROCESS_DELAY_MS));
+    }
 
     // Use workspace/willRenameFiles to get the edits needed
     const result = await this.sendRequest('workspace/willRenameFiles', {
@@ -352,15 +448,23 @@ const printUsage = () => {
 LSP Rename Utility
 
 Usage:
-  Symbol rename:
+  Symbol rename (updates all references across the project):
     node lsp-rename.mjs symbol <file> <line> <column> <newName>
     Example: node lsp-rename.mjs symbol src/utils.ts 10 5 newFunctionName
 
     Note: line and column are 1-indexed (like in editors)
 
-  File rename:
+  File rename (updates import paths):
     node lsp-rename.mjs file <oldPath> <newPath>
     Example: node lsp-rename.mjs file src/old-name.ts src/new-name.ts
+
+  Combined rename (symbol + file, recommended for component renames):
+    node lsp-rename.mjs combined <file> <line> <column> <newSymbolName> <newFilePath>
+    Example: node lsp-rename.mjs combined src/OldComponent.tsx 5 17 NewComponent src/NewComponent.tsx
+
+    This performs both operations in sequence:
+    1. Renames the symbol (updating all import names and usages)
+    2. Renames the file (updating all import paths)
 
 Environment:
   DEBUG=1  Enable debug logging
@@ -404,6 +508,11 @@ const main = async () => {
 
       result = await client.renameSymbol(filePath, line, character, newName);
 
+      if (result) {
+        const totalEdits = applyWorkspaceEdit(result);
+        console.log(`\nTotal: ${totalEdits} edit(s) applied.`);
+      }
+
     } else if (command === 'file') {
       if (args.length < 3) {
         printUsage();
@@ -429,20 +538,55 @@ const main = async () => {
       }
       fs.renameSync(oldPath, newPath);
 
+    } else if (command === 'combined') {
+      if (args.length < 6) {
+        printUsage();
+        process.exit(1);
+      }
+
+      const filePath = path.resolve(args[1]);
+      const line = parseInt(args[2], 10) - 1;
+      const character = parseInt(args[3], 10) - 1;
+      const newSymbolName = args[4];
+      const newFilePath = path.resolve(args[5]);
+
+      console.log('\n=== Step 1: Rename Symbol ===');
+      const symbolResult = await client.renameSymbol(filePath, line, character, newSymbolName);
+
+      if (symbolResult) {
+        const symbolEdits = applyWorkspaceEdit(symbolResult);
+        console.log(`Symbol rename: ${symbolEdits} edit(s) applied.`);
+      }
+
+      console.log('\n=== Step 2: Rename File ===');
+      // Skip re-indexing since we already indexed
+      const fileResult = await client.renameFile(filePath, newFilePath, true);
+
+      if (fileResult) {
+        const fileEdits = applyWorkspaceEdit(fileResult);
+        console.log(`Import path updates: ${fileEdits} edit(s) applied.`);
+      }
+
+      // Now physically rename the file
+      console.log(`Moving file: ${filePath} -> ${newFilePath}`);
+      const newDir = path.dirname(newFilePath);
+      if (!fs.existsSync(newDir)) {
+        fs.mkdirSync(newDir, { recursive: true });
+      }
+      fs.renameSync(filePath, newFilePath);
+
     } else {
       printUsage();
       process.exit(1);
     }
 
-    if (command === 'symbol' && result) {
-      const totalEdits = applyWorkspaceEdit(result);
-      console.log(`\nTotal: ${totalEdits} edit(s) applied.`);
-    }
-
-    console.log('Done!');
+    console.log('\nDone!');
 
   } catch (error) {
     console.error('Error:', error.message);
+    if (process.env.DEBUG) {
+      console.error(error.stack);
+    }
     process.exit(1);
   } finally {
     clearTimeout(timeout);
@@ -451,4 +595,3 @@ const main = async () => {
 };
 
 main();
-

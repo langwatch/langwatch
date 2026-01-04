@@ -1,7 +1,9 @@
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { useEffect, useRef, useState } from "react";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
+import { useTabId } from "../prompt-browser/ui/TabContext";
 import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
@@ -31,6 +33,10 @@ export function SyncedChatInput({
     submitTrigger,
     triggerSubmit,
   } = usePromptPlaygroundChatSync();
+  const tabId = useTabId();
+  const totalTabCount = useDraggableTabsBrowserStore((state) =>
+    state.windows.reduce((count, window) => count + window.tabs.length, 0),
+  );
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -138,6 +144,7 @@ export function SyncedChatInput({
           onChange={(e) => setCurrentInput(e.target.value)}
           onKeyDown={handleKeyDown}
           ref={textareaRef}
+          data-tab-id={tabId}
         />
         <HStack
           width="full"
@@ -145,16 +152,18 @@ export function SyncedChatInput({
           padding={2}
           position="relative"
         >
-          {/* Bottom left - Sync checkbox (shows on hover) */}
-          <ChatSyncCheckbox
-            position="absolute"
-            left="50%"
-            bottom={2}
-            transform="translateX(-50%)"
-            checked={isSynced}
-            onChange={setIsSynced}
-            visible={isHovered}
-          />
+          {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
+          {totalTabCount > 1 && (
+            <ChatSyncCheckbox
+              position="absolute"
+              left="50%"
+              bottom={2}
+              transform="translateX(-50%)"
+              checked={isSynced}
+              onChange={setIsSynced}
+              visible={isHovered}
+            />
+          )}
 
           {/* Right icon - Send button */}
           <ChatSendButton

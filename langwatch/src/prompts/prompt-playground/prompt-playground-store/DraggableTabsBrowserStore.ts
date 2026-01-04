@@ -44,6 +44,11 @@ export const TabDataSchema = z.object({
       versionNumber: undefined,
       scope: undefined,
     }),
+  /**
+   * Runtime variable values entered by the user in the Variables tab.
+   * These are persisted separately from the form values.
+   */
+  variableValues: z.record(z.string(), z.string()).default({}),
 });
 export type TabData = z.infer<typeof TabDataSchema>;
 

@@ -107,6 +107,7 @@ export function PublishedPromptsList() {
                       versionNumber:
                         defaultValues.versionMetadata?.versionNumber,
                     },
+                    variableValues: {},
                   },
                 });
               }}

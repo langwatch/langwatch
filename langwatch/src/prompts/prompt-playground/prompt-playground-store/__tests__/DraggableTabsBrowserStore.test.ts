@@ -40,6 +40,7 @@ function createTabData(overrides?: Partial<TabData>): TabData {
       versionNumber: undefined,
       scope: undefined,
     },
+    variableValues: {},
     ...overrides,
   };
 }
@@ -472,6 +473,111 @@ describe("DraggableTabsBrowserStore", () => {
 
       expect(store.getState().windows).toEqual([]);
       expect(store.getState().activeWindowId).toBeNull();
+    });
+  });
+
+  describe("variableValues", () => {
+    it("initializes with empty variableValues", () => {
+      store.getState().addTab({ data: createTabData() });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      const tabData = store.getState().getByTabId(tabId!);
+
+      expect(tabData?.variableValues).toEqual({});
+    });
+
+    it("stores variable values via updateTabData", () => {
+      store.getState().addTab({ data: createTabData() });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      store.getState().updateTabData({
+        tabId: tabId!,
+        updater: (data) => ({
+          ...data,
+          variableValues: {
+            ...data.variableValues,
+            name: "John",
+            context: "Some context",
+          },
+        }),
+      });
+
+      const tabData = store.getState().getByTabId(tabId!);
+      expect(tabData?.variableValues).toEqual({
+        name: "John",
+        context: "Some context",
+      });
+    });
+
+    it("preserves variableValues when updating other fields", () => {
+      store.getState().addTab({
+        data: createTabData({
+          variableValues: { name: "John" },
+        }),
+      });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      // Update meta, variableValues should remain
+      store.getState().updateTabData({
+        tabId: tabId!,
+        updater: (data) => ({
+          ...data,
+          meta: { ...data.meta, title: "New Title" },
+        }),
+      });
+
+      const tabData = store.getState().getByTabId(tabId!);
+      expect(tabData?.variableValues).toEqual({ name: "John" });
+      expect(tabData?.meta.title).toBe("New Title");
+    });
+
+    it("keeps separate variableValues per tab", () => {
+      store.getState().addTab({
+        data: createTabData({ variableValues: { name: "Tab1" } }),
+      });
+      store.getState().addTab({
+        data: createTabData({ variableValues: { name: "Tab2" } }),
+      });
+
+      const tab1Id = store.getState().windows[0]?.tabs[0]?.id;
+      const tab2Id = store.getState().windows[0]?.tabs[1]?.id;
+
+      expect(store.getState().getByTabId(tab1Id!)?.variableValues).toEqual({
+        name: "Tab1",
+      });
+      expect(store.getState().getByTabId(tab2Id!)?.variableValues).toEqual({
+        name: "Tab2",
+      });
+    });
+
+    it("deep clones variableValues when splitting tab", () => {
+      store.getState().addTab({
+        data: createTabData({ variableValues: { name: "Original" } }),
+      });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      store.getState().splitTab({ tabId: tabId! });
+
+      // Modify original
+      store.getState().updateTabData({
+        tabId: tabId!,
+        updater: (data) => ({
+          ...data,
+          variableValues: { name: "Modified" },
+        }),
+      });
+
+      const originalTab = store.getState().windows[0]?.tabs[0];
+      const clonedTab = store.getState().windows[1]?.tabs[0];
+
+      expect(originalTab?.data.variableValues).toEqual({ name: "Modified" });
+      expect(clonedTab?.data.variableValues).toEqual({ name: "Original" });
     });
   });
 });
