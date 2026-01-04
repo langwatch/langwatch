@@ -1,13 +1,17 @@
 import type { createLogger } from "../../../../utils/logger";
 import type { AggregateType } from "../domain/aggregateType";
-import type { Event, EventOrderingStrategy, Projection } from "../domain/types";
+import type { Event, EventOrderingStrategy } from "../domain/types";
 import type { EventHandlerDefinitions } from "../eventHandler.types";
-import type { ProjectionDefinitions } from "../projection.types";
+import type {
+  ProjectionDefinitions,
+  ProjectionTypeMap,
+} from "../projection.types";
 import type { EventPublisher } from "../publishing/eventPublisher.types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStoreReadContext } from "../stores/projectionStore.types";
 import type { DistributedLock } from "../utils/distributedLock";
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Default time-to-live for distributed locks used during projection updates.
@@ -29,12 +33,17 @@ export interface EventSourcingOptions<EventType extends Event = Event> {
 /**
  * Options for updating a projection.
  */
-export interface UpdateProjectionOptions<_EventType extends Event = Event> {
+export interface UpdateProjectionOptions<EventType extends Event = Event> {
   /**
    * Optional projection store context. If not provided, defaults to eventStoreContext.
    * Useful when projection store requires different tenant isolation or permissions.
    */
   projectionStoreContext?: ProjectionStoreReadContext;
+  /**
+   * Pre-fetched events to avoid duplicate query.
+   * If provided, updateProjectionByName will use these events instead of fetching from the event store.
+   */
+  events?: readonly EventType[];
 }
 
 /**
@@ -58,7 +67,7 @@ export interface ReplayEventsOptions<_EventType extends Event = Event> {
  */
 export interface EventSourcingServiceOptions<
   EventType extends Event = Event,
-  _ProjectionType extends Projection = Projection,
+  ProjectionTypes extends ProjectionTypeMap = ProjectionTypeMap
 > {
   /**
    * The pipeline name for this service.
@@ -80,7 +89,7 @@ export interface EventSourcingServiceOptions<
    * Each projection has a unique name, store, and handler.
    * Projections are automatically updated after events are stored.
    */
-  projections?: ProjectionDefinitions<EventType>;
+  projections?: ProjectionDefinitions<EventType, ProjectionTypes>;
   /**
    * Optional event publisher for publishing events to external systems.
    * Events are published after they are successfully stored.
@@ -106,16 +115,23 @@ export interface EventSourcingServiceOptions<
   logger?: ReturnType<typeof createLogger>;
 
   /**
-   * Optional distributed lock for preventing concurrent updates of the same aggregate projection.
+   * Required distributed lock for preventing concurrent updates of the same aggregate projection.
    *
-   * **Concurrency:** Without a distributed lock, concurrent updates to the same aggregate projection
-   * may result in lost updates (last write wins). This is acceptable for single-instance deployments
-   * but not recommended for production with multiple workers.
+   * **Concurrency:** The distributed lock ensures only one thread processes events for the same
+   * aggregate at a time, preventing race conditions and ensuring correct failure handling.
+   * Without a distributed lock, concurrent processing can cause events to be processed out of order
+   * or fail to block on previous failures.
+   *
+   * **Lock Scope:** The lock is per-aggregate, allowing parallel processing across different aggregates.
+   * This provides both safety and performance.
    *
    * **Failure Mode:** If lock acquisition fails, updateProjectionByName throws an error.
    * The caller should retry via queue processing.
+   *
+   * **Required:** This is now a required parameter. All deployments must provide a DistributedLock
+   * implementation (e.g., Redis-based lock).
    */
-  distributedLock?: DistributedLock;
+  distributedLock: DistributedLock;
   /**
    * Time-to-live for update locks in milliseconds.
    * Prevents locks from being held indefinitely if a process crashes.
@@ -129,6 +145,12 @@ export interface EventSourcingServiceOptions<
    */
   handlerLockTtlMs?: number;
   /**
+   * Time-to-live for command locks in milliseconds.
+   * Prevents locks from being held indefinitely if a process crashes.
+   * Default: 30 seconds
+   */
+  commandLockTtlMs?: number;
+  /**
    * Optional queue processor factory for creating queues for event handlers.
    *
    * **Performance:** Without a queue factory, event handlers execute synchronously during event storage,
@@ -141,12 +163,20 @@ export interface EventSourcingServiceOptions<
     create<Payload>(definition: {
       name: string;
       process: (payload: Payload) => Promise<void>;
-      makeJobId?: (payload: Payload) => string;
       delay?: number;
+      deduplication?: {
+        makeId: (payload: Payload) => string;
+        ttlMs?: number;
+      };
       options?: { concurrency?: number };
       spanAttributes?: (
-        payload: Payload,
+        payload: Payload
       ) => Record<string, string | number | boolean>;
     }): EventSourcedQueueProcessor<Payload>;
   };
+  /**
+   * Optional feature flag service for kill switches.
+   * When provided, enables automatic feature flag-based kill switches for components.
+   */
+  featureFlagService?: FeatureFlagServiceInterface;
 }

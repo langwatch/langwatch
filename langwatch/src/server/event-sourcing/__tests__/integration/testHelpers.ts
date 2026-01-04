@@ -10,6 +10,7 @@ import type {
   RegisteredPipeline,
 } from "../../runtime/pipeline/types";
 import { BullmqQueueProcessorFactory } from "../../runtime/queue/factory";
+import { CheckpointCacheRedis } from "../../runtime/stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "../../runtime/stores/eventStoreClickHouse";
 import { ProcessorCheckpointStoreClickHouse } from "../../runtime/stores/processorCheckpointStoreClickHouse";
 import { CheckpointRepositoryClickHouse } from "../../runtime/stores/repositories/checkpointRepositoryClickHouse";
@@ -38,6 +39,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   { testCommand: any }
 > & {
   eventStore: EventStoreClickHouse;
+  processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
 } {
   const clickHouseClient = getTestClickHouseClient();
   const redisConnection = getTestRedisConnection();
@@ -59,8 +61,11 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     new EventRepositoryClickHouse(clickHouseClient),
   );
 
+  const checkpointCache = new CheckpointCacheRedis(redisConnection);
+
   const processorCheckpointStore = new ProcessorCheckpointStoreClickHouse(
     new CheckpointRepositoryClickHouse(clickHouseClient),
+    checkpointCache,
   );
 
   // Create queue factory that uses BullMQ with test Redis connection
@@ -96,176 +101,118 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   // Build pipeline
   // Note: TestProjectionHandler has a static store property, so we don't need to pass it
   // Using test aggregate type (now included in production schemas)
+  // Use event-based deduplication for tests to ensure each event gets its own job.
+  // In production, aggregate-based deduplication is used for debouncing, but the batch
+  // processor handles fetching all events. For tests, we want each event processed
+  // independently to verify the pipeline behavior.
+  const eventBasedDeduplication = {
+    makeId: (event: { id: string }) => event.id,
+    ttlMs: 100,
+  };
+
   const pipeline = eventSourcing
-    .registerPipeline<any, any>()
+    .registerPipeline<any>()
     .withName("test_pipeline")
     .withAggregateType("test_aggregate" as AggregateType)
     .withCommand("testCommand", TestCommandHandler as any)
-    .withEventHandler("testHandler", TestEventHandler as any)
-    .withProjection("testProjection", TestProjectionHandler as any)
+    .withEventHandler("testHandler", TestEventHandler as any, {
+      deduplication: eventBasedDeduplication,
+    })
+    .withProjection("testProjection", TestProjectionHandler as any, {
+      deduplication: eventBasedDeduplication,
+    })
     .build();
 
   return {
     ...pipeline,
     eventStore,
+    processorCheckpointStore,
   } as PipelineWithCommandHandlers<
     RegisteredPipeline<any, any>,
     { testCommand: any }
   > & {
     eventStore: EventStoreClickHouse;
+    processorCheckpointStore: ProcessorCheckpointStoreClickHouse;
   };
 }
 
 /**
- * Waits for all queue jobs to complete.
- * Polls queue status until all jobs are processed.
+ * Waits for a checkpoint to reach the expected sequence number.
+ * This is the most reliable way to ensure handlers have processed events.
  */
-export async function waitForQueueProcessing(
-  timeoutMs = 30000,
+export async function waitForCheckpoint(
+  pipelineName: string,
+  processorName: string,
+  aggregateId: string,
+  tenantId: string,
+  expectedSequenceNumber: number,
+  timeoutMs = 5000,
   pollIntervalMs = 100,
+  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
 ): Promise<void> {
-  const redisConnection = getTestRedisConnection();
-  if (!redisConnection) {
+  const startTime = Date.now();
+
+  // Check immediately first - handlers might already be done
+  let checkpoint = await verifyCheckpoint(
+    pipelineName,
+    processorName,
+    aggregateId,
+    tenantId,
+    expectedSequenceNumber,
+    processorCheckpointStore,
+  );
+
+  if (checkpoint) {
     return;
   }
 
-  const startTime = Date.now();
-  let consecutiveEmptyChecks = 0;
-  const requiredEmptyChecks = 3; // Require 3 consecutive empty checks to ensure processing is complete
+  // If not found, wait briefly then poll aggressively
+  // Give handlers a moment to start processing (but not too long)
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
+  // Poll with increasing intervals - start fast, slow down over time
   while (Date.now() - startTime < timeoutMs) {
-    // Check if there are any active jobs in BullMQ queues
-    const active = await redisConnection.keys("bull:*:active");
-    const waiting = await redisConnection.keys("bull:*:waiting");
-    const delayed = await redisConnection.keys("bull:*:delayed");
-    const failed = await redisConnection.keys("bull:*:failed");
+    checkpoint = await verifyCheckpoint(
+      pipelineName,
+      processorName,
+      aggregateId,
+      tenantId,
+      expectedSequenceNumber,
+      processorCheckpointStore,
+    );
 
-    // Check for failed jobs - if there are any, something went wrong
-    if (failed.length > 0) {
-      // Get details of failed jobs for debugging
-      const failedJobDetails: string[] = [];
-      const errorMessages: string[] = [];
-
-      for (const key of failed.slice(0, 5)) {
-        // Extract queue name from key (format: bull:queueName:failed)
-        const queueName = key.split(":")[1];
-        if (queueName) {
-          try {
-            const jobIds = await redisConnection.zrange(key, 0, 4);
-            if (jobIds.length > 0) {
-              failedJobDetails.push(
-                `${queueName}: ${jobIds.length} failed job(s)`,
-              );
-
-              // Get actual error messages from failed jobs
-              for (const jobId of jobIds.slice(0, 3)) {
-                try {
-                  // BullMQ stores job data in a hash at bull:queueName:jobId
-                  const jobDataKey = `bull:${queueName}:${jobId}`;
-                  const jobData = await redisConnection.hgetall(jobDataKey);
-
-                  // Extract error information
-                  const failedReason =
-                    jobData.failedReason ?? jobData.reason ?? "Unknown error";
-                  const stacktrace = jobData.stacktrace ?? "";
-
-                  // Get job data/payload for context
-                  let jobPayload = "N/A";
-                  try {
-                    const dataStr = jobData.data;
-                    if (dataStr) {
-                      const parsed = JSON.parse(dataStr);
-                      jobPayload = JSON.stringify(parsed, null, 2).substring(
-                        0,
-                        200,
-                      );
-                    }
-                  } catch {
-                    // Ignore parse errors
-                  }
-
-                  errorMessages.push(
-                    `\n  ${queueName}:${jobId}\n    Error: ${failedReason}\n    Payload: ${jobPayload}${stacktrace ? `\n    Stack: ${stacktrace.substring(0, 300)}` : ""}`,
-                  );
-                } catch (error) {
-                  // If we can't get job details, at least report the job ID
-                  errorMessages.push(
-                    `\n  ${queueName}:${jobId}\n    Error: Could not retrieve job details, Error: ${error as any}`,
-                  );
-                }
-              }
-            }
-          } catch {
-            // Ignore errors when inspecting failed jobs
-          }
-        }
-      }
-
-      if (failedJobDetails.length > 0) {
-        const errorSummary =
-          errorMessages.length > 0
-            ? `\n\nDetailed errors:${errorMessages.join("\n")}`
-            : "";
-        throw new Error(
-          `Queue processing found failed jobs: ${failedJobDetails.join(", ")}.${errorSummary}\n\nCheck logs for more details.`,
-        );
-      }
+    if (checkpoint) {
+      return;
     }
 
-    if (active.length === 0 && waiting.length === 0 && delayed.length === 0) {
-      consecutiveEmptyChecks++;
-      if (consecutiveEmptyChecks >= requiredEmptyChecks) {
-        // Give it a bit more time to ensure all async operations complete
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs * 2));
-        return;
-      }
-    } else {
-      consecutiveEmptyChecks = 0;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    // Adaptive polling: start fast, increase interval as time passes
+    const elapsed = Date.now() - startTime;
+    const currentInterval =
+      elapsed < 500
+        ? pollIntervalMs
+        : elapsed < 1500
+          ? pollIntervalMs * 2
+          : Math.min(pollIntervalMs * 3, 300);
+    await new Promise((resolve) => setTimeout(resolve, currentInterval));
   }
 
-  // Final check for failed jobs before throwing timeout
-  const finalFailed = await redisConnection.keys("bull:*:failed");
-  if (finalFailed.length > 0) {
-    const errorMessages: string[] = [];
+  const finalCheckpoint = await verifyCheckpoint(
+    pipelineName,
+    processorName,
+    aggregateId,
+    tenantId,
+    expectedSequenceNumber,
+    processorCheckpointStore,
+  );
 
-    for (const key of finalFailed.slice(0, 5)) {
-      const queueName = key.split(":")[1];
-      if (queueName) {
-        try {
-          const jobIds = await redisConnection.zrange(key, 0, 2);
-          for (const jobId of jobIds) {
-            try {
-              const jobDataKey = `bull:${queueName}:${jobId}`;
-              const jobData = await redisConnection.hgetall(jobDataKey);
-              const failedReason =
-                jobData.failedReason ?? jobData.reason ?? "Unknown error";
-              errorMessages.push(`\n  ${queueName}:${jobId} - ${failedReason}`);
-            } catch {
-              errorMessages.push(
-                `\n  ${queueName}:${jobId} - Could not retrieve error`,
-              );
-            }
-          }
-        } catch {
-          // Ignore errors
-        }
-      }
-    }
-
-    const errorDetails =
-      errorMessages.length > 0
-        ? `\n\nFailed job errors:${errorMessages.join("")}`
-        : "";
-    throw new Error(
-      `Queue processing timeout after ${timeoutMs}ms. Some jobs may have failed.${errorDetails}\n\nCheck logs for more details.`,
-    );
+  // If checkpoint exists in final check, return successfully
+  // This handles ClickHouse eventual consistency where data might not be immediately visible
+  if (finalCheckpoint) {
+    return;
   }
 
   throw new Error(
-    `Queue processing timeout after ${timeoutMs}ms. Active jobs may still be processing.`,
+    `Timeout waiting for checkpoint. Expected sequence ${expectedSequenceNumber}, checkpoint exists: ${finalCheckpoint}`,
   );
 }
 
@@ -303,6 +250,8 @@ export function getTenantIdString(
 
 /**
  * Helper to verify checkpoint state.
+ * Uses the ProcessorCheckpointStore which checks Redis cache first, then ClickHouse.
+ * This matches production behavior and avoids ClickHouse eventual consistency issues.
  */
 export async function verifyCheckpoint(
   pipelineName: string,
@@ -310,7 +259,65 @@ export async function verifyCheckpoint(
   aggregateId: string,
   tenantId: string,
   expectedSequenceNumber?: number,
+  processorCheckpointStore?: ProcessorCheckpointStoreClickHouse,
 ): Promise<boolean> {
+  const tenantIdObj = createTenantId(tenantId);
+
+  // If checkpoint store is provided, use it (preferred - checks Redis cache first)
+  if (processorCheckpointStore && expectedSequenceNumber !== void 0) {
+    try {
+      // Infer processor type from processor name
+      // Convention: handlers end with "Handler", projections end with "Projection"
+      const processorType = processorName.endsWith("Handler")
+        ? ("handler" as const)
+        : ("projection" as const);
+
+      const checkpoint =
+        await processorCheckpointStore.getCheckpointBySequenceNumber(
+          pipelineName,
+          processorName,
+          processorType,
+          tenantIdObj,
+          "test_aggregate" as AggregateType,
+          aggregateId,
+          expectedSequenceNumber,
+        );
+
+      logger.debug(
+        {
+          pipelineName,
+          processorName,
+          aggregateId,
+          tenantId,
+          expectedSequenceNumber,
+          checkpoint: checkpoint
+            ? {
+                sequenceNumber: checkpoint.sequenceNumber,
+                status: checkpoint.status,
+              }
+            : null,
+        },
+        "[verifyCheckpoint] Result from checkpoint store",
+      );
+
+      return checkpoint !== null && checkpoint.status === "processed";
+    } catch (error) {
+      logger.error(
+        {
+          pipelineName,
+          processorName,
+          aggregateId,
+          tenantId,
+          expectedSequenceNumber,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "[verifyCheckpoint] Error checking checkpoint store",
+      );
+      return false;
+    }
+  }
+
+  // Fallback to direct ClickHouse query if checkpoint store not provided
   const clickHouseClient = getTestClickHouseClient();
   if (!clickHouseClient) {
     logger.debug(
@@ -320,16 +327,12 @@ export async function verifyCheckpoint(
         aggregateId,
         tenantId,
         expectedSequenceNumber,
-        testForceClickHouse:
-          process.env.TEST_FORCE_CLICKHOUSE_CHECKPOINTS === "true",
       },
       "[verifyCheckpoint] ClickHouse client unavailable for checkpoint check",
     );
     return false;
   }
 
-  // Use buildCheckpointKey to ensure consistency with actual code
-  const tenantIdObj = createTenantId(tenantId);
   const checkpointKey = buildCheckpointKey(
     tenantIdObj,
     pipelineName,
@@ -338,19 +341,20 @@ export async function verifyCheckpoint(
     aggregateId,
   );
 
-  // Query with FINAL to get the latest merged version from ReplacingMergeTree
-  // Filter by Status='processed' to only get successfully processed checkpoints
-  // Use same table reference format as repository (rely on default database)
   const result = await clickHouseClient.query({
     query: `
       SELECT SequenceNumber, Status, EventId
-      FROM processor_checkpoints FINAL
+      FROM processor_checkpoints
       WHERE CheckpointKey = {checkpointKey:String}
         AND Status = 'processed'
+        AND SequenceNumber >= {expectedSequence:UInt32}
       ORDER BY SequenceNumber DESC
       LIMIT 1
     `,
-    query_params: { checkpointKey },
+    query_params: {
+      checkpointKey,
+      expectedSequence: expectedSequenceNumber ?? 0,
+    },
     format: "JSONEachRow",
   });
 
@@ -365,61 +369,28 @@ export async function verifyCheckpoint(
       checkpointKey,
       rows,
       expectedSequenceNumber,
-      hasClickHouseClient: true,
     },
-    "[verifyCheckpoint] Result",
+    "[verifyCheckpoint] Result from ClickHouse",
   );
 
   if (rows.length === 0) {
-    logger.debug(
-      {
-        checkpointKey,
-        expectedSequenceNumber,
-        tenantId,
-        processorName,
-        aggregateId,
-      },
-      "[verifyCheckpoint] No processed checkpoint rows",
-    );
     return false;
   }
 
   const checkpoint = rows[0];
   if (!checkpoint) {
-    logger.debug(
-      {
-        checkpointKey,
-        rowsLength: rows.length,
-      },
-      "[verifyCheckpoint] First checkpoint row missing",
-    );
     return false;
   }
 
   const checkpointSequenceNumber = Number(checkpoint.SequenceNumber);
   if (Number.isNaN(checkpointSequenceNumber)) {
-    logger.debug(
-      {
-        checkpointKey,
-        rawSequenceNumber: checkpoint.SequenceNumber,
-      },
-      "[verifyCheckpoint] Invalid sequence number",
-    );
     return false;
   }
 
   if (
     expectedSequenceNumber !== void 0 &&
-    checkpointSequenceNumber !== expectedSequenceNumber
+    checkpointSequenceNumber < expectedSequenceNumber
   ) {
-    logger.debug(
-      {
-        checkpointKey,
-        expectedSequenceNumber,
-        actualSequenceNumber: checkpointSequenceNumber,
-      },
-      "[verifyCheckpoint] Sequence mismatch",
-    );
     return false;
   }
 

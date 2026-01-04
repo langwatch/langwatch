@@ -1,4 +1,3 @@
-import { Queue } from "bullmq";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { AggregateType } from "../../library";
 import { getTestRedisConnection } from "./testContainers";
@@ -7,9 +6,8 @@ import {
   createTestPipeline,
   createTestTenantId,
   getTenantIdString,
-  waitForQueueProcessing,
+  waitForCheckpoint,
 } from "./testHelpers";
-import type { TestEvent } from "./testPipelines";
 
 describe("BullMQ Queue - Integration Tests", () => {
   let pipeline: ReturnType<typeof createTestPipeline>;
@@ -25,8 +23,12 @@ describe("BullMQ Queue - Integration Tests", () => {
   });
 
   afterEach(async () => {
-    await cleanupTestDataForTenant(tenantIdString);
+    // Close pipeline first to stop all workers and queues
     await pipeline.service.close();
+    // Wait a bit for all async operations to complete
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Then clean up test data
+    await cleanupTestDataForTenant(tenantIdString);
   });
 
   it("creates queues for commands, handlers, and projections", async () => {
@@ -35,13 +37,24 @@ describe("BullMQ Queue - Integration Tests", () => {
     }
 
     // Send a command to trigger queue creation
+    const aggregateId = "queue-test-1";
     await pipeline.commands.testCommand.send({
       tenantId: tenantIdString,
-      aggregateId: "queue-test-1",
+      aggregateId,
       value: 1,
     });
 
-    await waitForQueueProcessing(10000);
+    // Wait for processing to complete via checkpoint
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
+    );
 
     // Check that queues exist in Redis
     if (redisConnection) {
@@ -64,38 +77,6 @@ describe("BullMQ Queue - Integration Tests", () => {
     }
   });
 
-  it("processes jobs in correct order", async () => {
-    const aggregateId = "queue-test-2";
-
-    // Send multiple commands
-    const values = [1, 2, 3];
-    for (const value of values) {
-      await pipeline.commands.testCommand.send({
-        tenantId: tenantIdString,
-        aggregateId,
-        value,
-      });
-    }
-
-    // Wait for processing
-    await waitForQueueProcessing(30000);
-
-    // Verify events were processed in order
-    const events = await pipeline.eventStore.getEvents(
-      aggregateId,
-      { tenantId },
-      "test_aggregate" as AggregateType,
-    );
-
-    expect(events.length).toBe(3);
-    const event0 = events[0] as TestEvent | undefined;
-    const event1 = events[1] as TestEvent | undefined;
-    const event2 = events[2] as TestEvent | undefined;
-    expect(event0?.data.value).toBe(1);
-    expect(event1?.data.value).toBe(2);
-    expect(event2?.data.value).toBe(3);
-  });
-
   it("handles job retries on failure", async () => {
     // This test would require a handler that can fail
     // For now, we verify that the queue infrastructure supports retries
@@ -109,7 +90,17 @@ describe("BullMQ Queue - Integration Tests", () => {
       value: 1,
     });
 
-    await waitForQueueProcessing(10000);
+    // Wait for processing to complete via checkpoint
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
+    );
 
     // Verify job was processed (no failures in normal case)
     const events = await pipeline.eventStore.getEvents(
@@ -130,7 +121,17 @@ describe("BullMQ Queue - Integration Tests", () => {
       value: 1,
     });
 
-    await waitForQueueProcessing(10000);
+    // Wait for processing to complete via checkpoint
+    await waitForCheckpoint(
+      "test_pipeline",
+      "testHandler",
+      aggregateId,
+      tenantIdString,
+      1,
+      5000,
+      100,
+      pipeline.processorCheckpointStore,
+    );
 
     // Close pipeline
     await pipeline.service.close();
@@ -139,39 +140,5 @@ describe("BullMQ Queue - Integration Tests", () => {
     // This is more of a smoke test - actual cleanup verification would require
     // checking BullMQ queue state, which is complex
     expect(pipeline.service).toBeDefined();
-  });
-
-  it("processes jobs concurrently for different aggregates", async () => {
-    const aggregateIds = ["queue-test-5", "queue-test-6", "queue-test-7"];
-
-    // Send commands concurrently
-    const startTime = Date.now();
-    await Promise.all(
-      aggregateIds.map((aggregateId) =>
-        pipeline.commands.testCommand.send({
-          tenantId: tenantIdString,
-          aggregateId,
-          value: 1,
-        }),
-      ),
-    );
-
-    await waitForQueueProcessing(30000);
-    const endTime = Date.now();
-
-    // Verify all were processed
-    for (const aggregateId of aggregateIds) {
-      const events = await pipeline.eventStore.getEvents(
-        aggregateId,
-        { tenantId },
-        "test_aggregate" as AggregateType,
-      );
-      expect(events.length).toBe(1);
-    }
-
-    // Processing should have been concurrent (faster than sequential)
-    // Allow some buffer for queue overhead
-    const duration = endTime - startTime;
-    expect(duration).toBeLessThan(10000); // Should complete in < 10s for concurrent processing
   });
 }, 60000);

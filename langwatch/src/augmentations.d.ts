@@ -19,5 +19,14 @@ declare global {
      * Strongly-typed values derived from keys of T
      */
     values<T extends object>(o: T): Array<T[Extract<keyof T, string>]>;
+
+    /**
+     * Strongly-typed fromEntries that reconstructs object type from entries array
+     */
+    fromEntries<Entries extends ReadonlyArray<readonly [PropertyKey, unknown]>>(
+      entries: Entries,
+    ): {
+      [K in Entries[number] as K[0]]: K[1];
+    };
   }
 }

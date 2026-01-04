@@ -8,6 +8,7 @@ import type { EventSourcingConfig } from "./config";
 import { createEventSourcingConfig } from "./config";
 import type { QueueProcessorFactory } from "./queue";
 import { DefaultQueueProcessorFactory } from "./queue";
+import { CheckpointCacheRedis } from "./stores/checkpointCacheRedis";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
 import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
@@ -210,8 +211,25 @@ export class EventSourcingRuntime {
     // Use ClickHouse if available and enabled
     if (clickHouseEnabled && clickHouseClient) {
       logger.debug("Using ClickHouse checkpoint store");
+
+      // Create Redis cache if Redis connection is available
+      const cache = this.config.redisConnection
+        ? new CheckpointCacheRedis(this.config.redisConnection)
+        : undefined;
+
+      if (cache) {
+        logger.info(
+          "Redis checkpoint cache enabled for fast checkpoint visibility",
+        );
+      } else {
+        logger.warn(
+          "Redis checkpoint cache disabled (no Redis connection) - may cause ordering retries",
+        );
+      }
+
       return new ProcessorCheckpointStoreClickHouse(
         new CheckpointRepositoryClickHouse(clickHouseClient),
+        cache,
       );
     }
 

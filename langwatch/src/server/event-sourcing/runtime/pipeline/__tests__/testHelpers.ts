@@ -19,7 +19,10 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../../library/queues";
-import { createTestEvent } from "../../../library/services/__tests__/testHelpers";
+import {
+  createMockDistributedLock,
+  createTestEvent,
+} from "../../../library/services/__tests__/testHelpers";
 import type { EventStore } from "../../../library/stores/eventStore.types";
 import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
 import type { QueueProcessorFactory } from "../../queue";
@@ -29,11 +32,33 @@ import { PipelineBuilder } from "../builder";
  * Creates a mock EventStore with spyable methods.
  */
 export function createMockEventStore<T extends Event>(): EventStore<T> {
-  return {
+  const mockStore = {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    getEventsUpTo: vi
+      .fn()
+      .mockImplementation(
+        async (aggregateId, context, aggregateType, upToEvent) => {
+          // Default implementation: get all events and filter
+          const allEvents = await mockStore.getEvents(
+            aggregateId,
+            context,
+            aggregateType,
+          );
+          const upToIndex = allEvents.findIndex(
+            (e: T) => e.id === upToEvent.id,
+          );
+          if (upToIndex === -1) {
+            throw new Error(
+              `Event ${upToEvent.id} not found in aggregate ${aggregateId}`,
+            );
+          }
+          return allEvents.slice(0, upToIndex + 1);
+        },
+      ),
     countEventsBefore: vi.fn().mockResolvedValue(0),
   };
+  return mockStore;
 }
 
 /**
@@ -116,15 +141,16 @@ export interface TestEvent extends Event<{ result: string }> {
 
 /**
  * Creates a test command handler class with configurable properties.
+ *
+ * Note: Configuration options like delay, concurrency, and deduplication should be
+ * provided via registration options (e.g., `.withCommand("name", Handler, { delay: 1000 })`),
+ * not as static class properties.
  */
 export function createTestCommandHandlerClass<
   Payload extends TestCommandPayload = TestCommandPayload,
   EventType extends Event = TestEvent,
 >(config?: {
   getAggregateId?: (payload: Payload) => string;
-  makeJobId?: (payload: Payload) => string;
-  delay?: number;
-  concurrency?: number;
   getSpanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
@@ -156,18 +182,6 @@ export function createTestCommandHandlerClass<
       return getAggregateId(payload);
     }
 
-    static get makeJobId() {
-      return config?.makeJobId;
-    }
-
-    static get delay() {
-      return config?.delay;
-    }
-
-    static get concurrency() {
-      return config?.concurrency;
-    }
-
     static get getSpanAttributes() {
       return config?.getSpanAttributes;
     }
@@ -187,20 +201,18 @@ export function createTestCommandHandlerClass<
 /**
  * Creates a test PipelineBuilder with mock dependencies.
  */
-export function createTestPipelineBuilder<
-  EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
->(
+export function createTestPipelineBuilder<EventType extends Event = Event>(
   eventStore?: EventStore<EventType>,
   queueProcessorFactory?: QueueProcessorFactory,
-): PipelineBuilder<EventType, ProjectionType> {
+): PipelineBuilder<EventType> {
   const mockEventStore = eventStore ?? createMockEventStore<EventType>();
   const mockFactory =
     queueProcessorFactory ?? createMockQueueProcessorFactory();
 
-  return new PipelineBuilder<EventType, ProjectionType>({
+  return new PipelineBuilder<EventType>({
     eventStore: mockEventStore,
     queueProcessorFactory: mockFactory,
+    distributedLock: createMockDistributedLock(),
   });
 }
 
@@ -228,7 +240,7 @@ export function createMockEventHandler<
       id: "test-projection-id",
       aggregateId: "test-aggregate",
       tenantId: createTenantId("test-tenant"),
-      version: 1000000,
+      version: TEST_CONSTANTS.PROJECTION_VERSION,
       data: {},
     } as TProjection),
   };
@@ -293,7 +305,7 @@ export function createTestProjectionHandlerClass<
         id: "test-projection-id",
         aggregateId: "test-aggregate",
         tenantId: createTenantId("test-tenant"),
-        version: 1000000,
+        version: TEST_CONSTANTS.PROJECTION_VERSION,
         data: {},
       } as TProjection;
     }
@@ -318,6 +330,7 @@ export const TEST_CONSTANTS = {
   BASE_TIMESTAMP: 1000000,
   AGGREGATE_ID: "test-aggregate-123",
   TENANT_ID_VALUE: "test-tenant",
+  PROJECTION_VERSION: "2025-12-17",
   PROJECTION_NAME: "test-projection",
   HANDLER_NAME: "test-handler",
   PIPELINE_NAME: "test-pipeline",
@@ -333,7 +346,7 @@ export const TEST_CONSTANTS = {
 export function createTestEventForBuilder(
   aggregateId: string,
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
-  aggregateType: AggregateType = "span_ingestion",
+  aggregateType: AggregateType = "trace",
 ): TestEvent {
   return createTestEvent(aggregateId, aggregateType, tenantId) as TestEvent;
 }
@@ -345,7 +358,7 @@ export function createTestProjection<TData = unknown>(
   id: string,
   aggregateId: string,
   tenantId: ReturnType<typeof createTenantId>,
-  version: number = TEST_CONSTANTS.BASE_TIMESTAMP,
+  version: string = TEST_CONSTANTS.PROJECTION_VERSION,
   data: TData = {} as TData,
 ): Projection<TData> {
   return {
@@ -381,12 +394,13 @@ export function createMinimalPipelineBuilder() {
       TestEvent
     >,
   ) => {
-    return new PipelineBuilder<TestEvent, Projection>({
+    return new PipelineBuilder<TestEvent>({
       eventStore,
       queueProcessorFactory: factory,
+      distributedLock: createMockDistributedLock(),
     })
       .withName("test-pipeline")
-      .withAggregateType("span_ingestion")
+      .withAggregateType("trace")
       .withCommand("testCommand", HandlerClass)
       .build();
   };

@@ -26,6 +26,12 @@ const EXEMPT_MODELS = [
    * Notifications can be at organization or project level
    */
   "Notification",
+
+  /**
+   * These both have project id's, but are dealt with in a tx, + not sensitive data.
+   */
+  "ProjectDailyUsage",
+  "ProjectDailyUsageProcessedAggregates",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
@@ -60,6 +66,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   } else if (
     !params.args?.where?.projectId &&
     !params.args?.where?.projectId_slug &&
+    !params.args?.where?.projectId_date &&
     !params.args?.where?.projectId?.in &&
     !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {

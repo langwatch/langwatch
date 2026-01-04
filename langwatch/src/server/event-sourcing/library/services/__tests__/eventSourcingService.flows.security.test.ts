@@ -8,6 +8,7 @@ import type { Event } from "../../domain/types";
 import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
+  createMockDistributedLock,
   createMockEventHandler,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
@@ -40,6 +41,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is required in all contexts", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -64,6 +66,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("tenantId is validated before operations", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -88,6 +91,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("events are filtered by tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -126,6 +130,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -161,6 +166,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -208,6 +214,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("missing tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -229,6 +236,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("invalid tenantId causes errors", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -267,6 +275,7 @@ describe("EventSourcingService - Security Flows", () => {
       });
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -295,8 +304,9 @@ describe("EventSourcingService - Security Flows", () => {
   describe("aggregate type scoping", () => {
     it("correct aggregateType is used for all operations", async () => {
       const eventStore = createMockEventStore<Event>();
-      const customAggregateType = "trace_aggregation" as const;
+      const customAggregateType = "trace" as const;
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: customAggregateType,
         eventStore,
@@ -322,16 +332,18 @@ describe("EventSourcingService - Security Flows", () => {
 
     it("aggregateType prevents cross-type contamination", async () => {
       const eventStore = createMockEventStore<Event>();
-      const aggregateType1 = "span_ingestion" as const satisfies AggregateType;
-      const aggregateType2 = "trace_aggregation" as const as AggregateType;
+      const aggregateType1 = "trace" as const satisfies AggregateType;
+      const aggregateType2 = "test_aggregate" as const as AggregateType;
 
       const service1 = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType1,
         eventStore,
       });
 
       const service2 = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType: aggregateType2,
         eventStore,
@@ -366,6 +378,7 @@ describe("EventSourcingService - Security Flows", () => {
     it("stores enforce tenant isolation", async () => {
       const eventStore = createMockEventStore<Event>();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -410,6 +423,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -443,6 +457,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -484,6 +499,7 @@ describe("EventSourcingService - Security Flows", () => {
       const context2 = createTestEventStoreReadContext(tenantId2);
 
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -536,6 +552,7 @@ describe("EventSourcingService - Security Flows", () => {
         new CheckpointRepositoryMemory(),
       );
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -604,6 +621,7 @@ describe("EventSourcingService - Security Flows", () => {
         new CheckpointRepositoryMemory(),
       );
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -694,6 +712,7 @@ describe("EventSourcingService - Security Flows", () => {
       const handler = createMockEventReactionHandler<Event>();
       const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
@@ -740,6 +759,7 @@ describe("EventSourcingService - Security Flows", () => {
       const handler = createMockEventReactionHandler<Event>();
       const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
+        distributedLock: createMockDistributedLock(),
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,

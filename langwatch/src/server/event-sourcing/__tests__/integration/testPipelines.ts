@@ -89,6 +89,7 @@ export class TestCommandHandler
       command.data.aggregateId,
       tenantId,
       TEST_EVENT_TYPE as EventType,
+      "2025-12-17",
       {
         value: command.data.value,
         message: command.data.message,
@@ -231,8 +232,7 @@ export class TestProjectionHandler
       id: `test:${aggregateId}`,
       aggregateId,
       tenantId,
-      version:
-        events.length > 0 ? events[events.length - 1]!.timestamp : Date.now(),
+      version: "2025-12-17",
       data: {
         totalValue,
         eventCount: events.length,
