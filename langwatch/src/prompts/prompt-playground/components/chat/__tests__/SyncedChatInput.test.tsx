@@ -160,14 +160,15 @@ describe("SyncedChatInput", () => {
       ).toBeInTheDocument();
     });
 
-    it("disables textarea when inProgress", () => {
+    it("keeps textarea enabled when inProgress to allow typing next message", () => {
       store.getState().addTab({ data: createTabData() });
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
 
       renderSyncedChatInput({ tabId: tabId!, inProgress: true });
 
       const textarea = screen.getByPlaceholderText(/type your message/i);
-      expect(textarea).toBeDisabled();
+      // Textarea should remain enabled during AI response so user can type their next message
+      expect(textarea).not.toBeDisabled();
     });
 
     it("includes data-tab-id attribute for focus targeting", () => {

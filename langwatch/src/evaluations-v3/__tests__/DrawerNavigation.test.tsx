@@ -143,6 +143,10 @@ describe("Drawer Navigation", () => {
       expect(onSelect).toHaveBeenCalledWith({
         id: "prompt-1",
         name: "test-prompt",
+        version: 1,
+        versionId: undefined,
+        inputs: undefined,
+        outputs: undefined,
       });
       // closeDrawer is NOT called - the onSelect callback is responsible for navigation
       // This allows the callback to navigate to another drawer (e.g., promptEditor)

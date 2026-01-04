@@ -47,6 +47,17 @@ vi.mock("~/hooks/useDrawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
+  }),
+}));
+
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
@@ -54,6 +65,11 @@ vi.mock("~/utils/api", () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
+        },
+      },
+      prompts: {
+        getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
         },
       },
     }),

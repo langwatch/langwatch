@@ -290,6 +290,11 @@ export const system = createSystem(defaultConfig, {
           },
         },
       }),
+      badge: defineRecipe({
+        base: {
+          borderRadius: "lg",
+        },
+      }),
     },
     slotRecipes: {
       card: defineSlotRecipe({

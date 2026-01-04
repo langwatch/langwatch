@@ -46,6 +46,8 @@ import {
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
+import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 
@@ -55,12 +57,18 @@ export type PromptEditorDrawerProps = {
   onSave?: (prompt: {
     id: string;
     name: string;
+    version?: number;
     versionId?: string;
     inputs?: Array<{ identifier: string; type: string }>;
     outputs?: Array<{ identifier: string; type: string }>;
   }) => void;
   /** If provided, loads an existing prompt for editing */
   promptId?: string;
+  /**
+   * If provided, fetches this specific version instead of the latest.
+   * Used when editing a prompt that has local changes based on an older version.
+   */
+  promptVersionId?: string;
   /**
    * For evaluations context: callback to persist local changes when closing without save.
    * If provided, closing with unsaved changes will call this instead of showing a warning.
@@ -87,6 +95,16 @@ export type PromptEditorDrawerProps = {
     identifier: string,
     mapping: FieldMapping | undefined,
   ) => void;
+  /**
+   * Callback when a version is loaded from history (for evaluations context).
+   * Called before the form is reset with the new version data.
+   */
+  onVersionChange?: (prompt: {
+    version: number;
+    versionId: string;
+    inputs?: Array<{ identifier: string; type: string }>;
+    outputs?: Array<{ identifier: string; type: string }>;
+  }) => void;
 };
 
 /**
@@ -147,6 +165,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     (complexProps.onSave as PromptEditorDrawerProps["onSave"]);
   const onLocalConfigChange =
     props.onLocalConfigChange ?? flowCallbacks?.onLocalConfigChange;
+  const onVersionChange =
+    props.onVersionChange ??
+    (flowCallbacks?.onVersionChange as PromptEditorDrawerProps["onVersionChange"]);
 
   // Data sources: In evaluations context, use reactive data from hook.
   // Otherwise, fall back to props/complexProps (for standalone usage like prompt playground).
@@ -216,11 +237,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     props.promptId ??
     drawerParams.promptId ??
     (complexProps.promptId as string | undefined);
+  // Get the specific version ID if provided (for editing pinned versions)
+  const promptVersionId =
+    props.promptVersionId ??
+    drawerParams.promptVersionId ??
+    (complexProps.promptVersionId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Load existing prompt if editing
+  // If promptVersionId is provided, fetch that specific version instead of latest
   const promptQuery = api.prompts.getByIdOrHandle.useQuery(
-    { idOrHandle: promptId ?? "", projectId: project?.id ?? "" },
+    {
+      idOrHandle: promptId ?? "",
+      projectId: project?.id ?? "",
+      // Note: versionId was added to the tRPC router but types may need regeneration
+      versionId: promptVersionId, // Fetch specific version if provided
+    } as { idOrHandle: string; projectId: string; versionId?: string },
     {
       enabled: !!promptId && !!project?.id && isOpen,
       refetchOnWindowFocus: false,
@@ -264,8 +296,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Refs for callbacks (these need to be refs because they're used in subscriptions)
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
   onLocalConfigChangeRef.current = onLocalConfigChange;
+  // NOTE: savedFormValuesRef is updated in useEffect below, NOT on every render.
+  // This prevents the ref from being overwritten with stale query data after save
+  // (the onSuccess handler sets fresh values, which would be lost if we overwrote here).
   const savedFormValuesRef = useRef(savedFormValues);
-  savedFormValuesRef.current = savedFormValues;
   const promptIdRef = useRef(promptId);
   promptIdRef.current = promptId;
 
@@ -305,7 +339,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         : serverValues;
 
       setConfigValues(formValues);
-      savedFormValuesRef.current = formValues;
+      // IMPORTANT: savedFormValuesRef should be the SERVER values, not form values.
+      // If we have local changes (initialLocalConfig), form will differ from saved,
+      // which keeps hasUnsavedChanges=true and doesn't clear the local config.
+      savedFormValuesRef.current = serverValues;
       methods.reset(formValues);
       setIsFormInitialized(true);
     } else if (!promptId) {
@@ -366,10 +403,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     }
   }, [isOpen]);
 
-  // Reset when switching prompts
+  // Reset when switching prompts, versions, or targets
   useEffect(() => {
     setIsFormInitialized(false);
-  }, [promptId]);
+  }, [promptId, promptVersionId, targetId]);
 
   // Debounced function to update local config (avoids flooding store on every keystroke)
   const debouncedUpdateLocalConfig = useMemo(
@@ -428,9 +465,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     };
   }, [methods, debouncedUpdateLocalConfig]);
 
-  // Update hasUnsavedChanges when savedFormValues changes (e.g., after save)
+  // Update hasUnsavedChanges when savedFormValues changes (e.g., after query refetch)
+  // Also sync the ref here (not on every render, to avoid overwriting onSuccess updates)
   useEffect(() => {
     if (savedFormValues) {
+      savedFormValuesRef.current = savedFormValues;
       const currentValues = methods.getValues();
       const isUnsaved = !areFormValuesEqual(currentValues, savedFormValues);
       setHasUnsavedChanges(isUnsaved);
@@ -452,6 +491,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onSave?.({
         id: prompt.id,
         name: prompt.handle ?? "Untitled",
+        version: prompt.version,
         versionId: prompt.versionId,
         inputs: prompt.inputs,
         outputs: prompt.outputs,
@@ -501,6 +541,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onSave?.({
         id: prompt.id,
         name: prompt.handle ?? "Untitled",
+        version: prompt.version,
         versionId: prompt.versionId,
         inputs: prompt.inputs,
         outputs: prompt.outputs,
@@ -693,10 +734,69 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // Handle version history restore
   const handleVersionRestore = async (prompt: VersionedPrompt) => {
+    // Notify evaluations context about the version change (if in evaluations context)
+    // This updates the target's version info before we reset the form
+    onVersionChange?.({
+      version: prompt.version,
+      versionId: prompt.versionId,
+      inputs: prompt.inputs,
+      outputs: prompt.outputs,
+    });
+
     const newFormValues =
       versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+    // Update savedFormValuesRef to the restored version's values
+    // This ensures hasUnsavedChanges is false after restore
+    savedFormValuesRef.current = newFormValues;
     methods.reset(newFormValues);
   };
+
+  // Version drift detection - use the dedicated hook to get actual latest from DB
+  // Note: When promptVersionId is passed, promptQuery returns that specific version,
+  // not the latest. We need useLatestPromptVersion to detect drift properly.
+  const currentVersion = methods.watch("versionMetadata.versionNumber");
+  const {
+    latestVersion,
+    isOutdated,
+    nextVersion,
+  } = useLatestPromptVersion({
+    configId: promptId,
+    currentVersion,
+  });
+
+  // Show version badge only when pinned to a specific version (not "latest")
+  // i.e., when promptVersionId is passed from evaluations context
+  const showVersionBadge = !!promptVersionId && currentVersion !== undefined;
+
+  // Upgrade to latest version - need to fetch the actual latest
+  const handleUpgradeToLatest = useCallback(async () => {
+    if (!promptId || !project?.id) return;
+    try {
+      // Fetch the actual latest version (not the pinned one)
+      const latestPrompt = await utils.prompts.getByIdOrHandle.fetch({
+        idOrHandle: promptId,
+        projectId: project.id,
+      });
+      if (!latestPrompt) return;
+
+      const newFormValues =
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt);
+      // Update savedFormValuesRef to the latest version's values
+      // This ensures hasUnsavedChanges is false after upgrade
+      savedFormValuesRef.current = newFormValues;
+      methods.reset(newFormValues);
+
+      // Also notify parent about the version change
+      onVersionChange?.({
+        version: latestPrompt.version,
+        versionId: latestPrompt.versionId,
+        inputs: latestPrompt.inputs,
+        outputs: latestPrompt.outputs,
+      });
+    } catch (error) {
+      console.error("Failed to upgrade to latest version:", error);
+    }
+  }, [promptId, project?.id, utils.prompts.getByIdOrHandle, methods, onVersionChange]);
 
   // Handle setting variable mapping when selecting a source field from the text area
   const handleSetVariableMapping = useCallback(
@@ -826,29 +926,38 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
               </Button>
             )}
             {promptId && promptQuery.data?.handle ? (
-              <HStack
-                gap={1}
-                cursor="pointer"
-                onClick={() => setChangeHandleDialogOpen(true)}
-                _hover={{ "& .edit-icon": { opacity: 1 } }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    setChangeHandleDialogOpen(true);
-                  }
-                }}
-              >
-                <Heading>{promptQuery.data.handle}</Heading>
-                <Box
-                  className="edit-icon"
-                  opacity={0}
-                  transition="opacity 0.2s"
-                  color="gray.500"
+              <>
+                <HStack
+                  gap={1}
+                  cursor="pointer"
+                  onClick={() => setChangeHandleDialogOpen(true)}
+                  _hover={{ "& .edit-icon": { display: "block" } }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setChangeHandleDialogOpen(true);
+                    }
+                  }}
                 >
-                  <LuPencil size={16} />
-                </Box>
-              </HStack>
+                  <Heading>{promptQuery.data.handle}</Heading>
+                  <Box
+                    className="edit-icon"
+                    display="none"
+                    transition="opacity 0.2s"
+                    color="gray.500"
+                  >
+                    <LuPencil size={16} />
+                  </Box>
+                </HStack>
+                {showVersionBadge && (
+                  <VersionBadge
+                    version={currentVersion!}
+                    latestVersion={latestVersion}
+                    onUpgrade={isOutdated ? handleUpgradeToLatest : undefined}
+                  />
+                )}
+              </>
             ) : (
               <Heading>New Prompt</Heading>
             )}
@@ -899,6 +1008,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                   isOpen={saveVersionDialogOpen}
                   onClose={() => setSaveVersionDialogOpen(false)}
                   onSubmit={handleSaveVersionSubmit}
+                  nextVersion={nextVersion}
                 />
 
                 {/* Save Prompt Dialog - asks for handle when creating new prompt */}
@@ -918,13 +1028,15 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                 />
 
                 {/* Messages (includes system prompt + user messages) */}
-                <PromptMessagesField
-                  messageFields={messageFields}
-                  availableFields={availableFields}
-                  otherNodesFields={{}}
-                  availableSources={availableSources}
-                  onSetVariableMapping={handleSetVariableMapping}
-                />
+                <Box paddingX={4}>
+                  <PromptMessagesField
+                    messageFields={messageFields}
+                    availableFields={availableFields}
+                    otherNodesFields={{}}
+                    availableSources={availableSources}
+                    onSetVariableMapping={handleSetVariableMapping}
+                  />
+                </Box>
 
                 {/* Variables */}
                 <Box paddingX={4} paddingBottom={4}>

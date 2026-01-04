@@ -23,6 +23,8 @@ import {
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
+import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { TargetConfig } from "../../types";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
@@ -81,6 +83,30 @@ export const TargetHeader = memo(function TargetHeader({
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
 
+  // Get the latest version for this prompt (to determine if target is at "latest")
+  const { latestVersion } = useLatestPromptVersion({
+    configId: target.type === "prompt" ? target.promptId : undefined,
+    currentVersion: target.type === "prompt" ? target.promptVersionNumber : undefined,
+  });
+
+  // Check if this target is effectively at "latest" version
+  // (either has no pinned version, or pinned version matches latest)
+  const isAtLatestVersion =
+    target.type === "prompt" &&
+    (target.promptVersionNumber === undefined ||
+      target.promptVersionNumber === latestVersion);
+
+  // Show version badge if:
+  // - Has version number defined AND is NOT at latest version
+  // Simple rule: if you're pinned to an older version, show the version badge (gray, no upgrade arrow)
+  // This helps users see they're working with an older version at a glance
+  // Note: We intentionally don't show drift/upgrade on the table. Users pin old versions
+  // for comparison. Drift detection is handled in the drawer.
+  const showVersionBadge =
+    target.type === "prompt" &&
+    target.promptVersionNumber !== undefined &&
+    !isAtLatestVersion;
+
   // Controlled menu state to prevent closing on re-renders
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -126,6 +152,13 @@ export const TargetHeader = memo(function TargetHeader({
             <Text fontSize="13px" fontWeight="medium" truncate>
               {target.name}
             </Text>
+            {showVersionBadge && target.promptVersionNumber !== undefined && (
+              <Box flexShrink={0}>
+                <VersionBadge
+                  version={target.promptVersionNumber}
+                />
+              </Box>
+            )}
             {hasMissingMappings && (
               <Tooltip
                 content="Missing variable mappings - Click to configure"

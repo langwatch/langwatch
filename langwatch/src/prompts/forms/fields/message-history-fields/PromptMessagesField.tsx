@@ -126,7 +126,7 @@ function MessageRow({
         )}
         <Box
           flex={fillHeight ? 1 : undefined}
-          minHeight={fillHeight ? 0 : undefined}
+          height={fillHeight ? "100%" : undefined}
         >
           <Controller
             key={`message-row-${idx}-content`}
@@ -437,7 +437,11 @@ export function PromptMessagesField({
                 borderBottomWidth={borderless ? "1px" : 0}
                 borderColor="gray.200"
               >
-                <HStack width="full" paddingX={borderless ? 2 : 0} paddingBottom={borderless ? 2 : 0}>
+                <HStack
+                  width="full"
+                  paddingX={borderless ? 2 : 0}
+                  paddingBottom={borderless ? 2 : 0}
+                >
                   <MessageRoleLabel role="system" />
                   <Spacer />
                   {editingMode === "messages" && (
@@ -476,6 +480,7 @@ export function PromptMessagesField({
                   borderColor="gray.200"
                   flex={borderless && isLast ? 1 : undefined}
                   paddingX={borderless ? 1 : 0}
+                  height={borderless && isLast ? "100%" : undefined}
                 >
                   <MessageRow
                     key={`message-row-${idx}`}

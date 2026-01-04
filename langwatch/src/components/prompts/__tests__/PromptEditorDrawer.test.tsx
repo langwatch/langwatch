@@ -20,6 +20,9 @@ vi.mock("next/router", () => ({
   }),
 }));
 
+// Track current drawer params for testing
+let mockDrawerParams: Record<string, unknown> = {};
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
@@ -28,7 +31,7 @@ vi.mock("~/hooks/useDrawer", () => ({
     goBack: mockGoBack,
   }),
   getComplexProps: () => ({}),
-  useDrawerParams: () => ({}),
+  useDrawerParams: () => mockDrawerParams,
   getFlowCallbacks: () => undefined,
 }));
 
@@ -102,6 +105,8 @@ const mockGetByIdOrHandle = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 
+const mockUpdateHandle = vi.fn();
+
 vi.mock("~/utils/api", () => ({
   api: {
     prompts: {
@@ -117,6 +122,12 @@ vi.mock("~/utils/api", () => ({
       update: {
         useMutation: () => ({
           mutate: mockUpdate,
+          isPending: false,
+        }),
+      },
+      updateHandle: {
+        useMutation: (opts?: { onSuccess?: () => void; onError?: () => void }) => ({
+          mutate: mockUpdateHandle,
           isPending: false,
         }),
       },
@@ -226,6 +237,8 @@ describe("PromptEditorDrawer", () => {
     mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
     // Default: form values equal saved values (no changes)
     mockAreFormValuesEqual.mockReturnValue(true);
+    // Reset drawer params
+    mockDrawerParams = {};
   });
 
   afterEach(() => {
@@ -238,9 +251,10 @@ describe("PromptEditorDrawer", () => {
       expect(screen.getByText("New Prompt")).toBeInTheDocument();
     });
 
-    it("shows prompt handle input field", () => {
+    it("shows save button with Save text for new prompts", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
-      expect(screen.getByTestId("prompt-handle-input")).toBeInTheDocument();
+      // New prompts show "Save" on the button (no version update)
+      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent("Save");
     });
 
     it("shows model selector in header", () => {
@@ -288,11 +302,12 @@ describe("PromptEditorDrawer", () => {
       });
     });
 
-    it("renders Edit Prompt header when editing", () => {
+    it("renders prompt handle as header when editing", () => {
       renderWithProviders(
         <PromptEditorDrawer open={true} promptId="prompt-123" />
       );
-      expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+      // When editing, shows the prompt handle as the title
+      expect(screen.getByText("test-prompt")).toBeInTheDocument();
     });
 
     it("does not show handle input field when editing", () => {
@@ -370,8 +385,8 @@ describe("PromptEditorDrawer", () => {
         />
       );
 
-      // The drawer should render with the prompt loaded
-      expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+      // The drawer should render with the prompt loaded (shows handle as title)
+      expect(screen.getByText("test-prompt")).toBeInTheDocument();
     });
   });
 
@@ -513,8 +528,8 @@ describe("PromptEditorDrawer", () => {
         />
       );
 
-      // The drawer should render without errors
-      expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+      // The drawer should render without errors (shows handle as title)
+      expect(screen.getByText("test-prompt")).toBeInTheDocument();
     });
 
     it("sets mapping when selecting a source field from variable insert menu", async () => {
@@ -598,6 +613,110 @@ describe("PromptEditorDrawer", () => {
       // Only one save button should exist (in header)
       const saveButtons = screen.getAllByTestId("save-prompt-button");
       expect(saveButtons).toHaveLength(1);
+    });
+  });
+
+  describe("Switching between targets (evaluations context)", () => {
+    const mockOnLocalConfigChange = vi.fn();
+
+    const localConfigA = {
+      llm: { model: "openai/gpt-4", temperature: 0.5 },
+      messages: [{ role: "system" as const, content: "Content from Target A" }],
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+    };
+
+    const localConfigB = {
+      llm: { model: "openai/gpt-4", temperature: 0.9 },
+      messages: [{ role: "system" as const, content: "Content from Target B" }],
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
+    };
+
+    beforeEach(() => {
+      mockGetByIdOrHandle.mockReturnValue({
+        data: mockPromptDataWithMessages,
+        isLoading: false,
+      });
+      mockOnLocalConfigChange.mockClear();
+    });
+
+    it("resets form when targetId changes (same prompt, different target)", async () => {
+      // First render with target-1
+      mockDrawerParams = { targetId: "target-1" };
+
+      const { rerender } = renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          initialLocalConfig={localConfigA}
+          onLocalConfigChange={mockOnLocalConfigChange}
+        />
+      );
+
+      // Verify first render (shows handle as title)
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Now switch to target-2 (same prompt, different target)
+      mockDrawerParams = { targetId: "target-2" };
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptEditorDrawer
+            open={true}
+            promptId="prompt-123"
+            initialLocalConfig={localConfigB}
+            onLocalConfigChange={mockOnLocalConfigChange}
+          />
+        </ChakraProvider>
+      );
+
+      // The drawer should still be showing (form reinitialized with new config)
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+    });
+
+    it("resets form when switching targets with same version but different local changes", async () => {
+      // First target with changes based on v3
+      mockDrawerParams = { targetId: "target-1", promptVersionId: "version-3" };
+
+      const { rerender } = renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-123"
+          promptVersionId="version-3"
+          initialLocalConfig={localConfigA}
+          onLocalConfigChange={mockOnLocalConfigChange}
+        />
+      );
+
+      // Shows handle as title
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
+
+      // Switch to different target at same version but different local changes
+      mockDrawerParams = { targetId: "target-2", promptVersionId: "version-3" };
+
+      rerender(
+        <ChakraProvider value={defaultSystem}>
+          <PromptEditorDrawer
+            open={true}
+            promptId="prompt-123"
+            promptVersionId="version-3"
+            initialLocalConfig={localConfigB}
+            onLocalConfigChange={mockOnLocalConfigChange}
+          />
+        </ChakraProvider>
+      );
+
+      // Drawer should re-render with new target's config
+      await waitFor(() => {
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
+      });
     });
   });
 });

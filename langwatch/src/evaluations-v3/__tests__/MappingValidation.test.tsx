@@ -8,6 +8,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, render, screen, cleanup } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
+  }),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
 import type { TargetConfig, DatasetReference, EvaluatorConfig } from "../types";

@@ -25,6 +25,7 @@ export type PromptListDrawerProps = {
   onSelect?: (prompt: {
     id: string;
     name: string;
+    version?: number;
     versionId?: string;
     inputs?: Array<{ identifier: string; type: string }>;
     outputs?: Array<{ identifier: string; type: string }>;
@@ -104,6 +105,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
     onSelect?.({
       id: prompt.id,
       name: prompt.handle ?? "Untitled",
+      version: fullPrompt?.version,
       versionId: fullPrompt?.versionId,
       inputs: fullPrompt?.inputs,
       outputs: fullPrompt?.outputs,

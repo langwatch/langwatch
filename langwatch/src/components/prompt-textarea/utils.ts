@@ -5,7 +5,7 @@ export const VARIABLE_REGEX = /\{\{([^}]+)\}\}/g;
 export const parseVariablesFromText = (text: string): string[] => {
   const matches = text.match(VARIABLE_REGEX);
   if (!matches) return [];
-  return matches.map((m) => m.slice(2, -2)); // Remove {{ and }}
+  return Array.from(new Set(matches.map((m) => m.slice(2, -2)))); // Remove {{ and }}
 };
 
 /** Find unclosed {{ before cursor position for triggering the variable menu */
@@ -54,7 +54,7 @@ export const BORDERLESS_LINE_HEIGHT = 28;
 /**
  * Replace textarea content in an undo-able way using execCommand.
  * This integrates with the browser's native undo stack (Ctrl+Z).
- * 
+ *
  * @param textarea - The textarea element
  * @param newValue - The new complete value for the textarea
  * @param cursorPosition - Optional cursor position after the change
@@ -67,15 +67,14 @@ export const setTextareaValueUndoable = (
   // Focus and select all text
   textarea.focus();
   textarea.select();
-  
+
   // Use execCommand to replace - this is tracked by browser undo stack
   // Note: execCommand is deprecated but still works and is the only way
   // to integrate with the native undo stack
   document.execCommand("insertText", false, newValue);
-  
+
   // Set cursor position if provided
   if (cursorPosition !== undefined) {
     textarea.setSelectionRange(cursorPosition, cursorPosition);
   }
 };
-

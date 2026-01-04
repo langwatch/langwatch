@@ -7,7 +7,6 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
 import { useTabId } from "../ui/TabContext";
-import { SavePromptButton } from "./SavePromptButton";
 
 /**
  * Header bar for the prompt browser with handle, model selector, and action buttons.
@@ -38,7 +37,6 @@ export function PromptBrowserHeader() {
         onSave={handleSaveVersion}
         hasUnsavedChanges={hasUnsavedChanges}
         onVersionRestore={handleOnRestore}
-        customSaveButton={<SavePromptButton />}
       />
     </Box>
   );

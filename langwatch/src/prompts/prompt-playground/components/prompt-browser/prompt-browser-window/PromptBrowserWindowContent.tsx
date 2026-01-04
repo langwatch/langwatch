@@ -43,14 +43,17 @@ export const useLayoutMode = () => useContext(LayoutModeContext);
  */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
-  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(({ windows }) => {
-    const allTabs = windows.flatMap((w) => w.tabs);
-    return {
-      tab: allTabs.find((t) => t.id === tabId),
-      isSingleWindow: windows.length === 1,
-    };
-  });
+  const { tab, isSingleWindow } = useDraggableTabsBrowserStore(
+    ({ windows }) => {
+      const allTabs = windows.flatMap((w) => w.tabs);
+      return {
+        tab: allTabs.find((t) => t.id === tabId),
+        isSingleWindow: windows.length === 1,
+      };
+    },
+  );
   const currentValues = tab?.data.form.currentValues;
+  const versionNumber = tab?.data.meta.versionNumber;
   const initialConfigValues = useMemo(
     () => cloneDeep(currentValues),
     [currentValues],
@@ -61,8 +64,13 @@ export function PromptBrowserWindowContent() {
   // Use horizontal layout when there's only one window
   const layoutMode: LayoutMode = isSingleWindow ? "horizontal" : "vertical";
 
+  // Key includes version to force remount when version changes externally (e.g., upgrade clicked)
+  // This ensures react-hook-form gets fresh defaultValues
+  const formKey = `${tabId}-v${versionNumber ?? 0}`;
+
   return (
     <PromptBrowserWindowInner
+      key={formKey}
       initialConfigValues={initialConfigValues}
       tabId={tabId}
       layoutMode={layoutMode}
@@ -94,6 +102,24 @@ function PromptBrowserWindowInner(props: {
     () => debounce(updateTabData, 500),
     [updateTabData],
   );
+
+  // Track version to cancel debounced updates when external upgrade happens
+  const lastVersionRef = useRef(
+    props.initialConfigValues?.versionMetadata?.versionNumber,
+  );
+
+  useEffect(() => {
+    const newVersion =
+      props.initialConfigValues?.versionMetadata?.versionNumber;
+    if (newVersion !== lastVersionRef.current) {
+      // Version changed externally (e.g., upgrade clicked) - cancel pending updates
+      updateTabDataDebounced.cancel();
+      lastVersionRef.current = newVersion;
+    }
+  }, [
+    props.initialConfigValues?.versionMetadata?.versionNumber,
+    updateTabDataDebounced,
+  ]);
 
   useEffect(() => {
     const sub = form.methods.watch((values) => {
@@ -129,14 +155,16 @@ function PromptBrowserWindowInner(props: {
 
   // Calculate max height based on container size
   const getMaxAllowedHeight = useCallback(() => {
-    if (!containerRef.current || !headerRef.current) return 400;
+    if (!containerRef.current || !headerRef.current) return;
     const containerHeight = containerRef.current.clientHeight;
     const headerHeight = headerRef.current.clientHeight;
     // Leave space for tabs header + divider + minimum chat area
-    return Math.max(
+    const maxAllowed = Math.max(
       0,
       containerHeight - headerHeight - TABS_AND_DIVIDER_HEIGHT - MIN_CHAT_AREA,
     );
+    if (maxAllowed == 0) return;
+    return maxAllowed;
   }, []);
 
   // Handle drag with direct DOM manipulation (no React state updates during drag)
@@ -157,7 +185,7 @@ function PromptBrowserWindowInner(props: {
       const newHeight = relativeY - headerHeight;
 
       // Clamp between 0 and max allowed
-      const maxAllowed = getMaxAllowedHeight();
+      const maxAllowed = getMaxAllowedHeight() ?? 0;
       const clampedHeight = Math.max(0, Math.min(maxAllowed, newHeight));
 
       // Store for drag end and update DOM directly (no re-render)
@@ -205,8 +233,8 @@ function PromptBrowserWindowInner(props: {
   const messagesMaxHeight = isCollapsed
     ? 0
     : userMaxHeight !== null
-      ? userMaxHeight
-      : getMaxAllowedHeight();
+    ? userMaxHeight
+    : getMaxAllowedHeight();
 
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
@@ -233,26 +261,38 @@ function PromptBrowserWindowInner(props: {
               overflow="hidden"
               boxShadow="md"
             >
-              <Box ref={headerRef} flexShrink={0} paddingTop={3} paddingBottom={3}>
+              <Box
+                ref={headerRef}
+                flexShrink={0}
+                paddingTop={3}
+                paddingBottom={3}
+              >
                 <Box width="full" paddingX={3}>
                   <PromptBrowserHeader />
                 </Box>
               </Box>
               <Box
                 flex={1}
-                overflow="auto"
                 paddingBottom={3}
                 display="flex"
                 flexDirection="column"
+                overflow="auto"
+                position="relative"
+                height="full"
+                minHeight={0}
               >
-                <Box flex={1} minHeight={0} height="100%">
-                  <PromptMessagesEditor />
-                </Box>
+                <PromptMessagesEditor />
               </Box>
             </Box>
 
             {/* Right panel: Tabbed section (conversation/variables) */}
-            <Box flex={1} display="flex" flexDirection="column" overflow="hidden" paddingTop={2}>
+            <Box
+              flex={1}
+              display="flex"
+              flexDirection="column"
+              overflow="hidden"
+              paddingTop={2}
+            >
               <PromptTabbedSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
@@ -289,7 +329,13 @@ function PromptBrowserWindowInner(props: {
           {/* Prompt messages area - collapsible, auto-grows with content */}
           <Box
             ref={messagesWrapperRef}
-            maxHeight={isCollapsed ? 0 : `${messagesMaxHeight}px`}
+            maxHeight={
+              isCollapsed
+                ? 0
+                : messagesMaxHeight
+                ? `${messagesMaxHeight}px`
+                : undefined
+            }
             overflow="hidden"
             position="relative"
             flexShrink={0}

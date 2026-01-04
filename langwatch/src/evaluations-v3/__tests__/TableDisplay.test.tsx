@@ -16,6 +16,17 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
+  }),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 
@@ -54,6 +65,11 @@ vi.mock("~/utils/api", () => ({
       agents: {
         getById: {
           fetch: vi.fn(),
+        },
+      },
+      prompts: {
+        getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
         },
       },
     }),

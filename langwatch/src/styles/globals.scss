@@ -260,4 +260,11 @@ span[data-highlight]::after {
     .copilotKitChat, .copilotKitMessages {
         background: none;
     }
+    .copilotKitMessage.copilotKitUserMessage, .copilotKitMarkdownElement {
+        font-size: 14px;
+    }
+}
+
+.rich-textarea-position-relative {
+    position: relative!important;
 }

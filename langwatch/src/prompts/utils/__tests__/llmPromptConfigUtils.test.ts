@@ -5,7 +5,10 @@ import { describe, expect, it, vi } from "vitest";
 import {
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
+  promptConfigFormValuesToOptimizationStudioNodeData,
 } from "../llmPromptConfigUtils";
+import type { VersionedPrompt } from "~/server/prompt-config";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {
@@ -286,5 +289,128 @@ describe("versionedPromptToPromptConfigFormValues", () => {
 
   describe("when prompt handle is valid", () => {
     it.todo("keeps valid handle unchanged");
+  });
+});
+
+describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
+  /**
+   * Creates a mock VersionedPrompt for testing
+   */
+  const createMockVersionedPrompt = (overrides: Partial<VersionedPrompt> = {}): VersionedPrompt => ({
+    id: "prompt-1",
+    name: "test-prompt",
+    handle: "test-prompt",
+    scope: PromptScope.PROJECT,
+    version: 1,
+    versionId: "version-1",
+    versionCreatedAt: new Date(),
+    model: "gpt-4",
+    temperature: 0.7,
+    maxTokens: 1000,
+    prompt: "You are a helpful assistant.", // System message stored here
+    projectId: "test-project",
+    organizationId: "org-1",
+    authorId: null,
+    messages: [{ role: "user", content: "Hello!" }], // Non-system messages
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    updatedAt: new Date(),
+    createdAt: new Date(),
+    ...overrides,
+  });
+
+  it("includes system message in messages array", () => {
+    const prompt = createMockVersionedPrompt({
+      prompt: "You are a cat.",
+      messages: [{ role: "user", content: "Say meow" }],
+    });
+
+    const result = versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
+
+    // System message should be first in the array
+    expect(result.version.configData.messages[0]).toEqual({
+      role: "system",
+      content: "You are a cat.",
+    });
+    // User message should follow
+    expect(result.version.configData.messages[1]).toEqual({
+      role: "user",
+      content: "Say meow",
+    });
+  });
+
+  it("does NOT include system message when using versionedPromptToPromptConfigFormValues (without system message)", () => {
+    const prompt = createMockVersionedPrompt({
+      prompt: "You are a cat.",
+      messages: [{ role: "user", content: "Say meow" }],
+    });
+
+    const result = versionedPromptToPromptConfigFormValues(prompt);
+
+    // Should NOT have the system message
+    expect(result.version.configData.messages.length).toBe(1);
+    expect(result.version.configData.messages[0]).toEqual({
+      role: "user",
+      content: "Say meow",
+    });
+  });
+
+  describe("optimization studio form reset regression test", () => {
+    /**
+     * BUG: When saving a prompt in the optimization studio, using the wrong function
+     * (versionedPromptToPromptConfigFormValues instead of WithSystemMessage) caused
+     * the system prompt content to disappear from the workflow DSL.
+     *
+     * This test ensures the correct function preserves the system message through
+     * the round-trip: VersionedPrompt -> FormValues -> NodeData
+     */
+    it("preserves system message through form reset and node data conversion", () => {
+      const savedPrompt = createMockVersionedPrompt({
+        prompt: "You are a helpful cat assistant.",
+        messages: [],
+      });
+
+      // Simulate what happens in PromptSourceHeader.onSuccess after saving:
+      // 1. Convert saved prompt to form values (MUST use WithSystemMessage)
+      const formValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(savedPrompt);
+
+      // Verify form values have the system message
+      expect(formValues.version.configData.messages).toHaveLength(1);
+      expect(formValues.version.configData.messages[0]).toEqual({
+        role: "system",
+        content: "You are a helpful cat assistant.",
+      });
+
+      // 2. Simulate what syncNodeDataWithFormValues does - convert form to node data
+      const nodeData = promptConfigFormValuesToOptimizationStudioNodeData(formValues);
+
+      // Verify node data has the instructions (system prompt)
+      const instructionsParam = nodeData.parameters?.find(p => p.identifier === "instructions");
+      expect(instructionsParam?.value).toBe("You are a helpful cat assistant.");
+
+      // Verify messages param does NOT have the system message (it's stored separately in instructions)
+      const messagesParam = nodeData.parameters?.find(p => p.identifier === "messages");
+      expect(messagesParam?.value).toEqual([]);
+    });
+
+    it("FAILS to preserve system message when using wrong function (demonstrating the bug)", () => {
+      const savedPrompt = createMockVersionedPrompt({
+        prompt: "You are a helpful cat assistant.",
+        messages: [],
+      });
+
+      // BUG: Using versionedPromptToPromptConfigFormValues (WITHOUT system message)
+      const formValuesWRONG = versionedPromptToPromptConfigFormValues(savedPrompt);
+
+      // Form values are MISSING the system message!
+      expect(formValuesWRONG.version.configData.messages).toHaveLength(0);
+
+      // When converted to node data, instructions will be empty
+      const nodeDataWRONG = promptConfigFormValuesToOptimizationStudioNodeData(formValuesWRONG);
+      const instructionsParam = nodeDataWRONG.parameters?.find(p => p.identifier === "instructions");
+
+      // BUG: The system prompt is LOST
+      expect(instructionsParam?.value).toBe("");
+    });
   });
 });

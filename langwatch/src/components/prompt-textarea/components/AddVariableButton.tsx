@@ -1,16 +1,16 @@
-import { Button, Text } from "@chakra-ui/react";
+import { Button, type ButtonProps, Text } from "@chakra-ui/react";
 import { Braces } from "lucide-react";
 import { forwardRef } from "react";
 
 type AddVariableButtonProps = {
   onClick: (e: React.MouseEvent) => void;
-};
+} & ButtonProps;
 
 /**
  * Button for adding variables, shown on hover in the textarea.
  */
 export const AddVariableButton = forwardRef<HTMLButtonElement, AddVariableButtonProps>(
-  ({ onClick }, ref) => {
+  ({ onClick, ...props }, ref) => {
     return (
       <Button
         ref={ref}
@@ -24,6 +24,7 @@ export const AddVariableButton = forwardRef<HTMLButtonElement, AddVariableButton
         onMouseDown={(e) => e.stopPropagation()}
         opacity={0.7}
         _hover={{ opacity: 1, background: "gray.100" }}
+        {...props}
       >
         <Text fontSize="xs" marginRight={1} fontWeight="500">
           Add variable

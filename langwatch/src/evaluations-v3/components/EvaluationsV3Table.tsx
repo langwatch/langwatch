@@ -14,6 +14,7 @@ import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
 import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
@@ -54,7 +55,9 @@ import { type FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { DatasetColumnType } from "~/server/datasets/types";
 
 import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
-import { ColumnTypeIcon, SuperHeader } from "./TableUI";
+import { ColumnTypeIcon } from "./ColumnTypeIcon";
+import { DatasetSuperHeader } from "./DatasetSuperHeader";
+import { TargetSuperHeader } from "./TargetSuperHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
   CheckboxHeaderFromMeta,
@@ -81,6 +84,7 @@ export function EvaluationsV3Table({
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
+  const trpcUtils = api.useContext();
 
   // Sync saved dataset changes to DB
   useDatasetSync();
@@ -216,6 +220,7 @@ export function EvaluationsV3Table({
     (prompt: {
       id: string;
       name: string;
+      version?: number;
       versionId?: string;
       inputs?: Array<{ identifier: string; type: string }>;
       outputs?: Array<{ identifier: string; type: string }>;
@@ -229,6 +234,7 @@ export function EvaluationsV3Table({
         name: prompt.name,
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
+        promptVersionNumber: prompt.version,
         inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
           identifier: i.identifier,
           type: i.type as Field["type"],
@@ -252,6 +258,8 @@ export function EvaluationsV3Table({
           updateTarget(targetId, {
             name: savedPrompt.name,
             promptId: savedPrompt.id,
+            promptVersionId: savedPrompt.versionId,
+            promptVersionNumber: savedPrompt.version,
             localPromptConfig: undefined,
             // Update inputs/outputs from saved prompt to keep validation working
             inputs: savedPrompt.inputs?.map((i) => ({
@@ -287,10 +295,15 @@ export function EvaluationsV3Table({
       });
 
       // Open the prompt editor drawer for the newly added target
-      openDrawer("promptEditor", {
-        promptId: prompt.id,
-        urlParams: { targetId },
-      });
+      // Reset stack to prevent back button when switching between targets
+      openDrawer(
+        "promptEditor",
+        {
+          promptId: prompt.id,
+          urlParams: { targetId },
+        },
+        { resetStack: true },
+      );
     },
     [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
   );
@@ -800,15 +813,13 @@ export function EvaluationsV3Table({
       <table ref={tableRef}>
         <thead>
           <tr>
-            <SuperHeader
-              type="dataset"
+            <DatasetSuperHeader
               colSpan={datasetColSpan}
               activeDataset={activeDataset}
               datasetHandlers={datasetHandlers}
               isLoading={isLoadingExperiment}
             />
-            <SuperHeader
-              type="targets"
+            <TargetSuperHeader
               colSpan={targetsColSpan}
               onAddClick={() => {
                 // Clear any pending mappings from previous flows
@@ -819,21 +830,26 @@ export function EvaluationsV3Table({
 
                 // Handler to open promptEditor for new prompts with proper props
                 const openNewPromptEditor = () => {
-                  openDrawer("promptEditor", {
-                    // Pass available sources via complexProps
-                    availableSources,
-                    inputMappings: {},
-                    onInputMappingsChange: (
-                      identifier: string,
-                      mapping: UIFieldMapping | undefined,
-                    ) => {
-                      if (mapping) {
-                        pendingMappingsRef.current[identifier] = mapping;
-                      } else {
-                        delete pendingMappingsRef.current[identifier];
-                      }
+                  openDrawer(
+                    "promptEditor",
+                    {
+                      // Pass available sources via complexProps
+                      availableSources,
+                      inputMappings: {},
+                      onInputMappingsChange: (
+                        identifier: string,
+                        mapping: UIFieldMapping | undefined,
+                      ) => {
+                        if (mapping) {
+                          pendingMappingsRef.current[identifier] = mapping;
+                        } else {
+                          delete pendingMappingsRef.current[identifier];
+                        }
+                      },
                     },
-                  });
+                    // Reset stack to prevent back button when creating new prompts
+                    { resetStack: true },
+                  );
                 };
 
                 // Set flow callbacks for the entire add-target flow
@@ -872,6 +888,7 @@ export function EvaluationsV3Table({
                       name: savedPrompt.name,
                       promptId: savedPrompt.id,
                       promptVersionId: savedPrompt.versionId,
+                      promptVersionNumber: savedPrompt.version,
                       inputs: (savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
                         identifier: i.identifier,
                         type: i.type as Field["type"],

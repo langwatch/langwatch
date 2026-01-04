@@ -26,6 +26,7 @@ import { api } from "~/utils/api";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
+import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 
@@ -332,19 +333,38 @@ export function SignaturePropertiesPanelForm({
     content: PromptTextAreaOnAddMention,
     idx: number,
   ): string | undefined => {
-    const { node, newPrompt, newHandle } = onAddEdge(id, handle, content);
-    const messagesParam = node.data.parameters?.find(
-      (param) => param.identifier === "messages",
-    );
-    if (!messagesParam) return;
+    const { node: stateNode, newPrompt, newHandle } = onAddEdge(id, handle, content);
 
-    setNodeParameter(node.id, {
-      identifier: "messages",
-      type: "chat_messages",
-      value: (messagesParam.value as any[]).map((field, i) =>
-        i === idx ? { ...field, content: newPrompt } : field,
-      ),
+    // Get form messages to correctly map form index to node parameter
+    const formMessages = messageFields.fields.map((f) => ({
+      role: f.role,
+      content: f.content,
+    }));
+
+    const update = computeMessageEdgeUpdate({
+      formMessages,
+      nodeParameters: (stateNode.data.parameters ?? []) as Array<{
+        identifier: string;
+        type: string;
+        value: Array<{ role: string; content: string }> | string;
+      }>,
+      formIndex: idx,
+      newContent: newPrompt,
     });
+
+    if (update.parameterToUpdate === "instructions") {
+      setNodeParameter(stateNode.id, {
+        identifier: "instructions",
+        type: "str",
+        value: update.newValue as string,
+      });
+    } else {
+      setNodeParameter(stateNode.id, {
+        identifier: "messages",
+        type: "chat_messages",
+        value: update.newValue as Array<{ role: string; content: string }>,
+      });
+    }
 
     return newHandle;
   };

@@ -10,6 +10,10 @@ import { salvageValidData } from "~/utils/zodSalvage";
  * Note: We test the salvageValidData utility directly rather than rendering
  * the React hook, as the hook's primary responsibility is data parsing,
  * which is delegated to salvageValidData. This avoids needing jsdom/DOM env.
+ *
+ * IMPORTANT: The hook uses instance-level refs for sync flags (disableOnChangeRef,
+ * disableNodeSyncRef) to prevent cross-instance interference. Previously these
+ * were module-level variables which caused bugs in multi-tab scenarios.
  */
 describe("usePromptConfigForm", () => {
   describe("when initialConfigValues are valid", () => {

@@ -544,8 +544,8 @@ describe("Prompt Editor Local Changes", () => {
       const commitMessageInput = screen.getByPlaceholderText("Enter a description for this version");
       await user.type(commitMessageInput, "Test commit message");
 
-      // Find and click the save button in the dialog
-      const dialogSaveButton = screen.getByRole("button", { name: /save$/i });
+      // Find and click the save button in the dialog (may say "Save" or "Update to vX")
+      const dialogSaveButton = screen.getByRole("button", { name: /save$|update to v\d+$/i });
       await user.click(dialogSaveButton);
 
       // Verify save was actually called
@@ -566,6 +566,154 @@ describe("Prompt Editor Local Changes", () => {
     }, 20000);
   });
 
+
+  describe("switching between targets preserves local changes", () => {
+    it("local changes are NOT lost when switching between targets without closing drawer", async () => {
+      // BUG: When user has two targets with the same prompt, edits one, then switches
+      // to the other and back, the local changes are lost.
+      //
+      // Steps to reproduce:
+      // 1. Add same prompt twice as target A and target B
+      // 2. Edit target B (add "*" to content)
+      // 3. Orange dot shows on target B (local changes)
+      // 4. Without closing drawer, open target A - content updates correctly
+      // 5. Without closing drawer, open target B again - content shows "*"
+      // 6. BUT: Orange dot disappears and if you close/reopen, changes are LOST
+
+      // Setup: Two targets with the same prompt
+      const localConfigB: LocalPromptConfig = {
+        llm: { model: "gpt-4", temperature: 0.7 },
+        messages: [{ role: "user", content: "Hello with STAR *" }],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      };
+
+      useEvaluationsV3Store.setState({
+        targets: [
+          {
+            id: "target-A",
+            type: "prompt",
+            name: "test-prompt-A",
+            promptId: "prompt-1",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+            localPromptConfig: undefined, // Target A has NO local changes
+          },
+          {
+            id: "target-B",
+            type: "prompt",
+            name: "test-prompt-B",
+            promptId: "prompt-1", // Same prompt!
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+            mappings: {},
+            localPromptConfig: localConfigB, // Target B HAS local changes
+          },
+        ],
+        datasets: [],
+        activeDatasetId: undefined,
+      });
+
+      // Track calls to onLocalConfigChange for each target
+      const targetAChanges: Array<LocalPromptConfig | undefined> = [];
+      const targetBChanges: Array<LocalPromptConfig | undefined> = [];
+
+      const onLocalConfigChangeA = (config: LocalPromptConfig | undefined) => {
+        targetAChanges.push(config);
+        useEvaluationsV3Store.getState().updateTarget("target-A", { localPromptConfig: config });
+      };
+
+      const onLocalConfigChangeB = (config: LocalPromptConfig | undefined) => {
+        targetBChanges.push(config);
+        useEvaluationsV3Store.getState().updateTarget("target-B", { localPromptConfig: config });
+      };
+
+      // Step 1: Open drawer for target B (which has local changes)
+      mockRouterQuery = {
+        "drawer.open": "promptEditor",
+        "drawer.promptId": "prompt-1",
+        "drawer.targetId": "target-B",
+      };
+
+      const { rerender } = render(
+        <PromptEditorDrawer
+          open={true}
+          promptId="prompt-1"
+          initialLocalConfig={localConfigB}
+          onLocalConfigChange={onLocalConfigChangeB}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => expect(screen.getByText("test-prompt")).toBeInTheDocument(), { timeout: 5000 });
+
+      // Verify target B's changes are shown
+      let textareas = screen.getAllByRole("textbox");
+      expect(textareas[0]).toHaveValue("Hello with STAR *");
+
+      // Step 2: Switch to target A WITHOUT closing the drawer
+      mockRouterQuery = {
+        "drawer.open": "promptEditor",
+        "drawer.promptId": "prompt-1",
+        "drawer.targetId": "target-A",
+      };
+
+      rerender(
+        <Wrapper>
+          <PromptEditorDrawer
+            open={true}
+            promptId="prompt-1"
+            initialLocalConfig={undefined} // Target A has no local config
+            onLocalConfigChange={onLocalConfigChangeA}
+          />
+        </Wrapper>,
+      );
+
+      // Target A should show server data (no local changes)
+      await waitFor(() => {
+        textareas = screen.getAllByRole("textbox");
+        expect(textareas[0]).toHaveValue("You are a helpful assistant.");
+      }, { timeout: 5000 });
+
+      // KEY CHECK: Target B's local config should NOT have been cleared during switch
+      const targetBAfterSwitch = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+      expect(targetBAfterSwitch?.localPromptConfig).toBeDefined();
+      expect(targetBAfterSwitch?.localPromptConfig?.messages[0]?.content).toBe("Hello with STAR *");
+
+      // Step 3: Switch BACK to target B
+      mockRouterQuery = {
+        "drawer.open": "promptEditor",
+        "drawer.promptId": "prompt-1",
+        "drawer.targetId": "target-B",
+      };
+
+      // Get the CURRENT local config from the store (should still have the changes)
+      const currentTargetB = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+
+      rerender(
+        <Wrapper>
+          <PromptEditorDrawer
+            open={true}
+            promptId="prompt-1"
+            initialLocalConfig={currentTargetB?.localPromptConfig}
+            onLocalConfigChange={onLocalConfigChangeB}
+          />
+        </Wrapper>,
+      );
+
+      // Target B should still show its local changes
+      await waitFor(() => {
+        textareas = screen.getAllByRole("textbox");
+        expect(textareas[0]).toHaveValue("Hello with STAR *");
+      }, { timeout: 5000 });
+
+      // FINAL CHECK: Verify local config was NOT cleared during the switch
+      const finalTargetB = useEvaluationsV3Store.getState().targets.find(t => t.id === "target-B");
+      expect(finalTargetB?.localPromptConfig).toBeDefined();
+      expect(finalTargetB?.localPromptConfig?.messages[0]?.content).toBe("Hello with STAR *");
+    }, 30000);
+  });
 
   describe("flow callbacks integration", () => {
     it("updateTarget is called when onLocalConfigChange fires with config", async () => {

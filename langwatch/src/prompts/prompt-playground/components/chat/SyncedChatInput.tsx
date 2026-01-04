@@ -157,15 +157,15 @@ export function SyncedChatInput({
         >
           {/* Bottom left - Sync checkbox (shows on hover, only if multiple tabs) */}
           {totalTabCount > 1 && (
-            <ChatSyncCheckbox
-              position="absolute"
-              left="50%"
-              bottom={2}
-              transform="translateX(-50%)"
-              checked={isSynced}
-              onChange={setIsSynced}
-              visible={isHovered}
-            />
+          <ChatSyncCheckbox
+            position="absolute"
+            left="50%"
+            bottom={2}
+            transform="translateX(-50%)"
+            checked={isSynced}
+            onChange={setIsSynced}
+            visible={isHovered}
+          />
           )}
 
           {/* Right icon - Send button */}

@@ -193,7 +193,8 @@ export const useDrawer = () => {
    * @param drawer - The drawer type to open
    * @param props - Props for the drawer component (type-checked against drawer props).
    *                Can also include additional URL params via the `urlParams` property.
-   * @param options - Options like { replace: true } to replace URL instead of push
+   * @param options - Options like { replace: true } to replace URL instead of push,
+   *                   or { resetStack: true } to reset navigation stack (no back button)
    *
    * @example
    * // Type-safe drawer props
@@ -201,23 +202,26 @@ export const useDrawer = () => {
    *
    * // With additional URL params for context
    * openDrawer("promptEditor", { promptId: "abc", urlParams: { targetId: "123" } });
+   *
+   * // Reset stack to prevent back button (useful when switching contexts)
+   * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
    */
   const openDrawer = <T extends DrawerType>(
     drawer: T,
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
-    { replace }: { replace?: boolean } = {},
+    { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
   ) => {
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
     const allParams = { ...drawerProps, ...urlParams } as Record<string, unknown>;
 
     // Manage drawer stack for navigation history
-    if (currentDrawer) {
+    if (resetStack || !currentDrawer) {
+      // Reset stack - fresh start with no back navigation
+      drawerStack = [{ drawer, params: allParams }];
+    } else {
       // A drawer is already open - navigating forward, push to stack
       drawerStack.push({ drawer, params: allParams });
-    } else {
-      // No drawer open - fresh start, reset stack
-      drawerStack = [{ drawer, params: allParams }];
     }
 
     const badKeys = Object.entries(allParams)

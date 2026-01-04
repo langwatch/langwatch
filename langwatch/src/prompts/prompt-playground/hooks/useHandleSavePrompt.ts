@@ -3,12 +3,14 @@ import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompts";
+import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { api } from "~/utils/api";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   type TabData,
@@ -25,10 +27,15 @@ export function useHandleSavePrompt() {
     usePromptConfigContext();
   const methods = useFormContext<PromptConfigFormValues>();
   const configId = methods.watch("configId");
+  const currentVersion = methods.watch("versionMetadata.versionNumber");
   const { updateTabData } = useDraggableTabsBrowserStore(
     ({ updateTabData }) => ({ updateTabData }),
   );
   const tabId = useTabId();
+  const utils = api.useContext();
+
+  // Get the latest version from DB for accurate "Update to vX" display
+  const { nextVersion } = useLatestPromptVersion({ configId, currentVersion });
 
   /**
    * handleSaveVersion
@@ -66,7 +73,16 @@ export function useHandleSavePrompt() {
           form: {
             currentValues: cloneDeep(newSavedState),
           },
+          meta: {
+            ...data.meta,
+            versionNumber: prompt.version,
+          },
         }),
+      });
+
+      // Invalidate the query cache so useLatestPromptVersion gets the new version
+      void utils.prompts.getByIdOrHandle.invalidate({
+        idOrHandle: prompt.id,
       });
 
       toaster.create({
@@ -103,7 +119,7 @@ export function useHandleSavePrompt() {
        */
       const onSuccessChangeHandle = (prompt: VersionedPrompt) => {
         if (prompt.id !== configId) throw new Error("Prompt ID mismatch");
-        triggerSaveVersion({ id: prompt.id, data, onSuccess, onError });
+        triggerSaveVersion({ id: prompt.id, data, nextVersion, onSuccess, onError });
       };
 
       void triggerChangeHandle({
@@ -112,7 +128,7 @@ export function useHandleSavePrompt() {
         onError,
       });
     } else if (configId) {
-      void triggerSaveVersion({ id: configId, data, onSuccess, onError });
+      void triggerSaveVersion({ id: configId, data, nextVersion, onSuccess, onError });
     } else {
       void triggerCreatePrompt({ data, onSuccess, onError });
     }
@@ -124,6 +140,8 @@ export function useHandleSavePrompt() {
     triggerChangeHandle,
     updateTabData,
     tabId,
+    utils.prompts.getByIdOrHandle,
+    nextVersion,
   ]);
 
   return { handleSaveVersion };

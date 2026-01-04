@@ -21,6 +21,10 @@ function PromptBrowserTabView({
   hasUnsavedChanges,
   dimmed,
   handleClose,
+  latestVersion,
+  isOutdated,
+  handleUpgrade,
+  showVersionBadge,
   ...rest
 }: PromptBrowserTabProps & PromptBrowserTabControllerProps) {
   if (!tab) return null;
@@ -32,13 +36,18 @@ function PromptBrowserTabView({
         <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
           {meta.title ?? "Untitled"}
         </Text>
-        {hasUnsavedChanges ? (
+        {hasUnsavedChanges && (
           <Box>
             <Circle size="10px" bg="orange.400" color="gray.50" />
           </Box>
-        ) : meta.versionNumber != null ? (
-          <VersionBadge version={meta.versionNumber ?? 0} />
-        ) : null}
+        )}
+        {showVersionBadge && meta.versionNumber != null && (
+          <VersionBadge
+            version={meta.versionNumber}
+            latestVersion={latestVersion}
+            onUpgrade={isOutdated ? handleUpgrade : undefined}
+          />
+        )}
       </HStack>
       <Box
         role="button"

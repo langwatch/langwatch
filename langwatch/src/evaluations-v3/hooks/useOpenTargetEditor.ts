@@ -108,6 +108,8 @@ export const useOpenTargetEditor = () => {
             updateTarget(target.id, {
               name: savedPrompt.name,
               promptId: savedPrompt.id,
+              promptVersionId: savedPrompt.versionId,
+              promptVersionNumber: savedPrompt.version,
               localPromptConfig: undefined, // Clear local config on save
               // Update inputs/outputs from saved prompt to keep validation working
               inputs: savedPrompt.inputs?.map((i) => ({
@@ -115,6 +117,28 @@ export const useOpenTargetEditor = () => {
                 type: i.type as Field["type"],
               })),
               outputs: savedPrompt.outputs?.map((o) => ({
+                identifier: o.identifier,
+                type: o.type as Field["type"],
+              })),
+            });
+          },
+          // Called when a version is loaded from history (before saving)
+          onVersionChange: (loadedPrompt: {
+            version: number;
+            versionId: string;
+            inputs?: Array<{ identifier: string; type: string }>;
+            outputs?: Array<{ identifier: string; type: string }>;
+          }) => {
+            // Update target to use the loaded version as new base
+            updateTarget(target.id, {
+              promptVersionId: loadedPrompt.versionId,
+              promptVersionNumber: loadedPrompt.version,
+              localPromptConfig: undefined, // Clear local changes since we're loading a clean version
+              inputs: loadedPrompt.inputs?.map((i) => ({
+                identifier: i.identifier,
+                type: i.type as Field["type"],
+              })),
+              outputs: loadedPrompt.outputs?.map((o) => ({
                 identifier: o.identifier,
                 type: o.type as Field["type"],
               })),
@@ -146,13 +170,21 @@ export const useOpenTargetEditor = () => {
 
         // Open the drawer with initial config and available sources
         const initialLocalConfig = target.localPromptConfig;
-        openDrawer("promptEditor", {
-          promptId: target.promptId,
-          initialLocalConfig,
-          availableSources,
-          inputMappings: uiMappings,
-          urlParams: { targetId: target.id },
-        });
+        openDrawer(
+          "promptEditor",
+          {
+            promptId: target.promptId,
+            // If there are local changes or a pinned version, use that version ID
+            // so the drawer shows the correct base version
+            promptVersionId: target.promptVersionId,
+            initialLocalConfig,
+            availableSources,
+            inputMappings: uiMappings,
+            urlParams: { targetId: target.id },
+          },
+          // Reset stack to prevent back button when switching between targets
+          { resetStack: true },
+        );
       } else if (target.type === "agent" && target.dbAgentId) {
         // Fetch the agent to determine its type
         try {

@@ -153,6 +153,7 @@ export function PromptPlaygroundBrowser() {
                 boxShadow="md"
                 background="white"
                 padding={0}
+                minHeight="0"
               >
                 <PromptBrowserWindowContent />
               </DraggableTabsBrowser.Content>

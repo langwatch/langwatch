@@ -20,7 +20,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
-import { usePrompts } from "./hooks";
 
 const logger = createLogger("VersionHistoryListPopover");
 
@@ -135,7 +134,7 @@ function VersionHistoryItem({
         </VStack>
         {!isCurrent && (
           <Tooltip
-            content="Restore this version"
+            content="Load this version"
             positioning={{ placement: "top" }}
           >
             <Button
@@ -309,7 +308,6 @@ export function VersionHistoryListPopover({
 }) {
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
-  const { restoreVersion } = usePrompts();
   const { data: prompts = [], isLoading } =
     api.prompts.getAllVersionsForPrompt.useQuery(
       {
@@ -321,39 +319,45 @@ export function VersionHistoryListPopover({
       },
     );
 
+  /**
+   * Load version data into the form without creating a new version.
+   * User will need to save manually to complete the restore.
+   */
   const handleRestore = useCallback(
     (params: { versionId: string }) => {
       void (async () => {
-        if (!project?.id) {
-          logger.error("Cannot restore version: project not loaded");
+        const { versionId } = params;
+
+        // Find the version in the already-fetched data
+        const prompt = prompts.find((p) => p.versionId === versionId);
+        if (!prompt) {
+          logger.error("Version not found in loaded data");
           toaster.error({
-            title: "Failed to restore version",
-            description: "Project information is not available",
+            title: "Failed to load version",
+            description: "Version not found",
           });
           return;
         }
-        const { versionId } = params;
+
         try {
-          const prompt = await restoreVersion({
-            versionId,
-            projectId: project?.id ?? "",
-          });
           await onRestoreSuccess?.(prompt);
           onClose();
-          toaster.success({
-            title: "Version restored successfully",
+          toaster.info({
+            title: `Loaded v${prompt.version}`,
+            description: "Click 'Update' to save the restored version",
+            duration: 3000,
           });
         } catch (error) {
-          logger.error({ error }, "Error restoring version");
+          logger.error({ error }, "Error loading version");
           toaster.error({
-            title: "Failed to restore version",
+            title: "Failed to load version",
             description:
               error instanceof Error ? error.message : "Unknown error",
           });
         }
       })();
     },
-    [restoreVersion, onRestoreSuccess, onClose, project?.id],
+    [prompts, onRestoreSuccess, onClose],
   );
 
   const handleDiscardChanges = useCallback(() => {

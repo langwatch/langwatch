@@ -187,6 +187,15 @@ export const targetConfigSchema = z.object({
   icon: z.string().optional(),
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),
+  /**
+   * The version number currently loaded for this target.
+   * Used for:
+   * - Displaying version badge in UI
+   * - Comparing with latest DB version to detect outdated status
+   * - When undefined + no localPromptConfig, target "follows latest" automatically
+   * - When set + has localPromptConfig, target is "pinned" to this version
+   */
+  promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
   dbAgentId: z.string().optional(),
   inputs: z.array(fieldSchema).optional(),

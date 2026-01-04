@@ -18,15 +18,16 @@ interface UsePromptConfigFormProps {
   onChange?: (formValues: PromptConfigFormValues) => void;
 }
 
-let disableOnChange = false;
-let disableNodeSync = false;
-let disableFormSyncTimeout: NodeJS.Timeout | null = null;
-
 export const usePromptConfigForm = ({
   configId,
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
+  // Instance-specific flags to prevent sync loops (NOT module-level to avoid cross-instance interference)
+  const disableOnChangeRef = useRef(false);
+  const disableNodeSyncRef = useRef(false);
+  const disableFormSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Store schema in ref so resolver can access it
   const schemaRef = useRef(formSchema);
   /**
@@ -123,10 +124,30 @@ export const usePromptConfigForm = ({
     }
   }, [formData, methods]);
 
+  // Track current version to detect external upgrades
+  const currentVersionRef = useRef(
+    parsedInitialValues?.versionMetadata?.versionNumber,
+  );
+
   // Provides forward sync of parent component to form values
   useEffect(() => {
-    if (disableNodeSync) return;
-    disableOnChange = true;
+    if (disableNodeSyncRef.current) return;
+
+    const newVersion = parsedInitialValues?.versionMetadata?.versionNumber;
+    const currentVersion = currentVersionRef.current;
+
+    // If version changed externally (e.g., upgrade clicked), do a full reset
+    if (newVersion !== undefined && newVersion !== currentVersion) {
+      currentVersionRef.current = newVersion;
+      disableOnChangeRef.current = true;
+      methods.reset(parsedInitialValues);
+      setTimeout(() => {
+        disableOnChangeRef.current = false;
+      }, 100); // Longer delay to let debounced updates settle
+      return;
+    }
+
+    disableOnChangeRef.current = true;
     // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(
       parsedInitialValues?.version?.configData ?? {},
@@ -139,20 +160,20 @@ export const usePromptConfigForm = ({
       }
     }
     setTimeout(() => {
-      disableOnChange = false;
+      disableOnChangeRef.current = false;
     }, 1);
   }, [parsedInitialValues, methods]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {
-    if (disableOnChange) return;
-    disableNodeSync = true;
+    if (disableOnChangeRef.current) return;
+    disableNodeSyncRef.current = true;
     onChange?.(formData);
-    if (disableFormSyncTimeout) {
-      clearTimeout(disableFormSyncTimeout);
+    if (disableFormSyncTimeoutRef.current) {
+      clearTimeout(disableFormSyncTimeoutRef.current);
     }
-    disableFormSyncTimeout = setTimeout(() => {
-      disableNodeSync = false;
+    disableFormSyncTimeoutRef.current = setTimeout(() => {
+      disableNodeSyncRef.current = false;
     }, 1);
   }, [formData, onChange]);
 
