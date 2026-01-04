@@ -512,7 +512,7 @@ describe("VariablesSection", () => {
   });
 
   describe("disabled mappings", () => {
-    it("shows disabled text instead of mapping input", () => {
+    it("hides mapping input when disabled", () => {
       const variables: Variable[] = [{ identifier: "input", type: "str" }];
       renderComponent({
         variables,
@@ -521,11 +521,13 @@ describe("VariablesSection", () => {
         availableSources: mockSources,
       });
 
-      // Should show disabled mapping text
-      expect(screen.getByTestId("mapping-disabled-input")).toBeInTheDocument();
+      // Variable name should still be shown
+      expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
+      // But mapping input should NOT be shown (no = sign or input field)
+      expect(screen.queryByText("=")).not.toBeInTheDocument();
     });
 
-    it("shows custom tooltip as disabled text when provided", () => {
+    it("shows info icon with tooltip when variableInfo provided for disabled mapping", () => {
       const variables: Variable[] = [{ identifier: "input", type: "str" }];
       renderComponent({
         variables,
@@ -537,13 +539,11 @@ describe("VariablesSection", () => {
         availableSources: mockSources,
       });
 
-      // Should show the custom tooltip text as the disabled text
-      expect(
-        screen.getByText("Value comes from conversation tab")
-      ).toBeInTheDocument();
+      // Should show the info icon for the disabled variable
+      expect(screen.getByTestId("variable-info-input")).toBeInTheDocument();
     });
 
-    it("shows mapping input for non-disabled variables", () => {
+    it("shows mapping input only for non-disabled variables", () => {
       const variables: Variable[] = [
         { identifier: "input", type: "str" },
         { identifier: "context", type: "str" },
@@ -555,13 +555,13 @@ describe("VariablesSection", () => {
         availableSources: mockSources,
       });
 
-      // Input should have disabled mapping
-      expect(screen.getByTestId("mapping-disabled-input")).toBeInTheDocument();
-
-      // Context should not have disabled mapping text
-      expect(
-        screen.queryByTestId("mapping-disabled-context")
-      ).not.toBeInTheDocument();
+      // Both variable names should be shown
+      expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
+      expect(screen.getByTestId("variable-name-context")).toBeInTheDocument();
+      
+      // Only one = sign should be shown (for context, not input)
+      const equalSigns = screen.getAllByText("=");
+      expect(equalSigns).toHaveLength(1);
     });
   });
 });

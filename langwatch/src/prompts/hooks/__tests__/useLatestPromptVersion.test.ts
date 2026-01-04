@@ -102,7 +102,9 @@ describe("useLatestPromptVersion", () => {
   });
 
   describe("when fetching (refetch)", () => {
-    it("returns isOutdated as false while fetching", () => {
+    it("preserves previous isOutdated state while refetching to prevent flicker", () => {
+      // During refetch, isFetching is true but isLoading is false
+      // The hook should preserve the previous isOutdated state
       mockUseQuery.mockReturnValue({
         data: { version: 5 },
         isLoading: false,
@@ -113,7 +115,9 @@ describe("useLatestPromptVersion", () => {
         useLatestPromptVersion({ configId: "config-123", currentVersion: 3 }),
       );
 
-      expect(result.current.isLoading).toBe(true);
+      // isLoading comes directly from the query (false during refetch)
+      expect(result.current.isLoading).toBe(false);
+      // isOutdated is preserved from previous state (initially false since ref starts as false)
       expect(result.current.isOutdated).toBe(false);
     });
   });
