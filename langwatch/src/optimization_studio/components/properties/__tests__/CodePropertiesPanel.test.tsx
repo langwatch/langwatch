@@ -32,16 +32,20 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 const mockSetNode = vi.fn();
 const mockSetNodeParameter = vi.fn();
 
-vi.mock("../../../hooks/useWorkflowStore", () => ({
-  useWorkflowStore: (selector: (state: unknown) => unknown) =>
-    selector({
-      setNode: mockSetNode,
-      setNodeParameter: mockSetNodeParameter,
-      nodes: [],
-      edges: [],
-      getWorkflow: () => ({ nodes: [], edges: [] }),
-    }),
-}));
+vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../hooks/useWorkflowStore")>();
+  return {
+    ...actual,
+    useWorkflowStore: (selector: (state: unknown) => unknown) =>
+      selector({
+        setNode: mockSetNode,
+        setNodeParameter: mockSetNodeParameter,
+        nodes: [],
+        edges: [],
+        getWorkflow: () => ({ nodes: [], edges: [] }),
+      }),
+  };
+});
 
 // Mock ReactFlow hooks
 vi.mock("@xyflow/react", () => ({

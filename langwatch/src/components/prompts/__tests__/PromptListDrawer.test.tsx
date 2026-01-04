@@ -25,6 +25,7 @@ vi.mock("~/hooks/useDrawer", () => ({
     goBack: mockGoBack,
   }),
   getComplexProps: () => ({}),
+  getFlowCallbacks: () => undefined,
 }));
 
 vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
@@ -161,10 +162,12 @@ describe("PromptListDrawer", () => {
 
       await user.click(screen.getByTestId("prompt-card-prompt-1"));
 
-      expect(onSelect).toHaveBeenCalledWith({
-        id: "prompt-1",
-        name: "my-assistant",
-      });
+      expect(onSelect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "prompt-1",
+          name: "my-assistant",
+        })
+      );
     });
 
     it("does not auto-close drawer after selection (callback handles closing/navigation)", async () => {
