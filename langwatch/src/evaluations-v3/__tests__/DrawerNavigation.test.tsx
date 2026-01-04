@@ -31,6 +31,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
   getComplexProps: () => ({}),
   useDrawerParams: () => ({}),
+  getFlowCallbacks: () => ({}),
 }));
 
 // Mock prompts hook

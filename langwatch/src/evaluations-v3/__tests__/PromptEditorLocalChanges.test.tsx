@@ -96,6 +96,7 @@ vi.mock("~/utils/api", () => ({
       prompts: {
         getByIdOrHandle: { invalidate: vi.fn() },
         getAllPromptsForProject: { invalidate: vi.fn() },
+        getAllVersionsForPrompt: { invalidate: vi.fn() },
       },
     }),
     prompts: {
@@ -217,7 +218,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
@@ -228,9 +229,8 @@ describe("Prompt Editor Local Changes", () => {
         await user.type(textareas[0], " modified");
       }
 
-      // Close the drawer
-      const closeButton = screen.getByLabelText(/close/i);
-      await user.click(closeButton);
+      // Close the drawer using Escape key (more reliable than clicking close button)
+      await user.keyboard("{Escape}");
 
       // KEY ASSERTION: window.confirm should NOT be called
       // because onLocalConfigChange is provided (evaluations context)
@@ -257,7 +257,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
@@ -313,9 +313,8 @@ describe("Prompt Editor Local Changes", () => {
         await user.type(textareas[0], "some content");
       }
 
-      // Close the drawer
-      const closeButton = screen.getByLabelText(/close/i);
-      await user.click(closeButton);
+      // Close the drawer using Escape key (more reliable than clicking close button)
+      await user.keyboard("{Escape}");
 
       // KEY ASSERTION: window.confirm SHOULD be called
       // because onLocalConfigChange is NOT provided
@@ -510,7 +509,7 @@ describe("Prompt Editor Local Changes", () => {
         { wrapper: Wrapper },
       );
 
-      await waitFor(() => expect(screen.getByText("Edit Prompt")).toBeInTheDocument(), { timeout: 5000 });
+      await waitFor(() => expect(screen.getByText("test-prompt")).toBeInTheDocument(), { timeout: 5000 });
 
       // Form should initially show LOCAL UNSAVED CONTENT (from initialLocalConfig)
       let textareas = screen.getAllByRole("textbox");
@@ -534,6 +533,20 @@ describe("Prompt Editor Local Changes", () => {
 
       // CLICK THE SAVE BUTTON!
       await user.click(saveButton);
+
+      // For existing prompts, a SaveVersionDialog appears asking for commit message
+      // Wait for the dialog and submit it
+      await waitFor(() => {
+        expect(screen.getByText("Save Version")).toBeInTheDocument();
+      }, { timeout: 3000 });
+
+      // Type a commit message (required for the Save button to be enabled)
+      const commitMessageInput = screen.getByPlaceholderText("Enter a description for this version");
+      await user.type(commitMessageInput, "Test commit message");
+
+      // Find and click the save button in the dialog
+      const dialogSaveButton = screen.getByRole("button", { name: /save$/i });
+      await user.click(dialogSaveButton);
 
       // Verify save was actually called
       await waitFor(() => {
@@ -582,7 +595,7 @@ describe("Prompt Editor Local Changes", () => {
 
       await waitFor(
         () => {
-        expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+        expect(screen.getByText("test-prompt")).toBeInTheDocument();
         },
         { timeout: 5000 },
       );
