@@ -213,7 +213,14 @@ export const PromptTextAreaWithVariables = ({
           break;
       }
     },
-    [menuOpen, optionCount, closeMenu, selectHighlightedOption, setHighlightedIndex, setIsKeyboardNav],
+    [
+      menuOpen,
+      optionCount,
+      closeMenu,
+      selectHighlightedOption,
+      setHighlightedIndex,
+      setIsKeyboardNav,
+    ],
   );
 
   // Handle text change
@@ -271,7 +278,9 @@ export const PromptTextAreaWithVariables = ({
               // changes character width and breaks caret positioning. Use text-shadow
               // for a "faux bold" effect that doesn't affect text metrics.
               fontWeight: borderless ? undefined : 600,
-              textShadow: borderless ? `0px 0px 1px ${variableColor}` : undefined,
+              textShadow: borderless
+                ? `0px 0px 1px ${variableColor}`
+                : undefined,
             }}
           >
             {match[0]}
@@ -302,7 +311,10 @@ export const PromptTextAreaWithVariables = ({
           setIsHovered(false);
           handleMouseLeave();
         }}
-        onMouseMove={handleMouseMove}
+        onMouseMove={(e) => {
+          setIsHovered(true);
+          handleMouseMove(e);
+        }}
         onDragOver={handleDragOverContainer}
         onDrop={(e) => {
           if (dropTargetParagraph !== null) {
@@ -332,6 +344,7 @@ export const PromptTextAreaWithVariables = ({
           disabled={disabled}
           autoHeight={useAutoHeight}
           data-role={role}
+          className="rich-textarea-position-relative"
           style={{
             width: "100%",
             minHeight: fillHeight ? "100%" : minHeight,
@@ -347,6 +360,7 @@ export const PromptTextAreaWithVariables = ({
             fontSize: borderless ? "14px" : "13px",
             lineHeight: borderless ? "28px" : "1.5",
             padding: borderless ? "0 0 0 24px" : "8px 10px",
+            ...(invalidVariables.length > 0 ? { paddingBottom: "28px" } : {}),
             border: borderless
               ? "none"
               : `1px solid ${
@@ -357,7 +371,6 @@ export const PromptTextAreaWithVariables = ({
             borderRadius: borderless ? "0" : "12px",
             outline: "none",
             resize: borderless ? "none" : "vertical",
-            overflow: "auto",
             background: borderless ? "transparent" : undefined,
           }}
           onFocus={(e) => {
@@ -393,10 +406,37 @@ export const PromptTextAreaWithVariables = ({
           />
         )}
 
-        {/* Add variable button */}
-        {showAddContextButton && isHovered && !disabled && (
-          <AddVariableButton ref={addButtonRef} onClick={handleAddVariableClick} />
-        )}
+        <Box position="sticky" bottom={0} width="full">
+          {/* Invalid variables warning */}
+          {invalidVariables.length > 0 && (
+            <Text
+              fontSize="xs"
+              color="red.800"
+              backgroundColor="red.50"
+              borderRadius="lg"
+              padding={1}
+              marginBottom={1}
+              paddingLeft={2}
+              position="absolute"
+              bottom={borderless ? -2 : 0}
+              marginLeft={1}
+              width="calc(100% - 8px)"
+            >
+              Undefined variables: {invalidVariables.join(", ")}
+            </Text>
+          )}
+
+          {/* Add variable button */}
+          {showAddContextButton && isHovered && !disabled && (
+            <AddVariableButton
+              ref={addButtonRef}
+              onClick={handleAddVariableClick}
+              bottom={
+                (invalidVariables.length > 0 ? 9 : 2.5) - (borderless ? 2 : 0)
+              }
+            />
+          )}
+        </Box>
 
         {/* Variable Insert Menu */}
         <VariableInsertMenu
@@ -412,29 +452,9 @@ export const PromptTextAreaWithVariables = ({
           onSelect={handleSelectField}
           onCreateVariable={onCreateVariable ? handleCreateVariable : undefined}
           onClose={closeMenu}
+          triggerRef={addButtonRef}
         />
       </Box>
-
-      {/* Invalid variables warning */}
-      {invalidVariables.length > 0 && (
-        <Text
-          fontSize="xs"
-          color="red.800"
-          backgroundColor="red.50"
-          borderRadius="lg"
-          padding={1}
-          marginBottom={1}
-          paddingLeft={2}
-          position="absolute"
-          transform="translateY(-100%)"
-          marginTop={-2}
-          marginLeft={1}
-          width="calc(100% - 8px)"
-        >
-          Undefined variables: {invalidVariables.join(", ")}
-        </Text>
-      )}
     </>
   );
 };
-

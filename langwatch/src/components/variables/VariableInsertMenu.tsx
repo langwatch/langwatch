@@ -58,6 +58,8 @@ type VariableInsertMenuProps = {
   onClose: () => void;
   /** Expected type for type mismatch warnings */
   expectedType?: string;
+  /** Ref to trigger element - clicks on this won't close the menu */
+  triggerRef?: React.RefObject<HTMLElement | null>;
 };
 
 // ============================================================================
@@ -99,6 +101,7 @@ export const VariableInsertMenu = ({
   onCreateVariable,
   onClose,
   expectedType,
+  triggerRef,
 }: VariableInsertMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -108,19 +111,22 @@ export const VariableInsertMenu = ({
   const isKeyboardNav = isKeyboardNavProp ?? localKeyboardNav;
   const setIsKeyboardNav = onKeyboardNavChange ?? setLocalKeyboardNav;
 
-  // Handle click outside
+  // Handle click outside - close menu when clicking outside menu and trigger
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+      const target = e.target as Node;
+      // Ignore clicks inside the menu
+      if (menuRef.current?.contains(target)) return;
+      // Ignore clicks on the trigger element (e.g., Add Variable button)
+      if (triggerRef?.current?.contains(target)) return;
+      onClose();
     };
 
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [isOpen, onClose]);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen, onClose, triggerRef]);
 
   // Focus search input when menu opens in editable mode
   useEffect(() => {
@@ -241,9 +247,7 @@ export const VariableInsertMenu = ({
   return (
     <Popover.Root
       open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
+      // We handle click-outside manually to properly ignore the trigger element
       positioning={{
         // Use a virtual anchor at the given position
         getAnchorRect: () => ({
@@ -255,13 +259,6 @@ export const VariableInsertMenu = ({
         placement: "bottom-start",
         flip: true,
         slide: true,
-        // Different offset depending on placement:
-        // - When below cursor (normal): small offset
-        // - When above cursor (flipped): larger offset to not cover text
-        // offset: (({ placement }: { placement: string }) => ({
-        //   mainAxis: placement.startsWith("top") ? 36 : 4,
-        //   crossAxis: 0,
-        // })) as { mainAxis?: number; crossAxis?: number },
       }}
       // Only allow auto-focus when in editable mode (has search input)
       // When onQueryChange is NOT provided (readonly mode), don't steal focus
