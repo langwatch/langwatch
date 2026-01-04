@@ -25,7 +25,7 @@ export function VersionBadge({
   if (isOutdated && onUpgrade) {
     return (
       <Tooltip
-        content="This prompt is outdated, click to update to latest version"
+        content="This prompt is outdated, click to use the latest version"
         positioning={{ placement: "top" }}
         showArrow
       >

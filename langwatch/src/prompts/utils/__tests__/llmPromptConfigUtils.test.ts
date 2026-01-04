@@ -279,16 +279,90 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
 });
 
 describe("versionedPromptToPromptConfigFormValues", () => {
-  describe("when prompt handle is empty string", () => {
-    it.todo("converts empty string to null");
+  /**
+   * Creates a mock VersionedPrompt for testing handle extraction
+   */
+  const createMockPrompt = (handle: string | null): VersionedPrompt => ({
+    id: "prompt-1",
+    name: "test-prompt",
+    handle: handle,
+    scope: PromptScope.PROJECT,
+    version: 1,
+    versionId: "version-1",
+    versionCreatedAt: new Date(),
+    model: "gpt-4",
+    temperature: 0.7,
+    maxTokens: 1000,
+    prompt: "You are a helpful assistant.",
+    projectId: "test-project",
+    organizationId: "org-1",
+    authorId: null,
+    messages: [],
+    inputs: [{ identifier: "input", type: "str" }],
+    outputs: [{ identifier: "output", type: "str" }],
+    updatedAt: new Date(),
+    createdAt: new Date(),
+  });
+
+  describe("when prompt handle has no prefix", () => {
+    it("keeps simple handle unchanged", () => {
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("gato"));
+      expect(result.handle).toBe("gato");
+    });
+
+    it("keeps folder handle unchanged", () => {
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt("folder/gato"));
+      expect(result.handle).toBe("folder/gato");
+    });
+  });
+
+  describe("when prompt handle has project_ prefix", () => {
+    it("strips project prefix from simple handle", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/gato")
+      );
+      expect(result.handle).toBe("gato");
+    });
+
+    it("strips project prefix but keeps folder structure", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("project_CfNq0pGCaUnwalAWkERgz/folder/gato")
+      );
+      expect(result.handle).toBe("folder/gato");
+    });
+  });
+
+
+  describe("when prompt handle has organization_ prefix", () => {
+    it("strips organization prefix from simple handle", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("organization_ABC123/gato")
+      );
+      expect(result.handle).toBe("gato");
+    });
+  });
+
+  describe("when prompt handle has 21-char nanoid prefix", () => {
+    it("strips nanoid prefix from simple handle", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("iuc4aYIoL5YcI7imutYvl/gato")
+      );
+      expect(result.handle).toBe("gato");
+    });
+
+    it("strips nanoid prefix but keeps folder structure", () => {
+      const result = versionedPromptToPromptConfigFormValues(
+        createMockPrompt("KAXYxPR8MUgTcP8CF193y/folder/gato")
+      );
+      expect(result.handle).toBe("folder/gato");
+    });
   });
 
   describe("when prompt handle is null", () => {
-    it.todo("keeps handle as null");
-  });
-
-  describe("when prompt handle is valid", () => {
-    it.todo("keeps valid handle unchanged");
+    it("keeps handle as null", () => {
+      const result = versionedPromptToPromptConfigFormValues(createMockPrompt(null));
+      expect(result.handle).toBeNull();
+    });
   });
 });
 

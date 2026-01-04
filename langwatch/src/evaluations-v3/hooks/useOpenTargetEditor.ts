@@ -21,13 +21,13 @@ import {
   convertToUIMapping,
   convertFromUIMapping,
 } from "../utils/fieldMappingConverters";
+import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import {
   datasetColumnTypeToFieldType,
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
 import type { TargetConfig } from "../types";
-import type { Field } from "~/optimization_studio/types/dsl";
 
 export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
@@ -94,79 +94,19 @@ export const useOpenTargetEditor = () => {
           uiMappings[key] = convertToUIMapping(mapping);
         }
 
-        // Set flow callbacks for the prompt editor
-        // onLocalConfigChange: persists local changes to the store (for orange dot indicator)
-        // onSave: updates target when prompt is published
-        // onInputMappingsChange: updates target mappings when variable mappings change (for active dataset)
-        // NOTE: No onInputsInitialized here - inputs are already initialized when target was added
-        setFlowCallbacks("promptEditor", {
-          onLocalConfigChange: (localConfig) => {
-            // Only update localPromptConfig for tracking unsaved changes
-            updateTarget(target.id, { localPromptConfig: localConfig });
-          },
-          onSave: (savedPrompt) => {
-            updateTarget(target.id, {
-              name: savedPrompt.name,
-              promptId: savedPrompt.id,
-              promptVersionId: savedPrompt.versionId,
-              promptVersionNumber: savedPrompt.version,
-              localPromptConfig: undefined, // Clear local config on save
-              // Update inputs/outputs from saved prompt to keep validation working
-              inputs: savedPrompt.inputs?.map((i) => ({
-                identifier: i.identifier,
-                type: i.type as Field["type"],
-              })),
-              outputs: savedPrompt.outputs?.map((o) => ({
-                identifier: o.identifier,
-                type: o.type as Field["type"],
-              })),
-            });
-          },
-          // Called when a version is loaded from history (before saving)
-          onVersionChange: (loadedPrompt: {
-            version: number;
-            versionId: string;
-            inputs?: Array<{ identifier: string; type: string }>;
-            outputs?: Array<{ identifier: string; type: string }>;
-          }) => {
-            // Update target to use the loaded version as new base
-            updateTarget(target.id, {
-              promptVersionId: loadedPrompt.versionId,
-              promptVersionNumber: loadedPrompt.version,
-              localPromptConfig: undefined, // Clear local changes since we're loading a clean version
-              inputs: loadedPrompt.inputs?.map((i) => ({
-                identifier: i.identifier,
-                type: i.type as Field["type"],
-              })),
-              outputs: loadedPrompt.outputs?.map((o) => ({
-                identifier: o.identifier,
-                type: o.type as Field["type"],
-              })),
-            });
-          },
-          onInputMappingsChange: (
-            identifier: string,
-            mapping: UIFieldMapping | undefined
-          ) => {
-            // Get the current active dataset from store (it may have changed since drawer was opened)
-            const currentActiveDatasetId =
-              useEvaluationsV3Store.getState().activeDatasetId;
-            const currentDatasets = useEvaluationsV3Store.getState().datasets;
-            const checkIsDatasetSource = (sourceId: string) =>
-              currentDatasets.some((d) => d.id === sourceId);
-
-            if (mapping) {
-              setTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-                convertFromUIMapping(mapping, checkIsDatasetSource)
-              );
-            } else {
-              removeTargetMapping(target.id, currentActiveDatasetId, identifier);
-            }
-          },
-        });
+        // Set flow callbacks for the prompt editor using the centralized helper
+        // This ensures we never forget a required callback
+        setFlowCallbacks(
+          "promptEditor",
+          createPromptEditorCallbacks({
+            targetId: target.id,
+            updateTarget,
+            setTargetMapping,
+            removeTargetMapping,
+            getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
+            getDatasets: () => useEvaluationsV3Store.getState().datasets,
+          })
+        );
 
         // Open the drawer with initial config and available sources
         const initialLocalConfig = target.localPromptConfig;

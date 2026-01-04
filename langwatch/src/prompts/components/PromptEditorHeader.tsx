@@ -21,8 +21,6 @@ export type PromptEditorHeaderProps = {
   isSaving?: boolean;
   /** Callback when a version is restored from history */
   onVersionRestore?: (prompt: VersionedPrompt) => Promise<void>;
-  /** Callback when changes are discarded */
-  onDiscardChanges?: () => void;
 };
 
 /**
@@ -41,7 +39,6 @@ export function PromptEditorHeader({
   isValid = true,
   isSaving = false,
   onVersionRestore,
-  onDiscardChanges,
 }: PromptEditorHeaderProps) {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
@@ -58,8 +55,8 @@ export function PromptEditorHeader({
         {configId && onVersionRestore && (
           <VersionHistoryButton
             configId={configId}
+            currentVersionId={formMethods.watch("versionMetadata")?.versionId}
             onRestoreSuccess={onVersionRestore}
-            onDiscardChanges={onDiscardChanges}
             hasUnsavedChanges={hasUnsavedChanges}
           />
         )}

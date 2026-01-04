@@ -130,6 +130,7 @@ export function PromptSourceHeader({
           {configId && (
             <VersionHistoryButton
               configId={configId}
+              currentVersionId={formProps.getValues("versionMetadata")?.versionId}
               onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}

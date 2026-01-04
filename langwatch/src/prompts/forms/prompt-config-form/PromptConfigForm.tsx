@@ -12,7 +12,7 @@ import type { PromptConfigFormValues } from "~/prompts";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
   formValuesToTriggerSaveVersionParams,
-  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
@@ -74,7 +74,7 @@ function InnerPromptConfigForm() {
     const data = formValuesToTriggerSaveVersionParams(values);
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValues(prompt));
+      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
       setIsSaving(false);
     };
 
@@ -108,7 +108,7 @@ function InnerPromptConfigForm() {
 
   const handleRestore = useCallback(
     async (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValues(prompt));
+      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
     },
     [methods],
   );
@@ -139,6 +139,7 @@ function InnerPromptConfigForm() {
           {configId && (
             <VersionHistoryButton
               configId={configId}
+              currentVersionId={methods.watch("versionMetadata")?.versionId}
               label="History"
               onRestoreSuccess={handleRestore}
             />

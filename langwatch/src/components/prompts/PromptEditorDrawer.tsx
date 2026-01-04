@@ -1,12 +1,13 @@
 import {
   Box,
   Button,
+  Circle,
   Heading,
   HStack,
   Spinner,
-  Text,
   VStack,
 } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
@@ -725,13 +726,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     onClose();
   };
 
-  // Discard changes and restore to the current published version
-  const handleDiscardChanges = useCallback(() => {
-    if (!savedFormValues) return;
-    methods.reset(savedFormValues);
-    // The useEffect will automatically clear local config since hasUnsavedChanges will become false
-  }, [savedFormValues, methods]);
-
   // Handle version history restore
   const handleVersionRestore = async (prompt: VersionedPrompt) => {
     // Notify evaluations context about the version change (if in evaluations context)
@@ -755,11 +749,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   // Note: When promptVersionId is passed, promptQuery returns that specific version,
   // not the latest. We need useLatestPromptVersion to detect drift properly.
   const currentVersion = methods.watch("versionMetadata.versionNumber");
-  const {
-    latestVersion,
-    isOutdated,
-    nextVersion,
-  } = useLatestPromptVersion({
+  const { latestVersion, isOutdated, nextVersion } = useLatestPromptVersion({
     configId: promptId,
     currentVersion,
   });
@@ -796,7 +786,13 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     } catch (error) {
       console.error("Failed to upgrade to latest version:", error);
     }
-  }, [promptId, project?.id, utils.prompts.getByIdOrHandle, methods, onVersionChange]);
+  }, [
+    promptId,
+    project?.id,
+    utils.prompts.getByIdOrHandle,
+    methods,
+    onVersionChange,
+  ]);
 
   // Handle setting variable mapping when selecting a source field from the text area
   const handleSetVariableMapping = useCallback(
@@ -957,6 +953,16 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                     onUpgrade={isOutdated ? handleUpgradeToLatest : undefined}
                   />
                 )}
+                {hasUnsavedChanges && (
+                  <Tooltip
+                    content="Unpublished modifications"
+                    positioning={{ placement: "top" }}
+                    openDelay={0}
+                    showArrow
+                  >
+                    <Circle size="10px" bg="orange.400" />
+                  </Tooltip>
+                )}
               </>
             ) : (
               <Heading>New Prompt</Heading>
@@ -999,7 +1005,6 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
                     isValid={isValid}
                     isSaving={isSaving}
                     onVersionRestore={handleVersionRestore}
-                    onDiscardChanges={handleDiscardChanges}
                   />
                 </Box>
 

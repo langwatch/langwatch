@@ -40,6 +40,7 @@ import {
   convertToUIMapping,
   convertFromUIMapping,
 } from "../utils/fieldMappingConverters";
+import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import type {
   TargetConfig,
   DatasetColumn,
@@ -248,51 +249,19 @@ export function EvaluationsV3Table({
       // addTarget will auto-map based on the real inputs
       addTarget(targetConfig);
 
-      // Set up flow callbacks for the prompt editor
-      setFlowCallbacks("promptEditor", {
-        onLocalConfigChange: (localConfig) => {
-          // Only update localPromptConfig for tracking unsaved changes
-          updateTarget(targetId, { localPromptConfig: localConfig });
-        },
-        onSave: (savedPrompt) => {
-          updateTarget(targetId, {
-            name: savedPrompt.name,
-            promptId: savedPrompt.id,
-            promptVersionId: savedPrompt.versionId,
-            promptVersionNumber: savedPrompt.version,
-            localPromptConfig: undefined,
-            // Update inputs/outputs from saved prompt to keep validation working
-            inputs: savedPrompt.inputs?.map((i) => ({
-              identifier: i.identifier,
-              type: i.type as Field["type"],
-            })),
-            outputs: savedPrompt.outputs?.map((o) => ({
-              identifier: o.identifier,
-              type: o.type as Field["type"],
-            })),
-          });
-        },
-        onInputMappingsChange: (
-          identifier: string,
-          mapping: UIFieldMapping | undefined,
-        ) => {
-          // Get state at callback time to ensure freshness
-          const state = useEvaluationsV3Store.getState();
-          const checkIsDatasetSource = (sourceId: string) =>
-            state.datasets.some((d) => d.id === sourceId);
-
-          if (mapping) {
-            setTargetMapping(
-              targetId,
-              state.activeDatasetId,
-              identifier,
-              convertFromUIMapping(mapping, checkIsDatasetSource),
-            );
-          } else {
-            removeTargetMapping(targetId, state.activeDatasetId, identifier);
-          }
-        },
-      });
+      // Set up flow callbacks for the prompt editor using the centralized helper
+      // This ensures we never forget a required callback
+      setFlowCallbacks(
+        "promptEditor",
+        createPromptEditorCallbacks({
+          targetId,
+          updateTarget,
+          setTargetMapping,
+          removeTargetMapping,
+          getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
+          getDatasets: () => useEvaluationsV3Store.getState().datasets,
+        })
+      );
 
       // Open the prompt editor drawer for the newly added target
       // Reset stack to prevent back button when switching between targets

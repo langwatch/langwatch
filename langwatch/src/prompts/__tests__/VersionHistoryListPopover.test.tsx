@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
@@ -74,6 +74,10 @@ describe("VersionHistoryListPopover", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    cleanup();
+  });
+
   describe("when loading a previous version", () => {
     it("calls onRestoreSuccess with version data without making backend API call", async () => {
       const onRestoreSuccess = vi.fn().mockResolvedValue(undefined);
@@ -140,6 +144,105 @@ describe("VersionHistoryListPopover", () => {
       // Current version (v3) should not have a restore button
       expect(screen.queryByTestId("restore-version-button-3")).not.toBeInTheDocument();
       expect(onRestoreSuccess).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("currentVersionId prop", () => {
+    it("marks latest version as current when currentVersionId is not provided", async () => {
+      renderWithChakra(
+        <VersionHistoryListPopover
+          configId="config-1"
+          // No currentVersionId - should default to latest (v3)
+        />,
+      );
+
+      // Open the popover
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      // Wait for popover to open
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+
+      // V3 (latest) should be marked as current - no restore button
+      expect(screen.queryByTestId("restore-version-button-3")).not.toBeInTheDocument();
+      // V2 should have restore button (not current)
+      expect(screen.getByTestId("restore-version-button-2")).toBeInTheDocument();
+      // V1 should have restore button (not current)
+      expect(screen.getByTestId("restore-version-button-1")).toBeInTheDocument();
+    });
+
+    it("marks specified version as current when currentVersionId is provided", async () => {
+      renderWithChakra(
+        <VersionHistoryListPopover
+          configId="config-1"
+          currentVersionId="version-2" // User is editing v2
+        />,
+      );
+
+      // Open the popover
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      // Wait for popover to open
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+
+      // V3 should have restore button (not current when editing v2)
+      expect(screen.getByTestId("restore-version-button-3")).toBeInTheDocument();
+      // V2 should be marked as current - no restore button
+      expect(screen.queryByTestId("restore-version-button-2")).not.toBeInTheDocument();
+      // V1 should have restore button (not current)
+      expect(screen.getByTestId("restore-version-button-1")).toBeInTheDocument();
+    });
+
+    it("marks oldest version as current when editing v1", async () => {
+      renderWithChakra(
+        <VersionHistoryListPopover
+          configId="config-1"
+          currentVersionId="version-1" // User is editing v1
+        />,
+      );
+
+      // Open the popover
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      // Wait for popover to open
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+
+      // V3 should have restore button (not current)
+      expect(screen.getByTestId("restore-version-button-3")).toBeInTheDocument();
+      // V2 should have restore button (not current)
+      expect(screen.getByTestId("restore-version-button-2")).toBeInTheDocument();
+      // V1 should be marked as current - no restore button
+      expect(screen.queryByTestId("restore-version-button-1")).not.toBeInTheDocument();
+    });
+
+    it("shows 'current' tag on the version being edited", async () => {
+      renderWithChakra(
+        <VersionHistoryListPopover
+          configId="config-1"
+          currentVersionId="version-2" // User is editing v2
+        />,
+      );
+
+      // Open the popover
+      const historyButton = screen.getAllByTestId("version-history-button")[0]!;
+      fireEvent.click(historyButton);
+
+      // Wait for popover to open
+      await waitFor(() => {
+        expect(screen.getByText("Prompt Version History")).toBeInTheDocument();
+      });
+
+      // Should show "current" tag - only one should exist (for v2)
+      const currentTags = screen.getAllByText("current");
+      expect(currentTags).toHaveLength(1);
     });
   });
 });

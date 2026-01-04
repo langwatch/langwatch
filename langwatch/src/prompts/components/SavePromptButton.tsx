@@ -20,8 +20,12 @@ export type SavePromptButtonProps = {
  * Shared save button for prompts with "Update to vX" logic.
  * Shows:
  * - "Save" for new prompts
- * - "Update to vX" for existing prompts with changes (X = latest DB version + 1)
- * - "Saved" when no changes
+ * - "Update to vX" for existing prompts with changes OR not at latest version
+ * - "Saved" when no changes AND at latest version
+ *
+ * Button is enabled when:
+ * - There are unsaved changes, OR
+ * - The current version is not the latest (allows "rollback" by publishing old version as new)
  *
  * Uses the actual latest version from the database, not just current + 1,
  * to handle cases where the prompt was updated in another tab/session.
@@ -39,10 +43,22 @@ export function SavePromptButton({
   const configId = formMethods.watch("configId");
   const currentVersion = formMethods.watch("versionMetadata.versionNumber");
 
-  const { nextVersion } = useLatestPromptVersion({ configId, currentVersion });
+  const { nextVersion, latestVersion } = useLatestPromptVersion({
+    configId,
+    currentVersion,
+  });
+
+  // Check if we're at the latest version
+  const isAtLatestVersion = currentVersion === latestVersion;
+
+  // Button should be enabled when:
+  // - There are unsaved changes, OR
+  // - We're not at the latest version (allows "rollback")
+  const canSave = hasUnsavedChanges || !isAtLatestVersion;
 
   const getButtonLabel = () => {
-    if (!hasUnsavedChanges) return "Saved";
+    // Show "Saved" only when no changes AND at latest version
+    if (!hasUnsavedChanges && isAtLatestVersion) return "Saved";
     if (nextVersion !== undefined) return `Update to v${nextVersion}`;
     return "Save";
   };
@@ -52,7 +68,7 @@ export function SavePromptButton({
       colorPalette="blue"
       size={size}
       onClick={onSave}
-      disabled={!hasUnsavedChanges || !isValid || isSaving}
+      disabled={!canSave || !isValid || isSaving}
       loading={isSaving}
       data-testid="save-prompt-button"
     >

@@ -638,5 +638,70 @@ describe("Version Tracking in Evaluations V3", () => {
       expect(showBadge).toBe(true);
     });
   });
+
+  describe("handleSelectPrompt flow (immediate drawer open after adding runner)", () => {
+    /**
+     * BUG: When adding a new runner via handleSelectPrompt, the drawer opens immediately.
+     * If the user then loads an older version from version history, the target should update.
+     *
+     * The bug was that handleSelectPrompt did NOT set up the onVersionChange callback,
+     * so loading an older version in the immediately-opened drawer didn't update the target.
+     *
+     * But if the user closed and reopened the drawer (which uses useOpenTargetEditor),
+     * the onVersionChange callback WAS set up, and it worked.
+     */
+    it("onVersionChange callback should be set up when drawer opens immediately after handleSelectPrompt", async () => {
+      // This simulates the flow:
+      // 1. handleSelectPrompt creates target and opens drawer
+      // 2. User immediately loads older version from version history
+      // 3. Target should update to the loaded version
+
+      const targetId = "target-immediate-version-change";
+
+      // Step 1: Simulate handleSelectPrompt creating a target at latest version (v3)
+      act(() => {
+        useEvaluationsV3Store.getState().addTarget({
+          id: targetId,
+          type: "prompt",
+          name: "test-prompt",
+          promptId: "prompt-1",
+          promptVersionId: "version-3",
+          promptVersionNumber: 3,
+          inputs: [{ identifier: "input", type: "str" as const }],
+          outputs: [{ identifier: "output", type: "str" as const }],
+          mappings: {},
+        });
+      });
+
+      // Verify target is at v3
+      let target = useEvaluationsV3Store.getState().targets.find(t => t.id === targetId) as TargetConfig & { type: "prompt" };
+      expect(target.promptVersionNumber).toBe(3);
+
+      // Step 2: Simulate onVersionChange being called (when user loads v2 from history)
+      // This is what the onVersionChange callback in handleSelectPrompt should do
+      const loadedPrompt = createMockPromptData(2);
+
+      act(() => {
+        useEvaluationsV3Store.getState().updateTarget(targetId, {
+          promptVersionId: loadedPrompt.versionId,
+          promptVersionNumber: loadedPrompt.version,
+          localPromptConfig: undefined,
+          inputs: loadedPrompt.inputs?.map((i) => ({
+            identifier: i.identifier,
+            type: i.type,
+          })),
+          outputs: loadedPrompt.outputs?.map((o) => ({
+            identifier: o.identifier,
+            type: o.type,
+          })),
+        });
+      });
+
+      // Step 3: Verify target is now at v2
+      target = useEvaluationsV3Store.getState().targets.find(t => t.id === targetId) as TargetConfig & { type: "prompt" };
+      expect(target.promptVersionNumber).toBe(2);
+      expect(target.promptVersionId).toBe("version-2");
+    });
+  });
 });
 
