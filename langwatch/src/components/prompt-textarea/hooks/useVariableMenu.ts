@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaretPosition } from "rich-textarea";
-import type { AvailableSource, FieldType } from "../../VariableMappingInput";
-import type { Variable } from "../../VariablesSection";
-import type { SelectedField } from "../../VariableInsertMenu";
+import type { AvailableSource, FieldType } from "../../variables/VariableMappingInput";
+import type { Variable } from "../../variables/VariablesSection";
+import type { SelectedField } from "../../variables/VariableInsertMenu";
 import type { PromptTextAreaOnAddMention } from "../types";
+import { setTextareaValueUndoable } from "../utils";
 
 type UseVariableMenuProps = {
   localValue: string;
@@ -160,7 +161,7 @@ export const useVariableMenu = ({
     setButtonMenuMode(false);
   }, []);
 
-  // Insert variable at current position
+  // Insert variable at current position (undo-able via Ctrl+Z)
   const insertVariable = useCallback(
     (fieldName: string, fieldType: FieldType, sourceId: string, isOtherNodeField: boolean) => {
       if (triggerStart === null) return;
@@ -192,12 +193,11 @@ export const useVariableMenu = ({
             newCursorPos = before.length + newHandle.length + 4;
           }
 
+          // Use undo-able replacement so Ctrl+Z works
+          if (nativeTextarea) {
+            setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
+          }
           setValueImmediate(newValue);
-
-          setTimeout(() => {
-            nativeTextarea?.focus();
-            nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
-          }, 0);
         }
 
         closeMenu();
@@ -219,6 +219,10 @@ export const useVariableMenu = ({
         newCursorPos = before.length + fieldName.length + 4;
       }
 
+      // Use undo-able replacement so Ctrl+Z works
+      if (nativeTextarea) {
+        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
+      }
       setValueImmediate(newValue);
 
       // Create variable if it doesn't exist
@@ -231,11 +235,6 @@ export const useVariableMenu = ({
       }
 
       closeMenu();
-
-      setTimeout(() => {
-        nativeTextarea?.focus();
-        nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
-      }, 0);
     },
     [
       localValue,
@@ -284,14 +283,13 @@ export const useVariableMenu = ({
         newCursorPos = before.length + normalizedName.length + 4;
       }
 
+      // Use undo-able replacement so Ctrl+Z works
+      if (nativeTextarea) {
+        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
+      }
       setValueImmediate(newValue);
       onCreateVariable({ identifier: normalizedName, type: "str" });
       closeMenu();
-
-      setTimeout(() => {
-        nativeTextarea?.focus();
-        nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
-      }, 0);
     }
   }, [
     flattenedOptions,
@@ -319,7 +317,7 @@ export const useVariableMenu = ({
     [insertVariable, otherNodesFields],
   );
 
-  // Handle creating a new variable from menu
+  // Handle creating a new variable from menu (undo-able via Ctrl+Z)
   const handleCreateVariable = useCallback(
     (name: string) => {
       if (triggerStart === null || !onCreateVariable) return;
@@ -343,14 +341,13 @@ export const useVariableMenu = ({
         newCursorPos = before.length + normalizedName.length + 4;
       }
 
+      // Use undo-able replacement so Ctrl+Z works
+      if (nativeTextarea) {
+        setTextareaValueUndoable(nativeTextarea, newValue, newCursorPos);
+      }
       setValueImmediate(newValue);
       onCreateVariable({ identifier: normalizedName, type: "str" });
       closeMenu();
-
-      setTimeout(() => {
-        nativeTextarea?.focus();
-        nativeTextarea?.setSelectionRange(newCursorPos, newCursorPos);
-      }, 0);
     },
     [
       localValue,

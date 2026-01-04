@@ -244,7 +244,7 @@ export function PromptTabbedSection({
           <Box
             height="full"
             width="full"
-            maxWidth={layoutMode === "horizontal" ? "full" : "768px"}
+            maxWidth="768px"
             margin="0 auto"
             padding={3}
           >

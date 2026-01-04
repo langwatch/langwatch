@@ -7,31 +7,21 @@ type ParagraphPosition = {
   height: number;
 };
 
-type ParagraphOverlayProps = {
+type LineHighlightsProps = {
   positions: ParagraphPosition[];
-  hoveredParagraph: number | null;
   gripHoveredParagraph: number | null;
   draggedParagraph: number | null;
-  dropTargetParagraph: number | null;
-  onGripHover: (index: number | null) => void;
-  onDragStart: (e: DragEvent, index: number) => void;
-  onDragEnd: () => void;
 };
 
 /**
- * Renders paragraph drag handles and visual feedback overlays
- * for drag-and-drop reordering in borderless mode.
+ * Renders line highlight backgrounds for drag-and-drop.
+ * Should be rendered BEFORE the textarea so highlights appear behind text.
  */
-export function ParagraphOverlay({
+export function LineHighlights({
   positions,
-  hoveredParagraph,
   gripHoveredParagraph,
   draggedParagraph,
-  dropTargetParagraph,
-  onGripHover,
-  onDragStart,
-  onDragEnd,
-}: ParagraphOverlayProps) {
+}: LineHighlightsProps) {
   if (positions.length <= 1) return null;
 
   return (
@@ -46,7 +36,7 @@ export function ParagraphOverlay({
             left={0}
             right={0}
             height={`${positions[gripHoveredParagraph]?.height ?? 0}px`}
-            background="gray.100"
+            background="gray.50"
             pointerEvents="none"
             borderRadius="md"
           />
@@ -66,7 +56,37 @@ export function ParagraphOverlay({
           borderRadius="md"
         />
       )}
+    </>
+  );
+}
 
+type GripHandlesProps = {
+  positions: ParagraphPosition[];
+  hoveredParagraph: number | null;
+  draggedParagraph: number | null;
+  dropTargetParagraph: number | null;
+  onGripHover: (index: number | null) => void;
+  onDragStart: (e: DragEvent, index: number) => void;
+  onDragEnd: () => void;
+};
+
+/**
+ * Renders paragraph drag handles and drop indicator.
+ * Should be rendered AFTER the textarea so handles are clickable on top.
+ */
+export function GripHandles({
+  positions,
+  hoveredParagraph,
+  draggedParagraph,
+  dropTargetParagraph,
+  onGripHover,
+  onDragStart,
+  onDragEnd,
+}: GripHandlesProps) {
+  if (positions.length <= 1) return null;
+
+  return (
+    <>
       {/* Grip handles */}
       <Box
         position="absolute"
@@ -131,4 +151,3 @@ export function ParagraphOverlay({
     </>
   );
 }
-

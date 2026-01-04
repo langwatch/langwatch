@@ -10,8 +10,8 @@ import {
 } from "react";
 import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
-import { VariableInsertMenu } from "../VariableInsertMenu";
-import type { AvailableSource } from "../VariableMappingInput";
+import { VariableInsertMenu } from "../variables/VariableInsertMenu";
+import type { AvailableSource } from "../variables/VariableMappingInput";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
   VARIABLE_REGEX,
@@ -22,7 +22,7 @@ import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
 import { useVariableMenu } from "./hooks/useVariableMenu";
 import { useTextareaResize } from "./hooks/useTextareaResize";
 import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
-import { ParagraphOverlay } from "./components/ParagraphOverlay";
+import { LineHighlights, GripHandles } from "./components/ParagraphOverlay";
 import { AddVariableButton } from "./components/AddVariableButton";
 
 export const PromptTextAreaWithVariables = ({
@@ -313,6 +313,15 @@ export const PromptTextAreaWithVariables = ({
         height={fillHeight ? "100%" : undefined}
         {...boxProps}
       >
+        {/* Line highlights - rendered BEFORE textarea so they appear behind text */}
+        {borderless && visibleParagraphPositions.length > 1 && (
+          <LineHighlights
+            positions={visibleParagraphPositions}
+            gripHoveredParagraph={gripHoveredParagraph}
+            draggedParagraph={draggedParagraph}
+          />
+        )}
+
         <RichTextarea
           ref={textareaRef}
           value={localValue}
@@ -371,12 +380,11 @@ export const PromptTextAreaWithVariables = ({
           {renderText}
         </RichTextarea>
 
-        {/* Paragraph drag handles - rendered after textarea so they appear on top */}
+        {/* Grip handles - rendered AFTER textarea so they're clickable on top */}
         {borderless && visibleParagraphPositions.length > 1 && (
-          <ParagraphOverlay
+          <GripHandles
             positions={visibleParagraphPositions}
             hoveredParagraph={hoveredParagraph}
-            gripHoveredParagraph={gripHoveredParagraph}
             draggedParagraph={draggedParagraph}
             dropTargetParagraph={dropTargetParagraph}
             onGripHover={setGripHoveredParagraph}

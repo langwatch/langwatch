@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
-import { BORDERLESS_LINE_HEIGHT } from "../utils";
+import { BORDERLESS_LINE_HEIGHT, setTextareaValueUndoable } from "../utils";
 
 type UseParagraphDragDropProps = {
   localValue: string;
@@ -135,12 +135,26 @@ export const useParagraphDragDrop = ({
       }
 
       const newText = newParagraphs.map((p) => p.text).join("\n");
-      onChange(newText);
+      
+      // Use undo-able replacement so Ctrl+Z works
+      const textarea = containerRef.current?.querySelector("textarea");
+      if (textarea) {
+        // Calculate cursor position at the start of the moved line
+        const movedLineStart = newParagraphs
+          .slice(0, targetIndex)
+          .reduce((acc, p) => acc + p.text.length + 1, 0);
+        
+        setTextareaValueUndoable(textarea, newText, movedLineStart);
+        // Still call onChange to sync React state
+        onChange(newText);
+      } else {
+        onChange(newText);
+      }
 
       setDraggedParagraph(null);
       setDropTargetParagraph(null);
     },
-    [draggedParagraph, parseParagraphs, onChange],
+    [draggedParagraph, parseParagraphs, onChange, containerRef],
   );
 
   // Handle drag end (cleanup)
