@@ -1,7 +1,7 @@
-import { Box, HStack, Icon, Text } from "@chakra-ui/react";
+import { Box, HStack, Text } from "@chakra-ui/react";
 import React from "react";
-import { Check, XCircle } from "react-feather";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useColorModeValue } from "../../ui/color-mode";
 import type { RunItem } from "./types";
@@ -27,14 +27,7 @@ export const RunHistoryItem = ({ item }: { item: RunItem }) => {
         }
       }}
     >
-      <Icon
-        as={item.status === ScenarioRunStatus.SUCCESS ? Check : XCircle}
-        color={
-          item.status === ScenarioRunStatus.SUCCESS ? "green.400" : "red.400"
-        }
-        boxSize={4}
-        mt={1}
-      />
+      <ScenarioRunStatusIcon status={item.status} boxSize={4} mt={1} />
       <Box>
         <Text fontWeight="semibold" fontSize="xs">
           {item.title}
