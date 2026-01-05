@@ -285,7 +285,9 @@ function Triggers() {
                 <Table.ColumnHeader>Action</Table.ColumnHeader>
                 <Table.ColumnHeader>Destination</Table.ColumnHeader>
                 <Table.ColumnHeader>Filters</Table.ColumnHeader>
-                <Table.ColumnHeader whiteSpace="nowrap">Last Triggered At</Table.ColumnHeader>
+                <Table.ColumnHeader whiteSpace="nowrap">
+                  Last Triggered At
+                </Table.ColumnHeader>
                 <Table.ColumnHeader>Active</Table.ColumnHeader>
                 <Table.ColumnHeader>Actions</Table.ColumnHeader>
               </Table.Row>

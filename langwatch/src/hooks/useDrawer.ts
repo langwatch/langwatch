@@ -213,7 +213,10 @@ export const useDrawer = () => {
   ) => {
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
-    const allParams = { ...drawerProps, ...urlParams } as Record<string, unknown>;
+    const allParams = { ...drawerProps, ...urlParams } as Record<
+      string,
+      unknown
+    >;
 
     // Manage drawer stack for navigation history
     if (resetStack || !currentDrawer) {
@@ -229,7 +232,9 @@ export const useDrawer = () => {
       .map(([k]) => k);
     if (badKeys.length > 0) {
       logger.warn(
-        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(", ")}. ` +
+        `Non-serializable props passed to drawer "${drawer}": ${badKeys.join(
+          ", ",
+        )}. ` +
           `Consider using setFlowCallbacks() for callbacks that need to persist across navigation.`,
       );
     }
@@ -317,4 +322,8 @@ export const useDrawer = () => {
 };
 
 // Re-export types for convenience
-export type { DrawerType, DrawerProps, DrawerCallbacks } from "../components/drawerRegistry";
+export type {
+  DrawerType,
+  DrawerProps,
+  DrawerCallbacks,
+} from "../components/drawerRegistry";

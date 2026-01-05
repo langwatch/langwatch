@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Trace } from "../../server/tracer/types";
-import { getLatestUpdatedAt } from "./cron/triggers";
+import { getLatestUpdatedAt } from "./cron/triggers/utils";
 
 describe("utils test", () => {
   it.skip("gets the latest updated at time", async () => {
