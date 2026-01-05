@@ -25,9 +25,20 @@ const updateScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
 });
 
+/**
+ * Target for scenario simulation.
+ * Extensible: add new types as needed (llm, http, workflow, etc.)
+ */
+const simulationTargetSchema = z.object({
+  type: z.enum(["prompt"]),
+  referenceId: z.string(),
+});
+
+export type SimulationTarget = z.infer<typeof simulationTargetSchema>;
+
 const runScenarioSchema = projectSchema.extend({
   scenarioId: z.string(),
-  promptId: z.string(),
+  target: simulationTargetSchema,
 });
 
 /**
@@ -91,9 +102,10 @@ export const scenarioRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const setId = "local-scenarios";
 
-      // TODO: Wire up ScenarioRunnerService with PromptConfigAdapter
+      // TODO: Wire up ScenarioRunnerService with adapter based on target.type
       // For now, just return the setId for redirect
-      // void runnerService.execute({ scenarioId: input.scenarioId, promptId: input.promptId, setId });
+      // const adapter = resolveAdapter(input.target);
+      // void runnerService.execute({ scenarioId: input.scenarioId, adapter, setId });
 
       return { setId };
     }),

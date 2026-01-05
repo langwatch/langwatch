@@ -126,7 +126,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const { setId } = await runMutation.mutateAsync({
         projectId: project.id,
         scenarioId: savedScenario.id,
-        promptId,
+        target: { type: "prompt", referenceId: promptId },
       });
 
       onClose();
