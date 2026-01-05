@@ -13,6 +13,7 @@ import { Bot, ChevronDown, Play, Plus } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { api } from "../../utils/api";
 import { Menu } from "../ui/menu";
 import { Drawer } from "../ui/drawer";
@@ -20,10 +21,9 @@ import { toaster } from "../ui/toaster";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
 
-type ScenarioFormDrawerProps = {
-  open: boolean;
-  onClose: () => void;
-  scenario?: Scenario | null;
+export type ScenarioFormDrawerProps = {
+  open?: boolean;
+  onClose?: () => void;
   onSuccess?: (scenario: Scenario) => void;
 };
 
@@ -32,16 +32,22 @@ type ScenarioFormDrawerProps = {
  * Two-column layout: form on left, help sidebar on right.
  * Bottom bar with Quick Test and Save and Run.
  */
-export function ScenarioFormDrawer({
-  open,
-  onClose,
-  scenario,
-  onSuccess,
-}: ScenarioFormDrawerProps) {
+export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
+  const { closeDrawer } = useDrawer();
+  const params = useDrawerParams();
   const utils = api.useContext();
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
   const [selectedAgent, setSelectedAgent] = useState("production");
+
+  const scenarioId = params.scenarioId;
+  const isOpen = props.open !== false && props.open !== undefined;
+  const onClose = props.onClose ?? closeDrawer;
+
+  const { data: scenario } = api.scenarios.getById.useQuery(
+    { projectId: project?.id ?? "", id: scenarioId ?? "" },
+    { enabled: !!project && !!scenarioId }
+  );
 
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data) => {
@@ -51,7 +57,7 @@ export function ScenarioFormDrawer({
         type: "success",
         meta: { closable: true },
       });
-      onSuccess?.(data);
+      props.onSuccess?.(data);
       onClose();
     },
     onError: (error) => {
@@ -76,7 +82,7 @@ export function ScenarioFormDrawer({
         type: "success",
         meta: { closable: true },
       });
-      onSuccess?.(data);
+      props.onSuccess?.(data);
       onClose();
     },
     onError: (error) => {
@@ -132,14 +138,7 @@ export function ScenarioFormDrawer({
 
   const isSubmitting = createMutation.isLoading || updateMutation.isLoading;
 
-  const defaultValues: Partial<ScenarioFormData> | undefined = scenario
-    ? {
-        name: scenario.name,
-        situation: scenario.situation,
-        criteria: scenario.criteria,
-        labels: scenario.labels,
-      }
-    : undefined;
+  const defaultValues: Partial<ScenarioFormData> | undefined = scenario ?? undefined;
 
   // Mock agents list - TODO: fetch from API
   const agents = [
@@ -150,7 +149,7 @@ export function ScenarioFormDrawer({
 
   return (
     <Drawer.Root
-      open={open}
+      open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
     >
@@ -170,7 +169,7 @@ export function ScenarioFormDrawer({
               borderColor="gray.200"
             >
               <ScenarioForm
-                key={scenario?.id ?? "new"}
+                key={scenarioId ?? "new"}
                 defaultValues={defaultValues}
                 formRef={setFormRef}
               />

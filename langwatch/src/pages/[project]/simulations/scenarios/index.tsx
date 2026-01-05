@@ -1,22 +1,22 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
-import type { Scenario } from "@prisma/client";
+import { HStack, Spinner, Spacer, Text, VStack } from "@chakra-ui/react";
 import type { ColumnFiltersState } from "@tanstack/react-table";
+import { Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { ScenarioEmptyState } from "~/components/scenarios/ScenarioEmptyState";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
-import { ScenarioLibraryToolbar } from "~/components/scenarios/ScenarioLibraryToolbar";
+import { LabelFilterDropdown } from "~/components/scenarios/LabelFilterDropdown";
 import { ScenarioTable } from "~/components/scenarios/ScenarioTable";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
 
 function ScenarioLibraryPage() {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer, drawerOpen } = useDrawer();
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [editingScenario, setEditingScenario] = useState<Scenario | null>(null);
 
   const {
     data: scenarios,
@@ -54,21 +54,11 @@ function ScenarioLibraryPage() {
   };
 
   const handleRowClick = (scenarioId: string) => {
-    const scenario = scenarios?.find((s) => s.id === scenarioId);
-    if (scenario) {
-      setEditingScenario(scenario);
-      setDrawerOpen(true);
-    }
+    openDrawer("scenarioEditor", { urlParams: { scenarioId } });
   };
 
   const handleNewScenario = () => {
-    setEditingScenario(null);
-    setDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setDrawerOpen(false);
-    setEditingScenario(null);
+    openDrawer("scenarioEditor");
   };
 
   return (
@@ -76,12 +66,15 @@ function ScenarioLibraryPage() {
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
           <PageLayout.Heading>Scenario Library</PageLayout.Heading>
-          <ScenarioLibraryToolbar
+          <Spacer />
+          <LabelFilterDropdown
             allLabels={allLabels}
             activeLabels={activeLabels}
-            onLabelToggle={handleLabelToggle}
-            onNewClick={handleNewScenario}
+            onToggle={handleLabelToggle}
           />
+          <PageLayout.HeaderButton onClick={handleNewScenario}>
+            <Plus size={16} /> New Scenario
+          </PageLayout.HeaderButton>
         </HStack>
       </PageLayout.Header>
 
@@ -115,11 +108,7 @@ function ScenarioLibraryPage() {
         )}
       </PageLayout.Container>
 
-      <ScenarioFormDrawer
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-        scenario={editingScenario}
-      />
+      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
     </DashboardLayout>
   );
 }
