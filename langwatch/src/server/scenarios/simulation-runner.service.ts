@@ -6,6 +6,8 @@ import type { SimulationTarget } from "../api/routers/scenarios";
 import { createLogger } from "~/utils/logger";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
 import { env } from "~/env.mjs";
+import { getVercelAIModel } from "../modelProviders/utils";
+import { DEFAULT_MODEL } from "~/utils/constants";
 
 const logger = createLogger("SimulationRunnerService");
 
@@ -98,19 +100,33 @@ export class SimulationRunnerService {
         return;
       }
 
-      // 2. Fetch project API key and configure SDK env vars
-      const apiKey = await this.getProjectApiKey(projectId);
-      process.env.LANGWATCH_API_KEY = apiKey;
+      // 2. Fetch project config and configure SDK env vars
+      // TODO: We should use the project service or repository instead of prisma directly
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        select: { apiKey: true, defaultModel: true },
+      });
+
+      if (!project?.apiKey) {
+        throw new Error(`Project ${projectId} not found or has no API key`);
+      }
+
+      process.env.LANGWATCH_API_KEY = project.apiKey;
       process.env.LANGWATCH_ENDPOINT = this.getLangWatchEndpoint();
       process.env.SCENARIO_HEADLESS = "true"; // Prevent browser opening on server
 
-      // 3. Resolve target to adapter
+      // 3. Get project's default model for simulator and judge agents
+      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
+      const simulatorModel = await getVercelAIModel(projectId, defaultModel);
+      const judgeModel = await getVercelAIModel(projectId, defaultModel);
+
+      // 4. Resolve target to adapter
       const adapter = this.resolveAdapter(target, projectId);
 
-      // 4. Run scenario with SDK
+      // 5. Run scenario with SDK
       logger.info(
-        { scenarioId, setId, targetType: target.type },
-        "Starting scenario execution",
+        { scenarioId, setId, targetType: target.type, model: defaultModel },
+        "Starting scenario execution"
       );
 
       const result = await ScenarioRunner.run({
@@ -118,7 +134,11 @@ export class SimulationRunnerService {
         name: scenario.name,
         description: scenario.situation,
         setId: setId,
-        agents: [adapter],
+        agents: [
+          adapter,
+          ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+          ScenarioRunner.judgeAgent({ model: judgeModel, criteria: scenario.criteria }),
+        ],
         verbose: true,
       });
 
@@ -129,12 +149,12 @@ export class SimulationRunnerService {
           success: result.success,
           reasoning: result.reasoning,
         },
-        "Scenario execution completed",
+        "Scenario execution completed"
       );
     } catch (error) {
       logger.error(
         { error, scenarioId, projectId, setId },
-        "Scenario execution failed",
+        "Scenario execution failed"
       );
     } finally {
       // Restore original env vars and release mutex
@@ -145,19 +165,6 @@ export class SimulationRunnerService {
     }
   }
 
-  private async getProjectApiKey(projectId: string): Promise<string> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { apiKey: true },
-    });
-
-    if (!project?.apiKey) {
-      throw new Error(`Project ${projectId} not found or has no API key`);
-    }
-
-    return project.apiKey;
-  }
-
   private getLangWatchEndpoint(): string {
     // Use BASE_HOST if available (self-referencing), otherwise default
     return env.BASE_HOST ?? "https://app.langwatch.ai";
@@ -165,14 +172,14 @@ export class SimulationRunnerService {
 
   private resolveAdapter(
     target: SimulationTarget,
-    projectId: string,
+    projectId: string
   ): AgentAdapter {
     switch (target.type) {
       case "prompt":
         return new PromptConfigAdapter(
           target.referenceId,
           this.promptService,
-          projectId,
+          projectId
         );
       default:
         throw new Error(`Unknown target type: ${target.type}`);
@@ -183,4 +190,3 @@ export class SimulationRunnerService {
     return new SimulationRunnerService(prisma);
   }
 }
-
