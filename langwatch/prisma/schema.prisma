@@ -235,6 +235,8 @@ model Project {
     archivedAt               DateTime?
     notifications            Notification[]
     featureClickHouse        Boolean                             @default(false)
+    agents                   Agent[]
+    evaluators               Evaluator[]
 
     @@index([teamId])
 }
@@ -713,6 +715,8 @@ model Workflow {
     copiedFromWorkflowId String?
     copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
     copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
+    agents               Agent[]
+    evaluators           Evaluator[]
 
     @@index([projectId])
     @@index([publishedById])
@@ -891,4 +895,38 @@ model Notification {
     @@index([projectId])
     @@index([createdAt])
     @@index([sentAt])
+}
+
+model Agent {
+    id         String    @id @default(nanoid())
+    projectId  String
+    project    Project   @relation(fields: [projectId], references: [id])
+    name       String
+    type       String // "signature" | "code" | "workflow"
+    config     Json // Node configuration (model, prompt, code, etc.)
+    workflowId String? // For "workflow" type - top level for joins
+    workflow   Workflow? @relation(fields: [workflowId], references: [id])
+    archivedAt DateTime?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@index([workflowId])
+}
+
+model Evaluator {
+    id         String    @id @default(nanoid())
+    projectId  String
+    project    Project   @relation(fields: [projectId], references: [id])
+    name       String
+    type       String // "evaluator" (built-in) | "workflow" (custom)
+    config     Json // Settings for built-in, or empty for workflow
+    workflowId String? // For "workflow" type - top level for joins
+    workflow   Workflow? @relation(fields: [workflowId], references: [id])
+    archivedAt DateTime?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@index([workflowId])
 }

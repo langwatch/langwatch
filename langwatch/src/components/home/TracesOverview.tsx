@@ -71,7 +71,7 @@ export function TracesOverview() {
   }
 
   return (
-    <HomeCard width="full" padding={4}>
+    <HomeCard width="full" padding={4} _hover={{ boxShadow: "2xs" }}>
       <HStack width="full" gap={2} marginBottom={2}>
         <Heading size="sm" color="gray.700">
           Traces Overview

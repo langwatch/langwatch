@@ -765,7 +765,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         open={showTraceSharingDialog}
         onOpenChange={({ open }) => setShowTraceSharingDialog(open)}
       >
-        <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
             <Dialog.Title>Disable Trace Sharing?</Dialog.Title>

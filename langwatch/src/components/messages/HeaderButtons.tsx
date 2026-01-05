@@ -14,7 +14,7 @@ export function useTableView() {
 
   const [localStorageTableView, setLocalStorageTableView] = useLocalStorage<
     "table" | "list"
-  >("tableView", "list");
+  >("tableView", "table");
   const isTableView = (router.query.view ?? localStorageTableView) === "table";
 
   const setView = (view: "table" | "list") => () => {
@@ -39,7 +39,7 @@ export function useTableView() {
         query: {
           ...router.query,
           project: project.slug,
-          view: localStorageTableView ?? "list",
+          view: localStorageTableView ?? "table",
         },
       });
     } else {

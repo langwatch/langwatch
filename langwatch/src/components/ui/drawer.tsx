@@ -16,13 +16,14 @@ export const DrawerContent = React.forwardRef<
   const { children, portalled = true, portalRef, offset, ...rest } = props;
   return (
     <Portal disabled={!portalled} container={portalRef}>
-      <ChakraDrawer.Positioner padding={offset}>
+      <ChakraDrawer.Positioner padding={offset} pointerEvents="none">
         <ChakraDrawer.Content
           ref={ref}
           margin={2}
           borderRadius="lg"
           background="white/75"
           backdropFilter="blur(8px)"
+          pointerEvents="auto"
           {...rest}
           asChild={false}
         >
@@ -50,8 +51,16 @@ export const DrawerCloseTrigger = React.forwardRef<
   );
 });
 
+export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
+  return (
+    <ChakraDrawer.Root
+      {...props}
+      preventScroll={false}
+    />
+  );
+};
+
 export const DrawerTrigger = ChakraDrawer.Trigger;
-export const DrawerRoot = ChakraDrawer.Root;
 export const DrawerFooter = ChakraDrawer.Footer;
 export const DrawerHeader = ChakraDrawer.Header;
 export const DrawerBody = ChakraDrawer.Body;

@@ -8,6 +8,7 @@ const logger = createLogger("langwatch:redis");
 export const isBuildOrNoRedis =
   process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD ||
   !!process.env.BUILD_TIME ||
+  !!process.env.SKIP_REDIS ||
   (!env.REDIS_URL && !env.REDIS_CLUSTER_ENDPOINTS);
 
 const useCluster = env.REDIS_CLUSTER_ENDPOINTS;

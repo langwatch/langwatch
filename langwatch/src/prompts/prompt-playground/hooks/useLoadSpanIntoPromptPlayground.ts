@@ -154,7 +154,7 @@ export function useLoadSpanIntoPromptPlayground() {
   const { project } = useOrganizationTeamProject();
   const { spanId, clearSpanIdFromUrl } = useSpanIdFromUrl();
   const trpc = api.useContext();
-  const { addTab } = useDraggableTabsBrowserStore();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
 
   useEffect(() => {
     if (!spanId || loadedRef.current || !project?.id) return;

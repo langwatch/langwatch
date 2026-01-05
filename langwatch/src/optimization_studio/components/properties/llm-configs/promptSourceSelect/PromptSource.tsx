@@ -1,105 +1,37 @@
-import { useDisclosure } from "@chakra-ui/react";
-import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { PromptList } from "./ui/PromptList";
-import { PromptSelectionButton } from "./ui/PromptSelectButton";
-import { PromptSourceDialog } from "./ui/PromptSourceDialog";
+import { useState } from "react";
 
-interface PromptSourceProps {
+import { PromptListDrawer } from "~/components/prompts/PromptListDrawer";
+import { PromptSelectionButton } from "./ui/PromptSelectButton";
+
+type PromptSourceProps = {
   selectedPromptId?: string;
   onSelect: (config: { id: string; name: string }) => void;
-}
-
-const usePrompSourceController = ({
-  onSelect,
-  selectedPromptId,
-}: PromptSourceProps) => {
-  const { open, onOpen, onClose } = useDisclosure();
-  const { project } = useOrganizationTeamProject();
-
-  // Fetch all prompt configs
-  const { data: prompts = [], isLoading } =
-    api.prompts.getAllPromptsForProject.useQuery(
-      {
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id,
-        onError: (error) => {
-          toaster.create({
-            title: "Error loading prompt configs",
-            description: error.message,
-            type: "error",
-          });
-        },
-      },
-    );
-
-  // Handle prompt selection
-  const handleSelectPrompt = (promptId: string) => {
-    const selectedPrompt = prompts?.find((p) => p.id === promptId);
-
-    if (!selectedPrompt || !project?.id) {
-      toaster.create({
-        title: "Error loading prompt configs",
-        description: "Please try again.",
-        type: "error",
-      });
-      return;
-    }
-
-    onSelect({
-      id: selectedPrompt.id,
-      name: selectedPrompt.name,
-    });
-
-    onClose();
-  };
-
-  return {
-    isLoading,
-    handleSelectPrompt,
-    prompts,
-    open,
-    onOpen,
-    onClose,
-    selectedPromptId,
-  };
 };
 
-export function PromptSourceSelect({
-  isLoading,
-  prompts,
-  handleSelectPrompt,
-  open,
-  onOpen,
-  onClose,
-  selectedPromptId,
-}: ReturnType<typeof usePrompSourceController>) {
+/**
+ * Component for selecting a prompt source in the optimization studio.
+ * Opens a drawer to list and select from existing prompts.
+ */
+export function PromptSource({ onSelect }: PromptSourceProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleSelect = (prompt: { id: string; name: string }) => {
+    onSelect(prompt);
+    setIsOpen(false);
+  };
+
   return (
     <>
-      <PromptSelectionButton onClick={onOpen} />
-      <PromptSourceDialog open={open} onOpen={onOpen} onClose={onClose}>
-        <PromptList
-          isLoading={isLoading}
-          prompts={prompts}
-          onSelect={handleSelectPrompt}
-          selectedPromptId={selectedPromptId}
-        />
-      </PromptSourceDialog>
+      <PromptSelectionButton onClick={() => setIsOpen(true)} />
+      <PromptListDrawer
+        open={isOpen}
+        onClose={() => setIsOpen(false)}
+        onSelect={handleSelect}
+        onCreateNew={() => {
+          // Close the drawer - user will use the main prompt creation flow
+          setIsOpen(false);
+        }}
+      />
     </>
   );
-}
-
-export function PromptSource({
-  selectedPromptId,
-  onSelect,
-}: PromptSourceProps) {
-  const controller = usePrompSourceController({
-    selectedPromptId,
-    onSelect,
-  });
-
-  return <PromptSourceSelect {...controller} />;
 }

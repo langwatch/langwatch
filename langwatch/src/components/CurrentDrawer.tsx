@@ -1,47 +1,22 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
-import { getComplexProps } from "../hooks/useDrawer";
-import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
-import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
-import { TriggerDrawer } from "./AddTriggerDrawer";
-import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
-import { SelectDatasetDrawer } from "./datasets/SelectDatasetDrawer";
-import { UploadCSVModal } from "./datasets/UploadCSVModal";
-import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
-import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
-import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
-import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { AlertDrawer } from "./analytics/AlertDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  type DrawerType,
+} from "../hooks/useDrawer";
+import { drawers } from "./drawerRegistry";
 
-// Re-export for backward compatibility (useDrawer moved to hooks/useDrawer.ts)
+// Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";
 
 type DrawerProps = {
   open: string;
-} & Record<string, any>;
-
-const drawers = {
-  traceDetails: TraceDetailsDrawer,
-  batchEvaluation: BatchEvaluationDrawer,
-  trigger: TriggerDrawer,
-  addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
-  addAnnotationQueue: AddAnnotationQueueDrawer,
-  addDatasetRecord: AddDatasetRecordDrawerV2,
-  llmModelCost: LLMModelCostDrawer,
-  uploadCSV: UploadCSVModal,
-  addOrEditDataset: AddOrEditDatasetDrawer,
-  editTriggerFilter: EditTriggerFilterDrawer,
-  seriesFilters: SeriesFiltersDrawer,
-  customGraphAlert: AlertDrawer,
-  selectDataset: SelectDatasetDrawer,
-} satisfies Record<string, React.FC<any>>;
+} & Record<string, unknown>;
 
 export function CurrentDrawer() {
   const router = useRouter();
-  const complexProps = getComplexProps();
   const queryString = router.asPath.split("?")[1] ?? "";
   const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
     allowDots: true,
@@ -50,11 +25,21 @@ export function CurrentDrawer() {
   });
   const queryDrawer = queryParams.drawer as DrawerProps | undefined;
 
-  const CurrentDrawer = queryDrawer
-    ? (drawers[queryDrawer.open as keyof typeof drawers] as React.FC<any>)
+  const drawerType = queryDrawer?.open as DrawerType | undefined;
+  const CurrentDrawerComponent = drawerType
+    ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
     : undefined;
 
-  return CurrentDrawer ? (
+  // Get props from multiple sources:
+  // 1. URL query params (serializable props)
+  // 2. complexProps (per-drawer non-serializable props)
+  // 3. flowCallbacks (persistent callbacks across navigation)
+  const complexProps = getComplexProps();
+  const flowCallbacksForDrawer = drawerType
+    ? getFlowCallbacks(drawerType)
+    : undefined;
+
+  return CurrentDrawerComponent ? (
     <ErrorBoundary
       fallback={null}
       onError={() => {
@@ -72,7 +57,11 @@ export function CurrentDrawer() {
         );
       }}
     >
-      <CurrentDrawer {...queryDrawer} {...complexProps} />
+      <CurrentDrawerComponent
+        {...queryDrawer}
+        {...complexProps}
+        {...flowCallbacksForDrawer}
+      />
     </ErrorBoundary>
   ) : null;
 }

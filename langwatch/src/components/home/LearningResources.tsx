@@ -7,7 +7,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuBookOpen, LuExternalLink, LuPlay } from "react-icons/lu";
+import {
+  LuBookOpen,
+  LuCirclePlay,
+  LuExternalLink,
+} from "react-icons/lu";
 import { Link } from "../ui/link";
 
 type ResourceCard = {
@@ -33,7 +37,7 @@ const resources: ResourceCard[] = [
   {
     title: "Video Tutorials",
     description: "Watch step-by-step guides and feature walkthroughs",
-    icon: <LuPlay size={18} />,
+    icon: <LuCirclePlay size={22} />,
     color: "red",
     background: "red.50",
     href: "https://www.youtube.com/@LangWatch/videos",

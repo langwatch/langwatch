@@ -1,4 +1,12 @@
-import { Box, type BoxProps, HStack, type StackProps } from "@chakra-ui/react";
+import {
+  Box,
+  type BoxProps,
+  HStack,
+  type StackProps,
+  Tabs,
+  type TabsRootProps,
+  VStack,
+} from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -16,7 +24,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import React from "react";
 import { PromptBrowserTab } from "../tab/PromptBrowserTab";
-import { BrowserLikeTabs } from "./BrowserLikeTabs";
 import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
@@ -172,7 +179,7 @@ function DraggableTabsBrowserRoot({
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
       >
-        <HStack width="full" gap={0} height="full">
+        <HStack width="full" gap={2} padding={2} height="full">
           {children}
           <DragOverlay>
             {activeDrag ? <DragOverlayContent activeDrag={activeDrag} /> : null}
@@ -215,7 +222,7 @@ function DragOverlayContent({
  * Single Responsibility: Manages a group of tabs with shared state and drop zone
  */
 interface DraggableTabsGroupProps
-  extends Omit<StackProps, "onClick" | "defaultValue"> {
+  extends Omit<TabsRootProps, "onClick" | "defaultValue"> {
   groupId: string;
   activeTabId?: string;
   onTabChange?: (groupId: string, tabId: string) => void;
@@ -248,14 +255,21 @@ function DraggableTabsGroup({
 
   return (
     <TabGroupContext.Provider value={groupContextValue}>
-      <BrowserLikeTabs.Root
-        {...props}
-        value={activeTabId}
-        onValueChange={(tabId) => onTabChange?.(groupId, tabId)}
-        onClick={() => onClick?.(groupId, activeTabId ?? "")}
-      >
-        {children}
-      </BrowserLikeTabs.Root>
+      <VStack height="full" gap={0} align="stretch" width="full">
+        <Tabs.Root
+          value={activeTabId}
+          onValueChange={(change) => onTabChange?.(groupId, change.value)}
+          onClick={() => onClick?.(groupId, activeTabId ?? "")}
+          width="full"
+          height="full"
+          display="flex"
+          flexDirection="column"
+          variant="enclosed"
+          {...props}
+        >
+          {children}
+        </Tabs.Root>
+      </VStack>
     </TabGroupContext.Provider>
   );
 }
@@ -265,7 +279,7 @@ function DraggableTabsGroup({
  *
  * Single Responsibility: Provides the droppable area for tabs and renders the tab bar
  */
-interface DraggableTabsTabBarProps {
+interface DraggableTabsTabBarProps extends StackProps {
   children: React.ReactNode;
   tabIds: string[];
 }
@@ -276,16 +290,18 @@ interface DraggableTabsTabBarProps {
  * @param children - Tab trigger components
  * @param tabIds - Array of tab IDs for sortable context
  */
-function DraggableTabsTabBar({ children, tabIds }: DraggableTabsTabBarProps) {
+function DraggableTabsTabBar({ children, tabIds, ...props }: DraggableTabsTabBarProps) {
   return (
-    <BrowserLikeTabs.Bar>
+    <HStack gap={0} width="full" {...props}>
       <SortableContext
         items={tabIds ?? []}
         strategy={horizontalListSortingStrategy}
       >
-        <BrowserLikeTabs.List>{children}</BrowserLikeTabs.List>
+        <Tabs.List width="full" gap={0} height="full" paddingY={0} background="none">
+          {children}
+        </Tabs.List>
       </SortableContext>
-    </BrowserLikeTabs.Bar>
+    </HStack>
   );
 }
 
@@ -299,7 +315,30 @@ interface DraggableTabTriggerProps extends BoxProps {
   id: string;
 }
 
-const DraggableBrowserTabTrigger = BrowserLikeTabs.Trigger;
+/**
+ * DraggableBrowserTabTrigger component
+ * Single Responsibility: Renders a single tab trigger with browser-like styling.
+ * @param value - Tab identifier
+ * @param children - Tab content/label
+ */
+function DraggableBrowserTabTrigger({
+  value,
+  children,
+}: {
+  value: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tabs.Trigger
+      value={value}
+      minWidth="fit-content"
+      cursor="pointer"
+      transition="all 0.15s ease-in-out"
+    >
+      {children}
+    </Tabs.Trigger>
+  );
+}
 
 /**
  * DraggableTab component
@@ -332,24 +371,16 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
     },
   });
 
-  const style: React.CSSProperties = {
-    ...rest.style,
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging || isOver ? 0.5 : 1,
-  };
-
   return (
     <Box
       {...rest}
       ref={setNodeRef}
-      style={{
-        flex: 1,
-        display: "flex",
-        alignItems: "stretch",
-        ...style,
-        cursor: isDragging ? "grabbing" : "grab",
-      }}
+      flex={1}
+      alignItems="stretch"
+      cursor={isDragging ? "grabbing" : "grab"}
+      transform={CSS.Transform.toString(transform)}
+      transition={transition}
+      opacity={isDragging || isOver ? 0.5 : 1}
       {...attributes}
       {...listeners}
     >
@@ -358,7 +389,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   );
 }
 
-const DraggableTabsContent = BrowserLikeTabs.Content;
+const DraggableTabsContent = Tabs.Content;
 
 /**
  * Compound component for draggable browser-like tabs.

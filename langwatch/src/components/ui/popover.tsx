@@ -38,6 +38,8 @@ export const PopoverArrow = React.forwardRef<
   );
 });
 
+export const PopoverArrowTip = ChakraPopover.ArrowTip;
+
 export const PopoverCloseTrigger = React.forwardRef<
   HTMLButtonElement,
   ChakraPopover.CloseTriggerProps
@@ -75,4 +77,5 @@ export const Popover = {
   Header: PopoverHeader,
   Body: PopoverBody,
   Trigger: PopoverTrigger,
+  ArrowTip: PopoverArrowTip,
 };

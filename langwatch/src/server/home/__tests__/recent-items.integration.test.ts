@@ -113,7 +113,7 @@ describe("Recent Items Integration", () => {
       expect(promptItem).toBeDefined();
       expect(promptItem?.type).toBe("prompt");
       expect(promptItem?.name).toBe("Test Prompt");
-      expect(promptItem?.href).toContain("/prompts");
+      expect(promptItem?.href?.includes("/prompts")).toBe(true);
     });
 
     it("returns recent workflow from audit log", async () => {
@@ -149,7 +149,7 @@ describe("Recent Items Integration", () => {
       expect(workflowItem).toBeDefined();
       expect(workflowItem?.type).toBe("workflow");
       expect(workflowItem?.name).toBe("Test Workflow");
-      expect(workflowItem?.href).toContain("/studio/");
+      expect(workflowItem?.href?.includes("/studio/")).toBe(true);
     });
 
     it("returns recent dataset from audit log", async () => {
@@ -185,7 +185,7 @@ describe("Recent Items Integration", () => {
       expect(datasetItem).toBeDefined();
       expect(datasetItem?.type).toBe("dataset");
       expect(datasetItem?.name).toBe("Test Dataset");
-      expect(datasetItem?.href).toContain("/datasets/");
+      expect(datasetItem?.href?.includes("/datasets/")).toBe(true);
     });
 
     it("excludes deleted prompts from results", async () => {

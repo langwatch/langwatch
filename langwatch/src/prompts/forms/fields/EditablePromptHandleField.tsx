@@ -1,28 +1,16 @@
-import { Button, HStack, type StackProps, Text } from "@chakra-ui/react";
+import { HStack, type StackProps, Text } from "@chakra-ui/react";
 import clsx from "clsx";
-import { Edit3 } from "react-feather";
 import { useFormContext } from "react-hook-form";
 
-import { toaster } from "~/components/ui/toaster";
-import { Tooltip } from "~/components/ui/tooltip";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts";
-import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config";
-import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
-
-const logger = createLogger(
-  "langwatch:prompt-configs:editable-prompt-handle-field",
-);
+import { EditPromptHandleButton } from "./EditPromptHandleButton";
 
 type EditablePromptHandleFieldProps = StackProps;
 
 /**
  * EditablePromptHandleField component
- * Single Responsibility: Displays and allows editing of prompt handle with permission checks
+ * Single Responsibility: Displays prompt handle with edit and copy buttons
  * @param props - EditablePromptHandleFieldProps extending StackProps
  * @returns JSX.Element - Renders an editable prompt handle display with edit and copy buttons
  */
@@ -30,58 +18,6 @@ export function EditablePromptHandleField(
   props: EditablePromptHandleFieldProps,
 ) {
   const form = useFormContext<PromptConfigFormValues>();
-  const { triggerChangeHandle } = usePromptConfigContext();
-  const { project } = useOrganizationTeamProject();
-
-  const configId = form.watch("configId");
-
-  const { data: permission } = api.prompts.checkModifyPermission.useQuery(
-    {
-      idOrHandle: configId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!configId && !!project?.id,
-    },
-  );
-
-  const canEdit = permission?.hasPermission ?? false;
-
-  const handleTriggerChangeHandle = () => {
-    const id = form.watch("configId");
-    if (!id) {
-      logger.error({ id }, "Config ID is required");
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: "Failed to change prompt handle",
-        type: "error",
-      });
-      return;
-    }
-
-    const onSuccess = (prompt: VersionedPrompt) => {
-      form.reset(
-        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
-      );
-      toaster.create({
-        title: "Prompt handle changed",
-        description: `Prompt handle has been changed to ${prompt.handle}`,
-        type: "success",
-      });
-    };
-
-    const onError = (error: Error) => {
-      console.error(error);
-      toaster.create({
-        title: "Error changing prompt handle",
-        description: error.message,
-        type: "error",
-      });
-    };
-
-    triggerChangeHandle({ id, onSuccess, onError });
-  };
-
   const handle = form.watch("handle");
 
   return (
@@ -130,30 +66,9 @@ export function EditablePromptHandleField(
           gap={1}
           background="gray.50"
           paddingX={1}
+          borderRadius="lg"
         >
-          <Tooltip
-            content={permission?.reason ?? "Edit prompt handle"}
-            disabled={canEdit}
-            positioning={{ placement: "top" }}
-            showArrow
-            portalled={false}
-          >
-            <Button
-              id="js-edit-prompt-handle"
-              onClick={handleTriggerChangeHandle}
-              variant="ghost"
-              _hover={{
-                backgroundColor: canEdit ? "gray.100" : undefined,
-              }}
-              textTransform="uppercase"
-              size="xs"
-              disabled={!canEdit}
-              opacity={canEdit ? 1 : 0.5}
-              cursor={canEdit ? "pointer" : "not-allowed"}
-            >
-              <Edit3 />
-            </Button>
-          </Tooltip>
+          <EditPromptHandleButton />
           <CopyButton value={handle} label="Prompt ID" />
         </HStack>
       )}

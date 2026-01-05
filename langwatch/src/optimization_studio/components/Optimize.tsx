@@ -90,7 +90,6 @@ export function Optimize() {
         </Button>
       </Tooltip>
       <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
-        <Dialog.Backdrop />
         {open && <OptimizeModalContent form={form} onClose={onClose} />}
       </Dialog.Root>
     </>

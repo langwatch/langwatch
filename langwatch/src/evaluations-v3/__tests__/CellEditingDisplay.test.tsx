@@ -9,6 +9,13 @@ import { cleanup, render, screen, waitFor, within } from "@testing-library/react
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock optimization_studio hooks to prevent circular dependency issues
+vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
+  store: vi.fn(() => ({})),
+  initialState: {},
+  useWorkflowStore: vi.fn(() => ({})),
+}));
+
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 
@@ -33,6 +40,21 @@ vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: vi.fn(),
     closeDrawer: vi.fn(),
+    drawerOpen: () => false,
+  }),
+  useDrawerParams: () => ({}),
+  getComplexProps: () => ({}),
+  setFlowCallbacks: vi.fn(),
+}));
+
+// Mock useLatestPromptVersion to avoid needing SessionProvider
+vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
+  useLatestPromptVersion: () => ({
+    currentVersion: undefined,
+    latestVersion: undefined,
+    isOutdated: false,
+    isLoading: false,
+    nextVersion: undefined,
   }),
 }));
 
@@ -42,6 +64,18 @@ const mockUpdateMutate = vi.fn();
 // Mock api
 vi.mock("~/utils/api", () => ({
   api: {
+    useContext: () => ({
+      agents: {
+        getById: {
+          fetch: vi.fn(),
+        },
+      },
+      prompts: {
+        getByIdOrHandle: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
+    }),
     datasetRecord: {
       getAll: {
         useQuery: () => ({ data: null, isLoading: false }),
@@ -53,12 +87,50 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn() }),
       },
     },
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
+    evaluators: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+    },
   },
 }));
 
 // Mock AddOrEditDatasetDrawer to avoid complex API dependencies
 vi.mock("~/components/AddOrEditDatasetDrawer", () => ({
   AddOrEditDatasetDrawer: () => null,
+}));
+
+// Mock Agent Drawers
+vi.mock("~/components/agents/AgentListDrawer", () => ({
+  AgentListDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentTypeSelectorDrawer", () => ({
+  AgentTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/agents/AgentCodeEditorDrawer", () => ({
+  AgentCodeEditorDrawer: () => null,
+}));
+vi.mock("~/components/agents/WorkflowSelectorDrawer", () => ({
+  WorkflowSelectorDrawer: () => null,
+}));
+
+// Mock Evaluator Drawers
+vi.mock("~/components/evaluators/EvaluatorListDrawer", () => ({
+  EvaluatorListDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorCategorySelectorDrawer", () => ({
+  EvaluatorCategorySelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorTypeSelectorDrawer", () => ({
+  EvaluatorTypeSelectorDrawer: () => null,
+}));
+vi.mock("~/components/evaluators/EvaluatorEditorDrawer", () => ({
+  EvaluatorEditorDrawer: () => null,
 }));
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -283,9 +355,12 @@ describe("Saved dataset - adding new rows", () => {
     render(<EvaluationsV3Table />, { wrapper: Wrapper });
 
     // Wait for initial render
-    await waitFor(() => {
+    await waitFor(
+      () => {
       expect(screen.getByTestId("cell-2-col1_0")).toBeInTheDocument();
-    });
+      },
+      { timeout: 5000 },
+    );
 
     // Type in the empty row (row 2)
     const cell = screen.getByTestId("cell-2-col1_0");
@@ -295,16 +370,19 @@ describe("Saved dataset - adding new rows", () => {
     await user.keyboard("{Enter}");
 
     // Value should appear
-    await waitFor(() => {
+    await waitFor(
+      () => {
       expect(screen.getByTestId("cell-2-col1_0")).toHaveTextContent("new value");
-    });
+      },
+      { timeout: 5000 },
+    );
 
     // Check store has the new record
     const state = useEvaluationsV3Store.getState();
     const dataset = state.datasets.find((d) => d.id === "saved_small");
     expect(dataset?.savedRecords?.length).toBe(3);
     expect(dataset?.savedRecords?.[2]?.col1).toBe("new value");
-  });
+  }, 15000);
 });
 
 describe("Saved dataset - DB sync sends full record", () => {

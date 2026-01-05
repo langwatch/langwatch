@@ -7,6 +7,7 @@ import {
   Separator,
   Tag,
   Text,
+  Spacer,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
@@ -19,7 +20,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
-import { usePrompts } from "./hooks";
 
 const logger = createLogger("VersionHistoryListPopover");
 
@@ -52,7 +52,7 @@ const VersionNumberBox = ({
       backgroundColor="orange.100"
       paddingY={3}
       paddingX={2}
-      borderRadius={4}
+      borderRadius="lg"
       fontWeight={600}
       fontSize="13px"
       color="gray.600"
@@ -76,26 +76,45 @@ function VersionHistoryItem({
   onRestore,
   isLoading,
   isCurrent,
+  hasUnsavedChanges,
 }: {
   data: VersionHistoryItemData;
   onRestore: () => void;
   isLoading: boolean;
   isCurrent: boolean;
+  hasUnsavedChanges?: boolean;
 }) {
   return (
     <VStack width="full" align="start" paddingBottom={2}>
       <Separator marginBottom={2} />
-      <HStack width="full" gap={3}>
+      <HStack width="full" gap={3} align="start">
         <VersionNumberBox version={data} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
-          <HStack width="full" justify="space-between">
-            <Text fontWeight={600} fontSize="13px" lineClamp={1}>
-              {data.commitMessage}
-            </Text>
-            {isCurrent && (
-              <Tag.Root colorPalette="green" size="sm" paddingX={2}>
-                <Tag.Label>current</Tag.Label>
-              </Tag.Root>
+          <HStack width="full">
+            <HStack gap={2} flex={1} minWidth={0}>
+              <Text fontWeight={600} fontSize="13px" lineClamp={1}>
+                {data.commitMessage}
+              </Text>
+              {isCurrent && (
+                <Tag.Root colorPalette="green" size="sm" paddingX={2} fontWeight="normal">
+                  <Tag.Label>current</Tag.Label>
+                </Tag.Root>
+              )}
+            </HStack>
+            <Spacer />
+            {/* Discard changes button - reloads current version (same as "Load this version") */}
+            {isCurrent && hasUnsavedChanges && (
+              <Button
+                size="xs"
+                variant="outline"
+                colorPalette="red"
+                onClick={onRestore}
+                loading={isLoading}
+                data-testid="discard-local-changes-button"
+                marginTop={1}
+              >
+                Discard local changes
+              </Button>
             )}
           </HStack>
           <HStack fontSize="12px">
@@ -116,7 +135,7 @@ function VersionHistoryItem({
         </VStack>
         {!isCurrent && (
           <Tooltip
-            content="Restore this version"
+            content="Load this version"
             positioning={{ placement: "top" }}
           >
             <Button
@@ -141,10 +160,15 @@ function VersionHistoryList({
   versions,
   onRestore,
   isLoading,
+  hasUnsavedChanges,
+  currentVersionId,
 }: {
   versions: VersionHistoryItemData[];
   onRestore: (params: { versionId: string }) => void;
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
+  /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
+  currentVersionId?: string;
 }) {
   return (
     <VStack
@@ -154,15 +178,24 @@ function VersionHistoryList({
       maxHeight="350px"
       overflowY="auto"
     >
-      {versions.map((version, index) => (
-        <VersionHistoryItem
-          key={version.versionId}
-          data={version}
-          onRestore={() => void onRestore({ versionId: version.versionId })}
-          isCurrent={index === 0}
-          isLoading={isLoading}
-        />
-      ))}
+      {versions.map((version, index) => {
+        // If currentVersionId is provided, use it to determine which is current
+        // Otherwise fall back to the first (latest) version
+        const isCurrent = currentVersionId
+          ? version.versionId === currentVersionId
+          : index === 0;
+
+        return (
+          <VersionHistoryItem
+            key={version.versionId}
+            data={version}
+            onRestore={() => void onRestore({ versionId: version.versionId })}
+            isCurrent={isCurrent}
+            isLoading={isLoading}
+            hasUnsavedChanges={hasUnsavedChanges}
+          />
+        );
+      })}
     </VStack>
   );
 }
@@ -179,7 +212,12 @@ function VersionHistoryTrigger({
 }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button variant="ghost" color="gray.500" minWidth={0}>
+      <Button
+        variant="ghost"
+        color="gray.500"
+        minWidth={0}
+        data-testid="version-history-button"
+      >
         <HistoryIcon size={16} />
         {label && <Text>{label}</Text>}
       </Button>
@@ -194,10 +232,14 @@ function VersionHistoryContent({
   onRestore,
   versions,
   isLoading,
+  hasUnsavedChanges,
+  currentVersionId,
 }: {
   onRestore: (params: { versionId: string }) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
+  currentVersionId?: string;
 }) {
   return (
     <Popover.Content width="500px">
@@ -211,6 +253,8 @@ function VersionHistoryContent({
           versions={versions}
           onRestore={onRestore}
           isLoading={isLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
+          currentVersionId={currentVersionId}
         />
       </Popover.Body>
     </Popover.Content>
@@ -226,6 +270,8 @@ function VersionHistoryPopover({
   onRestore,
   versions,
   isLoading,
+  hasUnsavedChanges,
+  currentVersionId,
   label,
 }: {
   isOpen: boolean;
@@ -233,6 +279,8 @@ function VersionHistoryPopover({
   onRestore: (params: { versionId: string }) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
+  hasUnsavedChanges?: boolean;
+  currentVersionId?: string;
   label?: string;
 }) {
   return (
@@ -243,6 +291,8 @@ function VersionHistoryPopover({
           onRestore={onRestore}
           versions={versions}
           isLoading={isLoading}
+          hasUnsavedChanges={hasUnsavedChanges}
+          currentVersionId={currentVersionId}
         />
       )}
     </Popover.Root>
@@ -254,16 +304,20 @@ function VersionHistoryPopover({
  */
 export function VersionHistoryListPopover({
   configId,
+  currentVersionId,
   onRestoreSuccess,
+  hasUnsavedChanges,
   label,
 }: {
   configId: string;
+  /** The versionId of the version currently being edited. If not provided, defaults to latest. */
+  currentVersionId?: string;
   onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
+  hasUnsavedChanges?: boolean;
   label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
-  const { restoreVersion } = usePrompts();
   const { data: prompts = [], isLoading } =
     api.prompts.getAllVersionsForPrompt.useQuery(
       {
@@ -275,39 +329,47 @@ export function VersionHistoryListPopover({
       },
     );
 
+  /**
+   * Load version data into the form without creating a new version.
+   * User will need to save manually to complete the restore.
+   */
   const handleRestore = useCallback(
     (params: { versionId: string }) => {
       void (async () => {
-        if (!project?.id) {
-          logger.error("Cannot restore version: project not loaded");
+        const { versionId } = params;
+
+        // Find the version in the already-fetched data
+        const prompt = prompts.find((p) => p.versionId === versionId);
+        if (!prompt) {
+          logger.error("Version not found in loaded data");
           toaster.error({
-            title: "Failed to restore version",
-            description: "Project information is not available",
+            title: "Failed to load version",
+            description: "Version not found",
           });
           return;
         }
-        const { versionId } = params;
+
         try {
-          const prompt = await restoreVersion({
-            versionId,
-            projectId: project?.id ?? "",
-          });
           await onRestoreSuccess?.(prompt);
           onClose();
-          toaster.success({
-            title: "Version restored successfully",
+          toaster.info({
+            title: `Loaded v${prompt.version}`,
+            description: "Click 'Update' to save the restored version",
+            meta: {
+              closable: true,
+            },
           });
         } catch (error) {
-          logger.error({ error }, "Error restoring version");
+          logger.error({ error }, "Error loading version");
           toaster.error({
-            title: "Failed to restore version",
+            title: "Failed to load version",
             description:
               error instanceof Error ? error.message : "Unknown error",
           });
         }
       })();
     },
-    [restoreVersion, onRestoreSuccess, onClose, project?.id],
+    [prompts, onRestoreSuccess, onClose],
   );
 
   return (
@@ -319,6 +381,8 @@ export function VersionHistoryListPopover({
       onRestore={handleRestore}
       versions={prompts}
       isLoading={isLoading}
+      hasUnsavedChanges={hasUnsavedChanges}
+      currentVersionId={currentVersionId}
       label={label}
     />
   );

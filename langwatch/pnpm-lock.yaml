@@ -467,9 +467,6 @@ importers:
       react-markdown:
         specifier: ^9.0.0
         version: 9.1.0(@types/react@19.0.10)(react@19.1.0)
-      react-mentions:
-        specifier: ^4.4.10
-        version: 4.4.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       react-papaparse:
         specifier: ^4.4.0
         version: 4.4.0
@@ -494,6 +491,9 @@ importers:
       require-in-the-middle:
         specifier: 7.5.1
         version: 7.5.1
+      rich-textarea:
+        specifier: ^0.27.0
+        version: 0.27.0(react@19.1.0)
       safe-regex2:
         specifier: ^4.0.1
         version: 4.0.1
@@ -624,15 +624,12 @@ importers:
       '@types/react-dom':
         specifier: ^19.0.3
         version: 19.0.4(@types/react@19.0.10)
-      '@types/react-mentions':
-        specifier: ^4.4.1
-        version: 4.4.1
       '@types/ws':
         specifier: ^8.5.12
         version: 8.5.12
       '@typescript/native-preview':
-        specifier: ^7.0.0-dev.20251204.1
-        version: 7.0.0-dev.20251207.1
+        specifier: ^7.0.0-dev.20251222.1
+        version: 7.0.0-dev.20251222.1
       '@vitest/coverage-v8':
         specifier: ^3.1.3
         version: 3.2.4(vitest@3.2.4)
@@ -1444,9 +1441,6 @@ packages:
   '@babel/runtime@7.27.6':
     resolution: {integrity: sha512-vbavdySgbTTrmFE+EsiqUTzlOr5bzlnJtUv9PynGCAKvfQqjIXbvFdumPM/GxMDfyuGMJaJAU6TO4zc1Jf1i8Q==}
     engines: {node: '>=6.9.0'}
-
-  '@babel/runtime@7.4.5':
-    resolution: {integrity: sha512-TuI4qpWZP6lGOGIuGWtp9sPluqYICmbk8T/1vpSysqJxRPkudh/ofFWyqdcMsDf2s7KvDL4/YHgKyvcS3g9CJQ==}
 
   '@babel/template@7.26.8':
     resolution: {integrity: sha512-iNKaX3ZebKIsCvJ+0jd6embf+Aulaa3vNBqZ41kM7iTWjx5qzWKXGHiJUW3+nTpQ18SG11hdF8OAzKrpXkb96Q==}
@@ -4976,9 +4970,6 @@ packages:
     peerDependencies:
       '@types/react': ^19.0.0
 
-  '@types/react-mentions@4.4.1':
-    resolution: {integrity: sha512-65QdcZYkGe2I4GnOLY2OhlXCGz/Csd8NhytwE5r59CoFeYafMltAE/WqFB/Y6SoPU8LvF7EyUrq6Rxrf0Kzxkg==}
-
   '@types/react-transition-group@4.4.11':
     resolution: {integrity: sha512-RM05tAniPZ5DZPzzNFP+DmrcOdD0efDUxMy3145oljWSl3x9ZV5vhme98gTxFrj2lhXvmGNnUiuDyJgY9IKkNA==}
 
@@ -5048,43 +5039,43 @@ packages:
   '@types/yargs@17.0.33':
     resolution: {integrity: sha512-WpxBCKWPLr4xSsHgz511rFJAM+wS28w2zEO1QDNY5zM/S8ok70NNfztH0xwhqKyaK0OHCbN98LDAZuy1ctxDkA==}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-waWJnuuvkXh4WdpbTjYf7pyahJzx0ycesV2BylyHrE9OxU9FSKcD/cRLQYvbq3YcBSdF7sZwRLDBer7qTeLsYA==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-wq2sTeZzexOrGYKKsMODvL/9+HF4nqyHt/h7hW55ikHU5gscby5xkhG4/oA8KECLTYVdDfAQM+Yfnku76SQBPw==}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-3bkD9QuIjxETtp6J1l5X2oKgudJ8z+8fwUq0izCjK1JrIs2vW1aQnbzxhynErSyHWH7URGhHHzcsXHbikckAsg==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-CQZFFdH7f/LkGRWqWBK1jwVwQi3XlWTYeu9MdaDpWafM4PJEjMHh1ZuGYp7cjI8SUk07oJRE8P4BMQ1moPe57g==}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-Qhp06OObkwy5B+PlAhAmq+Ls3GVt4LHAovrTRcpLB3Mk3yJ0h9DnIQwPQiayp16TdvTsGHI3jdIX4MGm5L/ghA==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-wN+IfT/KZfsq1g3Imd50+3k4qCgAwD8N7qU82tJDa9BNj6GtXE/za05N8LBFFq624FBiiqabazsTdE2e/m4OKw==}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-OjrZBq8XJkB7uCQvT1AZ1FPsp+lT0cHxY5SisE+ZTAU6V0IHAZMwJ7J/mnwlGsBcCKRLBT+lX3hgEuOTSwHr9w==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-WkxQVLJB9XuvsTMdrks3gaGc22HnuQrFknrkBRy7dqgjervN12h8UzaNCsU7FrAs955NJIAdXuTa6cKFxYhkbA==}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-fPRw0zfTBeVmrkgi5Le+sSwoeAz6pIdvcsa1OYZcrspueS9hn3qSC5bLEc5yX4NJP1vItadBqyGLUQ7u8FJjow==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-yra1TDTzBEI8DjV2BPuQR6PbLJJZPAMWvfCWOxETEbJfKRsz4kBKBG9cPgALeUdjvM6I8ah/CwvJtVc+9oVDGw==}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-KxY1i+HxeSFfzZ+HVsKwMGBM79laTRZv1ibFqHu22CEsfSPDt4yiV1QFis8Nw7OBXswNqJG/UGqY47VP8FeTvw==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-iatfzkhAlbQeLKxmFrhW6zyKIPo7IK5xgsa/6pL/GZb2x3zXGCPDa3LBt8DxNGUlnET20Itge1YEvj1iA9gOrA==}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-5l51HlXjX7lXwo65DEl1IaCFLjmkMtL6K3NrSEamPNeNTtTQwZRa3pQ9V65dCglnnCQ0M3+VF1RqzC7FU0iDKg==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-9wRuExH/aJq0sWm20DVhg1Ciu3M8jgegOfjSGqweaREp1toMEmVkyhXp7xH1y69LMuXZFmzjy2kmHiUZgOE6lQ==}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20251207.1':
-    resolution: {integrity: sha512-4QcRnzB0pi9rS0AOvg8kWbmuwHv5X7B2EXHbgcms9+56hsZ8SZrZjNgBJb2rUIodJ4kU5mrkj/xlTTT4r9VcpQ==}
+  '@typescript/native-preview@7.0.0-dev.20251222.1':
+    resolution: {integrity: sha512-/9Xrcwb1vkJX+Wdj57ckixQBgF+I1DwEi1PEwgu13i/q5gs1AWVxOGg318sibuZu/33ZfvxRZZXOS24UzqDwWw==}
     hasBin: true
 
   '@typescript/vfs@1.5.0':
@@ -7415,9 +7406,6 @@ packages:
     resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
     engines: {node: '>=12'}
 
-  invariant@2.2.4:
-    resolution: {integrity: sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA==}
-
   ioredis@5.4.2:
     resolution: {integrity: sha512-0SZXGNGZ+WzISQ67QDyZ2x0+wVxjjUndtD8oSeik/4ajifeiRufed8fCb8QW8VMyi4MXcS+UO1k/0NGhvq1PAg==}
     engines: {node: '>=12.22.0'}
@@ -9327,12 +9315,6 @@ packages:
       '@types/react': '>=18'
       react: '>=18'
 
-  react-mentions@4.4.10:
-    resolution: {integrity: sha512-JHiQlgF1oSZR7VYPjq32wy97z1w1oE4x10EuhKjPr4WUKhVzG1uFQhQjKqjQkbVqJrmahf+ldgBTv36NrkpKpA==}
-    peerDependencies:
-      react: '>=16.8.3'
-      react-dom: '>=16.8.3'
-
   react-papaparse@4.4.0:
     resolution: {integrity: sha512-xTEwHZYJ+1dh9mQDQjjwJXmWyX20DdZ52u+ddw75V+Xm5qsjXSvWmC7c8K82vRwMjKAOH2S9uFyGpHEyEztkUQ==}
     engines: {node: '>=8', npm: '>=5'}
@@ -9485,9 +9467,6 @@ packages:
   refractor@3.6.0:
     resolution: {integrity: sha512-MY9W41IOWxxk31o+YvFCNyNzdkc9M20NoZK5vq6jkv4I/uh2zkWcfudj0Q1fovjUQJrNewS9NMzeTtqPf+n5EA==}
 
-  regenerator-runtime@0.13.11:
-    resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
-
   regex-recursion@6.0.2:
     resolution: {integrity: sha512-0YCaSCq2VRIebiaUviZNs0cBz1kg5kVS2UKUfNIx8YVs1cN3AV7NTctO5FOKBA+UT2BPJIWZauYHPqJODG50cg==}
 
@@ -9594,6 +9573,11 @@ packages:
   reusify@1.0.4:
     resolution: {integrity: sha512-U9nH88a3fc/ekCF1l0/UP1IosiuIjyTh7hBvXVMHYgVcfGvt897Xguj2UOLDeI5BG2m7/uwyaLVT6fbtCwTyzw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
+
+  rich-textarea@0.27.0:
+    resolution: {integrity: sha512-u3vTbomrZtItGVLiOWJ4wbQq5IeY2jtykN543shn7NuIzjUqxucZHhG3HksMZKgaexRAYh0XZ6fmtUvfl0sHEA==}
+    peerDependencies:
+      react: '>=16.14.0'
 
   rimraf@3.0.2:
     resolution: {integrity: sha512-JZkJMZkAGFFPP2YqXZXPbMlMBgsxzE8ILs4lMIX/2o0L9UBw9O/Y3o6wFw/i9YLapcUJWwqbi3kdxIPdC62TIA==}
@@ -9965,11 +9949,6 @@ packages:
 
   stylis@4.3.6:
     resolution: {integrity: sha512-yQ3rwFWRfwNUY7H5vpU0wfdkNSnvnJinhF9830Swlaxl03zsOjCfmX0ugac+3LtK0lYSgwL/KXc8oYL3mG4YFQ==}
-
-  substyle@9.4.1:
-    resolution: {integrity: sha512-VOngeq/W1/UkxiGzeqVvDbGDPM8XgUyJVWjrqeh+GgKqspEPiLYndK+XRcsKUHM5Muz/++1ctJ1QCF/OqRiKWA==}
-    peerDependencies:
-      react: '>=16.8.3'
 
   superjson@1.13.1:
     resolution: {integrity: sha512-AVH2eknm9DEd3qvxM4Sq+LTCkSXE2ssfh1t11MHMXyYXFQyQ1HLgVvV+guLTsaQnJU3gnaVo34TohHPulY/wLg==}
@@ -12777,10 +12756,6 @@ snapshots:
 
   '@babel/runtime@7.27.6': {}
 
-  '@babel/runtime@7.4.5':
-    dependencies:
-      regenerator-runtime: 0.13.11
-
   '@babel/template@7.26.8':
     dependencies:
       '@babel/code-frame': 7.26.2
@@ -12867,7 +12842,7 @@ snapshots:
       deepmerge: 4.3.1
       dotenv: 16.6.1
       openai: 5.20.0(ws@8.18.2(bufferutil@4.0.9))(zod@3.25.76)
-      ws: 8.18.2(bufferutil@4.0.9)
+      ws: 8.18.3(bufferutil@4.0.9)
       zod: 3.25.76
       zod-to-json-schema: 3.24.5(zod@3.25.76)
     transitivePeerDependencies:
@@ -16737,10 +16712,6 @@ snapshots:
     dependencies:
       '@types/react': 19.0.10
 
-  '@types/react-mentions@4.4.1':
-    dependencies:
-      '@types/react': 19.0.10
-
   '@types/react-transition-group@4.4.11':
     dependencies:
       '@types/react': 19.0.10
@@ -16817,36 +16788,36 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20251207.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20251222.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20251207.1':
+  '@typescript/native-preview@7.0.0-dev.20251222.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20251207.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20251207.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20251222.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20251222.1
 
   '@typescript/vfs@1.5.0':
     dependencies:
@@ -19810,10 +19781,6 @@ snapshots:
 
   internmap@2.0.3: {}
 
-  invariant@2.2.4:
-    dependencies:
-      loose-envify: 1.4.0
-
   ioredis@5.4.2:
     dependencies:
       '@ioredis/commands': 1.2.0
@@ -22294,15 +22261,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-mentions@4.4.10(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
-    dependencies:
-      '@babel/runtime': 7.4.5
-      invariant: 2.2.4
-      prop-types: 15.8.1
-      react: 19.1.0
-      react-dom: 19.1.0(react@19.1.0)
-      substyle: 9.4.1(react@19.1.0)
-
   react-papaparse@4.4.0:
     dependencies:
       '@types/papaparse': 5.3.14
@@ -22492,8 +22450,6 @@ snapshots:
       parse-entities: 2.0.0
       prismjs: 1.27.0
 
-  regenerator-runtime@0.13.11: {}
-
   regex-recursion@6.0.2:
     dependencies:
       regex-utilities: 2.3.0
@@ -22629,6 +22585,10 @@ snapshots:
   retry@0.13.1: {}
 
   reusify@1.0.4: {}
+
+  rich-textarea@0.27.0(react@19.1.0):
+    dependencies:
+      react: 19.1.0
 
   rimraf@3.0.2:
     dependencies:
@@ -23067,12 +23027,6 @@ snapshots:
   stylis@4.2.0: {}
 
   stylis@4.3.6: {}
-
-  substyle@9.4.1(react@19.1.0):
-    dependencies:
-      '@babel/runtime': 7.27.6
-      invariant: 2.2.4
-      react: 19.1.0
 
   superjson@1.13.1:
     dependencies:

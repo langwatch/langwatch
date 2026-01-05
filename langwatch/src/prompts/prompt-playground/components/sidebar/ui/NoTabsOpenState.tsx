@@ -1,5 +1,6 @@
-import { Center, EmptyState } from "@chakra-ui/react";
+import { Center, EmptyState, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { LuFileText } from "react-icons/lu";
+import { AddPromptButton } from "../AddPromptButton";
 
 /**
  * Empty state for when user has prompts but no tabs open.
@@ -7,19 +8,24 @@ import { LuFileText } from "react-icons/lu";
  */
 export function NoTabsOpenState() {
   return (
-    <Center width="full" height="full" bg="white">
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <LuFileText />
-          </EmptyState.Indicator>
-          <EmptyState.Title>No prompts open</EmptyState.Title>
-          <EmptyState.Description>
-            Click the + button in the sidebar to create your first prompt, or
-            select an existing prompt to get started.
-          </EmptyState.Description>
-        </EmptyState.Content>
-      </EmptyState.Root>
-    </Center>
+    <VStack width="full" height="full">
+      <HStack width="full" paddingTop="18px" paddingRight="12px">
+        <Spacer />
+        <AddPromptButton />
+      </HStack>
+      <Center width="full" height="full" bg="white">
+        <EmptyState.Root>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <LuFileText />
+            </EmptyState.Indicator>
+            <EmptyState.Title>No prompts open</EmptyState.Title>
+            <EmptyState.Description>
+              Create a new prompt or select an existing prompt to get started.
+            </EmptyState.Description>
+          </EmptyState.Content>
+        </EmptyState.Root>
+      </Center>
+    </VStack>
   );
 }

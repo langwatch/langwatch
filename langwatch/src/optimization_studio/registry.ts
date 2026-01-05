@@ -1,4 +1,5 @@
 import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
+import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
 
 import type {
   Code,
@@ -9,11 +10,18 @@ import type {
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
 
+// Get defaults from the single source of truth
+const defaults = DEFAULT_FORM_VALUES.version.configData;
+const systemMessage = defaults.messages.find((m) => m.role === "system");
+const messages = defaults.messages.filter((m) => m.role !== "system");
+const defaultInput = defaults.inputs[0];
+const defaultOutput = defaults.outputs[0];
+
 /**
  * Default Empty LLM Signature Node
  *
- * This is an empty llm signature node
- * Use this when adding a new signature node to the workspace.
+ * Uses unified defaults from buildDefaultFormValues for consistency across
+ * Playground, Evaluations V3, and Optimization Studio.
  */
 const signature: Signature = {
   name: "LLM Node",
@@ -36,17 +44,12 @@ const signature: Signature = {
     {
       identifier: "instructions",
       type: "str",
-      value: "You are a helpful assistant.",
+      value: systemMessage!.content,
     },
     {
       identifier: "messages",
       type: "chat_messages",
-      value: [
-        {
-          role: "user",
-          content: "{{question}}",
-        },
-      ],
+      value: messages,
     },
     {
       identifier: "demonstrations",
@@ -54,18 +57,8 @@ const signature: Signature = {
       value: undefined,
     },
   ],
-  inputs: [
-    {
-      identifier: "question",
-      type: "str",
-    },
-  ],
-  outputs: [
-    {
-      identifier: "answer",
-      type: "str",
-    },
-  ],
+  inputs: defaults.inputs.map((i) => ({ identifier: i.identifier, type: i.type })) as Field[],
+  outputs: defaults.outputs.map((o) => ({ identifier: o.identifier, type: o.type })) as Field[],
 };
 
 const code: Code = {
@@ -78,25 +71,15 @@ const code: Code = {
       value: `import dspy
 
 class Code(dspy.Module):
-    def forward(self, question: str):
+    def forward(self, ${defaultInput?.identifier ?? "input"}: str):
         # Your code goes here
 
-        return {"answer": "Hello world!"}
+        return {"${defaultOutput?.identifier ?? "output"}": "Hello world!"}
 `,
     },
   ],
-  inputs: [
-    {
-      identifier: "question",
-      type: "str",
-    },
-  ],
-  outputs: [
-    {
-      identifier: "answer",
-      type: "str",
-    },
-  ],
+  inputs: defaults.inputs.map((i) => ({ identifier: i.identifier, type: i.type })) as Field[],
+  outputs: defaults.outputs.map((o) => ({ identifier: o.identifier, type: o.type })) as Field[],
 };
 
 const promptingTechniques: PromptingTechnique[] = [

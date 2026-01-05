@@ -1,10 +1,12 @@
-import { HStack, IconButton, Spacer } from "@chakra-ui/react";
+import { Box, HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { LuColumns2 } from "react-icons/lu";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { TabIdProvider } from "./ui/TabContext";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { AddPromptButton } from "../sidebar/AddPromptButton";
 
 /**
  * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
@@ -18,7 +20,23 @@ export function PromptPlaygroundBrowser() {
     setActiveTab,
     activeWindowId,
     setActiveWindow,
-  } = useDraggableTabsBrowserStore();
+  } = useDraggableTabsBrowserStore(
+    ({
+      windows,
+      splitTab,
+      moveTab,
+      setActiveTab,
+      activeWindowId,
+      setActiveWindow,
+    }) => ({
+      windows,
+      splitTab,
+      moveTab,
+      setActiveTab,
+      activeWindowId,
+      setActiveWindow,
+    }),
+  );
 
   /**
    * handleTabMove
@@ -61,20 +79,26 @@ export function PromptPlaygroundBrowser() {
           activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
           onClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
-          borderRight="1px solid var(--chakra-colors-gray-350)"
-          maxWidth={windows.length > 1 ? "50vw" : "auto"}
+          maxWidth={
+            windows.length > 1
+              ? `calc((100vw - 340px) / ${windows.length})`
+              : "auto"
+          }
+          paddingTop={0}
         >
           <DraggableTabsBrowser.TabBar
             tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
           >
-            <HStack gap={0} overflow="hidden" height="full">
+            <HStack
+              gap={0}
+              overflow="auto"
+              height="full"
+              paddingY={2}
+              paddingX={2}
+            >
               {tabbedWindow.tabs.map((tab) => (
                 <TabIdProvider key={tab.id} tabId={tab.id}>
-                  <DraggableTabsBrowser.Tab
-                    id={tab.id}
-                    borderRight="1px solid var(--chakra-colors-gray-350)"
-                    height="full"
-                  >
+                  <DraggableTabsBrowser.Tab id={tab.id} height="full">
                     <DraggableTabsBrowser.Trigger value={tab.id}>
                       <PromptBrowserTab
                         dimmed={tabbedWindow.id !== activeWindowId}
@@ -86,31 +110,55 @@ export function PromptPlaygroundBrowser() {
             </HStack>
             <Spacer />
             {tabbedWindow.id === activeWindowId && (
-              <HStack flexShrink={0} paddingX={3} title="Split tab">
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  aria-label="Split tab"
-                  onClick={() =>
-                    tabbedWindow.activeTabId &&
-                    handleSplit(tabbedWindow.activeTabId)
-                  }
-                  disabled={!tabbedWindow.activeTabId}
+              <>
+                <HStack
+                  flexShrink={0}
+                  paddingLeft={1}
+                  title="Split tab"
+                  position="relative"
+                  _before={{
+                    content: '""',
+                    position: "absolute",
+                    left: "-10px",
+                    top: 0,
+                    bottom: 0,
+                    width: "10px",
+                    height: "50px",
+                    background: "linear-gradient(to right, transparent, white)",
+                    zIndex: 10,
+                    pointerEvents: "none",
+                  }}
                 >
-                  <LuColumns2 size="18px" />
-                </IconButton>
-              </HStack>
+                  <PageLayout.HeaderButton
+                    onClick={() =>
+                      tabbedWindow.activeTabId &&
+                      handleSplit(tabbedWindow.activeTabId)
+                    }
+                    disabled={!tabbedWindow.activeTabId}
+                  >
+                    <LuColumns2 size="18px" />
+                    Compare
+                  </PageLayout.HeaderButton>
+                  <AddPromptButton />
+                </HStack>
+              </>
             )}
           </DraggableTabsBrowser.TabBar>
-          <HStack width="full" flex={1}>
-            {tabbedWindow.tabs.map((tab) => (
-              <TabIdProvider key={tab.id} tabId={tab.id}>
-                <DraggableTabsBrowser.Content value={tab.id} height="full">
-                  <PromptBrowserWindowContent />
-                </DraggableTabsBrowser.Content>
-              </TabIdProvider>
-            ))}
-          </HStack>
+          {tabbedWindow.tabs.map((tab) => (
+            <TabIdProvider key={tab.id} tabId={tab.id}>
+              <DraggableTabsBrowser.Content
+                value={tab.id}
+                height="full"
+                borderRadius="lg"
+                boxShadow="md"
+                background="white"
+                padding={0}
+                minHeight="0"
+              >
+                <PromptBrowserWindowContent />
+              </DraggableTabsBrowser.Content>
+            </TabIdProvider>
+          ))}
         </DraggableTabsBrowser.Group>
       ))}
     </DraggableTabsBrowser.Root>

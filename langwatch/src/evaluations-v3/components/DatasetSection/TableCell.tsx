@@ -9,7 +9,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 // Types
 // ============================================================================
 
-export type ColumnType = "checkbox" | "dataset" | "agent";
+export type ColumnType = "checkbox" | "dataset" | "target";
 
 type ColumnMeta = {
   columnType: ColumnType;
@@ -20,7 +20,7 @@ type ColumnMeta = {
 type RowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  agents: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
+  targets: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
 };
 
 type TableCellProps = {
@@ -117,7 +117,7 @@ export const TableCell = ({ cell, rowIndex, activeDatasetId, isLoading }: TableC
     );
   }
 
-  // For other cells (checkbox, agent)
+  // For other cells (checkbox, target)
   return (
     <td
       key={cell.id}

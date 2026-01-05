@@ -1,23 +1,21 @@
-import { Box, HStack, MenuSeparator, Portal, Spacer, Text, VStack } from "@chakra-ui/react";
+import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
 import {
-  Activity,
-  Bug,
-  BookOpen,
-  ChevronRight,
-  Github,
-  LifeBuoy,
-  Lightbulb,
-  MessageCircle,
-} from "lucide-react";
+  LuActivity,
+  LuBug,
+  LuBookOpen,
+  LuChevronRight,
+  LuGithub,
+  LuLifeBuoy,
+  LuLightbulb,
+  LuMessageCircle,
+} from "react-icons/lu";
 import { useState } from "react";
 import { DiscordOutlineIcon } from "../icons/DiscordOutline";
 import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
-import { Tooltip } from "../ui/tooltip";
-
-const MENU_ITEM_HEIGHT = "32px";
-const ICON_SIZE = 16;
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { SideMenuItem } from "./SideMenuLink";
 
 export type SupportMenuProps = {
   showLabel?: boolean;
@@ -26,59 +24,38 @@ export type SupportMenuProps = {
 export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
   const gray600 = useColorRawValue("gray.600");
   const [isOpen, setIsOpen] = useState(false);
+  const publicEnv = usePublicEnv();
 
   return (
     <VStack width="full" align="start" gap={0.5}>
       {/* Chat button */}
-      <Tooltip
-        content="Chat"
-        positioning={{ placement: "right" }}
-        disabled={showLabel}
-        openDelay={0}
-      >
-        <HStack
+      {publicEnv.data?.IS_SAAS && (
+        <Box
           as="button"
           width="full"
-          height={MENU_ITEM_HEIGHT}
-          gap={3}
-          paddingX={3}
-          borderRadius="lg"
-          backgroundColor="transparent"
-          _hover={{
-            backgroundColor: "gray.200",
-          }}
-          transition="background-color 0.15s ease-in-out"
           cursor="pointer"
           aria-label="Chat"
           onClick={(e) => {
             e.preventDefault();
-            (window as unknown as { $crisp?: { push: (args: unknown[]) => void } }).$crisp?.push([
-              "do",
-              "chat:show",
-            ]);
-            (window as unknown as { $crisp?: { push: (args: unknown[]) => void } }).$crisp?.push([
-              "do",
-              "chat:toggle",
-            ]);
+            (
+              window as unknown as {
+                $crisp?: { push: (args: unknown[]) => void };
+              }
+            ).$crisp?.push(["do", "chat:show"]);
+            (
+              window as unknown as {
+                $crisp?: { push: (args: unknown[]) => void };
+              }
+            ).$crisp?.push(["do", "chat:toggle"]);
           }}
         >
-          <Box
-            flexShrink={0}
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            width={`${ICON_SIZE}px`}
-            height={`${ICON_SIZE}px`}
-          >
-            <MessageCircle size={ICON_SIZE} color={gray600} />
-          </Box>
-          {showLabel && (
-            <Text fontSize="14px" fontWeight="normal" color="gray.700" whiteSpace="nowrap">
-              Chat
-            </Text>
-          )}
-        </HStack>
-      </Tooltip>
+          <SideMenuItem
+            icon={LuMessageCircle}
+            label="Chat"
+            showLabel={showLabel}
+          />
+        </Box>
+      )}
 
       {/* Support menu */}
       <Menu.Root
@@ -86,51 +63,27 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
         open={isOpen}
         onOpenChange={({ open }) => setIsOpen(open)}
       >
-        <Tooltip
-          content="Support"
-          positioning={{ placement: "right" }}
-          disabled={showLabel || isOpen}
-          openDelay={0}
-        >
-          <Menu.Trigger asChild>
-            <HStack
-              as="button"
-              width="full"
-              height={MENU_ITEM_HEIGHT}
-              gap={3}
-              paddingX={3}
-              borderRadius="lg"
-              backgroundColor={isOpen ? "gray.200" : "transparent"}
-              _hover={{
-                backgroundColor: "gray.200",
-              }}
-              transition="background-color 0.15s ease-in-out"
-              cursor="pointer"
-              aria-label="Support"
-              onMouseEnter={() => setIsOpen(true)}
-            >
-              <Box
-                flexShrink={0}
-                display="flex"
-                alignItems="center"
-                justifyContent="center"
-                width={`${ICON_SIZE}px`}
-                height={`${ICON_SIZE}px`}
-              >
-                <LifeBuoy size={ICON_SIZE} color={gray600} />
-              </Box>
-              {showLabel && (
-                <>
-                  <Text fontSize="14px" fontWeight="normal" color="gray.700" whiteSpace="nowrap">
-                    Support
-                  </Text>
-                  <Spacer />
-                  <ChevronRight size={14} color={gray600} />
-                </>
-              )}
-            </HStack>
-          </Menu.Trigger>
-        </Tooltip>
+        <Menu.Trigger asChild>
+          <Box
+            as="button"
+            width="full"
+            cursor="pointer"
+            aria-label="Support"
+            onMouseEnter={() => setIsOpen(true)}
+          >
+            <SideMenuItem
+              icon={LuLifeBuoy}
+              label="Support"
+              isActive={isOpen}
+              showLabel={showLabel}
+              rightElement={
+                showLabel ? (
+                  <LuChevronRight size={14} color={gray600} />
+                ) : undefined
+              }
+            />
+          </Box>
+        </Menu.Trigger>
 
         <Portal>
           <Menu.Content marginLeft={-1} onMouseLeave={() => setIsOpen(false)}>
@@ -139,7 +92,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
                 isExternal
                 href="https://github.com/orgs/langwatch/discussions/categories/support"
               >
-                <Github /> GitHub Support
+                <LuGithub /> GitHub Support
               </Link>
             </Menu.Item>
             <Menu.Item value="discord">
@@ -150,13 +103,13 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
             <MenuSeparator />
             <Menu.Item value="documentation">
               <Link isExternal href="https://docs.langwatch.ai">
-                <BookOpen /> Documentation
+                <LuBookOpen /> Documentation
               </Link>
             </Menu.Item>
 
             <Menu.Item value="status">
               <Link isExternal href="https://status.langwatch.ai/">
-                <Activity /> Status Page
+                <LuActivity /> Status Page
               </Link>
             </Menu.Item>
 
@@ -167,7 +120,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
                 isExternal
                 href="https://github.com/orgs/langwatch/discussions/categories/ideas"
               >
-                <Lightbulb /> Feature Request
+                <LuLightbulb /> Feature Request
               </Link>
             </Menu.Item>
             <Menu.Item value="bug-reports">
@@ -175,7 +128,7 @@ export const SupportMenu = ({ showLabel = true }: SupportMenuProps) => {
                 isExternal
                 href="https://github.com/langwatch/langwatch/issues"
               >
-                <Bug /> Report a Bug
+                <LuBug /> Report a Bug
               </Link>
             </Menu.Item>
           </Menu.Content>

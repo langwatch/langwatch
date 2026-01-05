@@ -1,11 +1,15 @@
 import {
   PropertySectionTitle,
   type PropertySectionTitleProps,
-} from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
+} from "~/components/ui/PropertySectionTitle";
+import { Text } from "@chakra-ui/react";
 
-interface MessageRoleLabelProps extends PropertySectionTitleProps {
+export type MessageRoleLabelProps = Omit<
+  PropertySectionTitleProps,
+  "children"
+> & {
   role: "system" | "user" | "assistant";
-}
+};
 
 /**
  * MessageRoleLabel
@@ -16,11 +20,22 @@ export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
     role === "system"
       ? "System prompt"
       : role === "user"
-        ? "user"
-        : "assistant";
+      ? "User"
+      : "Assistant";
   return (
-    <PropertySectionTitle padding={0} {...props}>
+    <Text
+      fontSize="xs"
+      textTransform="none"
+      fontWeight="normal"
+      color="gray.500"
+      backgroundColor="gray.100"
+      paddingX={2}
+      paddingY={0.5}
+      borderRadius="lg"
+      display="inline-block"
+      {...props}
+    >
       {label}
-    </PropertySectionTitle>
+    </Text>
   );
 }

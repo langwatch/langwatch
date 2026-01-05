@@ -464,13 +464,10 @@ function RolesManagement({
         open={defaultViewOpen}
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
-        <Dialog.Backdrop zIndex={1000} />
         <Dialog.Content
           maxWidth="600px"
           maxHeight="80vh"
           overflowY="auto"
-          backdrop={false}
-          zIndex={1001}
         >
           <Dialog.Header>
             <Dialog.Title>

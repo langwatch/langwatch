@@ -5,9 +5,9 @@
  * This is a one-way conversion - state is persisted via wizardState, not DSL.
  *
  * Key concepts:
- * - Evaluators are global/shared in state - agents reference them by ID
- * - When generating DSL, evaluators are duplicated per-agent with {agentId}.{evaluatorId} naming
- * - Mappings: agent.mappings for agent inputs, evaluator.mappings[agentId] for evaluator inputs
+ * - Evaluators are global/shared in state - targets reference them by ID
+ * - When generating DSL, evaluators are duplicated per-target with {targetId}.{evaluatorId} naming
+ * - Mappings: target.mappings for target inputs, evaluator.mappings[targetId] for evaluator inputs
  * - Multi-dataset: DSL is generated for the active dataset only
  */
 
@@ -22,7 +22,7 @@ import type {
   Field,
 } from "~/optimization_studio/types/dsl";
 import type {
-  AgentConfig,
+  TargetConfig,
   DatasetColumn,
   DatasetReference,
   EvaluationsV3State,
@@ -37,7 +37,7 @@ import type {
 /**
  * Convert V3 state to workflow DSL for execution.
  * Uses the active dataset for generating the entry node.
- * Evaluators are duplicated per-agent with clear naming for result mapping.
+ * Evaluators are duplicated per-target with clear naming for result mapping.
  *
  * @param state - The current evaluations V3 state
  * @param datasetIdOverride - Optional dataset ID to use instead of activeDatasetId
@@ -56,37 +56,38 @@ export const stateToWorkflow = (
 
   const entryNode = createEntryNode(activeDataset);
 
-  const agentNodes: Array<Node<Signature> | Node<Code>> = [];
+  const targetNodes: Array<Node<Signature> | Node<Code>> = [];
   const evaluatorNodes: Array<Node<Evaluator>> = [];
 
-  // Create agent nodes
-  state.agents.forEach((agent, agentIndex) => {
-    const agentNode =
-      agent.type === "llm"
-        ? createSignatureNode(agent, agentIndex)
-        : createCodeNode(agent, agentIndex);
+  // Create target nodes
+  state.targets.forEach((target, targetIndex) => {
+    // Skip prompt targets - they need different handling via API calls
+    if (target.type === "prompt") {
+      // For now, skip prompts - they would be handled differently
+      return;
+    }
 
-    agentNodes.push(agentNode);
+    // For agent targets, check the underlying agent type
+    const targetNode = createCodeNode(target, datasetId, targetIndex);
+    targetNodes.push(targetNode);
 
-    // Create evaluator nodes for each evaluator this agent uses
-    // Evaluators are duplicated per-agent in the DSL
-    agent.evaluatorIds.forEach((evaluatorId, evalIndex) => {
-      const evaluator = state.evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) return;
-
+    // Create evaluator nodes for ALL evaluators (they apply to all targets)
+    // Evaluators are duplicated per-target in the DSL
+    state.evaluators.forEach((evaluator, evalIndex) => {
       const evaluatorNode = createEvaluatorNode(
         evaluator,
-        agent.id,
-        agentIndex,
+        datasetId,
+        target.id,
+        targetIndex,
         evalIndex
       );
       evaluatorNodes.push(evaluatorNode);
     });
   });
 
-  const agentEdges = buildAgentEdges(state.agents, datasetId);
+  const targetEdges = buildTargetEdges(state.targets, datasetId);
   const evaluatorEdges = buildEvaluatorEdges(
-    state.agents,
+    state.targets,
     state.evaluators,
     datasetId
   );
@@ -104,8 +105,8 @@ export const stateToWorkflow = (
     },
     template_adapter: "default",
     enable_tracing: true,
-    nodes: [entryNode, ...agentNodes, ...evaluatorNodes] as Workflow["nodes"],
-    edges: [...agentEdges, ...evaluatorEdges],
+    nodes: [entryNode, ...targetNodes, ...evaluatorNodes] as Workflow["nodes"],
+    edges: [...targetEdges, ...evaluatorEdges],
     state: {},
   };
 };
@@ -151,78 +152,32 @@ const columnTypeToFieldType = (
 };
 
 /**
- * Create a signature (LLM) node from an agent config.
+ * Create a code node from a target config.
  * Uses the `parameters` array structure expected by the DSL.
+ * Sets default values on inputs that have value mappings.
  */
-const createSignatureNode = (
-  agent: AgentConfig,
-  index: number
-): Node<Signature> => {
+const createCodeNode = (target: TargetConfig, activeDatasetId: string, index: number): Node<Code> => {
   const parameters: Field[] = [];
 
-  // LLM config parameter
-  if (agent.llmConfig) {
-    parameters.push({
-      identifier: "llm",
-      type: "llm",
-      value: agent.llmConfig,
-    });
-  }
+  // Get mappings for the active dataset
+  const datasetMappings = target.mappings[activeDatasetId] ?? {};
 
-  // Instructions parameter
-  if (agent.instructions) {
-    parameters.push({
-      identifier: "instructions",
-      type: "str",
-      value: agent.instructions,
-    });
-  }
-
-  // Messages/prompts parameter
-  if (agent.messages) {
-    parameters.push({
-      identifier: "messages",
-      type: "chat_messages",
-      value: agent.messages,
-    });
-  }
+  // Apply value mappings as default values on inputs
+  const inputs: Field[] = (target.inputs ?? []).map((input) => {
+    const mapping = datasetMappings[input.identifier];
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    return input;
+  });
 
   return {
-    id: agent.id,
-    type: "signature",
-    data: {
-      name: agent.name,
-      inputs: agent.inputs,
-      outputs: agent.outputs,
-      parameters,
-    },
-    position: { x: 300, y: index * 200 },
-  };
-};
-
-/**
- * Create a code node from an agent config.
- * Uses the `parameters` array structure expected by the DSL.
- */
-const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
-  const parameters: Field[] = [];
-
-  // Code parameter
-  if (agent.code) {
-    parameters.push({
-      identifier: "code",
-      type: "code",
-      value: agent.code,
-    });
-  }
-
-  return {
-    id: agent.id,
+    id: target.id,
     type: "code",
     data: {
-      name: agent.name,
-      inputs: agent.inputs,
-      outputs: agent.outputs,
+      name: target.name,
+      inputs,
+      outputs: target.outputs ?? [{ identifier: "output", type: "str" }],
       parameters,
     },
     position: { x: 300, y: index * 200 },
@@ -230,60 +185,83 @@ const createCodeNode = (agent: AgentConfig, index: number): Node<Code> => {
 };
 
 /**
- * Create an evaluator node for a specific agent.
- * Node ID is {agentId}.{evaluatorId} for clear result mapping back to the table.
+ * Create an evaluator node for a specific target.
+ * Node ID is {targetId}.{evaluatorId} for clear result mapping back to the table.
+ * Sets default values on inputs that have value mappings.
  */
 const createEvaluatorNode = (
   evaluator: EvaluatorConfig,
-  agentId: string,
-  agentIndex: number,
+  activeDatasetId: string,
+  targetId: string,
+  targetIndex: number,
   evalIndex: number
 ): Node<Evaluator> => {
+  // Get the mappings for this dataset and target
+  const datasetMappings = evaluator.mappings[activeDatasetId];
+  const targetMappings = datasetMappings?.[targetId] ?? {};
+
+  // Apply value mappings as default values on inputs
+  const inputs: Field[] = evaluator.inputs.map((input) => {
+    const mapping = targetMappings[input.identifier];
+    if (mapping?.type === "value") {
+      return { ...input, value: mapping.value };
+    }
+    return input;
+  });
+
   return {
-    id: `${agentId}.${evaluator.id}`,
+    id: `${targetId}.${evaluator.id}`,
     type: "evaluator",
     data: {
       name: `${evaluator.name}`,
       cls: "LangWatchEvaluator",
-      inputs: evaluator.inputs,
+      inputs,
       outputs: [{ identifier: "passed", type: "bool" }],
       evaluator: evaluator.evaluatorType,
       ...evaluator.settings,
     },
-    position: { x: 600, y: agentIndex * 200 + evalIndex * 100 },
+    position: { x: 600, y: targetIndex * 200 + evalIndex * 100 },
   };
 };
 
 /**
- * Build edges connecting entry to agents based on agent.mappings.
+ * Build edges connecting entry to targets based on target.mappings.
+ * With per-dataset structure: mappings[datasetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
-const buildAgentEdges = (
-  agents: AgentConfig[],
+const buildTargetEdges = (
+  targets: TargetConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const agent of agents) {
-    for (const [inputField, mapping] of Object.entries(agent.mappings)) {
+  for (const target of targets) {
+    // Get mappings for the active dataset
+    const datasetMappings = target.mappings[activeDatasetId];
+    if (!datasetMappings) continue;
+
+    for (const [inputField, mapping] of Object.entries(datasetMappings)) {
+      // Skip value mappings - they don't create edges
+      if (mapping.type === "value") continue;
+
       if (
         mapping.source === "dataset" &&
         mapping.sourceId === activeDatasetId
       ) {
         edges.push({
-          id: `entry->${agent.id}.${inputField}`,
+          id: `entry->${target.id}.${inputField}`,
           source: "entry",
           sourceHandle: `output-${mapping.sourceField}`,
-          target: agent.id,
+          target: target.id,
           targetHandle: `input-${inputField}`,
         });
-      } else if (mapping.source === "agent") {
-        // Agent-to-agent mapping
+      } else if (mapping.source === "target") {
+        // Target-to-target mapping
         edges.push({
-          id: `${mapping.sourceId}->${agent.id}.${inputField}`,
+          id: `${mapping.sourceId}->${target.id}.${inputField}`,
           source: mapping.sourceId,
           sourceHandle: `output-${mapping.sourceField}`,
-          target: agent.id,
+          target: target.id,
           targetHandle: `input-${inputField}`,
         });
       }
@@ -294,26 +272,29 @@ const buildAgentEdges = (
 };
 
 /**
- * Build edges connecting agents to their evaluators.
- * Mappings are stored inside evaluator.mappings[agentId].
+ * Build edges connecting targets to their evaluators.
+ * With per-dataset, per-target structure: mappings[datasetId][targetId][inputField]
  * Only creates edges for mappings that reference the active dataset.
  */
 const buildEvaluatorEdges = (
-  agents: AgentConfig[],
+  targets: TargetConfig[],
   evaluators: EvaluatorConfig[],
   activeDatasetId: string
 ): Edge[] => {
   const edges: Edge[] = [];
 
-  for (const agent of agents) {
-    for (const evaluatorId of agent.evaluatorIds) {
-      const evaluator = evaluators.find((e) => e.id === evaluatorId);
-      if (!evaluator) continue;
+  // All evaluators apply to all targets
+  for (const target of targets) {
+    for (const evaluator of evaluators) {
+      // Get mappings for the active dataset and this target
+      const datasetMappings = evaluator.mappings[activeDatasetId];
+      const targetMappings = datasetMappings?.[target.id] ?? {};
+      const evaluatorNodeId = `${target.id}.${evaluator.id}`;
 
-      const agentMappings = evaluator.mappings[agent.id] ?? {};
-      const evaluatorNodeId = `${agent.id}.${evaluator.id}`;
+      for (const [inputField, mapping] of Object.entries(targetMappings)) {
+        // Skip value mappings - they don't create edges
+        if (mapping.type === "value") continue;
 
-      for (const [inputField, mapping] of Object.entries(agentMappings)) {
         if (
           mapping.source === "dataset" &&
           mapping.sourceId === activeDatasetId
@@ -327,13 +308,13 @@ const buildEvaluatorEdges = (
             targetHandle: `input-${inputField}`,
           });
         } else if (
-          mapping.source === "agent" &&
-          mapping.sourceId === agent.id
+          mapping.source === "target" &&
+          mapping.sourceId === target.id
         ) {
-          // From this agent's output
+          // From this target's output
           edges.push({
-            id: `${agent.id}->${evaluatorNodeId}.${inputField}`,
-            source: agent.id,
+            id: `${target.id}->${evaluatorNodeId}.${inputField}`,
+            source: target.id,
             sourceHandle: `output-${mapping.sourceField}`,
             target: evaluatorNodeId,
             targetHandle: `input-${inputField}`,

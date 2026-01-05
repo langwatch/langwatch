@@ -282,6 +282,10 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
+        /** Optional: fetch a specific version by ID */
+        versionId: z.string().optional(),
+        /** Optional: fetch a specific version by number */
+        version: z.number().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:view"))

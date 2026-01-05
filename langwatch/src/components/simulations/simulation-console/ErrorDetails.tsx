@@ -70,7 +70,7 @@ export function ErrorDetails({ error }: ErrorDetailsProps) {
               Stack Trace:
             </Text>
             <Code
-              colorScheme="red"
+              colorPalette="red"
               bg="transparent"
               color={CONSOLE_COLORS.failureColor}
               fontSize="xs"

@@ -1,4 +1,5 @@
-import { Badge, HStack } from "@chakra-ui/react";
+import { Icon } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
 /**
@@ -8,11 +9,10 @@ import { LuBuilding } from "react-icons/lu";
  */
 export function OrganizationBadge() {
   return (
-    <Badge colorPalette="purple" variant="outline">
-      <HStack>
+    <Tooltip content="This prompt is available to all projects in the organization">
+      <Icon color="purple">
         <LuBuilding />
-        Organization
-      </HStack>
-    </Badge>
+      </Icon>
+    </Tooltip>
   );
 }

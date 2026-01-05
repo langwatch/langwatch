@@ -1,6 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { Plus } from "react-feather";
 import { Menu } from "../../../../components/ui/menu";
+import { LuPlus } from "react-icons/lu";
 
 /**
  * AddMessageButton
@@ -14,11 +15,13 @@ export function AddMessageButton(props: {
   return (
     <Menu.Root>
       <Menu.Trigger asChild>
-        <Button size="xs" variant="ghost" type="button">
-          <Plus size={16} />
+        <Button size="xs" variant="outline" type="button">
+          <LuPlus />
+          Add
         </Button>
       </Menu.Trigger>
-      <Menu.Content>
+      {/* portalled={false} to avoid z-index issues when inside drawers */}
+      <Menu.Content portalled={false}>
         <Menu.Item value="add-user" onClick={() => onAdd("user")}>
           User
         </Menu.Item>

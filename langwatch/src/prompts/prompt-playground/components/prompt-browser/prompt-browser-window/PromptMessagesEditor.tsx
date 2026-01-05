@@ -1,5 +1,3 @@
-import { Box } from "@chakra-ui/react";
-import { useMemo } from "react";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
@@ -14,17 +12,20 @@ export function PromptMessagesEditor() {
     control: form.control,
     name: "version.configData.messages",
   });
-  const inputs = form.watch("version.configData.inputs");
-  const availableMentions = useMemo(() => {
-    return inputs.map((input) => input.identifier);
-  }, [inputs]);
+
+  // Watch inputs directly - avoid useMemo to ensure reactivity on form changes
+  const inputs = form.watch("version.configData.inputs") ?? [];
+  // Map to Variable[] format with both identifier and type
+  const availableVariables = inputs.map((input) => ({
+    identifier: input.identifier,
+    type: input.type,
+  }));
+
   return (
-    <Box width="full" bg="gray.100" paddingY={1} paddingX={2} borderRadius="md">
-      <PromptMessagesField
-        messageFields={messageFields}
-        availableFields={availableMentions}
-        otherNodesFields={{}}
-      />
-    </Box>
+    <PromptMessagesField
+      messageFields={messageFields}
+      availableFields={availableVariables}
+      otherNodesFields={{}}
+    />
   );
 }

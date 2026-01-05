@@ -42,7 +42,6 @@ const SimulationButton: React.FC<SimulationButtonProps> = ({
     asChild
     variant="outline"
     colorPalette={color}
-    colorScheme={color}
     borderRadius="md"
     px={3}
     py={6}

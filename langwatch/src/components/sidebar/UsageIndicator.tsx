@@ -41,7 +41,6 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     <Tooltip
       content={`You have used ${usage.data.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
       positioning={{ placement: "right", offset: { mainAxis: 8 } }}
-      disabled={showLabel}
     >
       <Link href="/settings/usage" width="full">
         <HStack

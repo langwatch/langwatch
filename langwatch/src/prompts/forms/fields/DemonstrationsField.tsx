@@ -25,6 +25,10 @@ export function DemonstrationsField() {
   );
   const total = transposedRecords.length;
 
+  if (total === 0) {
+    return null;
+  }
+
   return (
     <Controller
       name="version.configData.demonstrations"

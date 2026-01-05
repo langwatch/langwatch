@@ -1,0 +1,105 @@
+/**
+ * Shared icon and color definitions for features across the application.
+ * This ensures consistency between the sidebar, quick access links, and recent items.
+ */
+import {
+  BookText,
+  CheckSquare,
+  Home,
+  ListTree,
+  Pencil,
+  Play,
+  Settings,
+  Table,
+  TrendingUp,
+  Workflow,
+  type LucideIcon,
+} from "lucide-react";
+
+export type FeatureKey =
+  | "home"
+  | "analytics"
+  | "traces"
+  | "simulations"
+  | "evaluations"
+  | "workflows"
+  | "prompts"
+  | "datasets"
+  | "annotations"
+  | "settings";
+
+export type FeatureConfig = {
+  icon: LucideIcon;
+  color: string;
+  label: string;
+};
+
+/**
+ * Central configuration for feature icons and colors.
+ * Used by MainMenu, QuickAccessLinks, and RecentItemsSection.
+ */
+export const featureIcons: Record<FeatureKey, FeatureConfig> = {
+  home: {
+    icon: Home,
+    color: "gray.600",
+    label: "Home",
+  },
+  analytics: {
+    icon: TrendingUp,
+    color: "gray.600",
+    label: "Analytics",
+  },
+  traces: {
+    icon: ListTree,
+    color: "blue.500",
+    label: "Traces",
+  },
+  simulations: {
+    icon: Play,
+    color: "pink.500",
+    label: "Simulations",
+  },
+  evaluations: {
+    icon: CheckSquare,
+    color: "orange.500",
+    label: "Evaluations",
+  },
+  workflows: {
+    icon: Workflow,
+    color: "green.500",
+    label: "Workflows",
+  },
+  prompts: {
+    icon: BookText,
+    color: "purple.500",
+    label: "Prompts",
+  },
+  datasets: {
+    icon: Table,
+    color: "blue.500",
+    label: "Datasets",
+  },
+  annotations: {
+    icon: Pencil,
+    color: "teal.500",
+    label: "Annotations",
+  },
+  settings: {
+    icon: Settings,
+    color: "gray.600",
+    label: "Settings",
+  },
+};
+
+/**
+ * Map from RecentItemType to FeatureKey for consistent icons/colors.
+ */
+export const recentItemTypeToFeature: Record<string, FeatureKey> = {
+  prompt: "prompts",
+  workflow: "workflows",
+  dataset: "datasets",
+  evaluation: "evaluations",
+  annotation: "annotations",
+  simulation: "simulations",
+};
+

@@ -4,7 +4,7 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import {
   createInitialState,
   DEFAULT_TEST_DATA_ID,
-  type AgentConfig,
+  type TargetConfig,
   type DatasetReference,
   type EvaluatorConfig,
 } from "../types";
@@ -164,29 +164,33 @@ describe("useEvaluationsV3Store", () => {
       expect(state.activeDatasetId).toBe(DEFAULT_TEST_DATA_ID);
     });
 
-    it("cleans up agent mappings when removing dataset", () => {
+    it("cleans up target mappings when removing dataset", () => {
       const store = useEvaluationsV3Store.getState();
       store.addDataset(createTestDataset("ds-1", "Dataset 1"));
-      store.addAgent({
-        id: "agent-1",
-        type: "llm",
-        name: "Agent 1",
+      store.addTarget({
+        id: "target-1",
+        type: "prompt",
+        name: "Target 1",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [],
+        // Per-dataset mappings: datasetId -> inputField -> FieldMapping
         mappings: {
-          input: {
-            source: "dataset",
-            sourceId: "ds-1",
-            sourceField: "col1",
+          "ds-1": {
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "ds-1",
+              sourceField: "col1",
+            },
           },
         },
-        evaluatorIds: [],
       });
       store.removeDataset("ds-1");
 
       const state = useEvaluationsV3Store.getState();
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.mappings["input"]).toBeUndefined();
+      const target = state.targets.find((r) => r.id === "target-1");
+      // The entire dataset key should be removed
+      expect(target?.mappings?.["ds-1"]).toBeUndefined();
     });
 
     it("cleans up evaluator mappings when removing dataset", () => {
@@ -198,12 +202,16 @@ describe("useEvaluationsV3Store", () => {
         name: "Evaluator 1",
         settings: {},
         inputs: [],
+        // Per-dataset, per-target mappings: datasetId -> targetId -> inputField -> FieldMapping
         mappings: {
-          "agent-1": {
-            output: {
-              source: "dataset",
-              sourceId: "ds-1",
-              sourceField: "col1",
+          "ds-1": {
+            "target-1": {
+              output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "ds-1",
+                sourceField: "col1",
+              },
             },
           },
         },
@@ -212,7 +220,8 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["agent-1"]?.["output"]).toBeUndefined();
+      // The entire dataset key should be removed
+      expect(evaluator?.mappings["ds-1"]).toBeUndefined();
     });
 
     it("updates dataset properties", () => {
@@ -236,95 +245,143 @@ describe("useEvaluationsV3Store", () => {
     });
   });
 
-  describe("Agent operations", () => {
-    const createTestAgent = (id: string): AgentConfig => ({
+  describe("Target operations", () => {
+    const createTestTarget = (id: string): TargetConfig => ({
       id,
-      type: "llm",
-      name: `Agent ${id}`,
+      type: "prompt",
+      name: `Target ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
-      evaluatorIds: [],
     });
 
-    it("adds an agent", () => {
+    it("adds a target", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
+      store.addTarget(createTestTarget("target-1"));
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.agents).toHaveLength(1);
-      expect(state.agents[0]?.name).toBe("Agent agent-1");
+      expect(state.targets).toHaveLength(1);
+      expect(state.targets[0]?.name).toBe("Target target-1");
     });
 
-    it("updates an agent", () => {
+    it("updates a target", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.updateAgent("agent-1", { name: "Updated Agent" });
+      store.addTarget(createTestTarget("target-1"));
+      store.updateTarget("target-1", { name: "Updated Target" });
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.agents[0]?.name).toBe("Updated Agent");
+      expect(state.targets[0]?.name).toBe("Updated Target");
     });
 
-    it("removes an agent", () => {
+    it("cleans up mappings when inputs are removed", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.removeAgent("agent-1");
+      // Create target with two inputs
+      store.addTarget({
+        ...createTestTarget("target-1"),
+        inputs: [
+          { identifier: "question", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      });
+
+      // Add mappings for both inputs
+      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "question", {
+        type: "source",
+        source: "dataset",
+        sourceId: DEFAULT_TEST_DATA_ID,
+        sourceField: "input",
+      });
+      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "context", {
+        type: "value",
+        value: "some context",
+      });
+
+      // Verify both mappings exist
+      let state = useEvaluationsV3Store.getState();
+      let target = state.targets.find((r) => r.id === "target-1");
+      expect(target?.mappings[DEFAULT_TEST_DATA_ID]?.question).toBeDefined();
+      expect(target?.mappings[DEFAULT_TEST_DATA_ID]?.context).toBeDefined();
+
+      // Remove "context" input - only keep "question"
+      store.updateTarget("target-1", {
+        inputs: [{ identifier: "question", type: "str" }],
+      });
+
+      // "context" mapping should be cleaned up
+      state = useEvaluationsV3Store.getState();
+      target = state.targets.find((r) => r.id === "target-1");
+      expect(target?.mappings[DEFAULT_TEST_DATA_ID]?.question).toBeDefined();
+      expect(target?.mappings[DEFAULT_TEST_DATA_ID]?.context).toBeUndefined();
+    });
+
+    it("removes a target", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      store.removeTarget("target-1");
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.agents).toHaveLength(0);
+      expect(state.targets).toHaveLength(0);
     });
 
-    it("sets agent mapping inside agent with sourceId", () => {
+    it("sets target mapping for specific dataset", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.setAgentMapping("agent-1", "input", {
+      store.addTarget(createTestTarget("target-1"));
+      // setTargetMapping now takes: targetId, datasetId, inputField, mapping
+      store.setTargetMapping("target-1", DEFAULT_TEST_DATA_ID, "input", {
+        type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
         sourceField: "input",
       });
 
       const state = useEvaluationsV3Store.getState();
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.mappings["input"]).toEqual({
+      const target = state.targets.find((r) => r.id === "target-1");
+      // Mappings are now per-dataset
+      expect(target?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"]).toEqual({
+        type: "source",
         source: "dataset",
         sourceId: DEFAULT_TEST_DATA_ID,
         sourceField: "input",
       });
     });
 
-    it("removes agent and cleans up evaluator mappings", () => {
+    it("removes target and cleans up evaluator mappings", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
+      store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
-      store.setEvaluatorMapping("eval-1", "agent-1", "output", {
-        source: "agent",
-        sourceId: "agent-1",
+      // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
+        type: "source",
+        source: "target",
+        sourceId: "target-1",
         sourceField: "output",
       });
-      store.removeAgent("agent-1");
+      store.removeTarget("target-1");
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.agents).toHaveLength(0);
-      // Evaluator still exists but agent's mappings should be removed
+      expect(state.targets).toHaveLength(0);
+      // Evaluator still exists but target's mappings should be removed for all datasets
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["agent-1"]).toBeUndefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]).toBeUndefined();
     });
 
-    it("removes mappings referencing removed agent from other agents", () => {
+    it("removes mappings referencing removed target from other targets", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.addAgent(createTestAgent("agent-2"));
-      store.setAgentMapping("agent-2", "input", {
-        source: "agent",
-        sourceId: "agent-1",
+      store.addTarget(createTestTarget("target-1"));
+      store.addTarget(createTestTarget("target-2"));
+      // setTargetMapping now takes: targetId, datasetId, inputField, mapping
+      store.setTargetMapping("target-2", DEFAULT_TEST_DATA_ID, "input", {
+        type: "source",
+        source: "target",
+        sourceId: "target-1",
         sourceField: "output",
       });
-      store.removeAgent("agent-1");
+      store.removeTarget("target-1");
 
       const state = useEvaluationsV3Store.getState();
-      const agent2 = state.agents.find((a) => a.id === "agent-2");
-      expect(agent2?.mappings["input"]).toBeUndefined();
+      const target2 = state.targets.find((r) => r.id === "target-2");
+      // Mappings should be removed for the dataset that referenced the removed target
+      expect(target2?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"]).toBeUndefined();
     });
   });
 
@@ -356,37 +413,32 @@ describe("useEvaluationsV3Store", () => {
       expect(state.evaluators[0]?.name).toBe("Updated Evaluator");
     });
 
-    it("removes a global evaluator and cleans up agent references", () => {
+    it("removes a global evaluator", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent({
-        id: "agent-1",
-        type: "llm",
-        name: "Agent 1",
+      store.addTarget({
+        id: "target-1",
+        type: "prompt",
+        name: "Target 1",
         inputs: [],
         outputs: [],
         mappings: {},
-        evaluatorIds: [],
       });
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
       store.removeEvaluator("eval-1");
 
       const state = useEvaluationsV3Store.getState();
       expect(state.evaluators).toHaveLength(0);
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluatorIds).not.toContain("eval-1");
     });
   });
 
-  describe("Agent-evaluator relationship operations", () => {
-    const createTestAgent = (id: string): AgentConfig => ({
+  describe("Evaluator mapping operations (evaluators apply to all targets)", () => {
+    const createTestTarget = (id: string): TargetConfig => ({
       id,
-      type: "llm",
-      name: `Agent ${id}`,
+      type: "prompt",
+      name: `Target ${id}`,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
       mappings: {},
-      evaluatorIds: [],
     });
 
     const createTestEvaluator = (id: string): EvaluatorConfig => ({
@@ -398,91 +450,83 @@ describe("useEvaluationsV3Store", () => {
       mappings: {},
     });
 
-    it("adds an evaluator reference to an agent", () => {
+    it("sets evaluator mapping for a specific dataset and target", () => {
       const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
+      store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
-
-      const state = useEvaluationsV3Store.getState();
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluatorIds).toContain("eval-1");
-      // Evaluator should have initialized mappings for this agent
-      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["agent-1"]).toBeDefined();
-    });
-
-    it("does not add duplicate evaluator reference", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
-      store.addEvaluatorToAgent("agent-1", "eval-1"); // duplicate
-
-      const state = useEvaluationsV3Store.getState();
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluatorIds).toHaveLength(1);
-    });
-
-    it("removes an evaluator reference from an agent", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
-      store.removeEvaluatorFromAgent("agent-1", "eval-1");
-
-      const state = useEvaluationsV3Store.getState();
-      const agent = state.agents.find((a) => a.id === "agent-1");
-      expect(agent?.evaluatorIds).not.toContain("eval-1");
-      // Evaluator should have removed mappings for this agent
-      const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["agent-1"]).toBeUndefined();
-    });
-
-    it("sets evaluator mapping for an agent with sourceId", () => {
-      const store = useEvaluationsV3Store.getState();
-      store.addAgent(createTestAgent("agent-1"));
-      store.addEvaluator(createTestEvaluator("eval-1"));
-      store.addEvaluatorToAgent("agent-1", "eval-1");
-      store.setEvaluatorMapping("eval-1", "agent-1", "output", {
-        source: "agent",
-        sourceId: "agent-1",
+      // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
+        type: "source",
+        source: "target",
+        sourceId: "target-1",
         sourceField: "output",
       });
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings["agent-1"]?.["output"]).toEqual({
-        source: "agent",
-        sourceId: "agent-1",
+      // Mappings are per-dataset, per-target
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.["output"]).toEqual({
+        type: "source",
+        source: "target",
+        sourceId: "target-1",
         sourceField: "output",
       });
+    });
+
+    it("evaluators apply to all targets automatically", () => {
+      const store = useEvaluationsV3Store.getState();
+      store.addTarget(createTestTarget("target-1"));
+      store.addTarget(createTestTarget("target-2"));
+      store.addEvaluator(createTestEvaluator("eval-1"));
+
+      const state = useEvaluationsV3Store.getState();
+      // Evaluator exists globally and applies to all targets
+      expect(state.evaluators).toHaveLength(1);
+      expect(state.targets).toHaveLength(2);
+      // Both targets can have mappings set for this evaluator
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
+        type: "source",
+        source: "target",
+        sourceId: "target-1",
+        sourceField: "output",
+      });
+      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-2", "output", {
+        type: "source",
+        source: "target",
+        sourceId: "target-2",
+        sourceField: "output",
+      });
+
+      const updatedState = useEvaluationsV3Store.getState();
+      const evaluator = updatedState.evaluators.find((e) => e.id === "eval-1");
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]).toBeDefined();
+      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-2"]).toBeDefined();
     });
   });
 
   describe("UI state operations", () => {
     it("opens overlay with target", () => {
       const store = useEvaluationsV3Store.getState();
-      store.openOverlay("agent", "agent-1");
+      store.openOverlay("target", "target-1");
 
       const state = useEvaluationsV3Store.getState();
-      expect(state.ui.openOverlay).toBe("agent");
-      expect(state.ui.overlayTargetId).toBe("agent-1");
+      expect(state.ui.openOverlay).toBe("target");
+      expect(state.ui.overlayTargetId).toBe("target-1");
     });
 
     it("opens overlay with evaluator target", () => {
       const store = useEvaluationsV3Store.getState();
-      store.openOverlay("evaluator", "agent-1", "eval-1");
+      store.openOverlay("evaluator", "target-1", "eval-1");
 
       const state = useEvaluationsV3Store.getState();
       expect(state.ui.openOverlay).toBe("evaluator");
-      expect(state.ui.overlayTargetId).toBe("agent-1");
+      expect(state.ui.overlayTargetId).toBe("target-1");
       expect(state.ui.overlayEvaluatorId).toBe("eval-1");
     });
 
     it("closes overlay", () => {
       const store = useEvaluationsV3Store.getState();
-      store.openOverlay("agent", "agent-1");
+      store.openOverlay("target", "target-1");
       store.closeOverlay();
 
       const state = useEvaluationsV3Store.getState();
@@ -552,14 +596,14 @@ describe("useEvaluationsV3Store", () => {
     it("sets expanded evaluator", () => {
       const store = useEvaluationsV3Store.getState();
       store.setExpandedEvaluator({
-        agentId: "agent-1",
+        targetId: "target-1",
         evaluatorId: "eval-1",
         row: 0,
       });
 
       const state = useEvaluationsV3Store.getState();
       expect(state.ui.expandedEvaluator).toEqual({
-        agentId: "agent-1",
+        targetId: "target-1",
         evaluatorId: "eval-1",
         row: 0,
       });
@@ -586,14 +630,14 @@ describe("useEvaluationsV3Store", () => {
       store.setResults({
         status: "success",
         runId: "run-123",
-        agentOutputs: { "agent-1": ["output1"] },
+        targetOutputs: { "target-1": ["output1"] },
       });
       store.clearResults();
 
       const state = useEvaluationsV3Store.getState();
       expect(state.results.status).toBe("idle");
       expect(state.results.runId).toBeUndefined();
-      expect(state.results.agentOutputs).toEqual({});
+      expect(state.results.targetOutputs).toEqual({});
     });
   });
 
@@ -603,20 +647,19 @@ describe("useEvaluationsV3Store", () => {
       const initialState = createInitialState();
 
       store.setName("Modified Name");
-      store.addAgent({
-        id: "agent-1",
-        type: "llm",
-        name: "Agent",
+      store.addTarget({
+        id: "target-1",
+        type: "prompt",
+        name: "Target",
         inputs: [],
         outputs: [],
         mappings: {},
-        evaluatorIds: [],
       });
       store.reset();
 
       const state = useEvaluationsV3Store.getState();
       expect(state.name).toBe(initialState.name);
-      expect(state.agents).toEqual([]);
+      expect(state.targets).toEqual([]);
       expect(state.datasets).toHaveLength(1);
       expect(state.activeDatasetId).toBe(DEFAULT_TEST_DATA_ID);
     });

@@ -5,9 +5,10 @@ import { LuChevronDown } from "react-icons/lu";
 /**
  * Props for the SidebarRoot component
  */
-interface SidebarRootProps {
+interface SidebarRootProps extends BoxProps {
   /** The content to render inside the sidebar */
   children: React.ReactNode;
+  /** The props to pass to the Box component */
 }
 
 /**
@@ -16,16 +17,15 @@ interface SidebarRootProps {
  * @param props - The component props
  * @returns A styled navigation container with vertical scrolling
  */
-function SidebarRoot({ children }: SidebarRootProps) {
+function SidebarRoot({ children, ...props }: SidebarRootProps) {
   return (
     <Box
       as="nav"
       width="full"
       height="100%"
-      borderRight="1px solid"
-      borderColor="gray.200"
       overflowY="auto"
-      paddingY="3"
+      paddingBottom="2"
+      {...props}
     >
       <VStack gap={0} align="stretch">
         {children}
@@ -136,7 +136,7 @@ function SidebarList({
 
   if (!title) {
     return (
-      <VStack gap={0} align="stretch" paddingLeft={2}>
+      <VStack gap={0.5} align="stretch" paddingX={2}>
         {children}
       </VStack>
     );
@@ -159,7 +159,7 @@ function SidebarList({
         {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
       </SidebarSectionHeader>
       {(!collapsible || isOpen) && (
-        <VStack gap={0} align="stretch" paddingLeft={5}>
+        <VStack gap={0} align="stretch" paddingX={4}>
           {children}
         </VStack>
       )}
@@ -170,7 +170,7 @@ function SidebarList({
 /**
  * Props for the SidebarItem component
  */
-interface SidebarItemProps {
+interface SidebarItemProps extends BoxProps {
   /** The content to render inside the item */
   children: React.ReactNode;
   /** Click handler for the item */
@@ -198,6 +198,7 @@ function SidebarItem({
   icon,
   meta,
   variant = "default",
+  ...props
 }: SidebarItemProps) {
   if (variant === "empty") {
     return (
@@ -209,18 +210,18 @@ function SidebarItem({
 
   return (
     <Box
-      paddingX="2"
       fontSize="sm"
       color={active ? "blue.600" : "gray.700"}
       bg={active ? "blue.50" : "transparent"}
       borderRadius="md"
       cursor="pointer"
-      _hover={{ bg: active ? "blue.50" : "gray.50" }}
+      _hover={{ bg: active ? "blue.100" : "gray.100" }}
       onClick={onClick}
       display="flex"
       alignItems="center"
       gap={2}
       width="full"
+      {...props}
     >
       {icon && (
         <Box
