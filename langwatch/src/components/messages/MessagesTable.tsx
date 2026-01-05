@@ -56,9 +56,9 @@ import { Tooltip } from "../ui/tooltip";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import type { TraceWithGuardrail } from "./MessageCard";
 import {
-  MessagesNavigationFooter,
-  useMessagesNavigationFooter,
-} from "./MessagesNavigationFooter";
+  NavigationFooter,
+  useNavigationFooter,
+} from "../NavigationFooter";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import { LuList } from "react-icons/lu";
 
@@ -90,7 +90,7 @@ export function MessagesTable({
     setPeriod,
   } = usePeriodSelector();
 
-  const navigationFooter = useMessagesNavigationFooter();
+  const navigationFooter = useNavigationFooter();
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
@@ -1214,7 +1214,7 @@ export function MessagesTable({
                 </Table.Body>
               </Table.Root>
             </Table.ScrollArea>
-            <MessagesNavigationFooter {...navigationFooter} />
+            <NavigationFooter {...navigationFooter} />
           </VStack>
         </Box>
 

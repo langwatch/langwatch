@@ -17,7 +17,7 @@ import { useRouter } from "next/router";
 import Parse from "papaparse";
 import { useState } from "react";
 import { ProjectSelector } from "../../components/DashboardLayout";
-import { MessagesNavigationFooter } from "../../components/messages/MessagesNavigationFooter";
+import { NavigationFooter } from "../../components/NavigationFooter";
 import {
   PeriodSelector,
   usePeriodSelector,
@@ -514,7 +514,7 @@ function AuditLogPage() {
 
             {/* Pagination */}
             {totalHits > 0 && (
-              <MessagesNavigationFooter
+              <NavigationFooter
                 totalHits={totalHits}
                 pageOffset={pageOffset}
                 pageSize={pageSize}

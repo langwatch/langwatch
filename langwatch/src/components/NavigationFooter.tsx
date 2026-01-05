@@ -5,63 +5,104 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "react-feather";
-import type { AppRouter } from "../../server/api/root";
+import type { AppRouter } from "../server/api/root";
 
-export const useMessagesNavigationFooter = () => {
+export const useNavigationFooter = () => {
   const router = useRouter();
 
   const [totalHits, setTotalHits] = useState<number>(0);
 
   // Get pagination from URL parameters with defaults
-  const pageOffset = parseInt(router.query.pageOffset as string) || 0;
-  const pageSize = parseInt(router.query.pageSize as string) || 25;
+  const pageOffset = router.isReady
+    ? parseInt(router.query.pageOffset as string) || 0
+    : 0;
+  const pageSize = router.isReady
+    ? parseInt(router.query.pageSize as string) || 25
+    : 25;
 
   const nextPage = () => {
+    if (!router.isReady) return;
     const newOffset = pageOffset + pageSize;
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageOffset: newOffset.toString() },
-    });
+    const newQuery = {
+      ...Object.fromEntries(
+        Object.entries(router.query).filter(([_, v]) => v !== undefined),
+      ),
+      pageOffset: newOffset.toString(),
+    };
+    void router.replace(
+      {
+        pathname: router.pathname,
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true, scroll: false },
+    );
   };
 
   const prevPage = () => {
-    if (pageOffset > 0) {
-      const newOffset = pageOffset - pageSize;
-      void router.push({
+    if (!router.isReady || pageOffset <= 0) return;
+    const newOffset = pageOffset - pageSize;
+    const newQuery = {
+      ...Object.fromEntries(
+        Object.entries(router.query).filter(([_, v]) => v !== undefined),
+      ),
+      pageOffset: newOffset.toString(),
+    };
+    void router.replace(
+      {
         pathname: router.pathname,
-        query: { ...router.query, pageOffset: newOffset.toString() },
-      });
-    }
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true, scroll: false },
+    );
   };
 
   const changePageSize = (size: number) => {
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageSize: size.toString(), pageOffset: "0" },
-    });
+    if (!router.isReady) return;
+    const newQuery = {
+      ...Object.fromEntries(
+        Object.entries(router.query).filter(([_, v]) => v !== undefined),
+      ),
+      pageSize: size.toString(),
+      pageOffset: "0",
+    };
+    void router.replace(
+      {
+        pathname: router.pathname,
+        query: newQuery,
+      },
+      undefined,
+      { shallow: true, scroll: false },
+    );
   };
 
-  const useUpdateTotalHits = (
-    traceGroups: UseTRPCQueryResult<
-      inferRouterOutputs<AppRouter>["traces"]["getAllForProject"],
-      TRPCClientErrorLike<AppRouter>
-    >,
+  const useUpdateTotalHits = <T extends { totalHits?: number }>(
+    queryResult: UseTRPCQueryResult<T, TRPCClientErrorLike<AppRouter>>,
   ) => {
     useEffect(() => {
-      if (traceGroups.isFetched) {
-        const totalHits: number = traceGroups.data?.totalHits ?? 0;
+      if (queryResult.isFetched) {
+        const totalHits: number = queryResult.data?.totalHits ?? 0;
 
         setTotalHits(totalHits);
       }
-    }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
+    }, [queryResult.data?.totalHits, queryResult.isFetched]);
   };
 
   useEffect(() => {
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageOffset: "0", pageSize: "25" },
-    });
-  }, [router.query.query]);
+    // Only reset pagination when search query changes (for messages page)
+    // Skip if query parameter doesn't exist (evaluations page)
+    if (router.query.query !== undefined) {
+      void router.push(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, pageOffset: "0", pageSize: "25" },
+        },
+        undefined,
+        { shallow: true },
+      );
+    }
+  }, [router.query.query, router]);
 
   return {
     totalHits,
@@ -74,7 +115,7 @@ export const useMessagesNavigationFooter = () => {
   };
 };
 
-export function MessagesNavigationFooter({
+export function NavigationFooter({
   totalHits,
   pageOffset,
   pageSize,
@@ -98,7 +139,10 @@ export function MessagesNavigationFooter({
           <NativeSelect.Root size="sm">
             <NativeSelect.Field
               defaultValue="25"
-              onChange={(e) => changePageSize(parseInt(e.target.value))}
+              onChange={(e) => {
+                e.preventDefault();
+                changePageSize(parseInt(e.target.value));
+              }}
               borderColor="black"
               borderRadius="lg"
               value={pageSize.toString()}
@@ -127,18 +171,26 @@ export function MessagesNavigationFooter({
         </Text>
         <HStack gap={0}>
           <Button
+            type="button"
             variant="ghost"
             padding={0}
-            onClick={prevPage}
+            onClick={(e) => {
+              e.preventDefault();
+              prevPage();
+            }}
             disabled={pageOffset === 0}
           >
             <ChevronLeft />
           </Button>
           <Button
+            type="button"
             variant="ghost"
             padding={0}
             disabled={pageOffset + pageSize >= totalHits}
-            onClick={nextPage}
+            onClick={(e) => {
+              e.preventDefault();
+              nextPage();
+            }}
           >
             <ChevronRight />
           </Button>

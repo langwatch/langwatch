@@ -42,6 +42,10 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import {
+  NavigationFooter,
+  useNavigationFooter,
+} from "../../components/NavigationFooter";
 
 function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -51,6 +55,8 @@ function EvaluationsV2() {
     experimentId: string;
     evaluationName: string;
   } | null>(null);
+
+  const navigationFooter = useNavigationFooter();
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
@@ -62,9 +68,16 @@ function EvaluationsV2() {
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
+      pageOffset: navigationFooter.pageOffset,
+      pageSize: navigationFooter.pageSize,
     },
-    { enabled: !!project },
+    {
+      enabled: !!project && router.isReady,
+      keepPreviousData: true,
+    },
   );
+
+  navigationFooter.useUpdateTotalHits(experiments);
 
   const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
     {
@@ -162,7 +175,7 @@ function EvaluationsV2() {
 
               <Card.Root>
                 <Card.Body overflowX="auto">
-                  {experiments.data && experiments.data.length == 0 ? (
+                  {experiments.data && experiments.data.experiments.length == 0 ? (
                     <EmptyState.Root>
                       <EmptyState.Content>
                         <EmptyState.Indicator>
@@ -226,7 +239,7 @@ function EvaluationsV2() {
                               </Table.Row>
                             ))
                           : experiments.data
-                          ? experiments.data?.map((experiment, i) => (
+                          ? experiments.data.experiments?.map((experiment, i) => (
                               <Table.Row
                                 cursor="pointer"
                                 onClick={() => {
@@ -402,6 +415,9 @@ function EvaluationsV2() {
                     </Table.Root>
                   )}
                 </Card.Body>
+                {experiments.data && experiments.data.experiments.length > 0 && (
+                  <NavigationFooter {...navigationFooter} />
+                )}
               </Card.Root>
             </>
           )}

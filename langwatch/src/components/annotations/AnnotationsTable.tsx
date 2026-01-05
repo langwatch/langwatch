@@ -22,10 +22,7 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
 import { Tooltip } from "../../components/ui/tooltip";
-import {
-  MessagesNavigationFooter,
-  useMessagesNavigationFooter,
-} from "../messages/MessagesNavigationFooter";
+import { NavigationFooter, useNavigationFooter } from "../NavigationFooter";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
 import { RedactedField } from "../ui/RedactedField";
 import UserAvatarGroup from "./AvatarGroup";
@@ -89,7 +86,7 @@ export const AnnotationsTable = ({
   const { scoreOptions } = useAnnotationQueues();
   const { openDrawer } = useDrawer();
 
-  const navigationFooter = useMessagesNavigationFooter();
+  const navigationFooter = useNavigationFooter();
 
   const [selectedAnnotations, setSelectedAnnotations] =
     useState<string>("pending");
@@ -227,10 +224,11 @@ export const AnnotationsTable = ({
         annotation.annotations.some((annotation) => annotation.expectedOutput),
       );
     }
-    return allQueueItems.some((item: UnifiedQueueItem) =>
-      item.annotations?.some(
-        (annotation: AnnotationWithUser) => annotation.expectedOutput,
-      ),
+    return allQueueItems.some(
+      (item: UnifiedQueueItem) =>
+        item.annotations?.some(
+          (annotation: AnnotationWithUser) => annotation.expectedOutput,
+        ),
     );
   };
 
@@ -242,10 +240,11 @@ export const AnnotationsTable = ({
     ) {
       return true;
     }
-    return allQueueItems.some((item: UnifiedQueueItem) =>
-      item.annotations?.some(
-        (annotation: AnnotationWithUser) => annotation.comment,
-      ),
+    return allQueueItems.some(
+      (item: UnifiedQueueItem) =>
+        item.annotations?.some(
+          (annotation: AnnotationWithUser) => annotation.comment,
+        ),
     );
   };
 
@@ -590,7 +589,7 @@ export const AnnotationsTable = ({
             )}
           </Box>
         </HStack>
-        <MessagesNavigationFooter
+        <NavigationFooter
           totalHits={
             groupedAnnotations ? groupedAnnotations.length : totalCount
           }
