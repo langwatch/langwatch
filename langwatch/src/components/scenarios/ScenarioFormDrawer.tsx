@@ -1,23 +1,20 @@
 import {
-  Box,
   Button,
   Grid,
   GridItem,
   Heading,
   HStack,
-  NativeSelect,
-  Text,
 } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { Bot, ChevronDown, Play, Plus } from "lucide-react";
+import { Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { api } from "../../utils/api";
-import { Menu } from "../ui/menu";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
+import { QuickTestBar } from "./QuickTestBar";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
 
@@ -38,7 +35,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const params = useDrawerParams();
   const utils = api.useContext();
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
-  const [selectedAgent, setSelectedAgent] = useState("production");
+  const [selectedPromptId, setSelectedPromptId] = useState<string[]>([]);
 
   const scenarioId = params.scenarioId;
   const isOpen = props.open !== false && props.open !== undefined;
@@ -117,14 +114,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [project?.id, scenario, createMutation, updateMutation]
   );
 
-  const handleSaveAndRun = useCallback(
-    (agentId: string) => {
-      if (formRef.current) {
-        formRef.current.handleSubmit((data) => handleSubmit(data, true))();
-      }
-    },
-    [handleSubmit]
-  );
+  const handleSaveAndRun = useCallback(() => {
+    if (formRef.current) {
+      formRef.current.handleSubmit((data) => handleSubmit(data, true))();
+    }
+  }, [handleSubmit]);
 
   const handleSaveWithoutRunning = useCallback(() => {
     if (formRef.current) {
@@ -139,13 +133,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const isSubmitting = createMutation.isLoading || updateMutation.isLoading;
 
   const defaultValues: Partial<ScenarioFormData> | undefined = scenario ?? undefined;
-
-  // Mock agents list - TODO: fetch from API
-  const agents = [
-    { id: "production", name: "Production Agent" },
-    { id: "staging", name: "Staging Agent" },
-    { id: "dev", name: "Dev Agent" },
-  ];
 
   return (
     <Drawer.Root
@@ -184,88 +171,30 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
 
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          <HStack gap={4}>
-            <Text
-              fontSize="xs"
-              fontWeight="bold"
-              textTransform="uppercase"
-              color="gray.500"
+          <QuickTestBar
+            selectedPromptId={selectedPromptId}
+            onPromptChange={setSelectedPromptId}
+          />
+
+          <HStack gap={2}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSaveWithoutRunning}
+              loading={isSubmitting}
             >
-              Quick Test
-            </Text>
-            <HStack gap={2}>
-              <Text fontSize="sm" color="gray.600">
-                Target:
-              </Text>
-              <NativeSelect.Root size="sm" width="180px">
-                <NativeSelect.Field
-                  value={selectedAgent}
-                  onChange={(e) => setSelectedAgent(e.target.value)}
-                >
-                  {agents.map((agent) => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.name}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </HStack>
+              Save
+            </Button>
+            <Button
+              colorPalette="blue"
+              size="sm"
+              onClick={handleSaveAndRun}
+              loading={isSubmitting}
+            >
+              <Play size={14} />
+              Save and Run
+            </Button>
           </HStack>
-
-          <Menu.Root>
-            <Menu.Trigger asChild>
-              <Button colorPalette="blue" size="sm" loading={isSubmitting}>
-                <Play size={14} />
-                Save and Run
-                <ChevronDown size={14} />
-              </Button>
-            </Menu.Trigger>
-            <Menu.Content portalled={false}>
-              <Menu.Item
-                value="add-agent"
-                borderWidth="1px"
-                borderColor="blue.200"
-                borderRadius="md"
-                margin={1}
-              >
-                <HStack gap={2}>
-                  <Plus size={14} />
-                  <Text>Add new agent</Text>
-                </HStack>
-              </Menu.Item>
-
-              <Box px={3} py={2}>
-                <Text
-                  fontSize="xs"
-                  fontWeight="bold"
-                  textTransform="uppercase"
-                  color="gray.500"
-                >
-                  Agents
-                </Text>
-              </Box>
-
-              {agents.map((agent) => (
-                <Menu.Item
-                  key={agent.id}
-                  value={agent.id}
-                  onClick={() => handleSaveAndRun(agent.id)}
-                >
-                  <HStack gap={2}>
-                    <Bot size={14} />
-                    <Text>{agent.name}</Text>
-                  </HStack>
-                </Menu.Item>
-              ))}
-
-              <Menu.Separator />
-
-              <Menu.Item value="save-only" onClick={handleSaveWithoutRunning}>
-                <Text>Save without running</Text>
-              </Menu.Item>
-            </Menu.Content>
-          </Menu.Root>
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
