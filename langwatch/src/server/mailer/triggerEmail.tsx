@@ -7,11 +7,8 @@ import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
 
 import { env } from "../../env.mjs";
+import type { TriggerData } from "~/pages/api/cron/triggers/types";
 import { sendEmail } from "./emailSender";
-
-interface TriggerData {
-  traceId: string;
-}
 
 export const sendTriggerEmail = async ({
   triggerEmails,
@@ -73,16 +70,32 @@ const TriggerTable = ({
   triggerData: TriggerData[];
   projectSlug: string;
 }) => {
+  const getLink = (data: TriggerData) => {
+    // Check if this is a custom graph trigger
+    if (data.graphId) {
+      return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${data.graphId}`;
+    }
+    // Regular trace link
+    if (data.traceId) {
+      return `${env.BASE_HOST}/${projectSlug}/messages/${data.traceId}`;
+    }
+    return "#";
+  };
+
+  const getDisplayText = (data: TriggerData) => {
+    // For custom graphs, show a more user-friendly text
+    if (data.graphId) {
+      return "View Graph";
+    }
+    return data.traceId ?? "View";
+  };
+
   return (
     <Section>
       {triggerData.slice(0, 10).map((data, index) => (
         <Row key={index}>
           <Column>
-            <Link
-              href={`${env.BASE_HOST}/${projectSlug}/messages/${data.traceId}`}
-            >
-              {data.traceId}
-            </Link>
+            <Link href={getLink(data)}>{getDisplayText(data)}</Link>
           </Column>
         </Row>
       ))}

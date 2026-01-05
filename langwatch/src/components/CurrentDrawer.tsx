@@ -7,7 +7,6 @@ import {
   type DrawerType,
 } from "../hooks/useDrawer";
 import { drawers } from "./drawerRegistry";
-import { useEffect } from "react";
 
 // Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";

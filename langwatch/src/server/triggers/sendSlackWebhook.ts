@@ -5,7 +5,8 @@ import { env } from "../../env.mjs";
 import { captureException } from "../../utils/posthogErrorCapture";
 
 interface TriggerData {
-  traceId: string;
+  traceId?: string;
+  graphId?: string;
   input: string;
   output: string;
   fullTrace: Trace;
@@ -32,6 +33,7 @@ export const sendSlackWebhook = async ({
     .map((data) => {
       return {
         traceId: data.traceId,
+        graphId: data.graphId,
         input: data.input,
         output: data.output,
         events: data.fullTrace?.events ?? [],
@@ -39,17 +41,37 @@ export const sendSlackWebhook = async ({
     })
     .slice(0, 10);
 
+  const getLink = (data: { traceId?: string; graphId?: string }) => {
+    // Check if this is a custom graph trigger
+    if (data.graphId) {
+      return `${env.BASE_HOST}/${projectSlug}/analytics/custom/${data.graphId}`;
+    }
+    // Regular trace link
+    if (data.traceId) {
+      return `${env.BASE_HOST}/${projectSlug}/messages/${data.traceId}`;
+    }
+    return "#";
+  };
+
+  const getDisplayText = (data: { traceId?: string; graphId?: string }) => {
+    // For custom graphs, show a more user-friendly text
+    if (data.graphId) {
+      return "View Graph";
+    }
+    return data.traceId ?? "View";
+  };
+
   const traceLinks = traceIds.map((trace) => {
-    return `\n<${env.BASE_HOST}/${projectSlug}/messages/${trace.traceId}|${
-      trace.traceId
-    }>
+    const isCustomGraph = !!trace.graphId;
+    
+    return `\n<${getLink(trace)}|${getDisplayText(trace)}>
     ${
-      !triggerMessage
+      !triggerMessage && !isCustomGraph
         ? ` \n*Input:* ${trace.input}
     \n*Output:* ${trace.output}'\n`
         : ""
     }
-      ${(trace.events ?? [])
+      ${!isCustomGraph && (trace.events ?? [])
         .map((event: any) => {
           return `\n*Event Type:* ${event.event_type}
           ${Object.entries(event.metrics || {})

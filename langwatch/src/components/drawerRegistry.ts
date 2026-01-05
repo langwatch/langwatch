@@ -21,6 +21,7 @@ import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+import { AlertDrawer } from "./analytics/AlertDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
@@ -51,6 +52,7 @@ export const drawers = {
   editTriggerFilter: EditTriggerFilterDrawer,
   seriesFilters: SeriesFiltersDrawer,
   selectDataset: SelectDatasetDrawer,
+  customGraphAlert: AlertDrawer,
   // Evaluations V3 drawers
   targetTypeSelector: TargetTypeSelectorDrawer,
   promptList: PromptListDrawer,
