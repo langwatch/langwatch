@@ -40,8 +40,8 @@ export const useNavigationFooter = () => {
   };
 
   const prevPage = () => {
-    if (!router.isReady || pageOffset <= 0) return;
-    const newOffset = pageOffset - pageSize;
+    if (!router.isReady || pageOffset === 0) return;
+    const newOffset = Math.max(0, pageOffset - pageSize);
     const newQuery = {
       ...Object.fromEntries(
         Object.entries(router.query).filter(([_, v]) => v !== undefined),
@@ -102,7 +102,8 @@ export const useNavigationFooter = () => {
         { shallow: true },
       );
     }
-  }, [router.query.query, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.query.query]);
 
   return {
     totalHits,
