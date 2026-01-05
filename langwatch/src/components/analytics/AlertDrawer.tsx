@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Trash } from "lucide-react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import { Drawer } from "../ui/drawer";
 import { Radio, RadioGroup } from "../ui/radio";
 import { Tooltip } from "../ui/tooltip";

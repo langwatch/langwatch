@@ -26,7 +26,7 @@ import {
 } from "chakra-react-select";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/router";
-import {
+import React, {
   type Dispatch,
   type SetStateAction,
   useEffect,

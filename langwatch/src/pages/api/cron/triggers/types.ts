@@ -44,7 +44,7 @@ export interface TriggerContext {
 
 export interface TriggerResult {
   triggerId: string;
-  status: "triggered" | "not_triggered" | "error";
+  status: "triggered" | "not_triggered" | "error" | "already_firing";
   message?: string;
   updatedAt?: number;
   totalFound?: number;

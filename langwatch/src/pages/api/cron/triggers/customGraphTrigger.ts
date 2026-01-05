@@ -37,7 +37,7 @@ interface TimeseriesResult {
 
 export const processCustomGraphTrigger = async (
   trigger: Trigger,
-  projects: Project[],
+  projects: Project[]
 ): Promise<TriggerResult> => {
   const {
     id: triggerId,
@@ -175,7 +175,7 @@ export const processCustomGraphTrigger = async (
     const currentValue = calculateCurrentValue(
       timeseriesResult,
       series,
-      seriesName,
+      seriesName
     );
 
     // Check threshold condition
@@ -212,7 +212,7 @@ export const processCustomGraphTrigger = async (
           {
             input: `Graph: ${customGraph.name}`,
             output: `Current value: ${currentValue.toFixed(
-              2,
+              2
             )} (threshold: ${operator} ${threshold})`,
             graphId: customGraphId,
             projectId,
@@ -226,7 +226,7 @@ export const processCustomGraphTrigger = async (
             message:
               trigger.message ??
               `Graph "${customGraph.name}" alert: Value ${currentValue.toFixed(
-                2,
+                2
               )} ${operator} ${threshold}`,
           },
           projects,
@@ -304,7 +304,7 @@ export const processCustomGraphTrigger = async (
 const calculateCurrentValue = (
   timeseriesResult: TimeseriesResult,
   series: CustomGraphInput["series"][number],
-  seriesKey: string,
+  seriesKey: string
 ): number => {
   let currentValue = 0;
 

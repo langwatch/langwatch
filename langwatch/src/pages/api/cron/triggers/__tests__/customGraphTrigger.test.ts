@@ -11,6 +11,10 @@ vi.mock("~/server/db", () => ({
     customGraph: {
       findUnique: vi.fn(),
     },
+    triggerSent: {
+      findFirst: vi.fn(),
+      update: vi.fn(),
+    },
   },
 }));
 
@@ -25,6 +29,7 @@ vi.mock("../actions/sendSlackMessage", () => ({
 vi.mock("../utils", () => ({
   updateAlert: vi.fn(),
   checkThreshold: vi.fn(),
+  addTriggersSent: vi.fn(),
 }));
 
 vi.mock("~/utils/posthogErrorCapture", () => ({
@@ -45,6 +50,8 @@ describe("processCustomGraphTrigger", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock: no unresolved trigger (new alert will be sent)
+    vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
   });
 
   describe("when trigger has no customGraphId", () => {
@@ -219,6 +226,8 @@ describe("processCustomGraphTrigger", () => {
         },
         filters: {},
       } as any);
+
+      vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
 
       vi.mocked(timeseries).mockResolvedValue({
         currentPeriod: [
