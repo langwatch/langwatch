@@ -9,7 +9,7 @@ import { NoTabsOpenState } from "./NoTabsOpenState";
 export function MainContentEmptyState() {
   const { data } = useAllPromptsForProject();
   const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
-  const hasNoPrompts = !publishedPrompts || publishedPrompts.length === 0;
+  const hasNoPrompts = publishedPrompts?.length === 0;
 
   if (hasNoPrompts) {
     return <NoPromptsOnboardingState />;

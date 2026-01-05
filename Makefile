@@ -1,4 +1,4 @@
-.PHONY: start sync-all-openapi quickstart
+.PHONY: start sync-all-openapi quickstart user-delete-dry-run user-delete es-delete-dry-run es-delete
 
 
 install:

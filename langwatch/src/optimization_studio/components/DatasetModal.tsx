@@ -132,7 +132,6 @@ export function DatasetModal({
       onOpenChange={({ open }) => !open && onClose()}
       size="full"
     >
-      <Dialog.Backdrop />
       <Dialog.Content
         css={{
           marginX: "32px",

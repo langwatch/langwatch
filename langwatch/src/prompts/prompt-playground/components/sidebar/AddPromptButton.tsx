@@ -1,6 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { LuPlus } from "react-icons/lu";
 import { useCreateDraftPrompt } from "../../hooks/useCreateDraftPrompt";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 /**
  * AddPromptButton
@@ -9,8 +10,11 @@ import { useCreateDraftPrompt } from "../../hooks/useCreateDraftPrompt";
 export function AddPromptButton() {
   const { createDraftPrompt } = useCreateDraftPrompt();
   return (
-    <Button onClick={() => void createDraftPrompt()} size="xs" variant="ghost">
+    <PageLayout.HeaderButton
+      onClick={() => void createDraftPrompt()}
+    >
       <LuPlus size={14} />
-    </Button>
+      New Prompt
+    </PageLayout.HeaderButton>
   );
 }

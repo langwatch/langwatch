@@ -33,7 +33,12 @@ export function withPermissionGuard(
     } = options ?? {};
 
     const GuardedComponent = (props: P) => {
-      const { hasAnyPermission } = useOrganizationTeamProject();
+      const { hasAnyPermission, isLoading } = useOrganizationTeamProject();
+
+      // Don't check permissions while still loading - let the wrapped component handle loading state
+      if (isLoading) {
+        return <WrappedComponent {...props} />;
+      }
 
       // Unified permission checker automatically routes to org or team permissions
       const hasRequiredPermission = hasAnyPermission(permission);

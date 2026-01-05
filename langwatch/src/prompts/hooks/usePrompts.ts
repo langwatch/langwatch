@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -15,60 +16,67 @@ export const usePrompts = () => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const invalidateAll = async () =>
-    Promise.all([await trpc.prompts.invalidate()]);
+  const invalidateAll = useCallback(
+    async () => Promise.all([await trpc.prompts.invalidate()]),
+    [trpc.prompts]
+  );
 
-  const wrappedCreatePrompt: typeof createPrompt.mutateAsync = async (
-    params,
-  ) => {
-    const prompt = await createPrompt.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedCreatePrompt: typeof createPrompt.mutateAsync = useCallback(
+    async (params) => {
+      const prompt = await createPrompt.mutateAsync(params);
+      await invalidateAll();
+      return prompt;
+    },
+    [createPrompt, invalidateAll]
+  );
 
-  const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = async (
-    params,
-  ) => {
-    const prompt = await updatePrompt.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = useCallback(
+    async (params) => {
+      const prompt = await updatePrompt.mutateAsync(params);
+      await invalidateAll();
+      return prompt;
+    },
+    [updatePrompt, invalidateAll]
+  );
 
-  const wrappedUpdateHandle: typeof updateHandle.mutateAsync = async (
-    params,
-  ) => {
-    const prompt = await updateHandle.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedUpdateHandle: typeof updateHandle.mutateAsync = useCallback(
+    async (params) => {
+      const prompt = await updateHandle.mutateAsync(params);
+      await invalidateAll();
+      return prompt;
+    },
+    [updateHandle, invalidateAll]
+  );
 
-  const wrappedGetPromptById = async (params: {
-    id: string;
-    projectId?: string;
-  }) => {
-    const prompt = await trpc.prompts.getByIdOrHandle.fetch({
-      idOrHandle: params.id,
-      projectId: params.projectId ?? projectId,
-    });
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedGetPromptById = useCallback(
+    async (params: { id: string; projectId?: string }) => {
+      const prompt = await trpc.prompts.getByIdOrHandle.fetch({
+        idOrHandle: params.id,
+        projectId: params.projectId ?? projectId,
+      });
+      await invalidateAll();
+      return prompt;
+    },
+    [trpc.prompts.getByIdOrHandle, projectId, invalidateAll]
+  );
 
-  const wrappedRestoreVersion: typeof restoreVersion.mutateAsync = async (
-    params,
-  ) => {
-    const prompt = await restoreVersion.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedRestoreVersion: typeof restoreVersion.mutateAsync = useCallback(
+    async (params) => {
+      const prompt = await restoreVersion.mutateAsync(params);
+      await invalidateAll();
+      return prompt;
+    },
+    [restoreVersion, invalidateAll]
+  );
 
-  const wrappedDeletePrompt: typeof deletePrompt.mutateAsync = async (
-    params,
-  ) => {
-    const prompt = await deletePrompt.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
+  const wrappedDeletePrompt: typeof deletePrompt.mutateAsync = useCallback(
+    async (params) => {
+      const prompt = await deletePrompt.mutateAsync(params);
+      await invalidateAll();
+      return prompt;
+    },
+    [deletePrompt, invalidateAll]
+  );
 
   return {
     createPrompt: wrappedCreatePrompt,

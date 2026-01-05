@@ -1,5 +1,6 @@
 import { Card, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ScenarioSetData } from "~/app/api/scenario-events/[[...route]]/types";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 export interface SetCardProps extends ScenarioSetData {
   onClick: () => void;
@@ -26,31 +27,34 @@ export function SetCard({
       bg="white"
       border="1px solid"
       borderColor="gray.200"
-      borderRadius="lg"
+      borderRadius="xl"
+      boxShadow="lg"
       p="5"
       _hover={{
         borderColor: "gray.300",
         transform: "translateY(-1px)",
-        shadow: "sm",
+        shadow: "xl",
       }}
       transition="all 0.15s ease"
       cursor="pointer"
       onClick={onClick}
       position="relative"
     >
-      <VStack align="stretch" gap="4">
-        <Text fontSize="xl" fontWeight="700" color="gray.900">
+      <VStack align="stretch" gap="2">
+        <Text fontSize="2xl" paddingBottom="2">{"🎭"}</Text>
+        <Text fontWeight="500" color="gray.900">
           {scenarioSetId}
         </Text>
 
         {/* Scenarios count and last run in a row */}
-        <HStack justify="space-between" align="center">
-          <Text fontSize="md" fontWeight="600" color="gray.700">
-            {scenarioCount} scenarios
-          </Text>
-          <Text fontSize="sm" color="gray.500">
-            Last run: {formatDate(lastRunAt)}
-          </Text>
+        <HStack
+          justify="space-between"
+          align="center"
+          color="gray.400"
+          fontSize="sm"
+        >
+          <Text>{scenarioCount} scenarios</Text>
+          <Text>Last run: {formatTimeAgo(lastRunAt)}</Text>
         </HStack>
       </VStack>
     </Card.Root>

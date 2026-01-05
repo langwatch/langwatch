@@ -254,4 +254,17 @@ span[data-highlight]::after {
         max-width: 768px;
         margin: 0 auto;
     }
+    .copilotKitMessagesContainer {
+        padding-right: 4px;
+    }
+    .copilotKitChat, .copilotKitMessages {
+        background: none;
+    }
+    .copilotKitMessage.copilotKitUserMessage, .copilotKitMarkdownElement {
+        font-size: 14px;
+    }
+}
+
+.rich-textarea-position-relative {
+    position: relative!important;
 }

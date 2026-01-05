@@ -42,7 +42,6 @@ const SimulationButton: React.FC<SimulationButtonProps> = ({
     asChild
     variant="outline"
     colorPalette={color}
-    colorScheme={color}
     borderRadius="md"
     px={3}
     py={6}
@@ -131,7 +130,7 @@ const AgentSimulationTesting: React.FC = () => {
             <Icon color="orange.500" boxSize={4}>
               <LuBot />
             </Icon>
-            <Heading size="md" fontWeight="bold" textAlign="left">
+            <Heading size="md" textAlign="left">
               Introducing Scenario: Agentic Simulations
             </Heading>
             <Badge

@@ -148,162 +148,137 @@ export default function AuthenticationSettings() {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
+      <VStack gap={6} width="full" align="start">
         <VStack align="start" gap={1}>
-          <Heading size="lg" as="h1">
-            Authentication Settings
-          </Heading>
+          <Heading as="h2">Authentication Settings</Heading>
           <Text>({session?.user?.email})</Text>
         </VStack>
 
         {publicEnv.data?.NEXTAUTH_PROVIDER === "email" && (
-          <Card.Root width="full">
-            <Card.Body width="full" paddingY={4}>
-              <HorizontalFormControl
-                label="Change Password"
-                helper={
-                  <Text>Password must be at least 8 characters long.</Text>
-                }
-              >
-                {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-                <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-                  <VStack width="full" align="stretch" gap={4} marginTop={4}>
-                    <Field.Root
-                      invalid={!!passwordForm.formState.errors.currentPassword}
-                    >
-                      <Field.Label>Current Password</Field.Label>
-                      <Input
-                        type="password"
-                        {...passwordForm.register("currentPassword")}
-                      />
-                      {passwordForm.formState.errors.currentPassword && (
-                        <Field.ErrorText>
-                          {
-                            passwordForm.formState.errors.currentPassword
-                              .message
-                          }
-                        </Field.ErrorText>
-                      )}
-                    </Field.Root>
-                    <Field.Root
-                      invalid={!!passwordForm.formState.errors.newPassword}
-                    >
-                      <Field.Label>New Password</Field.Label>
-                      <Input
-                        type="password"
-                        {...passwordForm.register("newPassword")}
-                      />
-                      {passwordForm.formState.errors.newPassword && (
-                        <Field.ErrorText>
-                          {passwordForm.formState.errors.newPassword.message}
-                        </Field.ErrorText>
-                      )}
-                    </Field.Root>
-                    <Field.Root
-                      invalid={!!passwordForm.formState.errors.confirmPassword}
-                    >
-                      <Field.Label>Confirm New Password</Field.Label>
-                      <Input
-                        type="password"
-                        {...passwordForm.register("confirmPassword")}
-                      />
-                      {passwordForm.formState.errors.confirmPassword && (
-                        <Field.ErrorText>
-                          {
-                            passwordForm.formState.errors.confirmPassword
-                              .message
-                          }
-                        </Field.ErrorText>
-                      )}
-                    </Field.Root>
-                    <HStack width="full" justify="end">
-                      <Button
-                        type="submit"
-                        colorPalette="orange"
-                        disabled={changePasswordMutation.isPending}
-                        loading={changePasswordMutation.isPending}
-                      >
-                        Change Password
-                      </Button>
-                    </HStack>
-                  </VStack>
-                </form>
-              </HorizontalFormControl>
-            </Card.Body>
-          </Card.Root>
+          <HorizontalFormControl
+            label="Change Password"
+            helper={<Text>Password must be at least 8 characters long.</Text>}
+          >
+            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
+              <VStack width="full" align="stretch" gap={4} marginTop={4}>
+                <Field.Root
+                  invalid={!!passwordForm.formState.errors.currentPassword}
+                >
+                  <Field.Label>Current Password</Field.Label>
+                  <Input
+                    type="password"
+                    {...passwordForm.register("currentPassword")}
+                  />
+                  {passwordForm.formState.errors.currentPassword && (
+                    <Field.ErrorText>
+                      {passwordForm.formState.errors.currentPassword.message}
+                    </Field.ErrorText>
+                  )}
+                </Field.Root>
+                <Field.Root
+                  invalid={!!passwordForm.formState.errors.newPassword}
+                >
+                  <Field.Label>New Password</Field.Label>
+                  <Input
+                    type="password"
+                    {...passwordForm.register("newPassword")}
+                  />
+                  {passwordForm.formState.errors.newPassword && (
+                    <Field.ErrorText>
+                      {passwordForm.formState.errors.newPassword.message}
+                    </Field.ErrorText>
+                  )}
+                </Field.Root>
+                <Field.Root
+                  invalid={!!passwordForm.formState.errors.confirmPassword}
+                >
+                  <Field.Label>Confirm New Password</Field.Label>
+                  <Input
+                    type="password"
+                    {...passwordForm.register("confirmPassword")}
+                  />
+                  {passwordForm.formState.errors.confirmPassword && (
+                    <Field.ErrorText>
+                      {passwordForm.formState.errors.confirmPassword.message}
+                    </Field.ErrorText>
+                  )}
+                </Field.Root>
+                <HStack width="full" justify="end">
+                  <Button
+                    type="submit"
+                    colorPalette="orange"
+                    disabled={changePasswordMutation.isPending}
+                    loading={changePasswordMutation.isPending}
+                  >
+                    Change Password
+                  </Button>
+                </HStack>
+              </VStack>
+            </form>
+          </HorizontalFormControl>
         )}
 
         {publicEnv.data?.NEXTAUTH_PROVIDER &&
           publicEnv.data?.NEXTAUTH_PROVIDER !== "email" && (
-            <Card.Root width="full">
-              <Card.Body width="full" paddingY={4}>
-                <HorizontalFormControl
-                  label="Linked Sign-in Methods"
-                  helper={
-                    !hasSSOProvider ? (
-                      <Text>
-                        You can link additional sign-in methods to your account.
-                        <br />
-                        All linked methods must use the same email address as
-                        your main account.
-                      </Text>
-                    ) : (
-                      <Text>
-                        You are linked via your company&apos;s SSO provider.
-                        <br />
-                        No additional sign-in methods can be linked.
-                      </Text>
-                    )
-                  }
-                >
-                  {isLoading ? (
-                    <Spinner />
-                  ) : (
-                    <VStack width="full" align="end" gap={4} marginTop={4}>
-                      <VStack align="start" gap={1}>
-                        {accounts?.map((account) => (
-                          <HStack key={account.id} width="full">
-                            <LuKeyRound />
-                            <Text>
-                              {getProviderDisplayName(
-                                account.provider,
-                                account.providerAccountId,
-                              )}
-                            </Text>
-                            <Spacer />
-                            {accounts.length > 1 && (
-                              <IconButton
-                                aria-label="Remove sign-in method"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => void handleUnlink(account.id)}
-                                disabled={unlinkAccount.isLoading}
-                              >
-                                <LuX />
-                              </IconButton>
-                            )}
-                          </HStack>
-                        ))}
-                      </VStack>
-                      <Button
-                        onClick={handleLinkProvider}
-                        colorPalette="orange"
-                        disabled={hasSSOProvider}
-                      >
-                        Link New Sign-in Method
-                      </Button>
-                    </VStack>
-                  )}
-                </HorizontalFormControl>
-              </Card.Body>
-            </Card.Root>
+            <HorizontalFormControl
+              label="Linked Sign-in Methods"
+              helper={
+                !hasSSOProvider ? (
+                  <Text>
+                    You can link additional sign-in methods to your account.
+                    <br />
+                    All linked methods must use the same email address as your
+                    main account.
+                  </Text>
+                ) : (
+                  <Text>
+                    You are linked via your company&apos;s SSO provider.
+                    <br />
+                    No additional sign-in methods can be linked.
+                  </Text>
+                )
+              }
+            >
+              {isLoading ? (
+                <Spinner />
+              ) : (
+                <VStack width="full" align="end" gap={6} marginTop={4}>
+                  <VStack align="start" gap={1}>
+                    {accounts?.map((account) => (
+                      <HStack key={account.id} width="full">
+                        <LuKeyRound />
+                        <Text>
+                          {getProviderDisplayName(
+                            account.provider,
+                            account.providerAccountId,
+                          )}
+                        </Text>
+                        <Spacer />
+                        {accounts.length > 1 && (
+                          <IconButton
+                            aria-label="Remove sign-in method"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void handleUnlink(account.id)}
+                            disabled={unlinkAccount.isLoading}
+                          >
+                            <LuX />
+                          </IconButton>
+                        )}
+                      </HStack>
+                    ))}
+                  </VStack>
+                  <Button
+                    onClick={handleLinkProvider}
+                    colorPalette="orange"
+                    disabled={hasSSOProvider}
+                  >
+                    Link New Sign-in Method
+                  </Button>
+                </VStack>
+              )}
+            </HorizontalFormControl>
           )}
       </VStack>
     </SettingsLayout>

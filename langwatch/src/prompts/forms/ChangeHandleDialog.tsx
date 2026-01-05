@@ -129,8 +129,7 @@ export function ChangeHandleDialog({
         }
       }}
     >
-      <Dialog.Backdrop />
-      <Dialog.Content backdrop={false}>
+      <Dialog.Content>
         <form
           onSubmit={(e) => {
             e.preventDefault();

@@ -342,7 +342,6 @@ and ListIcon is now like this:
         </List.Indicator>
 
 Also, there is no Modal anymore, modal is now called Dialog, and it looks like this:<Dialog.Root>
-  <Dialog.Backdrop /> // former Modal.Overlay
   <Dialog.Trigger />
   <Dialog.Content>
     <Dialog.CloseTrigger />
@@ -488,7 +487,6 @@ Also, DO NOT change my `function` declarations to `const`, leave it as is.
 Also, Drawer is different now:
 
 <Drawer.Root>
-  <Drawer.Backdrop />
   <Drawer.Trigger />
   <Drawer.Content>
     <Drawer.CloseTrigger />

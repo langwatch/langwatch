@@ -1,14 +1,14 @@
 import {
   Alert,
   Box,
+  Button,
   HStack,
   Skeleton,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { Plus } from "lucide-react";
-import { AnalyticsHeader } from "~/components/analytics/AnalyticsHeader";
+import { useRouter } from "next/router";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import GraphsLayout from "~/components/GraphsLayout";
@@ -37,7 +37,7 @@ function ReportsContent() {
   // Get or create first dashboard
   const getOrCreateFirst = api.dashboards.getOrCreateFirst.useQuery(
     { projectId },
-    { enabled: !!projectId && !urlDashboardId }
+    { enabled: !!projectId && !urlDashboardId },
   );
 
   const activeDashboardId = urlDashboardId ?? getOrCreateFirst.data?.id;
@@ -45,16 +45,18 @@ function ReportsContent() {
   // Fetch all dashboards to get current dashboard name
   const dashboardsQuery = api.dashboards.getAll.useQuery(
     { projectId },
-    { enabled: !!projectId }
+    { enabled: !!projectId },
   );
 
-  const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
+  const currentDashboard = dashboardsQuery.data?.find(
+    (d) => d.id === activeDashboardId,
+  );
   const dashboardTitle = currentDashboard?.name ?? "Reports";
 
   // Graphs for the active dashboard
   const graphsQuery = api.graphs.getAll.useQuery(
     { projectId, dashboardId: activeDashboardId },
-    { enabled: !!projectId && !!activeDashboardId }
+    { enabled: !!projectId && !!activeDashboardId },
   );
 
   const deleteGraph = api.graphs.delete.useMutation();
@@ -78,7 +80,7 @@ function ReportsContent() {
               meta: { closable: true },
             });
           },
-        }
+        },
       );
     }
   };
@@ -124,7 +126,11 @@ function ReportsContent() {
           // Recalculate all positions after size change
           const updatedGraphs = graphsQuery.data?.map((g) =>
             g.id === graphId
-              ? { ...g, colSpan: sizeConfig.colSpan, rowSpan: sizeConfig.rowSpan }
+              ? {
+                  ...g,
+                  colSpan: sizeConfig.colSpan,
+                  rowSpan: sizeConfig.rowSpan,
+                }
               : g,
           );
 
@@ -180,13 +186,22 @@ function ReportsContent() {
     : `/${project?.slug}/analytics/custom`;
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader
-        title={dashboardTitle}
-        isEditable
-        onTitleSave={handleTitleSave}
-      />
-
+    <GraphsLayout
+      title={dashboardTitle}
+      analyticsHeaderProps={{
+        isEditable: true,
+        onTitleSave: handleTitleSave,
+      }}
+      extraHeaderButtons={
+        project ? (
+          <Link href={addChartUrl} asChild>
+            <Button colorPalette="orange" size="sm">
+              <Plus /> Add chart
+            </Button>
+          </Link>
+        ) : null
+      }
+    >
       {/* Empty state */}
       {hasNoGraphs && (
         <Alert.Root
@@ -200,22 +215,13 @@ function ReportsContent() {
             <Alert.Title>Add your custom graphs here</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add to get
-                started.
+                You haven{"'"}t set up any custom graphs yet. Click + Add chart
+                to get started.
               </Text>
             </Alert.Description>
           </VStack>
         </Alert.Root>
       )}
-
-      {/* Add chart button */}
-      <HStack width="full" paddingBottom={6}>
-        {project ? (
-          <Link href={addChartUrl}>
-            <Plus /> Add chart
-          </Link>
-        ) : null}
-      </HStack>
 
       {/* Main content */}
       <HStack align="start" gap={6} width="full">
@@ -241,6 +247,4 @@ function ReportsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(ReportsContent);
+export default withPermissionGuard("analytics:view")(ReportsContent);

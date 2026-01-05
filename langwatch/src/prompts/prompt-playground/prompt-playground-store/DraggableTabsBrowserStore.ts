@@ -44,6 +44,11 @@ export const TabDataSchema = z.object({
       versionNumber: undefined,
       scope: undefined,
     }),
+  /**
+   * Runtime variable values entered by the user in the Variables tab.
+   * These are persisted separately from the form values.
+   */
+  variableValues: z.record(z.string(), z.string()).default({}),
 });
 export type TabData = z.infer<typeof TabDataSchema>;
 
@@ -586,13 +591,9 @@ function createDraggableTabsBrowserStore(projectId: string) {
  * Hook to access the project-scoped draggable tabs browser store.
  * Single Responsibility: Provides access to the appropriate store instance for the current project.
  */
-export function useDraggableTabsBrowserStore(): DraggableTabsBrowserState;
 export function useDraggableTabsBrowserStore<T>(
   selector: (state: DraggableTabsBrowserState) => T,
-): T;
-export function useDraggableTabsBrowserStore<T>(
-  selector?: (state: DraggableTabsBrowserState) => T,
-): T | DraggableTabsBrowserState {
+): T {
   const { projectId } = useOrganizationTeamProject();
   const key = projectId ?? "__default__";
 
@@ -610,7 +611,6 @@ export function useDraggableTabsBrowserStore<T>(
   const useStore = storeInstances.get(key)!;
 
   // Call the store hook with or without selector
-  // @ts-expect-error - Zustand types are complex, but this works at runtime
   return useStore(selector);
 }
 

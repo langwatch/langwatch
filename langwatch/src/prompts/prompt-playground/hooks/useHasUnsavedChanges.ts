@@ -7,7 +7,11 @@ import { useDraggableTabsBrowserStore } from "../prompt-playground-store/Draggab
 
 /**
  * Determines whether the prompt in the specified tab has unsaved changes.
- * Single Responsibility: Compare current form values against saved prompt state to detect unsaved changes.
+ * Single Responsibility: Compare current form values against the version currently loaded in the form.
+ *
+ * This compares against the LOADED version (via versionId), not the latest version.
+ * This means loading an older version and making no changes = no unsaved changes.
+ * The "Update" button should still be enabled for older versions to allow "rollback".
  *
  * @param tabId - The ID of the tab to check for unsaved changes
  * @returns true if there are unsaved changes, false otherwise
@@ -21,12 +25,16 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   const configId = tab?.data.form.currentValues.configId;
   const currentValues = tab?.data.form.currentValues;
   const handle = tab?.data.form.currentValues.handle;
+  // Get the version ID from the form to compare against the correct version
+  const versionId = tab?.data.form.currentValues.versionMetadata?.versionId;
 
+  // Fetch the specific version that's loaded in the form, not the latest
   const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
     api.prompts.getByIdOrHandle.useQuery(
       {
         idOrHandle: configId ?? "",
         projectId: project?.id ?? "",
+        versionId: versionId, // Fetch the specific version loaded in the form
       },
       {
         enabled: !!configId && !!project?.id,

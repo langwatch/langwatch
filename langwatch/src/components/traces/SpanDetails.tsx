@@ -166,6 +166,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             borderColor="gray.300"
             width="full"
             whiteSpace="pre-wrap"
+            background="white/75"
           >
             <RenderInputOutput
               value={JSON.stringify(

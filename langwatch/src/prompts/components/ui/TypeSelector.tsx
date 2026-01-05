@@ -196,7 +196,6 @@ function JsonSchemaDialog({
         }
       }}
     >
-      <Dialog.Backdrop />
       <Dialog.Content margin="64px" background="#272822" color="white">
         <Dialog.Header>
           <Dialog.Title>JSON Schema</Dialog.Title>

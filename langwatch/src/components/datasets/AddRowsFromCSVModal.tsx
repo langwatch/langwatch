@@ -218,7 +218,6 @@ export function AddRowsFromCSVModal({
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Add rows from CSV</Dialog.Title>

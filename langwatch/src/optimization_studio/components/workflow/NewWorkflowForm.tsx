@@ -257,7 +257,7 @@ export const NewWorkflowForm = ({
             />
             <Field.Label>Name and Icon</Field.Label>
             <HStack>
-              <Button onClick={emojiPicker.onOpen} fontSize="18px">
+              <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
                 {icon}
               </Button>
               <Input

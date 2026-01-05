@@ -2,7 +2,9 @@ import { createTRPCRouter } from "~/server/api/trpc";
 
 import { dependencies } from "../../injection/dependencies.server";
 
+import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
+import { evaluatorsRouter } from "./routers/evaluators";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { batchRecordRouter } from "./routers/batchRecord";
@@ -13,6 +15,7 @@ import { evaluationsRouter } from "./routers/evaluations";
 import { experimentsRouter } from "./routers/experiments";
 import { graphsRouter } from "./routers/graphs";
 import { dashboardsRouter } from "./routers/dashboards";
+import { homeRouter } from "./routers/home";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
@@ -42,6 +45,8 @@ import { workflowRouter } from "./routers/workflows";
  * All routers added in /api/routers should be manually added here.
  */
 export const appRouter = createTRPCRouter({
+  agents: agentsRouter,
+  evaluators: evaluatorsRouter,
   organization: organizationRouter,
   project: projectRouter,
   team: teamRouter,
@@ -56,6 +61,7 @@ export const appRouter = createTRPCRouter({
   datasetRecord: datasetRecordRouter,
   graphs: graphsRouter,
   dashboards: dashboardsRouter,
+  home: homeRouter,
   evaluations: evaluationsRouter,
   batchRecord: batchRecordRouter,
   limits: limitsRouter,

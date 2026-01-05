@@ -108,26 +108,26 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
           paddingY={4}
           borderX="1px solid"
           borderTop={
-            (highlighted ??
-            (!loadingMore && (index === "first" || index === "only")))
+            highlighted ||
+            (!loadingMore && (index === "first" || index === "only"))
               ? "1px solid"
               : "none"
           }
-          borderRadius={
-            loadingMore
-              ? "0"
-              : index === "only"
-                ? "4px"
-                : index === "first"
-                  ? "4px 4px 0 0"
-                  : index === "last"
-                    ? "0 0 4px 4px"
-                    : "0"
-          }
+          {...(loadingMore
+            ? { borderRadius: "0" }
+            : index === "only"
+              ? { borderRadius: "lg" }
+              : index === "first"
+                ? { borderTopRadius: "lg" }
+                : index === "last"
+                  ? { borderBottomRadius: "lg" }
+                  : { borderRadius: "0" })}
           borderBottom={
-            (highlighted ?? index === "last") ? "1px solid" : "none"
+            highlighted || index === "last" || index === "only"
+              ? "1px solid"
+              : "none"
           }
-          borderColor={highlighted ? "blue.200" : "gray.200"}
+          borderColor={highlighted ? "blue.200" : "gray.300"}
           onMouseEnter={() => setShowTools(true)}
           onMouseMove={() => setShowTools(true)}
           onMouseLeave={() => setShowTools(false)}

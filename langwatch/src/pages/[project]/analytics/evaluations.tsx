@@ -207,8 +207,7 @@ function EvaluationsContent() {
   );
 
   return (
-    <GraphsLayout>
-      <AnalyticsHeader title="Evaluations" />
+    <GraphsLayout title="Evaluations">
       {checks.data && checks.data?.length === 0 && (
         <Alert.Root
           colorPalette="warning"
@@ -250,6 +249,4 @@ function EvaluationsContent() {
   );
 }
 
-export default withPermissionGuard("analytics:view", {
-  layoutComponent: GraphsLayout,
-})(EvaluationsContent);
+export default withPermissionGuard("analytics:view")(EvaluationsContent);

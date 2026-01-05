@@ -20,7 +20,7 @@ import {
 import { type ZodType, z } from "zod";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
-import { PropertySectionTitle } from "../../optimization_studio/components/properties/BasePropertiesPanel";
+import { PropertySectionTitle } from "../ui/PropertySectionTitle";
 import type {
   EvaluatorDefinition,
   Evaluators,

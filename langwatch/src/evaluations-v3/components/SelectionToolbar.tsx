@@ -1,0 +1,118 @@
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Play, Trash2, X } from "lucide-react";
+import { useState } from "react";
+
+import {
+  DialogRoot,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+  DialogCloseTrigger,
+} from "~/components/ui/dialog";
+
+export type SelectionToolbarProps = {
+  selectedCount: number;
+  onRun: () => void;
+  onDelete: () => void;
+  onClear: () => void;
+};
+
+export function SelectionToolbar({
+  selectedCount,
+  onRun,
+  onDelete,
+  onClear,
+}: SelectionToolbarProps) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  if (selectedCount === 0) return null;
+
+  const handleDeleteClick = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete();
+    setShowDeleteConfirm(false);
+  };
+
+  return (
+    <>
+      <HStack
+        position="fixed"
+        bottom={4}
+        left="50%"
+        transform="translateX(-50%)"
+        paddingX={4}
+        paddingY={2}
+        borderRadius="lg"
+        boxShadow="lg"
+        gap={3}
+        zIndex={100}
+      >
+        <Text fontSize="sm" data-testid="selection-count">
+          {selectedCount} selected
+        </Text>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onRun}
+          data-testid="selection-run-btn"
+        >
+          <Play size={16} /> Run
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleDeleteClick}
+          data-testid="selection-delete-btn"
+        >
+          <Trash2 size={16} /> Delete
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onClear}
+          data-testid="selection-clear-btn"
+        >
+          <X size={16} />
+        </Button>
+      </HStack>
+
+      <DialogRoot
+        open={showDeleteConfirm}
+        onOpenChange={({ open }) => setShowDeleteConfirm(open)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedCount} row{selectedCount > 1 ? "s" : ""}?</DialogTitle>
+          </DialogHeader>
+          <DialogCloseTrigger />
+          <DialogBody>
+            <Text>
+              Are you sure you want to delete {selectedCount} selected row{selectedCount > 1 ? "s" : ""}?
+            </Text>
+          </DialogBody>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              data-testid="delete-cancel-btn"
+            >
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              onClick={handleConfirmDelete}
+              data-testid="delete-confirm-btn"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </DialogRoot>
+    </>
+  );
+}

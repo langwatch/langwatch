@@ -1,31 +1,32 @@
 import { VStack } from "@chakra-ui/react";
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import debounce from "lodash.debounce";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
 import { toaster } from "~/components/ui/toaster";
+import {
+  FormVariablesSection,
+  type AvailableSource,
+  type FieldMapping,
+  type PromptTextAreaOnAddMention,
+} from "~/components/variables";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import { type PromptConfigFormValues, usePromptConfigForm } from "~/prompts";
-import type { PromptTextAreaOnAddMention } from "~/prompts/components/ui/PromptTextArea";
 import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import {
-  InputsFieldGroup,
-  OutputsFieldGroup,
-} from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompts/forms/fields/PromptField";
-import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-  versionedPromptToPromptConfigFormValues,
+  versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
+import { computeMessageEdgeUpdate } from "./messageEdgeUtils";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 
@@ -52,6 +53,7 @@ export function SignaturePropertiesPanelForm({
     edgeConnectToNewHandle,
     getWorkflow,
     setNodeParameter,
+    setEdges,
   } = useWorkflowStore(
     useShallow((state) => ({
       templateAdapter: state.getWorkflow().template_adapter,
@@ -61,6 +63,7 @@ export function SignaturePropertiesPanelForm({
       setNode: state.setNode,
       getWorkflow: state.getWorkflow,
       setNodeParameter: state.setNodeParameter,
+      setEdges: state.setEdges,
     })),
   );
 
@@ -125,7 +128,11 @@ export function SignaturePropertiesPanelForm({
       }
 
       // Reset the form with the updated node data
-      formProps.methods.reset(versionedPromptToPromptConfigFormValues(config));
+      // Use WithSystemMessage to ensure the system prompt is added to the messages array,
+      // since PromptMessagesField expects system prompt to be in messages[0] with role: "system"
+      formProps.methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(config),
+      );
     } catch (error) {
       console.error(error);
       toaster.error({
@@ -149,7 +156,10 @@ export function SignaturePropertiesPanelForm({
   // TODO: Refactor so that all of the node call back methods are in the parent,
   // not here in the form logic
   const availableFields = useMemo(() => {
-    return node.data.inputs.map((input) => input.identifier);
+    return node.data.inputs.map((input) => ({
+      identifier: input.identifier,
+      type: input.type,
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(node.data.inputs)]);
 
@@ -191,6 +201,98 @@ export function SignaturePropertiesPanelForm({
 
   const updateNodeInternals = useUpdateNodeInternals();
 
+  // Build availableSources for variable mappings
+  const availableSources: AvailableSource[] = useMemo(() => {
+    const dependentNodes: string[] = [];
+    const toVisit = [node.id];
+    while (toVisit.length > 0) {
+      const currentNode = toVisit.shift();
+      if (!currentNode) continue;
+      dependentNodes.push(currentNode);
+      toVisit.push(
+        ...edges
+          .filter((edge) => edge.source === currentNode)
+          .map((edge) => edge.target),
+      );
+    }
+
+    return nodes
+      .filter((n) => !dependentNodes.includes(n.id) && n.id !== "end")
+      .map((n) => {
+        const isEntry = n.type === "entry";
+        // For entry nodes, get dataset name from data.dataset
+        const entryDataset = isEntry
+          ? (n.data as { dataset?: { name?: string } }).dataset
+          : undefined;
+        return {
+          id: n.id,
+          name: isEntry ? entryDataset?.name ?? "Dataset" : n.data.name ?? n.id,
+          type: isEntry ? "dataset" : (n.type as AvailableSource["type"]),
+          fields:
+            n.data.outputs?.map((output) => ({
+              name: output.identifier,
+              type: output.type,
+            })) ?? [],
+        };
+      })
+      .filter((source) => source.fields.length > 0);
+  }, [edges, nodes, node.id]);
+
+  // Build mappings from edges
+  const variableMappings: Record<string, FieldMapping> = useMemo(() => {
+    const mappings: Record<string, FieldMapping> = {};
+    edges
+      .filter((edge) => edge.target === node.id)
+      .forEach((edge) => {
+        // Parse targetHandle (e.g., "inputs.question") to get the input identifier
+        const targetHandle = edge.targetHandle?.split(".")[1];
+        // Parse sourceHandle (e.g., "outputs.answer") to get the source field
+        const sourceField = edge.sourceHandle?.split(".")[1];
+        if (targetHandle && sourceField && edge.source) {
+          mappings[targetHandle] = {
+            type: "source",
+            sourceId: edge.source,
+            field: sourceField,
+          };
+        }
+      });
+    return mappings;
+  }, [edges, node.id]);
+
+  // Handle mapping changes by creating/removing edges
+  const onMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      const currentEdges = getWorkflow().edges;
+
+      // Remove existing edge for this input
+      const filteredEdges = currentEdges.filter(
+        (edge) =>
+          !(
+            edge.target === node.id &&
+            edge.targetHandle === `inputs.${identifier}`
+          ),
+      );
+
+      if (mapping && mapping.type === "source") {
+        // Add new edge
+        const newEdge = {
+          id: `edge-${identifier}-${Date.now()}`,
+          source: mapping.sourceId,
+          target: node.id,
+          sourceHandle: `outputs.${mapping.field}`,
+          targetHandle: `inputs.${identifier}`,
+          type: "default",
+        };
+        setEdges([...filteredEdges, newEdge]);
+      } else {
+        setEdges(filteredEdges);
+      }
+
+      updateNodeInternals(node.id);
+    },
+    [getWorkflow, node.id, setEdges, updateNodeInternals],
+  );
+
   const onAddEdge = (
     id: string,
     handle: string,
@@ -206,7 +308,7 @@ export function SignaturePropertiesPanelForm({
       content.value.substring(content.endPos);
 
     const stateNode = getWorkflow().nodes.find((n) => n.id === node.id)!;
-    return { node: stateNode, newPrompt: content_ };
+    return { node: stateNode, newPrompt: content_, newHandle };
   };
 
   const onAddPromptEdge = (
@@ -214,13 +316,15 @@ export function SignaturePropertiesPanelForm({
     handle: string,
     content: PromptTextAreaOnAddMention,
   ) => {
-    const { node, newPrompt } = onAddEdge(id, handle, content);
+    const { node, newPrompt, newHandle } = onAddEdge(id, handle, content);
 
     setNodeParameter(node.id, {
       identifier: "instructions",
       type: "str",
       value: newPrompt,
     });
+
+    return newHandle;
   };
 
   const onAddMessageEdge = (
@@ -228,20 +332,41 @@ export function SignaturePropertiesPanelForm({
     handle: string,
     content: PromptTextAreaOnAddMention,
     idx: number,
-  ) => {
-    const { node, newPrompt } = onAddEdge(id, handle, content);
-    const messagesParam = node.data.parameters?.find(
-      (param) => param.identifier === "messages",
-    );
-    if (!messagesParam) return;
+  ): string | undefined => {
+    const { node: stateNode, newPrompt, newHandle } = onAddEdge(id, handle, content);
 
-    setNodeParameter(node.id, {
-      identifier: "messages",
-      type: "chat_messages",
-      value: (messagesParam.value as any[]).map((field, i) =>
-        i === idx ? { ...field, content: newPrompt } : field,
-      ),
+    // Get form messages to correctly map form index to node parameter
+    const formMessages = messageFields.fields.map((f) => ({
+      role: f.role,
+      content: f.content,
+    }));
+
+    const update = computeMessageEdgeUpdate({
+      formMessages,
+      nodeParameters: (stateNode.data.parameters ?? []) as Array<{
+        identifier: string;
+        type: string;
+        value: Array<{ role: string; content: string }> | string;
+      }>,
+      formIndex: idx,
+      newContent: newPrompt,
     });
+
+    if (update.parameterToUpdate === "instructions") {
+      setNodeParameter(stateNode.id, {
+        identifier: "instructions",
+        type: "str",
+        value: update.newValue as string,
+      });
+    } else {
+      setNodeParameter(stateNode.id, {
+        identifier: "messages",
+        type: "chat_messages",
+        value: update.newValue as Array<{ role: string; content: string }>,
+      });
+    }
+
+    return newHandle;
   };
 
   return (
@@ -255,24 +380,22 @@ export function SignaturePropertiesPanelForm({
             }
           />
           <WrappedOptimizationStudioLLMConfigField />
-          <PromptField
-            messageFields={messageFields}
-            templateAdapter={templateAdapter}
-            availableFields={availableFields}
-            otherNodesFields={otherNodesFields}
-            onAddEdge={onAddPromptEdge}
-            isTemplateSupported={templateAdapter === "default"}
-          />
           {templateAdapter === "default" && (
             <PromptMessagesField
               messageFields={messageFields}
               availableFields={availableFields}
               otherNodesFields={otherNodesFields}
+              availableSources={availableSources}
               onAddEdge={onAddMessageEdge}
             />
           )}
-          <InputsFieldGroup />
-          <OutputsFieldGroup />
+          <FormVariablesSection
+            showMappings={true}
+            title="Variables"
+            availableSources={availableSources}
+            mappings={variableMappings}
+            onMappingChange={onMappingChange}
+          />
           {!isInsideWizard && <DemonstrationsField />}
         </VStack>
       </form>

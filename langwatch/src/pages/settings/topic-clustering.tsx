@@ -1,14 +1,4 @@
-import {
-  Alert,
-  Button,
-  Card,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { PermissionAlert } from "~/components/PermissionAlert";
+import { Alert, Button, Card, Heading, Text, VStack } from "@chakra-ui/react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
@@ -25,20 +15,8 @@ function TopicClusteringSettings() {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="920px"
-        align="start"
-      >
-        <HStack width="full" marginTop={6}>
-          <Heading size="lg" as="h1">
-            Topic Clustering
-          </Heading>
-          <Spacer />
-        </HStack>
+      <VStack gap={6} width="full" align="start">
+        <Heading as="h2">Topic Clustering</Heading>
 
         <TopicClusteringCard project={project} />
       </VStack>
@@ -70,18 +48,17 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   });
 
   return (
-    <VStack
-      gap={6}
-      width="full"
-      maxWidth="920px"
-      align="start"
-      paddingBottom={12}
-    >
-      <Card.Root>
+    <VStack gap={6} width="full" align="start" paddingBottom={12}>
+      <VStack gap={0} width="full" align="stretch">
+        <TopicClusteringModel />
+        <EmbeddingsModel />
+      </VStack>
+
+      <Card.Root width="full">
         <Card.Header>
-          <Heading size="md">Manual Topic Clustering</Heading>
+          <Heading>Manual Topic Clustering</Heading>
         </Card.Header>
-        <Card.Body>
+        <Card.Body width="full">
           <VStack align="start" gap={4}>
             <Text>
               Manually trigger topic clustering to organize your traces into
@@ -112,25 +89,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
           </VStack>
         </Card.Body>
       </Card.Root>
-
-      <VStack width="full" align="start" gap={6}>
-        <VStack gap={2} marginTop={2} align="start" width="full">
-          <Heading size="md" as="h2">
-            Default Models
-          </Heading>
-          <Text>
-            Configure the default models used on topic clustering and embeddings
-          </Text>
-        </VStack>
-        <Card.Root width="full">
-          <Card.Body width="full">
-            <VStack gap={0} width="full" align="stretch">
-              <TopicClusteringModel />
-              <EmbeddingsModel />
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      </VStack>
     </VStack>
   );
 }

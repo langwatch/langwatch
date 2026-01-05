@@ -235,6 +235,8 @@ model Project {
     archivedAt               DateTime?
     notifications            Notification[]
     featureClickHouse        Boolean                             @default(false)
+    agents                   Agent[]
+    evaluators               Evaluator[]
 
     @@index([teamId])
 }
@@ -393,24 +395,26 @@ model Dashboard {
 }
 
 model CustomGraph {
-    id           String      @id @default(nanoid())
-    projectId    String
-    project      Project     @relation(fields: [projectId], references: [id])
-    name         String
-    graph        Json
-    filters      Json?
-    createdAt    DateTime    @default(now())
-    updatedAt    DateTime    @default(now()) @updatedAt
+    id        String   @id @default(nanoid())
+    projectId String
+    project   Project  @relation(fields: [projectId], references: [id])
+    name      String
+    graph     Json
+    filters   Json?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
 
     // Report page relationship
     dashboardId String?
     dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
 
     // Grid positioning (2-column grid)
-    gridColumn   Int         @default(0)
-    gridRow      Int         @default(0)
-    colSpan      Int         @default(1)
-    rowSpan      Int         @default(1)
+    gridColumn  Int           @default(0)
+    gridRow     Int           @default(0)
+    colSpan     Int           @default(1)
+    rowSpan     Int           @default(1)
+    trigger     Trigger?
+    TriggerSent TriggerSent[]
 
     @@index([projectId])
     @@index([dashboardId])
@@ -456,21 +460,23 @@ enum AlertType {
 }
 
 model Trigger {
-    id           String        @id @default(nanoid())
-    name         String
-    projectId    String
-    project      Project       @relation(fields: [projectId], references: [id])
-    action       TriggerAction
-    actionParams Json
-    filters      Json
-    lastRunAt    Float         @default(0)
-    createdAt    DateTime      @default(now())
-    updatedAt    DateTime      @default(now()) @updatedAt
-    active       Boolean       @default(true)
-    message      String?
-    deleted      Boolean       @default(false)
-    alertType    AlertType?
-    TriggerSent  TriggerSent[]
+    id            String        @id @default(nanoid())
+    name          String
+    projectId     String
+    project       Project       @relation(fields: [projectId], references: [id])
+    action        TriggerAction
+    actionParams  Json
+    filters       Json
+    lastRunAt     Float         @default(0)
+    createdAt     DateTime      @default(now())
+    updatedAt     DateTime      @default(now()) @updatedAt
+    active        Boolean       @default(true)
+    message       String?
+    deleted       Boolean       @default(false)
+    alertType     AlertType?
+    TriggerSent   TriggerSent[]
+    customGraphId String?       @unique
+    customGraph   CustomGraph?  @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
 
     @@index([projectId])
 }
@@ -479,6 +485,7 @@ enum ExperimentType {
     DSPY
     BATCH_EVALUATION
     BATCH_EVALUATION_V2
+    EVALUATIONS_V3
 }
 
 model Experiment {
@@ -540,18 +547,23 @@ model ModelProvider {
 }
 
 model TriggerSent {
-    id        String   @id @default(nanoid())
-    triggerId String
-    traceId   String
-    projectId String
-    project   Project  @relation(fields: [projectId], references: [id])
-    trigger   Trigger  @relation(fields: [triggerId], references: [id])
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
+    id            String       @id @default(nanoid())
+    triggerId     String
+    traceId       String? // Set for trace-based triggers, null for custom graph alerts
+    customGraphId String? // Set for custom graph alerts, null for trace-based triggers
+    customGraph   CustomGraph? @relation(fields: [customGraphId], references: [id], onDelete: Cascade)
+    projectId     String
+    project       Project      @relation(fields: [projectId], references: [id])
+    trigger       Trigger      @relation(fields: [triggerId], references: [id])
+    resolvedAt    DateTime? // For custom graph alerts: null = still firing, set = resolved
+    createdAt     DateTime     @default(now())
+    updatedAt     DateTime     @default(now()) @updatedAt
 
     @@unique([triggerId, traceId])
     @@index([triggerId])
     @@index([projectId])
+    @@index([customGraphId])
+    @@index([resolvedAt])
 }
 
 enum AnnotationScoreDataType {
@@ -703,6 +715,8 @@ model Workflow {
     copiedFromWorkflowId String?
     copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
     copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
+    agents               Agent[]
+    evaluators           Evaluator[]
 
     @@index([projectId])
     @@index([publishedById])
@@ -881,4 +895,38 @@ model Notification {
     @@index([projectId])
     @@index([createdAt])
     @@index([sentAt])
+}
+
+model Agent {
+    id         String    @id @default(nanoid())
+    projectId  String
+    project    Project   @relation(fields: [projectId], references: [id])
+    name       String
+    type       String // "signature" | "code" | "workflow"
+    config     Json // Node configuration (model, prompt, code, etc.)
+    workflowId String? // For "workflow" type - top level for joins
+    workflow   Workflow? @relation(fields: [workflowId], references: [id])
+    archivedAt DateTime?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@index([workflowId])
+}
+
+model Evaluator {
+    id         String    @id @default(nanoid())
+    projectId  String
+    project    Project   @relation(fields: [projectId], references: [id])
+    name       String
+    type       String // "evaluator" (built-in) | "workflow" (custom)
+    config     Json // Settings for built-in, or empty for workflow
+    workflowId String? // For "workflow" type - top level for joins
+    workflow   Workflow? @relation(fields: [workflowId], references: [id])
+    archivedAt DateTime?
+    createdAt  DateTime  @default(now())
+    updatedAt  DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
+    @@index([workflowId])
 }

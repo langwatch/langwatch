@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, Heading, HStack, Text } from "@chakra-ui/react";
 import { useEffect, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -36,17 +36,10 @@ export function SeriesFiltersDrawer({
       size="lg"
       onOpenChange={() => closeDrawer()}
     >
-      <Drawer.Backdrop />
       <Drawer.Content>
         <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Text paddingTop={5} fontSize="2xl">
-              Edit Series Filter
-            </Text>
-          </HStack>
+          <Heading>Edit Series Filter</Heading>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <HorizontalFormControl

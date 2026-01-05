@@ -27,6 +27,7 @@ import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
@@ -284,271 +285,246 @@ function AuditLogPage() {
 
   return (
     <SettingsLayout>
-      <VStack
-        paddingX={4}
-        paddingY={6}
-        gap={6}
-        width="full"
-        maxWidth="1200px"
-        align="start"
-      >
+      <VStack gap={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
-          <Heading size="lg" as="h1">
-            Audit Log
-          </Heading>
+          <VStack align="start" gap={1}>
+            <Heading as="h2">Audit Log</Heading>
+            <Text color="gray.600">
+              View all audit logs for your organization. Filter by project,
+              user, action type, or date range.
+            </Text>
+          </VStack>
           <Spacer />
-          <Button
-            colorPalette="black"
-            minWidth="fit-content"
-            variant="ghost"
-            onClick={() => void downloadCSV()}
-            disabled={isExporting}
-          >
-            {isExporting ? (
-              <>
-                <Spinner size="sm" style={{ marginRight: "8px" }} />
-                Exporting...
-              </>
-            ) : (
-              <>
-                Export CSV <Download style={{ marginLeft: "8px" }} />
-              </>
-            )}
-          </Button>
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
         </HStack>
 
-        <Text color="gray.600">
-          View all audit logs for your organization. Filter by project, user,
-          action type, or date range.
-        </Text>
-
         {/* Filters */}
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={4} paddingX={4}>
-            <HStack gap={4} width="full" flexWrap="wrap" align="end">
-              <VStack
-                align="start"
-                gap={1}
-                flex="1"
-                minWidth="200px"
-                maxWidth="300px"
-              >
-                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-                  Search by User
-                </Text>
-                <InputGroup startElement={<Search size={16} />} width="full">
-                  <Input
-                    placeholder="Search by name or email..."
-                    value={userSearch}
-                    onChange={(e) => handleUserSearchChange(e.target.value)}
-                    width="full"
-                  />
-                </InputGroup>
-              </VStack>
 
-              <VStack
-                align="start"
-                gap={1}
-                flex="1"
-                minWidth="200px"
-                maxWidth="300px"
-              >
-                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-                  Filter by Action
-                </Text>
-                <Input
-                  placeholder="Filter by action type..."
-                  value={actionFilter}
-                  onChange={(e) => handleActionFilterChange(e.target.value)}
-                  width="full"
-                />
-              </VStack>
+        <HStack gap={4} width="full" flexWrap="wrap" align="end">
+          <VStack
+            align="start"
+            gap={1}
+            flex="1"
+            minWidth="200px"
+            maxWidth="300px"
+          >
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Search by User
+            </Text>
+            <InputGroup startElement={<Search size={16} />} width="full">
+              <Input
+                placeholder="Search by name or email..."
+                value={userSearch}
+                onChange={(e) => handleUserSearchChange(e.target.value)}
+                width="full"
+              />
+            </InputGroup>
+          </VStack>
 
-              <VStack
-                align="start"
-                gap={1}
-                flex="1"
-                minWidth="150px"
-                maxWidth="200px"
-              >
-                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-                  Project
-                </Text>
-                <NativeSelect.Root size="sm" width="full">
-                  <NativeSelect.Field
-                    value={selectedProjectId ?? "all"}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      handleProjectChange(
-                        e.target.value === "all" ? null : e.target.value,
-                      )
-                    }
-                  >
-                    <option value="all">All Projects</option>
-                    {organization.teams
-                      .flatMap((team) => team.projects)
-                      .map((proj) => (
-                        <option key={proj.id} value={proj.id}>
-                          {proj.name}
-                        </option>
-                      ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              </VStack>
+          <VStack
+            align="start"
+            gap={1}
+            flex="1"
+            minWidth="200px"
+            maxWidth="300px"
+          >
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Filter by Action
+            </Text>
+            <Input
+              placeholder="Filter by action type..."
+              value={actionFilter}
+              onChange={(e) => handleActionFilterChange(e.target.value)}
+              width="full"
+            />
+          </VStack>
 
-              <VStack
-                align="start"
-                gap={1}
-                flex="1"
-                minWidth="200px"
-                maxWidth="300px"
+          <VStack
+            align="start"
+            gap={1}
+            flex="1"
+            minWidth="150px"
+            maxWidth="200px"
+          >
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Project
+            </Text>
+            <NativeSelect.Root size="sm" width="full">
+              <NativeSelect.Field
+                value={selectedProjectId ?? "all"}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  handleProjectChange(
+                    e.target.value === "all" ? null : e.target.value,
+                  )
+                }
               >
-                <Text fontSize="sm" fontWeight="medium" color="fg.muted">
-                  Select Date
-                </Text>
-                <PeriodSelector
-                  period={{ startDate, endDate }}
-                  setPeriod={(start, end) => {
-                    void router.push({
-                      pathname: router.pathname,
-                      query: {
-                        ...router.query,
-                        startDate: start.toISOString(),
-                        endDate: end.toISOString(),
-                        pageOffset: 0,
-                      },
-                    });
-                  }}
-                />
-              </VStack>
-            </HStack>
-          </Card.Body>
-        </Card.Root>
+                <option value="all">All Projects</option>
+                {organization.teams
+                  .flatMap((team) => team.projects)
+                  .map((proj) => (
+                    <option key={proj.id} value={proj.id}>
+                      {proj.name}
+                    </option>
+                  ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          </VStack>
+
+          <VStack
+            align="start"
+            gap={1}
+            flex="1"
+            minWidth="200px"
+            maxWidth="300px"
+          >
+            <Text fontSize="sm" fontWeight="medium" color="fg.muted">
+              Select Date
+            </Text>
+            <PeriodSelector
+              period={{ startDate, endDate }}
+              setPeriod={(start, end) => {
+                void router.push({
+                  pathname: router.pathname,
+                  query: {
+                    ...router.query,
+                    startDate: start.toISOString(),
+                    endDate: end.toISOString(),
+                    pageOffset: 0,
+                  },
+                });
+              }}
+            />
+          </VStack>
+
+          <PageLayout.HeaderButton
+            onClick={() => void downloadCSV()}
+            disabled={isExporting}
+          >
+            <Download />
+            Export CSV
+          </PageLayout.HeaderButton>
+        </HStack>
 
         {/* Audit Logs Table */}
-        <Card.Root width="full">
-          <Card.Body width="full" paddingY={0} paddingX={0}>
-            {isLoading ? (
-              <VStack padding={8}>
-                <Spinner />
-                <Text>Loading audit logs...</Text>
-              </VStack>
-            ) : auditLogs.length === 0 ? (
-              <VStack padding={8}>
-                <Text color="gray.500">No audit logs found</Text>
-              </VStack>
-            ) : (
-              <>
-                <Table.Root variant="line" width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
-                      <Table.ColumnHeader>User</Table.ColumnHeader>
-                      <Table.ColumnHeader>Action</Table.ColumnHeader>
-                      <Table.ColumnHeader>Project</Table.ColumnHeader>
-                      <Table.ColumnHeader>IP Address</Table.ColumnHeader>
-                      <Table.ColumnHeader>Error</Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {auditLogs.map((log) => (
-                      <Table.Row key={log.id}>
-                        <Table.Cell>
-                          <VStack align="start" gap={0}>
-                            <Text fontSize="sm">
-                              {new Date(log.createdAt).toLocaleString()}
-                            </Text>
-                            <Text fontSize="xs" color="gray.500">
-                              {formatDistanceToNow(new Date(log.createdAt), {
-                                addSuffix: true,
-                              })}
-                            </Text>
-                          </VStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {log.user ? (
-                            <VStack align="start" gap={0}>
-                              <Text fontSize="sm" fontWeight="medium">
-                                {log.user.name ?? "Unknown"}
-                              </Text>
-                              <Text fontSize="xs" color="gray.500">
-                                {log.user.email}
-                              </Text>
-                            </VStack>
-                          ) : (
-                            <Text fontSize="sm" color="gray.400">
-                              User not found
-                            </Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Text fontSize="sm" fontFamily="mono">
-                            {log.action}
+        {isLoading ? (
+          <VStack padding={8}>
+            <Spinner />
+            <Text>Loading audit logs...</Text>
+          </VStack>
+        ) : auditLogs.length === 0 ? (
+          <VStack padding={8}>
+            <Text color="gray.500">No audit logs found</Text>
+          </VStack>
+        ) : (
+          <>
+            <Table.Root variant="line" width="full">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
+                  <Table.ColumnHeader>User</Table.ColumnHeader>
+                  <Table.ColumnHeader>Action</Table.ColumnHeader>
+                  <Table.ColumnHeader>Project</Table.ColumnHeader>
+                  <Table.ColumnHeader>IP Address</Table.ColumnHeader>
+                  <Table.ColumnHeader>Error</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {auditLogs.map((log) => (
+                  <Table.Row key={log.id}>
+                    <Table.Cell>
+                      <VStack align="start" gap={0}>
+                        <Text fontSize="sm">
+                          {new Date(log.createdAt).toLocaleString()}
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          {formatDistanceToNow(new Date(log.createdAt), {
+                            addSuffix: true,
+                          })}
+                        </Text>
+                      </VStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {log.user ? (
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="sm" fontWeight="medium">
+                            {log.user.name ?? "Unknown"}
                           </Text>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {log.projectId ? (
-                            (() => {
-                              const project = organization.teams
-                                .flatMap((team) => team.projects)
-                                .find((p) => p.id === log.projectId);
-                              return (
-                                <Text fontSize="sm">
-                                  {project?.name ?? log.projectId}
-                                </Text>
-                              );
-                            })()
-                          ) : (
-                            <Text fontSize="sm" color="gray.400">
-                              —
+                          <Text fontSize="xs" color="gray.500">
+                            {log.user.email}
+                          </Text>
+                        </VStack>
+                      ) : (
+                        <Text fontSize="sm" color="gray.400">
+                          User not found
+                        </Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="sm" fontFamily="mono">
+                        {log.action}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {log.projectId ? (
+                        (() => {
+                          const project = organization.teams
+                            .flatMap((team) => team.projects)
+                            .find((p) => p.id === log.projectId);
+                          return (
+                            <Text fontSize="sm">
+                              {project?.name ?? log.projectId}
                             </Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          {log.ipAddress ? (
-                            <Text fontSize="sm" fontFamily="mono">
-                              {log.ipAddress}
-                            </Text>
-                          ) : (
-                            <Text fontSize="sm" color="gray.400">
-                              —
-                            </Text>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell>
-                          {log.error ? (
-                            <Text fontSize="sm" color="red.600">
-                              {log.error}
-                            </Text>
-                          ) : (
-                            <Text fontSize="sm" color="gray.400">
-                              —
-                            </Text>
-                          )}
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Root>
+                          );
+                        })()
+                      ) : (
+                        <Text fontSize="sm" color="gray.400">
+                          —
+                        </Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {log.ipAddress ? (
+                        <Text fontSize="sm" fontFamily="mono">
+                          {log.ipAddress}
+                        </Text>
+                      ) : (
+                        <Text fontSize="sm" color="gray.400">
+                          —
+                        </Text>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {log.error ? (
+                        <Text fontSize="sm" color="red.600">
+                          {log.error}
+                        </Text>
+                      ) : (
+                        <Text fontSize="sm" color="gray.400">
+                          —
+                        </Text>
+                      )}
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
 
-                {/* Pagination */}
-                {totalHits > 0 && (
-                  <MessagesNavigationFooter
-                    totalHits={totalHits}
-                    pageOffset={pageOffset}
-                    pageSize={pageSize}
-                    nextPage={nextPage}
-                    prevPage={prevPage}
-                    changePageSize={changePageSize}
-                  />
-                )}
-              </>
+            {/* Pagination */}
+            {totalHits > 0 && (
+              <MessagesNavigationFooter
+                totalHits={totalHits}
+                pageOffset={pageOffset}
+                pageSize={pageSize}
+                nextPage={nextPage}
+                prevPage={prevPage}
+                changePageSize={changePageSize}
+              />
             )}
-          </Card.Body>
-        </Card.Root>
+          </>
+        )}
       </VStack>
     </SettingsLayout>
   );

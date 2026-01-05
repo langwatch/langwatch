@@ -37,10 +37,10 @@ export function DeletableMessage({
         aria-label="Delete message"
         size="xs"
         variant="ghost"
-        colorPalette="red"
+        marginTop={-1}
         onClick={() => onDelete(messageId)}
       >
-        <LuTrash2 size={14} color="currentColor" />
+        <LuTrash2 />
       </IconButton>
     </HStack>
   );

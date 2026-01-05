@@ -128,12 +128,12 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
     <VStack
       align="start"
       width="full"
-      gap={6}
+      gap={4}
       ref={topicSelectorRef}
       minHeight={`${minHeight}px`}
     >
       {showTitle && (
-        <Heading as="h2" size="md">
+        <Heading fontSize="sm" as="h2">
           Topics
         </Heading>
       )}
@@ -167,11 +167,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                       onChange={(e) =>
                         handleTopicChange(topic.id, e.target.checked)
                       }
+                      size="sm"
                     >
                       <OverflownTextWithTooltip
                         lineClamp={1}
                         wordBreak="break-all"
-                        fontSize="15px"
                         maxWidth="300px"
                       >
                         {topic.name}
@@ -194,7 +194,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           paddingX={2}
                           paddingLeft={8}
                           fontWeight="normal"
-                          fontSize="15px"
                         >
                           <Checkbox
                             borderColor="gray.400"
@@ -225,10 +224,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                           </Text>
                         </HStack>
                       ))}
-                  <Separator
-                    borderColor="gray.200"
-                    _last={{ display: "none" }}
-                  />
                 </React.Fragment>
               ))
           ) : (

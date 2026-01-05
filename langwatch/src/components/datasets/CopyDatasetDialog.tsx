@@ -102,7 +102,6 @@ export const CopyDatasetDialog = ({
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Backdrop />
       <Dialog.Content onClick={(e) => e.stopPropagation()}>
         <Dialog.Header>
           <Dialog.Title>Replicate Dataset</Dialog.Title>

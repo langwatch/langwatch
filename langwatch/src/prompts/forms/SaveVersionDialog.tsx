@@ -19,12 +19,15 @@ export interface SaveVersionDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: SaveDialogFormValues) => Promise<void>;
+  /** Next version number to display in button (e.g., "Update to v5") */
+  nextVersion?: number;
 }
 
 export function SaveVersionDialog({
   isOpen,
   onClose,
   onSubmit,
+  nextVersion,
 }: SaveVersionDialogProps) {
   const {
     register,
@@ -59,8 +62,7 @@ export function SaveVersionDialog({
         }
       }}
     >
-      <Dialog.Backdrop />
-      <Dialog.Content backdrop={false}>
+      <Dialog.Content>
         <Dialog.Header>
           <Dialog.Title>Save Version</Dialog.Title>
         </Dialog.Header>
@@ -99,7 +101,7 @@ export function SaveVersionDialog({
             loading={isSubmitting}
             disabled={!isDirty}
           >
-            Save
+            {nextVersion !== undefined ? `Update to v${nextVersion}` : "Save"}
           </Button>
         </Dialog.Footer>
       </Dialog.Content>

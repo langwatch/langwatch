@@ -96,7 +96,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                 boxSize={12}
               />
               <Badge
-                colorScheme={run.status === "SUCCESS" ? "green" : "orange"}
+                colorPalette={run.status === "SUCCESS" ? "green" : "orange"}
                 variant="subtle"
                 display="flex"
                 alignItems="center"

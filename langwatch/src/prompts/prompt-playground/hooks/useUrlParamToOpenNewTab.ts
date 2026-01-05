@@ -17,7 +17,7 @@ const logger = createLogger("useUrlParamToOpenNewTab");
  */
 export function useUrlParamToOpenNewTab() {
   const { project } = useOrganizationTeamProject();
-  const { addTab } = useDraggableTabsBrowserStore();
+  const { addTab } = useDraggableTabsBrowserStore(({ addTab }) => ({ addTab }));
   const { selectedPromptId } = usePromptIdQueryParam();
   const trpc = api.useContext();
 
@@ -62,6 +62,7 @@ export function useUrlParamToOpenNewTab() {
             versionNumber: defaultValues.versionMetadata?.versionNumber,
             scope: defaultValues.scope,
           },
+          variableValues: {},
         },
       });
     }

@@ -38,7 +38,7 @@ export function SimulationConsole({
       overflow="auto"
     >
       <Code
-        colorScheme="green"
+        colorPalette="green"
         bg="transparent"
         color="inherit"
         whiteSpace="pre-wrap"

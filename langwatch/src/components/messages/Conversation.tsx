@@ -151,7 +151,7 @@ export function Conversation({
                   paddingRight={10}
                   paddingY={4}
                   background="white"
-                  borderRadius="4px"
+                  borderRadius="lg"
                   minHeight="524px"
                 >
                   <Message
