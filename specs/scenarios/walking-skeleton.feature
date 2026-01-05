@@ -3,9 +3,7 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   As a LangWatch user
   I want to create scenarios and run them against HTTP targets
   So that I can validate my agent's behavior on the platform
-
   # Routes are at /[project]/simulationsv2/* (hidden for now, no nav link)
-
   # ============================================================================
   # Frontend: Navigation & List (SCEN-10)
   # ============================================================================
@@ -20,9 +18,9 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   @visual
   Scenario: View scenarios list
     Given scenarios exist in the project:
-      | name           | labels              |
-      | Refund Flow    | ["support"]         |
-      | Billing Check  | ["billing", "edge"] |
+      | name          | labels              |
+      | Refund Flow   | ["support"]         |
+      | Billing Check | ["billing", "edge"] |
     When I am on the scenarios list page
     Then I see a list with both scenarios
     And each row shows the scenario name
@@ -35,7 +33,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     When I am on the scenarios list page
     Then I see an empty state message
     And I see a call to action to create a scenario
-
   # ============================================================================
   # Frontend: Create Scenario (SCEN-20, SCEN-22)
   # ============================================================================
@@ -51,11 +48,11 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   Scenario: Scenario form fields
     When I am on the create scenario page
     Then I see the following fields:
-      | field     | type          |
-      | Name      | text input    |
-      | Situation | textarea      |
+      | field     | type              |
+      | Name      | text input        |
+      | Situation | textarea          |
       | Criteria  | list (add/remove) |
-      | Labels    | tag input     |
+      | Labels    | tag input         |
 
   @visual
   Scenario: Add criteria to list
@@ -78,7 +75,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     Then the scenario is created
     And I navigate back to the list
     And the new scenario appears in the list
-
   # ============================================================================
   # Frontend: Edit Scenario
   # ============================================================================
@@ -97,7 +93,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     And I click "Save"
     Then the scenario is updated
     And I see the updated name in the list
-
   # ============================================================================
   # Frontend: HTTP Target Configuration (SCEN-43)
   # ============================================================================
@@ -107,10 +102,10 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     Given I am on the scenario edit page
     When I click "Configure Target"
     Then I see the HTTP target form with fields:
-      | field   | type       |
-      | URL     | text input |
+      | field   | type                |
+      | URL     | text input          |
       | Method  | dropdown (POST/GET) |
-      | Headers | key-value pairs |
+      | Headers | key-value pairs     |
 
   @visual
   Scenario: Save HTTP target as Agent
@@ -118,7 +113,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     When I save the target
     Then an Agent with type "http" is created
     And the target is associated with the scenario run
-
   # ============================================================================
   # Frontend: Quick Run & Results (SCEN-24, SCEN-32)
   # ============================================================================
