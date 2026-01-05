@@ -10,11 +10,10 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Check, Trash } from "lucide-react";
+import { Trash } from "lucide-react";
 import { type UseFormReturn, useForm } from "react-hook-form";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { Drawer } from "../ui/drawer";
-import { Popover } from "../ui/popover";
 import { Radio, RadioGroup } from "../ui/radio";
 import { Tooltip } from "../ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -30,6 +29,7 @@ import {
 } from "../../pages/[project]/analytics/custom/index";
 import type { CustomGraphInput } from "./CustomGraph";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { AlertDrawerMultiSelect } from "./AlertDrawerMultiSelect";
 
 interface AlertDrawerProps {
   form?: UseFormReturn<CustomGraphFormData>;
@@ -170,66 +170,27 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
     }
   }, [form]);
 
-  const handlePopoverChange = ({ open: isOpen }: { open: boolean }) => {
-    if (isOpen) {
-      onOpen();
-    } else {
-      form?.setValue("alert.actionParams.members", selectedMembers);
-      onClose();
-    }
-  };
+  const handlePopoverChange = useCallback(
+    ({ open: isOpen }: { open: boolean }) => {
+      if (isOpen) {
+        onOpen();
+      } else {
+        form?.setValue("alert.actionParams.members", selectedMembers);
+        onClose();
+      }
+    },
+    [onOpen, onClose, form, selectedMembers],
+  );
 
-  const MultiSelect = () => (
-    <VStack width="full" align="start" paddingLeft={7}>
-      <Popover.Root
-        positioning={{ placement: "bottom" }}
-        open={open}
-        onOpenChange={handlePopoverChange}
-      >
-        <Popover.Trigger width="full">
-          <Field.Root width="100%">
-            <Input
-              placeholder="Select email/s"
-              value={selectedMembers.join(", ")}
-              readOnly
-              width="100%"
-            />
-          </Field.Root>
-        </Popover.Trigger>
-        <Popover.Content marginTop="-8px">
-          <Popover.CloseTrigger onClick={onClose} zIndex={1000} />
-          <Popover.Body>
-            <VStack width="full" align="start">
-              {teamWithMembers.data?.members.map((member) => {
-                const email = member.user.email ?? "";
-                return (
-                  <HStack
-                    key={member.user.id}
-                    cursor="pointer"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (selectedMembers.includes(email)) {
-                        setSelectedMembers(
-                          selectedMembers.filter((m) => m !== email),
-                        );
-                      } else {
-                        setSelectedMembers([...selectedMembers, email]);
-                      }
-                    }}
-                  >
-                    <Check
-                      size={18}
-                      color={selectedMembers.includes(email) ? "green" : "gray"}
-                    />
-                    <Text>{email}</Text>
-                  </HStack>
-                );
-              })}
-            </VStack>
-          </Popover.Body>
-        </Popover.Content>
-      </Popover.Root>
-    </VStack>
+  const handleMemberToggle = useCallback(
+    (email: string) => {
+      if (selectedMembers.includes(email)) {
+        setSelectedMembers(selectedMembers.filter((m) => m !== email));
+      } else {
+        setSelectedMembers([...selectedMembers, email]);
+      }
+    },
+    [selectedMembers],
   );
 
   const handleSave = () => {
@@ -296,16 +257,31 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
   const handleRemoveAlert = () => {
     if (!form || !graphId || !project) return;
 
-    form.setValue("alert.enabled", false);
-    form.setValue("alert.threshold", 0);
-    form.setValue("alert.seriesName", "");
-    form.setValue("alert.actionParams.members", []);
-    form.setValue("alert.actionParams.slackWebhook", "");
+    // Store current form values to restore on error
+    const currentFormData = form.getValues();
+    const previousAlert = currentFormData.alert
+      ? { ...currentFormData.alert }
+      : undefined;
 
-    // Save the graph without the alert
+    // Prepare the graph data with alert disabled (without mutating form state)
     const graphName = form.getValues("title");
-    const graphJson = customGraphFormToCustomGraphInput(form.getValues());
-    const formData = form.getValues();
+    const currentFormValues = form.getValues();
+    const graphJson = customGraphFormToCustomGraphInput(currentFormValues);
+
+    // Create alert data with disabled state for the mutation
+    const alertData = currentFormValues.alert
+      ? {
+          ...currentFormValues.alert,
+          enabled: false,
+          threshold: 0,
+          seriesName: "",
+          actionParams: {
+            ...currentFormValues.alert.actionParams,
+            members: [],
+            slackWebhook: "",
+          },
+        }
+      : undefined;
 
     updateGraphById.mutate(
       {
@@ -314,10 +290,17 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
         graphId: graphId,
         graph: JSON.stringify(graphJson),
         filterParams: filterParams,
-        alert: formData.alert,
+        alert: alertData,
       },
       {
         onSuccess: () => {
+          // Only update form state after successful mutation
+          form.setValue("alert.enabled", false);
+          form.setValue("alert.threshold", 0);
+          form.setValue("alert.seriesName", "");
+          form.setValue("alert.actionParams.members", []);
+          form.setValue("alert.actionParams.slackWebhook", "");
+
           void trpc.graphs.getById.invalidate();
           void trpc.graphs.getAll.invalidate();
           toaster.create({
@@ -327,6 +310,11 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
           closeDrawer();
         },
         onError: () => {
+          // Restore previous form values on error
+          if (previousAlert) {
+            form.setValue("alert", previousAlert);
+          }
+
           toaster.create({
             title: "Error removing alert",
             type: "error",
@@ -548,7 +536,16 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
                           </Text>
                         </VStack>
                       </Radio>
-                      {alertAction === "SEND_EMAIL" && <MultiSelect />}
+                      {alertAction === "SEND_EMAIL" && (
+                        <AlertDrawerMultiSelect
+                          open={open}
+                          onOpenChange={handlePopoverChange}
+                          selectedMembers={selectedMembers}
+                          onMemberToggle={handleMemberToggle}
+                          onClose={onClose}
+                          members={teamWithMembers.data?.members}
+                        />
+                      )}
                     </VStack>
                   </Tooltip>
                 </Stack>

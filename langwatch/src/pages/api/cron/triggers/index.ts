@@ -51,12 +51,38 @@ export default async function handler(
   for (const trigger of triggers) {
     // Check if this is a custom graph alert (has customGraphId)
     if (trigger.customGraphId) {
-      const result = await processCustomGraphTrigger(trigger, projects);
-      results.push(result);
+      try {
+        const result = await processCustomGraphTrigger(trigger, projects);
+        results.push(result);
+      } catch (error) {
+        console.error(
+          `Error processing custom graph trigger ${trigger.id}:`,
+          error instanceof Error ? error.message : error,
+        );
+        results.push({
+          triggerId: trigger.id,
+          status: "error",
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "customGraph",
+        });
+      }
     } else {
       // Existing trace-based trigger logic
-      const result = await processTraceBasedTrigger(trigger, projects);
-      results.push(result);
+      try {
+        const result = await processTraceBasedTrigger(trigger, projects);
+        results.push(result);
+      } catch (error) {
+        console.error(
+          `Error processing trace-based trigger ${trigger.id}:`,
+          error instanceof Error ? error.message : error,
+        );
+        results.push({
+          triggerId: trigger.id,
+          status: "error",
+          message: error instanceof Error ? error.message : "Unknown error",
+          type: "traceBased",
+        });
+      }
     }
   }
 
