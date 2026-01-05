@@ -29,7 +29,7 @@ import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
-import { scenarioRouter } from "./routers/scenario";
+import { scenarioRouter } from "./routers/scenarios";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
