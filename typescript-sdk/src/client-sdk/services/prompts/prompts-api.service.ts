@@ -98,10 +98,12 @@ export class PromptsApiService {
     const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}",
       {
-        params: { path: { id } },
-        query: {
-          version: options?.version,
-        },
+        params: { 
+          path: { id },
+          ...(options?.version && options.version !== "latest" && !isNaN(parseInt(options.version, 10)) && {
+              query: { version: parseInt(options.version, 10) }
+            }),
+          },
       },
     );
 
