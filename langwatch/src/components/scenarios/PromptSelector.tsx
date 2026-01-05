@@ -1,12 +1,11 @@
 import {
   Button,
+  createListCollection,
   Portal,
-  useFilter,
   useListbox,
-  useListCollection,
 } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Listbox } from "../ui/listbox";
 import { Popover } from "../ui/popover";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -26,17 +25,20 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const { contains } = useFilter({ sensitivity: "base" });
+  const collection = useMemo(() => {
+    const allItems = (prompts?.filter((p) => p.version > 0) ?? []).map((p) => ({
+      label: p.handle ?? p.id,
+      value: p.id,
+    }));
 
-  const initialItems = (prompts?.filter((p) => p.version > 0) ?? []).map((p) => ({
-    label: p.handle ?? p.id,
-    value: p.id,
-  }));
+    const filteredItems = inputValue
+      ? allItems.filter((item) =>
+          item.label.toLowerCase().includes(inputValue.toLowerCase())
+        )
+      : allItems;
 
-  const { collection, filter } = useListCollection({
-    initialItems,
-    filter: contains,
-  });
+    return createListCollection({ items: filteredItems });
+  }, [prompts, inputValue]);
 
   const listbox = useListbox({
     collection,
@@ -74,10 +76,7 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
               outline="0"
               placeholder="Search prompts..."
               value={inputValue}
-              onChange={(e) => {
-                setInputValue(e.currentTarget.value);
-                filter(e.currentTarget.value);
-              }}
+              onChange={(e) => setInputValue(e.currentTarget.value)}
             />
             <Listbox.Content
               borderWidth="0"
@@ -98,4 +97,3 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
     </Popover.Root>
   );
 }
-
