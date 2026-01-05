@@ -7,6 +7,7 @@ import {
 } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import { Play } from "lucide-react";
+import { useRouter } from "next/router";
 import { useCallback, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -30,12 +31,15 @@ export type ScenarioFormDrawerProps = {
  * Bottom bar with Quick Test and Save and Run.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
+  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
   const [selectedPromptId, setSelectedPromptId] = useState<string[]>([]);
+
+  const runMutation = api.scenarios.run.useMutation();
 
   const scenarioId = params.scenarioId;
   const isOpen = props.open !== false && props.open !== undefined;
@@ -49,13 +53,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
-      toaster.create({
-        title: "Scenario created",
-        type: "success",
-        meta: { closable: true },
-      });
       props.onSuccess?.(data);
-      onClose();
     },
     onError: (error) => {
       toaster.create({
@@ -74,13 +72,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         projectId: project?.id ?? "",
         id: data.id,
       });
-      toaster.create({
-        title: "Scenario updated",
-        type: "success",
-        meta: { closable: true },
-      });
       props.onSuccess?.(data);
-      onClose();
     },
     onError: (error) => {
       toaster.create({
@@ -92,45 +84,78 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
   });
 
-  const handleSubmit = useCallback(
-    (data: ScenarioFormData, runAfterSave: boolean = false) => {
-      if (!project?.id) return;
+  const handleSave = useCallback(
+    async (data: ScenarioFormData): Promise<Scenario | null> => {
+      if (!project?.id) return null;
 
       if (scenario) {
-        updateMutation.mutate({
+        return updateMutation.mutateAsync({
           projectId: project.id,
           id: scenario.id,
           ...data,
         });
       } else {
-        createMutation.mutate({
+        return createMutation.mutateAsync({
           projectId: project.id,
           ...data,
         });
       }
-
-      // TODO: Handle runAfterSave when run functionality is implemented
     },
     [project?.id, scenario, createMutation, updateMutation]
   );
 
-  const handleSaveAndRun = useCallback(() => {
-    if (formRef.current) {
-      formRef.current.handleSubmit((data) => handleSubmit(data, true))();
-    }
-  }, [handleSubmit]);
+  const handleSaveAndRun = useCallback(async () => {
+    const form = formRef.current;
+    if (!form || !project?.id) return;
 
-  const handleSaveWithoutRunning = useCallback(() => {
-    if (formRef.current) {
-      formRef.current.handleSubmit((data) => handleSubmit(data, false))();
+    const promptId = selectedPromptId[0];
+    if (!promptId) {
+      toaster.create({
+        title: "Select a prompt",
+        description: "Please select a prompt to run the scenario against.",
+        type: "warning",
+        meta: { closable: true },
+      });
+      return;
     }
-  }, [handleSubmit]);
+
+    await form.handleSubmit(async (data) => {
+      const savedScenario = await handleSave(data);
+      if (!savedScenario) return;
+
+      const { setId } = await runMutation.mutateAsync({
+        projectId: project.id,
+        scenarioId: savedScenario.id,
+        promptId,
+      });
+
+      onClose();
+      void router.push(`/${project.slug}/simulations/scenarios/${setId}`);
+    })();
+  }, [handleSave, project, selectedPromptId, runMutation, onClose, router]);
+
+  const handleSaveWithoutRunning = useCallback(async () => {
+    const form = formRef.current;
+    if (!form) return;
+
+    await form.handleSubmit(async (data) => {
+      const saved = await handleSave(data);
+      if (saved) {
+        toaster.create({
+          title: scenario ? "Scenario updated" : "Scenario created",
+          type: "success",
+          meta: { closable: true },
+        });
+        onClose();
+      }
+    })();
+  }, [handleSave, scenario, onClose]);
 
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     formRef.current = form;
   }, []);
 
-  const isSubmitting = createMutation.isLoading || updateMutation.isLoading;
+  const isSubmitting = createMutation.isLoading || updateMutation.isLoading || runMutation.isLoading;
 
   const defaultValues: Partial<ScenarioFormData> | undefined = scenario ?? undefined;
 

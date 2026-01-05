@@ -25,6 +25,11 @@ const updateScenarioSchema = projectSchema.extend({
   labels: z.array(z.string()).optional(),
 });
 
+const runScenarioSchema = projectSchema.extend({
+  scenarioId: z.string(),
+  promptId: z.string(),
+});
+
 /**
  * TODO: Split the router into scenario crud and scenario events.
  */
@@ -74,6 +79,23 @@ export const scenarioRouter = createTRPCRouter({
         ...data,
         lastUpdatedById: ctx.session.user.id,
       });
+    }),
+
+  /**
+   * Run a scenario against a prompt target.
+   * Returns immediately with setId for redirect; execution is async.
+   */
+  run: protectedProcedure
+    .input(runScenarioSchema)
+    .use(checkProjectPermission("scenarios:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const setId = "local-scenarios";
+
+      // TODO: Wire up ScenarioRunnerService with PromptConfigAdapter
+      // For now, just return the setId for redirect
+      // void runnerService.execute({ scenarioId: input.scenarioId, promptId: input.promptId, setId });
+
+      return { setId };
     }),
 
   // ============================================================================
