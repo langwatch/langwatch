@@ -135,7 +135,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     formRef.current = form;
   }, []);
-  const isSubmitting = createMutation.isLoading || updateMutation.isLoading || runMutation.isLoading;
+  const isSubmitting = createMutation.isPending || updateMutation.isPending || runMutation.isPending;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => scenario ?? undefined, [scenario]);
   return (
     <Drawer.Root closeOnInteractOutside={false}
