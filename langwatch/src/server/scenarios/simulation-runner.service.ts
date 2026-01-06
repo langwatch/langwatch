@@ -16,7 +16,7 @@ const logger = createLogger("SimulationRunnerService");
  *
  * TODO: Remove this mutex once @langwatch/scenario SDK supports
  * programmatic config via ScenarioConfig.langwatch option.
- * See: https://github.com/langwatch/langwatch/issues/XXX
+ * See: https://github.com/langwatch/scenario/issues/203
  */
 class Mutex {
   private queue: (() => void)[] = [];
@@ -63,6 +63,7 @@ export class SimulationRunnerService {
    * and LANGWATCH_ENDPOINT from process.env, not from config.
    *
    * TODO: Remove once SDK supports ScenarioConfig.langwatch option.
+   * See: https://github.com/langwatch/scenario/issues/203
    */
   private static readonly executionMutex = new Mutex();
 
