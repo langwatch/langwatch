@@ -6,9 +6,12 @@
  * we add it here and TypeScript will enforce it everywhere.
  */
 
-import type { LocalPromptConfig, FieldMapping as StoreFieldMapping } from "../types";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { Field } from "~/optimization_studio/types/dsl";
+import type {
+  LocalPromptConfig,
+  FieldMapping as StoreFieldMapping,
+} from "../types";
 import { convertFromUIMapping } from "./fieldMappingConverters";
 
 /**
@@ -27,18 +30,18 @@ export type CreatePromptEditorCallbacksParams = {
       localPromptConfig?: LocalPromptConfig;
       inputs?: Array<{ identifier: string; type: Field["type"] }>;
       outputs?: Array<{ identifier: string; type: Field["type"] }>;
-    }
+    },
   ) => void;
   setTargetMapping: (
     targetId: string,
     datasetId: string,
     inputIdentifier: string,
-    mapping: StoreFieldMapping
+    mapping: StoreFieldMapping,
   ) => void;
   removeTargetMapping: (
     targetId: string,
     datasetId: string,
-    inputIdentifier: string
+    inputIdentifier: string,
   ) => void;
   getActiveDatasetId: () => string;
   getDatasets: () => Array<{ id: string }>;
@@ -76,7 +79,10 @@ export type PromptEditorCallbacksForTarget = {
   onLocalConfigChange: (localConfig: LocalPromptConfig | undefined) => void;
   onSave: (savedPrompt: SavedPromptData) => void;
   onVersionChange: (loadedPrompt: LoadedVersionData) => void;
-  onInputMappingsChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+  onInputMappingsChange: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -161,11 +167,10 @@ export const createPromptEditorCallbacks = ({
         targetId,
         currentActiveDatasetId,
         identifier,
-        convertFromUIMapping(mapping, checkIsDatasetSource)
+        convertFromUIMapping(mapping, checkIsDatasetSource),
       );
     } else {
       removeTargetMapping(targetId, currentActiveDatasetId, identifier);
     }
   },
 });
-

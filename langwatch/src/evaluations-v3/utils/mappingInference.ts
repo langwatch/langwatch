@@ -10,14 +10,14 @@
  * 3. Cross-dataset propagation from existing mappings
  */
 
+import type { Field } from "~/optimization_studio/types/dsl";
 import type {
   DatasetColumn,
   DatasetReference,
+  EvaluatorConfig,
   FieldMapping,
   TargetConfig,
-  EvaluatorConfig,
 } from "../types";
-import type { Field } from "~/optimization_studio/types/dsl";
 
 // ============================================================================
 // Semantic Mapping Dictionary
@@ -103,15 +103,13 @@ const REVERSE_SEMANTIC_LOOKUP = buildReverseLookup();
  */
 export const findMatchingColumn = (
   fieldName: string,
-  columns: DatasetColumn[]
+  columns: DatasetColumn[],
 ): string | undefined => {
   const columnNames = columns.map((c) => c.name.toLowerCase());
   const fieldLower = fieldName.toLowerCase();
 
   // 1. Exact match
-  const exactMatch = columns.find(
-    (c) => c.name.toLowerCase() === fieldLower
-  );
+  const exactMatch = columns.find((c) => c.name.toLowerCase() === fieldLower);
   if (exactMatch) {
     return exactMatch.name;
   }
@@ -132,7 +130,7 @@ export const findMatchingColumn = (
 
   for (const potentialName of potentialMatches) {
     const match = columns.find(
-      (c) => c.name.toLowerCase() === potentialName.toLowerCase()
+      (c) => c.name.toLowerCase() === potentialName.toLowerCase(),
     );
     if (match) {
       return match.name;
@@ -153,7 +151,7 @@ export const findMatchingColumn = (
 export const inferTargetMappings = (
   inputFields: Field[],
   dataset: DatasetReference,
-  existingMappings: Record<string, FieldMapping> = {}
+  existingMappings: Record<string, FieldMapping> = {},
 ): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
 
@@ -164,7 +162,10 @@ export const inferTargetMappings = (
     }
 
     // Try to find a matching column
-    const matchingColumn = findMatchingColumn(field.identifier, dataset.columns);
+    const matchingColumn = findMatchingColumn(
+      field.identifier,
+      dataset.columns,
+    );
     if (matchingColumn) {
       newMappings[field.identifier] = {
         type: "source",
@@ -192,7 +193,7 @@ export const inferTargetMappings = (
 export const propagateMappingsToNewDataset = (
   inputFields: Field[],
   existingMappings: Record<string, Record<string, FieldMapping>>,
-  newDataset: DatasetReference
+  newDataset: DatasetReference,
 ): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
 
@@ -225,7 +226,10 @@ export const propagateMappingsToNewDataset = (
       }
     } else {
       // No existing mapping - try basic inference
-      const matchingColumn = findMatchingColumn(field.identifier, newDataset.columns);
+      const matchingColumn = findMatchingColumn(
+        field.identifier,
+        newDataset.columns,
+      );
       if (matchingColumn) {
         newMappings[field.identifier] = {
           type: "source",
@@ -244,7 +248,13 @@ export const propagateMappingsToNewDataset = (
  * Fields that should primarily come from the target output.
  * "output" is the most common evaluator input that should connect to target.
  */
-const TARGET_OUTPUT_FIELDS = new Set(["output", "response", "answer", "result", "generated"]);
+const TARGET_OUTPUT_FIELDS = new Set([
+  "output",
+  "response",
+  "answer",
+  "result",
+  "generated",
+]);
 
 /**
  * Infer mappings for an evaluator's inputs.
@@ -267,7 +277,7 @@ export const inferEvaluatorMappings = (
   evaluatorInputs: Field[],
   dataset: DatasetReference,
   target: TargetConfig,
-  existingMappings: Record<string, FieldMapping> = {}
+  existingMappings: Record<string, FieldMapping> = {},
 ): Record<string, FieldMapping> => {
   const newMappings: Record<string, FieldMapping> = {};
 
@@ -284,7 +294,11 @@ export const inferEvaluatorMappings = (
       // For "output" and similar: try target FIRST, then dataset
       const targetOutputMatch = findMatchingColumn(
         input.identifier,
-        target.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+        target.outputs.map((o) => ({
+          id: o.identifier,
+          name: o.identifier,
+          type: "string" as const,
+        })),
       );
 
       if (targetOutputMatch) {
@@ -298,7 +312,10 @@ export const inferEvaluatorMappings = (
       }
 
       // Fallback to dataset if no target match
-      const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
+      const datasetColumnMatch = findMatchingColumn(
+        input.identifier,
+        dataset.columns,
+      );
       if (datasetColumnMatch) {
         newMappings[input.identifier] = {
           type: "source",
@@ -309,7 +326,10 @@ export const inferEvaluatorMappings = (
       }
     } else {
       // For "input", "expected_output", etc: try dataset FIRST, then target
-      const datasetColumnMatch = findMatchingColumn(input.identifier, dataset.columns);
+      const datasetColumnMatch = findMatchingColumn(
+        input.identifier,
+        dataset.columns,
+      );
       if (datasetColumnMatch) {
         newMappings[input.identifier] = {
           type: "source",
@@ -323,7 +343,11 @@ export const inferEvaluatorMappings = (
       // Fallback to target if no dataset match
       const targetOutputMatch = findMatchingColumn(
         input.identifier,
-        target.outputs.map((o) => ({ id: o.identifier, name: o.identifier, type: "string" as const }))
+        target.outputs.map((o) => ({
+          id: o.identifier,
+          name: o.identifier,
+          type: "string" as const,
+        })),
       );
       if (targetOutputMatch) {
         newMappings[input.identifier] = {
@@ -348,7 +372,7 @@ export const inferEvaluatorMappings = (
  */
 export const inferAllTargetMappings = (
   target: TargetConfig,
-  datasets: DatasetReference[]
+  datasets: DatasetReference[],
 ): Record<string, Record<string, FieldMapping>> => {
   const result = { ...target.mappings };
 
@@ -357,7 +381,7 @@ export const inferAllTargetMappings = (
     const newMappings = inferTargetMappings(
       target.inputs,
       dataset,
-      existingDatasetMappings
+      existingDatasetMappings,
     );
 
     if (Object.keys(newMappings).length > 0) {
@@ -382,7 +406,7 @@ export const inferAllTargetMappings = (
 export const inferAllEvaluatorMappings = (
   evaluator: EvaluatorConfig,
   datasets: DatasetReference[],
-  targets: TargetConfig[]
+  targets: TargetConfig[],
 ): Record<string, Record<string, Record<string, FieldMapping>>> => {
   const result = { ...evaluator.mappings };
 
@@ -394,7 +418,7 @@ export const inferAllEvaluatorMappings = (
         evaluator.inputs,
         dataset,
         target,
-        existingMappings
+        existingMappings,
       );
 
       if (Object.keys(newMappings).length > 0) {

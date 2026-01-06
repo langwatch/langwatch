@@ -5,9 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { EvaluatorListDrawer } from "../EvaluatorListDrawer";
 import { api } from "~/utils/api";
+import { EvaluatorListDrawer } from "../EvaluatorListDrawer";
 
 // Mock dependencies
 vi.mock("next/router", () => ({
@@ -124,7 +123,7 @@ describe("EvaluatorListDrawer", () => {
         onCreateNew={mockOnCreateNew}
         {...props}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
   };
 
@@ -181,7 +180,7 @@ describe("EvaluatorListDrawer", () => {
           id: "evaluator-1",
           name: "Exact Match",
           type: "evaluator",
-        })
+        }),
       );
     });
 
@@ -241,7 +240,9 @@ describe("EvaluatorListDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No evaluators yet")).toBeInTheDocument();
-        expect(screen.getByText("Create your first evaluator to get started")).toBeInTheDocument();
+        expect(
+          screen.getByText("Create your first evaluator to get started"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -254,7 +255,9 @@ describe("EvaluatorListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("create-first-evaluator-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("create-first-evaluator-button"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -268,7 +271,9 @@ describe("EvaluatorListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("create-first-evaluator-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("create-first-evaluator-button"),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId("create-first-evaluator-button"));

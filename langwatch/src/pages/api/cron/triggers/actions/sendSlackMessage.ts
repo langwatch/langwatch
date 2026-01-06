@@ -28,4 +28,3 @@ export const handleSendSlackMessage = async (context: TriggerContext) => {
     });
   }
 };
-

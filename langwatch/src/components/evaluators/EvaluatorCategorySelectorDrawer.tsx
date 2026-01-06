@@ -10,7 +10,7 @@ import {
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 export type EvaluatorCategoryId =
   | "expected_answer"

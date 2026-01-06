@@ -47,7 +47,8 @@ export const ENTITY_ID_EXTRACTORS: Record<
   prompt: (args) => (args.configId as string) ?? null,
   workflow: (args) => (args.workflowId as string) ?? null,
   dataset: (args) => (args.datasetId as string) ?? null,
-  evaluation: (args) => (args.checkId as string) ?? (args.monitorId as string) ?? null,
+  evaluation: (args) =>
+    (args.checkId as string) ?? (args.monitorId as string) ?? null,
   annotation: (args) => (args.annotationQueueId as string) ?? null,
   simulation: (args) => (args.scenarioSetId as string) ?? null,
 };

@@ -80,13 +80,16 @@ export const TargetHeader = memo(function TargetHeader({
   const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
 
   // Check if there are missing mappings for the active dataset
-  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+  const activeDatasetId = useEvaluationsV3Store(
+    (state) => state.activeDatasetId,
+  );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
 
   // Get the latest version for this prompt (to determine if target is at "latest")
   const { latestVersion } = useLatestPromptVersion({
     configId: target.type === "prompt" ? target.promptId : undefined,
-    currentVersion: target.type === "prompt" ? target.promptVersionNumber : undefined,
+    currentVersion:
+      target.type === "prompt" ? target.promptVersionNumber : undefined,
   });
 
   // Check if this target is effectively at "latest" version
@@ -154,9 +157,7 @@ export const TargetHeader = memo(function TargetHeader({
             </Text>
             {showVersionBadge && target.promptVersionNumber !== undefined && (
               <Box flexShrink={0}>
-                <VersionBadge
-                  version={target.promptVersionNumber}
-                />
+                <VersionBadge version={target.promptVersionNumber} />
               </Box>
             )}
             {hasMissingMappings && (
@@ -231,7 +232,11 @@ export const TargetHeader = memo(function TargetHeader({
 
       {/* Play button on far right */}
       <Tooltip
-        content={hasMissingMappings ? "Configure missing mappings first" : "Run evaluation"}
+        content={
+          hasMissingMappings
+            ? "Configure missing mappings first"
+            : "Run evaluation"
+        }
         positioning={{ placement: "top" }}
         openDelay={200}
       >

@@ -1,4 +1,4 @@
-import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { processCustomGraphTrigger } from "../customGraphTrigger";
 
@@ -230,10 +230,7 @@ describe("processCustomGraphTrigger", () => {
       vi.mocked(prisma.triggerSent.findFirst).mockResolvedValue(null);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [
-          { "1/errors/count": 60 },
-          { "1/errors/count": 70 },
-        ],
+        currentPeriod: [{ "1/errors/count": 60 }, { "1/errors/count": 70 }],
         previousPeriod: [],
       } as any);
       vi.mocked(checkThreshold).mockReturnValue(true);
@@ -285,10 +282,7 @@ describe("processCustomGraphTrigger", () => {
       } as any);
 
       vi.mocked(timeseries).mockResolvedValue({
-        currentPeriod: [
-          { "0/count/count": 15 },
-          { "0/count/count": 20 },
-        ],
+        currentPeriod: [{ "0/count/count": 15 }, { "0/count/count": 20 }],
         previousPeriod: [],
       } as any);
 

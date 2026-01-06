@@ -1,15 +1,15 @@
-import { VStack, Text, Box } from "@chakra-ui/react";
+import { Box, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import {
-  VariablesSection,
-  datasetColumnTypeToFieldType,
-  type Variable,
   type AvailableSource,
-  type FieldMapping as VariableFieldMapping,
+  datasetColumnTypeToFieldType,
   type FieldType,
+  type Variable,
+  type FieldMapping as VariableFieldMapping,
+  VariablesSection,
 } from "~/components/variables";
-import type { TargetConfig, FieldMapping, DatasetReference } from "../../types";
 import type { Field } from "~/optimization_studio/types/dsl";
+import type { DatasetReference, FieldMapping, TargetConfig } from "../../types";
 import { getUsedFields } from "../../utils/mappingValidation";
 
 // ============================================================================
@@ -28,7 +28,10 @@ type TargetVariablesPanelProps = {
   /** Callback when inputs change */
   onInputsChange: (inputs: Field[]) => void;
   /** Callback when a single mapping changes for the active dataset */
-  onMappingChange: (inputField: string, mapping: FieldMapping | undefined) => void;
+  onMappingChange: (
+    inputField: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
   /** Whether the inputs are read-only (e.g., for agents with fixed inputs) */
   readOnly?: boolean;
 };
@@ -43,7 +46,7 @@ type TargetVariablesPanelProps = {
  */
 const buildAvailableSources = (
   activeDataset: DatasetReference | undefined,
-  otherTargets: TargetConfig[]
+  otherTargets: TargetConfig[],
 ): AvailableSource[] => {
   const sources: AvailableSource[] = [];
 
@@ -104,7 +107,7 @@ const variablesToFields = (variables: Variable[]): Field[] => {
  * Both support source and value mapping types.
  */
 const convertToVariableMappings = (
-  mappings: Record<string, FieldMapping>
+  mappings: Record<string, FieldMapping>,
 ): Record<string, VariableFieldMapping> => {
   const result: Record<string, VariableFieldMapping> = {};
 
@@ -129,7 +132,7 @@ const convertToVariableMappings = (
  */
 const convertFromVariableMapping = (
   mapping: VariableFieldMapping,
-  datasets: DatasetReference[]
+  datasets: DatasetReference[],
 ): FieldMapping => {
   if (mapping.type === "value") {
     return { type: "value", value: mapping.value };
@@ -171,19 +174,19 @@ export const TargetVariablesPanel = ({
   // Find the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
-    [datasets, activeDatasetId]
+    [datasets, activeDatasetId],
   );
 
   // Build available sources for mapping (only active dataset)
   const availableSources = useMemo(
     () => buildAvailableSources(activeDataset, otherTargets),
-    [activeDataset, otherTargets]
+    [activeDataset, otherTargets],
   );
 
   // Convert target inputs to variables
   const variables = useMemo(
     () => fieldsToVariables(target.inputs),
-    [target.inputs]
+    [target.inputs],
   );
 
   // Get mappings for the active dataset
@@ -192,7 +195,7 @@ export const TargetVariablesPanel = ({
   // Convert target mappings to variable mappings for display
   const mappings = useMemo(
     () => convertToVariableMappings(datasetMappings),
-    [datasetMappings]
+    [datasetMappings],
   );
 
   // Get fields that are actually used in the prompt (for validation)
@@ -203,7 +206,8 @@ export const TargetVariablesPanel = ({
   // "Undefined variables" (used but not in inputs) don't require mappings
   const missingMappings = useMemo(() => {
     return target.inputs.filter(
-      (input) => usedFields.has(input.identifier) && !datasetMappings[input.identifier]
+      (input) =>
+        usedFields.has(input.identifier) && !datasetMappings[input.identifier],
     );
   }, [target.inputs, datasetMappings, usedFields]);
 
@@ -221,7 +225,7 @@ export const TargetVariablesPanel = ({
   // Handle mapping change for a single field
   const handleMappingChange = (
     identifier: string,
-    mapping: VariableFieldMapping | undefined
+    mapping: VariableFieldMapping | undefined,
   ) => {
     if (mapping) {
       const storeMapping = convertFromVariableMapping(mapping, datasets);

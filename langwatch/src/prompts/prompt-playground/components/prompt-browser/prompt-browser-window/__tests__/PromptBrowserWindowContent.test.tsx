@@ -112,7 +112,9 @@ describe("PromptBrowserWindowContent Layout Mode Detection", () => {
 
       // Both windows now have tabs
       expect(store.getState().windows.length).toBe(2);
-      expect(store.getState().windows.some((w) => w.tabs.length > 0)).toBe(true);
+      expect(store.getState().windows.some((w) => w.tabs.length > 0)).toBe(
+        true,
+      );
     });
   });
 
@@ -138,4 +140,3 @@ describe("PromptBrowserWindowContent Layout Mode Detection", () => {
     });
   });
 });
-

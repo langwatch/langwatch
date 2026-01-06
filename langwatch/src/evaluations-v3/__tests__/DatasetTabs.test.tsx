@@ -2,13 +2,12 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, act } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DatasetTabs } from "../components/DatasetSection/DatasetTabs";
-import { DEFAULT_TEST_DATA_ID, type DatasetReference } from "../types";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { type DatasetReference, DEFAULT_TEST_DATA_ID } from "../types";
 
 // Mock callbacks
 const mockOnSelectExisting = vi.fn();
@@ -29,7 +28,7 @@ const renderDatasetTabs = () => {
       onEditDataset={mockOnEditDataset}
       onSaveAsDataset={mockOnSaveAsDataset}
     />,
-    { wrapper: Wrapper }
+    { wrapper: Wrapper },
   );
 };
 
@@ -37,7 +36,7 @@ const renderDatasetTabs = () => {
 const createTestDataset = (
   id: string,
   name: string,
-  type: "inline" | "saved" = "inline"
+  type: "inline" | "saved" = "inline",
 ): DatasetReference => ({
   id,
   name,
@@ -77,7 +76,9 @@ describe("DatasetTabs", () => {
 
     it("shows default Test Data tab", () => {
       renderDatasetTabs();
-      expect(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`)).toBeInTheDocument();
+      expect(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      ).toBeInTheDocument();
       expect(screen.getByText("Test Data")).toBeInTheDocument();
     });
 
@@ -95,7 +96,9 @@ describe("DatasetTabs", () => {
   describe("Active tab behavior", () => {
     it("active tab exists and is rendered", () => {
       renderDatasetTabs();
-      const activeTab = screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`);
+      const activeTab = screen.getByTestId(
+        `dataset-tab-${DEFAULT_TEST_DATA_ID}`,
+      );
       expect(activeTab).toBeInTheDocument();
     });
   });
@@ -126,7 +129,9 @@ describe("DatasetTabs", () => {
 
       renderDatasetTabs();
 
-      expect(screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`)).toBeInTheDocument();
+      expect(
+        screen.getByTestId(`dataset-tab-${DEFAULT_TEST_DATA_ID}`),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("dataset-tab-ds-2")).toBeInTheDocument();
     });
 

@@ -70,7 +70,7 @@ function CustomCopilotKitChatInner({
         {
           error,
         },
-        "Failed to convert scenario messages to CopilotKit messages"
+        "Failed to convert scenario messages to CopilotKit messages",
       );
     }
   }, [messages, setMessages]);

@@ -5,16 +5,16 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
 } from "../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { TabIdProvider } from "../../prompt-browser/ui/TabContext";
-import { SyncedChatInput } from "../SyncedChatInput";
 import { PromptPlaygroundChatProvider } from "../PromptPlaygroundChatContext";
+import { SyncedChatInput } from "../SyncedChatInput";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -106,7 +106,7 @@ describe("PromptPlaygroundChat ref methods", () => {
 
       // Simulate what focusInput does
       const foundTextarea = document.querySelector<HTMLTextAreaElement>(
-        `textarea[data-tab-id="${TEST_TAB_ID}"]`
+        `textarea[data-tab-id="${TEST_TAB_ID}"]`,
       );
       foundTextarea?.focus();
 
@@ -119,7 +119,7 @@ describe("PromptPlaygroundChat ref methods", () => {
     it("does not throw when textarea not found", () => {
       // Simulate what focusInput does with missing textarea
       const foundTextarea = document.querySelector<HTMLTextAreaElement>(
-        `textarea[data-tab-id="non-existent"]`
+        `textarea[data-tab-id="non-existent"]`,
       );
 
       // This should not throw
@@ -145,14 +145,13 @@ describe("PromptPlaygroundChat ref methods", () => {
               />
             </PromptPlaygroundChatProvider>
           </TabIdProvider>
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       const textarea = screen.getByPlaceholderText(
-        /type your message/i
+        /type your message/i,
       ) as HTMLTextAreaElement;
       expect(textarea).toHaveAttribute("data-tab-id", tabId);
     });
   });
 });
-

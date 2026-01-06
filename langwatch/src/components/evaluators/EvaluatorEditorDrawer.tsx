@@ -9,24 +9,27 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { LuArrowLeft } from "react-icons/lu";
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FormProvider, useForm } from "react-hook-form";
+import { LuArrowLeft } from "react-icons/lu";
 import { z } from "zod";
-
+import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps, useDrawerParams } from "~/hooks/useDrawer";
+import {
+  type AvailableSource,
+  type FieldMapping as UIFieldMapping,
+  VariablesSection,
+} from "~/components/variables";
+import { getComplexProps, useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
-import DynamicZodForm from "~/components/checks/DynamicZodForm";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
+import { api } from "~/utils/api";
 import type { EvaluatorCategoryId } from "./EvaluatorCategorySelectorDrawer";
-import { VariablesSection, type FieldMapping as UIFieldMapping, type AvailableSource } from "~/components/variables";
 
 /**
  * Mapping configuration for showing evaluator input mappings.
@@ -39,7 +42,10 @@ export type EvaluatorMappingsConfig = {
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
-  onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+  onMappingChange: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
 };
 
 export type EvaluatorEditorDrawerProps = {
@@ -264,9 +270,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>
-              {evaluatorDef?.name ?? "Configure Evaluator"}
-            </Heading>
+            <Heading>{evaluatorDef?.name ?? "Configure Evaluator"}</Heading>
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -324,16 +328,17 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                 )}
 
                 {/* Mappings section - shown when caller provides mappingsConfig */}
-                {mappingsConfig && mappingsConfig.availableSources.length > 0 && (
-                  <Box paddingTop={4}>
-                    <EvaluatorMappingsSection
-                      evaluatorDef={evaluatorDef}
-                      availableSources={mappingsConfig.availableSources}
-                      initialMappings={mappingsConfig.initialMappings}
-                      onMappingChange={mappingsConfig.onMappingChange}
-                    />
-                  </Box>
-                )}
+                {mappingsConfig &&
+                  mappingsConfig.availableSources.length > 0 && (
+                    <Box paddingTop={4}>
+                      <EvaluatorMappingsSection
+                        evaluatorDef={evaluatorDef}
+                        availableSources={mappingsConfig.availableSources}
+                        initialMappings={mappingsConfig.initialMappings}
+                        onMappingChange={mappingsConfig.onMappingChange}
+                      />
+                    </Box>
+                  )}
               </VStack>
             </FormProvider>
           )}
@@ -374,7 +379,10 @@ type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => void;
+  onMappingChange: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -389,7 +397,8 @@ function EvaluatorMappingsSection({
   onMappingChange,
 }: EvaluatorMappingsSectionProps) {
   // Local state for mappings - source of truth for UI
-  const [localMappings, setLocalMappings] = useState<Record<string, UIFieldMapping>>(initialMappings);
+  const [localMappings, setLocalMappings] =
+    useState<Record<string, UIFieldMapping>>(initialMappings);
 
   // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
   useEffect(() => {
@@ -409,7 +418,11 @@ function EvaluatorMappingsSection({
     let hasAnyMapping = false;
     for (const field of allFields) {
       const mapping = localMappings[field];
-      if (mapping && (mapping.type === "value" || (mapping.type === "source" && mapping.field))) {
+      if (
+        mapping &&
+        (mapping.type === "value" ||
+          (mapping.type === "source" && mapping.field))
+      ) {
         hasAnyMapping = true;
         break;
       }
@@ -431,7 +444,11 @@ function EvaluatorMappingsSection({
     }
 
     return missing;
-  }, [evaluatorDef?.requiredFields, evaluatorDef?.optionalFields, localMappings]);
+  }, [
+    evaluatorDef?.requiredFields,
+    evaluatorDef?.optionalFields,
+    localMappings,
+  ]);
 
   // Handler that updates local state AND persists to store
   const handleMappingChange = useCallback(
@@ -450,7 +467,7 @@ function EvaluatorMappingsSection({
       // Persist to store
       onMappingChange(identifier, mapping);
     },
-    [onMappingChange]
+    [onMappingChange],
   );
 
   // Build variables from evaluator definition's required/optional fields

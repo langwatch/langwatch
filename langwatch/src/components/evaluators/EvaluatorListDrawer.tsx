@@ -8,15 +8,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { Evaluator } from "@prisma/client";
+import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, Plus, Workflow } from "lucide-react";
 import { LuEllipsisVertical, LuPencil, LuTrash2 } from "react-icons/lu";
-import { formatDistanceToNow } from "date-fns";
-
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { Evaluator } from "@prisma/client";
 import { Menu } from "../ui/menu";
 
 export type EvaluatorListDrawerProps = {

@@ -92,7 +92,10 @@ export class EvaluatorRepository {
   /**
    * Soft deletes an evaluator by setting archivedAt.
    */
-  async softDelete(input: { id: string; projectId: string }): Promise<Evaluator> {
+  async softDelete(input: {
+    id: string;
+    projectId: string;
+  }): Promise<Evaluator> {
     return await this.prisma.evaluator.update({
       where: {
         id: input.id,

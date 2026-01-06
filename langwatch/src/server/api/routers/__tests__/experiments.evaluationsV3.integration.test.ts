@@ -190,7 +190,9 @@ describe("Evaluations V3 Endpoints", () => {
       expect(saved?.wizardState).toBeDefined();
       const wizardState = saved?.wizardState as Record<string, unknown>;
       expect(wizardState.name).toBe("State Test");
-      expect((wizardState.datasets as Array<{ id: string }>)[0]?.id).toBe("custom-data");
+      expect((wizardState.datasets as Array<{ id: string }>)[0]?.id).toBe(
+        "custom-data",
+      );
     });
   });
 
@@ -221,7 +223,7 @@ describe("Evaluations V3 Endpoints", () => {
         caller.experiments.getEvaluationsV3BySlug({
           projectId,
           experimentSlug: "nonexistent-slug-12345",
-        })
+        }),
       ).rejects.toThrow("Experiment not found");
     });
 
@@ -242,7 +244,7 @@ describe("Evaluations V3 Endpoints", () => {
         caller.experiments.getEvaluationsV3BySlug({
           projectId,
           experimentSlug: dspyExperiment.slug,
-        })
+        }),
       ).rejects.toThrow("Experiment is not an EVALUATIONS_V3 type");
     });
   });

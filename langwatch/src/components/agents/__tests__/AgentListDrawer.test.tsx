@@ -5,9 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { AgentListDrawer } from "../AgentListDrawer";
 import { api } from "~/utils/api";
+import { AgentListDrawer } from "../AgentListDrawer";
 
 // Mock dependencies
 vi.mock("next/router", () => ({
@@ -113,7 +112,7 @@ describe("AgentListDrawer", () => {
         onCreateNew={mockOnCreateNew}
         {...props}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
   };
 
@@ -168,7 +167,7 @@ describe("AgentListDrawer", () => {
           id: "agent-1",
           name: "GPT-4 Assistant",
           type: "signature",
-        })
+        }),
       );
     });
 
@@ -228,7 +227,9 @@ describe("AgentListDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("No agents yet")).toBeInTheDocument();
-        expect(screen.getByText("Create your first agent to get started")).toBeInTheDocument();
+        expect(
+          screen.getByText("Create your first agent to get started"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -241,7 +242,9 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("create-first-agent-button"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -255,7 +258,9 @@ describe("AgentListDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(screen.getByTestId("create-first-agent-button")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("create-first-agent-button"),
+        ).toBeInTheDocument();
       });
 
       await user.click(screen.getByTestId("create-first-agent-button"));

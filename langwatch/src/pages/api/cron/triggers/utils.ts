@@ -19,7 +19,9 @@ export const addTriggersSent = async (
 ) => {
   // Separate trace-based and custom graph alerts
   const traceData = triggerData.filter((data) => data.traceId);
-  const customGraphData = triggerData.filter((data) => data.graphId && !data.traceId);
+  const customGraphData = triggerData.filter(
+    (data) => data.graphId && !data.traceId,
+  );
 
   // Create TriggerSent records for trace-based triggers
   if (traceData.length > 0) {

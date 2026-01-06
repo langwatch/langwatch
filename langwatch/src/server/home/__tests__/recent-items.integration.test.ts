@@ -6,9 +6,9 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../utils/testUtils";
-import { prisma } from "../../db";
 import { appRouter } from "../../api/root";
 import { createInnerTRPCContext } from "../../api/trpc";
+import { prisma } from "../../db";
 
 describe("Recent Items Integration", () => {
   const projectId = "test-project-id";

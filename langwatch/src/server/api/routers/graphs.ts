@@ -1,4 +1,4 @@
-import { AlertType, TriggerAction, Prisma } from "@prisma/client";
+import { AlertType, type Prisma, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";

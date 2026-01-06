@@ -226,134 +226,134 @@ function DatasetsPage() {
                       </Table.Row>
                     ))
                   : datasets.data
-                  ? datasets.data.map((dataset: Dataset) => (
-                      <Table.Row
-                        cursor="pointer"
-                        onClick={() => goToDataset(dataset.id)}
-                        key={dataset.id}
-                      >
-                        <Table.Cell>{dataset.name}</Table.Cell>
-                        <Table.Cell maxWidth="250px">
-                          <HStack wrap="wrap">
-                            {(
-                              (dataset.columnTypes as DatasetColumns) ?? []
-                            ).map(({ name }) => (
-                              <Badge size="sm" key={name}>
-                                {name}
-                              </Badge>
-                            ))}
-                          </HStack>
-                        </Table.Cell>
-                        <Table.Cell>
-                          {dataset.useS3
-                            ? dataset.s3RecordCount ?? 0
-                            : dataset._count.datasetRecords ?? 0}
-                        </Table.Cell>
-                        <Table.Cell>
-                          {new Date(dataset.createdAt).toLocaleString()}
-                        </Table.Cell>
-                        <Table.Cell>
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button
-                                variant={"ghost"}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                }}
-                              >
-                                <MoreVertical />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              <Tooltip
-                                content={
-                                  !hasDatasetsCreatePermission
-                                    ? "You need datasets:create permission to replicate datasets"
-                                    : undefined
-                                }
-                                disabled={hasDatasetsCreatePermission}
-                                positioning={{ placement: "right" }}
-                                showArrow
-                              >
-                                <Menu.Item
-                                  value="copy"
+                    ? datasets.data.map((dataset: Dataset) => (
+                        <Table.Row
+                          cursor="pointer"
+                          onClick={() => goToDataset(dataset.id)}
+                          key={dataset.id}
+                        >
+                          <Table.Cell>{dataset.name}</Table.Cell>
+                          <Table.Cell maxWidth="250px">
+                            <HStack wrap="wrap">
+                              {(
+                                (dataset.columnTypes as DatasetColumns) ?? []
+                              ).map(({ name }) => (
+                                <Badge size="sm" key={name}>
+                                  {name}
+                                </Badge>
+                              ))}
+                            </HStack>
+                          </Table.Cell>
+                          <Table.Cell>
+                            {dataset.useS3
+                              ? (dataset.s3RecordCount ?? 0)
+                              : (dataset._count.datasetRecords ?? 0)}
+                          </Table.Cell>
+                          <Table.Cell>
+                            {new Date(dataset.createdAt).toLocaleString()}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Menu.Root>
+                              <Menu.Trigger asChild>
+                                <Button
+                                  variant={"ghost"}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    if (hasDatasetsCreatePermission) {
-                                      setCopyDataset({
-                                        datasetId: dataset.id,
-                                        datasetName: dataset.name,
-                                      });
-                                    }
                                   }}
-                                  disabled={!hasDatasetsCreatePermission}
                                 >
-                                  <Copy size={16} /> Replicate to another
-                                  project
-                                </Menu.Item>
-                              </Tooltip>
-                              <Tooltip
-                                content={
-                                  !hasDatasetsUpdatePermission
-                                    ? "You need datasets:update permission to edit datasets"
-                                    : undefined
-                                }
-                                disabled={hasDatasetsUpdatePermission}
-                                positioning={{ placement: "right" }}
-                                showArrow
-                              >
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (hasDatasetsUpdatePermission) {
-                                      setEditDataset({
-                                        datasetId: dataset.id,
-                                        name: dataset.name,
-                                        columnTypes:
-                                          dataset.columnTypes as DatasetColumns,
-                                      });
-                                      addEditDatasetDrawer.onOpen();
-                                    }
-                                  }}
-                                  disabled={!hasDatasetsUpdatePermission}
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                              <Menu.Content>
+                                <Tooltip
+                                  content={
+                                    !hasDatasetsCreatePermission
+                                      ? "You need datasets:create permission to replicate datasets"
+                                      : undefined
+                                  }
+                                  disabled={hasDatasetsCreatePermission}
+                                  positioning={{ placement: "right" }}
+                                  showArrow
                                 >
-                                  <Edit size={16} /> Edit dataset
-                                </Menu.Item>
-                              </Tooltip>
-                              <Tooltip
-                                content={
-                                  !hasDatasetsDeletePermission
-                                    ? "You need datasets:delete permission to delete datasets"
-                                    : undefined
-                                }
-                                disabled={hasDatasetsDeletePermission}
-                                positioning={{ placement: "right" }}
-                                showArrow
-                              >
-                                <Menu.Item
-                                  value="delete"
-                                  color="red.600"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (hasDatasetsDeletePermission) {
-                                      showDeleteDialog({
-                                        id: dataset.id,
-                                        name: dataset.name,
-                                      });
-                                    }
-                                  }}
-                                  disabled={!hasDatasetsDeletePermission}
+                                  <Menu.Item
+                                    value="copy"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (hasDatasetsCreatePermission) {
+                                        setCopyDataset({
+                                          datasetId: dataset.id,
+                                          datasetName: dataset.name,
+                                        });
+                                      }
+                                    }}
+                                    disabled={!hasDatasetsCreatePermission}
+                                  >
+                                    <Copy size={16} /> Replicate to another
+                                    project
+                                  </Menu.Item>
+                                </Tooltip>
+                                <Tooltip
+                                  content={
+                                    !hasDatasetsUpdatePermission
+                                      ? "You need datasets:update permission to edit datasets"
+                                      : undefined
+                                  }
+                                  disabled={hasDatasetsUpdatePermission}
+                                  positioning={{ placement: "right" }}
+                                  showArrow
                                 >
-                                  <Trash2 size={16} /> Delete dataset
-                                </Menu.Item>
-                              </Tooltip>
-                            </Menu.Content>
-                          </Menu.Root>
-                        </Table.Cell>
-                      </Table.Row>
-                    ))
-                  : null}
+                                  <Menu.Item
+                                    value="edit"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (hasDatasetsUpdatePermission) {
+                                        setEditDataset({
+                                          datasetId: dataset.id,
+                                          name: dataset.name,
+                                          columnTypes:
+                                            dataset.columnTypes as DatasetColumns,
+                                        });
+                                        addEditDatasetDrawer.onOpen();
+                                      }
+                                    }}
+                                    disabled={!hasDatasetsUpdatePermission}
+                                  >
+                                    <Edit size={16} /> Edit dataset
+                                  </Menu.Item>
+                                </Tooltip>
+                                <Tooltip
+                                  content={
+                                    !hasDatasetsDeletePermission
+                                      ? "You need datasets:delete permission to delete datasets"
+                                      : undefined
+                                  }
+                                  disabled={hasDatasetsDeletePermission}
+                                  positioning={{ placement: "right" }}
+                                  showArrow
+                                >
+                                  <Menu.Item
+                                    value="delete"
+                                    color="red.600"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (hasDatasetsDeletePermission) {
+                                        showDeleteDialog({
+                                          id: dataset.id,
+                                          name: dataset.name,
+                                        });
+                                      }
+                                    }}
+                                    disabled={!hasDatasetsDeletePermission}
+                                  >
+                                    <Trash2 size={16} /> Delete dataset
+                                  </Menu.Item>
+                                </Tooltip>
+                              </Menu.Content>
+                            </Menu.Root>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))
+                    : null}
               </Table.Body>
             </Table.Root>
           )}

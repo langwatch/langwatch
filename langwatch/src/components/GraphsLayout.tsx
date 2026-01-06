@@ -1,13 +1,15 @@
 import { Container, Heading, HStack, VStack } from "@chakra-ui/react";
-import { type PropsWithChildren } from "react";
+import type { PropsWithChildren } from "react";
 import { CustomDashboardsSection } from "~/components/analytics/CustomDashboardsSection";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import {
+  AnalyticsHeader,
+  type AnalyticsHeaderProps,
+} from "./analytics/AnalyticsHeader";
 import { useFilterToggle } from "./filters/FilterToggle";
 import { SmallLabel } from "./SmallLabel";
-import { AnalyticsHeader } from "./analytics/AnalyticsHeader";
-import { type AnalyticsHeaderProps } from "./analytics/AnalyticsHeader";
 
 export default function GraphsLayout({
   children,
@@ -24,7 +26,11 @@ export default function GraphsLayout({
 
   return (
     <DashboardLayout>
-      <AnalyticsHeader title={title} {...analyticsHeaderProps} extraHeaderButtons={extraHeaderButtons} />
+      <AnalyticsHeader
+        title={title}
+        {...analyticsHeaderProps}
+        extraHeaderButtons={extraHeaderButtons}
+      />
       <HStack align="start" width="full" height="full">
         <VStack
           align="start"

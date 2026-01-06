@@ -1,17 +1,13 @@
 import {
   Box,
+  Link as ChakraLink,
   Grid,
   Heading,
   HStack,
-  Link as ChakraLink,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import {
-  LuBookOpen,
-  LuCirclePlay,
-  LuExternalLink,
-} from "react-icons/lu";
+import { LuBookOpen, LuCirclePlay, LuExternalLink } from "react-icons/lu";
 import { Link } from "../ui/link";
 
 type ResourceCard = {

@@ -20,6 +20,7 @@ import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
 import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
+import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -36,7 +37,6 @@ import { InputGroup } from "../ui/input-group";
 import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
 import { Tooltip } from "../ui/tooltip";
-import { LuZap } from "react-icons/lu";
 
 export function QueryStringFieldsFilters({
   hideTriggerButton = false,
@@ -164,12 +164,7 @@ function FieldsFilter({
         onOpenChange={({ open }) => setOpen(open)}
       >
         <Popover.Trigger asChild>
-          <Button
-            variant="subtle"
-            size="sm"
-            width="100%"
-            fontWeight="normal"
-          >
+          <Button variant="subtle" size="sm" width="100%" fontWeight="normal">
             <HStack width="full" gap={1}>
               <Text color="gray.500" fontWeight="500" paddingRight={4}>
                 {filter.name}

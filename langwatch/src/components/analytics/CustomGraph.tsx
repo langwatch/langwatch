@@ -178,8 +178,8 @@ const CustomGraph_ = React.memo(
       const timeScale_ = summaryGraphTypes.includes(input.graphType)
         ? "full"
         : input.timeScale === "full"
-        ? input.timeScale
-        : parseInt(input.timeScale.toString(), 10);
+          ? input.timeScale
+          : parseInt(input.timeScale.toString(), 10);
 
       // Show 1 hour granularity for full period when days difference is 2 days or less
       if (
@@ -280,12 +280,12 @@ const CustomGraph_ = React.memo(
       return input.series.length > 1
         ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
         : groupName
-        ? uppercaseFirstLetter(groupName)
-            .replace("Evaluation passed passed", "Evaluation Passed")
-            .replace("Evaluation passed failed", "Evaluation Failed")
-            .replace("Contains error", "Traces")
-            .replace(/^Evaluation label /i, "")
-        : series?.name ?? aggKey;
+          ? uppercaseFirstLetter(groupName)
+              .replace("Evaluation passed passed", "Evaluation Passed")
+              .replace("Evaluation passed failed", "Evaluation Failed")
+              .replace("Contains error", "Traces")
+              .replace(/^Evaluation label /i, "")
+          : (series?.name ?? aggKey);
     };
 
     const colorForSeries = (aggKey: string, index: number): string => {
@@ -998,10 +998,10 @@ function MonitorGraph({
   const colorSet: RotatingColorSet = input.monitorGraph?.disabled
     ? "grayTones"
     : average > 0.8 || !hasLoaded
-    ? "greenTones"
-    : average < 0.4
-    ? "redTones"
-    : "orangeTones";
+      ? "greenTones"
+      : average < 0.4
+        ? "redTones"
+        : "orangeTones";
 
   const maxValue = isPassRate
     ? 1

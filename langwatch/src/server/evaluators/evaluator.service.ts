@@ -1,5 +1,8 @@
 import type { Evaluator, PrismaClient } from "@prisma/client";
-import { EvaluatorRepository, type CreateEvaluatorInput } from "./evaluator.repository";
+import {
+  type CreateEvaluatorInput,
+  EvaluatorRepository,
+} from "./evaluator.repository";
 
 /**
  * Service layer for Evaluator business logic.

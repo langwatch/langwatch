@@ -1,7 +1,11 @@
 import { HStack, IconButton } from "@chakra-ui/react";
 import { Redo2, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { useEvaluationsV3Store, performUndo, performRedo } from "../hooks/useEvaluationsV3Store";
+import {
+  performRedo,
+  performUndo,
+  useEvaluationsV3Store,
+} from "../hooks/useEvaluationsV3Store";
 
 /**
  * UndoRedo component with keyboard shortcuts.
@@ -14,12 +18,12 @@ export function UndoRedo() {
   const pastStatesLength = useSyncExternalStore(
     temporal.subscribe,
     () => temporal.getState().pastStates.length,
-    () => 0
+    () => 0,
   );
   const futureStatesLength = useSyncExternalStore(
     temporal.subscribe,
     () => temporal.getState().futureStates.length,
-    () => 0
+    () => 0,
   );
 
   const canUndo = pastStatesLength > 0;

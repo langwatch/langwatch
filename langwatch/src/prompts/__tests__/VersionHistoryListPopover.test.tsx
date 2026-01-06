@@ -1,9 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
 // Mock dependencies
@@ -61,9 +68,9 @@ vi.mock("~/components/ui/toaster", () => ({
   },
 }));
 
+import { toaster } from "~/components/ui/toaster";
 // Import after mocks
 import { VersionHistoryListPopover } from "../VersionHistoryListPopover";
-import { toaster } from "~/components/ui/toaster";
 
 const renderWithChakra = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
@@ -95,7 +102,9 @@ describe("VersionHistoryListPopover", () => {
 
       // Wait for popover to open and find the restore button for v2
       await waitFor(() => {
-        expect(screen.getByTestId("restore-version-button-2")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("restore-version-button-2"),
+        ).toBeInTheDocument();
       });
 
       // Click restore for version 2
@@ -142,7 +151,9 @@ describe("VersionHistoryListPopover", () => {
       });
 
       // Current version (v3) should not have a restore button
-      expect(screen.queryByTestId("restore-version-button-3")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("restore-version-button-3"),
+      ).not.toBeInTheDocument();
       expect(onRestoreSuccess).not.toHaveBeenCalled();
     });
   });
@@ -166,11 +177,17 @@ describe("VersionHistoryListPopover", () => {
       });
 
       // V3 (latest) should be marked as current - no restore button
-      expect(screen.queryByTestId("restore-version-button-3")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("restore-version-button-3"),
+      ).not.toBeInTheDocument();
       // V2 should have restore button (not current)
-      expect(screen.getByTestId("restore-version-button-2")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-2"),
+      ).toBeInTheDocument();
       // V1 should have restore button (not current)
-      expect(screen.getByTestId("restore-version-button-1")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-1"),
+      ).toBeInTheDocument();
     });
 
     it("marks specified version as current when currentVersionId is provided", async () => {
@@ -191,11 +208,17 @@ describe("VersionHistoryListPopover", () => {
       });
 
       // V3 should have restore button (not current when editing v2)
-      expect(screen.getByTestId("restore-version-button-3")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-3"),
+      ).toBeInTheDocument();
       // V2 should be marked as current - no restore button
-      expect(screen.queryByTestId("restore-version-button-2")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("restore-version-button-2"),
+      ).not.toBeInTheDocument();
       // V1 should have restore button (not current)
-      expect(screen.getByTestId("restore-version-button-1")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-1"),
+      ).toBeInTheDocument();
     });
 
     it("marks oldest version as current when editing v1", async () => {
@@ -216,11 +239,17 @@ describe("VersionHistoryListPopover", () => {
       });
 
       // V3 should have restore button (not current)
-      expect(screen.getByTestId("restore-version-button-3")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-3"),
+      ).toBeInTheDocument();
       // V2 should have restore button (not current)
-      expect(screen.getByTestId("restore-version-button-2")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("restore-version-button-2"),
+      ).toBeInTheDocument();
       // V1 should be marked as current - no restore button
-      expect(screen.queryByTestId("restore-version-button-1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("restore-version-button-1"),
+      ).not.toBeInTheDocument();
     });
 
     it("shows 'current' tag on the version being edited", async () => {

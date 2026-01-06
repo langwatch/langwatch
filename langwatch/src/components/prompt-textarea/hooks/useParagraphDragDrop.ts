@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
+import {
+  type DragEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { BORDERLESS_LINE_HEIGHT, setTextareaValueUndoable } from "../utils";
 
 type UseParagraphDragDropProps = {
@@ -25,12 +31,18 @@ export const useParagraphDragDrop = ({
   borderless,
 }: UseParagraphDragDropProps) => {
   const [hoveredParagraph, setHoveredParagraph] = useState<number | null>(null);
-  const [gripHoveredParagraph, setGripHoveredParagraph] = useState<number | null>(null);
+  const [gripHoveredParagraph, setGripHoveredParagraph] = useState<
+    number | null
+  >(null);
   const [draggedParagraph, setDraggedParagraph] = useState<number | null>(null);
-  const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(null);
+  const [dropTargetParagraph, setDropTargetParagraph] = useState<number | null>(
+    null,
+  );
 
   // Store paragraph positions in a ref to avoid re-renders during typing
-  const paragraphPositionsRef = useRef<Array<{ top: number; height: number; text?: string }>>([]);
+  const paragraphPositionsRef = useRef<
+    Array<{ top: number; height: number; text?: string }>
+  >([]);
 
   // Clear cached positions when text changes so they get recalculated
   useEffect(() => {
@@ -135,7 +147,7 @@ export const useParagraphDragDrop = ({
       }
 
       const newText = newParagraphs.map((p) => p.text).join("\n");
-      
+
       // Use undo-able replacement so Ctrl+Z works
       const textarea = containerRef.current?.querySelector("textarea");
       if (textarea) {
@@ -143,7 +155,7 @@ export const useParagraphDragDrop = ({
         const movedLineStart = newParagraphs
           .slice(0, targetIndex)
           .reduce((acc, p) => acc + p.text.length + 1, 0);
-        
+
         setTextareaValueUndoable(textarea, newText, movedLineStart);
         // Still call onChange to sync React state
         onChange(newText);
@@ -257,4 +269,3 @@ export const useParagraphDragDrop = ({
     getVisibleParagraphPositions,
   };
 };
-

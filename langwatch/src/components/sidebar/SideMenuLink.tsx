@@ -1,6 +1,6 @@
 import { Badge, Box, HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import React from "react";
+import type React from "react";
 import { trackEvent } from "../../utils/tracking";
 import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
@@ -145,4 +145,3 @@ export const SideMenuLink = ({
     </Link>
   );
 };
-

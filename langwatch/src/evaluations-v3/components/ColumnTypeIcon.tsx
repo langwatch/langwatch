@@ -21,4 +21,3 @@ export const ColumnTypeIcon = ({ type }: { type: string }) => {
       return <Type {...iconProps} color="var(--chakra-colors-gray-400)" />;
   }
 };
-

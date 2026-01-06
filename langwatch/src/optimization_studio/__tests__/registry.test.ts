@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MODULES } from "../registry";
 
 describe("Optimization Studio Registry", () => {
@@ -26,7 +26,7 @@ describe("Optimization Studio Registry", () => {
     it("has instructions parameter with default system prompt", () => {
       expect(signature.parameters).toBeDefined();
       const instructionsParam = signature.parameters?.find(
-        (p) => p.identifier === "instructions"
+        (p) => p.identifier === "instructions",
       );
 
       expect(instructionsParam).toBeDefined();
@@ -36,7 +36,7 @@ describe("Optimization Studio Registry", () => {
     it("has messages parameter with user message using {{input}}", () => {
       expect(signature.parameters).toBeDefined();
       const messagesParam = signature.parameters?.find(
-        (p) => p.identifier === "messages"
+        (p) => p.identifier === "messages",
       );
 
       expect(messagesParam).toBeDefined();
@@ -93,8 +93,12 @@ describe("Optimization Studio Registry", () => {
       expect(signature.outputs).toBeDefined();
       expect(code.outputs).toBeDefined();
 
-      expect(signature.inputs?.[0]?.identifier).toBe(code.inputs?.[0]?.identifier);
-      expect(signature.outputs?.[0]?.identifier).toBe(code.outputs?.[0]?.identifier);
+      expect(signature.inputs?.[0]?.identifier).toBe(
+        code.inputs?.[0]?.identifier,
+      );
+      expect(signature.outputs?.[0]?.identifier).toBe(
+        code.outputs?.[0]?.identifier,
+      );
     });
   });
 });

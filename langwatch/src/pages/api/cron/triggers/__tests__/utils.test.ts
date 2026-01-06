@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { checkThreshold, getLatestUpdatedAt } from "../utils";
 import type { TraceGroups } from "../types";
+import { checkThreshold, getLatestUpdatedAt } from "../utils";
 
 describe("checkThreshold", () => {
   describe("when operator is 'gt'", () => {

@@ -285,12 +285,14 @@ function MemberRow({
         </Box>
       </HStack>
       {teamFields.length > 0 && (
-        <VStack marginLeft={4} paddingRight={3} align="start" gap={2} width="100%">
-          <HStack
-            paddingLeft={4}
-            justify="space-between"
-            width="100%"
-          >
+        <VStack
+          marginLeft={4}
+          paddingRight={3}
+          align="start"
+          gap={2}
+          width="100%"
+        >
+          <HStack paddingLeft={4} justify="space-between" width="100%">
             <Text fontSize="sm" fontWeight="medium" color="gray.700">
               Team Assignments
             </Text>

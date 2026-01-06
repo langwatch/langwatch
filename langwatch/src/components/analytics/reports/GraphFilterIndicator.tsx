@@ -31,4 +31,3 @@ export function GraphFilterIndicator({ filters }: GraphFilterIndicatorProps) {
     </Tooltip>
   );
 }
-

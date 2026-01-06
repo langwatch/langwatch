@@ -6,7 +6,7 @@ import type { DatasetColumn } from "../types";
  */
 export const filterEmptyRows = (
   datasetRecords: Array<{ id: string } & Record<string, string>>,
-  columnNames: string[]
+  columnNames: string[],
 ): Array<{ id: string } & Record<string, string>> => {
   return datasetRecords.filter((row) => {
     // Check if at least one column has a non-empty value
@@ -23,11 +23,11 @@ export const filterEmptyRows = (
  */
 export const convertInlineToRowRecords = (
   columns: DatasetColumn[],
-  records: Record<string, string[]>
+  records: Record<string, string[]>,
 ): Array<{ id: string } & Record<string, string>> => {
   const rowCount = Math.max(
     ...Object.values(records).map((arr) => arr.length),
-    0
+    0,
   );
 
   const datasetRecords: Array<{ id: string } & Record<string, string>> = [];

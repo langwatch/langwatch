@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { ScenarioRunStatusIcon } from "./ScenarioRunStatusIcon";
 
 interface ScenarioRunHeaderProps {
@@ -15,12 +15,7 @@ export function ScenarioRunHeader({
   scenarioId,
 }: ScenarioRunHeaderProps) {
   return (
-    <Box
-      p={5}
-      borderBottom="1px"
-      borderColor="gray.200"
-      w="100%"
-    >
+    <Box p={5} borderBottom="1px" borderColor="gray.200" w="100%">
       <HStack justify="space-between" align="center">
         <VStack gap={4}>
           <VStack align="start" gap={0}>

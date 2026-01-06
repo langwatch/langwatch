@@ -1,14 +1,16 @@
-import { useCallback, useMemo } from "react";
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useCallback, useMemo } from "react";
 import { LuPlus } from "react-icons/lu";
-
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useEvaluatorMappings } from "../../hooks/useEvaluatorMappings";
-import { convertFromUIMapping, convertToUIMapping } from "../../utils/fieldMappingConverters";
+import type { EvaluatorConfig, TargetConfig } from "../../types";
+import {
+  convertFromUIMapping,
+  convertToUIMapping,
+} from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
-import type { TargetConfig, EvaluatorConfig } from "../../types";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
 type TargetCellContentProps = {
@@ -84,7 +86,8 @@ export function TargetCellContent({
       });
 
       // Get current mappings in UI format (used as initial state in the drawer)
-      const storeMappings = evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
+      const storeMappings =
+        evaluator.mappings[activeDatasetId]?.[target.id] ?? {};
       const initialMappings: Record<string, UIFieldMapping> = {};
       for (const [key, mapping] of Object.entries(storeMappings)) {
         initialMappings[key] = convertToUIMapping(mapping);
@@ -93,25 +96,45 @@ export function TargetCellContent({
       return {
         availableSources,
         initialMappings,
-        onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
+        onMappingChange: (
+          identifier: string,
+          mapping: UIFieldMapping | undefined,
+        ) => {
           if (mapping) {
             const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-            setEvaluatorMapping(evaluator.id, activeDatasetId, target.id, identifier, storeMapping);
+            setEvaluatorMapping(
+              evaluator.id,
+              activeDatasetId,
+              target.id,
+              identifier,
+              storeMapping,
+            );
           } else {
-            removeEvaluatorMapping(evaluator.id, activeDatasetId, target.id, identifier);
+            removeEvaluatorMapping(
+              evaluator.id,
+              activeDatasetId,
+              target.id,
+              identifier,
+            );
           }
         },
       };
     },
-    [datasets, activeDatasetId, target, setEvaluatorMapping, removeEvaluatorMapping]
+    [
+      datasets,
+      activeDatasetId,
+      target,
+      setEvaluatorMapping,
+      removeEvaluatorMapping,
+    ],
   );
 
   const displayOutput =
     output === null || output === undefined
       ? ""
       : typeof output === "object"
-      ? JSON.stringify(output)
-      : String(output);
+        ? JSON.stringify(output)
+        : String(output);
 
   return (
     <VStack align="stretch" gap={2}>

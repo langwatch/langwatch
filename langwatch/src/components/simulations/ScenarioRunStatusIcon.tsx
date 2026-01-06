@@ -31,7 +31,8 @@ export function ScenarioRunStatusIcon({
     status === ScenarioRunStatus.PENDING
   ) {
     IconComponent = Clock;
-    defaultColor = status === ScenarioRunStatus.IN_PROGRESS ? "orange.400" : "gray.400";
+    defaultColor =
+      status === ScenarioRunStatus.IN_PROGRESS ? "orange.400" : "gray.400";
   }
 
   return (

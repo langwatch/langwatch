@@ -1,19 +1,19 @@
 import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
-import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import type { DraggableAttributes } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
+import { BarChart2, Bell } from "lucide-react";
 import { useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { BarChart2, Bell } from "lucide-react";
-import type { FilterField } from "~/server/filters/types";
-import { GraphFilterIndicator } from "./GraphFilterIndicator";
-import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
+import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useDrawer } from "~/hooks/useDrawer";
 import {
-  customGraphInputToFormData,
   type CustomGraphFormData,
+  customGraphInputToFormData,
 } from "~/pages/[project]/analytics/custom/index";
-import type { CustomGraphInput } from "~/components/analytics/CustomGraph";
+import type { FilterField } from "~/server/filters/types";
+import { GraphCardMenu, type SizeOption } from "./GraphCardMenu";
+import { GraphFilterIndicator } from "./GraphFilterIndicator";
 
 interface GraphCardHeaderProps {
   graphId: string;
@@ -66,8 +66,12 @@ export function GraphCardHeader({
 
   const hasFilters = useMemo(
     () =>
-      !!(filters && typeof filters === "object" && Object.keys(filters).length > 0),
-    [filters]
+      !!(
+        filters &&
+        typeof filters === "object" &&
+        Object.keys(filters).length > 0
+      ),
+    [filters],
   );
 
   return (
@@ -143,4 +147,3 @@ export function GraphCardHeader({
     </HStack>
   );
 }
-

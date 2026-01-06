@@ -15,6 +15,7 @@ import { AnnotationScoreDataType } from "@prisma/client";
 import { useEffect, useState } from "react";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
@@ -26,7 +27,6 @@ import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { api } from "../../utils/api";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function AnnotationScorePage() {
   const { project, hasPermission } = useOrganizationTeamProject();

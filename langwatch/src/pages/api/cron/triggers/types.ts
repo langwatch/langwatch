@@ -1,9 +1,9 @@
 import type { Project, Trigger } from "@prisma/client";
-import type { Trace } from "~/server/tracer/types";
 import type {
   TRACE_EXPANSIONS,
   TraceMapping,
 } from "~/server/tracer/tracesMapping";
+import type { Trace } from "~/server/tracer/types";
 
 export interface TraceGroups {
   groups: Trace[][];

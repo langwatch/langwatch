@@ -233,8 +233,8 @@ function PromptBrowserWindowInner(props: {
   const messagesMaxHeight = isCollapsed
     ? 0
     : userMaxHeight !== null
-    ? userMaxHeight
-    : getMaxAllowedHeight();
+      ? userMaxHeight
+      : getMaxAllowedHeight();
 
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
@@ -333,8 +333,8 @@ function PromptBrowserWindowInner(props: {
               isCollapsed
                 ? 0
                 : messagesMaxHeight
-                ? `${messagesMaxHeight}px`
-                : undefined
+                  ? `${messagesMaxHeight}px`
+                  : undefined
             }
             overflow="hidden"
             position="relative"

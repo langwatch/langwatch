@@ -5,13 +5,22 @@
  * Covers UI buttons, keyboard shortcuts, and store actions.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store, performUndo, performRedo } from "../hooks/useEvaluationsV3Store";
-import { UndoRedo } from "../components/UndoRedo";
 import { AutosaveStatus } from "../components/AutosaveStatus";
+import { UndoRedo } from "../components/UndoRedo";
+import {
+  performRedo,
+  performUndo,
+  useEvaluationsV3Store,
+} from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -62,7 +71,9 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make a change
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "hello");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "hello");
 
       // Wait for the debounce in temporal middleware
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -77,7 +88,9 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make a change
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "hello");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "hello");
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Undo
@@ -96,24 +109,34 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make two changes (temporal requires distinct state changes for history)
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "first");
       await new Promise((resolve) => setTimeout(resolve, 150));
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "second");
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Verify change was made
-      expect(useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input")).toBe("second");
+      expect(
+        useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input"),
+      ).toBe("second");
 
       // Wait for button to be enabled
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /undo/i })).not.toBeDisabled();
+        expect(
+          screen.getByRole("button", { name: /undo/i }),
+        ).not.toBeDisabled();
       });
 
       // Click undo
       await user.click(screen.getByRole("button", { name: /undo/i }));
 
       // Verify change was undone - back to "first"
-      expect(useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input")).toBe("first");
+      expect(
+        useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input"),
+      ).toBe("first");
     });
 
     it("redoes change when redo button is clicked", async () => {
@@ -121,25 +144,35 @@ describe("UndoRedo Component", () => {
       render(<UndoRedo />, { wrapper: Wrapper });
 
       // Make two changes
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "first");
       await new Promise((resolve) => setTimeout(resolve, 150));
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "second");
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Undo
       useEvaluationsV3Store.temporal.getState().undo();
-      expect(useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input")).toBe("first");
+      expect(
+        useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input"),
+      ).toBe("first");
 
       // Wait for redo button to be enabled
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: /redo/i })).not.toBeDisabled();
+        expect(
+          screen.getByRole("button", { name: /redo/i }),
+        ).not.toBeDisabled();
       });
 
       // Click redo
       await user.click(screen.getByRole("button", { name: /redo/i }));
 
       // Verify change was redone
-      expect(useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input")).toBe("second");
+      expect(
+        useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input"),
+      ).toBe("second");
     });
   });
 
@@ -154,13 +187,17 @@ describe("UndoRedo Component", () => {
           <UndoRedo />
           <textarea data-testid="test-textarea" />
         </div>,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Make two changes
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "first");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "first");
       await new Promise((resolve) => setTimeout(resolve, 150));
-      useEvaluationsV3Store.getState().setCellValue("test-data", 0, "input", "second");
+      useEvaluationsV3Store
+        .getState()
+        .setCellValue("test-data", 0, "input", "second");
       await new Promise((resolve) => setTimeout(resolve, 150));
 
       // Focus textarea and simulate Cmd+Z
@@ -169,7 +206,9 @@ describe("UndoRedo Component", () => {
       fireEvent.keyDown(textarea, { key: "z", metaKey: true });
 
       // Value should NOT be undone (keyboard shortcut should be ignored in textarea)
-      expect(useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input")).toBe("second");
+      expect(
+        useEvaluationsV3Store.getState().getCellValue("test-data", 0, "input"),
+      ).toBe("second");
     });
   });
 });
@@ -180,37 +219,25 @@ describe("AutosaveStatus Component", () => {
   });
 
   it("shows Saved when both states are idle", () => {
-    render(
-      <AutosaveStatus
-        evaluationState="idle"
-        datasetState="idle"
-      />,
-      { wrapper: Wrapper }
-    );
+    render(<AutosaveStatus evaluationState="idle" datasetState="idle" />, {
+      wrapper: Wrapper,
+    });
 
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
   it("shows Saving when evaluation is saving", () => {
-    render(
-      <AutosaveStatus
-        evaluationState="saving"
-        datasetState="idle"
-      />,
-      { wrapper: Wrapper }
-    );
+    render(<AutosaveStatus evaluationState="saving" datasetState="idle" />, {
+      wrapper: Wrapper,
+    });
 
     expect(screen.getByText("Saving...")).toBeInTheDocument();
   });
 
   it("shows Saving when dataset is saving", () => {
-    render(
-      <AutosaveStatus
-        evaluationState="idle"
-        datasetState="saving"
-      />,
-      { wrapper: Wrapper }
-    );
+    render(<AutosaveStatus evaluationState="idle" datasetState="saving" />, {
+      wrapper: Wrapper,
+    });
 
     expect(screen.getByText("Saving...")).toBeInTheDocument();
   });
@@ -222,7 +249,7 @@ describe("AutosaveStatus Component", () => {
         datasetState="idle"
         evaluationError="Network error"
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Failed to save")).toBeInTheDocument();
@@ -235,7 +262,7 @@ describe("AutosaveStatus Component", () => {
         datasetState="error"
         datasetError="Sync failed"
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
 
     expect(screen.getByText("Failed to save")).toBeInTheDocument();
@@ -255,16 +282,26 @@ describe("Autosave status in store", () => {
 
   it("updates evaluation status", () => {
     useEvaluationsV3Store.getState().setAutosaveStatus("evaluation", "saving");
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("saving");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
+      "saving",
+    );
 
     useEvaluationsV3Store.getState().setAutosaveStatus("evaluation", "saved");
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("saved");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe(
+      "saved",
+    );
   });
 
   it("updates dataset status with error", () => {
-    useEvaluationsV3Store.getState().setAutosaveStatus("dataset", "error", "Network error");
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.dataset).toBe("error");
-    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.datasetError).toBe("Network error");
+    useEvaluationsV3Store
+      .getState()
+      .setAutosaveStatus("dataset", "error", "Network error");
+    expect(useEvaluationsV3Store.getState().ui.autosaveStatus.dataset).toBe(
+      "error",
+    );
+    expect(
+      useEvaluationsV3Store.getState().ui.autosaveStatus.datasetError,
+    ).toBe("Network error");
   });
 });
 
@@ -481,7 +518,8 @@ describe("Undo/Redo store actions (unit)", () => {
     const store = useEvaluationsV3Store.getState();
 
     // Get baseline history count
-    const baselineCount = useEvaluationsV3Store.temporal.getState().pastStates.length;
+    const baselineCount =
+      useEvaluationsV3Store.temporal.getState().pastStates.length;
 
     // User makes a content change (use unique value to avoid matching previous test state)
     const uniqueValue = `navigation-test-${Date.now()}`;
@@ -490,7 +528,8 @@ describe("Undo/Redo store actions (unit)", () => {
     await new Promise((resolve) => setTimeout(resolve, 150));
 
     // Count history entries after content change
-    const entriesAfterEdit = useEvaluationsV3Store.temporal.getState().pastStates.length;
+    const entriesAfterEdit =
+      useEvaluationsV3Store.temporal.getState().pastStates.length;
     expect(entriesAfterEdit).toBeGreaterThan(baselineCount);
 
     // Now user navigates around WITHOUT changing any content
@@ -510,7 +549,8 @@ describe("Undo/Redo store actions (unit)", () => {
     });
 
     // CRITICAL: History entries should NOT have increased from navigation
-    const entriesAfterNavigation = useEvaluationsV3Store.temporal.getState().pastStates.length;
+    const entriesAfterNavigation =
+      useEvaluationsV3Store.temporal.getState().pastStates.length;
     expect(entriesAfterNavigation).toBe(entriesAfterEdit);
   });
 
@@ -535,11 +575,15 @@ describe("Undo/Redo store actions (unit)", () => {
     store.setActiveDataset("second-dataset");
     await new Promise((resolve) => setTimeout(resolve, 150));
 
-    expect(useEvaluationsV3Store.getState().activeDatasetId).toBe("second-dataset");
+    expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+      "second-dataset",
+    );
 
     // Undo - should switch back
     useEvaluationsV3Store.temporal.getState().undo();
 
-    expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(originalActiveId);
+    expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+      originalActiveId,
+    );
   });
 });

@@ -69,7 +69,11 @@ export const dashboardsRouter = createTRPCRouter({
     .use(dashboardErrorHandler)
     .mutation(async ({ ctx, input }) => {
       const service = DashboardService.create(ctx.prisma);
-      return await service.rename(input.projectId, input.dashboardId, input.name);
+      return await service.rename(
+        input.projectId,
+        input.dashboardId,
+        input.name,
+      );
     }),
 
   /**

@@ -1,4 +1,4 @@
-import { Button, useDisclosure, type ButtonProps } from "@chakra-ui/react";
+import { Button, type ButtonProps, useDisclosure } from "@chakra-ui/react";
 import { Lock, Plus } from "lucide-react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
@@ -64,7 +64,13 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
   if (!hasWorkflowsCreatePermission) {
     return (
       <Tooltip content="You need workflows:create permission to create workflows">
-        <Button variant="outline" size="sm" colorPalette="gray" opacity={0.6} disabled>
+        <Button
+          variant="outline"
+          size="sm"
+          colorPalette="gray"
+          opacity={0.6}
+          disabled
+        >
           <Lock size={14} />
           Create Workflow
         </Button>
@@ -88,4 +94,3 @@ export const CreateWorkflowButton = ({ props }: { props?: ButtonProps }) => {
     </>
   );
 };
-

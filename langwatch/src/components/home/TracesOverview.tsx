@@ -2,10 +2,7 @@ import { Heading, HStack, Spacer } from "@chakra-ui/react";
 import { LuArrowRight } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "~/server/analytics/registry";
-import {
-  CustomGraph,
-  type CustomGraphInput,
-} from "../analytics/CustomGraph";
+import { CustomGraph, type CustomGraphInput } from "../analytics/CustomGraph";
 import { Link } from "../ui/link";
 import { HomeCard } from "./HomeCard";
 

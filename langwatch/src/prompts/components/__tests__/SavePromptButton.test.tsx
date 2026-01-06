@@ -65,9 +65,17 @@ describe("SavePromptButton", () => {
       });
 
       render(
-        <TestWrapper formValues={{ versionMetadata: { versionNumber: 5, versionId: "v5", versionCreatedAt: new Date() } }}>
+        <TestWrapper
+          formValues={{
+            versionMetadata: {
+              versionNumber: 5,
+              versionId: "v5",
+              versionCreatedAt: new Date(),
+            },
+          }}
+        >
           <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={false} />
-        </TestWrapper>
+        </TestWrapper>,
       );
 
       const button = screen.getByTestId("save-prompt-button");
@@ -87,9 +95,17 @@ describe("SavePromptButton", () => {
       });
 
       render(
-        <TestWrapper formValues={{ versionMetadata: { versionNumber: 5, versionId: "v5", versionCreatedAt: new Date() } }}>
+        <TestWrapper
+          formValues={{
+            versionMetadata: {
+              versionNumber: 5,
+              versionId: "v5",
+              versionCreatedAt: new Date(),
+            },
+          }}
+        >
           <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={true} />
-        </TestWrapper>
+        </TestWrapper>,
       );
 
       const button = screen.getByTestId("save-prompt-button");
@@ -109,9 +125,17 @@ describe("SavePromptButton", () => {
       });
 
       render(
-        <TestWrapper formValues={{ versionMetadata: { versionNumber: 3, versionId: "v3", versionCreatedAt: new Date() } }}>
+        <TestWrapper
+          formValues={{
+            versionMetadata: {
+              versionNumber: 3,
+              versionId: "v3",
+              versionCreatedAt: new Date(),
+            },
+          }}
+        >
           <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={false} />
-        </TestWrapper>
+        </TestWrapper>,
       );
 
       const button = screen.getByTestId("save-prompt-button");
@@ -131,9 +155,17 @@ describe("SavePromptButton", () => {
       });
 
       render(
-        <TestWrapper formValues={{ versionMetadata: { versionNumber: 3, versionId: "v3", versionCreatedAt: new Date() } }}>
+        <TestWrapper
+          formValues={{
+            versionMetadata: {
+              versionNumber: 3,
+              versionId: "v3",
+              versionCreatedAt: new Date(),
+            },
+          }}
+        >
           <SavePromptButton onSave={vi.fn()} hasUnsavedChanges={true} />
-        </TestWrapper>
+        </TestWrapper>,
       );
 
       const button = screen.getByTestId("save-prompt-button");
@@ -142,4 +174,3 @@ describe("SavePromptButton", () => {
     });
   });
 });
-

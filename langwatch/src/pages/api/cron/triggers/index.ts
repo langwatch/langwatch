@@ -1,5 +1,5 @@
+import type { Project, Trigger } from "@prisma/client";
 import type { NextApiRequest, NextApiResponse } from "next";
-import type { Trigger, Project } from "@prisma/client";
 import { prisma } from "~/server/db";
 import { processCustomGraphTrigger } from "./customGraphTrigger";
 import { processTraceBasedTrigger } from "./traceBasedTrigger";

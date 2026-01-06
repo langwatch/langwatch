@@ -1,12 +1,12 @@
 import type { Agent, Prisma, PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import {
-  signatureComponentSchema,
+  type CodeComponentConfig,
+  type CustomComponentConfig,
   codeComponentSchema,
   customComponentSchema,
   type SignatureComponentConfig,
-  type CodeComponentConfig,
-  type CustomComponentConfig,
+  signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
 
 /**

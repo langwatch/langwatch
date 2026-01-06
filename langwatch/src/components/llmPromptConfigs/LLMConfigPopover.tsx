@@ -8,13 +8,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Settings, X } from "react-feather";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
-import { OutputsSection, type Output, type OutputType } from "../outputs/OutputsSection";
+import {
+  type Output,
+  OutputsSection,
+  type OutputType,
+} from "../outputs/OutputsSection";
 import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { Switch } from "../ui/switch";
@@ -115,7 +119,7 @@ export function LLMConfigPopover({
       outputs[0]?.type !== "str");
 
   const [isStructuredOutputsEnabled, setIsStructuredOutputsEnabled] = useState(
-    hasNonDefaultOutputs ?? false
+    hasNonDefaultOutputs ?? false,
   );
 
   // Sync state when outputs change externally (e.g., loading a prompt)

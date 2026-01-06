@@ -1,8 +1,9 @@
 /** @vitest-environment jsdom */
-import { render, screen, cleanup } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, afterEach } from "vitest";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EditableHeading } from "../EditableHeading";
 
@@ -21,7 +22,7 @@ describe("EditableHeading", () => {
   describe("when loading", () => {
     it("does not show the value when isLoading is true", () => {
       renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} isLoading />
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} isLoading />,
       );
 
       expect(screen.queryByText("My Evaluation")).not.toBeInTheDocument();
@@ -33,7 +34,7 @@ describe("EditableHeading", () => {
           value="My Evaluation"
           onSave={mockOnSave}
           isLoading={false}
-        />
+        />,
       );
 
       expect(screen.getByText("My Evaluation")).toBeInTheDocument();
@@ -43,7 +44,7 @@ describe("EditableHeading", () => {
   describe("when displaying", () => {
     it("shows the value when provided", () => {
       renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
       );
 
       expect(screen.getByText("My Evaluation")).toBeInTheDocument();
@@ -52,7 +53,7 @@ describe("EditableHeading", () => {
     it("shows pencil icon on hover", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
       );
 
       const heading = screen.getByText("My Evaluation").parentElement!;
@@ -67,7 +68,7 @@ describe("EditableHeading", () => {
     it("shows input field after clicking", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("My Evaluation"));
@@ -79,7 +80,7 @@ describe("EditableHeading", () => {
     it("focuses and selects the input text", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="My Evaluation" onSave={mockOnSave} />
+        <EditableHeading value="My Evaluation" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("My Evaluation"));
@@ -93,7 +94,7 @@ describe("EditableHeading", () => {
     it("calls onSave when pressing Enter with new value", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -108,7 +109,7 @@ describe("EditableHeading", () => {
     it("calls onSave when blurring with new value", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -123,7 +124,7 @@ describe("EditableHeading", () => {
     it("does not call onSave when value is unchanged", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Same Name" onSave={mockOnSave} />
+        <EditableHeading value="Same Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Same Name"));
@@ -135,7 +136,7 @@ describe("EditableHeading", () => {
     it("does not call onSave when value is only whitespace", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -150,7 +151,7 @@ describe("EditableHeading", () => {
     it("trims whitespace from saved value", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -165,7 +166,7 @@ describe("EditableHeading", () => {
     it("returns to display mode after saving", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -182,7 +183,7 @@ describe("EditableHeading", () => {
     it("does not call onSave when pressing Escape", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -197,7 +198,7 @@ describe("EditableHeading", () => {
     it("returns to display mode when pressing Escape", async () => {
       const user = userEvent.setup();
       renderWithProviders(
-        <EditableHeading value="Old Name" onSave={mockOnSave} />
+        <EditableHeading value="Old Name" onSave={mockOnSave} />,
       );
 
       await user.click(screen.getByText("Old Name"));
@@ -208,4 +209,3 @@ describe("EditableHeading", () => {
     });
   });
 });
-

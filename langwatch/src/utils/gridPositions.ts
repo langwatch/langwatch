@@ -17,7 +17,7 @@ type GridItem = {
  * This uses a simple row-by-row layout algorithm for a 2-column grid.
  */
 export const calculateGridPositions = <T extends GridItem>(
-  items: T[]
+  items: T[],
 ): GridLayout[] => {
   const layouts: GridLayout[] = [];
 
@@ -31,7 +31,7 @@ export const calculateGridPositions = <T extends GridItem>(
     col: number,
     row: number,
     colSpan: number,
-    rowSpan: number
+    rowSpan: number,
   ) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
@@ -47,7 +47,7 @@ export const calculateGridPositions = <T extends GridItem>(
     col: number,
     row: number,
     colSpan: number,
-    rowSpan: number
+    rowSpan: number,
   ) => {
     for (let c = col; c < col + colSpan; c++) {
       for (let r = row; r < row + rowSpan; r++) {
@@ -86,4 +86,3 @@ export const calculateGridPositions = <T extends GridItem>(
 
   return layouts;
 };
-

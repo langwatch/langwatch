@@ -1,10 +1,10 @@
 import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { PromptPlaygroundMainContent } from "~/prompts/prompt-playground/components/PromptPlaygroundMainContent";
 import { PromptPlaygroundSidebar } from "~/prompts/prompt-playground/components/sidebar/PromptPlaygroundSidebar";
 import { PromptConfigProvider } from "~/prompts/providers/PromptConfigProvider";
 import { PromptPlaygroundChatProvider } from "./chat/PromptPlaygroundChatContext";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { AddPromptButton } from "./sidebar/AddPromptButton";
 
 /**

@@ -8,12 +8,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { DashboardLayout } from "../../../components/DashboardLayout";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
 } from "../../../components/analytics/DocumentsCountsTable";
 import { UserMetrics } from "../../../components/analytics/UserMetrics";
+import { DashboardLayout } from "../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../components/filters/FilterSidebar";
 import GraphsLayout from "../../../components/GraphsLayout";
 import { LLMMetrics } from "../../../components/LLMMetrics";
@@ -39,7 +39,12 @@ function AnalyticsContent() {
                   "Your project is not set up yet so you won't be able to see any data on the dashboard, please go to the "
                 }
               </Text>
-              <Link textDecoration="underline" href={`/${project.slug}/messages`}>setup</Link>
+              <Link
+                textDecoration="underline"
+                href={`/${project.slug}/messages`}
+              >
+                setup
+              </Link>
               <Text as="span"> page to get started.</Text>
             </Alert.Description>
           </Alert.Content>
@@ -115,4 +120,3 @@ function DocumentsMetrics() {
 export default withPermissionGuard("analytics:view", {
   layoutComponent: DashboardLayout,
 })(AnalyticsContent);
-

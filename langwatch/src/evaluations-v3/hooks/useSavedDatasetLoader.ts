@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { DatasetColumn, DatasetReference, SavedRecord } from "../types";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 /**
@@ -10,14 +10,17 @@ import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
  * Each saved dataset tab should use this hook to declaratively fetch its data.
  * tRPC handles batching multiple queries automatically.
  */
-export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) => {
+export const useSavedDatasetRecords = (
+  dataset: DatasetReference | undefined,
+) => {
   const { project } = useOrganizationTeamProject();
   const setSavedDatasetRecords = useEvaluationsV3Store(
-    (state) => state.setSavedDatasetRecords
+    (state) => state.setSavedDatasetRecords,
   );
   const hasLoadedRef = useRef(false);
 
-  const isSavedDataset = dataset?.type === "saved" && Boolean(dataset.datasetId);
+  const isSavedDataset =
+    dataset?.type === "saved" && Boolean(dataset.datasetId);
   const needsLoading = isSavedDataset && !dataset.savedRecords;
 
   // Declarative query - tRPC batches these automatically
@@ -28,12 +31,13 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
     },
     {
       enabled: Boolean(project?.id) && needsLoading,
-    }
+    },
   );
 
   // Sync to store when data arrives
   useEffect(() => {
-    if (!dataset || !needsLoading || !query.data || hasLoadedRef.current) return;
+    if (!dataset || !needsLoading || !query.data || hasLoadedRef.current)
+      return;
 
     hasLoadedRef.current = true;
 
@@ -44,9 +48,9 @@ export const useSavedDatasetRecords = (dataset: DatasetReference | undefined) =>
           (dataset.columns as DatasetColumn[]).map((col) => [
             col.name,
             String((record.entry as Record<string, unknown>)?.[col.name] ?? ""),
-          ])
+          ]),
         ),
-      })
+      }),
     );
 
     setSavedDatasetRecords(dataset.id, savedRecords);
@@ -71,7 +75,7 @@ export const useSavedDatasetLoader = () => {
 
   // Find saved datasets that need records loaded
   const savedDatasetsNeedingRecords = datasets.filter(
-    (d) => d.type === "saved" && d.datasetId && !d.savedRecords
+    (d) => d.type === "saved" && d.datasetId && !d.savedRecords,
   );
 
   return {

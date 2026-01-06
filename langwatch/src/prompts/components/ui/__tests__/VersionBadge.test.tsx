@@ -1,10 +1,11 @@
 /**
  * @vitest-environment jsdom
  */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { VersionBadge } from "../VersionBadge";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
 const renderWithChakra = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);

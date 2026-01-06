@@ -23,7 +23,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   if (!usage.data || !isSaaS) {
@@ -34,7 +34,7 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     (usage.data.currentMonthMessagesCount /
       usage.data.activePlan.maxMessagesPerMonth) *
       100,
-    100
+    100,
   );
 
   return (
@@ -102,4 +102,3 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
     </Tooltip>
   );
 };
-

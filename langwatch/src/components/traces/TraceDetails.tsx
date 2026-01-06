@@ -246,7 +246,9 @@ export function TraceDetails(props: {
                     open={open}
                   >
                     <Popover.Trigger asChild>
-                      <Button data-scope="header" colorPalette="gray">Annotation Queue</Button>
+                      <Button data-scope="header" colorPalette="gray">
+                        Annotation Queue
+                      </Button>
                     </Popover.Trigger>
                     <Popover.Content
                       display={queueDrawerOpen.open ? "none" : "block"}

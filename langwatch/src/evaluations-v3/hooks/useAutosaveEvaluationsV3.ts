@@ -1,18 +1,18 @@
 import { useRouter } from "next/router";
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { toaster } from "../../components/ui/toaster";
 import { captureException } from "../../utils/posthogErrorCapture";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
 const stringifiedInitialState = JSON.stringify(
-  extractPersistedState(createInitialState())
+  extractPersistedState(createInitialState()),
 );
 
 /**
@@ -53,7 +53,7 @@ export const useAutosaveEvaluationsV3 = () => {
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
       loadState: state.loadState,
-    }))
+    })),
   );
 
   const persistedState = extractPersistedState({
@@ -88,7 +88,8 @@ export const useAutosaveEvaluationsV3 = () => {
   const routerSlug = router.query.slug as string | undefined;
 
   // Only try to load existing experiment if we don't already have an experimentId loaded
-  const shouldLoadExisting = !!project && !!routerSlug && !experimentId && !hasLoadedExistingRef.current;
+  const shouldLoadExisting =
+    !!project && !!routerSlug && !experimentId && !hasLoadedExistingRef.current;
 
   // Load existing experiment if navigating to one
   const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
@@ -96,7 +97,7 @@ export const useAutosaveEvaluationsV3 = () => {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
     },
-    { enabled: shouldLoadExisting }
+    { enabled: shouldLoadExisting },
   );
 
   // Update URL when experiment slug changes
@@ -105,7 +106,7 @@ export const useAutosaveEvaluationsV3 = () => {
       void router.replace(
         `/${project.slug}/evaluations/v3/${experimentSlug}`,
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,7 +137,15 @@ export const useAutosaveEvaluationsV3 = () => {
       hasLoadedExistingRef.current = true;
       setExperimentSlug(routerSlug);
     }
-  }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
+  }, [
+    existingExperiment.data,
+    existingExperiment.isLoading,
+    routerSlug,
+    experimentSlug,
+    setExperimentId,
+    setExperimentSlug,
+    loadState,
+  ]);
 
   // Clear timeouts on unmount
   useEffect(() => {
@@ -191,7 +200,9 @@ export const useAutosaveEvaluationsV3 = () => {
             experimentId: experimentId,
             // Cast to any since the actual types are more complex than the schema
             // The schema is designed to be lenient for storage
-            state: persistedState as Parameters<typeof saveExperiment.mutateAsync>[0]["state"],
+            state: persistedState as Parameters<
+              typeof saveExperiment.mutateAsync
+            >[0]["state"],
           });
 
           setExperimentId(updatedExperiment.id);
@@ -202,7 +213,11 @@ export const useAutosaveEvaluationsV3 = () => {
           markSaved();
         } catch (error) {
           console.error("Failed to autosave evaluations v3:", error);
-          setAutosaveStatus("evaluation", "error", error instanceof Error ? error.message : "Unknown error");
+          setAutosaveStatus(
+            "evaluation",
+            "error",
+            error instanceof Error ? error.message : "Unknown error",
+          );
           toaster.create({
             title: "Failed to autosave evaluation",
             type: "error",
@@ -228,7 +243,13 @@ export const useAutosaveEvaluationsV3 = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
+  }, [
+    stringifiedState,
+    project?.id,
+    shouldLoadExisting,
+    experimentId,
+    existingExperiment.isLoading,
+  ]);
 
   return {
     isLoading: existingExperiment.isLoading,

@@ -12,14 +12,14 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  VariableTypeIcon,
   TYPE_LABELS,
+  VariableTypeIcon,
 } from "~/prompts/components/ui/VariableTypeIcon";
 import {
-  VariableMappingInput,
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  VariableMappingInput,
 } from "./VariableMappingInput";
 
 // ============================================================================

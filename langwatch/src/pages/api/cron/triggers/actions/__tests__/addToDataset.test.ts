@@ -43,7 +43,9 @@ describe("handleAddToDataset", () => {
           actionParams: {
             datasetId: "dataset-1",
             datasetMapping: {
-              mapping: { field1: { source: "input", key: "value", subkey: "" } },
+              mapping: {
+                field1: { source: "input", key: "value", subkey: "" },
+              },
               expansions: ["input", "output"],
             },
           },

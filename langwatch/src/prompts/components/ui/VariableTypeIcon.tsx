@@ -35,7 +35,9 @@ export const VariableTypeIcon = ({
 
     case "bool":
     case "boolean":
-      return <ToggleLeft {...iconProps} color="var(--chakra-colors-orange-500)" />;
+      return (
+        <ToggleLeft {...iconProps} color="var(--chakra-colors-orange-500)" />
+      );
 
     case "list":
     case "list[str]":

@@ -15,6 +15,7 @@ import { ShieldUser } from "lucide-react";
 
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { PermissionViewer } from "../../components/settings/PermissionViewer";
 import { RoleCard } from "../../components/settings/RoleCard";
@@ -27,7 +28,6 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
 import { api } from "../../utils/api";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 /**
  * Role Management Settings Page
@@ -464,11 +464,7 @@ function RolesManagement({
         open={defaultViewOpen}
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
-        <Dialog.Content
-          maxWidth="600px"
-          maxHeight="80vh"
-          overflowY="auto"
-        >
+        <Dialog.Content maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
             <Dialog.Title>
               View Permissions - {viewingDefaultRole?.name}

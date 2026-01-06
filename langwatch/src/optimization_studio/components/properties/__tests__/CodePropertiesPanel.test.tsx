@@ -3,8 +3,8 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "@xyflow/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -16,7 +16,10 @@ vi.mock("next/router", () => ({
 
 // Mock next-auth
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: { user: { id: "test-user" } }, status: "authenticated" }),
+  useSession: () => ({
+    data: { user: { id: "test-user" } },
+    status: "authenticated",
+  }),
 }));
 
 // Mock useOrganizationTeamProject
@@ -33,7 +36,8 @@ const mockSetNode = vi.fn();
 const mockSetNodeParameter = vi.fn();
 
 vi.mock("../../../hooks/useWorkflowStore", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../hooks/useWorkflowStore")>();
+  const actual =
+    await importOriginal<typeof import("../../../hooks/useWorkflowStore")>();
   return {
     ...actual,
     useWorkflowStore: (selector: (state: unknown) => unknown) =>
@@ -54,7 +58,13 @@ vi.mock("@xyflow/react", () => ({
 
 // Mock CodeBlockEditor - we don't need to test Monaco editor
 vi.mock("~/components/blocks/CodeBlockEditor", () => ({
-  CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
+  CodeBlockEditor: ({
+    code,
+    onChange,
+  }: {
+    code: string;
+    onChange: (code: string) => void;
+  }) => (
     <div data-testid="code-editor">
       <textarea
         data-testid="code-textarea"
@@ -77,10 +87,12 @@ vi.mock("../BasePropertiesPanel", () => ({
   ),
 }));
 
-import { CodePropertiesPanel } from "../CodePropertiesPanel";
 import type { Component, Field } from "../../../types/dsl";
+import { CodePropertiesPanel } from "../CodePropertiesPanel";
 
-const createMockNode = (overrides: Partial<Component> = {}): Node<Component> => ({
+const createMockNode = (
+  overrides: Partial<Component> = {},
+): Node<Component> => ({
   id: "node-1",
   type: "code",
   position: { x: 0, y: 0 },
@@ -104,7 +116,7 @@ const renderComponent = (node: Node<Component> = createMockNode()) => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <CodePropertiesPanel node={node} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -202,7 +214,7 @@ describe("CodePropertiesPanel", () => {
       const select = container.querySelector("select");
       if (select) {
         const options = Array.from(select.querySelectorAll("option")).map(
-          (opt) => opt.getAttribute("value")
+          (opt) => opt.getAttribute("value"),
         );
         // Should have code types: str, float, bool, dict, list, image
         expect(options).toContain("str");

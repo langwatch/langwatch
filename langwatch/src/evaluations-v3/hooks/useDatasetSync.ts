@@ -1,8 +1,8 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import type { DatasetReference } from "../types";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 /**
  * Hook to sync saved dataset record changes to the database.
@@ -68,10 +68,13 @@ export const useDatasetSync = () => {
     }
   }, [markSaved]);
 
-  const handleSyncError = useCallback((error: { message: string }) => {
-    pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
-    setAutosaveStatus("dataset", "error", error.message);
-  }, [setAutosaveStatus]);
+  const handleSyncError = useCallback(
+    (error: { message: string }) => {
+      pendingOpsRef.current = Math.max(0, pendingOpsRef.current - 1);
+      setAutosaveStatus("dataset", "error", error.message);
+    },
+    [setAutosaveStatus],
+  );
 
   // Effect to sync pending changes to DB (debounced)
   useEffect(() => {
@@ -89,13 +92,20 @@ export const useDatasetSync = () => {
 
         // Find the dataset in our state to get the full record data
         const dataset = datasetsRef.current.find(
-          (d): d is DatasetReference & { type: "saved"; savedRecords: Array<{ id: string } & Record<string, string>> } =>
-            d.type === "saved" && d.datasetId === dbDatasetId
+          (
+            d,
+          ): d is DatasetReference & {
+            type: "saved";
+            savedRecords: Array<{ id: string } & Record<string, string>>;
+          } => d.type === "saved" && d.datasetId === dbDatasetId,
         );
 
         // Separate deletions from updates
         const recordsToDelete: string[] = [];
-        const recordsToUpdate: Array<{ recordId: string; changes: Record<string, unknown> }> = [];
+        const recordsToUpdate: Array<{
+          recordId: string;
+          changes: Record<string, unknown>;
+        }> = [];
 
         for (const [recordId, changes] of Object.entries(recordChanges)) {
           if (!changes || Object.keys(changes).length === 0) continue;
@@ -127,7 +137,7 @@ export const useDatasetSync = () => {
                 console.error("Failed to delete saved records:", error);
                 handleSyncError(error);
               },
-            }
+            },
           );
         }
 
@@ -135,7 +145,9 @@ export const useDatasetSync = () => {
         if (dataset?.savedRecords && recordsToUpdate.length > 0) {
           for (const { recordId } of recordsToUpdate) {
             // Find the full record to send all columns (backend replaces entire entry)
-            const fullRecord = dataset.savedRecords.find((r) => r.id === recordId);
+            const fullRecord = dataset.savedRecords.find(
+              (r) => r.id === recordId,
+            );
             if (!fullRecord) continue;
 
             // Build the full record data (excluding the 'id' field which is metadata)
@@ -159,7 +171,7 @@ export const useDatasetSync = () => {
                   console.error("Failed to sync saved record:", error);
                   handleSyncError(error);
                 },
-              }
+              },
             );
           }
         }

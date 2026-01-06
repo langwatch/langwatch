@@ -4,9 +4,9 @@
  * @vitest-environment jsdom
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { act, render, screen, cleanup } from "@testing-library/react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock useLatestPromptVersion to avoid needing SessionProvider
 vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
@@ -19,27 +19,27 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../components/TargetSection/TargetHeader";
-import type { TargetConfig, DatasetReference, EvaluatorConfig } from "../types";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import type { DatasetReference, EvaluatorConfig, TargetConfig } from "../types";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 import {
-  getTargetMissingMappings,
-  targetHasMissingMappings,
-  getEvaluatorMissingMappings,
   evaluatorHasMissingMappings,
-  validateWorkbench,
   extractFieldsFromContent,
+  getEvaluatorMissingMappings,
+  getTargetMissingMappings,
   getUsedFields,
+  targetHasMissingMappings,
+  validateWorkbench,
 } from "../utils/mappingValidation";
 
 const createTestDataset = (
   id: string = DEFAULT_TEST_DATA_ID,
-  name: string = "Test Data",
+  name = "Test Data",
   columns: Array<{ name: string; type: "string" | "number" | "boolean" }> = [
     { name: "input", type: "string" },
     { name: "expected_output", type: "string" },
-  ]
+  ],
 ): DatasetReference => ({
   id,
   name,
@@ -49,8 +49,10 @@ const createTestDataset = (
 
 const createTestTarget = (
   id: string,
-  inputs: Array<{ identifier: string; type: string }> = [{ identifier: "question", type: "str" }],
-  mappings: TargetConfig["mappings"] = {}
+  inputs: Array<{ identifier: string; type: string }> = [
+    { identifier: "question", type: "str" },
+  ],
+  mappings: TargetConfig["mappings"] = {},
 ): TargetConfig => ({
   id,
   type: "prompt",
@@ -60,8 +62,16 @@ const createTestTarget = (
   mappings,
   localPromptConfig: {
     llm: { model: "gpt-4" },
-    messages: [{ role: "user", content: `Hello {{${inputs[0]?.identifier || "input"}}}` }],
-    inputs: inputs.map((i) => ({ identifier: i.identifier, type: i.type as "str" })),
+    messages: [
+      {
+        role: "user",
+        content: `Hello {{${inputs[0]?.identifier || "input"}}}`,
+      },
+    ],
+    inputs: inputs.map((i) => ({
+      identifier: i.identifier,
+      type: i.type as "str",
+    })),
     outputs: [{ identifier: "output", type: "str" }],
   },
 });
@@ -122,7 +132,9 @@ describe("mappingValidation utility", () => {
 
   describe("getUsedFields", () => {
     it("extracts used fields from prompt messages", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }]);
+      const target = createTestTarget("r1", [
+        { identifier: "question", type: "str" },
+      ]);
       const fields = getUsedFields(target);
       expect(fields.has("question")).toBe(true);
     });
@@ -144,7 +156,11 @@ describe("mappingValidation utility", () => {
 
   describe("getTargetMissingMappings", () => {
     it("identifies missing mappings for used fields", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+      const target = createTestTarget(
+        "r1",
+        [{ identifier: "question", type: "str" }],
+        {},
+      );
       const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
 
       expect(result.isValid).toBe(false);
@@ -153,30 +169,38 @@ describe("mappingValidation utility", () => {
     });
 
     it("returns valid when all used fields are mapped", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
-        [DEFAULT_TEST_DATA_ID]: {
-          question: {
-            type: "source",
-            source: "dataset",
-            sourceId: DEFAULT_TEST_DATA_ID,
-            sourceField: "input",
+      const target = createTestTarget(
+        "r1",
+        [{ identifier: "question", type: "str" }],
+        {
+          [DEFAULT_TEST_DATA_ID]: {
+            question: {
+              type: "source",
+              source: "dataset",
+              sourceId: DEFAULT_TEST_DATA_ID,
+              sourceField: "input",
+            },
           },
         },
-      });
+      );
       const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
       expect(result.isValid).toBe(true);
       expect(result.missingMappings.length).toBe(0);
     });
 
     it("considers value mappings as valid", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
-        [DEFAULT_TEST_DATA_ID]: {
-          question: {
-            type: "value",
-            value: "Hello world",
+      const target = createTestTarget(
+        "r1",
+        [{ identifier: "question", type: "str" }],
+        {
+          [DEFAULT_TEST_DATA_ID]: {
+            question: {
+              type: "value",
+              value: "Hello world",
+            },
           },
         },
-      });
+      );
       const result = getTargetMissingMappings(target, DEFAULT_TEST_DATA_ID);
       expect(result.isValid).toBe(true);
     });
@@ -184,22 +208,32 @@ describe("mappingValidation utility", () => {
 
   describe("targetHasMissingMappings", () => {
     it("returns true when mappings are missing", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+      const target = createTestTarget(
+        "r1",
+        [{ identifier: "question", type: "str" }],
+        {},
+      );
       expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(true);
     });
 
     it("returns false when all mappings are set", () => {
-      const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
-        [DEFAULT_TEST_DATA_ID]: {
-          question: {
-            type: "source",
-            source: "dataset",
-            sourceId: DEFAULT_TEST_DATA_ID,
-            sourceField: "input",
+      const target = createTestTarget(
+        "r1",
+        [{ identifier: "question", type: "str" }],
+        {
+          [DEFAULT_TEST_DATA_ID]: {
+            question: {
+              type: "source",
+              source: "dataset",
+              sourceId: DEFAULT_TEST_DATA_ID,
+              sourceField: "input",
+            },
           },
         },
-      });
-      expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(false);
+      );
+      expect(targetHasMissingMappings(target, DEFAULT_TEST_DATA_ID)).toBe(
+        false,
+      );
     });
   });
 
@@ -249,7 +283,11 @@ describe("mappingValidation utility", () => {
 
 describe("TargetHeader alert icon", () => {
   it("shows alert icon when target has missing mappings", () => {
-    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+    const target = createTestTarget(
+      "r1",
+      [{ identifier: "question", type: "str" }],
+      {},
+    );
 
     renderWithProviders(
       <TargetHeader
@@ -257,23 +295,27 @@ describe("TargetHeader alert icon", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByTestId("missing-mapping-alert")).toBeInTheDocument();
   });
 
   it("does not show alert icon when all mappings are set", () => {
-    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
-      [DEFAULT_TEST_DATA_ID]: {
-        question: {
-          type: "source",
-          source: "dataset",
-          sourceId: DEFAULT_TEST_DATA_ID,
-          sourceField: "input",
+    const target = createTestTarget(
+      "r1",
+      [{ identifier: "question", type: "str" }],
+      {
+        [DEFAULT_TEST_DATA_ID]: {
+          question: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
         },
       },
-    });
+    );
 
     renderWithProviders(
       <TargetHeader
@@ -281,10 +323,12 @@ describe("TargetHeader alert icon", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
-    expect(screen.queryByTestId("missing-mapping-alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("missing-mapping-alert"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows unpublished indicator when no missing mappings but has local changes", () => {
@@ -313,10 +357,12 @@ describe("TargetHeader alert icon", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
-    expect(screen.queryByTestId("missing-mapping-alert")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("missing-mapping-alert"),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("unpublished-indicator")).toBeInTheDocument();
   });
 });
@@ -525,7 +571,9 @@ describe("Target header alert icon integration", () => {
     });
 
     // Get the target FROM THE STORE (like the real component does)
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     renderWithProviders(
       <TargetHeader
@@ -533,7 +581,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     // Alert icon SHOULD be present because "user_input" has no mapping
@@ -587,7 +635,9 @@ describe("Target header alert icon integration", () => {
       });
     });
 
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     renderWithProviders(
       <TargetHeader
@@ -595,7 +645,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     // Alert icon should NOT be present - all variables are mapped
@@ -639,13 +689,20 @@ describe("Target header alert icon integration", () => {
       });
     });
 
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     // Verify "my_custom_var" was NOT auto-inferred (no matching column)
-    expect(storeTarget.mappings["dataset-no-match"]?.my_custom_var).toBeUndefined();
+    expect(
+      storeTarget.mappings["dataset-no-match"]?.my_custom_var,
+    ).toBeUndefined();
 
     // Test the validation function directly
-    const hasMissing = targetHasMissingMappings(storeTarget, "dataset-no-match");
+    const hasMissing = targetHasMissingMappings(
+      storeTarget,
+      "dataset-no-match",
+    );
     expect(hasMissing).toBe(true); // Should have missing mappings
 
     renderWithProviders(
@@ -654,7 +711,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     // Alert icon SHOULD be present because "my_custom_var" has no mapping
@@ -694,11 +751,14 @@ describe("Target header alert icon integration", () => {
         localPromptConfig: {
           llm: { model: "gpt-5" },
           messages: [
-            { role: "system", content: "Context: {{custom_context}}\nQuestion: {{input}}" },
+            {
+              role: "system",
+              content: "Context: {{custom_context}}\nQuestion: {{input}}",
+            },
           ],
           inputs: [
             { identifier: "custom_context", type: "str" }, // NO matching column!
-            { identifier: "input", type: "str" },          // Will be mapped
+            { identifier: "input", type: "str" }, // Will be mapped
           ],
           outputs: [{ identifier: "output", type: "str" }],
         },
@@ -706,14 +766,19 @@ describe("Target header alert icon integration", () => {
     });
 
     // Get updated target
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     // "input" should be mapped (exact match)
     expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.input).toBeDefined();
 
     // "custom_context" should NOT be mapped (no matching column)
     // So validation should detect it as missing
-    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(
+      storeTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
     expect(hasMissing).toBe(true);
 
     renderWithProviders(
@@ -722,7 +787,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     const alertIcon = screen.queryByTestId("missing-mapping-alert");
@@ -756,18 +821,30 @@ describe("Target header alert icon integration", () => {
     });
 
     // Verify auto-mapping worked (user_input -> input via semantic equivalents)
-    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input?.type).toBe("source");
+    let storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeDefined();
+    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input?.type).toBe(
+      "source",
+    );
 
     // Step 2: User clears the mapping (clicks X on the tag)
     act(() => {
-      useEvaluationsV3Store.getState().removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
+      useEvaluationsV3Store
+        .getState()
+        .removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
     });
 
     // Verify mapping is cleared
-    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeUndefined();
 
     // Step 3 & 4: User closes and reopens drawer
     // With the fix, reopening the drawer does NOT re-run auto-mapping.
@@ -775,8 +852,12 @@ describe("Target header alert icon integration", () => {
     // initialization function. The mapping should remain cleared.
 
     // Final check: mapping is STILL cleared
-    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeUndefined();
   });
 
   it("auto-maps user_input to input column via semantic equivalents", () => {
@@ -801,11 +882,14 @@ describe("Target header alert icon integration", () => {
       });
     });
 
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     // user_input SHOULD be auto-mapped to input column via SEMANTIC_EQUIVALENTS
     // user_input: ["input", ...] means user_input field maps to input column
-    const userInputMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
+    const userInputMapping =
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
     expect(userInputMapping).toBeDefined();
     expect(userInputMapping?.type).toBe("source");
     if (userInputMapping?.type === "source") {
@@ -813,7 +897,10 @@ describe("Target header alert icon integration", () => {
     }
 
     // No missing mappings - user_input was successfully mapped
-    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(
+      storeTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
     expect(hasMissing).toBe(false);
 
     renderWithProviders(
@@ -822,7 +909,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     // No alert icon - all mappings are complete
@@ -867,7 +954,9 @@ describe("Target header alert icon integration", () => {
     }).not.toThrow();
 
     // Step 3: Verify the target now has the correct inputs
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId);
     expect(storeTarget?.inputs).toHaveLength(1);
     expect(storeTarget?.inputs?.[0]?.identifier).toBe("user_input");
   });
@@ -899,7 +988,9 @@ describe("Target header alert icon integration", () => {
     });
 
     // Verify target was created with inputs
-    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    let storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId);
     expect(storeTarget?.inputs).toBeDefined();
     expect(storeTarget?.inputs).toHaveLength(1);
 
@@ -910,7 +1001,9 @@ describe("Target header alert icon integration", () => {
         useEvaluationsV3Store.getState().updateTarget(targetId, {
           localPromptConfig: {
             llm: { model: "gpt-5" },
-            messages: [{ role: "system", content: "You are helpful. {{foobar}}" }],
+            messages: [
+              { role: "system", content: "You are helpful. {{foobar}}" },
+            ],
             inputs: [{ identifier: "foobar", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
           },
@@ -920,7 +1013,9 @@ describe("Target header alert icon integration", () => {
     }).not.toThrow();
 
     // Step 3: Verify state is correct
-    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId);
+    storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId);
     expect(storeTarget?.inputs).toHaveLength(1);
     expect(storeTarget?.inputs?.[0]?.identifier).toBe("foobar");
   });
@@ -954,15 +1049,18 @@ describe("Target header alert icon integration", () => {
     });
 
     // Get target - auto-mapping already happened in addTarget
-    const storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
+    const storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
 
     // Verify inputs are set
     expect(storeTarget.inputs).toHaveLength(2);
-    expect(storeTarget.inputs.map(i => i.identifier)).toContain("foobar");
-    expect(storeTarget.inputs.map(i => i.identifier)).toContain("user_input");
+    expect(storeTarget.inputs.map((i) => i.identifier)).toContain("foobar");
+    expect(storeTarget.inputs.map((i) => i.identifier)).toContain("user_input");
 
     // user_input should be mapped (via semantic equivalents user_input -> input)
-    const userInputMapping = storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
+    const userInputMapping =
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input;
     expect(userInputMapping).toBeDefined(); // Should be auto-mapped
 
     // foobar should NOT be mapped (no matching column)
@@ -970,7 +1068,10 @@ describe("Target header alert icon integration", () => {
     expect(foobarMapping).toBeUndefined();
 
     // Validation should detect foobar is missing
-    const hasMissing = targetHasMissingMappings(storeTarget, DEFAULT_TEST_DATA_ID);
+    const hasMissing = targetHasMissingMappings(
+      storeTarget,
+      DEFAULT_TEST_DATA_ID,
+    );
     expect(hasMissing).toBe(true); // foobar has no mapping!
 
     // Render TargetHeader and check for alert icon
@@ -980,7 +1081,7 @@ describe("Target header alert icon integration", () => {
         onEdit={vi.fn()}
         onRemove={vi.fn()}
         onRun={vi.fn()}
-      />
+      />,
     );
 
     // Alert icon SHOULD be present because foobar has no mapping
@@ -1009,17 +1110,27 @@ describe("Target header alert icon integration", () => {
     });
 
     // Verify user_input was auto-inferred
-    let storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeDefined();
+    let storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeDefined();
 
     // Step 2: User manually clears the mapping
     act(() => {
-      useEvaluationsV3Store.getState().removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
+      useEvaluationsV3Store
+        .getState()
+        .removeTargetMapping(targetId, DEFAULT_TEST_DATA_ID, "user_input");
     });
 
     // Verify mapping was removed
-    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeUndefined();
 
     // Step 3: User makes some other change (e.g., updates localPromptConfig)
     // This should NOT re-infer the mapping!
@@ -1037,8 +1148,12 @@ describe("Target header alert icon integration", () => {
     });
 
     // Verify mapping is STILL removed - not re-inferred
-    storeTarget = useEvaluationsV3Store.getState().targets.find(r => r.id === targetId)!;
-    expect(storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input).toBeUndefined();
+    storeTarget = useEvaluationsV3Store
+      .getState()
+      .targets.find((r) => r.id === targetId)!;
+    expect(
+      storeTarget.mappings[DEFAULT_TEST_DATA_ID]?.user_input,
+    ).toBeUndefined();
   });
 });
 
@@ -1048,7 +1163,11 @@ describe("Target header alert icon integration", () => {
 
 describe("Target play button validation", () => {
   it("calls onEdit instead of onRun when mappings are missing", async () => {
-    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {});
+    const target = createTestTarget(
+      "r1",
+      [{ identifier: "question", type: "str" }],
+      {},
+    );
     const onEdit = vi.fn();
     const onRun = vi.fn();
 
@@ -1058,7 +1177,7 @@ describe("Target play button validation", () => {
         onEdit={onEdit}
         onRemove={vi.fn()}
         onRun={onRun}
-      />
+      />,
     );
 
     const playButton = screen.getByTestId("target-play-button");
@@ -1070,16 +1189,20 @@ describe("Target play button validation", () => {
   });
 
   it("calls onRun when all mappings are set", async () => {
-    const target = createTestTarget("r1", [{ identifier: "question", type: "str" }], {
-      [DEFAULT_TEST_DATA_ID]: {
-        question: {
-          type: "source",
-          source: "dataset",
-          sourceId: DEFAULT_TEST_DATA_ID,
-          sourceField: "input",
+    const target = createTestTarget(
+      "r1",
+      [{ identifier: "question", type: "str" }],
+      {
+        [DEFAULT_TEST_DATA_ID]: {
+          question: {
+            type: "source",
+            source: "dataset",
+            sourceId: DEFAULT_TEST_DATA_ID,
+            sourceField: "input",
+          },
         },
       },
-    });
+    );
     const onEdit = vi.fn();
     const onRun = vi.fn();
 
@@ -1089,7 +1212,7 @@ describe("Target play button validation", () => {
         onEdit={onEdit}
         onRemove={vi.fn()}
         onRun={onRun}
-      />
+      />,
     );
 
     const playButton = screen.getByTestId("target-play-button");
@@ -1109,7 +1232,7 @@ const createTestEvaluator = (
   id: string,
   evaluatorType: string,
   inputs: Array<{ identifier: string; type: string }>,
-  mappings: EvaluatorConfig["mappings"] = {}
+  mappings: EvaluatorConfig["mappings"] = {},
 ): EvaluatorConfig => ({
   id,
   evaluatorType: evaluatorType as EvaluatorConfig["evaluatorType"],
@@ -1135,15 +1258,29 @@ describe("Evaluator validation with required/optional fields", () => {
       {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
-            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
-            expected_output: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "expected_output" },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: targetId,
+              sourceField: "output",
+            },
+            expected_output: {
+              type: "source",
+              source: "dataset",
+              sourceId: DEFAULT_TEST_DATA_ID,
+              sourceField: "expected_output",
+            },
             // "input" is optional and not mapped - should still be valid
           },
         },
-      }
+      },
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
+    const result = getEvaluatorMissingMappings(
+      evaluator,
+      DEFAULT_TEST_DATA_ID,
+      targetId,
+    );
 
     expect(result.isValid).toBe(true);
     expect(result.missingMappings.length).toBe(0);
@@ -1161,14 +1298,23 @@ describe("Evaluator validation with required/optional fields", () => {
       {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
-            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: targetId,
+              sourceField: "output",
+            },
             // "expected_output" is required but missing
           },
         },
-      }
+      },
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
+    const result = getEvaluatorMissingMappings(
+      evaluator,
+      DEFAULT_TEST_DATA_ID,
+      targetId,
+    );
 
     expect(result.isValid).toBe(false);
     expect(result.missingMappings.length).toBe(1);
@@ -1189,15 +1335,29 @@ describe("Evaluator validation with required/optional fields", () => {
       {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
-            input: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "input" },
-            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: DEFAULT_TEST_DATA_ID,
+              sourceField: "input",
+            },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: targetId,
+              sourceField: "output",
+            },
             // "contexts" is optional and not mapped - should still be valid
           },
         },
-      }
+      },
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
+    const result = getEvaluatorMissingMappings(
+      evaluator,
+      DEFAULT_TEST_DATA_ID,
+      targetId,
+    );
 
     expect(result.isValid).toBe(true);
     expect(result.missingMappings.length).toBe(0);
@@ -1215,10 +1375,14 @@ describe("Evaluator validation with required/optional fields", () => {
       ],
       {
         // No mappings at all
-      }
+      },
     );
 
-    const result = getEvaluatorMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId);
+    const result = getEvaluatorMissingMappings(
+      evaluator,
+      DEFAULT_TEST_DATA_ID,
+      targetId,
+    );
 
     // Invalid because ALL fields are empty - need at least one mapping
     expect(result.isValid).toBe(false);
@@ -1239,14 +1403,26 @@ describe("Evaluator validation with required/optional fields", () => {
       {
         [DEFAULT_TEST_DATA_ID]: {
           [targetId]: {
-            input: { type: "source", source: "dataset", sourceId: DEFAULT_TEST_DATA_ID, sourceField: "input" },
-            output: { type: "source", source: "target", sourceId: targetId, sourceField: "output" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: DEFAULT_TEST_DATA_ID,
+              sourceField: "input",
+            },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: targetId,
+              sourceField: "output",
+            },
           },
         },
-      }
+      },
     );
 
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(false);
+    expect(
+      evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId),
+    ).toBe(false);
   });
 
   it("evaluatorHasMissingMappings returns true when all fields empty", () => {
@@ -1257,9 +1433,11 @@ describe("Evaluator validation with required/optional fields", () => {
         { identifier: "input", type: "str" },
         { identifier: "output", type: "str" },
       ],
-      {}
+      {},
     );
 
-    expect(evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId)).toBe(true);
+    expect(
+      evaluatorHasMissingMappings(evaluator, DEFAULT_TEST_DATA_ID, targetId),
+    ).toBe(true);
   });
 });

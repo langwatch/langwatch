@@ -1,20 +1,21 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act, cleanup } from "@testing-library/react";
+
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import {
-  useDrawer,
-  useDrawerParams,
-  getComplexProps,
-  setFlowCallbacks,
-  getFlowCallbacks,
+  clearDrawerStack,
   clearFlowCallbacks,
   getAllFlowCallbacks,
+  getComplexProps,
   getDrawerStack,
-  clearDrawerStack,
+  getFlowCallbacks,
+  setFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
 } from "../useDrawer";
 
 // Mock next/router
@@ -25,9 +26,10 @@ let mockQuery: Record<string, string> = {};
 vi.mock("next/router", () => ({
   useRouter: () => ({
     query: mockQuery,
-    asPath: Object.keys(mockQuery).length > 0
-      ? "?" + new URLSearchParams(mockQuery).toString()
-      : "/",
+    asPath:
+      Object.keys(mockQuery).length > 0
+        ? "?" + new URLSearchParams(mockQuery).toString()
+        : "/",
     push: mockPush,
     replace: mockReplace,
   }),
@@ -294,7 +296,7 @@ describe("useDrawerParams", () => {
       "drawer.open": "promptEditor",
       "drawer.promptId": "test-123",
       "drawer.targetId": "runner-456",
-      "otherParam": "ignored",
+      otherParam: "ignored",
     };
 
     const { result } = renderHook(() => useDrawerParams());
@@ -439,9 +441,16 @@ describe("Complex Props (backward compatibility)", () => {
   it("extracts object props into complexProps and excludes them from URL", () => {
     const { result } = renderHook(() => useDrawer());
     const availableSources = [
-      { id: "ds1", name: "Dataset 1", type: "dataset", fields: [{ name: "input", type: "string" }] },
+      {
+        id: "ds1",
+        name: "Dataset 1",
+        type: "dataset",
+        fields: [{ name: "input", type: "string" }],
+      },
     ];
-    const inputMappings = { input: { type: "source", sourceId: "ds1", field: "input" } };
+    const inputMappings = {
+      input: { type: "source", sourceId: "ds1", field: "input" },
+    };
 
     act(() => {
       result.current.openDrawer("promptEditor", {

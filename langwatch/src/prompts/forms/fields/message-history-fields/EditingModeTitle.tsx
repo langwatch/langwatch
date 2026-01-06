@@ -1,8 +1,8 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import { LuChevronDown } from "react-icons/lu";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import { Menu } from "~/components/ui/menu";
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 /**
  * Editing mode for the prompt messages field.
@@ -16,7 +16,7 @@ export type PromptEditingMode = "prompt" | "messages";
  * Returns "messages" if there are messages beyond just system + optional user with {{input}}.
  */
 export const getDefaultEditingMode = (
-  messages: Array<{ role: string; content?: string }>
+  messages: Array<{ role: string; content?: string }>,
 ): PromptEditingMode => {
   // Find system and non-system messages
   const systemMessages = messages.filter((m) => m.role === "system");

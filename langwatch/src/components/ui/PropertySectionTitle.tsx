@@ -1,4 +1,4 @@
-import { Box, HStack, Text, type StackProps } from "@chakra-ui/react";
+import { Box, HStack, type StackProps, Text } from "@chakra-ui/react";
 import { Info } from "react-feather";
 import { Tooltip } from "./tooltip";
 

@@ -1,17 +1,10 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Bot, FileText } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
-import { type TargetType } from "~/evaluations-v3/types";
+import type { TargetType } from "~/evaluations-v3/types";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 // Re-export for backward compatibility
 export type { TargetType };
@@ -51,7 +44,9 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as TargetTypeSelectorDrawerProps["onSelect"]);
+  const onSelect =
+    props.onSelect ??
+    (complexProps.onSelect as TargetTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: TargetType) => {
@@ -94,19 +89,20 @@ export function TargetTypeSelectorDrawer(props: TargetTypeSelectorDrawerProps) {
             <Heading>Add to Evaluation</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
-              Choose what you want to evaluate - a prompt from your library or a custom agent.
+              Choose what you want to evaluate - a prompt from your library or a
+              custom agent.
             </Text>
 
             {/* Target type cards */}
-            <VStack
-              gap={3}
-              align="stretch"
-              paddingX={6}
-              paddingBottom={4}
-            >
+            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
               {targetTypes.map((targetType) => (
                 <TargetTypeCard
                   key={targetType.type}
@@ -139,7 +135,13 @@ type TargetTypeCardProps = {
   onClick: () => void;
 };
 
-function TargetTypeCard({ type, icon: Icon, title, description, onClick }: TargetTypeCardProps) {
+function TargetTypeCard({
+  type,
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: TargetTypeCardProps) {
   const iconColor = type === "prompt" ? "green" : "blue";
   const iconBg = type === "prompt" ? "green.50" : "blue.50";
 
@@ -168,9 +170,7 @@ function TargetTypeCard({ type, icon: Icon, title, description, onClick }: Targe
           <Icon size={16} />
         </Box>
         <VStack align="start" gap={1} flex={1}>
-          <Text fontWeight="medium">
-            {title}
-          </Text>
+          <Text fontWeight="medium">{title}</Text>
           <Text fontSize="13px" color="gray.600">
             {description}
           </Text>

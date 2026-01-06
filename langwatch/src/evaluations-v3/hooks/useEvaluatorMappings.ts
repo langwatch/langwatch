@@ -10,14 +10,13 @@
 
 import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
-
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
-import { convertToUIMapping } from "../utils/fieldMappingConverters";
 import {
-  datasetColumnTypeToFieldType,
   type AvailableSource,
+  datasetColumnTypeToFieldType,
   type FieldMapping as UIFieldMapping,
 } from "~/components/variables";
+import { convertToUIMapping } from "../utils/fieldMappingConverters";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 type UseEvaluatorMappingsResult = {
   /** Available sources for variable mapping (active dataset columns + target outputs) */
@@ -39,18 +38,23 @@ type UseEvaluatorMappingsResult = {
  */
 export const useEvaluatorMappings = (
   evaluatorId: string | undefined,
-  targetId: string | undefined
+  targetId: string | undefined,
 ): UseEvaluatorMappingsResult => {
-  const { activeDatasetId, datasets, evaluator, target } = useEvaluationsV3Store(
-    useShallow((state) => ({
-      activeDatasetId: state.activeDatasetId,
-      datasets: state.datasets,
-      evaluator: evaluatorId
-        ? state.evaluators.find((e) => e.id === evaluatorId || e.dbEvaluatorId === evaluatorId)
-        : undefined,
-      target: targetId ? state.targets.find((r) => r.id === targetId) : undefined,
-    }))
-  );
+  const { activeDatasetId, datasets, evaluator, target } =
+    useEvaluationsV3Store(
+      useShallow((state) => ({
+        activeDatasetId: state.activeDatasetId,
+        datasets: state.datasets,
+        evaluator: evaluatorId
+          ? state.evaluators.find(
+              (e) => e.id === evaluatorId || e.dbEvaluatorId === evaluatorId,
+            )
+          : undefined,
+        target: targetId
+          ? state.targets.find((r) => r.id === targetId)
+          : undefined,
+      })),
+    );
 
   // Build available sources from the active dataset AND the target's outputs
   const availableSources = useMemo((): AvailableSource[] => {
@@ -78,7 +82,13 @@ export const useEvaluatorMappings = (
         type: "signature" as const,
         fields: target.outputs.map((output) => ({
           name: output.identifier,
-          type: output.type as "str" | "float" | "bool" | "image" | "list" | "dict",
+          type: output.type as
+            | "str"
+            | "float"
+            | "bool"
+            | "image"
+            | "list"
+            | "dict",
         })),
       });
     }

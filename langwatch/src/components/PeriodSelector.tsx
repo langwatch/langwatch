@@ -18,8 +18,8 @@ import {
 import { useRouter } from "next/router";
 import { useCallback, useMemo } from "react";
 import { Calendar, ChevronDown } from "react-feather";
-import { Popover } from "./ui/popover";
 import { LuCalendar } from "react-icons/lu";
+import { Popover } from "./ui/popover";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;

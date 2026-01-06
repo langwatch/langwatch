@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import React from "react";
 import { Archive, MoreVertical, Plus } from "react-feather";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
 import { Link } from "../../components/ui/link";
@@ -24,7 +25,6 @@ import type {
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();

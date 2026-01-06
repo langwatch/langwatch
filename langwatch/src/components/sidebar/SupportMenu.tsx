@@ -1,20 +1,20 @@
 import { Box, MenuSeparator, Portal, VStack } from "@chakra-ui/react";
+import { useState } from "react";
 import {
   LuActivity,
-  LuBug,
   LuBookOpen,
+  LuBug,
   LuChevronRight,
   LuGithub,
   LuLifeBuoy,
   LuLightbulb,
   LuMessageCircle,
 } from "react-icons/lu";
-import { useState } from "react";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { DiscordOutlineIcon } from "../icons/DiscordOutline";
 import { useColorRawValue } from "../ui/color-mode";
 import { Link } from "../ui/link";
 import { Menu } from "../ui/menu";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { SideMenuItem } from "./SideMenuLink";
 
 export type SupportMenuProps = {

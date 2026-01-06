@@ -1,29 +1,29 @@
 import { Box, Text } from "@chakra-ui/react";
 import {
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
   useCallback,
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
-  type DragEvent,
-  type KeyboardEvent,
 } from "react";
 import { RichTextarea, type RichTextareaHandle } from "rich-textarea";
 import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import { VariableInsertMenu } from "../variables/VariableInsertMenu";
 import type { AvailableSource } from "../variables/VariableMappingInput";
+import { AddVariableButton } from "./components/AddVariableButton";
+import { GripHandles, LineHighlights } from "./components/ParagraphOverlay";
+import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
+import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
+import { useTextareaResize } from "./hooks/useTextareaResize";
+import { useVariableMenu } from "./hooks/useVariableMenu";
 import type { PromptTextAreaWithVariablesProps } from "./types";
 import {
-  VARIABLE_REGEX,
-  parseVariablesFromText,
   findUnclosedBraces,
+  parseVariablesFromText,
+  VARIABLE_REGEX,
 } from "./utils";
-import { useDebouncedTextarea } from "./hooks/useDebouncedTextarea";
-import { useVariableMenu } from "./hooks/useVariableMenu";
-import { useTextareaResize } from "./hooks/useTextareaResize";
-import { useParagraphDragDrop } from "./hooks/useParagraphDragDrop";
-import { LineHighlights, GripHandles } from "./components/ParagraphOverlay";
-import { AddVariableButton } from "./components/AddVariableButton";
 
 export const PromptTextAreaWithVariables = ({
   value,
@@ -352,8 +352,8 @@ export const PromptTextAreaWithVariables = ({
             height: fillHeight
               ? "100%"
               : userResizedHeight
-              ? `${userResizedHeight}px`
-              : undefined,
+                ? `${userResizedHeight}px`
+                : undefined,
             fontFamily: borderless
               ? undefined
               : 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',

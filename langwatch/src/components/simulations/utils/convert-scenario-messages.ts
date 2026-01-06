@@ -36,14 +36,17 @@ export function convertScenarioMessagesToCopilotKit(
   // So we reverse the array and then remove duplicates in order
   // and then reverse it again.
   const seenTraceIds = new Set<string>();
-  return convertedMessages.toReversed().map((message) => {
-    if (!message.traceId) return message;
-    if (seenTraceIds.has(message.traceId)) {
-      message.traceId = undefined;
-    }
-    seenTraceIds.add(message.traceId!);
-    return message;
-  }).toReversed();
+  return convertedMessages
+    .toReversed()
+    .map((message) => {
+      if (!message.traceId) return message;
+      if (seenTraceIds.has(message.traceId)) {
+        message.traceId = undefined;
+      }
+      seenTraceIds.add(message.traceId!);
+      return message;
+    })
+    .toReversed();
 }
 
 /**
@@ -134,18 +137,21 @@ function convertMixedContent(
 
       // Anthropic tool use
     } else if (item.type === "tool_use") {
-      const actionExecutionMessage: ActionExecutionMessage & { traceId?: string } = new ActionExecutionMessage({
+      const actionExecutionMessage: ActionExecutionMessage & {
+        traceId?: string;
+      } = new ActionExecutionMessage({
         name: item.name,
         arguments: item.arguments ?? item.input,
       });
       actionExecutionMessage.traceId = originalMessage.trace_id;
       messages.push(actionExecutionMessage);
     } else if (item.type === "tool_result") {
-      const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage({
-        actionExecutionId: item.tool_use_id,
-        actionName: item.name ?? "tool_result",
-        result: item.content,
-      });
+      const resultMessage: ResultMessage & { traceId?: string } =
+        new ResultMessage({
+          actionExecutionId: item.tool_use_id,
+          actionName: item.name ?? "tool_result",
+          result: item.content,
+        });
       resultMessage.traceId = originalMessage.trace_id;
       messages.push(resultMessage);
     }

@@ -23,7 +23,8 @@ export const MenuLink = ({
 }>) => {
   const pathname = usePathname();
   const selected =
-    isSelected ?? isSelectedAnnotation ??
+    isSelected ??
+    isSelectedAnnotation ??
     (pathname === href || (includePath && pathname?.includes(includePath)));
 
   return (

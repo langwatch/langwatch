@@ -1,4 +1,4 @@
-import { TriggerAction, type Project, type Trigger } from "@prisma/client";
+import { type Project, type Trigger, TriggerAction } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { processTraceBasedTrigger } from "../traceBasedTrigger";
 

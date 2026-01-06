@@ -411,7 +411,9 @@ export function formValuesToTriggerSaveVersionParams(
  * - "gato" -> "gato" (no change if no prefix)
  * - "folder/gato" -> "folder/gato" (no change if no scope prefix)
  */
-const extractShortHandle = (handle: string | null | undefined): string | null => {
+const extractShortHandle = (
+  handle: string | null | undefined,
+): string | null => {
   if (!handle) return null;
 
   // Check for known prefixes: project_, org_, organization_

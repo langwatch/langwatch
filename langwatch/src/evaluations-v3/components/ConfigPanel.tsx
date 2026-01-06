@@ -53,7 +53,12 @@ export function ConfigPanel({
           {title}
         </Heading>
         <Spacer />
-        <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
+        <IconButton
+          aria-label="Close"
+          variant="ghost"
+          size="sm"
+          onClick={onClose}
+        >
           <LuX size={18} />
         </IconButton>
       </HStack>

@@ -8,8 +8,9 @@
  * 3. Loading historical version pins to that version
  * 4. Saving clears pinning and sets to new version
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, act } from "@testing-library/react";
+
+import { act, cleanup } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -29,7 +30,12 @@ const createMockPromptData = (version: number) => ({
   maxTokens: 1000,
   prompt: `You are a helpful assistant. Version ${version}`,
   projectId: "test-project",
-  messages: [{ role: "system", content: `You are a helpful assistant. Version ${version}` }],
+  messages: [
+    {
+      role: "system",
+      content: `You are a helpful assistant. Version ${version}`,
+    },
+  ],
   inputs: [{ identifier: "input", type: "str" as const }],
   outputs: [{ identifier: "output", type: "str" as const }],
 });
@@ -75,7 +81,8 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify target is correctly stored with version info
-      const target = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const target = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(target.promptVersionId).toBe("version-2");
       expect(target.promptVersionNumber).toBe(2);
       expect(target.localPromptConfig).toBeDefined();
@@ -91,10 +98,13 @@ describe("Version Tracking in Evaluations V3", () => {
         });
       });
 
-      const updatedTarget = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const updatedTarget = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(updatedTarget.promptVersionId).toBe("version-2");
       expect(updatedTarget.promptVersionNumber).toBe(2);
-      expect(updatedTarget.localPromptConfig?.messages[0]?.content).toBe("Updated local changes");
+      expect(updatedTarget.localPromptConfig?.messages[0]?.content).toBe(
+        "Updated local changes",
+      );
     });
 
     it("useOpenTargetEditor should pass promptVersionId when target has pinned version", async () => {
@@ -197,7 +207,8 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify the target was updated correctly
-      const updatedTarget = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const updatedTarget = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(updatedTarget.promptVersionId).toBe("version-3");
       expect(updatedTarget.promptVersionNumber).toBe(3);
       expect(updatedTarget.localPromptConfig).toBeUndefined();
@@ -247,7 +258,8 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify the target is now pinned to v2
-      const updatedTarget = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const updatedTarget = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(updatedTarget.promptVersionId).toBe("version-2");
       expect(updatedTarget.promptVersionNumber).toBe(2);
       expect(updatedTarget.localPromptConfig).toBeUndefined();
@@ -311,7 +323,8 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify the target is now at the new saved version
-      const updatedTarget = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const updatedTarget = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(updatedTarget.promptVersionId).toBe("version-4");
       expect(updatedTarget.promptVersionNumber).toBe(4);
       expect(updatedTarget.localPromptConfig).toBeUndefined();
@@ -371,7 +384,8 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify the target version matches the latest
-      const updatedTarget = useEvaluationsV3Store.getState().targets[0] as TargetConfig & { type: "prompt" };
+      const updatedTarget = useEvaluationsV3Store.getState()
+        .targets[0] as TargetConfig & { type: "prompt" };
       expect(updatedTarget.promptVersionNumber).toBe(4);
       expect(updatedTarget.promptVersionNumber).toBe(currentLatestVersion);
       // When version matches latest, isOutdated should be false
@@ -402,9 +416,11 @@ describe("Version Tracking in Evaluations V3", () => {
         addTarget(newTarget);
       });
 
-      const addedTarget = useEvaluationsV3Store.getState().targets.find(
-        (t) => t.id === "target-new"
-      ) as TargetConfig & { type: "prompt" };
+      const addedTarget = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === "target-new") as TargetConfig & {
+        type: "prompt";
+      };
 
       expect(addedTarget).toBeDefined();
       expect(addedTarget.promptVersionId).toBe("version-5");
@@ -434,10 +450,7 @@ describe("Version Tracking in Evaluations V3", () => {
       // - Has version number defined
       // - Is NOT at latest version
       // Simple rule: if you're pinned to an older version, show the version badge
-      return (
-        target.promptVersionNumber !== undefined &&
-        !isAtLatestVersion
-      );
+      return target.promptVersionNumber !== undefined && !isAtLatestVersion;
     };
 
     it("does NOT show version badge when target version matches latest", () => {
@@ -522,20 +535,24 @@ describe("Version Tracking in Evaluations V3", () => {
       const latestVersion = 5;
 
       // Target A: pinned to v5 which IS the latest, so don't show
-      expect(computeShowVersionBadge({
-        target: targetA,
-        allTargets,
-        latestVersion,
-        hasLocalChanges: false,
-      })).toBe(false);
+      expect(
+        computeShowVersionBadge({
+          target: targetA,
+          allTargets,
+          latestVersion,
+          hasLocalChanges: false,
+        }),
+      ).toBe(false);
 
       // Target B: no version number at all, so don't show
-      expect(computeShowVersionBadge({
-        target: targetB,
-        allTargets,
-        latestVersion,
-        hasLocalChanges: false,
-      })).toBe(false);
+      expect(
+        computeShowVersionBadge({
+          target: targetB,
+          allTargets,
+          latestVersion,
+          hasLocalChanges: false,
+        }),
+      ).toBe(false);
     });
 
     it("SHOWS version badge when two targets have actually different versions", () => {
@@ -567,20 +584,24 @@ describe("Version Tracking in Evaluations V3", () => {
       const latestVersion = 5;
 
       // Target A: v3 is NOT latest (5), and there are different versions
-      expect(computeShowVersionBadge({
-        target: targetA,
-        allTargets,
-        latestVersion,
-        hasLocalChanges: false,
-      })).toBe(true);
+      expect(
+        computeShowVersionBadge({
+          target: targetA,
+          allTargets,
+          latestVersion,
+          hasLocalChanges: false,
+        }),
+      ).toBe(true);
 
       // Target B: v5 IS latest, so don't show even with different versions
-      expect(computeShowVersionBadge({
-        target: targetB,
-        allTargets,
-        latestVersion,
-        hasLocalChanges: false,
-      })).toBe(false);
+      expect(
+        computeShowVersionBadge({
+          target: targetB,
+          allTargets,
+          latestVersion,
+          hasLocalChanges: false,
+        }),
+      ).toBe(false);
     });
 
     it("SHOWS version badge when target is behind latest and has local changes", () => {
@@ -674,7 +695,11 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Verify target is at v3
-      let target = useEvaluationsV3Store.getState().targets.find(t => t.id === targetId) as TargetConfig & { type: "prompt" };
+      let target = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === targetId) as TargetConfig & {
+        type: "prompt";
+      };
       expect(target.promptVersionNumber).toBe(3);
 
       // Step 2: Simulate onVersionChange being called (when user loads v2 from history)
@@ -698,10 +723,13 @@ describe("Version Tracking in Evaluations V3", () => {
       });
 
       // Step 3: Verify target is now at v2
-      target = useEvaluationsV3Store.getState().targets.find(t => t.id === targetId) as TargetConfig & { type: "prompt" };
+      target = useEvaluationsV3Store
+        .getState()
+        .targets.find((t) => t.id === targetId) as TargetConfig & {
+        type: "prompt";
+      };
       expect(target.promptVersionNumber).toBe(2);
       expect(target.promptVersionId).toBe("version-2");
     });
   });
 });
-

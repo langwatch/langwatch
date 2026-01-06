@@ -10,16 +10,16 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { VariablesSection, type Variable } from "~/components/variables";
+import { type Variable, VariablesSection } from "~/components/variables";
+import type { PromptConfigFormValues } from "~/prompts/types";
 import {
   clearStoreInstances,
   getStoreForTesting,
   type TabData,
 } from "../../../../prompt-playground-store/DraggableTabsBrowserStore";
 import { PromptTabbedSection } from "../PromptTabbedSection";
-import { FormProvider, useForm } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompts/types";
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -79,7 +79,7 @@ const renderVariablesSection = (props: {
         lockedVariables={LOCKED_VARIABLES}
         variableInfo={VARIABLE_INFO}
       />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -103,7 +103,9 @@ describe("Playground Variables Section Integration", () => {
         variables: [{ identifier: "input", type: "str" }],
       });
 
-      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-variable-input"),
+      ).not.toBeInTheDocument();
     });
 
     it("shows delete button for non-locked variables", () => {
@@ -115,7 +117,9 @@ describe("Playground Variables Section Integration", () => {
       });
 
       // Input should not have delete button
-      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-variable-input"),
+      ).not.toBeInTheDocument();
       // Context should have delete button
       expect(screen.getByTestId("remove-variable-context")).toBeInTheDocument();
     });
@@ -165,7 +169,9 @@ describe("Playground Variables Section Integration", () => {
       await user.click(screen.getByTestId("remove-variable-context"));
 
       // onChange should be called with only input remaining
-      expect(onChange).toHaveBeenCalledWith([{ identifier: "input", type: "str" }]);
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "input", type: "str" },
+      ]);
     });
 
     it("cannot remove the locked input variable", () => {
@@ -177,7 +183,9 @@ describe("Playground Variables Section Integration", () => {
       });
 
       // Input delete button should not exist
-      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-variable-input"),
+      ).not.toBeInTheDocument();
       // But we can still see the variable
       expect(screen.getByText("input")).toBeInTheDocument();
     });
@@ -198,8 +206,16 @@ describe("Playground Variables Section Integration", () => {
 
       // Values should be shown in inputs
       const inputs = screen.getAllByRole("textbox");
-      expect(inputs.some((input) => (input as HTMLInputElement).value === "Hello world")).toBe(true);
-      expect(inputs.some((input) => (input as HTMLInputElement).value === "Some context")).toBe(true);
+      expect(
+        inputs.some(
+          (input) => (input as HTMLInputElement).value === "Hello world",
+        ),
+      ).toBe(true);
+      expect(
+        inputs.some(
+          (input) => (input as HTMLInputElement).value === "Some context",
+        ),
+      ).toBe(true);
     });
 
     it("calls onValueChange when value is edited", async () => {
@@ -213,7 +229,9 @@ describe("Playground Variables Section Integration", () => {
       });
 
       const inputs = screen.getAllByRole("textbox");
-      const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
+      const valueInput = inputs.find(
+        (input) => (input as HTMLInputElement).value === "",
+      );
 
       if (valueInput) {
         await user.type(valueInput, "test");
@@ -341,10 +359,10 @@ describe("PromptTabbedSection Store Integration", () => {
       });
 
       expect(store.getState().getByTabId(tab1Id!)?.variableValues.name).toBe(
-        "Tab1Updated"
+        "Tab1Updated",
       );
       expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe(
-        "Tab2Value"
+        "Tab2Value",
       );
     });
   });
@@ -419,7 +437,7 @@ function FormWrapper({ children }: { children: React.ReactNode }) {
 }
 
 const renderPromptTabbedSection = (
-  props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {}
+  props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {},
 ) => {
   const defaultProps = {
     layoutMode: "vertical" as const,
@@ -435,7 +453,7 @@ const renderPromptTabbedSection = (
       <FormWrapper>
         <PromptTabbedSection {...defaultProps} />
       </FormWrapper>
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -478,7 +496,9 @@ describe("PromptTabbedSection Layout Modes", () => {
     });
 
     it("shows border-bottom on tabs in horizontal mode", () => {
-      const { container } = renderPromptTabbedSection({ layoutMode: "horizontal" });
+      const { container } = renderPromptTabbedSection({
+        layoutMode: "horizontal",
+      });
 
       // Tabs should have border-bottom in horizontal mode
       const tabsList = container.querySelector('[role="tablist"]');
@@ -491,22 +511,30 @@ describe("PromptTabbedSection Layout Modes", () => {
   describe("common features", () => {
     it("shows Conversation tab in both modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
-      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("tab", { name: /conversation/i }),
+      ).toBeInTheDocument();
 
       cleanup();
 
       renderPromptTabbedSection({ layoutMode: "horizontal" });
-      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("tab", { name: /conversation/i }),
+      ).toBeInTheDocument();
     });
 
     it("shows Reset chat button in both modes", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
-      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /reset chat/i }),
+      ).toBeInTheDocument();
 
       cleanup();
 
       renderPromptTabbedSection({ layoutMode: "horizontal" });
-      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /reset chat/i }),
+      ).toBeInTheDocument();
     });
   });
 });

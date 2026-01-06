@@ -1,5 +1,9 @@
 import { Button, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
-import { ListChevronsDownUp, ListChevronsUpDown, SlidersHorizontal } from "lucide-react";
+import {
+  ListChevronsDownUp,
+  ListChevronsUpDown,
+  SlidersHorizontal,
+} from "lucide-react";
 
 import { Popover } from "~/components/ui/popover";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -30,10 +34,12 @@ const options: ToggleOption[] = [
  * Expanded mode shows all content (up to character limit).
  */
 export function RowHeightToggle() {
-  const { rowHeightMode, setRowHeightMode } = useEvaluationsV3Store((state) => ({
-    rowHeightMode: state.ui.rowHeightMode,
-    setRowHeightMode: state.setRowHeightMode,
-  }));
+  const { rowHeightMode, setRowHeightMode } = useEvaluationsV3Store(
+    (state) => ({
+      rowHeightMode: state.ui.rowHeightMode,
+      setRowHeightMode: state.setRowHeightMode,
+    }),
+  );
 
   return (
     <Popover.Root>

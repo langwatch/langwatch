@@ -1,9 +1,9 @@
-export { ReportGrid } from "./ReportGrid";
+export { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
 export {
   DraggableGraphCard,
-  sizeOptions,
+  type GraphData,
   getCurrentSize,
   type SizeOption,
-  type GraphData,
+  sizeOptions,
 } from "./DraggableGraphCard";
-export { calculateGridPositions, type GridLayout } from "~/utils/gridPositions";
+export { ReportGrid } from "./ReportGrid";

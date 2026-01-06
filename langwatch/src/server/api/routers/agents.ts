@@ -1,16 +1,16 @@
-import { z } from "zod";
 import { nanoid } from "nanoid";
-import { AgentService } from "../../agents/agent.service";
+import { z } from "zod";
 import {
-  agentTypeSchema,
-  type AgentType,
-  type AgentComponentConfig,
-} from "../../agents/agent.repository";
-import {
-  signatureComponentSchema,
   codeComponentSchema,
   customComponentSchema,
+  signatureComponentSchema,
 } from "~/optimization_studio/types/dsl";
+import {
+  type AgentComponentConfig,
+  type AgentType,
+  agentTypeSchema,
+} from "../../agents/agent.repository";
+import { AgentService } from "../../agents/agent.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 

@@ -1,13 +1,13 @@
 import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
+import { Edit2 } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import { Edit2 } from "lucide-react";
 import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
-import { Tooltip } from "../ui/tooltip";
 import { PageLayout } from "../ui/layouts/PageLayout";
+import { Tooltip } from "../ui/tooltip";
 
 export interface AnalyticsHeaderProps {
   title: string;

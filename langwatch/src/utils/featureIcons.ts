@@ -7,13 +7,13 @@ import {
   CheckSquare,
   Home,
   ListTree,
+  type LucideIcon,
   Pencil,
   Play,
   Settings,
   Table,
   TrendingUp,
   Workflow,
-  type LucideIcon,
 } from "lucide-react";
 
 export type FeatureKey =
@@ -102,4 +102,3 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   annotation: "annotations",
   simulation: "simulations",
 };
-

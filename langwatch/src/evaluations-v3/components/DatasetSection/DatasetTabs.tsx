@@ -1,4 +1,3 @@
-import { generate } from "@langwatch/ksuid";
 import {
   Box,
   Button,
@@ -7,7 +6,7 @@ import {
   Spacer,
   Text,
 } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { generate } from "@langwatch/ksuid";
 import {
   ChevronDown,
   Database,
@@ -18,6 +17,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { useMemo } from "react";
 
 import { Menu } from "~/components/ui/menu";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
@@ -63,7 +63,11 @@ export function DatasetTabs({
     if (!first) {
       return [
         { id: "input", name: "input", type: "string" as const },
-        { id: "expected_output", name: "expected_output", type: "string" as const },
+        {
+          id: "expected_output",
+          name: "expected_output",
+          type: "string" as const,
+        },
       ];
     }
     return first.columns;
@@ -98,8 +102,19 @@ export function DatasetTabs({
   };
 
   return (
-    <HStack gap={2} flexWrap="nowrap" alignItems="center" overflow="auto" width="full">
-      <Text fontWeight="semibold" fontSize="sm" color="gray.700" paddingRight={2}>
+    <HStack
+      gap={2}
+      flexWrap="nowrap"
+      alignItems="center"
+      overflow="auto"
+      width="full"
+    >
+      <Text
+        fontWeight="semibold"
+        fontSize="sm"
+        color="gray.700"
+        paddingRight={2}
+      >
         Datasets
       </Text>
 
@@ -257,10 +272,7 @@ function DatasetTab({
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
         )}
         {canRemove && (
-          <Menu.Item
-            value="remove"
-            onClick={onRemove}
-          >
+          <Menu.Item value="remove" onClick={onRemove}>
             <HStack gap={2}>
               <Trash2 size={14} />
               <Text>Remove from workbench</Text>

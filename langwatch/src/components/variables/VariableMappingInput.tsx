@@ -7,11 +7,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Database, Type } from "lucide-react";
-import { VariableTypeIcon, VariableTypeBadge } from "~/prompts/components/ui/VariableTypeIcon";
-import { ComponentIcon, ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ColorfulBlockIcon,
+  ComponentIcon,
+} from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType, Field } from "~/optimization_studio/types/dsl";
+import {
+  VariableTypeBadge,
+  VariableTypeIcon,
+} from "~/prompts/components/ui/VariableTypeIcon";
 
 // ============================================================================
 // Types
@@ -58,7 +64,14 @@ type VariableMappingInputProps = {
 
 /** Represents a selectable option in the dropdown */
 type DropdownOption =
-  | { type: "field"; sourceId: string; sourceName: string; sourceType: SourceType; fieldName: string; fieldType: string }
+  | {
+      type: "field";
+      sourceId: string;
+      sourceName: string;
+      sourceType: SourceType;
+      fieldName: string;
+      fieldType: string;
+    }
   | { type: "value"; value: string };
 
 // ============================================================================
@@ -98,7 +111,9 @@ export const VariableMappingInput = ({
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   // Local state to track the current value - prevents stale prop issues
-  const [localMapping, setLocalMapping] = useState<FieldMapping | undefined>(mapping);
+  const [localMapping, setLocalMapping] = useState<FieldMapping | undefined>(
+    mapping,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,7 +130,9 @@ export const VariableMappingInput = ({
   // Get source info for the current mapping
   const sourceInfo = useMemo(() => {
     if (isSourceMapping && localMapping) {
-      const source = availableSources.find((s) => s.id === localMapping.sourceId);
+      const source = availableSources.find(
+        (s) => s.id === localMapping.sourceId,
+      );
       return source ? { source, field: localMapping.field } : null;
     }
     return null;
@@ -130,16 +147,17 @@ export const VariableMappingInput = ({
   }, [localMapping, isValueMapping]);
 
   // Filter sources based on search query
-  const filteredSources = useMemo(() =>
-    availableSources
-      .map((source) => ({
-        ...source,
-        fields: source.fields.filter((field) =>
-          field.name.toLowerCase().includes(searchQuery.toLowerCase())
-        ),
-      }))
-      .filter((source) => source.fields.length > 0),
-    [availableSources, searchQuery]
+  const filteredSources = useMemo(
+    () =>
+      availableSources
+        .map((source) => ({
+          ...source,
+          fields: source.fields.filter((field) =>
+            field.name.toLowerCase().includes(searchQuery.toLowerCase()),
+          ),
+        }))
+        .filter((source) => source.fields.length > 0),
+    [availableSources, searchQuery],
   );
 
   // Build flat list of options for keyboard navigation
@@ -196,64 +214,82 @@ export const VariableMappingInput = ({
   };
 
   // Handle option selection
-  const handleSelectOption = useCallback((option: DropdownOption) => {
-    if (option.type === "field") {
-      const newMapping: FieldMapping = { type: "source", sourceId: option.sourceId, field: option.fieldName };
-      setLocalMapping(newMapping);
-      onMappingChange?.(newMapping);
-    } else {
-      const newMapping: FieldMapping = { type: "value", value: option.value };
-      setLocalMapping(newMapping);
-      onMappingChange?.(newMapping);
-    }
-    setIsOpen(false);
-    setSearchQuery("");
-  }, [onMappingChange]);
+  const handleSelectOption = useCallback(
+    (option: DropdownOption) => {
+      if (option.type === "field") {
+        const newMapping: FieldMapping = {
+          type: "source",
+          sourceId: option.sourceId,
+          field: option.fieldName,
+        };
+        setLocalMapping(newMapping);
+        onMappingChange?.(newMapping);
+      } else {
+        const newMapping: FieldMapping = { type: "value", value: option.value };
+        setLocalMapping(newMapping);
+        onMappingChange?.(newMapping);
+      }
+      setIsOpen(false);
+      setSearchQuery("");
+    },
+    [onMappingChange],
+  );
 
   // Handle keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Handle backspace to clear source mapping when input is empty
-    if (e.key === "Backspace" && isSourceMapping && searchQuery === "") {
-      e.preventDefault();
-      handleClearMapping();
-      return;
-    }
-
-    if (!isOpen) {
-      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        setIsOpen(true);
-        setIsKeyboardNav(true);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Handle backspace to clear source mapping when input is empty
+      if (e.key === "Backspace" && isSourceMapping && searchQuery === "") {
         e.preventDefault();
+        handleClearMapping();
+        return;
       }
-      return;
-    }
 
-    switch (e.key) {
-      case "ArrowDown":
-        e.preventDefault();
-        setIsKeyboardNav(true);
-        setHighlightedIndex((prev) =>
-          prev < allOptions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case "ArrowUp":
-        e.preventDefault();
-        setIsKeyboardNav(true);
-        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
-        break;
-      case "Enter":
-        e.preventDefault();
-        if (allOptions[highlightedIndex]) {
-          handleSelectOption(allOptions[highlightedIndex]);
+      if (!isOpen) {
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          setIsOpen(true);
+          setIsKeyboardNav(true);
+          e.preventDefault();
         }
-        break;
-      case "Escape":
-        e.preventDefault();
-        setIsOpen(false);
-        setSearchQuery("");
-        break;
-    }
-  }, [isOpen, allOptions, highlightedIndex, handleSelectOption, isSourceMapping, searchQuery, handleClearMapping]);
+        return;
+      }
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setIsKeyboardNav(true);
+          setHighlightedIndex((prev) =>
+            prev < allOptions.length - 1 ? prev + 1 : prev,
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setIsKeyboardNav(true);
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+          break;
+        case "Enter":
+          e.preventDefault();
+          if (allOptions[highlightedIndex]) {
+            handleSelectOption(allOptions[highlightedIndex]);
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          setIsOpen(false);
+          setSearchQuery("");
+          break;
+      }
+    },
+    [
+      isOpen,
+      allOptions,
+      highlightedIndex,
+      handleSelectOption,
+      isSourceMapping,
+      searchQuery,
+      handleClearMapping,
+    ],
+  );
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -273,7 +309,11 @@ export const VariableMappingInput = ({
   }, []);
 
   // Calculate dropdown position
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 0,
+  });
 
   useEffect(() => {
     if (isOpen && containerRef.current) {
@@ -302,7 +342,7 @@ export const VariableMappingInput = ({
           borderColor: isMissing ? "yellow.600" : "blue.500",
           boxShadow: isMissing
             ? "var(--chakra-colors-yellow-400) 0px 1px 0px 0px"
-            : "var(--chakra-colors-blue-500) 0px 1px 0px 0px"
+            : "var(--chakra-colors-blue-500) 0px 1px 0px 0px",
         }}
         cursor={disabled ? "not-allowed" : "text"}
         onClick={() => {
@@ -342,11 +382,15 @@ export const VariableMappingInput = ({
 
           <Input
             ref={inputRef}
-            value={isOpen ? searchQuery : (isSourceMapping ? "" : getDisplayValue())}
+            value={
+              isOpen ? searchQuery : isSourceMapping ? "" : getDisplayValue()
+            }
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
             onKeyDown={handleKeyDown}
-            placeholder={isMissing ? "Required" : isSourceMapping ? "" : placeholder}
+            placeholder={
+              isMissing ? "Required" : isSourceMapping ? "" : placeholder
+            }
             _placeholder={{ color: isMissing ? "yellow.600" : undefined }}
             size="sm"
             border="none"
@@ -403,7 +447,11 @@ export const VariableMappingInput = ({
                       marginBottom={1}
                     >
                       <SourceTypeIconComponent type={source.type} />
-                      <Text fontSize="xs" fontWeight="semibold" color="gray.600">
+                      <Text
+                        fontSize="xs"
+                        fontWeight="semibold"
+                        color="gray.600"
+                      >
                         {source.name}
                       </Text>
                     </HStack>
@@ -424,27 +472,28 @@ export const VariableMappingInput = ({
                           borderRadius="4px"
                           background={isHighlighted ? "blue.50" : "transparent"}
                           onMouseMove={() => {
-                            if (isKeyboardNav || highlightedIndex !== optionIdx) {
+                            if (
+                              isKeyboardNav ||
+                              highlightedIndex !== optionIdx
+                            ) {
                               setIsKeyboardNav(false);
                               setHighlightedIndex(optionIdx);
                             }
                           }}
-                          onClick={() => handleSelectOption({
-                            type: "field",
-                            sourceId: source.id,
-                            sourceName: source.name,
-                            sourceType: source.type,
-                            fieldName: field.name,
-                            fieldType: field.type,
-                          })}
+                          onClick={() =>
+                            handleSelectOption({
+                              type: "field",
+                              sourceId: source.id,
+                              sourceName: source.name,
+                              sourceType: source.type,
+                              fieldName: field.name,
+                              fieldType: field.type,
+                            })
+                          }
                           data-highlighted={isHighlighted}
                         >
                           <VariableTypeIcon type={field.type} size={12} />
-                          <Text
-                            fontSize="13px"
-                            fontFamily="mono"
-                            flex={1}
-                          >
+                          <Text fontSize="13px" fontFamily="mono" flex={1}>
                             {field.name}
                           </Text>
                           <VariableTypeBadge type={field.type} size="xs" />
@@ -466,20 +515,38 @@ export const VariableMappingInput = ({
                       gap={2}
                       cursor="pointer"
                       borderRadius="4px"
-                      background={highlightedIndex === allOptions.length - 1 ? "blue.50" : "transparent"}
+                      background={
+                        highlightedIndex === allOptions.length - 1
+                          ? "blue.50"
+                          : "transparent"
+                      }
                       onMouseMove={() => {
                         const valueOptionIdx = allOptions.length - 1;
-                        if (isKeyboardNav || highlightedIndex !== valueOptionIdx) {
+                        if (
+                          isKeyboardNav ||
+                          highlightedIndex !== valueOptionIdx
+                        ) {
                           setIsKeyboardNav(false);
                           setHighlightedIndex(valueOptionIdx);
                         }
                       }}
-                      onClick={() => handleSelectOption({ type: "value", value: searchQuery.trim() })}
-                      data-highlighted={highlightedIndex === allOptions.length - 1}
+                      onClick={() =>
+                        handleSelectOption({
+                          type: "value",
+                          value: searchQuery.trim(),
+                        })
+                      }
+                      data-highlighted={
+                        highlightedIndex === allOptions.length - 1
+                      }
                     >
                       <Type size={14} color="var(--chakra-colors-gray-500)" />
                       <Text fontSize="13px" color="gray.600">
-                        Use "<Text as="span" fontWeight="medium" color="gray.800">{searchQuery.trim()}</Text>" as value
+                        Use "
+                        <Text as="span" fontWeight="medium" color="gray.800">
+                          {searchQuery.trim()}
+                        </Text>
+                        " as value
                       </Text>
                     </HStack>
                   </div>

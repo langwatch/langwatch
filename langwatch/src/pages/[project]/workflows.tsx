@@ -9,13 +9,13 @@ import {
 } from "@chakra-ui/react";
 import { Workflow } from "lucide-react";
 import { DashboardLayout } from "../../components/DashboardLayout";
+import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { CreateWorkflowButton } from "../../components/workflows/CreateWorkflowButton";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
 import { api } from "../../utils/api";
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
 
 function Workflows() {
   const { project } = useOrganizationTeamProject();

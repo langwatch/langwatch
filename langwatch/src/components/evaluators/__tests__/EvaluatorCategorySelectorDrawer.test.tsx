@@ -102,7 +102,9 @@ describe("EvaluatorCategorySelectorDrawer", () => {
         expect(screen.getByText("Expected Answer")).toBeInTheDocument();
       });
 
-      await user.click(screen.getByTestId("evaluator-category-expected_answer"));
+      await user.click(
+        screen.getByTestId("evaluator-category-expected_answer"),
+      );
 
       expect(mockOpenDrawer).toHaveBeenCalledWith("evaluatorTypeSelector", {
         category: "expected_answer",

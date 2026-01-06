@@ -77,5 +77,3 @@ export const useRenamePromptHandle = ({
     permissionReason: permission?.reason,
   };
 };
-
-

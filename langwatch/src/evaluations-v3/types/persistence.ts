@@ -19,7 +19,7 @@ export type PersistedEvaluationsV3State = Omit<
  * Extracts the persistable state from the full store state.
  */
 export const extractPersistedState = (
-  state: EvaluationsV3State
+  state: EvaluationsV3State,
 ): PersistedEvaluationsV3State => {
   const { ui: _ui, results: _results, ...persistedState } = state;
   return persistedState;

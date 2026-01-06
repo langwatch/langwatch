@@ -1,4 +1,4 @@
 export {
-  OnboardingChecksService,
   type OnboardingCheckStatus,
+  OnboardingChecksService,
 } from "./onboarding-checks.service";

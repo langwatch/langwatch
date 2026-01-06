@@ -11,8 +11,8 @@ import {
 import type { TRPCClientErrorLike } from "@trpc/react-query";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
 import { CopyIcon } from "lucide-react";
+import { useRouter } from "next/router";
 import { useMemo, useState } from "react";
 import {
   LuChevronDown,
@@ -30,9 +30,9 @@ import type { AppRouter } from "../../server/api/root";
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { api } from "../../utils/api";
 import { CustomGraph } from "../analytics/CustomGraph";
-import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
 import { Link } from "../ui/link";
 import { toaster } from "../ui/toaster";
+import { CopyEvaluationDialog } from "./CopyEvaluationDialog";
 
 type MonitorsSectionProps = {
   title: string;

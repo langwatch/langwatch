@@ -13,13 +13,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
+import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import ErrorPage from "next/error";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
-import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -29,16 +29,16 @@ import { api } from "../utils/api";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
+import { FullLogo } from "./icons/FullLogo";
+import { LogoIcon } from "./icons/LogoIcon";
 import { LoadingScreen } from "./LoadingScreen";
 import { MainMenu, MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "./MainMenu";
+import { RandomColorAvatar } from "./RandomColorAvatar";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
-import { FullLogo } from "./icons/FullLogo";
-import { LogoIcon } from "./icons/LogoIcon";
-import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -107,8 +107,8 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     a.name.toLowerCase() < b.name.toLowerCase()
       ? -1
       : a.name.toLowerCase() > b.name.toLowerCase()
-      ? 1
-      : 0;
+        ? 1
+        : 0;
 
   const projectGroups = organizations.sort(sortByName).flatMap((organization) =>
     organization.teams.flatMap((team) => ({
@@ -290,7 +290,7 @@ export type DashboardLayoutProps = {
 export const DashboardLayout = ({
   children,
   publicPage = false,
-  compactMenu : compactMenuProp = false,
+  compactMenu: compactMenuProp = false,
   ...props
 }: DashboardLayoutProps) => {
   const isSmallScreen = useBreakpointValue({ base: true, lg: false });

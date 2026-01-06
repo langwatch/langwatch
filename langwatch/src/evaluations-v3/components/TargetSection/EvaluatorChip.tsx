@@ -7,19 +7,19 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import {
-  LuCircleAlert,
   LuChevronDown,
+  LuCircleAlert,
   LuPencil,
   LuTrash2,
 } from "react-icons/lu";
-import { keyframes } from "@emotion/react";
 
 import { Menu } from "~/components/ui/menu";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import type { EvaluatorConfig } from "../../types";
 
