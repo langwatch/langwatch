@@ -133,7 +133,7 @@ export function ScenarioEditorSidebar() {
               Best Practices
             </Text>
 
-            <List.Root gap={2}>
+            <List.Root gap={2} listStyleType="none">
               <List.Item fontSize="xs" color="gray.600">
                 <List.Indicator asChild color="blue.500">
                   <Check size={14} />
@@ -165,4 +165,6 @@ export function ScenarioEditorSidebar() {
     </VStack>
   );
 }
+
+
 

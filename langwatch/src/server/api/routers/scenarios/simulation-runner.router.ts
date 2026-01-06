@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
+import { SimulationRunnerService } from "~/server/scenarios/simulation-runner.service";
 
 const projectSchema = z.object({
   projectId: z.string(),
@@ -33,12 +34,18 @@ export const simulationRunnerRouter = createTRPCRouter({
   run: protectedProcedure
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const setId = "local-scenarios";
 
-      // TODO: Wire up ScenarioRunnerService with adapter based on target.type
-      // const adapter = resolveAdapter(input.target);
-      // void runnerService.execute({ scenarioId: input.scenarioId, adapter, setId });
+      const runnerService = SimulationRunnerService.create(ctx.prisma);
+
+      // Fire and forget - execution happens async
+      void runnerService.execute({
+        projectId: input.projectId,
+        scenarioId: input.scenarioId,
+        target: input.target,
+        setId,
+      });
 
       return { setId };
     }),

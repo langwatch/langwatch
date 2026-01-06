@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
@@ -64,16 +64,23 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
     formRef?.(form);
   }, [form, formRef]);
 
-  // Reset form when defaultValues change
+  // Reset form when defaultValues change (using ref to track previous serialized values)
+  const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
-    if (defaultValues) {
-      reset({
-        name: "",
-        situation: "",
-        criteria: [],
-        labels: [],
-        ...defaultValues,
-      });
+    const currentDefaults = defaultValues
+      ? JSON.stringify([defaultValues.name, defaultValues.situation, defaultValues.criteria, defaultValues.labels])
+      : null;
+    if (currentDefaults !== prevDefaultsRef.current) {
+      prevDefaultsRef.current = currentDefaults;
+      if (defaultValues) {
+        reset({
+          name: "",
+          situation: "",
+          criteria: [],
+          labels: [],
+          ...defaultValues,
+        });
+      }
     }
   }, [defaultValues, reset]);
 
