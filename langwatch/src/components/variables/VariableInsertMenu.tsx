@@ -1,23 +1,21 @@
-import {
-  Box,
-  HStack,
-  Input,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Database, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ComponentIcon,
   ColorfulBlockIcon,
+  ComponentIcon,
 } from "~/optimization_studio/components/ColorfulBlockIcons";
 import type { ComponentType } from "~/optimization_studio/types/dsl";
 import {
-  VariableTypeIcon,
   VariableTypeBadge,
+  VariableTypeIcon,
 } from "~/prompts/components/ui/VariableTypeIcon";
-import type { AvailableSource, SourceType, FieldType } from "./VariableMappingInput";
 import { Popover } from "../ui/popover";
+import type {
+  AvailableSource,
+  FieldType,
+  SourceType,
+} from "./VariableMappingInput";
 
 // ============================================================================
 // Types
@@ -145,11 +143,11 @@ export const VariableInsertMenu = ({
         .map((source) => ({
           ...source,
           fields: source.fields.filter((field) =>
-            field.name.toLowerCase().includes(query.toLowerCase())
+            field.name.toLowerCase().includes(query.toLowerCase()),
           ),
         }))
         .filter((source) => source.fields.length > 0),
-    [availableSources, query]
+    [availableSources, query],
   );
 
   // Normalize query for variable creation
@@ -160,10 +158,10 @@ export const VariableInsertMenu = ({
     () =>
       filteredSources.some((source) =>
         source.fields.some(
-          (field) => field.name.toLowerCase() === normalizedQuery
-        )
+          (field) => field.name.toLowerCase() === normalizedQuery,
+        ),
       ),
-    [filteredSources, normalizedQuery]
+    [filteredSources, normalizedQuery],
   );
 
   // Show "Create variable" option when:
@@ -222,7 +220,7 @@ export const VariableInsertMenu = ({
         onCreateVariable(option.name);
       }
     },
-    [flattenedOptions, onSelect, onCreateVariable]
+    [flattenedOptions, onSelect, onCreateVariable],
   );
 
   // Expose methods for parent to call on keyboard events
@@ -235,7 +233,9 @@ export const VariableInsertMenu = ({
   }, [highlightedIndex, onHighlightChange]);
 
   const moveHighlightDown = useCallback(() => {
-    onHighlightChange(Math.min(highlightedIndex + 1, flattenedOptions.length - 1));
+    onHighlightChange(
+      Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
+    );
   }, [highlightedIndex, flattenedOptions.length, onHighlightChange]);
 
   // Attach keyboard handlers to parent (via ref or expose)
@@ -294,7 +294,7 @@ export const VariableInsertMenu = ({
                   e.preventDefault();
                   setIsKeyboardNav(true);
                   onHighlightChange(
-                    Math.min(highlightedIndex + 1, flattenedOptions.length - 1)
+                    Math.min(highlightedIndex + 1, flattenedOptions.length - 1),
                   );
                 } else if (e.key === "ArrowUp") {
                   e.preventDefault();
@@ -376,7 +376,10 @@ export const VariableInsertMenu = ({
                         borderRadius="4px"
                         background={isHighlighted ? "blue.50" : undefined}
                         onMouseMove={() => {
-                          if (isKeyboardNav || highlightedIndex !== optionIndex) {
+                          if (
+                            isKeyboardNav ||
+                            highlightedIndex !== optionIndex
+                          ) {
                             setIsKeyboardNav(false);
                             onHighlightChange(optionIndex);
                           }
@@ -403,10 +406,15 @@ export const VariableInsertMenu = ({
                   cursor="pointer"
                   borderRadius="4px"
                   background={
-                    highlightedIndex === createOptionIndex ? "blue.50" : undefined
+                    highlightedIndex === createOptionIndex
+                      ? "blue.50"
+                      : undefined
                   }
                   onMouseMove={() => {
-                    if (isKeyboardNav || highlightedIndex !== createOptionIndex) {
+                    if (
+                      isKeyboardNav ||
+                      highlightedIndex !== createOptionIndex
+                    ) {
                       setIsKeyboardNav(false);
                       onHighlightChange(createOptionIndex);
                     }
@@ -434,7 +442,7 @@ export const VariableInsertMenu = ({
 export const getMenuOptionCount = (
   availableSources: AvailableSource[],
   query: string,
-  canCreate: boolean
+  canCreate: boolean,
 ): number => {
   const normalizedQuery = query.trim().replace(/ /g, "_").toLowerCase();
   let count = 0;
@@ -449,7 +457,7 @@ export const getMenuOptionCount = (
 
   // Check for exact match
   const hasExactMatch = availableSources.some((source) =>
-    source.fields.some((field) => field.name.toLowerCase() === normalizedQuery)
+    source.fields.some((field) => field.name.toLowerCase() === normalizedQuery),
   );
 
   if (canCreate && normalizedQuery && !hasExactMatch) {

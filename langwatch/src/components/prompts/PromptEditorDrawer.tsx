@@ -7,50 +7,48 @@ import {
   Spinner,
   VStack,
 } from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
-import { LuArrowLeft, LuPencil } from "react-icons/lu";
+import debounce from "lodash-es/debounce";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
-import debounce from "lodash-es/debounce";
-
+import { LuArrowLeft, LuPencil } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
-import {
-  useDrawer,
-  getComplexProps,
-  useDrawerParams,
-  getFlowCallbacks,
-} from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
-
+import { Tooltip } from "~/components/ui/tooltip";
 import {
-  FormVariablesSection,
   type AvailableSource,
   type FieldMapping,
+  FormVariablesSection,
 } from "~/components/variables";
 import { useEvaluationMappings } from "~/evaluations-v3/hooks/useEvaluationMappings";
+import type { LocalPromptConfig } from "~/evaluations-v3/types";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
+import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
+import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
+import {
+  type SaveDialogFormValues,
+  SaveVersionDialog,
+} from "~/prompts/forms/SaveVersionDialog";
+import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
+import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
-import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
-import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
-import {
-  SaveVersionDialog,
-  type SaveDialogFormValues,
-} from "~/prompts/forms/SaveVersionDialog";
-import { ChangeHandleDialog } from "~/prompts/forms/ChangeHandleDialog";
-import type { ChangeHandleFormValues } from "~/prompts/forms/schemas/change-handle-form.schema";
+import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
 } from "~/prompts/utils/llmPromptConfigUtils";
-import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
-import type { LocalPromptConfig } from "~/evaluations-v3/types";
-import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
-import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
+import { api } from "~/utils/api";
 
 export type PromptEditorDrawerProps = {
   open?: boolean;
@@ -175,8 +173,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const availableSources =
     targetId && evaluationData.isValid
       ? evaluationData.availableSources
-      : props.availableSources ??
-        (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]);
+      : (props.availableSources ??
+        (complexProps.availableSources as PromptEditorDrawerProps["availableSources"]));
 
   // ============================================================================
   // INPUT MAPPINGS - Single Source of Truth Pattern
@@ -196,8 +194,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   const _mappingsFromProps =
     targetId && evaluationData.isValid
       ? evaluationData.inputMappings
-      : props.inputMappings ??
-        (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]);
+      : (props.inputMappings ??
+        (complexProps.inputMappings as PromptEditorDrawerProps["inputMappings"]));
 
   // External callback to persist changes to store
   const _onMappingsChangeProp =

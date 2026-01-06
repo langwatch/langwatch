@@ -119,7 +119,13 @@ export function useHandleSavePrompt() {
        */
       const onSuccessChangeHandle = (prompt: VersionedPrompt) => {
         if (prompt.id !== configId) throw new Error("Prompt ID mismatch");
-        triggerSaveVersion({ id: prompt.id, data, nextVersion, onSuccess, onError });
+        triggerSaveVersion({
+          id: prompt.id,
+          data,
+          nextVersion,
+          onSuccess,
+          onError,
+        });
       };
 
       void triggerChangeHandle({
@@ -128,7 +134,13 @@ export function useHandleSavePrompt() {
         onError,
       });
     } else if (configId) {
-      void triggerSaveVersion({ id: configId, data, nextVersion, onSuccess, onError });
+      void triggerSaveVersion({
+        id: configId,
+        data,
+        nextVersion,
+        onSuccess,
+        onError,
+      });
     } else {
       void triggerCreatePrompt({ data, onSuccess, onError });
     }

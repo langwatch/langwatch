@@ -16,8 +16,8 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetColumn } from "../types";
 
 // Mock next/router
@@ -162,11 +162,15 @@ describe("Column visibility", () => {
 
       // First hide the column
       store.toggleColumnVisibility("input");
-      expect(useEvaluationsV3Store.getState().ui.hiddenColumns.has("input")).toBe(true);
+      expect(
+        useEvaluationsV3Store.getState().ui.hiddenColumns.has("input"),
+      ).toBe(true);
 
       // Toggle again to show
       store.toggleColumnVisibility("input");
-      expect(useEvaluationsV3Store.getState().ui.hiddenColumns.has("input")).toBe(false);
+      expect(
+        useEvaluationsV3Store.getState().ui.hiddenColumns.has("input"),
+      ).toBe(false);
     });
 
     it("setHiddenColumns replaces all hidden columns", () => {
@@ -205,7 +209,12 @@ describe("Column visibility", () => {
       // Set up some data
       const store = useEvaluationsV3Store.getState();
       store.setCellValue("test-data", 0, "input", "test input value");
-      store.setCellValue("test-data", 0, "expected_output", "test output value");
+      store.setCellValue(
+        "test-data",
+        0,
+        "expected_output",
+        "test output value",
+      );
 
       // Hide the 'input' column
       store.toggleColumnVisibility("input");

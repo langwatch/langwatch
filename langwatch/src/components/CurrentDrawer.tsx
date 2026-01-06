@@ -2,9 +2,9 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
 import {
+  type DrawerType,
   getComplexProps,
   getFlowCallbacks,
-  type DrawerType,
 } from "../hooks/useDrawer";
 import { drawers } from "./drawerRegistry";
 

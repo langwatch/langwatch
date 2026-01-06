@@ -408,8 +408,11 @@ export const codeComponentSchema = baseComponentSchema.extend({
   parameters: z
     .array(z.union([codeParameterSchema, fieldSchema]))
     .refine(
-      (params) => params?.some((p) => p.identifier === "code" && p.type === "code"),
-      { message: "Code component must have a 'code' parameter with type 'code'" },
+      (params) =>
+        params?.some((p) => p.identifier === "code" && p.type === "code"),
+      {
+        message: "Code component must have a 'code' parameter with type 'code'",
+      },
     ),
 });
 

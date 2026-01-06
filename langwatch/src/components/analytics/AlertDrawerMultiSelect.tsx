@@ -1,4 +1,4 @@
-import { Field, Input, VStack, HStack, Text } from "@chakra-ui/react";
+import { Field, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Check } from "lucide-react";
 import { memo } from "react";
 import { Popover } from "../ui/popover";
@@ -72,4 +72,3 @@ export const AlertDrawerMultiSelect = memo(function AlertDrawerMultiSelect({
     </VStack>
   );
 });
-

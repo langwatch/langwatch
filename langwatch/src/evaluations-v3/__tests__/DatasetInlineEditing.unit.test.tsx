@@ -5,9 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EditableCell } from "../components/DatasetSection/EditableCell";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 
 // Wrapper with Chakra provider
@@ -16,17 +15,29 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 );
 
 // Helper to render with store reset and Chakra provider
-const renderCell = (value: string, row: number, columnId: string, datasetId: string = DEFAULT_TEST_DATA_ID) => {
+const renderCell = (
+  value: string,
+  row: number,
+  columnId: string,
+  datasetId: string = DEFAULT_TEST_DATA_ID,
+) => {
   return render(
-    <EditableCell value={value} row={row} columnId={columnId} datasetId={datasetId} />,
-    { wrapper: Wrapper }
+    <EditableCell
+      value={value}
+      row={row}
+      columnId={columnId}
+      datasetId={datasetId}
+    />,
+    { wrapper: Wrapper },
   );
 };
 
 // Helper to get active dataset records
 const getActiveDatasetRecords = () => {
   const state = useEvaluationsV3Store.getState();
-  const activeDataset = state.datasets.find(d => d.id === state.activeDatasetId);
+  const activeDataset = state.datasets.find(
+    (d) => d.id === state.activeDatasetId,
+  );
   return activeDataset?.inline?.records;
 };
 
@@ -56,7 +67,9 @@ describe("Dataset inline editing", () => {
       renderCell("original", 0, "input");
 
       // Set editing cell directly (in real app, this is done by DatasetCellTd on double-click)
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
 
       // Should show textarea with the value
       const textarea = await screen.findByRole("textbox");
@@ -71,7 +84,9 @@ describe("Dataset inline editing", () => {
       renderCell("original", 0, "input");
 
       // Enter edit mode
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
 
       // Type something
       const textarea = await screen.findByRole("textbox");
@@ -93,7 +108,9 @@ describe("Dataset inline editing", () => {
       renderCell("", 0, "input");
 
       // Enter edit mode
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
 
       // Type new value
       const textarea = await screen.findByRole("textbox");
@@ -115,7 +132,9 @@ describe("Dataset inline editing", () => {
       renderCell("original", 0, "input");
 
       // Enter edit mode
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
 
       // Should show textarea with help text
       expect(await screen.findByText(/Enter to save/i)).toBeInTheDocument();
@@ -129,7 +148,9 @@ describe("Dataset inline editing", () => {
       renderCell("", 0, "input");
 
       // Make an edit
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
       const textarea = await screen.findByRole("textbox");
       await user.type(textarea, "first value");
       await user.keyboard("{Enter}");
@@ -160,7 +181,9 @@ describe("Dataset inline editing", () => {
       renderCell("", 0, "input");
 
       // Make an edit
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
       const textarea = await screen.findByRole("textbox");
       await user.type(textarea, "modified");
       await user.keyboard("{Enter}");

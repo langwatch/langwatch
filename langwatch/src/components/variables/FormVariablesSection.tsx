@@ -1,8 +1,13 @@
 import { useCallback } from "react";
 import { useFieldArray, useFormContext, useWatch } from "react-hook-form";
-import { VariablesSection, type Variable, type AvailableSource, type FieldMapping } from ".";
 import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigInputType } from "~/types";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  type Variable,
+  VariablesSection,
+} from ".";
 
 // ============================================================================
 // Types
@@ -18,7 +23,10 @@ type FormVariablesSectionProps = {
   /** Mappings for each variable */
   mappings?: Record<string, FieldMapping>;
   /** Callback when a mapping changes */
-  onMappingChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
+  onMappingChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
   /** Whether in read-only mode */
   readOnly?: boolean;
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
@@ -107,7 +115,9 @@ export const FormVariablesSection = ({
         // Removed a variable - find which one
         for (let i = 0; i < currentFields.length; i++) {
           const currentField = currentFields[i];
-          if (!newVariables.some((v) => v.identifier === currentField?.identifier)) {
+          if (
+            !newVariables.some((v) => v.identifier === currentField?.identifier)
+          ) {
             remove(i);
             break;
           }
@@ -131,7 +141,7 @@ export const FormVariablesSection = ({
         }
       }
     },
-    [getValues, append, remove, update]
+    [getValues, append, remove, update],
   );
 
   return (

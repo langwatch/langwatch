@@ -1,6 +1,6 @@
 import { Icon } from "@chakra-ui/react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
+import { Tooltip } from "~/components/ui/tooltip";
 
 /**
  * Renders an organization scope badge with an icon.

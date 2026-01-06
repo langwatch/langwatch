@@ -41,4 +41,3 @@ export const dashboardErrorHandler = async <T>({
 }): Promise<T> => {
   return await withDashboardErrorHandling(next);
 };
-

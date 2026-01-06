@@ -3,10 +3,10 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import {
   createInitialState,
-  DEFAULT_TEST_DATA_ID,
-  type TargetConfig,
   type DatasetReference,
+  DEFAULT_TEST_DATA_ID,
   type EvaluatorConfig,
+  type TargetConfig,
 } from "../types";
 
 describe("useEvaluationsV3Store", () => {
@@ -22,7 +22,7 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       expect(activeDataset?.inline?.records["input"]?.[0]).toBe("Hello world");
     });
@@ -33,10 +33,12 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       expect(activeDataset?.inline?.records["input"]?.length).toBe(6);
-      expect(activeDataset?.inline?.records["input"]?.[5]).toBe("Value at row 5");
+      expect(activeDataset?.inline?.records["input"]?.[5]).toBe(
+        "Value at row 5",
+      );
     });
 
     it("adds a new column to inline dataset", () => {
@@ -49,7 +51,7 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       expect(activeDataset?.columns).toHaveLength(3);
       expect(activeDataset?.columns[2]?.name).toBe("context");
@@ -62,7 +64,7 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       expect(activeDataset?.columns).toHaveLength(1);
       expect(activeDataset?.inline?.records["expected_output"]).toBeUndefined();
@@ -74,7 +76,7 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       const column = activeDataset?.columns.find((c) => c.id === "input");
       expect(column?.name).toBe("user_question");
@@ -86,7 +88,7 @@ describe("useEvaluationsV3Store", () => {
 
       const state = useEvaluationsV3Store.getState();
       const activeDataset = state.datasets.find(
-        (d) => d.id === DEFAULT_TEST_DATA_ID
+        (d) => d.id === DEFAULT_TEST_DATA_ID,
       );
       const column = activeDataset?.columns.find((c) => c.id === "input");
       expect(column?.type).toBe("json");
@@ -101,7 +103,7 @@ describe("useEvaluationsV3Store", () => {
       store.setCellValue(DEFAULT_TEST_DATA_ID, 10, "input", "Value");
 
       expect(
-        useEvaluationsV3Store.getState().getRowCount(DEFAULT_TEST_DATA_ID)
+        useEvaluationsV3Store.getState().getRowCount(DEFAULT_TEST_DATA_ID),
       ).toBe(11);
     });
   });
@@ -350,19 +352,27 @@ describe("useEvaluationsV3Store", () => {
       store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
       // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
-        type: "source",
-        source: "target",
-        sourceId: "target-1",
-        sourceField: "output",
-      });
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-1",
+        "output",
+        {
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "output",
+        },
+      );
       store.removeTarget("target-1");
 
       const state = useEvaluationsV3Store.getState();
       expect(state.targets).toHaveLength(0);
       // Evaluator still exists but target's mappings should be removed for all datasets
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]).toBeUndefined();
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"],
+      ).toBeUndefined();
     });
 
     it("removes mappings referencing removed target from other targets", () => {
@@ -381,7 +391,9 @@ describe("useEvaluationsV3Store", () => {
       const state = useEvaluationsV3Store.getState();
       const target2 = state.targets.find((r) => r.id === "target-2");
       // Mappings should be removed for the dataset that referenced the removed target
-      expect(target2?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"]).toBeUndefined();
+      expect(
+        target2?.mappings?.[DEFAULT_TEST_DATA_ID]?.["input"],
+      ).toBeUndefined();
     });
   });
 
@@ -455,17 +467,25 @@ describe("useEvaluationsV3Store", () => {
       store.addTarget(createTestTarget("target-1"));
       store.addEvaluator(createTestEvaluator("eval-1"));
       // setEvaluatorMapping now takes: evaluatorId, datasetId, targetId, inputField, mapping
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
-        type: "source",
-        source: "target",
-        sourceId: "target-1",
-        sourceField: "output",
-      });
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-1",
+        "output",
+        {
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "output",
+        },
+      );
 
       const state = useEvaluationsV3Store.getState();
       const evaluator = state.evaluators.find((e) => e.id === "eval-1");
       // Mappings are per-dataset, per-target
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.["output"]).toEqual({
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]?.["output"],
+      ).toEqual({
         type: "source",
         source: "target",
         sourceId: "target-1",
@@ -484,23 +504,39 @@ describe("useEvaluationsV3Store", () => {
       expect(state.evaluators).toHaveLength(1);
       expect(state.targets).toHaveLength(2);
       // Both targets can have mappings set for this evaluator
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-1", "output", {
-        type: "source",
-        source: "target",
-        sourceId: "target-1",
-        sourceField: "output",
-      });
-      store.setEvaluatorMapping("eval-1", DEFAULT_TEST_DATA_ID, "target-2", "output", {
-        type: "source",
-        source: "target",
-        sourceId: "target-2",
-        sourceField: "output",
-      });
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-1",
+        "output",
+        {
+          type: "source",
+          source: "target",
+          sourceId: "target-1",
+          sourceField: "output",
+        },
+      );
+      store.setEvaluatorMapping(
+        "eval-1",
+        DEFAULT_TEST_DATA_ID,
+        "target-2",
+        "output",
+        {
+          type: "source",
+          source: "target",
+          sourceId: "target-2",
+          sourceField: "output",
+        },
+      );
 
       const updatedState = useEvaluationsV3Store.getState();
       const evaluator = updatedState.evaluators.find((e) => e.id === "eval-1");
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"]).toBeDefined();
-      expect(evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-2"]).toBeDefined();
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-1"],
+      ).toBeDefined();
+      expect(
+        evaluator?.mappings[DEFAULT_TEST_DATA_ID]?.["target-2"],
+      ).toBeDefined();
     });
   });
 
@@ -569,11 +605,13 @@ describe("useEvaluationsV3Store", () => {
       const store = useEvaluationsV3Store.getState();
       store.toggleRowSelection(0);
 
-      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(true);
+      expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(
+        true,
+      );
 
       store.toggleRowSelection(0);
       expect(useEvaluationsV3Store.getState().ui.selectedRows.has(0)).toBe(
-        false
+        false,
       );
     });
 
@@ -728,7 +766,7 @@ describe("useEvaluationsV3Store", () => {
 
       // Same number of past states (UI changes are not tracked)
       expect(
-        useEvaluationsV3Store.temporal.getState().pastStates.length
+        useEvaluationsV3Store.temporal.getState().pastStates.length,
       ).toBeLessThanOrEqual(pastStatesCount);
     });
   });

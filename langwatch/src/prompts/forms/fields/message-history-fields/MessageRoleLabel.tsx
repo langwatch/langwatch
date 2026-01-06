@@ -1,8 +1,8 @@
+import { Text } from "@chakra-ui/react";
 import {
   PropertySectionTitle,
   type PropertySectionTitleProps,
 } from "~/components/ui/PropertySectionTitle";
-import { Text } from "@chakra-ui/react";
 
 export type MessageRoleLabelProps = Omit<
   PropertySectionTitleProps,
@@ -20,8 +20,8 @@ export function MessageRoleLabel({ role, ...props }: MessageRoleLabelProps) {
     role === "system"
       ? "System prompt"
       : role === "user"
-      ? "User"
-      : "Assistant";
+        ? "User"
+        : "Assistant";
   return (
     <Text
       fontSize="xs"

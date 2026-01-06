@@ -1,7 +1,7 @@
 import { Button } from "@chakra-ui/react";
 import { Plus } from "react-feather";
-import { Menu } from "../../../../components/ui/menu";
 import { LuPlus } from "react-icons/lu";
+import { Menu } from "../../../../components/ui/menu";
 
 /**
  * AddMessageButton

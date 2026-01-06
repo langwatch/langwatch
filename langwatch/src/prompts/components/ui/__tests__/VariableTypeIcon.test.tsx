@@ -5,10 +5,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  VariableTypeIcon,
-  VariableTypeBadge,
   getTypeLabel,
   TYPE_LABELS,
+  VariableTypeBadge,
+  VariableTypeIcon,
 } from "../VariableTypeIcon";
 
 describe("TYPE_LABELS", () => {
@@ -76,7 +76,7 @@ describe("VariableTypeIcon", () => {
     return render(
       <ChakraProvider value={defaultSystem}>
         <VariableTypeIcon type={type} />
-      </ChakraProvider>
+      </ChakraProvider>,
     );
   };
 
@@ -121,7 +121,7 @@ describe("VariableTypeBadge", () => {
     return render(
       <ChakraProvider value={defaultSystem}>
         <VariableTypeBadge type={type} size={size} />
-      </ChakraProvider>
+      </ChakraProvider>,
     );
   };
 

@@ -5,17 +5,17 @@
  * Used to show validation alerts and highlight fields that need attention.
  */
 
-import type {
-  DatasetReference,
-  TargetConfig,
-  EvaluatorConfig,
-  FieldMapping,
-} from "../types";
 import type { Field } from "~/optimization_studio/types/dsl";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
+import type {
+  DatasetReference,
+  EvaluatorConfig,
+  FieldMapping,
+  TargetConfig,
+} from "../types";
 
 // ============================================================================
 // Types
@@ -142,7 +142,7 @@ export const getUsedFields = (target: TargetConfig): Set<string> => {
  */
 export const getTargetMissingMappings = (
   target: TargetConfig,
-  datasetId: string
+  datasetId: string,
 ): TargetValidationResult => {
   const missingMappings: MissingMapping[] = [];
   const usedFields = getUsedFields(target);
@@ -186,7 +186,7 @@ export const getTargetMissingMappings = (
  */
 export const targetHasMissingMappings = (
   target: TargetConfig,
-  datasetId: string
+  datasetId: string,
 ): boolean => {
   const { isValid } = getTargetMissingMappings(target, datasetId);
   return !isValid;
@@ -213,13 +213,14 @@ export const targetHasMissingMappings = (
 export const getEvaluatorMissingMappings = (
   evaluator: EvaluatorConfig,
   datasetId: string,
-  targetId: string
+  targetId: string,
 ): EvaluatorValidationResult => {
   const missingMappings: MissingMapping[] = [];
   const targetMappings = evaluator.mappings[datasetId]?.[targetId] ?? {};
 
   // Get the evaluator definition to know which fields are required vs optional
-  const evaluatorDef = AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
+  const evaluatorDef =
+    AVAILABLE_EVALUATORS[evaluator.evaluatorType as EvaluatorTypes];
   const requiredFieldsArr = evaluatorDef?.requiredFields ?? [];
   const optionalFieldsArr = evaluatorDef?.optionalFields ?? [];
 
@@ -266,7 +267,8 @@ export const getEvaluatorMissingMappings = (
   // 1. Any required field is missing, OR
   // 2. ALL fields are empty (must have at least one mapping)
   const allFieldsCount = evaluator.inputs.length;
-  const isValid = missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
+  const isValid =
+    missingRequiredCount === 0 && (allFieldsCount === 0 || hasAnyMapping);
 
   return {
     isValid,
@@ -285,9 +287,13 @@ export const getEvaluatorMissingMappings = (
 export const evaluatorHasMissingMappings = (
   evaluator: EvaluatorConfig,
   datasetId: string,
-  targetId: string
+  targetId: string,
 ): boolean => {
-  const { isValid } = getEvaluatorMissingMappings(evaluator, datasetId, targetId);
+  const { isValid } = getEvaluatorMissingMappings(
+    evaluator,
+    datasetId,
+    targetId,
+  );
   return !isValid;
 };
 
@@ -307,7 +313,7 @@ export const evaluatorHasMissingMappings = (
 export const validateWorkbench = (
   targets: TargetConfig[],
   evaluators: EvaluatorConfig[],
-  activeDatasetId: string
+  activeDatasetId: string,
 ): WorkbenchValidationResult => {
   // Check targets first
   for (const target of targets) {
@@ -327,7 +333,7 @@ export const validateWorkbench = (
       const evalValidation = getEvaluatorMissingMappings(
         evaluator,
         activeDatasetId,
-        target.id
+        target.id,
       );
       if (!evalValidation.isValid) {
         return {
@@ -354,7 +360,7 @@ export const validateWorkbench = (
  */
 export const getAllTargetMissingMappings = (
   targets: TargetConfig[],
-  datasetId: string
+  datasetId: string,
 ): Map<string, MissingMapping[]> => {
   const result = new Map<string, MissingMapping[]>();
 

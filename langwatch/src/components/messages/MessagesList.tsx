@@ -15,6 +15,7 @@ import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { createRef, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, Maximize2 } from "react-feather";
+import { LuLayers, LuRefreshCw } from "react-icons/lu";
 import { formatMilliseconds } from "~/utils/formatMilliseconds";
 import { Menu } from "../../components/ui/menu";
 import { Radio, RadioGroup } from "../../components/ui/radio";
@@ -27,14 +28,13 @@ import { getSingleQueryParam } from "../../utils/getSingleQueryParam";
 import { FilterSidebar } from "../filters/FilterSidebar";
 import { FilterToggle } from "../filters/FilterToggle";
 import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
+import { PageLayout } from "../ui/layouts/PageLayout";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
 import {
   MessagesNavigationFooter,
   useMessagesNavigationFooter,
 } from "./MessagesNavigationFooter";
-import { PageLayout } from "../ui/layouts/PageLayout";
-import { LuLayers, LuRefreshCw } from "react-icons/lu";
 
 export function MessagesList() {
   const { project } = useOrganizationTeamProject();

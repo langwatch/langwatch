@@ -1,25 +1,24 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
+import type { Evaluator } from "@prisma/client";
 import {
+  type ColumnDef,
+  type ColumnSizingState,
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
-  type ColumnDef,
-  type ColumnSizingState,
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-
 import { AddOrEditDatasetDrawer } from "~/components/AddOrEditDatasetDrawer";
-import { useDrawer, setFlowCallbacks } from "~/hooks/useDrawer";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import type { TypedAgent } from "~/server/agents/agent.repository";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "~/server/evaluations/evaluators.generated";
-import type { Evaluator } from "@prisma/client";
+import { api } from "~/utils/api";
 
 /**
  * Type for the config stored in DB Evaluator.config field.
@@ -30,42 +29,42 @@ type EvaluatorDbConfig = {
   evaluatorType?: EvaluatorTypes;
   settings?: Record<string, unknown>;
 };
+
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import type { Field } from "~/optimization_studio/types/dsl";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
-import { convertInlineToRowRecords } from "../utils/datasetConversion";
-import {
-  convertToUIMapping,
-  convertFromUIMapping,
-} from "../utils/fieldMappingConverters";
-import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import type {
-  TargetConfig,
   DatasetColumn,
   DatasetReference,
-  SavedRecord,
-  FieldMapping,
   EvaluatorConfig,
-  TableRowData,
+  FieldMapping,
+  SavedRecord,
   TableMeta,
+  TableRowData,
+  TargetConfig,
 } from "../types";
-import type { Field } from "~/optimization_studio/types/dsl";
-import { type FieldMapping as UIFieldMapping } from "~/components/variables";
-import type { DatasetColumnType } from "~/server/datasets/types";
-
-import { TableCell, type ColumnType } from "./DatasetSection/TableCell";
+import { convertInlineToRowRecords } from "../utils/datasetConversion";
+import {
+  convertFromUIMapping,
+  convertToUIMapping,
+} from "../utils/fieldMappingConverters";
+import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
 import { ColumnTypeIcon } from "./ColumnTypeIcon";
+import { type ColumnType, TableCell } from "./DatasetSection/TableCell";
 import { DatasetSuperHeader } from "./DatasetSuperHeader";
-import { TargetSuperHeader } from "./TargetSuperHeader";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
-  CheckboxHeaderFromMeta,
   CheckboxCellFromMeta,
-  TargetHeaderFromMeta,
+  CheckboxHeaderFromMeta,
   TargetCellFromMeta,
+  TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
+import { TargetSuperHeader } from "./TargetSuperHeader";
 
 // Types are imported from ../types (TableRowData, TableMeta)
 // Meta wrappers are imported from ./TableMetaWrappers
@@ -184,7 +183,8 @@ export function EvaluationsV3Table({
   const [editDatasetDrawerOpen, setEditDatasetDrawerOpen] = useState(false);
 
   // Hook for opening target editor with proper flow callbacks
-  const { openTargetEditor, buildAvailableSources, isDatasetSource } = useOpenTargetEditor();
+  const { openTargetEditor, buildAvailableSources, isDatasetSource } =
+    useOpenTargetEditor();
 
   // Track pending mappings for new prompts (before they become targets)
   const pendingMappingsRef = useRef<Record<string, UIFieldMapping>>({});
@@ -236,11 +236,15 @@ export function EvaluationsV3Table({
         promptId: prompt.id,
         promptVersionId: prompt.versionId,
         promptVersionNumber: prompt.version,
-        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
-          identifier: i.identifier,
-          type: i.type as Field["type"],
-        })),
-        outputs: (prompt.outputs ?? [{ identifier: "output", type: "str" }]).map((o) => ({
+        inputs: (prompt.inputs ?? [{ identifier: "input", type: "str" }]).map(
+          (i) => ({
+            identifier: i.identifier,
+            type: i.type as Field["type"],
+          }),
+        ),
+        outputs: (
+          prompt.outputs ?? [{ identifier: "output", type: "str" }]
+        ).map((o) => ({
           identifier: o.identifier,
           type: o.type as Field["type"],
         })),
@@ -258,9 +262,10 @@ export function EvaluationsV3Table({
           updateTarget,
           setTargetMapping,
           removeTargetMapping,
-          getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
+          getActiveDatasetId: () =>
+            useEvaluationsV3Store.getState().activeDatasetId,
           getDatasets: () => useEvaluationsV3Store.getState().datasets,
-        })
+        }),
       );
 
       // Open the prompt editor drawer for the newly added target
@@ -274,63 +279,67 @@ export function EvaluationsV3Table({
         { resetStack: true },
       );
     },
-    [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
+    [
+      addTarget,
+      openDrawer,
+      updateTarget,
+      setTargetMapping,
+      removeTargetMapping,
+    ],
   );
 
   // Handler for opening the evaluator selector (evaluators apply to ALL targets)
-  const handleAddEvaluator = useCallback(
-    () => {
-      // Set up flow callback to handle evaluator selection
-      setFlowCallbacks("evaluatorList", {
-        onSelect: (evaluator: Evaluator) => {
-          // Extract evaluator config from the Prisma evaluator
-          const config = evaluator.config as EvaluatorDbConfig | null;
+  const handleAddEvaluator = useCallback(() => {
+    // Set up flow callback to handle evaluator selection
+    setFlowCallbacks("evaluatorList", {
+      onSelect: (evaluator: Evaluator) => {
+        // Extract evaluator config from the Prisma evaluator
+        const config = evaluator.config as EvaluatorDbConfig | null;
 
-          // Check if this evaluator is already added globally
-          const existingEvaluator = evaluators.find(
-            (e) => e.dbEvaluatorId === evaluator.id
-          );
+        // Check if this evaluator is already added globally
+        const existingEvaluator = evaluators.find(
+          (e) => e.dbEvaluatorId === evaluator.id,
+        );
 
-          // If already exists, no need to add again (it applies to all targets)
-          if (existingEvaluator) {
-            return;
-          }
+        // If already exists, no need to add again (it applies to all targets)
+        if (existingEvaluator) {
+          return;
+        }
 
-          // Get the evaluator definition to derive inputs from requiredFields/optionalFields
-          const evaluatorType = config?.evaluatorType;
-          const evaluatorDef = evaluatorType
-            ? AVAILABLE_EVALUATORS[evaluatorType]
-            : undefined;
+        // Get the evaluator definition to derive inputs from requiredFields/optionalFields
+        const evaluatorType = config?.evaluatorType;
+        const evaluatorDef = evaluatorType
+          ? AVAILABLE_EVALUATORS[evaluatorType]
+          : undefined;
 
-          // Derive inputs from evaluator definition's required and optional fields
-          const inputFields = [
-            ...(evaluatorDef?.requiredFields ?? []),
-            ...(evaluatorDef?.optionalFields ?? []),
-          ];
+        // Derive inputs from evaluator definition's required and optional fields
+        const inputFields = [
+          ...(evaluatorDef?.requiredFields ?? []),
+          ...(evaluatorDef?.optionalFields ?? []),
+        ];
 
-          // Create a new EvaluatorConfig from the Prisma evaluator
-          const evaluatorConfig: EvaluatorConfig = {
-            id: `evaluator_${Date.now()}`,
-            evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
-            name: evaluator.name,
-            settings: config?.settings ?? {},
-            inputs: inputFields.map((field) => ({
-              identifier: field,
-              type: "str" as const, // Default all evaluator inputs to string
-            })),
-            mappings: {},
-            dbEvaluatorId: evaluator.id,
-          };
+        // Create a new EvaluatorConfig from the Prisma evaluator
+        const evaluatorConfig: EvaluatorConfig = {
+          id: `evaluator_${Date.now()}`,
+          evaluatorType: (config?.evaluatorType ??
+            "custom/unknown") as EvaluatorConfig["evaluatorType"],
+          name: evaluator.name,
+          settings: config?.settings ?? {},
+          inputs: inputFields.map((field) => ({
+            identifier: field,
+            type: "str" as const, // Default all evaluator inputs to string
+          })),
+          mappings: {},
+          dbEvaluatorId: evaluator.id,
+        };
 
-          // Add the evaluator globally (applies to all targets automatically)
-          addEvaluator(evaluatorConfig);
-        },
-      });
+        // Add the evaluator globally (applies to all targets automatically)
+        addEvaluator(evaluatorConfig);
+      },
+    });
 
-      openDrawer("evaluatorList");
-    },
-    [openDrawer, evaluators, addEvaluator],
-  );
+    openDrawer("evaluatorList");
+  }, [openDrawer, evaluators, addEvaluator]);
 
   // Handler for removing a target from the workbench
   const handleRemoveTarget = useCallback(
@@ -508,13 +517,16 @@ export function EvaluationsV3Table({
 
   // Similarly stabilize dataset column IDs
   const datasetColumnIdsKey = datasetColumns.map((c) => c.id).join(",");
-  const stableDatasetColumns = useMemo(() => datasetColumns, [datasetColumnIdsKey]);
+  const stableDatasetColumns = useMemo(
+    () => datasetColumns,
+    [datasetColumnIdsKey],
+  );
 
   // Build table meta for passing dynamic data to headers/cells
   // This allows column definitions to stay stable while data changes
   const targetsMap = useMemo(
     () => new Map(targets.map((r) => [r.id, r])),
-    [targets]
+    [targets],
   );
 
   const tableMeta: TableMeta = useMemo(
@@ -549,7 +561,7 @@ export function EvaluationsV3Table({
       toggleRowSelection,
       selectAllRows,
       clearRowSelection,
-    ]
+    ],
   );
 
   const columns = useMemo(() => {
@@ -842,12 +854,18 @@ export function EvaluationsV3Table({
                   onSave: (savedPrompt) => {
                     // Apply pending mappings when creating the target
                     const storeMappings: Record<string, FieldMapping> = {};
-                    for (const [key, uiMapping] of Object.entries(pendingMappingsRef.current)) {
-                      storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
+                    for (const [key, uiMapping] of Object.entries(
+                      pendingMappingsRef.current,
+                    )) {
+                      storeMappings[key] = convertFromUIMapping(
+                        uiMapping,
+                        isDatasetSource,
+                      );
                     }
 
                     // Get current state for active dataset
-                    const currentActiveDatasetId = useEvaluationsV3Store.getState().activeDatasetId;
+                    const currentActiveDatasetId =
+                      useEvaluationsV3Store.getState().activeDatasetId;
 
                     // Create target with pending mappings
                     const targetId = `target_${Date.now()}`;
@@ -858,17 +876,26 @@ export function EvaluationsV3Table({
                       promptId: savedPrompt.id,
                       promptVersionId: savedPrompt.versionId,
                       promptVersionNumber: savedPrompt.version,
-                      inputs: (savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]).map((i) => ({
+                      inputs: (
+                        savedPrompt.inputs ?? [
+                          { identifier: "input", type: "str" },
+                        ]
+                      ).map((i) => ({
                         identifier: i.identifier,
                         type: i.type as Field["type"],
                       })),
-                      outputs: (savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]).map((o) => ({
+                      outputs: (
+                        savedPrompt.outputs ?? [
+                          { identifier: "output", type: "str" },
+                        ]
+                      ).map((o) => ({
                         identifier: o.identifier,
                         type: o.type as Field["type"],
                       })),
-                      mappings: Object.keys(storeMappings).length > 0
-                        ? { [currentActiveDatasetId]: storeMappings }
-                        : {},
+                      mappings:
+                        Object.keys(storeMappings).length > 0
+                          ? { [currentActiveDatasetId]: storeMappings }
+                          : {},
                     };
                     addTarget(targetConfig);
 

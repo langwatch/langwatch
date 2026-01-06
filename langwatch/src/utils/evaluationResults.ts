@@ -17,7 +17,9 @@ export type ParsedEvaluationResult = {
  * @param result - The raw evaluation result (can be boolean, object, or undefined)
  * @returns Parsed evaluation result with status and optional score/label/details
  */
-export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult => {
+export const parseEvaluationResult = (
+  result: unknown,
+): ParsedEvaluationResult => {
   if (result === null || result === undefined) {
     return { status: "pending" };
   }
@@ -33,7 +35,8 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
     // Check for error first
     if ("error" in obj) {
       parsed.status = "error";
-      parsed.details = typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
+      parsed.details =
+        typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
       return parsed;
     }
 
@@ -89,7 +92,9 @@ export const EVALUATION_STATUS_COLORS = {
 /**
  * Returns a human-readable status label.
  */
-export const getStatusLabel = (status: ParsedEvaluationResult["status"]): string => {
+export const getStatusLabel = (
+  status: ParsedEvaluationResult["status"],
+): string => {
   switch (status) {
     case "passed":
       return "Passed";

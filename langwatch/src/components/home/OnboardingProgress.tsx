@@ -3,8 +3,8 @@ import {
   Grid,
   HStack,
   Progress,
-  Text,
   Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";

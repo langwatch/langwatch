@@ -5,9 +5,9 @@
 import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
-import type { TableRowData, TableMeta } from "../types";
-import { TargetHeader } from "./TargetSection/TargetHeader";
+import type { TableMeta, TableRowData } from "../types";
 import { TargetCellContent } from "./TargetSection/TargetCell";
+import { TargetHeader } from "./TargetSection/TargetHeader";
 
 /**
  * Checkbox header that reads selection state from table meta.

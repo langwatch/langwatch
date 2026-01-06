@@ -1,5 +1,5 @@
-import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 import { DEFAULT_FORM_VALUES } from "~/prompts/utils/buildDefaultFormValues";
+import { AVAILABLE_EVALUATORS } from "../server/evaluations/evaluators.generated";
 
 import type {
   Code,
@@ -57,8 +57,14 @@ const signature: Signature = {
       value: undefined,
     },
   ],
-  inputs: defaults.inputs.map((i) => ({ identifier: i.identifier, type: i.type })) as Field[],
-  outputs: defaults.outputs.map((o) => ({ identifier: o.identifier, type: o.type })) as Field[],
+  inputs: defaults.inputs.map((i) => ({
+    identifier: i.identifier,
+    type: i.type,
+  })) as Field[],
+  outputs: defaults.outputs.map((o) => ({
+    identifier: o.identifier,
+    type: o.type,
+  })) as Field[],
 };
 
 const code: Code = {
@@ -78,8 +84,14 @@ class Code(dspy.Module):
 `,
     },
   ],
-  inputs: defaults.inputs.map((i) => ({ identifier: i.identifier, type: i.type })) as Field[],
-  outputs: defaults.outputs.map((o) => ({ identifier: o.identifier, type: o.type })) as Field[],
+  inputs: defaults.inputs.map((i) => ({
+    identifier: i.identifier,
+    type: i.type,
+  })) as Field[],
+  outputs: defaults.outputs.map((o) => ({
+    identifier: o.identifier,
+    type: o.type,
+  })) as Field[],
 };
 
 const promptingTechniques: PromptingTechnique[] = [

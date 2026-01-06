@@ -12,22 +12,21 @@
 
 import { useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
-
+import {
+  type AvailableSource,
+  datasetColumnTypeToFieldType,
+  type FieldMapping as UIFieldMapping,
+} from "~/components/variables";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
+import type { TargetConfig } from "../types";
 import {
-  convertToUIMapping,
   convertFromUIMapping,
+  convertToUIMapping,
 } from "../utils/fieldMappingConverters";
 import { createPromptEditorCallbacks } from "../utils/promptEditorCallbacks";
-import {
-  datasetColumnTypeToFieldType,
-  type AvailableSource,
-  type FieldMapping as UIFieldMapping,
-} from "~/components/variables";
-import type { TargetConfig } from "../types";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 export const useOpenTargetEditor = () => {
   const { openDrawer } = useDrawer();
@@ -47,7 +46,7 @@ export const useOpenTargetEditor = () => {
       updateTarget: state.updateTarget,
       setTargetMapping: state.setTargetMapping,
       removeTargetMapping: state.removeTargetMapping,
-    }))
+    })),
   );
 
   /**
@@ -55,7 +54,7 @@ export const useOpenTargetEditor = () => {
    */
   const isDatasetSource = useCallback(
     (sourceId: string) => datasets.some((d) => d.id === sourceId),
-    [datasets]
+    [datasets],
   );
 
   /**
@@ -103,9 +102,10 @@ export const useOpenTargetEditor = () => {
             updateTarget,
             setTargetMapping,
             removeTargetMapping,
-            getActiveDatasetId: () => useEvaluationsV3Store.getState().activeDatasetId,
+            getActiveDatasetId: () =>
+              useEvaluationsV3Store.getState().activeDatasetId,
             getDatasets: () => useEvaluationsV3Store.getState().datasets,
-          })
+          }),
         );
 
         // Open the drawer with initial config and available sources
@@ -157,11 +157,12 @@ export const useOpenTargetEditor = () => {
             setFlowCallbacks("agentCodeEditor", {
               onInputMappingsChange: (
                 identifier: string,
-                mapping: UIFieldMapping | undefined
+                mapping: UIFieldMapping | undefined,
               ) => {
                 const currentActiveDatasetId =
                   useEvaluationsV3Store.getState().activeDatasetId;
-                const currentDatasets = useEvaluationsV3Store.getState().datasets;
+                const currentDatasets =
+                  useEvaluationsV3Store.getState().datasets;
                 const checkIsDatasetSource = (sourceId: string) =>
                   currentDatasets.some((d) => d.id === sourceId);
 
@@ -170,10 +171,14 @@ export const useOpenTargetEditor = () => {
                     target.id,
                     currentActiveDatasetId,
                     identifier,
-                    convertFromUIMapping(mapping, checkIsDatasetSource)
+                    convertFromUIMapping(mapping, checkIsDatasetSource),
                   );
                 } else {
-                  removeTargetMapping(target.id, currentActiveDatasetId, identifier);
+                  removeTargetMapping(
+                    target.id,
+                    currentActiveDatasetId,
+                    identifier,
+                  );
                 }
               },
             });
@@ -202,7 +207,7 @@ export const useOpenTargetEditor = () => {
       trpcUtils.agents.getById,
       project?.id,
       project?.slug,
-    ]
+    ],
   );
 
   return { openTargetEditor, buildAvailableSources, isDatasetSource };

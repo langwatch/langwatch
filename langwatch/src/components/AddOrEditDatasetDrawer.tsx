@@ -297,7 +297,8 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                 <VStack align="start" width="full">
                   {fields.map((field, index) => {
                     const columnName = watch(`columnTypes.${index}.name`);
-                    const isHidden = props.columnVisibility?.hiddenColumns.has(columnName);
+                    const isHidden =
+                      props.columnVisibility?.hiddenColumns.has(columnName);
                     return (
                       <HStack key={field.id} width="full" gap={2}>
                         <Input
@@ -328,12 +329,22 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                           <IconButton
                             size="sm"
                             variant="ghost"
-                            onClick={() => props.columnVisibility?.onToggleVisibility(columnName)}
+                            onClick={() =>
+                              props.columnVisibility?.onToggleVisibility(
+                                columnName,
+                              )
+                            }
                             color={isHidden ? "gray.400" : "gray.600"}
-                            aria-label={isHidden ? "Show column" : "Hide column"}
+                            aria-label={
+                              isHidden ? "Show column" : "Hide column"
+                            }
                             title={isHidden ? "Show column" : "Hide column"}
                           >
-                            {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {isHidden ? (
+                              <EyeOff size={16} />
+                            ) : (
+                              <Eye size={16} />
+                            )}
                           </IconButton>
                         )}
                         <Button size="sm" onClick={() => remove(index)}>

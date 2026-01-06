@@ -3,15 +3,15 @@ import type {
   QueryDslBoolQuery,
   SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
+import { generate } from "@langwatch/ksuid";
 import {
   EvaluationExecutionMode,
   ExperimentType,
-  Prisma,
+  type Prisma,
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import {
@@ -207,7 +207,8 @@ export const experimentsRouter = createTRPCRouter({
 
       // For new experiments, use the ID as the slug (guaranteed unique)
       // For existing experiments, keep the same slug to avoid breaking URLs
-      const name = input.state.name || (await findNextDraftName(input.projectId));
+      const name =
+        input.state.name || (await findNextDraftName(input.projectId));
 
       let slug: string;
       if (isNewExperiment) {
@@ -1139,8 +1140,8 @@ const findNextDraftName = async (projectId: string) => {
     },
   });
 
-  const draftCount = experiments.filter(
-    (draft) => draft.name?.startsWith("Draft"),
+  const draftCount = experiments.filter((draft) =>
+    draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -1321,8 +1322,9 @@ const getExperimentBatchEvaluationRuns = async (
         dataset_average_duration: runAgg?.dataset_average_duration.value as
           | number
           | undefined,
-        evaluations_average_cost: runAgg?.evaluations_cost.average_cost
-          .value as number | undefined,
+        evaluations_average_cost: runAgg?.evaluations_cost.average_cost.value as
+          | number
+          | undefined,
         evaluations_average_duration: runAgg?.evaluations_cost.average_duration
           .value as number | undefined,
         evaluations: Object.fromEntries(

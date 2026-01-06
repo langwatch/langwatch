@@ -2,13 +2,20 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  VariableMappingInput,
   type AvailableSource,
   type FieldMapping,
+  VariableMappingInput,
 } from "../VariableMappingInput";
 
 // Debounce delay used in VariableMappingInput
@@ -36,14 +43,13 @@ const mockSources: AvailableSource[] = [
   },
 ];
 
-const renderComponent = (props: Partial<Parameters<typeof VariableMappingInput>[0]> = {}) => {
+const renderComponent = (
+  props: Partial<Parameters<typeof VariableMappingInput>[0]> = {},
+) => {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <VariableMappingInput
-        availableSources={mockSources}
-        {...props}
-      />
-    </ChakraProvider>
+      <VariableMappingInput availableSources={mockSources} {...props} />
+    </ChakraProvider>,
   );
 };
 
@@ -56,7 +62,9 @@ describe("VariableMappingInput", () => {
   describe("rendering", () => {
     it("renders with placeholder text", () => {
       renderComponent({ placeholder: "Select a source..." });
-      expect(screen.getByPlaceholderText("Select a source...")).toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Select a source..."),
+      ).toBeInTheDocument();
     });
 
     it("renders with value mapping", () => {
@@ -66,7 +74,11 @@ describe("VariableMappingInput", () => {
     });
 
     it("displays source mapping as a closable tag", () => {
-      const mapping: FieldMapping = { type: "source", sourceId: "dataset-1", field: "input" };
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "input",
+      };
       renderComponent({ mapping });
       // Should show a tag with just the field name (no source name prefix)
       expect(screen.getByTestId("source-mapping-tag")).toBeInTheDocument();
@@ -135,7 +147,9 @@ describe("VariableMappingInput", () => {
       await waitFor(() => {
         // No matching fields, but "use as value" option should appear
         expect(screen.getByTestId("use-as-value-option")).toBeInTheDocument();
-        expect(screen.getByTestId("use-as-value-option").textContent).toContain("nonexistent");
+        expect(screen.getByTestId("use-as-value-option").textContent).toContain(
+          "nonexistent",
+        );
       });
     });
   });
@@ -354,8 +368,12 @@ describe("VariableMappingInput", () => {
       await waitFor(() => {
         expect(screen.getByTestId("use-as-value-option")).toBeInTheDocument();
         // The value is in a nested span, so just check the option contains it
-        expect(screen.getByTestId("use-as-value-option").textContent).toContain("custom");
-        expect(screen.getByTestId("use-as-value-option").textContent).toContain("as value");
+        expect(screen.getByTestId("use-as-value-option").textContent).toContain(
+          "custom",
+        );
+        expect(screen.getByTestId("use-as-value-option").textContent).toContain(
+          "as value",
+        );
       });
     });
 
@@ -416,7 +434,11 @@ describe("VariableMappingInput", () => {
     it("clears mapping when clicking the X button on the tag", async () => {
       const user = userEvent.setup();
       const onMappingChange = vi.fn();
-      const mapping: FieldMapping = { type: "source", sourceId: "dataset-1", field: "input" };
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "input",
+      };
       renderComponent({ mapping, onMappingChange });
 
       // Should have a tag with close button
@@ -432,7 +454,11 @@ describe("VariableMappingInput", () => {
 
     it("clears source mapping with Backspace when input is empty", async () => {
       const onMappingChange = vi.fn();
-      const mapping: FieldMapping = { type: "source", sourceId: "dataset-1", field: "input" };
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "input",
+      };
       renderComponent({ mapping, onMappingChange });
 
       // Focus the input
@@ -449,7 +475,11 @@ describe("VariableMappingInput", () => {
 
     it("does not clear mapping with Backspace when there is search text", async () => {
       const onMappingChange = vi.fn();
-      const mapping: FieldMapping = { type: "source", sourceId: "dataset-1", field: "input" };
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "input",
+      };
       renderComponent({ mapping, onMappingChange });
 
       // Focus and type something
@@ -468,7 +498,11 @@ describe("VariableMappingInput", () => {
   describe("continued editing after selection", () => {
     it("allows typing after selecting a source to search for another", async () => {
       const onMappingChange = vi.fn();
-      const mapping: FieldMapping = { type: "source", sourceId: "dataset-1", field: "input" };
+      const mapping: FieldMapping = {
+        type: "source",
+        sourceId: "dataset-1",
+        field: "input",
+      };
       renderComponent({ mapping, onMappingChange });
 
       // Should have the tag displayed
@@ -520,11 +554,13 @@ describe("VariableMappingInput", () => {
             availableSources={mockSources}
             onMappingChange={onMappingChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Verify no mapping shown initially
-      expect(screen.queryByTestId("source-mapping-tag")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("source-mapping-tag"),
+      ).not.toBeInTheDocument();
 
       // Simulate external prop update (e.g., from store after onMappingChange was called)
       const newMapping: FieldMapping = {
@@ -540,7 +576,7 @@ describe("VariableMappingInput", () => {
             mapping={newMapping}
             onMappingChange={onMappingChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Should immediately show the new mapping as a tag
@@ -565,7 +601,7 @@ describe("VariableMappingInput", () => {
             mapping={currentMapping}
             onMappingChange={onMappingChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Focus the input to open dropdown
@@ -595,7 +631,7 @@ describe("VariableMappingInput", () => {
             mapping={currentMapping}
             onMappingChange={onMappingChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Should show the mapping immediately without needing to close/reopen

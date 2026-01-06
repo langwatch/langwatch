@@ -165,12 +165,10 @@ export const useFilterParams = () => {
   const setNegateFilters = (negateFilters: boolean) => {
     void router.push(
       "?" +
-        qs.stringify(
-          {
-            ...router.query,
-            negateFilters: negateFilters ? "true" : "false",
-          },
-        ),
+        qs.stringify({
+          ...router.query,
+          negateFilters: negateFilters ? "true" : "false",
+        }),
       undefined,
       { shallow: true, scroll: false },
     );

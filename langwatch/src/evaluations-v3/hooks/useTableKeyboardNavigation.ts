@@ -14,7 +14,9 @@ type UseTableKeyboardNavigationParams = {
   displayRowCount: number;
   editingCell: { row: number; columnId: string } | undefined;
   selectedCell: { row: number; columnId: string } | undefined;
-  setSelectedCell: (cell: { row: number; columnId: string } | undefined) => void;
+  setSelectedCell: (
+    cell: { row: number; columnId: string } | undefined,
+  ) => void;
   setEditingCell: (cell: { row: number; columnId: string } | undefined) => void;
   toggleRowSelection: (rowIndex: number) => void;
 };
@@ -24,7 +26,7 @@ type UseTableKeyboardNavigationParams = {
  */
 export const buildNavigableColumns = (
   datasetColumns: DatasetColumn[],
-  targets: TargetConfig[]
+  targets: TargetConfig[],
 ): NavigableColumn[] => {
   const cols: NavigableColumn[] = [];
 
@@ -68,7 +70,7 @@ export const useTableKeyboardNavigation = ({
       if (!selectedCell) return;
 
       const currentColIndex = allColumns.findIndex(
-        (c) => c.id === selectedCell.columnId
+        (c) => c.id === selectedCell.columnId,
       );
       if (currentColIndex === -1) return;
 

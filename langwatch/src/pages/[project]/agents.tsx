@@ -7,18 +7,18 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { AgentCard } from "~/components/agents/AgentCard";
+import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
-import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
 import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
+import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
-import { AgentCard } from "~/components/agents/AgentCard";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
 
 /**
  * Agents management page
@@ -73,7 +73,9 @@ function Page() {
       <PageLayout.Header>
         <PageLayout.Heading>Agents</PageLayout.Heading>
         <Spacer />
-        <PageLayout.HeaderButton onClick={() => openDrawer("agentTypeSelector")}>
+        <PageLayout.HeaderButton
+          onClick={() => openDrawer("agentTypeSelector")}
+        >
           <Plus size={16} /> New Agent
         </PageLayout.HeaderButton>
       </PageLayout.Header>

@@ -13,18 +13,11 @@ import {
 import { type Node, useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
 import { useCallback, useEffect, useState } from "react";
-import {
-  ChevronDown,
-  Columns,
-  Info,
-  Plus,
-  Trash2,
-  X,
-} from "react-feather";
+import { ChevronDown, Columns, Info, Plus, Trash2, X } from "react-feather";
 import { useFieldArray, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { useShallow } from "zustand/react/shallow";
-
+import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 import { HoverableBigText } from "../../../components/HoverableBigText";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { camelCaseToTitleCase } from "../../../utils/stringCasing";
@@ -45,7 +38,6 @@ import {
   NodeSectionTitle,
   TypeLabel,
 } from "../nodes/Nodes";
-import { PropertySectionTitle } from "~/components/ui/PropertySectionTitle";
 
 import { OptimizationStudioLLMConfigField } from "./llm-configs/OptimizationStudioLLMConfigField";
 
@@ -461,7 +453,10 @@ export function FieldsForm({
 }
 
 // Re-export PropertySectionTitle for backwards compatibility
-export { PropertySectionTitle, type PropertySectionTitleProps } from "~/components/ui/PropertySectionTitle";
+export {
+  PropertySectionTitle,
+  type PropertySectionTitleProps,
+} from "~/components/ui/PropertySectionTitle";
 
 export function BasePropertiesPanel({
   node,

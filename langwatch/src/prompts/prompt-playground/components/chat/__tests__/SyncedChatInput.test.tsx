@@ -66,7 +66,10 @@ type RenderOptions = {
   inProgress?: boolean;
 };
 
-const renderSyncedChatInput = ({ tabId, inProgress = false }: RenderOptions) => {
+const renderSyncedChatInput = ({
+  tabId,
+  inProgress = false,
+}: RenderOptions) => {
   const onSend = vi.fn().mockResolvedValue(undefined);
   const onStop = vi.fn();
 
@@ -83,7 +86,7 @@ const renderSyncedChatInput = ({ tabId, inProgress = false }: RenderOptions) => 
             />
           </PromptPlaygroundChatProvider>
         </TabIdProvider>
-      </ChakraProvider>
+      </ChakraProvider>,
     ),
     onSend,
     onStop,
@@ -156,7 +159,7 @@ describe("SyncedChatInput", () => {
       renderSyncedChatInput({ tabId: tabId! });
 
       expect(
-        screen.getByPlaceholderText(/type your message/i)
+        screen.getByPlaceholderText(/type your message/i),
       ).toBeInTheDocument();
     });
 
@@ -202,7 +205,9 @@ describe("SyncedChatInput", () => {
 
       // Find the button (there's only one button when no checkbox)
       const buttons = screen.getAllByRole("button");
-      const sendButton = buttons.find((btn) => btn.getAttribute("type") === "button");
+      const sendButton = buttons.find(
+        (btn) => btn.getAttribute("type") === "button",
+      );
       expect(sendButton).toBeDisabled();
     });
   });

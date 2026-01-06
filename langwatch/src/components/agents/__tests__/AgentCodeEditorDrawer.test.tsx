@@ -5,9 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 import type { AvailableSource, FieldMapping } from "~/components/variables";
+import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -20,7 +19,10 @@ vi.mock("next/router", () => ({
 
 // Mock next-auth
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: { user: { id: "test-user" } }, status: "authenticated" }),
+  useSession: () => ({
+    data: { user: { id: "test-user" } },
+    status: "authenticated",
+  }),
 }));
 
 // Mock useOrganizationTeamProject
@@ -40,7 +42,13 @@ vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
 
 // Mock CodeBlockEditor
 vi.mock("~/components/blocks/CodeBlockEditor", () => ({
-  CodeBlockEditor: ({ code, onChange }: { code: string; onChange: (code: string) => void }) => (
+  CodeBlockEditor: ({
+    code,
+    onChange,
+  }: {
+    code: string;
+    onChange: (code: string) => void;
+  }) => (
     <div data-testid="code-editor">
       <textarea
         data-testid="code-textarea"
@@ -146,14 +154,12 @@ describe("AgentCodeEditorDrawer", () => {
     cleanup();
   });
 
-  const renderDrawer = (props: Partial<Parameters<typeof AgentCodeEditorDrawer>[0]> = {}) => {
+  const renderDrawer = (
+    props: Partial<Parameters<typeof AgentCodeEditorDrawer>[0]> = {},
+  ) => {
     return render(
-      <AgentCodeEditorDrawer
-        open={true}
-        onClose={mockOnClose}
-        {...props}
-      />,
-      { wrapper: Wrapper }
+      <AgentCodeEditorDrawer open={true} onClose={mockOnClose} {...props} />,
+      { wrapper: Wrapper },
     );
   };
 
