@@ -262,6 +262,25 @@ export default async function handler(
   return res.status(200).json(result);
 }
 
+const autoparseContexts = (
+  contexts: unknown[] | unknown,
+): string[] | undefined => {
+  if (contexts === null || contexts === undefined) {
+    return undefined;
+  }
+  let parsedContexts = Array.isArray(contexts) ? contexts : [contexts];
+
+  return parsedContexts.map((context) => {
+    if (typeof context === "string") {
+      return context;
+    } else {
+      return extractChunkTextualContent(
+        "content" in context ? context.content : context,
+      );
+    }
+  });
+};
+
 export const getEvaluatorDataForParams = (
   checkType: string,
   params: Record<string, any>,
@@ -272,7 +291,12 @@ export const getEvaluatorDataForParams = (
       data: params,
     };
   }
-  const data_ = defaultEvaluatorInputSchema.parse(params);
+
+  const data_ = defaultEvaluatorInputSchema.parse({
+    ...params,
+    contexts: autoparseContexts(params.contexts),
+    expected_contexts: autoparseContexts(params.expected_contexts),
+  });
   const {
     input,
     output,
@@ -282,34 +306,14 @@ export const getEvaluatorDataForParams = (
     expected_contexts,
   } = data_;
 
-  const contextList = contexts
-    ?.map((context) => {
-      if (typeof context === "string") {
-        return context;
-      } else {
-        return extractChunkTextualContent(context.content);
-      }
-    })
-    .filter((x) => x);
-
-  const expectedContextList = expected_contexts
-    ?.map((context) => {
-      if (typeof context === "string") {
-        return context;
-      } else {
-        return extractChunkTextualContent(context.content);
-      }
-    })
-    .filter((x) => x);
-
   return {
     type: "default",
     data: {
       input: input ? input : undefined,
       output: output ? output : undefined,
-      contexts: JSON.stringify(contextList),
+      contexts: JSON.stringify(contexts),
       expected_output: expected_output ? expected_output : undefined,
-      expected_contexts: JSON.stringify(expectedContextList),
+      expected_contexts: JSON.stringify(expected_contexts),
       conversation: JSON.stringify(
         conversation?.map((message) => ({
           input: message.input ?? undefined,

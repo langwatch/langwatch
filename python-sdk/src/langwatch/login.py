@@ -1,6 +1,7 @@
 import httpx
 
 import langwatch
+from langwatch.utils.exceptions import better_raise_for_status
 from .state import get_api_key, get_endpoint
 from getpass import getpass
 
@@ -25,7 +26,7 @@ def login(relogin=False):
     )
     if response.status_code == 401:
         raise ValueError("API key is not valid, please try to login again")
-    response.raise_for_status()
+    better_raise_for_status(response)
 
     langwatch.setup(api_key=api_key)
     print("LangWatch API key set")

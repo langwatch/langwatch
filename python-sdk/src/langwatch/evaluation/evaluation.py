@@ -34,6 +34,7 @@ import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
 from langwatch.telemetry.tracing import LangWatchTrace
+from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback
 
 from coolname import generate_slug  # type: ignore
@@ -132,7 +133,7 @@ class Evaluation:
             raise ValueError(
                 "API key is not valid, please try to login again with langwatch.login()"
             )
-        response.raise_for_status()
+        better_raise_for_status(response)
         response_json = response.json()
         experiment_path = response_json["path"]
         self.experiment_slug = response_json["slug"]
@@ -388,7 +389,7 @@ class Evaluation:
             data=json.dumps(body, cls=SerializableWithStringFallback),  # type: ignore
             timeout=60,
         )
-        response.raise_for_status()
+        better_raise_for_status(response)
 
     def _wait_for_completion(self):
         async def wait_for_completion(self: Evaluation):

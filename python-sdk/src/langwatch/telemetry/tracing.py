@@ -6,6 +6,7 @@ import httpx
 import threading
 from deprecated import deprecated
 from langwatch.attributes import AttributeKey
+from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
     convert_typed_values,
@@ -300,7 +301,7 @@ class LangWatchTrace:
                 headers={"X-Auth-Token": get_api_key()},
                 timeout=15,
             )
-            response.raise_for_status()
+            better_raise_for_status(response)
             path = response.json()["path"]
             return f"{endpoint}{path}"
 
@@ -317,7 +318,7 @@ class LangWatchTrace:
                 headers={"X-Auth-Token": get_api_key()},
                 timeout=15,
             )
-            response.raise_for_status()
+            better_raise_for_status(response)
 
     def update(
         self,
