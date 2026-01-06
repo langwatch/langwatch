@@ -8,7 +8,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Check } from "react-feather";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
 import "@copilotkit/react-ui/styles.css";
 import { LuCircleOff } from "react-icons/lu";
@@ -90,7 +91,10 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
               gap={2}
               alignItems="center"
             >
-              {run.status === "SUCCESS" && <Check size={12} />}
+              <ScenarioRunStatusIcon
+                status={run.status as ScenarioRunStatus}
+                boxSize={12}
+              />
               <Badge
                 colorPalette={run.status === "SUCCESS" ? "green" : "orange"}
                 variant="subtle"

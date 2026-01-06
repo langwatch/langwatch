@@ -32,7 +32,18 @@ export function convertScenarioMessagesToCopilotKit(
     }
   });
 
-  return convertedMessages;
+  // We only want the last message with a given trace id to show it,
+  // So we reverse the array and then remove duplicates in order
+  // and then reverse it again.
+  const seenTraceIds = new Set<string>();
+  return convertedMessages.toReversed().map((message) => {
+    if (!message.traceId) return message;
+    if (seenTraceIds.has(message.traceId)) {
+      message.traceId = undefined;
+    }
+    seenTraceIds.add(message.traceId!);
+    return message;
+  }).toReversed();
 }
 
 /**
@@ -103,39 +114,40 @@ function convertMixedContent(
 
   content.forEach((item, index) => {
     if (typeof item === "object" && item.type === "text") {
-      messages.push(
-        new TextMessage({
-          id: `${originalMessage.id}-content-${index}`,
-          role: originalMessage.role as MessageRole,
-          content: item.text,
-        }),
-      );
+      const textMessage: TextMessage & { traceId?: string } = new TextMessage({
+        id: `${originalMessage.id}-content-${index}`,
+        role: originalMessage.role as MessageRole,
+        content: item.text,
+      });
+      textMessage.traceId = originalMessage.trace_id;
+      messages.push(textMessage);
     } else if (typeof item === "object" && item.image) {
       const imageMessage = createImageMessage(
         item.image,
         originalMessage,
         index,
       );
+
       if (imageMessage) {
         messages.push(imageMessage);
       }
 
       // Anthropic tool use
     } else if (item.type === "tool_use") {
-      messages.push(
-        new ActionExecutionMessage({
-          name: item.name,
-          arguments: item.arguments ?? item.input,
-        }),
-      );
+      const actionExecutionMessage: ActionExecutionMessage & { traceId?: string } = new ActionExecutionMessage({
+        name: item.name,
+        arguments: item.arguments ?? item.input,
+      });
+      actionExecutionMessage.traceId = originalMessage.trace_id;
+      messages.push(actionExecutionMessage);
     } else if (item.type === "tool_result") {
-      messages.push(
-        new ResultMessage({
-          actionExecutionId: item.tool_use_id,
-          actionName: item.name ?? "tool_result",
-          result: item.content,
-        }),
-      );
+      const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage({
+        actionExecutionId: item.tool_use_id,
+        actionName: item.name ?? "tool_result",
+        result: item.content,
+      });
+      resultMessage.traceId = originalMessage.trace_id;
+      messages.push(resultMessage);
     }
   });
 
