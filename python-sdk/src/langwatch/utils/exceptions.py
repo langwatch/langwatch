@@ -31,3 +31,5 @@ def better_raise_for_status(response: httpx.Response, cls: Type[BaseException] =
         if "error" in json:
             error = json["error"]
             raise cls(f"{response.status_code} {error}") from http_err
+        else:
+            raise http_err
