@@ -1,5 +1,5 @@
 import { createTRPCRouter } from "~/server/api/trpc";
-import { scenarioCrudRouter } from "./scenario.router";
+import { scenarioCrudRouter } from "./scenario-crud.router";
 import { scenarioEventsRouter } from "./scenario-events.router";
 import { simulationRunnerRouter } from "./simulation-runner.router";
 
