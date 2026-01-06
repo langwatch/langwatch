@@ -1,9 +1,9 @@
 @integration @unit @visual
 Feature: On-Platform Scenarios - Walking Skeleton (S0)
   As a LangWatch user
-  I want to create scenarios and run them against HTTP targets
+  I want to create scenarios and run them against prompt targets
   So that I can validate my agent's behavior on the platform
-  # Routes are at /[project]/simulationsv2/* (hidden for now, no nav link)
+  # Routes are at /[project]/simulations/* (hidden for now, no nav link)
   # ============================================================================
   # Frontend: Navigation & List (SCEN-10)
   # ============================================================================
@@ -11,7 +11,7 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   @visual
   Scenario: Navigate to scenarios list
     Given I am logged into project "my-project"
-    When I navigate to "/my-project/simulationsv2"
+    When I navigate to "/my-project/simulations"
     Then I see the scenarios list page
     And I see a "New Scenario" button
 
@@ -41,7 +41,7 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   Scenario: Navigate to create form
     Given I am on the scenarios list page
     When I click "New Scenario"
-    Then I navigate to "/[project]/simulationsv2/new"
+    Then I navigate to "/[project]/simulations/new"
     And I see the scenario form
 
   @visual
@@ -83,7 +83,7 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   Scenario: Navigate to edit form
     Given scenario "Refund Flow" exists
     When I click on "Refund Flow" in the list
-    Then I navigate to "/[project]/simulationsv2/[id]"
+    Then I navigate to "/[project]/simulations/[id]"
     And the form is populated with existing data
 
   @visual
@@ -94,25 +94,21 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     Then the scenario is updated
     And I see the updated name in the list
   # ============================================================================
-  # Frontend: HTTP Target Configuration (SCEN-43)
+  # Frontend: Prompt Target Configuration (SCEN-43)
   # ============================================================================
 
   @visual
-  Scenario: Configure HTTP target
+  Scenario: Configure prompt target
     Given I am on the scenario edit page
     When I click "Configure Target"
-    Then I see the HTTP target form with fields:
-      | field   | type                |
-      | URL     | text input          |
-      | Method  | dropdown (POST/GET) |
-      | Headers | key-value pairs     |
+    Then I see a prompt selector
+    And I can select an existing prompt config
 
   @visual
-  Scenario: Save HTTP target as Agent
-    Given I have configured an HTTP target
-    When I save the target
-    Then an Agent with type "http" is created
-    And the target is associated with the scenario run
+  Scenario: Select prompt as target
+    Given prompts exist in the project
+    When I select a prompt as target
+    Then the target is associated with the scenario run
   # ============================================================================
   # Frontend: Quick Run & Results (SCEN-24, SCEN-32)
   # ============================================================================
@@ -120,7 +116,7 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   @visual
   Scenario: Run scenario
     Given scenario "Refund Flow" exists with criteria
-    And an HTTP target is configured
+    And a prompt target is configured
     When I click "Run"
     Then the run starts
     And I navigate to the run visualization page
@@ -144,40 +140,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     Given I am viewing run results
     When I click "Back to Scenarios"
     Then I navigate to the scenarios list
-  # ============================================================================
-  # Agent Model Extension (SCEN-02)
-  # ============================================================================
-
-  @unit
-  Scenario: Agent types include HTTP
-    Then the agentTypeSchema accepts the following types:
-      | type      |
-      | signature |
-      | code      |
-      | workflow  |
-      | http      |
-
-  @unit
-  Scenario: HTTP agent config validation
-    When I create an agent with type "http" and config:
-      | url     | https://api.example.com/chat         |
-      | method  | POST                                 |
-      | headers | {"Content-Type": "application/json"} |
-    Then the config is validated against httpAgentConfigSchema
-    And the agent is created successfully
-
-  @unit
-  Scenario: HTTP agent requires valid URL
-    When I create an agent with type "http" and config:
-      | url    | not-a-url |
-      | method | POST      |
-    Then validation fails with "Invalid url"
-
-  @unit
-  Scenario: HTTP agent method defaults to POST
-    When I create an agent with type "http" and config:
-      | url | https://api.example.com/chat |
-    Then the method defaults to "POST"
   # ============================================================================
   # Scenario Schema (SCEN-01)
   # ============================================================================
@@ -220,13 +182,6 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     And updatedAt is refreshed
 
   @integration
-  Scenario: Delete scenario (soft delete)
-    Given scenario "Scenario A" exists
-    When I call scenario.delete with the scenario ID
-    Then the scenario has archivedAt set
-    And the scenario no longer appears in scenario.list
-
-  @integration
   Scenario: Scenarios are project-scoped
     Given scenario "Scenario A" exists in project "project-1"
     And scenario "Scenario B" exists in project "project-2"
@@ -237,15 +192,13 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
   # ============================================================================
 
   @integration
-  Scenario: Run scenario against HTTP target
+  Scenario: Run scenario against prompt target
     Given scenario "Refund Test" exists with:
       | situation | User wants refund        |
       | criteria  | ["Acknowledges request"] |
-    And agent "Test API" exists with type "http" and config:
-      | url    | https://httpbin.org/post |
-      | method | POST                     |
-    When I call scenario.run with scenarioId and agentId
-    Then the ScenarioRunnerService is invoked
+    And prompt "Test Prompt" exists
+    When I call scenario.run with scenarioId and promptId
+    Then the SimulationRunnerService is invoked
     And events are emitted to ES "scenario-events"
     And a runId is returned
 
@@ -255,48 +208,27 @@ Feature: On-Platform Scenarios - Walking Skeleton (S0)
     When I call scenarios.getRunState with the runId
     Then I receive the current run state
     And the state includes conversation events
-
-  @unit
-  Scenario: HTTP target adapter invokes endpoint
-    Given an HTTP agent config:
-      | url    | https://api.test/chat |
-      | method | POST                  |
-    When the SimulationTargetAdapter processes message "Hello"
-    Then an HTTP POST is made to "https://api.test/chat"
-    And the response is returned
-
-  @unit
-  Scenario: HTTP target adapter handles timeout
-    Given an HTTP agent config with slow endpoint
-    When the SimulationTargetAdapter times out
-    Then an error event is emitted with "timeout"
-
-  @unit
-  Scenario: HTTP target adapter handles non-2xx response
-    Given an HTTP agent config
-    When the endpoint returns 500
-    Then an error event is emitted with the status code
   # ============================================================================
-  # ScenarioRunnerService (SCEN-06)
+  # SimulationRunnerService (SCEN-06)
   # ============================================================================
 
   @unit
-  Scenario: ScenarioRunnerService loads scenario and agent
+  Scenario: SimulationRunnerService loads scenario and prompt
     Given scenario "Test" exists
-    And agent "API" exists with type "http"
-    When ScenarioRunnerService.run is called
-    Then the scenario is loaded from ScenarioRepository
-    And the agent is loaded from AgentRepository
+    And prompt "Test Prompt" exists
+    When SimulationRunnerService.run is called
+    Then the scenario is loaded from ScenarioService
+    And the prompt is loaded from PromptService
     And the SDK scenario.run is invoked
 
   @unit
-  Scenario: ScenarioRunnerService passes situation to SDK
+  Scenario: SimulationRunnerService passes situation to SDK
     Given scenario with situation "User is angry about billing"
-    When ScenarioRunnerService executes
-    Then the SDK receives the situation in the config
+    When SimulationRunnerService executes
+    Then the SDK receives the situation in the description
 
   @unit
-  Scenario: ScenarioRunnerService passes criteria to SDK
+  Scenario: SimulationRunnerService passes criteria to SDK
     Given scenario with criteria ["Must apologize", "Must offer refund"]
-    When ScenarioRunnerService executes
+    When SimulationRunnerService executes
     Then the SDK receives the criteria for judge evaluation

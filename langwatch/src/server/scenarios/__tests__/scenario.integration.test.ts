@@ -85,4 +85,42 @@ describe("ScenarioService", () => {
     expect(result.name).toBe("Updated");
     expect(result.situation).toBe("Updated situation");
   });
+
+  it("isolates scenarios by project", async () => {
+    const otherProjectId = "other-project-id";
+
+    // Clean up other project
+    await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
+
+    // Create scenario in main project
+    await service.create({
+      projectId,
+      name: "Scenario A",
+      situation: "Test",
+      criteria: [],
+      labels: [],
+    });
+
+    // Create scenario in other project
+    await service.create({
+      projectId: otherProjectId,
+      name: "Scenario B",
+      situation: "Test",
+      criteria: [],
+      labels: [],
+    });
+
+    // Query main project - should only see Scenario A
+    const mainResult = await service.getAll({ projectId });
+    expect(mainResult.length).toBe(1);
+    expect(mainResult[0]?.name).toBe("Scenario A");
+
+    // Query other project - should only see Scenario B
+    const otherResult = await service.getAll({ projectId: otherProjectId });
+    expect(otherResult.length).toBe(1);
+    expect(otherResult[0]?.name).toBe("Scenario B");
+
+    // Cleanup
+    await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
+  });
 });
