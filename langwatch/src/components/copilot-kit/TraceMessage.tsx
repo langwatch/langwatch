@@ -25,6 +25,7 @@ interface TraceMessageProps extends StackProps {
   traceId: string;
 }
 
+
 export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
   const { project } = useOrganizationTeamProject();
 
@@ -52,7 +53,7 @@ function TraceSuccessState({
   const { openDrawer, drawerOpen } = useDrawer();
 
   return (
-    <HStack marginTop={-6} paddingBottom={4} {...props}>
+    <HStack paddingBottom={4} {...props}>
       <Button
         colorPalette="gray"
         onClick={() => {
