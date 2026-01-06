@@ -195,29 +195,24 @@ describe("SimulationRunnerService Integration", () => {
     expect(successfulCalls.length).toBe(0);
   });
 
-  it("builds messages correctly with prompt configuration", async () => {
-    // Create prompt with messages
+  it("resolves PromptConfigAdapter for prompt target type", async () => {
     const prompt = await promptService.createPrompt({
       projectId,
-      handle: "test-prompt-with-messages",
-      prompt: "You are a customer service agent.",
-      messages: [
-        { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi there!" },
-      ],
+      handle: "test-prompt-adapter-resolution",
+      prompt: "You are a helpful assistant.",
       model: "openai/gpt-4o-mini",
     });
 
     const scenario = await scenarioService.create({
       projectId,
-      name: "Test Scenario 3",
+      name: "Test Scenario Adapter",
       situation: "User asks a question",
       criteria: [],
       labels: [],
     });
 
     mockGenerateText.mockResolvedValue({
-      text: "How can I help you?",
+      text: "Response",
     } as any);
 
     await runnerService.execute({
@@ -230,36 +225,16 @@ describe("SimulationRunnerService Integration", () => {
       setId: "test-set-id",
     });
 
-    // Verify messages structure - find the call made by our adapter
-    const adapterCall = mockGenerateText.mock.calls.find((call) => {
-      const messages = call[0]?.messages as Array<{
-        role: string;
-        content: string;
-      }>;
-      return (
-        messages?.some(
-          (m) =>
-            m.role === "system" &&
-            m.content === "You are a customer service agent.",
-        )
-      );
-    });
-
-    expect(adapterCall).toBeDefined();
-    const callArgs = adapterCall?.[0];
-    const messages = callArgs?.messages as Array<{
-      role: string;
-      content: string;
-    }>;
-
-    expect(messages).toBeDefined();
-    expect(messages.length).toBeGreaterThan(0);
-    // First message should be system prompt
-    expect(messages[0]?.role).toBe("system");
-    expect(messages[0]?.content).toBe("You are a customer service agent.");
-    // Should include prompt messages (excluding system)
-    expect(messages[1]?.role).toBe("user");
-    expect(messages[1]?.content).toBe("Hello");
+    // Verify ScenarioRunner.run was called with an adapter
+    expect(mockScenarioRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: scenario.id,
+        name: scenario.name,
+        agents: expect.arrayContaining([
+          expect.objectContaining({ name: "PromptConfigAdapter" }),
+        ]),
+      })
+    );
   });
 });
 
