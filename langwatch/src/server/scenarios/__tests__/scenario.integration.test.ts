@@ -8,14 +8,45 @@ import { ScenarioService } from "../scenario.service";
 
 describe("ScenarioService", () => {
   const projectId = "test-project-id";
+  const otherProjectId = "other-project-id";
   const service = ScenarioService.create(prisma);
 
   beforeAll(async () => {
     await getTestUser();
+
+    // Create other project for isolation test
+    const existingProject = await prisma.project.findUnique({
+      where: { id: otherProjectId },
+    });
+    if (!existingProject) {
+      // Get organization first, then team
+      const organization = await prisma.organization.findUnique({
+        where: { slug: "test-organization" },
+      });
+      if (organization) {
+        const team = await prisma.team.findFirst({
+          where: { slug: "test-team", organizationId: organization.id },
+        });
+        if (team) {
+          await prisma.project.create({
+            data: {
+              id: otherProjectId,
+              name: "Other Project",
+              slug: "other-project",
+              apiKey: "other-api-key",
+              teamId: team.id,
+              language: "en",
+              framework: "test-framework",
+            },
+          });
+        }
+      }
+    }
   });
 
   beforeEach(async () => {
     await prisma.scenario.deleteMany({ where: { projectId } });
+    await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
   });
 
   it("creates a scenario", async () => {
@@ -87,11 +118,6 @@ describe("ScenarioService", () => {
   });
 
   it("isolates scenarios by project", async () => {
-    const otherProjectId = "other-project-id";
-
-    // Clean up other project
-    await prisma.scenario.deleteMany({ where: { projectId: otherProjectId } });
-
     // Create scenario in main project
     await service.create({
       projectId,

@@ -1,8 +1,9 @@
 /**
  * @vitest-environment node
  */
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { generateText } from "ai";
+import ScenarioRunner from "@langwatch/scenario";
 import { getTestUser } from "../../../utils/testUtils";
 import { prisma } from "../../db";
 import { SimulationRunnerService } from "../simulation-runner.service";
@@ -18,7 +19,39 @@ vi.mock("ai", async () => {
   };
 });
 
+// Mock getVercelAIModel to avoid model provider lookup (no API keys in CI)
+vi.mock("../../modelProviders/utils", () => ({
+  getVercelAIModel: vi.fn(() => Promise.resolve({ modelId: "test-model" })),
+}));
+
+// Mock @langwatch/scenario SDK to prevent its internal LLM calls
+// while still testing our adapter integration
+vi.mock("@langwatch/scenario", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/scenario")>();
+  return {
+    ...actual,
+    default: {
+      ...actual.default,
+      run: vi.fn(async (config: { agents: Array<{ call?: (input: unknown) => Promise<string> }> }) => {
+        // Simulate SDK behavior: call the adapter agent if present
+        const adapter = config.agents.find(
+          (a) => a.call && typeof a.call === "function"
+        );
+        if (adapter?.call) {
+          await adapter.call({
+            messages: [{ role: "user", content: "Hello" }],
+          });
+        }
+        return { success: true, reasoning: "Mocked result" };
+      }),
+      userSimulatorAgent: vi.fn(() => ({ name: "UserSimulator" })),
+      judgeAgent: vi.fn(() => ({ name: "JudgeAgent" })),
+    },
+  };
+});
+
 const mockGenerateText = vi.mocked(generateText);
+const mockScenarioRun = ScenarioRunner.run as Mock;
 
 describe("SimulationRunnerService Integration", () => {
   const projectId = "test-project-id";
