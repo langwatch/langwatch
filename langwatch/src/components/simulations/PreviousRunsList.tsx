@@ -9,6 +9,7 @@ import {
 } from "@chakra-ui/react";
 import React from "react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
 import "@copilotkit/react-ui/styles.css";
@@ -63,7 +64,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
         </EmptyState.Root>
       )}
 
-      {scenarioRunData?.data?.map((run) => (
+      {scenarioRunData?.data?.map((run: ScenarioRunData) => (
         <Box
           key={run.scenarioRunId}
           p={4}

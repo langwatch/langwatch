@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
+import { Button, HStack, Input, Text } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { useState } from "react";
 
@@ -62,18 +62,26 @@ export function InlineTagsInput({
           gap={1}
         >
           <Text>{tag}</Text>
-          <Box
-            as="button"
+          <button
             type="button"
             onClick={() => handleRemove(index)}
-            cursor="pointer"
-            color="blue.500"
-            _hover={{ color: "blue.700" }}
-            display="flex"
-            alignItems="center"
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              background: "transparent",
+              border: "none",
+              color: "var(--chakra-colors-blue-500)",
+            }}
+            onMouseOver={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-700)")
+            }
+            onMouseOut={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-blue-500)")
+            }
           >
             <X size={12} />
-          </Box>
+          </button>
         </HStack>
       ))}
 

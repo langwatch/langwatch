@@ -45,11 +45,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     { enabled: !!project && !!scenarioId }
   );
   const createMutation = api.scenarios.create.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
       props.onSuccess?.(data);
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toaster.create({
         title: "Failed to create scenario",
         description: error.message,
@@ -59,7 +59,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
   });
   const updateMutation = api.scenarios.update.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: project?.id ?? "" });
       void utils.scenarios.getById.invalidate({
         projectId: project?.id ?? "",
@@ -67,7 +67,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       });
       props.onSuccess?.(data);
     },
-    onError: (error) => {
+    onError: (error: { message: string }) => {
       toaster.create({
         title: "Failed to update scenario",
         description: error.message,

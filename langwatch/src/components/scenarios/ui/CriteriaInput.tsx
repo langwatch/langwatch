@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Input, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 
@@ -43,19 +43,27 @@ export function CriteriaInput({
       {value.map((criterion, index) => (
         <HStack key={index} gap={2}>
           <Input value={criterion} size="sm" readOnly flex={1} bg="gray.50" />
-          <Box
-            as="button"
+          <button
             type="button"
             onClick={() => handleRemove(index)}
-            cursor="pointer"
-            color="gray.400"
-            _hover={{ color: "red.500" }}
-            display="flex"
-            alignItems="center"
-            padding={2}
+            style={{
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              padding: "8px",
+              background: "transparent",
+              border: "none",
+              color: "var(--chakra-colors-gray-400)",
+            }}
+            onMouseOver={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-red-500)")
+            }
+            onMouseOut={(e) =>
+              (e.currentTarget.style.color = "var(--chakra-colors-gray-400)")
+            }
           >
             <X size={14} />
-          </Box>
+          </button>
         </HStack>
       ))}
 

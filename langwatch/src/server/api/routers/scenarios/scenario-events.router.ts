@@ -2,14 +2,14 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission } from "../../rbac";
 
 // Base schema for all project-related operations
 const projectSchema = z.object({
   projectId: z.string(),
 });
 
-export const scenarioRouter = createTRPCRouter({
+export const scenarioEventsRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
     .input(projectSchema)
