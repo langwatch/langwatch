@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { useEffect } from "react";
-import { Edit, MoreVertical, Plus, XCircle } from "react-feather";
+import { Edit, MoreVertical, Plus, XCircle } from "lucide-react";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
@@ -353,9 +353,10 @@ export default function ModelsPage() {
                 disabled={providerToDisable ? isDefaultProvider(providerToDisable.provider) : false}
                 onClick={async () => {
                   if (!providerToDisable) return;
+                  if (!project?.id) return;
                   await disableMutation.mutateAsync({
                     id: providerToDisable.id,
-                    projectId: project?.id ?? "",
+                    projectId: project.id,
                     provider: providerToDisable.provider,
                     enabled: false,
                   });
