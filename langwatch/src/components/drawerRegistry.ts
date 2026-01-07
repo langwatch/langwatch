@@ -45,7 +45,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
-  addOrEditModelProvier : AddOrEditModelProviderDrawer,
+  addOrEditModelProvider: AddOrEditModelProviderDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,

@@ -48,7 +48,7 @@ export default function ModelsPage() {
   });
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
-  const isProviderDrawerOpen = isDrawerOpen("addOrEditModelProvier");
+  const isProviderDrawerOpen = isDrawerOpen("addOrEditModelProvider");
   const disableMutation = api.modelProvider.update.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
@@ -124,7 +124,7 @@ export default function ModelsPage() {
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
           <Tooltip
-            content="You need annotations view permissions to add new scores."
+            content="You need model provider manage permissions to add new providers."
             disabled={hasModelProvidersManagePermission}
           >
             <Menu.Root>
@@ -138,7 +138,7 @@ export default function ModelsPage() {
                   <Menu.Item
                     key={provider.provider}
                     value={provider.provider}
-                    onClick={() => openDrawer("addOrEditModelProvier", {
+                    onClick={() => openDrawer("addOrEditModelProvider", {
                       mode: "add",
                       projectId: project?.id,
                       organizationId: organization?.id,
@@ -214,7 +214,7 @@ export default function ModelsPage() {
                                 value="edit"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  openDrawer("addOrEditModelProvier", {
+                                  openDrawer("addOrEditModelProvider", {
                                     mode: "edit",
                                     projectId: project?.id,
                                     organizationId: organization?.id,

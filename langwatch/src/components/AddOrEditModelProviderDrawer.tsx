@@ -1,7 +1,7 @@
 
 import { HStack, Text } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
-import { Drawer } from "../components/ui/drawer";
+import { Drawer } from "./ui/drawer";
 import { AddModelProviderForm, EditModelProviderForm } from "./settings/ModelProviderForm";
 import { modelProviders } from "../server/modelProviders/registry";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
