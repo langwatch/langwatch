@@ -138,15 +138,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const isSubmitting = createMutation.isPending || updateMutation.isPending || runMutation.isPending;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => scenario ?? undefined, [scenario]);
   return (
-    <Drawer.Root closeOnInteractOutside={false}
+    <Drawer.Root
+      closeOnInteractOutside={false}
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
       size="xl"
+      modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
-          <Heading size="md">Edit Scenario</Heading>
+          <Heading size="md">{scenario ? "Edit Scenario" : "Create Scenario"}</Heading>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">

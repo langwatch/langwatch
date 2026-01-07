@@ -1,3 +1,6 @@
+'use client'
+// Internal pages don't need to be server rendering
+
 import { HStack, Spinner, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";

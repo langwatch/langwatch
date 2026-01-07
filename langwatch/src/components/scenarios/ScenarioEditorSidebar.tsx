@@ -35,7 +35,7 @@ export function ScenarioEditorSidebar() {
                 borderRadius="md"
                 color="blue.500"
               >
-                <Sparkles size={20} />
+                <Icon as={Sparkles} boxSize={5} />
               </Box>
               <VStack align="start" gap={0}>
                 <Text fontWeight="semibold" fontSize="sm">
