@@ -81,6 +81,10 @@ export class PromptConfigAdapter extends AgentAdapter {
         "PromptConfigAdapter.call completed",
       );
 
+      if (!result.text) {
+        logger.warn(result, "LLM returned empty response");
+      }
+
       return result.text;
     } catch (error) {
       logger.error(
