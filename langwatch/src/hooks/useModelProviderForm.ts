@@ -8,6 +8,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
+import { isProviderUsedForDefaultModels } from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
 
@@ -17,8 +18,15 @@ export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
   projectDefaultModel?: string | null;
+  projectTopicClusteringModel?: string | null;
+  projectEmbeddingsModel?: string | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
+  onDefaultModelsUpdated?: (models: {
+    defaultModel?: string;
+    topicClusteringModel?: string;
+    embeddingsModel?: string;
+  }) => void;
 };
 
 export type UseModelProviderFormState = {
@@ -32,6 +40,10 @@ export type UseModelProviderFormState = {
   chatModelOptions: SelectOption[];
   embeddingModelOptions: SelectOption[];
   defaultModel: string | null;
+  useAsDefaultProvider: boolean;
+  projectDefaultModel: string | null;
+  projectTopicClusteringModel: string | null;
+  projectEmbeddingsModel: string | null;
   isSaving: boolean;
   isToggling: boolean;
   errors: {
@@ -41,6 +53,7 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setEnabledLocal: (enabled: boolean) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
   addExtraHeader: () => void;
@@ -53,6 +66,10 @@ export type UseModelProviderFormActions = {
   setCustomEmbeddingsModels: (options: SelectOption[]) => void;
   addCustomEmbeddingsFromText: (text: string) => void;
   setDefaultModel: (model: string | null) => void;
+  setUseAsDefaultProvider: (use: boolean) => void;
+  setProjectDefaultModel: (model: string | null) => void;
+  setProjectTopicClusteringModel: (model: string | null) => void;
+  setProjectEmbeddingsModel: (model: string | null) => void;
   setManaged: (managed: boolean) => void;
   submit: () => Promise<void>;
 };
@@ -60,10 +77,24 @@ export type UseModelProviderFormActions = {
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const { provider, projectId, projectDefaultModel, onSuccess, onError } =
-    params;
+  const {
+    provider,
+    projectId,
+    projectDefaultModel: initialProjectDefaultModel,
+    projectTopicClusteringModel: initialProjectTopicClusteringModel,
+    projectEmbeddingsModel: initialProjectEmbeddingsModel,
+    onSuccess,
+    onError,
+    onDefaultModelsUpdated,
+  } = params;
 
   const updateMutation = api.modelProvider.update.useMutation();
+  const updateDefaultModelMutation =
+    api.project.updateDefaultModel.useMutation();
+  const updateTopicClusteringModelMutation =
+    api.project.updateTopicClusteringModel.useMutation();
+  const updateEmbeddingsModelMutation =
+    api.project.updateEmbeddingsModel.useMutation();
 
   const providerDefinition =
     modelProvidersRegistry[
@@ -215,8 +246,18 @@ export function useModelProviderForm(
   );
 
   const [defaultModel, setDefaultModel] = useState<string | null>(
-    projectDefaultModel ?? null,
+    initialProjectDefaultModel ?? null,
   );
+
+  const [useAsDefaultProvider, setUseAsDefaultProvider] =
+    useState<boolean>(false);
+  const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
+    initialProjectDefaultModel ?? null,
+  );
+  const [projectTopicClusteringModel, setProjectTopicClusteringModel] =
+    useState<string | null>(initialProjectTopicClusteringModel ?? null);
+  const [projectEmbeddingsModel, setProjectEmbeddingsModel] =
+    useState<string | null>(initialProjectEmbeddingsModel ?? null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
@@ -282,7 +323,20 @@ export function useModelProviderForm(
       ),
     );
 
-    setDefaultModel(projectDefaultModel ?? null);
+    setDefaultModel(initialProjectDefaultModel ?? null);
+    
+    // Auto-enable the toggle if this provider is currently being used for any default models
+    const isUsedForDefaults = isProviderUsedForDefaultModels(
+      provider.provider,
+      initialProjectDefaultModel ?? null,
+      initialProjectTopicClusteringModel ?? null,
+      initialProjectEmbeddingsModel ?? null
+    );
+    setUseAsDefaultProvider(isUsedForDefaults);
+    
+    setProjectDefaultModel(initialProjectDefaultModel ?? null);
+    setProjectTopicClusteringModel(initialProjectTopicClusteringModel ?? null);
+    setProjectEmbeddingsModel(initialProjectEmbeddingsModel ?? null);
     setErrors({});
     setIsSaving(false);
     setIsToggling(false);
@@ -291,12 +345,16 @@ export function useModelProviderForm(
     provider.id,
     provider.enabled,
     provider.customKeys,
-    provider.models,
-    provider.embeddingsModels,
     provider.extraHeaders,
     originalSchemaShape,
-    projectDefaultModel,
+    initialProjectDefaultModel,
+    initialProjectTopicClusteringModel,
+    initialProjectEmbeddingsModel,
   ]);
+
+  const setEnabledLocal = useCallback((newEnabled: boolean) => {
+    setEnabledState(newEnabled);
+  }, []);
 
   const setEnabled = useCallback(
     async (newEnabled: boolean) => {
@@ -481,15 +539,55 @@ export function useModelProviderForm(
         id: provider.id,
         projectId: projectId ?? "",
         provider: provider.provider,
-        enabled,
+        enabled: true, // Always enable when saving through the form
         customKeys: customKeysToSend,
         customModels: (customModels ?? []).map((m) => m.value),
         customEmbeddingsModels: (customEmbeddingsModels ?? []).map(
           (m) => m.value,
         ),
         extraHeaders: extraHeadersToSend,
-        defaultModel: defaultModel ?? undefined,
       });
+
+      // Update project default models if useAsDefaultProvider is enabled
+      if (useAsDefaultProvider && projectId) {
+        const updatePromises: Promise<unknown>[] = [];
+
+        if (projectDefaultModel) {
+          updatePromises.push(
+            updateDefaultModelMutation.mutateAsync({
+              projectId,
+              defaultModel: projectDefaultModel,
+            }),
+          );
+        }
+
+        if (projectTopicClusteringModel) {
+          updatePromises.push(
+            updateTopicClusteringModelMutation.mutateAsync({
+              projectId,
+              topicClusteringModel: projectTopicClusteringModel,
+            }),
+          );
+        }
+
+        if (projectEmbeddingsModel) {
+          updatePromises.push(
+            updateEmbeddingsModelMutation.mutateAsync({
+              projectId,
+              embeddingsModel: projectEmbeddingsModel,
+            }),
+          );
+        }
+
+        await Promise.all(updatePromises);
+        
+        // Notify parent component about updated default models
+        onDefaultModelsUpdated?.({
+          defaultModel: projectDefaultModel ?? undefined,
+          topicClusteringModel: projectTopicClusteringModel ?? undefined,
+          embeddingsModel: projectEmbeddingsModel ?? undefined,
+        });
+      }
 
       toaster.create({
         title: "API Keys Updated",
@@ -514,8 +612,6 @@ export function useModelProviderForm(
     customKeys,
     customModels,
     customEmbeddingsModels,
-    defaultModel,
-    enabled,
     extraHeaders,
     onError,
     onSuccess,
@@ -524,6 +620,13 @@ export function useModelProviderForm(
     provider.id,
     provider.provider,
     updateMutation,
+    useAsDefaultProvider,
+    projectDefaultModel,
+    projectTopicClusteringModel,
+    projectEmbeddingsModel,
+    updateDefaultModelMutation,
+    updateTopicClusteringModelMutation,
+    updateEmbeddingsModelMutation,
   ]);
 
   return [
@@ -538,12 +641,17 @@ export function useModelProviderForm(
       chatModelOptions,
       embeddingModelOptions,
       defaultModel,
+      useAsDefaultProvider,
+      projectDefaultModel,
+      projectTopicClusteringModel,
+      projectEmbeddingsModel,
       isSaving,
       isToggling,
       errors,
     },
     {
       setEnabled,
+      setEnabledLocal,
       setUseApiGateway,
       setCustomKey,
       addExtraHeader,
@@ -556,6 +664,10 @@ export function useModelProviderForm(
       setCustomEmbeddingsModels,
       addCustomEmbeddingsFromText,
       setDefaultModel,
+      setUseAsDefaultProvider,
+      setProjectDefaultModel,
+      setProjectTopicClusteringModel,
+      setProjectEmbeddingsModel,
       setManaged,
       submit,
     },

@@ -268,6 +268,7 @@ export const getProjectModelProviders = async (
     .reduce(
       (acc, modelProvider) => {
         const modelProvider_: MaybeStoredModelProvider = {
+          id: modelProvider.id,
           provider: modelProvider.provider,
           enabled: modelProvider.enabled,
           customKeys: modelProvider.customKeys,

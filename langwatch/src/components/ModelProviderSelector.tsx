@@ -24,9 +24,9 @@ export const useProviderSelectionOptions = (
   providers: Record<string, MaybeStoredModelProvider> | undefined,
   selectedProvider: string | undefined,
 ) => {
-  // Filter to only show providers that are NOT enabled (disabled providers)
-  const disabledProviders = providers
-    ? Object.entries(providers).filter(([_, provider]) => !provider.enabled)
+  // Show all providers regardless of enabled state
+  const allProviders = providers
+    ? Object.entries(providers)
     : [];
 
   const selectOptions: Record<string, ProviderOption> = {};
@@ -41,8 +41,8 @@ export const useProviderSelectionOptions = (
     isDisabled: false,
   };
 
-  // Add disabled providers (excluding custom if it's already in the list)
-  disabledProviders.forEach(([providerKey, _]) => {
+  // Add all providers (excluding custom if it's already in the list)
+  allProviders.forEach(([providerKey, _]) => {
     if (providerKey === "custom") return; // Already added above
     
     const providerDefinition =
