@@ -50,7 +50,7 @@ export const AddOrEditModelProviderDrawer = (props: AddOrEditModelProviderDrawer
         <Drawer.Root
             open={true}
             placement="end"
-            size="lg"
+            size="md"
             onOpenChange={({ open }) => {
                 if (!open) {
                 closeDrawer();

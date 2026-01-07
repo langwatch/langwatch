@@ -88,6 +88,7 @@ export function useModelProviderForm(
     onDefaultModelsUpdated,
   } = params;
 
+  const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
   const updateDefaultModelMutation =
     api.project.updateDefaultModel.useMutation();
@@ -580,6 +581,10 @@ export function useModelProviderForm(
         }
 
         await Promise.all(updatePromises);
+
+        // Invalidate organization query to refetch project data
+        // This triggers useOrganizationTeamProject to refetch automatically
+        void utils.organization.getAll.invalidate();
         
         // Notify parent component about updated default models
         onDefaultModelsUpdated?.({
@@ -627,6 +632,7 @@ export function useModelProviderForm(
     updateDefaultModelMutation,
     updateTopicClusteringModelMutation,
     updateEmbeddingsModelMutation,
+    utils,
   ]);
 
   return [

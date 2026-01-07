@@ -172,7 +172,7 @@ const CredentialsSection = ({
 
   return (
     <>
-      <VStack align="stretch" gap={3}>
+      <VStack align="stretch" gap={3} width="full">
         {Object.keys(state.displayKeys).map((key) => {
           // Access Zod schema internals to check if field is optional
           const zodSchema = state.displayKeys[key];
@@ -181,27 +181,30 @@ const CredentialsSection = ({
           const isInvalid = Boolean(fieldErrors[key]);
 
           return (
-            <Field.Root key={key} required={!isOptional} invalid={isInvalid}>
+            <Field.Root key={key} required={!isOptional} invalid={isInvalid} width="full">
               <SmallLabel>
                 {key}
                 {!isOptional && <Field.RequiredIndicator />}
               </SmallLabel>
-              <Input
-                value={state.customKeys[key] ?? ""}
-                onChange={(e) => {
-                  actions.setCustomKey(key, e.target.value);
-                  if (fieldErrors[key]) {
-                    setFieldErrors(prev => {
-                      const updated = { ...prev };
-                      delete updated[key];
-                      return updated;
-                    });
-                  }
-                }}
-                type={isPassword ? "password" : "text"}
-                autoComplete="off"
-                placeholder={isOptional ? "optional" : undefined}
-              />
+              <Box width="full">
+                <Input
+                  value={state.customKeys[key] ?? ""}
+                  onChange={(e) => {
+                    actions.setCustomKey(key, e.target.value);
+                    if (fieldErrors[key]) {
+                      setFieldErrors(prev => {
+                        const updated = { ...prev };
+                        delete updated[key];
+                        return updated;
+                      });
+                    }
+                  }}
+                  type={isPassword ? "password" : "text"}
+                  autoComplete="off"
+                  placeholder={isOptional ? "optional" : undefined}
+                  width="full"
+                />
+              </Box>
               {fieldErrors[key] && (
                 <Field.ErrorText>{fieldErrors[key]}</Field.ErrorText>
               )}
@@ -265,6 +268,7 @@ const ExtraHeadersSection = ({
                   }
                   placeholder="Header name"
                   autoComplete="off"
+                  width="full"
                 />
               </GridItem>
               <GridItem>
@@ -279,6 +283,7 @@ const ExtraHeadersSection = ({
                   type={h.concealed ? "password" : "text"}
                   placeholder="Header value"
                   autoComplete="off"
+                  width="full"
                 />
               </GridItem>
               <GridItem>
@@ -582,15 +587,16 @@ export const AddModelProviderForm = ({
     };
   }, [initialProvider]);
 
+  // Use project data as primary source (auto-updates when organization.getAll is invalidated)
+  // Props are fallback for initial render before project data is available
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: currentDefaultModel ?? project?.defaultModel ?? DEFAULT_MODEL,
+    projectDefaultModel: project?.defaultModel ?? currentDefaultModel ?? DEFAULT_MODEL,
     projectTopicClusteringModel:
-      currentTopicClusteringModel ?? project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+      project?.topicClusteringModel ?? currentTopicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
     projectEmbeddingsModel:
-      currentEmbeddingsModel ?? project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
-    onSuccess: () => {
+      project?.embeddingsModel ?? currentEmbeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,    onSuccess: () => {
       closeDrawer();
     },
     onDefaultModelsUpdated,
@@ -742,14 +748,16 @@ export const EditModelProviderForm = ({
     };
   }, [modelProviderId, providers]);
 
+  // Use project data as primary source (auto-updates when organization.getAll is invalidated)
+  // Props are fallback for initial render before project data is available
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: currentDefaultModel ?? project?.defaultModel ?? DEFAULT_MODEL,
+    projectDefaultModel: project?.defaultModel ?? currentDefaultModel ?? DEFAULT_MODEL,
     projectTopicClusteringModel:
-      currentTopicClusteringModel ?? project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+      project?.topicClusteringModel ?? currentTopicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
     projectEmbeddingsModel:
-      currentEmbeddingsModel ?? project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
+      project?.embeddingsModel ?? currentEmbeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
     onSuccess: () => {
       closeDrawer();
     },
