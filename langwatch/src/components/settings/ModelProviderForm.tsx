@@ -7,12 +7,16 @@ import {
   GridItem,
   Input,
   Text,
-  createListCollection,
   Box,
+  Combobox,
+  TagsInput,
+  useCombobox,
+  useFilter,
+  useListCollection,
+  useTagsInput,
 } from "@chakra-ui/react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Plus, Trash2 } from "react-feather";
-import CreatableSelect from "react-select/creatable";
 import { z } from "zod";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import {
@@ -39,85 +43,119 @@ import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
 import { modelSelectorOptions } from "../ModelSelector";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
-import { Select } from "../ui/select";
 import { Tooltip } from "../ui/tooltip";
 import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";
 
-// ============================================================================
-// SHARED COMPONENTS
-// ============================================================================
 
 /**
- * A specialized dropdown selector that displays models from a specific provider.
- * Shows the provider icon and formats model names by removing the provider prefix.
- * 
+ * A creatable dropdown selector for default model selection.
+ * Uses native Chakra Combobox to allow users to select existing models or create custom model names.
+ * Shows model names without provider prefix and automatically adds the provider prefix to created models.
  * @param model - The currently selected model (in format "provider/model-name")
- * @param options - Array of available model options for this provider
- * @param onChange - Callback when a model is selected
+ * @param options - Array of available model options for this provider (in format "provider/model-name")
+ * @param onChange - Callback when a model is selected or created
  * @param providerKey - The provider identifier (e.g., "openai", "anthropic")
+ * @param placeholder - Optional placeholder text for the input
  */
-const ProviderModelSelector = ({
+const CreatableModelSelector = ({
   model,
   options,
   onChange,
   providerKey,
+  placeholder = "Select or type a model name",
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   providerKey: string;
+  placeholder?: string;
 }) => {
+  const inputId = useId();
   const providerIcon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
-  
-  const items = options.map((option) => {
-    const modelName = option.split("/").slice(1).join("/");
-    return {
-      label: modelName,
-      value: option,
-    };
+
+  // Convert options to display format (model name without prefix)
+  const displayOptions = useMemo(() => 
+    options.map((option) => option.split("/").slice(1).join("/")),
+    [options]
+  );
+
+  // Get current display value (model name without prefix)
+  const currentDisplayValue = useMemo(() => 
+    model ? model.split("/").slice(1).join("/") : "",
+    [model]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { contains } = useFilter({ sensitivity: "base" });
+  const { collection, filter } = useListCollection({
+    initialItems: displayOptions,
+    filter: contains,
   });
 
-  const collection = createListCollection({ items });
-  const selectedItem = items.find((item) => item.value === model);
+  const handleInputChange = useCallback(
+    (event: { inputValue: string }) => {
+      filter(event.inputValue);
+    },
+    [filter]
+  );
+
+  const handleValueChange = useCallback(
+    (event: { value?: string[]; inputValue?: string }) => {
+      const selected = event.value?.[0];
+      if (selected) {
+        // Convert display value back to full "provider/model-name" format
+        const fullValue = selected.includes("/") ? selected : `${providerKey}/${selected}`;
+        onChange(fullValue);
+      }
+    },
+    [onChange, providerKey]
+  );
+
+  const combobox = useCombobox({
+    ids: { input: inputId },
+    collection,
+    allowCustomValue: true,
+    value: currentDisplayValue ? [currentDisplayValue] : [],
+    inputValue: currentDisplayValue,
+    onInputValueChange: handleInputChange,
+    onValueChange: handleValueChange,
+  });
 
   return (
-    <Select.Root
-      collection={collection}
-      value={[model]}
-      onValueChange={(change) => {
-        const selectedValue = change.value[0];
-        if (selectedValue) {
-          onChange(selectedValue);
-        }
-      }}
-      size="md"
-      positioning={{ sameWidth: true }}
-    >
-      <Select.Trigger width="100%">
-        <Select.ValueText>
-          {() => (
-            <HStack gap={2}>
-              {providerIcon && <Box width="16px" minWidth="16px">{providerIcon}</Box>}
-              <Text fontSize="14px" fontFamily="mono">
-                {selectedItem?.label ?? model}
+    <Box width="full">
+      <Combobox.RootProvider value={combobox}>
+        <Combobox.Control>
+          <HStack  gap={1} >
+            <Combobox.Input 
+              placeholder={placeholder} 
+              fontSize="sm" 
+              fontFamily="mono"
+            />
+          </HStack>
+          <Combobox.ClearTrigger />
+        </Combobox.Control>
+        <Combobox.Positioner>
+          <Combobox.Content borderRadius="md">
+            <Combobox.Empty>
+              <Text fontSize="sm" color="gray.500">
+                Type to create a new model
               </Text>
-            </HStack>
-          )}
-        </Select.ValueText>
-      </Select.Trigger>
-      <Select.Content zIndex={2000}>
-        {items.map((item) => (
-          <Select.Item key={item.value} item={item}>
-            <HStack gap={3}>
-              {providerIcon && <Box width="14px" minWidth="14px">{providerIcon}</Box>}
-              <Text fontSize="14px" fontFamily="mono">
-                {item.label}
-              </Text>
-            </HStack>
-          </Select.Item>
-        ))}
-      </Select.Content>
-    </Select.Root>
+            </Combobox.Empty>
+            {(collection.items as string[]).map((item) => (
+              <Combobox.Item key={item} item={item} borderRadius="md">
+                <HStack gap={2}>
+                  {providerIcon && <Box boxSize={3.5} display="flex" alignItems="center">{providerIcon}</Box>}
+                  <Combobox.ItemText fontSize="sm" fontFamily="mono">
+                    {item}
+                  </Combobox.ItemText>
+                </HStack>
+                <Combobox.ItemIndicator />
+              </Combobox.Item>
+            ))}
+          </Combobox.Content>
+        </Combobox.Positioner>
+      </Combobox.RootProvider>
+    </Box>
   );
 };
 
@@ -125,7 +163,6 @@ const ProviderModelSelector = ({
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
  * For managed providers (enterprise deployments), displays a managed provider component instead of input fields.
  * Handles field validation, password masking, and optional field indicators.
- * 
  * @param state - Form state containing credential values and display configuration
  * @param actions - Form actions for updating credential values
  * @param provider - The model provider configuration
@@ -225,7 +262,6 @@ const CredentialsSection = ({
  * Renders a section for adding custom HTTP headers to API requests.
  * Only visible for Azure and Custom providers that support additional headers.
  * Provides controls to add/remove headers and toggle visibility (concealment) of header values.
- * 
  * @param state - Form state containing extra headers configuration
  * @param actions - Form actions for managing extra headers
  * @param provider - The model provider configuration
@@ -334,7 +370,6 @@ const ExtraHeadersSection = ({
  * Renders a multi-input field for specifying custom model names.
  * Only visible for the "custom" provider type (e.g., LiteLLM proxy, self-hosted vLLM).
  * Users can add comma-separated model names or create them individually.
- * 
  * @param state - Form state containing custom model names
  * @param actions - Form actions for managing custom models
  * @param provider - The model provider configuration
@@ -348,6 +383,76 @@ const CustomModelInputSection = ({
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
 }) => {
+  const inputId = useId();
+  const controlRef = useRef<HTMLDivElement | null>(null);
+
+  const customModelValues = useMemo(
+    () => state.customModels.map((m) => m.value),
+    [state.customModels]
+  );
+
+  // eslint-disable-next-line @typescript-eslint/unbound-method
+  const { contains } = useFilter({ sensitivity: "base" });
+  const { collection, filter } = useListCollection({
+    initialItems: [] as string[],
+    filter: contains,
+  });
+
+  const handleTagsValueChange = useCallback(
+    (details: { value: string[] }) => {
+      actions.setCustomModels(
+        details.value.map((value) => ({ label: value, value }))
+      );
+    },
+    [actions]
+  );
+
+  const tags = useTagsInput({
+    ids: { input: inputId },
+    value: customModelValues,
+    onValueChange: handleTagsValueChange,
+  });
+
+  useEffect(() => {
+    const differs =
+      tags.value.length !== customModelValues.length ||
+      tags.value.some((value, index) => value !== customModelValues[index]);
+    if (differs) {
+      tags.setValue(customModelValues);
+    }
+  }, [customModelValues, tags]);
+
+  const handleComboboxInputChange = useCallback(
+    (event: { inputValue: string }) => {
+      filter(event.inputValue);
+    },
+    [filter]
+  );
+
+  const handleComboboxValueChange = useCallback(
+    (event: { value?: string[] }) => {
+      const nextValue = event.value?.[0];
+      if (!nextValue) return;
+      if (!customModelValues.includes(nextValue)) {
+        tags.addValue(nextValue);
+      }
+    },
+    [customModelValues, tags]
+  );
+
+  const combobox = useCombobox({
+    ids: { input: inputId },
+    collection,
+    allowCustomValue: true,
+    value: [],
+    selectionBehavior: "clear",
+    positioning: {
+      getAnchorRect: () => controlRef.current?.getBoundingClientRect() ?? null,
+    },
+    onInputValueChange: handleComboboxInputChange,
+    onValueChange: handleComboboxValueChange,
+  });
+
   if (provider.provider !== "custom") {
     return null;
   }
@@ -356,23 +461,41 @@ const CustomModelInputSection = ({
     <VStack width="full" align="start" gap={2} paddingTop={4}>
       <SmallLabel>Models</SmallLabel>
       <Text fontSize="xs" color="gray.500">
-      Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.
+        Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.
       </Text>
       <Box width="full">
-        <CreatableSelect
-          value={state.customModels}
-          onChange={(v) => actions.setCustomModels(v ? [...v] : [])}
-          onCreateOption={(text) => actions.addCustomModelsFromText(text)}
-          isMulti
-          options={[]}
-          placeholder="Add custom model"
-          styles={{
-            control: (base) => ({
-              ...base,
-              minHeight: '40px',
-            }),
-          }}
-        />
+        <Field.Root>
+          <Combobox.RootProvider value={combobox}>
+            <TagsInput.RootProvider value={tags} size="sm">
+              <TagsInput.Control ref={controlRef}>
+                {tags.value.map((tag, index) => (
+                  <TagsInput.Item key={index} index={index} value={tag}>
+                    <TagsInput.ItemPreview
+                      borderRadius="md"
+                    >
+                      <TagsInput.ItemText>{tag}</TagsInput.ItemText>
+                      <TagsInput.ItemDeleteTrigger />
+                    </TagsInput.ItemPreview>
+                    <TagsInput.ItemInput />
+                  </TagsInput.Item>
+                ))}
+                <Combobox.Input unstyled asChild>
+                  <TagsInput.Input placeholder="Add custom model" />
+                </Combobox.Input>
+              </TagsInput.Control>
+              <TagsInput.HiddenInput />
+              <Combobox.Positioner>
+                <Combobox.Content borderRadius="md">
+                  <Combobox.Empty>
+                    <Text fontSize="sm" color="gray.500">
+                      Type to add a model
+                    </Text>
+                  </Combobox.Empty>
+                </Combobox.Content>
+              </Combobox.Positioner>
+            </TagsInput.RootProvider>
+          </Combobox.RootProvider>
+        </Field.Root>
       </Box>
     </VStack>
   );
@@ -382,7 +505,6 @@ const CustomModelInputSection = ({
  * Renders the "Use as default provider" toggle and default model selection fields.
  * When enabled, allows selection of default models for chat, topic clustering, and embeddings.
  * The toggle is disabled if the provider is currently in use or is the only enabled provider.
- * 
  * @param state - Form state containing default provider configuration and model selections
  * @param actions - Form actions for updating default provider settings
  * @param provider - The model provider configuration
@@ -475,9 +597,6 @@ const DefaultProviderSection = ({
           width="full"
           align="start"
           gap={4}
-          paddingLeft={4}
-          borderLeftWidth="2px"
-          borderLeftColor="gray.200"
         >
           {chatOptions.length > 0 ? (
             <>
@@ -486,7 +605,7 @@ const DefaultProviderSection = ({
                 <Text fontSize="xs" color="gray.500" marginBottom={2}>
                   For general tasks within LangWatch
                 </Text>
-                <ProviderModelSelector
+                <CreatableModelSelector
                   model={state.projectDefaultModel ?? chatOptions[0] ?? DEFAULT_MODEL}
                   options={chatOptions}
                   onChange={(model) => actions.setProjectDefaultModel(model)}
@@ -499,7 +618,7 @@ const DefaultProviderSection = ({
                 <Text fontSize="xs" color="gray.500" marginBottom={2}>
                   For generating topic names
                 </Text>
-                <ProviderModelSelector
+                <CreatableModelSelector
                   model={
                     state.projectTopicClusteringModel ??
                     chatOptions[0] ??
@@ -525,7 +644,7 @@ const DefaultProviderSection = ({
               <Text fontSize="xs" color="gray.500" marginBottom={2}>
                 For embeddings to be used in topic clustering and evaluations
               </Text>
-              <ProviderModelSelector
+              <CreatableModelSelector
                 model={state.projectEmbeddingsModel ?? embeddingOptions[0] ?? DEFAULT_EMBEDDINGS_MODEL}
                 options={embeddingOptions}
                 onChange={(model) => actions.setProjectEmbeddingsModel(model)}
@@ -684,10 +803,6 @@ export const AddModelProviderForm = ({
     </VStack>
   );
 };
-
-// ============================================================================
-// EDIT MODEL PROVIDER FORM
-// ============================================================================
 
 type EditModelProviderFormProps = {
   projectId?: string | undefined;
