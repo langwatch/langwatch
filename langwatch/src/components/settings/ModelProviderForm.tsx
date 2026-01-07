@@ -16,7 +16,7 @@ import {
   useTagsInput,
 } from "@chakra-ui/react";
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Eye, EyeOff, Plus, Trash2 } from "react-feather";
+import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import { z } from "zod";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import {
@@ -105,7 +105,7 @@ const CreatableModelSelector = ({
       const selected = event.value?.[0];
       if (selected) {
         // Convert display value back to full "provider/model-name" format
-        const fullValue = selected.includes("/") ? selected : `${providerKey}/${selected}`;
+        const fullValue = selected.startsWith(`${providerKey}/`) ? selected : `${providerKey}/${selected}`;
         onChange(fullValue);
       }
     },
@@ -117,7 +117,7 @@ const CreatableModelSelector = ({
     const inputValue = inputRef.current?.value?.trim();
     if (inputValue && inputValue !== currentDisplayValue) {
       // Convert display value back to full "provider/model-name" format
-      const fullValue = inputValue.includes("/") ? inputValue : `${providerKey}/${inputValue}`;
+      const fullValue = inputValue.startsWith(`${providerKey}/`) ? inputValue : `${providerKey}/${inputValue}`;
       onChange(fullValue);
     }
   }, [currentDisplayValue, onChange, providerKey]);
@@ -127,7 +127,7 @@ const CreatableModelSelector = ({
       const inputValue = (event.target as HTMLInputElement).value?.trim();
       if (inputValue && inputValue !== currentDisplayValue) {
         // Convert display value back to full "provider/model-name" format
-        const fullValue = inputValue.includes("/") ? inputValue : `${providerKey}/${inputValue}`;
+        const fullValue = inputValue.startsWith(`${providerKey}/`) ? inputValue : `${providerKey}/${inputValue}`;
         onChange(fullValue);
         event.preventDefault();
       }
@@ -237,9 +237,9 @@ const CredentialsSection = ({
     <>
       <VStack align="stretch" gap={3} width="full">
         {Object.keys(state.displayKeys).map((key) => {
-          // Access Zod schema internals to check if field is optional
+          // Check if field is optional using Zod's public API
           const zodSchema = state.displayKeys[key];
-          const isOptional = zodSchema?._def?.typeName === "ZodOptional";
+          const isOptional = zodSchema?.isOptional?.() ?? false;
           const isPassword = KEY_CHECK.some((k) => key.includes(k));
           const isInvalid = Boolean(fieldErrors[key]);
 
@@ -487,7 +487,7 @@ const CustomModelInputSection = ({
     <VStack width="full" align="start" gap={2} paddingTop={4}>
       <SmallLabel>Models</SmallLabel>
       <Text fontSize="xs" color="gray.500">
-        Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.
+        Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that support the /chat/completions endpoint.
       </Text>
       <Box width="full">
         <Field.Root>
