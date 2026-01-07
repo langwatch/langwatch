@@ -11,7 +11,7 @@ import type { ComponentProps } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
-import { AddOrEditModelProviderDrawer } from "./AddOrEditModelProviderDrawer";
+import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
@@ -45,7 +45,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
-  addOrEditModelProvider: AddOrEditModelProviderDrawer,
+  editModelProvider: EditModelProviderDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,

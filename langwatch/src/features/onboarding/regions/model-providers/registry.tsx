@@ -8,7 +8,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "open_ai",
     backendModelProviderKey: "openai",
     label: "OpenAI",
-    defaultModel: "gpt-5",
+    defaultModel: "gpt-5.2",
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",

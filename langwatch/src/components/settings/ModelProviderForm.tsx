@@ -72,6 +72,7 @@ const CreatableModelSelector = ({
 }) => {
   const inputId = useId();
   const providerIcon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Convert options to display format (model name without prefix)
   const displayOptions = useMemo(() => 
@@ -111,6 +112,28 @@ const CreatableModelSelector = ({
     [onChange, providerKey]
   );
 
+  // Handle custom input when user clicks away or presses Enter
+  const handleBlur = useCallback(() => {
+    const inputValue = inputRef.current?.value?.trim();
+    if (inputValue && inputValue !== currentDisplayValue) {
+      // Convert display value back to full "provider/model-name" format
+      const fullValue = inputValue.includes("/") ? inputValue : `${providerKey}/${inputValue}`;
+      onChange(fullValue);
+    }
+  }, [currentDisplayValue, onChange, providerKey]);
+
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      const inputValue = (event.target as HTMLInputElement).value?.trim();
+      if (inputValue && inputValue !== currentDisplayValue) {
+        // Convert display value back to full "provider/model-name" format
+        const fullValue = inputValue.includes("/") ? inputValue : `${providerKey}/${inputValue}`;
+        onChange(fullValue);
+        event.preventDefault();
+      }
+    }
+  }, [currentDisplayValue, onChange, providerKey]);
+
   const combobox = useCombobox({
     ids: { input: inputId },
     collection,
@@ -127,9 +150,12 @@ const CreatableModelSelector = ({
         <Combobox.Control>
           <HStack  gap={1} >
             <Combobox.Input 
+              ref={inputRef}
               placeholder={placeholder} 
               fontSize="sm" 
               fontFamily="mono"
+              onBlur={handleBlur}
+              onKeyDown={handleKeyDown}
             />
           </HStack>
           <Combobox.ClearTrigger />
@@ -576,6 +602,21 @@ const DefaultProviderSection = ({
           <Switch
             onCheckedChange={(details) => {
               actions.setUseAsDefaultProvider(details.checked);
+              
+              // When toggling ON, sync the model states to this provider's models
+              // if the current state values don't belong to this provider
+              // Only set if there are options available, otherwise allow custom input
+              if (details.checked) {
+                if (!state.projectDefaultModel?.startsWith(`${provider.provider}/`) && chatOptions.length > 0) {
+                  actions.setProjectDefaultModel(chatOptions[0] ?? null);
+                }
+                if (!state.projectTopicClusteringModel?.startsWith(`${provider.provider}/`) && chatOptions.length > 0) {
+                  actions.setProjectTopicClusteringModel(chatOptions[0] ?? null);
+                }
+                if (!state.projectEmbeddingsModel?.startsWith(`${provider.provider}/`) && embeddingOptions.length > 0) {
+                  actions.setProjectEmbeddingsModel(embeddingOptions[0] ?? null);
+                }
+              }
             }}
             checked={state.useAsDefaultProvider}
             disabled={isToggleDisabled}
@@ -598,64 +639,58 @@ const DefaultProviderSection = ({
           align="start"
           gap={4}
         >
-          {chatOptions.length > 0 ? (
-            <>
-              <Field.Root width="full">
-                <SmallLabel>Default Model</SmallLabel>
-                <Text fontSize="xs" color="gray.500" marginBottom={2}>
-                  For general tasks within LangWatch
-                </Text>
-                <CreatableModelSelector
-                  model={state.projectDefaultModel ?? chatOptions[0] ?? DEFAULT_MODEL}
-                  options={chatOptions}
-                  onChange={(model) => actions.setProjectDefaultModel(model)}
-                  providerKey={provider.provider}
-                />
-              </Field.Root>
-
-              <Field.Root width="full">
-                <SmallLabel>Topic Clustering Model</SmallLabel>
-                <Text fontSize="xs" color="gray.500" marginBottom={2}>
-                  For generating topic names
-                </Text>
-                <CreatableModelSelector
-                  model={
-                    state.projectTopicClusteringModel ??
-                    chatOptions[0] ??
-                    DEFAULT_TOPIC_CLUSTERING_MODEL
-                  }
-                  options={chatOptions}
-                  onChange={(model) =>
-                    actions.setProjectTopicClusteringModel(model)
-                  }
-                  providerKey={provider.provider}
-                />
-              </Field.Root>
-            </>
-          ) : (
-            <Text fontSize="sm" color="orange.500">
-              No chat models available for this provider in the registry.
+          <Field.Root width="full">
+            <SmallLabel>Default Model</SmallLabel>
+            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+              For general tasks within LangWatch
             </Text>
-          )}
+            <CreatableModelSelector
+              model={
+                state.projectDefaultModel?.startsWith(`${provider.provider}/`)
+                  ? state.projectDefaultModel
+                  : (chatOptions[0] ?? "")
+              }
+              options={chatOptions}
+              onChange={(model) => actions.setProjectDefaultModel(model)}
+              providerKey={provider.provider}
+            />
+          </Field.Root>
 
-          {embeddingOptions.length > 0 ? (
-            <Field.Root width="full">
-              <SmallLabel>Embeddings Model</SmallLabel>
-              <Text fontSize="xs" color="gray.500" marginBottom={2}>
-                For embeddings to be used in topic clustering and evaluations
-              </Text>
-              <CreatableModelSelector
-                model={state.projectEmbeddingsModel ?? embeddingOptions[0] ?? DEFAULT_EMBEDDINGS_MODEL}
-                options={embeddingOptions}
-                onChange={(model) => actions.setProjectEmbeddingsModel(model)}
-                providerKey={provider.provider}
-              />
-            </Field.Root>
-          ) : (
-            <Text fontSize="sm" color="orange.500">
-              No embedding models available for this provider in the registry.
+          <Field.Root width="full">
+            <SmallLabel>Topic Clustering Model</SmallLabel>
+            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+              For generating topic names
             </Text>
-          )}
+            <CreatableModelSelector
+              model={
+                state.projectTopicClusteringModel?.startsWith(`${provider.provider}/`)
+                  ? state.projectTopicClusteringModel
+                  : (chatOptions[0] ?? "")
+              }
+              options={chatOptions}
+              onChange={(model) =>
+                actions.setProjectTopicClusteringModel(model)
+              }
+              providerKey={provider.provider}
+            />
+          </Field.Root>
+
+          <Field.Root width="full">
+            <SmallLabel>Embeddings Model</SmallLabel>
+            <Text fontSize="xs" color="gray.500" marginBottom={2}>
+              For embeddings to be used in topic clustering and evaluations
+            </Text>
+            <CreatableModelSelector
+              model={
+                state.projectEmbeddingsModel?.startsWith(`${provider.provider}/`)
+                  ? state.projectEmbeddingsModel
+                  : (embeddingOptions[0] ?? "")
+              }
+              options={embeddingOptions}
+              onChange={(model) => actions.setProjectEmbeddingsModel(model)}
+              providerKey={provider.provider}
+            />
+          </Field.Root>
         </VStack>
       )}
     </VStack>
@@ -663,146 +698,6 @@ const DefaultProviderSection = ({
 };
 
 
-
-type AddModelProviderFormProps = {
-  projectId?: string | undefined;
-  organizationId?: string | undefined;
-  provider: string;
-  currentDefaultModel?: string;
-  currentTopicClusteringModel?: string;
-  currentEmbeddingsModel?: string;
-  onDefaultModelsUpdated?: (models: {
-    defaultModel?: string;
-    topicClusteringModel?: string;
-    embeddingsModel?: string;
-  }) => void;
-};
-
-export const AddModelProviderForm = ({
-  projectId,
-  organizationId,
-  provider: initialProvider,
-  currentDefaultModel,
-  currentTopicClusteringModel,
-  currentEmbeddingsModel,
-  onDefaultModelsUpdated,
-}: AddModelProviderFormProps) => {
-  const { closeDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
-
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  // Create a provider object for new provider
-  const provider: MaybeStoredModelProvider = useMemo(() => {
-    return {
-      provider: initialProvider,
-      enabled: false,
-      customKeys: null,
-      models: null,
-      embeddingsModels: null,
-      disabledByDefault: true,
-      deploymentMapping: null,
-      extraHeaders: [],
-    };
-  }, [initialProvider]);
-
-  // Use project data as primary source (auto-updates when organization.getAll is invalidated)
-  // Props are fallback for initial render before project data is available
-  const [state, actions] = useModelProviderForm({
-    provider,
-    projectId,
-    projectDefaultModel: project?.defaultModel ?? currentDefaultModel ?? DEFAULT_MODEL,
-    projectTopicClusteringModel:
-      project?.topicClusteringModel ?? currentTopicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-    projectEmbeddingsModel:
-      project?.embeddingsModel ?? currentEmbeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,    onSuccess: () => {
-      closeDrawer();
-    },
-    onDefaultModelsUpdated,
-  });
-
-  const providerDefinition =
-    modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
-    ];
-
-  const handleSave = useCallback(() => {
-    // Clear previous errors
-    setFieldErrors({});
-    
-    // Validate keys according to schema before submitting
-    if (providerDefinition?.keysSchema) {
-      const keysSchema = z.union([
-        providerDefinition.keysSchema,
-        z.object({ MANAGED: z.string() }),
-      ]);
-      
-      const keysToValidate: Record<string, unknown> = { ...state.customKeys };
-      const result = keysSchema.safeParse(keysToValidate);
-      
-      if (!result.success) {
-        // Parse the Zod error to get field-specific errors
-        const parsedErrors = parseZodFieldErrors(result.error as ZodErrorStructure);
-        setFieldErrors(parsedErrors);
-        return;
-      }
-    }
-    
-    void actions.submit();
-  }, [providerDefinition, state.customKeys, actions]);
-
-  return (
-    <VStack gap={4} align="start" width="full">
-      <VStack align="start" width="full" gap={4}>
-        {provider.provider === "azure" && (
-          <Field.Root>
-            <Switch
-              onCheckedChange={(details) => {
-                actions.setUseApiGateway(details.checked);
-              }}
-              checked={state.useApiGateway}
-            >
-              Use API Gateway
-            </Switch>
-          </Field.Root>
-        )}
-
-        <CredentialsSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          fieldErrors={fieldErrors}
-          setFieldErrors={setFieldErrors}
-          projectId={projectId}
-          organizationId={organizationId}
-        />
-
-        <ExtraHeadersSection
-          state={state}
-          actions={actions}
-          provider={provider}
-        />
-
-        <CustomModelInputSection
-          state={state}
-          actions={actions}
-          provider={provider}
-        />
-
-        <HStack width="full" justify="end">
-          <Button
-            size="sm"
-            colorPalette="orange"
-            loading={state.isSaving}
-            onClick={handleSave}
-          >
-            Save
-          </Button>
-        </HStack>
-      </VStack>
-    </VStack>
-  );
-};
 
 type EditModelProviderFormProps = {
   projectId?: string | undefined;

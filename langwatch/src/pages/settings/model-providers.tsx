@@ -48,13 +48,15 @@ export default function ModelsPage() {
   });
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
-  const isProviderDrawerOpen = isDrawerOpen("addOrEditModelProvider");
+  const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const disableMutation = api.modelProvider.update.useMutation();
+  const enableMutation = api.modelProvider.update.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
     provider: string;
     name: string;
   } | null>(null);
+  const [enablingProvider, setEnablingProvider] = useState<string | null>(null);
 
   // Initialize hooks to get current model values
   const defaultModelHook = useDefaultModel({
@@ -72,13 +74,13 @@ export default function ModelsPage() {
     initialValue: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
   });
 
-  // Check if provider is used for any of the default models
+  // Check if provider is used for any of the default models (using API data as source of truth)
   const isDefaultProvider = (providerKey: string) => {
     return isProviderUsedForDefaultModels(
       providerKey,
-      defaultModelHook.value,
-      topicClusteringModelHook.value,
-      embeddingsModelHook.value
+      project?.defaultModel ?? null,
+      project?.topicClusteringModel ?? null,
+      project?.embeddingsModel ?? null
     );
   };
 
@@ -99,8 +101,14 @@ export default function ModelsPage() {
     }
   };
 
+  const utils = api.useContext();
+
   useEffect(() => {
-    void refetch();
+    if (!isProviderDrawerOpen) {
+      // Refetch both providers and organization data when drawer closes
+      void refetch();
+      void utils.organization.getAll.invalidate();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isProviderDrawerOpen]);
 
@@ -129,7 +137,10 @@ export default function ModelsPage() {
           >
             <Menu.Root>
               <Menu.Trigger asChild>
-                <PageLayout.HeaderButton disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}>
+                <PageLayout.HeaderButton 
+                  disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}
+                  loading={!!enablingProvider}
+                >
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
               </Menu.Trigger>
@@ -138,16 +149,45 @@ export default function ModelsPage() {
                   <Menu.Item
                     key={provider.provider}
                     value={provider.provider}
-                    onClick={() => openDrawer("addOrEditModelProvider", {
-                      mode: "add",
-                      projectId: project?.id,
-                      organizationId: organization?.id,
-                      providerKey: provider.provider,
-                      currentDefaultModel: defaultModelHook.value,
-                      currentTopicClusteringModel: topicClusteringModelHook.value,
-                      currentEmbeddingsModel: embeddingsModelHook.value,
-                      onDefaultModelsUpdated: handleDefaultModelsUpdated,
-                    })}
+                    disabled={enablingProvider === provider.provider}
+                    onClick={async () => {
+                      if (!project?.id) return;
+                      
+                      setEnablingProvider(provider.provider);
+                      try {
+                        // Enable the provider directly via API
+                        await enableMutation.mutateAsync({
+                          id: undefined,
+                          projectId: project.id,
+                          provider: provider.provider,
+                          enabled: true,
+                          customKeys: null,
+                          customModels: null,
+                          customEmbeddingsModels: null,
+                          extraHeaders: null,
+                        });
+                        
+                        // Refetch providers to get the new provider with ID
+                        const result = await refetch();
+                        const updatedProviders = result.data;
+                        const newProvider = updatedProviders?.[provider.provider as keyof typeof updatedProviders];
+                        
+                        // Open drawer with the provider's ID
+                        if (newProvider?.id) {
+                          openDrawer("editModelProvider", {
+                            projectId: project.id,
+                            organizationId: organization?.id,
+                            modelProviderId: newProvider.id,
+                            currentDefaultModel: defaultModelHook.value,
+                            currentTopicClusteringModel: topicClusteringModelHook.value,
+                            currentEmbeddingsModel: embeddingsModelHook.value,
+                            onDefaultModelsUpdated: handleDefaultModelsUpdated,
+                          });
+                        }
+                      } finally {
+                        setEnablingProvider(null);
+                      }
+                    }}
                   >
                     <HStack gap={3}>
                       <Box width="20px" height="20px">
@@ -214,8 +254,7 @@ export default function ModelsPage() {
                                 value="edit"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  openDrawer("addOrEditModelProvider", {
-                                    mode: "edit",
+                                  openDrawer("editModelProvider", {
                                     projectId: project?.id,
                                     organizationId: organization?.id,
                                     modelProviderId: provider.id,
