@@ -10,6 +10,7 @@ import {
   signatureComponentSchema,
   codeComponentSchema,
   customComponentSchema,
+  httpComponentSchema,
 } from "~/optimization_studio/types/dsl";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -25,6 +26,8 @@ const getConfigInputSchema = (type: AgentType) => {
       return codeComponentSchema;
     case "workflow":
       return customComponentSchema;
+    case "http":
+      return httpComponentSchema;
   }
 };
 
@@ -35,6 +38,7 @@ const getConfigInputSchema = (type: AgentType) => {
  * - signature: LLM-based with prompt configuration (matches LlmPromptConfigComponent)
  * - code: Python code executor (matches Code component with code parameter)
  * - workflow: Reference to an existing workflow (matches Custom component)
+ * - http: External API caller with configurable URL, headers, auth, and body template
  *
  * Config is stored as DSL-compatible node data for direct execution.
  */

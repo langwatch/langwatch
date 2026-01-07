@@ -426,9 +426,46 @@ export const customComponentSchema = baseComponentSchema.extend({
 });
 
 /**
+ * Schema for HTTP header key-value pairs
+ */
+export const httpHeaderSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+/**
+ * Schema for HTTP authentication configuration
+ */
+export const httpAuthSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("none") }),
+  z.object({ type: z.literal("bearer"), token: z.string() }),
+  z.object({ type: z.literal("api_key"), header: z.string(), value: z.string() }),
+  z.object({ type: z.literal("basic"), username: z.string(), password: z.string() }),
+]);
+
+/**
+ * Schema for HTTP component node data
+ * Used for "http" type agents that call external APIs
+ */
+export const httpComponentSchema = baseComponentSchema.extend({
+  url: z.string().url(),
+  method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("POST"),
+  headers: z.array(httpHeaderSchema).optional(),
+  auth: httpAuthSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  timeoutMs: z.number().positive().optional(),
+  responseMapping: z
+    .object({
+      outputPath: z.string().optional(),
+    })
+    .optional(),
+});
+
+/**
  * Union type for all valid agent config types
  * These match the existing Component types so they're directly usable in DSL
  */
 export type SignatureComponentConfig = z.infer<typeof signatureComponentSchema>;
 export type CodeComponentConfig = z.infer<typeof codeComponentSchema>;
 export type CustomComponentConfig = z.infer<typeof customComponentSchema>;
+export type HttpComponentConfig = z.infer<typeof httpComponentSchema>;
