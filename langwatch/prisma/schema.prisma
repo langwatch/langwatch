@@ -71,6 +71,7 @@ model User {
     assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
     createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
     llmPromptConfigVersions LlmPromptConfigVersion[]
+    scenarios               Scenario[]
 }
 
 model VerificationToken {
@@ -237,6 +238,7 @@ model Project {
     featureClickHouse        Boolean                             @default(false)
     agents                   Agent[]
     evaluators               Evaluator[]
+    scenarios                Scenario[]
 
     @@index([teamId])
 }
@@ -929,4 +931,21 @@ model Evaluator {
 
     @@index([projectId])
     @@index([workflowId])
+}
+
+model Scenario {
+    id          String    @id @default(nanoid())
+    projectId   String
+    project     Project   @relation(fields: [projectId], references: [id])
+    name        String
+    situation   String
+    criteria    String[]
+    labels      String[]
+    lastUpdatedById String?
+    lastUpdatedBy   User?     @relation(fields: [lastUpdatedById], references: [id])
+    archivedAt  DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @default(now()) @updatedAt
+
+    @@index([projectId])
 }
