@@ -73,6 +73,8 @@ export type VariablesSectionProps = {
   variableInfo?: Record<string, string>;
   /** Set of variable identifiers whose mapping input is disabled (shows info instead) */
   disabledMappings?: Set<string>;
+  /** Disable mapping input */
+  isMappingDisabled?: boolean;
 };
 
 // ============================================================================
@@ -119,6 +121,7 @@ export const VariablesSection = ({
   lockedVariables = new Set(),
   variableInfo = {},
   disabledMappings = new Set(),
+  isMappingDisabled = false,
 }: VariablesSectionProps) => {
   // Default showAddButton to canAddRemove if not specified
   const shouldShowAddButton = showAddButton ?? canAddRemove;
@@ -224,7 +227,7 @@ export const VariablesSection = ({
           {variables.map((variable) => {
             const isLocked = lockedVariables.has(variable.identifier);
             const infoTooltip = variableInfo[variable.identifier];
-            const isMappingDisabled = disabledMappings.has(variable.identifier);
+            const isMappingDisabled_internal = isMappingDisabled || disabledMappings.has(variable.identifier);
 
             return (
               <VariableRow
@@ -257,7 +260,7 @@ export const VariablesSection = ({
                     : undefined
                 }
                 infoTooltip={infoTooltip}
-                isMappingDisabled={isMappingDisabled}
+                isMappingDisabled={isMappingDisabled_internal}
               />
             );
           })}

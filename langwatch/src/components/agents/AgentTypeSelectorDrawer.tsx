@@ -6,18 +6,18 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Code, Workflow } from "lucide-react";
+import { Code, Globe, Workflow } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
 
 /**
- * Agent types - code or workflow only.
+ * Agent types - code, workflow, or http.
  * Note: "signature" (prompt) agents have been removed.
  * Use the Prompts feature directly for LLM-based prompts.
  */
-export type AgentType = "code" | "workflow";
+export type AgentType = "code" | "workflow" | "http";
 
 export type AgentTypeSelectorDrawerProps = {
   open?: boolean;
@@ -43,6 +43,12 @@ const agentTypes: Array<{
     title: "Workflow Agent",
     description: "Use an existing workflow as the agent implementation",
   },
+  {
+    type: "http",
+    icon: Globe,
+    title: "HTTP Agent",
+    description: "Connect to an external API endpoint to process requests",
+  },
 ];
 
 /**
@@ -67,6 +73,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
         break;
       case "workflow":
         openDrawer("workflowSelector");
+        break;
+      case "http":
+        openDrawer("agentHttpEditor");
         break;
     }
   };
@@ -156,6 +165,7 @@ function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentT
       _hover={{ borderColor: "blue.400", bg: "blue.50" }}
       transition="all 0.15s"
       data-testid={`agent-type-${type}`}
+      cursor="pointer"
     >
       <HStack gap={4} align="start">
         <Box

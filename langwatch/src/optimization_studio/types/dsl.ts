@@ -425,6 +425,7 @@ export const customComponentSchema = baseComponentSchema.extend({
   versions: z.record(z.any()).optional(),
 });
 
+// TODO: Move schemas and exports to their own files
 /**
  * Schema for HTTP header key-value pairs
  */
@@ -444,21 +445,33 @@ export const httpAuthSchema = z.discriminatedUnion("type", [
 ]);
 
 /**
+ * HTTP methods supported by HTTP agents
+ */
+export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+
+/**
+ * HTTP authentication types
+ */
+export type HttpAuthType = "none" | "bearer" | "api_key" | "basic";
+export type HttpAuth = z.infer<typeof httpAuthSchema>;
+export type HttpHeader = z.infer<typeof httpHeaderSchema>;
+
+/**
  * Schema for HTTP component node data
  * Used for "http" type agents that call external APIs
+ *
+ * Note: URL validation is relaxed to allow progressive typing in UI.
+ * Full URL validation should happen on save in the drawer.
  */
 export const httpComponentSchema = baseComponentSchema.extend({
-  url: z.string().url(),
-  method: z.enum(["GET", "POST", "PUT", "DELETE", "PATCH"]).default("POST"),
+  url: z.string().min(1, "URL is required"),
+  method: z.enum(HTTP_METHODS).default("POST"),
   headers: z.array(httpHeaderSchema).optional(),
   auth: httpAuthSchema.optional(),
   bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),
-  responseMapping: z
-    .object({
-      outputPath: z.string().optional(),
-    })
-    .optional(),
 });
 
 /**
