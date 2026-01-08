@@ -55,11 +55,31 @@ env.globals["parse_fields"] = parse_fields
 env.keep_trailing_newline = True
 
 
+def fix_surrogate_pairs(text: str) -> str:
+    """
+    Fix surrogate pairs that may have been incorrectly encoded as separate escape sequences.
+    This handles cases like \\ud83d\\ude00 -> 😀 without affecting other escape sequences like \\n.
+    """
+
+    def replace_surrogate_pair(match: re.Match[str]) -> str:
+        try:
+            escaped = match.group(0)
+            decoded = escaped.encode("utf-8").decode("unicode_escape")
+            return decoded.encode("utf-16", "surrogatepass").decode("utf-16")
+        except Exception:
+            return match.group(0)
+
+    # Match pairs of unicode escape sequences that look like surrogate pairs
+    # High surrogate: \uD800-\uDBFF, Low surrogate: \uDC00-\uDFFF
+    surrogate_pair_pattern = r"\\u[dD][89aAbB][0-9a-fA-F]{2}\\u[dD][cCdDeEfF][0-9a-fA-F]{2}"
+    return re.sub(surrogate_pair_pattern, replace_surrogate_pair, text)
+
+
 def render_template(template_name: str, format=False, **kwargs) -> str:
     template = env.get_template(template_name)
     code = template.render(**kwargs)
-    # Fix emoji in system prompt utf-8 problem
-    code = code.encode("utf-8").decode("unicode_escape").encode("utf-16", "surrogatepass").decode("utf-16")
+    # Fix emoji surrogate pair encoding issues without affecting other escape sequences
+    code = fix_surrogate_pairs(code)
     code = re.sub(r"\n{4,}", "\n\n", code)
     try:
         code = isort.code(code, float_to_top=True)
