@@ -12,7 +12,6 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
 import { createLogger } from "../../../../../utils/logger";
-import { OPENAI_DEFAULT_BASE_URL } from "../../../../../utils/constants";
 import {
   parseZodFieldErrors,
   type ZodErrorStructure,
@@ -185,7 +184,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
 
     // Base URL is set to default OpenAI URL, but no API key
-    if (baseUrl === OPENAI_DEFAULT_BASE_URL && !apiKey) {
+    if (baseUrl === getModelProvider("open_ai")?.defaultBaseUrl && !apiKey) {
       setOpenAiValidationError(
         "API Key is required when using the default OpenAI base URL",
       );

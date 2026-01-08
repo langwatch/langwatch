@@ -1,13 +1,5 @@
-import {
-  MASKED_KEY_PLACEHOLDER,
-  OPENAI_DEFAULT_BASE_URL,
-  ANTHROPIC_DEFAULT_BASE_URL,
-  DEEPSEEK_DEFAULT_BASE_URL,
-  XAI_DEFAULT_BASE_URL,
-  CEREBRAS_DEFAULT_BASE_URL,
-  GROQ_DEFAULT_BASE_URL,
-  GEMINI_DEFAULT_BASE_URL,
-} from "../../../utils/constants";
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
+import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
 import { modelProviders } from "../../modelProviders/registry";
 
 /** Validation result returned by all validation functions */
@@ -31,17 +23,6 @@ const PROVIDER_AUTH_OVERRIDES: Partial<Record<string, AuthStrategy>> = {
 
 /** Providers with complex auth (AWS, gcloud, etc.) that skip validation */
 const SKIP_VALIDATION = new Set(["bedrock", "vertex_ai", "azure"]);
-
-/** Default base URLs for providers */
-const PROVIDER_BASE_URLS: Record<string, string> = {
-  openai: OPENAI_DEFAULT_BASE_URL,
-  anthropic: ANTHROPIC_DEFAULT_BASE_URL,
-  gemini: GEMINI_DEFAULT_BASE_URL,
-  deepseek: DEEPSEEK_DEFAULT_BASE_URL,
-  xai: XAI_DEFAULT_BASE_URL,
-  cerebras: CEREBRAS_DEFAULT_BASE_URL,
-  groq: GROQ_DEFAULT_BASE_URL,
-};
 
 /**
  * Builds the models endpoint URL by normalizing and appending /models if needed.
@@ -259,7 +240,7 @@ export async function validateProviderApiKey(
 
   // Get auth strategy (default to bearer) and base URL
   const authStrategy = PROVIDER_AUTH_OVERRIDES[provider] ?? "bearer";
-  const defaultBaseUrl = PROVIDER_BASE_URLS[provider] ?? "";
+  const defaultBaseUrl = providerDefaultBaseUrls[provider] ?? "";
 
   switch (authStrategy) {
     case "bearer":

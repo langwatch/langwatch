@@ -19,6 +19,7 @@ import {
   modelSelectorOptions,
 } from "../../components/ModelSelector";
 import SettingsLayout from "../../components/SettingsLayout";
+import { ProjectSelector } from "../../components/DashboardLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
 import { Tooltip } from "../../components/ui/tooltip";
@@ -38,7 +39,7 @@ import {
 import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
-  const { project, organization, hasPermission } =
+  const { project, organization, organizations, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   const { providers, isLoading, refetch } = useModelProvidersSettings({
@@ -49,6 +50,7 @@ export default function ModelsPage() {
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const disableMutation = api.modelProvider.update.useMutation();
   const enableMutation = api.modelProvider.update.useMutation();
+  const updateProject = api.project.update.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
     provider: string;
@@ -96,6 +98,10 @@ export default function ModelsPage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
+          {updateProject.isLoading && <Spinner />}
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
+          )}
           <Tooltip
             content="You need model provider manage permissions to add new providers."
             disabled={hasModelProvidersManagePermission}
