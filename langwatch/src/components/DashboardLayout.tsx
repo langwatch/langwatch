@@ -118,26 +118,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
     })),
   );
 
-  const handleProjectSelect = (projectSlug: string) => {
-    const currentPath = window.location.pathname;
-    const hasProjectInRoute = currentRoute?.path.includes("[project]");
-    const hasProjectInPath = currentPath.includes(project.slug);
-
-    if (hasProjectInRoute) {
-      const newPath = currentRoute?.path
-        .replace("[project]", projectSlug)
-        .replace(/\[.*?\]/g, "")
-        .replace(/\/\/+/g, "/");
-      void router.push(newPath ?? `/${projectSlug}`);
-    } else if (hasProjectInPath) {
-      void router.push(currentPath.replace(project.slug, projectSlug));
-    } else {
-      localStorage.setItem("selectedProjectSlug", JSON.stringify(projectSlug));
-      router.reload();
-    }
-    setOpen(false);
-  };
-
   return (
     <Menu.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Menu.Trigger asChild>
@@ -188,13 +168,54 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                           key={project_.id}
                           value={project_.id}
                           fontSize="14px"
-                          onClick={() => handleProjectSelect(project_.slug)}
-                          cursor="pointer"
+                          asChild
                         >
-                          <HStack gap={2}>
-                            <ProjectAvatar name={project_.name} />
-                            <Text>{project_.name}</Text>
-                          </HStack>
+                          <Link
+                            key={project_.id}
+                            href={(() => {
+                              const currentPath = window.location.pathname;
+                              const hasProjectInRoute =
+                                currentRoute?.path.includes("[project]");
+                              const hasProjectInPath = currentPath.includes(
+                                project.slug,
+                              );
+
+                              if (hasProjectInRoute) {
+                                return currentRoute?.path
+                                  .replace("[project]", project_.slug)
+                                  .replace(/\/\/+/g, "/");
+                              } else if (hasProjectInPath) {
+                                return currentPath.replace(
+                                  project.slug,
+                                  project_.slug,
+                                );
+                              } else {
+                                return `/${
+                                  project_.slug
+                                }?return_to=${encodeURIComponent(currentPath)}`;
+                              }
+                            })()}
+                            onClick={() => {
+                              const currentPath = window.location.pathname;
+                              const hasProjectInPath = currentPath.includes(
+                                project.slug,
+                              );
+                              if (!hasProjectInPath) {
+                                localStorage.setItem(
+                                  "selectedProjectSlug",
+                                  JSON.stringify(project_.slug),
+                                );
+                              }
+                            }}
+                            _hover={{
+                              textDecoration: "none",
+                            }}
+                          >
+                            <HStack gap={2}>
+                              <ProjectAvatar name={project_.name} />
+                              <Text>{project_.name}</Text>
+                            </HStack>
+                          </Link>
                         </Menu.Item>
                       ))}
                       <AddProjectButton
