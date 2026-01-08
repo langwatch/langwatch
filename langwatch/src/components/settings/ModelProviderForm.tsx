@@ -15,11 +15,6 @@ import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
-import {
-  DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
-  DEFAULT_TOPIC_CLUSTERING_MODEL,
-} from "../../utils/constants";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
@@ -30,13 +25,15 @@ import { DefaultProviderSection } from "./ModelProviderDefaultSection";
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
   organizationId?: string | undefined;
-  modelProviderId: string;
+  modelProviderId?: string;
+  providerKey: string;
 };
 
 export const EditModelProviderForm = ({
   projectId,
   organizationId,
   modelProviderId,
+  providerKey,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
@@ -52,16 +49,22 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider from modelProviderId
+  // Get provider - first try by ID, then fallback to provider key
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (modelProviderId && providers) {
-      const existing = Object.values(providers).find(
-        (p) => p.id === modelProviderId,
-      );
-      if (existing) return existing;
+    if (providers) {
+      // First try to find by ID
+      if (modelProviderId) {
+        const existing = Object.values(providers).find(
+          (p) => p.id === modelProviderId,
+        );
+        if (existing) return existing;
+      }
+      // Fallback: find by provider key
+      const byKey = providers[providerKey];
+      if (byKey) return byKey;
     }
 
-    // Fallback for edge cases
+    // Final fallback for edge cases
     return {
       provider: "custom",
       enabled: false,
@@ -72,15 +75,14 @@ export const EditModelProviderForm = ({
       deploymentMapping: null,
       extraHeaders: [],
     };
-  }, [modelProviderId, providers]);
+  }, [modelProviderId, providerKey, providers]);
 
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
+  // Effective defaults (project values with fallbacks) are computed inside the hook
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: project?.defaultModel ?? DEFAULT_MODEL,
-    projectTopicClusteringModel: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-    projectEmbeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
+    project,
     onSuccess: () => {
       closeDrawer();
     },
@@ -129,6 +131,15 @@ export const EditModelProviderForm = ({
     
     void actions.submit();
   }, [providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
+
+
+  console.group('EditModelProviderForm');
+  console.log('state', state);
+  console.log('actions', actions);
+  console.log('provider', provider);
+  console.log('enabledProvidersCount', enabledProvidersCount);
+  console.log('project', project);
+  console.groupEnd();
 
   return (
     <VStack gap={4} align="start" width="full">

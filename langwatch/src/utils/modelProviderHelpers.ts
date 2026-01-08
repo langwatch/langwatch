@@ -3,6 +3,12 @@
  * These helpers extract provider information and check provider usage across the application
  */
 
+import {
+  DEFAULT_EMBEDDINGS_MODEL,
+  DEFAULT_MODEL,
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+} from "./constants";
+
 /**
  * Extract the provider key from a model string
  * 
@@ -15,6 +21,65 @@
  */
 export function getProviderFromModel(model: string): string {
   return model.split("/")[0] ?? "";
+}
+
+/**
+ * Effective defaults for models - uses project values when set, otherwise falls back to constants
+ */
+export type EffectiveDefaults = {
+  defaultModel: string;
+  topicClusteringModel: string;
+  embeddingsModel: string;
+};
+
+/**
+ * Get effective default models for a project
+ * Returns project values when set, otherwise falls back to DEFAULT_* constants
+ * 
+ * @param project - The project object with optional default model fields
+ * @returns The effective defaults to use throughout the application
+ * 
+ * @example
+ * getEffectiveDefaults({ defaultModel: "anthropic/claude-3", topicClusteringModel: null, embeddingsModel: null })
+ * // Returns: { defaultModel: "anthropic/claude-3", topicClusteringModel: DEFAULT_TOPIC_CLUSTERING_MODEL, embeddingsModel: DEFAULT_EMBEDDINGS_MODEL }
+ */
+export function getEffectiveDefaults(
+  project: {
+    defaultModel?: string | null;
+    topicClusteringModel?: string | null;
+    embeddingsModel?: string | null;
+  } | null | undefined
+): EffectiveDefaults {
+  return {
+    defaultModel: project?.defaultModel ?? DEFAULT_MODEL,
+    topicClusteringModel: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+    embeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
+  };
+}
+
+/**
+ * Check if a provider is used for any of the effective default models
+ * Uses the unified effective defaults logic (project values when set, otherwise constants)
+ * 
+ * @param providerKey - The provider key to check (e.g., "openai", "anthropic")
+ * @param project - The project object with optional default model fields
+ * @returns True if the provider is used for any effective default model
+ */
+export function isProviderEffectiveDefault(
+  providerKey: string,
+  project: {
+    defaultModel?: string | null;
+    topicClusteringModel?: string | null;
+    embeddingsModel?: string | null;
+  } | null | undefined
+): boolean {
+  const effectiveDefaults = getEffectiveDefaults(project);
+  return isProviderUsedForDefaultModels(
+    providerKey,
+    effectiveDefaults.defaultModel,
+    effectiveDefaults.topicClusteringModel,
+    effectiveDefaults.embeddingsModel
+  );
 }
 
 /**

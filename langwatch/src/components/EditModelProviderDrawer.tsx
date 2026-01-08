@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "./ui/drawer";
 import { EditModelProviderForm } from "./settings/ModelProviderForm";
@@ -8,17 +8,24 @@ import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
 type EditModelProviderDrawerProps = {
   projectId?: string;
   organizationId?: string;
-  modelProviderId: string;
+  modelProviderId?: string;
+  providerKey: string;
 };
 
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
-    const { projectId, organizationId, modelProviderId } = props;
+    const { projectId, organizationId, modelProviderId, providerKey } = props;
     const { closeDrawer } = useDrawer();
-    const { providers } = useModelProvidersSettings({ projectId });
+    const { providers, isLoading } = useModelProvidersSettings({ projectId });
     
-    // Get provider name from the provider ID
+    // Get provider - by id or provider key
+    const provider = providers && (
+        modelProviderId 
+            ? Object.values(providers).find(p => p.id === modelProviderId)
+            : providers[providerKey]
+    );
+    
+    // Get provider name for the title
     let providerName = "";
-    const provider = providers && Object.values(providers).find(p => p.id === modelProviderId);
     if (provider) {
         const providerDef = modelProviders[provider.provider as keyof typeof modelProviders];
         providerName = providerDef?.name || provider.provider;
@@ -50,11 +57,18 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
                 </HStack>
                 </Drawer.Header>
                 <Drawer.Body>
-                    <EditModelProviderForm 
-                        projectId={projectId}
-                        organizationId={organizationId}
-                        modelProviderId={modelProviderId}
-                    />
+                    {isLoading || !providers ? (
+                        <VStack height="200px" justify="center">
+                            <Spinner />
+                        </VStack>
+                    ) : (
+                        <EditModelProviderForm 
+                            projectId={projectId}
+                            organizationId={organizationId}
+                            modelProviderId={modelProviderId}
+                            providerKey={providerKey}
+                        />
+                    )}
                 </Drawer.Body>
             </Drawer.Content>
 

@@ -18,7 +18,7 @@ import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
 import { modelSelectorOptions } from "../ModelSelector";
 import { Tooltip } from "../ui/tooltip";
-import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";
+import { isProviderEffectiveDefault } from "../../utils/modelProviderHelpers";
 import { ProviderModelSelector } from "./ProviderModelSelector";
 
 /**
@@ -49,12 +49,8 @@ export const DefaultProviderSection = ({
   } | null | undefined;
 }) => {
   // Determine if toggle should be disabled
-  const isUsedForDefaults = project ? isProviderUsedForDefaultModels(
-    provider.provider,
-    project.defaultModel ?? null,
-    project.topicClusteringModel ?? null,
-    project.embeddingsModel ?? null
-  ) : false;
+  // Uses effective defaults (project values with fallbacks to constants)
+  const isUsedForDefaults = isProviderEffectiveDefault(provider.provider, project);
   const isOnlyEnabledProvider = enabledProvidersCount === 1;
   const isToggleDisabled = isUsedForDefaults || isOnlyEnabledProvider;
 

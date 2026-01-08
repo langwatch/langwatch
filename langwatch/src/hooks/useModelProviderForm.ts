@@ -8,7 +8,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
-import { isProviderUsedForDefaultModels } from "../utils/modelProviderHelpers";
+import { getEffectiveDefaults, isProviderEffectiveDefault } from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
 
@@ -17,9 +17,11 @@ export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
-  projectDefaultModel?: string | null;
-  projectTopicClusteringModel?: string | null;
-  projectEmbeddingsModel?: string | null;
+  project: {
+    defaultModel?: string | null;
+    topicClusteringModel?: string | null;
+    embeddingsModel?: string | null;
+  } | null | undefined;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -67,12 +69,14 @@ export function useModelProviderForm(
   const {
     provider,
     projectId,
-    projectDefaultModel: initialProjectDefaultModel,
-    projectTopicClusteringModel: initialProjectTopicClusteringModel,
-    projectEmbeddingsModel: initialProjectEmbeddingsModel,
+    project,
     onSuccess,
     onError,
   } = params;
+
+  // Compute effective defaults using unified helper
+  const effectiveDefaults = useMemo(() => getEffectiveDefaults(project), [project]);
+  const { defaultModel: initialProjectDefaultModel, topicClusteringModel: initialProjectTopicClusteringModel, embeddingsModel: initialProjectEmbeddingsModel } = effectiveDefaults;
 
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
@@ -223,18 +227,19 @@ export function useModelProviderForm(
   );
 
   const [defaultModel, setDefaultModel] = useState<string | null>(
-    initialProjectDefaultModel ?? null,
+    initialProjectDefaultModel,
   );
 
+  // Auto-enable toggle if this provider is used for any effective default
   const [useAsDefaultProvider, setUseAsDefaultProvider] =
-    useState<boolean>(false);
+    useState<boolean>(() => isProviderEffectiveDefault(provider.provider, project));
   const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
-    initialProjectDefaultModel ?? null,
+    initialProjectDefaultModel,
   );
   const [projectTopicClusteringModel, setProjectTopicClusteringModel] =
-    useState<string | null>(initialProjectTopicClusteringModel ?? null);
+    useState<string | null>(initialProjectTopicClusteringModel);
   const [projectEmbeddingsModel, setProjectEmbeddingsModel] =
-    useState<string | null>(initialProjectEmbeddingsModel ?? null);
+    useState<string | null>(initialProjectEmbeddingsModel);
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
@@ -298,20 +303,15 @@ export function useModelProviderForm(
       ),
     );
 
-    setDefaultModel(initialProjectDefaultModel ?? null);
+    setDefaultModel(initialProjectDefaultModel);
     
-    // Auto-enable the toggle if this provider is currently being used for any default models
-    const isUsedForDefaults = isProviderUsedForDefaultModels(
-      provider.provider,
-      initialProjectDefaultModel ?? null,
-      initialProjectTopicClusteringModel ?? null,
-      initialProjectEmbeddingsModel ?? null
-    );
+    // Auto-enable the toggle if this provider is currently being used for any effective default models
+    const isUsedForDefaults = isProviderEffectiveDefault(provider.provider, project);
     setUseAsDefaultProvider(isUsedForDefaults);
     
-    setProjectDefaultModel(initialProjectDefaultModel ?? null);
-    setProjectTopicClusteringModel(initialProjectTopicClusteringModel ?? null);
-    setProjectEmbeddingsModel(initialProjectEmbeddingsModel ?? null);
+    setProjectDefaultModel(initialProjectDefaultModel);
+    setProjectTopicClusteringModel(initialProjectTopicClusteringModel);
+    setProjectEmbeddingsModel(initialProjectEmbeddingsModel);
     setErrors({});
     setIsSaving(false);
   }, [
@@ -324,6 +324,7 @@ export function useModelProviderForm(
     initialProjectDefaultModel,
     initialProjectTopicClusteringModel,
     initialProjectEmbeddingsModel,
+    project,
   ]);
 
   const setEnabled = useCallback(

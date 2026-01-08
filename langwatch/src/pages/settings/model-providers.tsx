@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { useEffect } from "react";
-import { Edit, MoreVertical, Plus, XCircle } from "lucide-react";
+import { Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
@@ -36,7 +36,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";
+import { isProviderUsedForDefaultModels, isProviderEffectiveDefault } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
   const { project, organization, organizations, hasPermission } =
@@ -58,14 +58,10 @@ export default function ModelsPage() {
   } | null>(null);
   const [enablingProvider, setEnablingProvider] = useState<string | null>(null);
 
-  // Check if provider is used for any of the default models (using API data as source of truth)
+  // Check if provider is used for any of the effective default models
+  // Uses project values when set, otherwise falls back to DEFAULT_* constants
   const isDefaultProvider = (providerKey: string) => {
-    return isProviderUsedForDefaultModels(
-      providerKey,
-      project?.defaultModel ?? null,
-      project?.topicClusteringModel ?? null,
-      project?.embeddingsModel ?? null
-    );
+    return isProviderEffectiveDefault(providerKey, project);
   };
 
   const utils = api.useContext();
@@ -102,11 +98,11 @@ export default function ModelsPage() {
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
-          <Tooltip
-            content="You need model provider manage permissions to add new providers."
-            disabled={hasModelProvidersManagePermission}
-          >
-            <Menu.Root>
+          <Menu.Root>
+            <Tooltip
+              content="You need model provider manage permissions to add new providers."
+              disabled={hasModelProvidersManagePermission}
+            >
               <Menu.Trigger asChild>
                 <PageLayout.HeaderButton 
                   disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}
@@ -115,70 +111,68 @@ export default function ModelsPage() {
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
               </Menu.Trigger>
-              <Menu.Content>
-                {notEnabledProviders.map((provider) => (
-                  <Menu.Item
-                    key={provider.provider}
-                    value={provider.provider}
-                    disabled={enablingProvider === provider.provider}
-                    onClick={async () => {
-                      if (!project?.id) return;
+            </Tooltip>
+            <Menu.Content>
+              {notEnabledProviders.map((provider) => (
+                <Menu.Item
+                  key={provider.provider}
+                  value={provider.provider}
+                  disabled={enablingProvider === provider.provider}
+                  onClick={async () => {
+                    if (!project?.id) return;
+                    
+                    setEnablingProvider(provider.provider);
+                    try {
+                      // Enable the provider directly via API
+                      await enableMutation.mutateAsync({
+                        id: undefined,
+                        projectId: project.id,
+                        provider: provider.provider,
+                        enabled: true,
+                        customKeys: null,
+                        customModels: null,
+                        customEmbeddingsModels: null,
+                        extraHeaders: null,
+                      });
                       
-                      setEnablingProvider(provider.provider);
-                      try {
-                        // Enable the provider directly via API
-                        await enableMutation.mutateAsync({
-                          id: undefined,
+                      // Refetch providers to get the new provider with ID
+                      const result = await refetch();
+                      const updatedProviders = result.data;
+                      const newProvider = updatedProviders?.[provider.provider as keyof typeof updatedProviders];
+                      
+                      // Open drawer with the provider's ID
+                      if (newProvider?.id) {
+                        openDrawer("editModelProvider", {
                           projectId: project.id,
-                          provider: provider.provider,
-                          enabled: true,
-                          customKeys: null,
-                          customModels: null,
-                          customEmbeddingsModels: null,
-                          extraHeaders: null,
+                          organizationId: organization?.id,
+                          modelProviderId: newProvider.id,
                         });
-                        
-                        // Refetch providers to get the new provider with ID
-                        const result = await refetch();
-                        const updatedProviders = result.data;
-                        const newProvider = updatedProviders?.[provider.provider as keyof typeof updatedProviders];
-                        
-                        // Open drawer with the provider's ID
-                        if (newProvider?.id) {
-                          openDrawer("editModelProvider", {
-                            projectId: project.id,
-                            organizationId: organization?.id,
-                            modelProviderId: newProvider.id,
-                          });
-                        }
-                      } finally {
-                        setEnablingProvider(null);
                       }
-                    }}
-                  >
-                    <HStack gap={3}>
-                      <Box width="20px" height="20px">
-                        {provider.icon}
-                      </Box>
-                      <Text>{provider.name}</Text>
-                    </HStack>
-                  </Menu.Item>
-                ))}
-              </Menu.Content>
-            </Menu.Root>
-          </Tooltip>
+                    } finally {
+                      setEnablingProvider(null);
+                    }
+                  }}
+                >
+                  <HStack gap={3}>
+                    <Box width="20px" height="20px">
+                      {provider.icon}
+                    </Box>
+                    <Text>{provider.name}</Text>
+                  </HStack>
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Root>
         </HStack>
 
         {isLoading ? (
           <Spinner />
         ) : (
-          <Table.Root width="full" interactive>
+          <Table.Root width="full">
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Provider</Table.ColumnHeader>
-                <Table.ColumnHeader width="100px">
-                  Actions
-                </Table.ColumnHeader>
+                <Table.ColumnHeader />
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -206,16 +200,21 @@ export default function ModelsPage() {
                             )}
                           </HStack>
                         </Table.Cell>
-                        <Table.Cell>
+                        <Table.Cell textAlign="right">
                           <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button 
-                                variant="ghost"
-                                disabled={!hasModelProvidersManagePermission}
-                              >
-                                <MoreVertical />
-                              </Button>
-                            </Menu.Trigger>
+                            <Tooltip
+                              content="You need model provider manage permissions to edit or delete providers."
+                              disabled={hasModelProvidersManagePermission}
+                            >
+                              <Menu.Trigger asChild>
+                                <Button 
+                                  variant="ghost"
+                                  disabled={!hasModelProvidersManagePermission}
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                            </Tooltip>
                             <Menu.Content>
                               <Menu.Item
                                 value="edit"
@@ -225,17 +224,19 @@ export default function ModelsPage() {
                                     projectId: project?.id,
                                     organizationId: organization?.id,
                                     modelProviderId: provider.id,
+                                    providerKey: provider.provider,
                                   });
                                 }}
                               >
                                 <Box display="flex" alignItems="center" gap={2}>
                                   <Edit size={14} />
-                                  Edit
+                                  Edit Provider
                                 </Box>
                               </Menu.Item>
                               <Menu.Item
                                 value="disable"
-                                colorPalette="red"
+                                color="red"
+                                // css={{ color: "var(--chakra-colors-red-600)" }}
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   setProviderToDisable({
@@ -246,8 +247,8 @@ export default function ModelsPage() {
                                 }}
                               >
                                 <Box display="flex" alignItems="center" gap={2}>
-                                  <XCircle size={14} />
-                                  Disable
+                                  <Trash2 size={14} />
+                                  Delete Provider
                                 </Box>
                               </Menu.Item>
                             </Menu.Content>
