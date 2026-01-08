@@ -64,9 +64,9 @@ export const EditModelProviderForm = ({
       if (byKey) return byKey;
     }
 
-    // Final fallback for edge cases
+    // Final fallback for new providers (not yet created in DB)
     return {
-      provider: "custom",
+      provider: providerKey,
       enabled: false,
       customKeys: null,
       models: null,

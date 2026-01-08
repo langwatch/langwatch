@@ -48,15 +48,13 @@ export default function ModelsPage() {
 
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
-  const disableMutation = api.modelProvider.update.useMutation();
-  const enableMutation = api.modelProvider.update.useMutation();
+  const updateMutation = api.modelProvider.update.useMutation();
   const updateProject = api.project.update.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
     provider: string;
     name: string;
   } | null>(null);
-  const [enablingProvider, setEnablingProvider] = useState<string | null>(null);
 
   // Check if provider is used for any of the effective default models
   // Uses project values when set, otherwise falls back to DEFAULT_* constants
@@ -106,7 +104,6 @@ export default function ModelsPage() {
               <Menu.Trigger asChild>
                 <PageLayout.HeaderButton 
                   disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}
-                  loading={!!enablingProvider}
                 >
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
@@ -117,40 +114,13 @@ export default function ModelsPage() {
                 <Menu.Item
                   key={provider.provider}
                   value={provider.provider}
-                  disabled={enablingProvider === provider.provider}
-                  onClick={async () => {
+                  onClick={() => {
                     if (!project?.id) return;
-                    
-                    setEnablingProvider(provider.provider);
-                    try {
-                      // Enable the provider directly via API
-                      await enableMutation.mutateAsync({
-                        id: undefined,
-                        projectId: project.id,
-                        provider: provider.provider,
-                        enabled: true,
-                        customKeys: null,
-                        customModels: null,
-                        customEmbeddingsModels: null,
-                        extraHeaders: null,
-                      });
-                      
-                      // Refetch providers to get the new provider with ID
-                      const result = await refetch();
-                      const updatedProviders = result.data;
-                      const newProvider = updatedProviders?.[provider.provider as keyof typeof updatedProviders];
-                      
-                      // Open drawer with the provider's ID
-                      if (newProvider?.id) {
-                        openDrawer("editModelProvider", {
-                          projectId: project.id,
-                          organizationId: organization?.id,
-                          modelProviderId: newProvider.id,
-                        });
-                      }
-                    } finally {
-                      setEnablingProvider(null);
-                    }
+                    openDrawer("editModelProvider", {
+                      projectId: project.id,
+                      organizationId: organization?.id,
+                      providerKey: provider.provider,
+                    });
                   }}
                 >
                   <HStack gap={3}>
@@ -271,16 +241,16 @@ export default function ModelsPage() {
         >
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title>Disable {providerToDisable?.name}?</Dialog.Title>
+              <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               {providerToDisable && isDefaultProvider(providerToDisable.provider) ? (
                 <VStack gap={3} align="start">
                   <Text>
-                    This provider is currently being used for one or more default models and cannot be disabled.
+                    This provider is currently being used for one or more default models and cannot be deleted.
                   </Text>
                   <Text fontWeight="medium">
-                    Please change the following before disabling:
+                    Please change the following before deleting:
                   </Text>
                   <VStack gap={2} align="start" paddingLeft={4}>
                     {isProviderUsedForDefaultModels(
@@ -313,12 +283,12 @@ export default function ModelsPage() {
               </Dialog.ActionTrigger>
               <Button
                 colorPalette="red"
-                loading={disableMutation.isPending}
+                loading={updateMutation.isPending}
                 disabled={providerToDisable ? isDefaultProvider(providerToDisable.provider) : false}
                 onClick={async () => {
                   if (!providerToDisable) return;
                   if (!project?.id) return;
-                  await disableMutation.mutateAsync({
+                  await updateMutation.mutateAsync({
                     id: providerToDisable.id,
                     projectId: project.id,
                     provider: providerToDisable.provider,
@@ -328,7 +298,7 @@ export default function ModelsPage() {
                   await refetch();
                 }}
               >
-                Disable
+                Delete
               </Button>
             </Dialog.Footer>
             <Dialog.CloseTrigger />
