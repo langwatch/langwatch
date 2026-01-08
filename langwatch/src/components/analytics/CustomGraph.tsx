@@ -341,26 +341,19 @@ const CustomGraph_ = React.memo(
       [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
     );
 
-    // Calculate pie/donut data using keysToSum (same as stacked charts)
-    // Both pie and donut charts use numeric timeScale with pipeline for consistency
+    // Calculate pie/donut data using shapeDataForSummary (same logic as summary charts)
     const pieData = useMemo(() => {
-      if (
-        (input.graphType === "pie" || input.graphType === "donnut") &&
-        keysToSum
-      ) {
-        // Both pie and donut use keysToSum (same as stacked charts)
-        const result = Object.entries(keysToSum)
-          .filter(([_, value]) => value > 0)
-          .map(([aggKey, value]) => ({
-            key: aggKey,
-            name: nameForSeries(aggKey),
-            value: value,
-          }));
-
-        return result;
+      if (input.graphType === "pie" || input.graphType === "donnut") {
+        const summaryData = shapeDataForSummary(
+          input,
+          seriesByKey,
+          timeseries,
+          nameForSeries,
+        );
+        return summaryData.current.filter((item) => item.value > 0);
       }
       return [];
-    }, [input.graphType, keysToSum, nameForSeries]);
+    }, [input, seriesByKey, timeseries, nameForSeries]);
 
     const colorForSeries = (aggKey: string, index: number): string => {
       const { series, groupKey } = getSeries(seriesByKey, aggKey);
