@@ -22,11 +22,6 @@ export type UseModelProviderFormParams = {
   projectEmbeddingsModel?: string | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
-  onDefaultModelsUpdated?: (models: {
-    defaultModel?: string;
-    topicClusteringModel?: string;
-    embeddingsModel?: string;
-  }) => void;
 };
 
 export type UseModelProviderFormState = {
@@ -85,7 +80,6 @@ export function useModelProviderForm(
     projectEmbeddingsModel: initialProjectEmbeddingsModel,
     onSuccess,
     onError,
-    onDefaultModelsUpdated,
   } = params;
 
   const utils = api.useContext();
@@ -585,13 +579,6 @@ export function useModelProviderForm(
         // Invalidate organization query to refetch project data
         // This triggers useOrganizationTeamProject to refetch automatically
         void utils.organization.getAll.invalidate();
-        
-        // Notify parent component about updated default models
-        onDefaultModelsUpdated?.({
-          defaultModel: projectDefaultModel ?? undefined,
-          topicClusteringModel: projectTopicClusteringModel ?? undefined,
-          embeddingsModel: projectEmbeddingsModel ?? undefined,
-        });
       }
 
       toaster.create({

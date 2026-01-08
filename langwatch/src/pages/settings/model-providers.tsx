@@ -25,7 +25,6 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { useDefaultModel } from "../../hooks/useDefaultModel";
 import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -58,22 +57,6 @@ export default function ModelsPage() {
   } | null>(null);
   const [enablingProvider, setEnablingProvider] = useState<string | null>(null);
 
-  // Initialize hooks to get current model values
-  const defaultModelHook = useDefaultModel({
-    projectId: project?.id,
-    initialValue: project?.defaultModel ?? DEFAULT_MODEL,
-  });
-
-  const embeddingsModelHook = useEmbeddingsModel({
-    projectId: project?.id,
-    initialValue: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
-  });
-
-  const topicClusteringModelHook = useTopicClusteringModel({
-    projectId: project?.id,
-    initialValue: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-  });
-
   // Check if provider is used for any of the default models (using API data as source of truth)
   const isDefaultProvider = (providerKey: string) => {
     return isProviderUsedForDefaultModels(
@@ -82,23 +65,6 @@ export default function ModelsPage() {
       project?.topicClusteringModel ?? null,
       project?.embeddingsModel ?? null
     );
-  };
-
-  // Callback to update hook values when default models are changed
-  const handleDefaultModelsUpdated = (models: {
-    defaultModel?: string;
-    topicClusteringModel?: string;
-    embeddingsModel?: string;
-  }) => {
-    if (models.defaultModel) {
-      defaultModelHook.setValue(models.defaultModel);
-    }
-    if (models.topicClusteringModel) {
-      topicClusteringModelHook.setValue(models.topicClusteringModel);
-    }
-    if (models.embeddingsModel) {
-      embeddingsModelHook.setValue(models.embeddingsModel);
-    }
   };
 
   const utils = api.useContext();
@@ -178,10 +144,6 @@ export default function ModelsPage() {
                             projectId: project.id,
                             organizationId: organization?.id,
                             modelProviderId: newProvider.id,
-                            currentDefaultModel: defaultModelHook.value,
-                            currentTopicClusteringModel: topicClusteringModelHook.value,
-                            currentEmbeddingsModel: embeddingsModelHook.value,
-                            onDefaultModelsUpdated: handleDefaultModelsUpdated,
                           });
                         }
                       } finally {
@@ -209,7 +171,7 @@ export default function ModelsPage() {
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Provider</Table.ColumnHeader>
-                <Table.ColumnHeader width="100px" textAlign="center">
+                <Table.ColumnHeader width="100px">
                   Actions
                 </Table.ColumnHeader>
               </Table.Row>
@@ -258,10 +220,6 @@ export default function ModelsPage() {
                                     projectId: project?.id,
                                     organizationId: organization?.id,
                                     modelProviderId: provider.id,
-                                    currentDefaultModel: defaultModelHook.value,
-                                    currentTopicClusteringModel: topicClusteringModelHook.value,
-                                    currentEmbeddingsModel: embeddingsModelHook.value,
-                                    onDefaultModelsUpdated: handleDefaultModelsUpdated,
                                   });
                                 }}
                               >
@@ -321,7 +279,7 @@ export default function ModelsPage() {
                   <VStack gap={2} align="start" paddingLeft={4}>
                     {isProviderUsedForDefaultModels(
                       providerToDisable.provider,
-                      defaultModelHook.value,
+                      project?.defaultModel ?? null,
                       null,
                       null
                     ) && <Text>• Default Model</Text>}
@@ -329,12 +287,12 @@ export default function ModelsPage() {
                       providerToDisable.provider,
                       null,
                       null,
-                      embeddingsModelHook.value
+                      project?.embeddingsModel ?? null
                     ) && <Text>• Embeddings Model</Text>}
                     {isProviderUsedForDefaultModels(
                       providerToDisable.provider,
                       null,
-                      topicClusteringModelHook.value,
+                      project?.topicClusteringModel ?? null,
                       null
                     ) && <Text>• Topic Clustering Model</Text>}
                   </VStack>

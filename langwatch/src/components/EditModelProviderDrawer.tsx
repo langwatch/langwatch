@@ -8,19 +8,11 @@ import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
 type EditModelProviderDrawerProps = {
   projectId?: string;
   organizationId?: string;
-  currentDefaultModel?: string;
-  currentTopicClusteringModel?: string;
-  currentEmbeddingsModel?: string;
-  onDefaultModelsUpdated?: (models: {
-    defaultModel?: string;
-    topicClusteringModel?: string;
-    embeddingsModel?: string;
-  }) => void;
   modelProviderId: string;
 };
 
 export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => {
-    const { projectId, organizationId, currentDefaultModel, currentTopicClusteringModel, currentEmbeddingsModel, onDefaultModelsUpdated, modelProviderId } = props;
+    const { projectId, organizationId, modelProviderId } = props;
     const { closeDrawer } = useDrawer();
     const { providers } = useModelProvidersSettings({ projectId });
     
@@ -62,10 +54,6 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
                         projectId={projectId}
                         organizationId={organizationId}
                         modelProviderId={modelProviderId}
-                        currentDefaultModel={currentDefaultModel}
-                        currentTopicClusteringModel={currentTopicClusteringModel}
-                        currentEmbeddingsModel={currentEmbeddingsModel}
-                        onDefaultModelsUpdated={onDefaultModelsUpdated}
                     />
                 </Drawer.Body>
             </Drawer.Content>

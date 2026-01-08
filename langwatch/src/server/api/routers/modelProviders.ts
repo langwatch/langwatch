@@ -24,9 +24,6 @@ import {
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-// ============================================================================
-// API KEY VALIDATION TYPES & REGISTRY
-// ============================================================================
 
 /** Validation result returned by all validation functions */
 type ValidationResult = { valid: boolean; error?: string };

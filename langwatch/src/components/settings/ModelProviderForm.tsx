@@ -717,24 +717,12 @@ type EditModelProviderFormProps = {
   projectId?: string | undefined;
   organizationId?: string | undefined;
   modelProviderId: string;
-  currentDefaultModel?: string;
-  currentTopicClusteringModel?: string;
-  currentEmbeddingsModel?: string;
-  onDefaultModelsUpdated?: (models: {
-    defaultModel?: string;
-    topicClusteringModel?: string;
-    embeddingsModel?: string;
-  }) => void;
 };
 
 export const EditModelProviderForm = ({
   projectId,
   organizationId,
   modelProviderId,
-  currentDefaultModel,
-  currentTopicClusteringModel,
-  currentEmbeddingsModel,
-  onDefaultModelsUpdated,
 }: EditModelProviderFormProps) => {
   const { providers } = useModelProvidersSettings({
     projectId: projectId,
@@ -773,19 +761,15 @@ export const EditModelProviderForm = ({
   }, [modelProviderId, providers]);
 
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
-  // Props are fallback for initial render before project data is available
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: project?.defaultModel ?? currentDefaultModel ?? DEFAULT_MODEL,
-    projectTopicClusteringModel:
-      project?.topicClusteringModel ?? currentTopicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
-    projectEmbeddingsModel:
-      project?.embeddingsModel ?? currentEmbeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
+    projectDefaultModel: project?.defaultModel ?? DEFAULT_MODEL,
+    projectTopicClusteringModel: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+    projectEmbeddingsModel: project?.embeddingsModel ?? DEFAULT_EMBEDDINGS_MODEL,
     onSuccess: () => {
       closeDrawer();
     },
-    onDefaultModelsUpdated,
   });
 
   const providerDefinition =
