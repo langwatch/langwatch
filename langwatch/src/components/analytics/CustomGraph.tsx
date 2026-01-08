@@ -200,21 +200,35 @@ const CustomGraph_ = React.memo(
 
     // For pie and donut charts without a pipeline, add a default pipeline to get grouped data
     // The backend requires a pipeline to populate grouped buckets
-    const queryInput = useMemo(() => {
+    const queryInput = useMemo((): CustomGraphInput => {
       if (
         (input.graphType === "pie" || input.graphType === "donnut") &&
         input.groupBy &&
         !input.series.some((s) => s.pipeline)
       ) {
-        return {
-          ...input,
-          series: input.series.map((series) => ({
-            ...series,
+        // Helper to add pipeline while preserving literal types
+        const addPipeline = (series: Series): Series => {
+          // Explicitly construct object to preserve literal types
+          const result = {
+            metric: series.metric,
+            aggregation: series.aggregation,
+            key: series.key,
+            subkey: series.subkey,
+            filters: series.filters,
+            asPercent: series.asPercent,
+            name: series.name,
+            colorSet: series.colorSet,
             pipeline: {
-              field: "trace_id",
+              field: "trace_id" as const,
               aggregation: "sum" as const,
             },
-          })),
+          } satisfies Series;
+          return result;
+        };
+
+        return {
+          ...input,
+          series: input.series.map(addPipeline),
         };
       }
       return input;
@@ -283,6 +297,8 @@ const CustomGraph_ = React.memo(
 
     // Use queryInput.series for seriesByKey to match the keys generated from the query
     // This ensures donut charts with added pipeline have matching keys
+    // Type assertion needed because Object.fromEntries widens literal pipeline.field types to string
+    // Runtime values are correct - the added pipeline uses "trace_id" literal
     const seriesForKeyMapping = queryInput.series;
     const seriesByKey = Object.fromEntries(
       seriesForKeyMapping.map((series, index) => {
@@ -299,7 +315,7 @@ const CustomGraph_ = React.memo(
 
         return [key, series];
       }),
-    );
+    ) as unknown as Record<string, Series>;
 
     const nameForSeries = useCallback(
       (aggKey: string) => {
