@@ -43,148 +43,162 @@ import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
 import { modelSelectorOptions } from "../ModelSelector";
-import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { Tooltip } from "../ui/tooltip";
+import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
+import { Select } from "../ui/select";
+import { InputGroup } from "../ui/input-group";
+import { Search } from "react-feather";
+import { createListCollection } from "@chakra-ui/react";
 import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";
 
-
 /**
- * A creatable dropdown selector for default model selection.
- * Uses native Chakra Combobox to allow users to select existing models or create custom model names.
- * Shows model names without provider prefix and automatically adds the provider prefix to created models.
- * @param model - The currently selected model (in format "provider/model-name")
- * @param options - Array of available model options for this provider (in format "provider/model-name")
- * @param onChange - Callback when a model is selected or created
- * @param providerKey - The provider identifier (e.g., "openai", "anthropic")
- * @param placeholder - Optional placeholder text for the input
+ * A simple model selector for a specific provider.
+ * Shows only the models passed in options without fetching from API.
+ * Used in the model provider settings form to select default models.
  */
-const CreatableModelSelector = ({
+const ProviderModelSelector = React.memo(function ProviderModelSelector({
   model,
   options,
   onChange,
   providerKey,
-  placeholder = "Select or type a model name",
+  size = "full",
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   providerKey: string;
-  placeholder?: string;
-}) => {
-  const inputId = useId();
+  size?: "sm" | "md" | "full";
+}) {
+  const [modelSearch, setModelSearch] = useState("");
+
   const providerIcon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Convert options to display format (model name without prefix)
-  const displayOptions = useMemo(() => 
-    options.map((option) => option.split("/").slice(1).join("/")),
-    [options]
+  // Create model options with labels (model name without provider prefix)
+  const selectOptions = useMemo(() => 
+    options.map((modelValue) => ({
+      label: modelValue.split("/").slice(1).join("/"),
+      value: modelValue,
+      icon: providerIcon,
+    })),
+    [options, providerIcon]
   );
 
-  // Get current display value (model name without prefix)
-  const currentDisplayValue = useMemo(() => 
-    model ? model.split("/").slice(1).join("/") : "",
-    [model]
+  // Filter models by search
+  const filteredModels = useMemo(() => 
+    selectOptions.filter(
+      (item) =>
+        item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
+        item.value.toLowerCase().includes(modelSearch.toLowerCase())
+    ),
+    [selectOptions, modelSearch]
   );
 
-  // eslint-disable-next-line @typescript-eslint/unbound-method
-  const { contains } = useFilter({ sensitivity: "base" });
-  const { collection, filter } = useListCollection({
-    initialItems: displayOptions,
-    filter: contains,
+  const modelCollection = createListCollection({
+    items: filteredModels,
   });
 
-  const handleInputChange = useCallback(
-    (event: { inputValue: string }) => {
-      filter(event.inputValue);
-    },
-    [filter]
+  const selectedItem = selectOptions.find((option) => option.value === model);
+
+  const selectValueText = (
+    <HStack overflow="hidden" gap={2} align="center">
+      {providerIcon && (
+        <Box minWidth="16px">
+          {providerIcon}
+        </Box>
+      )}
+      <Box
+        fontSize={14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+      >
+        {selectedItem?.label ?? model.split("/").slice(1).join("/")}
+      </Box>
+    </HStack>
   );
 
-  const handleValueChange = useCallback(
-    (event: { value?: string[]; inputValue?: string }) => {
-      const selected = event.value?.[0];
-      if (selected) {
-        // Convert display value back to full "provider/model-name" format
-        const fullValue = selected.startsWith(`${providerKey}/`) ? selected : `${providerKey}/${selected}`;
-        onChange(fullValue);
-      }
-    },
-    [onChange, providerKey]
-  );
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
 
-  // Handle custom input when user clicks away or presses Enter
-  const handleBlur = useCallback(() => {
-    const inputValue = inputRef.current?.value?.trim();
-    if (inputValue && inputValue !== currentDisplayValue) {
-      // Convert display value back to full "provider/model-name" format
-      const fullValue = inputValue.startsWith(`${providerKey}/`) ? inputValue : `${providerKey}/${inputValue}`;
-      onChange(fullValue);
+  useEffect(() => {
+    const highlightedItem = modelCollection.items.find(
+      (item) => item.value === highlightedValue
+    );
+    if (!highlightedItem) {
+      setHighlightedValue(modelCollection.items[0]?.value ?? null);
     }
-  }, [currentDisplayValue, onChange, providerKey]);
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
-      const inputValue = (event.target as HTMLInputElement).value?.trim();
-      if (inputValue && inputValue !== currentDisplayValue) {
-        // Convert display value back to full "provider/model-name" format
-        const fullValue = inputValue.startsWith(`${providerKey}/`) ? inputValue : `${providerKey}/${inputValue}`;
-        onChange(fullValue);
-        event.preventDefault();
-      }
-    }
-  }, [currentDisplayValue, onChange, providerKey]);
-
-  const combobox = useCombobox({
-    ids: { input: inputId },
-    collection,
-    allowCustomValue: true,
-    value: currentDisplayValue ? [currentDisplayValue] : [],
-    inputValue: currentDisplayValue,
-    onInputValueChange: handleInputChange,
-    onValueChange: handleValueChange,
-  });
+  }, [highlightedValue, modelCollection.items]);
 
   return (
-    <Box width="full">
-      <Combobox.RootProvider value={combobox}>
-        <Combobox.Control>
-          <HStack  gap={1} >
-            <Combobox.Input 
-              ref={inputRef}
-              placeholder={placeholder} 
-              fontSize="sm" 
-              fontFamily="mono"
-              onBlur={handleBlur}
-              onKeyDown={handleKeyDown}
-            />
-          </HStack>
-          <Combobox.ClearTrigger />
-        </Combobox.Control>
-        <Combobox.Positioner>
-          <Combobox.Content borderRadius="md">
-            <Combobox.Empty>
-              <Text fontSize="sm" color="gray.500">
-                Type to create a new model
-              </Text>
-            </Combobox.Empty>
-            {(collection.items as string[]).map((item) => (
-              <Combobox.Item key={item} item={item} borderRadius="md">
-                <HStack gap={2}>
-                  {providerIcon && <Box boxSize={3.5} display="flex" alignItems="center">{providerIcon}</Box>}
-                  <Combobox.ItemText fontSize="sm" fontFamily="mono">
-                    {item}
-                  </Combobox.ItemText>
-                </HStack>
-                <Combobox.ItemIndicator />
-              </Combobox.Item>
-            ))}
-          </Combobox.Content>
-        </Combobox.Positioner>
-      </Combobox.RootProvider>
-    </Box>
+    <Select.Root
+      collection={modelCollection}
+      value={[model]}
+      onChange={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onValueChange={(change) => {
+        const selectedValue = change.value[0];
+        if (selectedValue) {
+          onChange(selectedValue);
+        }
+      }}
+      loopFocus={true}
+      highlightedValue={highlightedValue}
+      onHighlightChange={(details) => {
+        setHighlightedValue(details.highlightedValue);
+      }}
+      size={size === "full" ? undefined : size}
+    >
+      <Select.Trigger
+        className="fix-hidden-inputs"
+        width={size === "full" ? "100%" : "auto"}
+        background="white"
+        padding={0}
+      >
+        <Select.ValueText
+          // @ts-ignore
+          placeholder={selectValueText}
+        >
+          {() => selectValueText}
+        </Select.ValueText>
+      </Select.Trigger>
+      <Select.Content zIndex="1600">
+        <Field.Root asChild>
+          <Box position="sticky" top={0} zIndex="1">
+            <InputGroup
+              startElement={<Search size={16} />}
+              startOffset="-4px"
+              background="white"
+              width="calc(100% - 9px)"
+            >
+              <Input
+                size="sm"
+                placeholder="Search models"
+                type="search"
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+              />
+            </InputGroup>
+          </Box>
+        </Field.Root>
+        {filteredModels.map((item) => (
+          <Select.Item key={item.value} item={item}>
+            <HStack gap={2}>
+              {providerIcon && (
+                <Box width="14px" minWidth="14px">
+                  {providerIcon}
+                </Box>
+              )}
+              <Box fontSize={14} fontFamily="mono" paddingY="2px">
+                {item.label}
+              </Box>
+            </HStack>
+          </Select.Item>
+        ))}
+      </Select.Content>
+    </Select.Root>
   );
-};
+});
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
@@ -658,7 +672,7 @@ const DefaultProviderSection = ({
             <Text fontSize="xs" color="gray.500" marginBottom={2}>
               For general tasks within LangWatch
             </Text>
-            <CreatableModelSelector
+            <ProviderModelSelector
               model={
                 state.projectDefaultModel?.startsWith(`${provider.provider}/`)
                   ? state.projectDefaultModel
@@ -675,7 +689,7 @@ const DefaultProviderSection = ({
             <Text fontSize="xs" color="gray.500" marginBottom={2}>
               For generating topic names
             </Text>
-            <CreatableModelSelector
+            <ProviderModelSelector
               model={
                 state.projectTopicClusteringModel?.startsWith(`${provider.provider}/`)
                   ? state.projectTopicClusteringModel
@@ -694,7 +708,7 @@ const DefaultProviderSection = ({
             <Text fontSize="xs" color="gray.500" marginBottom={2}>
               For embeddings to be used in topic clustering and evaluations
             </Text>
-            <CreatableModelSelector
+            <ProviderModelSelector
               model={
                 state.projectEmbeddingsModel?.startsWith(`${provider.provider}/`)
                   ? state.projectEmbeddingsModel

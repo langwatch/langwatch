@@ -582,7 +582,7 @@ export function useModelProviderForm(
       }
 
       toaster.create({
-        title: "API Keys Updated",
+        title: "Model Provider Updated",
         type: "success",
         duration: 3000,
         meta: { closable: true },
