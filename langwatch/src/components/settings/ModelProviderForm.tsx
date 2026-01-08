@@ -132,15 +132,6 @@ export const EditModelProviderForm = ({
     void actions.submit();
   }, [providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
 
-
-  console.group('EditModelProviderForm');
-  console.log('state', state);
-  console.log('actions', actions);
-  console.log('provider', provider);
-  console.log('enabledProvidersCount', enabledProvidersCount);
-  console.log('project', project);
-  console.groupEnd();
-
   return (
     <VStack gap={4} align="start" width="full">
       <VStack align="start" width="full" gap={4}>

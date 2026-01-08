@@ -126,3 +126,69 @@ export function isProviderUsedForDefaultModels(
     providerKey === embeddingsProvider
   );
 }
+
+/**
+ * Extract the underlying shape from a Zod schema to list credential keys.
+ */
+export function getSchemaShape(schema: unknown): Record<string, unknown> {
+  const s = schema as { shape?: Record<string, unknown>; _def?: { schema?: { shape?: Record<string, unknown> } } };
+  if (s?.shape) return s.shape;
+  if (s?._def?.schema) return s._def.schema.shape ?? {};
+  return {};
+}
+
+/**
+ * Determine which credential keys should be visible for the active provider and mode.
+ * Azure has special handling for API Gateway vs direct API keys.
+ */
+export function getDisplayKeysForProvider(
+  providerName: string,
+  useApiGateway: boolean,
+  schemaShape: Record<string, unknown>,
+): Record<string, unknown> {
+  if (providerName === "azure") {
+    if (useApiGateway) {
+      return {
+        AZURE_API_GATEWAY_BASE_URL: schemaShape.AZURE_API_GATEWAY_BASE_URL,
+        AZURE_API_GATEWAY_VERSION: schemaShape.AZURE_API_GATEWAY_VERSION,
+      };
+    }
+    return {
+      AZURE_OPENAI_API_KEY: schemaShape.AZURE_OPENAI_API_KEY,
+      AZURE_OPENAI_ENDPOINT: schemaShape.AZURE_OPENAI_ENDPOINT,
+    };
+  }
+
+  return schemaShape;
+}
+
+/**
+ * Build the credential form state while preserving prior user input when applicable.
+ */
+export function buildCustomKeyState(
+  displayKeyMap: Record<string, unknown>,
+  storedKeys: Record<string, unknown>,
+  previousKeys?: Record<string, string>,
+): Record<string, string> {
+  if (previousKeys?.MANAGED) {
+    return previousKeys;
+  }
+  const result: Record<string, string> = {};
+  Object.keys(displayKeyMap ?? {}).forEach((key) => {
+    if (
+      previousKeys &&
+      Object.prototype.hasOwnProperty.call(previousKeys, key)
+    ) {
+      const previousValue = previousKeys[key];
+      if (typeof previousValue === "string") {
+        result[key] = previousValue;
+        return;
+      }
+    }
+
+    const storedValue = storedKeys[key];
+    result[key] = typeof storedValue === "string" ? storedValue : "";
+  });
+
+  return result;
+}

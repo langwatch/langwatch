@@ -8,7 +8,13 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
-import { getEffectiveDefaults, isProviderEffectiveDefault } from "../utils/modelProviderHelpers";
+import {
+  getEffectiveDefaults,
+  isProviderEffectiveDefault,
+  getSchemaShape,
+  getDisplayKeysForProvider,
+  buildCustomKeyState,
+} from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
 
@@ -32,8 +38,6 @@ export type UseModelProviderFormState = {
   displayKeys: Record<string, any>;
   extraHeaders: ExtraHeader[];
   customModels: SelectOption[];
-  chatModelOptions: SelectOption[];
-  defaultModel: string | null;
   useAsDefaultProvider: boolean;
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
@@ -54,7 +58,6 @@ export type UseModelProviderFormActions = {
   setExtraHeaderKey: (index: number, key: string) => void;
   setExtraHeaderValue: (index: number, value: string) => void;
   setCustomModels: (options: SelectOption[]) => void;
-  setDefaultModel: (model: string | null) => void;
   setUseAsDefaultProvider: (use: boolean) => void;
   setProjectDefaultModel: (model: string | null) => void;
   setProjectTopicClusteringModel: (model: string | null) => void;
@@ -93,71 +96,7 @@ export function useModelProviderForm(
     (provider.customKeys as Record<string, unknown>) || {},
   );
 
-  /**
-   * Single Responsibility: Extract the underlying shape from a Zod schema to list credential keys.
-   */
-  const getSchemaShape = (schema: any) => {
-    if (schema?.shape) return schema.shape;
-    if (schema?._def?.schema) return schema._def.schema.shape;
-    return {} as Record<string, any>;
-  };
-
-  /**
-   * Single Responsibility: Determine which credential keys should be visible for the active provider and mode.
-   */
-  const getDisplayKeysForProvider = (
-    providerName: string,
-    useProviderApiGateway: boolean,
-    schemaShape: Record<string, any>,
-  ) => {
-    if (providerName === "azure") {
-      if (useProviderApiGateway) {
-        return {
-          AZURE_API_GATEWAY_BASE_URL: schemaShape.AZURE_API_GATEWAY_BASE_URL,
-          AZURE_API_GATEWAY_VERSION: schemaShape.AZURE_API_GATEWAY_VERSION,
-        } as Record<string, any>;
-      }
-      return {
-        AZURE_OPENAI_API_KEY: schemaShape.AZURE_OPENAI_API_KEY,
-        AZURE_OPENAI_ENDPOINT: schemaShape.AZURE_OPENAI_ENDPOINT,
-      } as Record<string, any>;
-    }
-
-    return schemaShape;
-  };
-
-  /**
-   * Single Responsibility: Build the credential form state while preserving prior user input when applicable.
-   */
-  const buildCustomKeyState = (
-    displayKeyMap: Record<string, any>,
-    storedKeys: Record<string, unknown>,
-    previousKeys?: Record<string, string>,
-  ) => {
-    if (previousKeys?.MANAGED) {
-      return previousKeys;
-    }
-    const result: Record<string, string> = {};
-    Object.keys(displayKeyMap ?? {}).forEach((key) => {
-      if (
-        previousKeys &&
-        Object.prototype.hasOwnProperty.call(previousKeys, key)
-      ) {
-        const previousValue = previousKeys[key];
-        if (typeof previousValue === "string") {
-          result[key] = previousValue;
-          return;
-        }
-      }
-
-      const storedValue = storedKeys[key];
-      result[key] = typeof storedValue === "string" ? storedValue : "";
-    });
-
-    return result;
-  };
-
-  const originalSchemaShape = useMemo<Record<string, any>>(() => {
+  const originalSchemaShape = useMemo<Record<string, unknown>>(() => {
     return providerDefinition?.keysSchema
       ? getSchemaShape(providerDefinition.keysSchema)
       : {};
@@ -219,15 +158,6 @@ export function useModelProviderForm(
       provider.provider,
       "embedding",
     ),
-  );
-
-  const chatModelOptions = useMemo(
-    () => getProviderModelOptions(provider.provider, "chat"),
-    [provider.provider],
-  );
-
-  const [defaultModel, setDefaultModel] = useState<string | null>(
-    initialProjectDefaultModel,
   );
 
   // Auto-enable toggle if this provider is used for any effective default
@@ -303,8 +233,6 @@ export function useModelProviderForm(
       ),
     );
 
-    setDefaultModel(initialProjectDefaultModel);
-    
     // Auto-enable the toggle if this provider is currently being used for any effective default models
     const isUsedForDefaults = isProviderEffectiveDefault(provider.provider, project);
     setUseAsDefaultProvider(isUsedForDefaults);
@@ -552,8 +480,6 @@ export function useModelProviderForm(
       displayKeys,
       extraHeaders,
       customModels,
-      chatModelOptions,
-      defaultModel,
       useAsDefaultProvider,
       projectDefaultModel,
       projectTopicClusteringModel,
@@ -571,7 +497,6 @@ export function useModelProviderForm(
       setExtraHeaderKey,
       setExtraHeaderValue,
       setCustomModels,
-      setDefaultModel,
       setUseAsDefaultProvider,
       setProjectDefaultModel,
       setProjectTopicClusteringModel,

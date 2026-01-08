@@ -73,11 +73,11 @@ vi.mock("../../ModelSelector", () => ({
 }));
 
 vi.mock("../../../utils/modelProviderHelpers", () => ({
-  isProviderUsedForDefaultModels: vi.fn(() => false),
+  isProviderEffectiveDefault: vi.fn(() => false),
 }));
 
 import { DefaultProviderSection } from "../ModelProviderDefaultSection";
-import { isProviderUsedForDefaultModels } from "../../../utils/modelProviderHelpers";
+import { isProviderEffectiveDefault } from "../../../utils/modelProviderHelpers";
 
 const mockActions = {
   setEnabled: vi.fn(),
@@ -89,7 +89,6 @@ const mockActions = {
   setExtraHeaderKey: vi.fn(),
   setExtraHeaderValue: vi.fn(),
   setCustomModels: vi.fn(),
-  setDefaultModel: vi.fn(),
   setUseAsDefaultProvider: vi.fn(),
   setProjectDefaultModel: vi.fn(),
   setProjectTopicClusteringModel: vi.fn(),
@@ -104,8 +103,6 @@ const createMockState = (overrides = {}) => ({
   displayKeys: {},
   extraHeaders: [],
   customModels: [],
-  chatModelOptions: [],
-  defaultModel: null,
   useAsDefaultProvider: false,
   projectDefaultModel: "openai/gpt-4o",
   projectTopicClusteringModel: "openai/gpt-4o-mini",
@@ -140,7 +137,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe("DefaultProviderSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(isProviderUsedForDefaultModels).mockReturnValue(false);
+    vi.mocked(isProviderEffectiveDefault).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -223,7 +220,7 @@ describe("DefaultProviderSection", () => {
   });
 
   it("disables toggle when provider is used for defaults", () => {
-    vi.mocked(isProviderUsedForDefaultModels).mockReturnValue(true);
+    vi.mocked(isProviderEffectiveDefault).mockReturnValue(true);
 
     renderWithProviders(
       <DefaultProviderSection
