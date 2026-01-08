@@ -96,7 +96,12 @@ function VersionHistoryItem({
                 {data.commitMessage}
               </Text>
               {isCurrent && (
-                <Tag.Root colorPalette="green" size="sm" paddingX={2} fontWeight="normal">
+                <Tag.Root
+                  colorPalette="gray"
+                  size="sm"
+                  paddingX={2}
+                  fontWeight="normal"
+                >
                   <Tag.Label>current</Tag.Label>
                 </Tag.Root>
               )}
