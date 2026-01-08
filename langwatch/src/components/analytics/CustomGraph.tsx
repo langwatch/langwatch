@@ -297,8 +297,6 @@ const CustomGraph_ = React.memo(
 
     // Use queryInput.series for seriesByKey to match the keys generated from the query
     // This ensures donut charts with added pipeline have matching keys
-    // Type assertion needed because Object.fromEntries widens literal pipeline.field types to string
-    // Runtime values are correct - the added pipeline uses "trace_id" literal
     const seriesForKeyMapping = queryInput.series;
     const seriesByKey = Object.fromEntries(
       seriesForKeyMapping.map((series, index) => {
