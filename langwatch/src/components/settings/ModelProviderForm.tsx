@@ -63,8 +63,6 @@ export const EditModelProviderForm = ({
       const byKey = providers[providerKey];
       if (byKey) return byKey;
     }
-
-    // Final fallback for new providers (not yet created in DB)
     return {
       provider: providerKey,
       enabled: false,
