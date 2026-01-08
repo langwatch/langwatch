@@ -25,22 +25,18 @@ export type UseModelProviderFormParams = {
 };
 
 export type UseModelProviderFormState = {
-  enabled: boolean;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
   extraHeaders: ExtraHeader[];
   customModels: SelectOption[];
-  customEmbeddingsModels: SelectOption[];
   chatModelOptions: SelectOption[];
-  embeddingModelOptions: SelectOption[];
   defaultModel: string | null;
   useAsDefaultProvider: boolean;
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
   isSaving: boolean;
-  isToggling: boolean;
   errors: {
     customKeysRoot?: string;
   };
@@ -48,7 +44,6 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
-  setEnabledLocal: (enabled: boolean) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
   addExtraHeader: () => void;
@@ -57,9 +52,6 @@ export type UseModelProviderFormActions = {
   setExtraHeaderKey: (index: number, key: string) => void;
   setExtraHeaderValue: (index: number, value: string) => void;
   setCustomModels: (options: SelectOption[]) => void;
-  addCustomModelsFromText: (text: string) => void;
-  setCustomEmbeddingsModels: (options: SelectOption[]) => void;
-  addCustomEmbeddingsFromText: (text: string) => void;
   setDefaultModel: (model: string | null) => void;
   setUseAsDefaultProvider: (use: boolean) => void;
   setProjectDefaultModel: (model: string | null) => void;
@@ -171,8 +163,6 @@ export function useModelProviderForm(
       : {};
   }, [providerDefinition?.keysSchema]);
 
-  const [enabled, setEnabledState] = useState<boolean>(provider.enabled);
-
   const initialUseApiGateway = useMemo(() => {
     if (provider.provider === "azure" && provider.customKeys) {
       return !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL;
@@ -235,10 +225,6 @@ export function useModelProviderForm(
     () => getProviderModelOptions(provider.provider, "chat"),
     [provider.provider],
   );
-  const embeddingModelOptions = useMemo(
-    () => getProviderModelOptions(provider.provider, "embedding"),
-    [provider.provider],
-  );
 
   const [defaultModel, setDefaultModel] = useState<string | null>(
     initialProjectDefaultModel ?? null,
@@ -255,7 +241,6 @@ export function useModelProviderForm(
     useState<string | null>(initialProjectEmbeddingsModel ?? null);
 
   const [isSaving, setIsSaving] = useState(false);
-  const [isToggling, setIsToggling] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
 
   const setManaged = useCallback((managed: boolean) => {
@@ -275,7 +260,6 @@ export function useModelProviderForm(
         ? !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL
         : false;
 
-    setEnabledState(provider.enabled);
     setUseApiGatewayState(nextUseApiGateway);
 
     const nextDisplayKeys = getDisplayKeysForProvider(
@@ -334,7 +318,6 @@ export function useModelProviderForm(
     setProjectEmbeddingsModel(initialProjectEmbeddingsModel ?? null);
     setErrors({});
     setIsSaving(false);
-    setIsToggling(false);
   }, [
     provider.provider,
     provider.id,
@@ -347,14 +330,8 @@ export function useModelProviderForm(
     initialProjectEmbeddingsModel,
   ]);
 
-  const setEnabledLocal = useCallback((newEnabled: boolean) => {
-    setEnabledState(newEnabled);
-  }, []);
-
   const setEnabled = useCallback(
     async (newEnabled: boolean) => {
-      setEnabledState(newEnabled);
-      setIsToggling(true);
       try {
         await updateMutation.mutateAsync({
           id: provider.id,
@@ -375,8 +352,6 @@ export function useModelProviderForm(
           duration: 4000,
           meta: { closable: true },
         });
-      } finally {
-        setIsToggling(false);
       }
     },
     [
@@ -459,29 +434,6 @@ export function useModelProviderForm(
     setExtraHeaders((prev) =>
       prev.map((h, i) => (i === index ? { ...h, value } : h)),
     );
-  }, []);
-
-  const addFromCommaText = (
-    text: string,
-    current: SelectOption[],
-  ): SelectOption[] => {
-    const tokens = text
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
-    const existing = new Set(current.map((v) => v.value));
-    const toAdd = tokens
-      .filter((t) => !existing.has(t))
-      .map((t) => ({ label: t, value: t }));
-    return [...current, ...toAdd];
-  };
-
-  const addCustomModelsFromText = useCallback((text: string) => {
-    setCustomModels((prev) => addFromCommaText(text, prev));
-  }, []);
-
-  const addCustomEmbeddingsFromText = useCallback((text: string) => {
-    setCustomEmbeddingsModels((prev) => addFromCommaText(text, prev));
   }, []);
 
   const submit = useCallback(async () => {
@@ -624,27 +576,22 @@ export function useModelProviderForm(
 
   return [
     {
-      enabled,
       useApiGateway,
       customKeys,
       displayKeys,
       extraHeaders,
       customModels,
-      customEmbeddingsModels,
       chatModelOptions,
-      embeddingModelOptions,
       defaultModel,
       useAsDefaultProvider,
       projectDefaultModel,
       projectTopicClusteringModel,
       projectEmbeddingsModel,
       isSaving,
-      isToggling,
       errors,
     },
     {
       setEnabled,
-      setEnabledLocal,
       setUseApiGateway,
       setCustomKey,
       addExtraHeader,
@@ -653,9 +600,6 @@ export function useModelProviderForm(
       setExtraHeaderKey,
       setExtraHeaderValue,
       setCustomModels,
-      addCustomModelsFromText,
-      setCustomEmbeddingsModels,
-      addCustomEmbeddingsFromText,
       setDefaultModel,
       setUseAsDefaultProvider,
       setProjectDefaultModel,

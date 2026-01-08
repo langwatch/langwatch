@@ -8,22 +8,30 @@ import { api } from "../utils/api";
  *
  * @param provider - The provider key (e.g., "openai", "gemini")
  * @param customKeys - The form state containing API keys and configuration
+ * @param projectId - The project ID for permission checking
  * @returns Object containing validation state and functions
  */
 export function useModelProviderApiKeyValidation(
   provider: string,
   customKeys: Record<string, string>,
+  projectId: string | undefined,
 ) {
   const [isValidating, setIsValidating] = useState(false);
   const [validationError, setValidationError] = useState<string | undefined>();
   const utils = api.useContext();
 
   const validate = useCallback(async (): Promise<boolean> => {
+    if (!projectId) {
+      setValidationError("Project ID is required for validation");
+      return false;
+    }
+
     setIsValidating(true);
     setValidationError(undefined);
 
     try {
       const result = await utils.modelProvider.validateApiKey.fetch({
+        projectId,
         provider,
         customKeys,
       });
@@ -44,7 +52,7 @@ export function useModelProviderApiKeyValidation(
     } finally {
       setIsValidating(false);
     }
-  }, [provider, customKeys, utils.modelProvider.validateApiKey]);
+  }, [projectId, provider, customKeys, utils.modelProvider.validateApiKey]);
 
   const clearError = useCallback(() => {
     setValidationError(undefined);
