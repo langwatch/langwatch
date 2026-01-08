@@ -76,9 +76,9 @@ export const SelectItem = React.forwardRef<
 });
 
 interface SelectValueTextProps
-  extends Omit<ChakraSelect.ValueTextProps, "children"> {
+  extends Omit<ChakraSelect.ValueTextProps, "children" | "placeholder"> {
   children?(items: CollectionItem[]): React.ReactNode;
-  placeholder?: string | React.ReactNode;
+  placeholder?: React.ReactNode;
 }
 
 export const SelectValueText = React.forwardRef<
@@ -86,13 +86,13 @@ export const SelectValueText = React.forwardRef<
   SelectValueTextProps
 >(function SelectValueText(props, ref) {
   // eslint-disable-next-line @typescript-eslint/unbound-method
-  const { children, ...rest } = props;
+  const { children, placeholder, ...rest } = props;
   return (
     <ChakraSelect.ValueText {...rest} ref={ref}>
       <ChakraSelect.Context>
         {(select) => {
           const items = select.selectedItems;
-          if (items.length === 0) return props.placeholder;
+          if (items.length === 0) return placeholder;
           if (children) return children(items);
           if (items.length === 1)
             return select.collection.stringifyItem(items[0]);
