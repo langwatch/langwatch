@@ -12,6 +12,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
 import { createLogger } from "../../../../../utils/logger";
+import { OPENAI_DEFAULT_BASE_URL } from "../../../../../utils/constants";
 import {
   parseZodFieldErrors,
   type ZodErrorStructure,
@@ -32,8 +33,6 @@ interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
   variant: "evaluations" | "prompts";
 }
-
-const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 const variantToDocsMapping: Record<"evaluations" | "prompts", string> = {
   evaluations: "/llm-evaluation/overview",

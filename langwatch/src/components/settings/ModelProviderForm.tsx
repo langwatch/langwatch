@@ -25,6 +25,7 @@ import {
   type UseModelProviderFormActions,
   type ExtraHeader,
 } from "../../hooks/useModelProviderForm";
+import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { dependencies } from "../../injection/dependencies.client";
@@ -205,6 +206,8 @@ const CredentialsSection = ({
   setFieldErrors,
   projectId,
   organizationId,
+  apiKeyValidationError,
+  onApiKeyValidationClear,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
@@ -213,6 +216,8 @@ const CredentialsSection = ({
   setFieldErrors: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   projectId?: string;
   organizationId?: string;
+  apiKeyValidationError?: string;
+  onApiKeyValidationClear?: () => void;
 }) => {
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
     projectId: projectId ?? "",
@@ -261,6 +266,10 @@ const CredentialsSection = ({
                         return updated;
                       });
                     }
+                    // Clear API key validation error when user modifies the field
+                    if (onApiKeyValidationClear && apiKeyValidationError) {
+                      onApiKeyValidationClear();
+                    }
                   }}
                   type={isPassword ? "password" : "text"}
                   autoComplete="off"
@@ -275,6 +284,11 @@ const CredentialsSection = ({
           );
         })}
       </VStack>
+      {apiKeyValidationError && (
+        <Field.Root invalid>
+          <Field.ErrorText>{apiKeyValidationError}</Field.ErrorText>
+        </Field.Root>
+      )}
       {state.errors.customKeysRoot && (
         <Field.Root invalid>
           <Field.ErrorText>{state.errors.customKeysRoot}</Field.ErrorText>
@@ -779,9 +793,15 @@ export const EditModelProviderForm = ({
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
-  const handleSave = useCallback(() => {
+  const { validate: validateApiKey, isValidating: isValidatingApiKey, validationError: apiKeyValidationError, clearError: clearApiKeyError } = useModelProviderApiKeyValidation(
+    provider.provider,
+    state.customKeys,
+  );
+
+  const handleSave = useCallback(async () => {
     // Clear previous errors
     setFieldErrors({});
+    clearApiKeyError();
     
     // Validate keys according to schema before submitting
     if (providerDefinition?.keysSchema) {
@@ -800,9 +820,16 @@ export const EditModelProviderForm = ({
         return;
       }
     }
+
+    // Validate API key if provider supports it
+    const isValid = await validateApiKey();
+    if (!isValid) {
+      // Validation error is already set in the hook
+      return;
+    }
     
     void actions.submit();
-  }, [providerDefinition, state.customKeys, actions]);
+  }, [providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
 
   return (
     <VStack gap={4} align="start" width="full">
@@ -828,6 +855,8 @@ export const EditModelProviderForm = ({
           setFieldErrors={setFieldErrors}
           projectId={projectId}
           organizationId={organizationId}
+          apiKeyValidationError={apiKeyValidationError}
+          onApiKeyValidationClear={clearApiKeyError}
         />
 
         <ExtraHeadersSection
@@ -854,7 +883,7 @@ export const EditModelProviderForm = ({
           <Button
             size="sm"
             colorPalette="orange"
-            loading={state.isSaving}
+            loading={state.isSaving || isValidatingApiKey}
             onClick={handleSave}
           >
             Save
