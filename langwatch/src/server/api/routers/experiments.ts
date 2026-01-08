@@ -458,9 +458,23 @@ export const experimentsRouter = createTRPCRouter({
     }),
 
   getAllForEvaluationsList: protectedProcedure
-    .input(z.object({ projectId: z.string() }))
+    .input(
+      z.object({
+        projectId: z.string(),
+        pageOffset: z.number().optional(),
+        pageSize: z.number().optional(),
+      }),
+    )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
+      const pageOffset = input.pageOffset ?? 0;
+      const pageSize = input.pageSize ?? 25;
+
+      // Get total count for pagination
+      const totalHits = await prisma.experiment.count({
+        where: { projectId: input.projectId },
+      });
+
       const experiments = await prisma.experiment.findMany({
         where: { projectId: input.projectId },
         include: {
@@ -473,6 +487,8 @@ export const experimentsRouter = createTRPCRouter({
         orderBy: {
           updatedAt: "desc",
         },
+        skip: pageOffset,
+        take: pageSize,
       });
 
       const getDatasetId = (dsl: JsonValue | undefined) => {
@@ -537,7 +553,10 @@ export const experimentsRouter = createTRPCRouter({
         })
         .sort((a, b) => b.updatedAt - a.updatedAt);
 
-      return experimentsWithDatasetsAndRuns;
+      return {
+        experiments: experimentsWithDatasetsAndRuns,
+        totalHits,
+      };
     }),
 
   getExperimentDSPyRuns: protectedProcedure

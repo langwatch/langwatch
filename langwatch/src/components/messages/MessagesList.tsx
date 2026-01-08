@@ -30,9 +30,9 @@ import { PeriodSelector, usePeriodSelector } from "../PeriodSelector";
 import { ToggleAnalytics, ToggleTableView } from "./HeaderButtons";
 import { MessageCard, type TraceWithGuardrail } from "./MessageCard";
 import {
-  MessagesNavigationFooter,
-  useMessagesNavigationFooter,
-} from "./MessagesNavigationFooter";
+  NavigationFooter,
+  useNavigationFooter,
+} from "../NavigationFooter";
 import { PageLayout } from "../ui/layouts/PageLayout";
 import { LuLayers, LuRefreshCw } from "react-icons/lu";
 
@@ -44,7 +44,7 @@ export function MessagesList() {
   >();
   const [groupBy] = useGroupBy();
   const { filterParams, queryOpts } = useFilterParams();
-  const navigationFooter = useMessagesNavigationFooter();
+  const navigationFooter = useNavigationFooter();
 
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
@@ -162,7 +162,7 @@ export function MessagesList() {
                 <MessageSkeleton />
               </>
             )}
-            <MessagesNavigationFooter {...navigationFooter} />
+            <NavigationFooter {...navigationFooter} />
           </VStack>
           <FilterSidebar defaultShowFilters={true} />
         </HStack>
