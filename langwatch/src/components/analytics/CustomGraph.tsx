@@ -434,20 +434,6 @@ const CustomGraph_ = React.memo(
         return formatDate(value as string);
       }
 
-      // For pie/donut charts, the payload contains the pieData entry directly
-      if (
-        (input.graphType === "pie" || input.graphType === "donnut") &&
-        payload.payload
-      ) {
-        // The value is already the correct total from pieData
-        const { series } = getSeries(
-          seriesByKey,
-          payload.payload.key ?? (payload.dataKey as string),
-        );
-        const metric = series?.metric && getMetric(series.metric);
-        return formatWith(metric?.format, value as number);
-      }
-
       const { series } = getSeries(
         seriesByKey,
         payload.payload?.key ?? (payload.dataKey as string),
