@@ -15,7 +15,7 @@ RUN uv build
 WORKDIR /usr/src/app/langwatch_nlp
 
 COPY langwatch_nlp/.python-version langwatch_nlp/uv.lock langwatch_nlp/pyproject.toml .
-RUN uv sync --no-editable
+RUN uv sync --no-editable && uv pip uninstall litellm-enterprise litellm-proxy-extras
 
 COPY langwatch_nlp .
 

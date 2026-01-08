@@ -41,7 +41,8 @@
     "tsc-watch": "tsc --noEmit --watch",
     "test:e2e": "playwright test --config=e2e/playwright.config.ts",
     "test:e2e:save-auth-state": "tsx e2e/save-auth-state.ts",
-    "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/"
+    "test:e2e:codegen": "playwright codegen --load-storage=./e2e/auth.json http://localhost:5560/",
+    "licenses": "pnpx license-checker --summary && pnpx license-checker --json > licenses.json && echo \"Full licenses report saved to licenses.json\""
   },
   "dependencies": {
     "@ag-grid-community/client-side-row-model": "^32.3.3",
