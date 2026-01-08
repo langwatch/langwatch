@@ -8,6 +8,7 @@ import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm"
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import {
+  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
@@ -124,7 +125,11 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
+    project: {
+      defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
+      topicClusteringModel: project?.topicClusteringModel ?? null,
+      embeddingsModel: project?.embeddingsModel ?? null,
+    },
     onSuccess: () => {
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
@@ -135,6 +140,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     },
   });
+
+  // Compute chat model options for the model settings component
+  const chatModelOptions = useMemo(
+    () => getProviderModelOptions(backendModelProviderKey, "chat"),
+    [backendModelProviderKey],
+  );
 
   const { fields: derivedFields } = useModelProviderFields(
     backendModelProviderKey,
@@ -307,10 +318,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           <ModelProviderModelSettings
             modelProviderKey={modelProviderKey}
             customModels={state.customModels}
-            chatModelOptions={state.chatModelOptions}
-            defaultModel={state.defaultModel}
+            chatModelOptions={chatModelOptions}
+            defaultModel={state.projectDefaultModel}
             onCustomModelsChange={actions.setCustomModels}
-            onDefaultModelChange={actions.setDefaultModel}
+            onDefaultModelChange={actions.setProjectDefaultModel}
           />
 
           <DocsLinks

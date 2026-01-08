@@ -178,6 +178,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument();
@@ -188,6 +189,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.getByTestId("credentials-section")).toBeInTheDocument();
@@ -198,6 +200,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.getByTestId("extra-headers-section")).toBeInTheDocument();
@@ -208,6 +211,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.getByTestId("custom-model-input-section")).toBeInTheDocument();
@@ -218,6 +222,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.getByTestId("default-provider-section")).toBeInTheDocument();
@@ -228,6 +233,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-azure"
+        providerKey="azure"
       />
     );
     expect(screen.getByText("Use API Gateway")).toBeInTheDocument();
@@ -238,6 +244,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
     expect(screen.queryByText("Use API Gateway")).not.toBeInTheDocument();
@@ -250,6 +257,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
 
@@ -268,6 +276,7 @@ describe("EditModelProviderForm", () => {
       <EditModelProviderForm
         projectId="test-project-id"
         modelProviderId="provider-openai"
+        providerKey="openai"
       />
     );
 
