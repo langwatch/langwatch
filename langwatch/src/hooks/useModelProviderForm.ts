@@ -76,12 +76,8 @@ export function useModelProviderForm(
 
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
-  const updateDefaultModelMutation =
-    api.project.updateDefaultModel.useMutation();
-  const updateTopicClusteringModelMutation =
-    api.project.updateTopicClusteringModel.useMutation();
-  const updateEmbeddingsModelMutation =
-    api.project.updateEmbeddingsModel.useMutation();
+  const updateProjectDefaultModelsMutation =
+    api.project.updateProjectDefaultModels.useMutation();
 
   const providerDefinition =
     modelProvidersRegistry[
@@ -497,36 +493,12 @@ export function useModelProviderForm(
 
       // Update project default models if useAsDefaultProvider is enabled
       if (useAsDefaultProvider && projectId) {
-        const updatePromises: Promise<unknown>[] = [];
-
-        if (projectDefaultModel) {
-          updatePromises.push(
-            updateDefaultModelMutation.mutateAsync({
-              projectId,
-              defaultModel: projectDefaultModel,
-            }),
-          );
-        }
-
-        if (projectTopicClusteringModel) {
-          updatePromises.push(
-            updateTopicClusteringModelMutation.mutateAsync({
-              projectId,
-              topicClusteringModel: projectTopicClusteringModel,
-            }),
-          );
-        }
-
-        if (projectEmbeddingsModel) {
-          updatePromises.push(
-            updateEmbeddingsModelMutation.mutateAsync({
-              projectId,
-              embeddingsModel: projectEmbeddingsModel,
-            }),
-          );
-        }
-
-        await Promise.all(updatePromises);
+        await updateProjectDefaultModelsMutation.mutateAsync({
+          projectId,
+          defaultModel: projectDefaultModel ?? undefined,
+          topicClusteringModel: projectTopicClusteringModel ?? undefined,
+          embeddingsModel: projectEmbeddingsModel ?? undefined,
+        });
 
         // Invalidate organization query to refetch project data
         // This triggers useOrganizationTeamProject to refetch automatically
@@ -568,9 +540,7 @@ export function useModelProviderForm(
     projectDefaultModel,
     projectTopicClusteringModel,
     projectEmbeddingsModel,
-    updateDefaultModelMutation,
-    updateTopicClusteringModelMutation,
-    updateEmbeddingsModelMutation,
+    updateProjectDefaultModelsMutation,
     utils,
   ]);
 

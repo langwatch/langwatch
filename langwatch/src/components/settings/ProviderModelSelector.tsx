@@ -5,7 +5,7 @@ import {
   Field,
 } from "@chakra-ui/react";
 import React, { useEffect, useMemo, useState } from "react";
-import { Search } from "react-feather";
+import { Search } from "lucide-react";
 import { createListCollection } from "@chakra-ui/react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { Select } from "../ui/select";
@@ -115,10 +115,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         background="white"
         padding={0}
       >
-        <Select.ValueText
-          // @ts-ignore
-          placeholder={selectValueText}
-        >
+        <Select.ValueText placeholder={selectValueText}>
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>

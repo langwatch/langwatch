@@ -218,10 +218,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         background="white"
         padding={0}
       >
-        <Select.ValueText
-          // @ts-ignore
-          placeholder={selectValueText}
-        >
+        <Select.ValueText placeholder={selectValueText}>
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>

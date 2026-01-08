@@ -33,7 +33,6 @@ import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
 import { isProviderUsedForDefaultModels } from "../../utils/modelProviderHelpers";

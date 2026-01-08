@@ -250,20 +250,11 @@ export async function validateProviderApiKey(
   }
 
   // Skip validation if no API key provided (schema validation handles required fields)
+  // For custom provider, only skip if no base URL either
   if (!apiKey) {
-    // For custom provider, also check if base URL is provided
-    if (provider === "custom" && !baseUrl) {
+    if (provider !== "custom" || !baseUrl) {
       return { valid: true };
     }
-    // For providers with optional base URL, skip if no API key
-    if (provider !== "custom") {
-      return { valid: true };
-    }
-  }
-
-  // For providers that support base URL without API key (e.g., OpenAI with proxy)
-  if (baseUrl && !apiKey && provider !== "custom") {
-    return { valid: true };
   }
 
   // Get auth strategy (default to bearer) and base URL
