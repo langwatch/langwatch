@@ -34,6 +34,7 @@ import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
+import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 
 /**
  * Map of drawer names to their React components.
@@ -67,6 +68,8 @@ export const drawers = {
   evaluatorEditor: EvaluatorEditorDrawer,
   // Workflow selector specifically for evaluators (same component, different context)
   workflowSelectorForEvaluator: WorkflowSelectorDrawer,
+  // Scenarios
+  scenarioEditor: ScenarioFormDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**
