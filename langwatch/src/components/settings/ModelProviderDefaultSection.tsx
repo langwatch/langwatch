@@ -9,6 +9,7 @@ import type {
   UseModelProviderFormActions,
 } from "../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { modelProviders } from "../../server/modelProviders/registry";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
@@ -66,6 +67,9 @@ export const DefaultProviderSection = ({
       "This is the only enabled provider and must be used as the default.";
   }
 
+  // Get provider name for display
+  const providerName = modelProviders[provider.provider as keyof typeof modelProviders]?.name || provider.provider;
+
   // Get all models from modelSelectorOptions for this specific provider only
   const chatOptions = modelSelectorOptions
     .filter(
@@ -116,7 +120,7 @@ export const DefaultProviderSection = ({
             checked={state.useAsDefaultProvider}
             disabled={isToggleDisabled}
           >
-            Use as default provider for models
+            Use {providerName} as the default for LangWatch features
           </Switch>
         </Box>
       </Tooltip>

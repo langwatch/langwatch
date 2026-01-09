@@ -76,6 +76,26 @@ vi.mock("../../../utils/modelProviderHelpers", () => ({
   isProviderEffectiveDefault: vi.fn(() => false),
 }));
 
+vi.mock("../../../server/modelProviders/registry", async () => {
+  const actual = await vi.importActual("../../../server/modelProviders/registry");
+  return {
+    ...actual,
+    modelProviders: {
+      openai: { name: "OpenAI" },
+      azure: { name: "Azure OpenAI" },
+      anthropic: { name: "Anthropic" },
+      gemini: { name: "Gemini" },
+      bedrock: { name: "Bedrock" },
+      vertex_ai: { name: "Vertex AI" },
+      deepseek: { name: "DeepSeek" },
+      xai: { name: "xAI" },
+      cerebras: { name: "Cerebras" },
+      groq: { name: "Groq" },
+      custom: { name: "Custom (OpenAI-compatible)" },
+    },
+  };
+});
+
 import { DefaultProviderSection } from "../ModelProviderDefaultSection";
 import { isProviderEffectiveDefault } from "../../../utils/modelProviderHelpers";
 
@@ -130,6 +150,11 @@ const mockProject = {
   embeddingsModel: "openai/text-embedding-3-small",
 };
 
+const mockProviders = {
+  openai: createMockProvider("openai"),
+  azure: createMockProvider("azure"),
+};
+
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 };
@@ -152,9 +177,10 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
-    expect(screen.getByText("Use as default provider for models")).toBeInTheDocument();
+    expect(screen.getByText("Use OpenAI as the default for LangWatch features")).toBeInTheDocument();
   });
 
   it("does not show model selectors when toggle is off", () => {
@@ -165,6 +191,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
     expect(screen.queryByText("Default Model")).not.toBeInTheDocument();
@@ -178,6 +205,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
     expect(screen.getByText("Default Model")).toBeInTheDocument();
@@ -193,6 +221,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
     expect(
@@ -210,6 +239,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
 
@@ -229,6 +259,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
 
@@ -244,6 +275,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={1}
         project={mockProject}
+        providers={mockProviders}
       />
     );
 
@@ -259,6 +291,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("azure")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
 
@@ -274,6 +307,7 @@ describe("DefaultProviderSection", () => {
         provider={createMockProvider("openai")}
         enabledProvidersCount={2}
         project={mockProject}
+        providers={mockProviders}
       />
     );
 
