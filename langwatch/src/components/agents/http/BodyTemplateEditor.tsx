@@ -1,47 +1,66 @@
-import { Box, Text, Textarea, VStack } from "@chakra-ui/react";
-import type { Field } from "~/optimization_studio/types/dsl";
+import { Box, Code, Text, Textarea, VStack } from "@chakra-ui/react";
+
+/**
+ * Standard variables available for HTTP agent body templates.
+ * These are provided at runtime by the Scenario/Workflow execution.
+ */
+export const STANDARD_AGENT_VARIABLES = [
+  { name: "threadId", description: "Unique identifier for the conversation thread" },
+  { name: "messages", description: "Array of chat messages in OpenAI format" },
+] as const;
 
 export type BodyTemplateEditorProps = {
   value: string;
   onChange: (value: string) => void;
-  availableVariables: Field[];
   disabled?: boolean;
 };
 
 /**
- * JSON body template editor with variable interpolation hints.
- * Variables are referenced using mustache syntax: {{variable_name}}
+ * JSON body template editor with mustache-style variable interpolation.
+ * Variables: {{threadId}}, {{messages}}
  */
 export function BodyTemplateEditor({
   value,
   onChange,
-  availableVariables,
   disabled = false,
 }: BodyTemplateEditorProps) {
-  const variableHints = availableVariables
-    .map((v) => `{{${v.identifier}}}`)
-    .join(", ");
-
   return (
-    <VStack align="stretch" gap={2} width="full">
+    <VStack align="stretch" gap={3} width="full">
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={`{
-  "messages": {{messages}},
-  "context": {{context}}
+  "thread_id": "{{threadId}}",
+  "messages": {{messages}}
 }`}
         fontFamily="mono"
         fontSize="13px"
-        minHeight="150px"
+        minHeight="180px"
         disabled={disabled}
         resize="vertical"
+        data-testid="body-template-editor"
       />
-      {availableVariables.length > 0 && (
-        <Text fontSize="xs" color="gray.500">
-          Available variables: {variableHints}
+      <Box
+        padding={3}
+        bg="gray.50"
+        borderRadius="md"
+        borderWidth="1px"
+        borderColor="gray.200"
+      >
+        <Text fontSize="xs" fontWeight="medium" color="gray.600" marginBottom={2}>
+          Available Variables
         </Text>
-      )}
+        <VStack align="stretch" gap={1}>
+          {STANDARD_AGENT_VARIABLES.map((v) => (
+            <Text key={v.name} fontSize="xs">
+              <Code fontSize="xs" colorPalette="blue">
+                {`{{${v.name}}}`}
+              </Code>{" "}
+              — {v.description}
+            </Text>
+          ))}
+        </VStack>
+      </Box>
     </VStack>
   );
 }

@@ -51,10 +51,13 @@ export const httpProxyRouter = createTRPCRouter({
         "Content-Type": "application/json",
       };
 
-      // Add custom headers
+      // Add custom headers (trim keys to prevent whitespace errors)
       if (headers) {
         for (const header of headers) {
-          requestHeaders[header.key] = header.value;
+          const key = header.key.trim();
+          if (key) {
+            requestHeaders[key] = header.value;
+          }
         }
       }
 
@@ -118,6 +121,12 @@ export const httpProxyRouter = createTRPCRouter({
           responseData = await response.text();
         }
 
+        // Capture response headers
+        const responseHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => {
+          responseHeaders[key] = value;
+        });
+
         // Extract output if path provided
         let extractedOutput: string | undefined;
         if (outputPath && outputPath.trim() && responseData) {
@@ -139,7 +148,10 @@ export const httpProxyRouter = createTRPCRouter({
             success: false,
             error: `HTTP ${response.status}: ${response.statusText}`,
             response: responseData,
+            status: response.status,
+            statusText: response.statusText,
             duration,
+            responseHeaders,
           };
         }
 
@@ -147,8 +159,10 @@ export const httpProxyRouter = createTRPCRouter({
           success: true,
           response: responseData,
           extractedOutput,
-          duration,
           status: response.status,
+          statusText: response.statusText,
+          duration,
+          responseHeaders,
         };
       } catch (err) {
         return {

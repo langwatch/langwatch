@@ -32,7 +32,6 @@ import type {
   HttpMethod,
   HttpAuth,
   HttpHeader,
-  Field as DSLField,
 } from "~/optimization_studio/types/dsl";
 
 import {
@@ -50,9 +49,10 @@ import {
 
 const DEFAULT_URL = "https://api.example.com/agent/chat";
 const DEFAULT_METHOD: HttpMethod = "POST";
-const DEFAULT_INPUTS: DSLField[] = [];
-const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
-const DEFAULT_BODY_TEMPLATE = "{}";
+const DEFAULT_BODY_TEMPLATE = `{
+  "thread_id": "{{threadId}}",
+  "messages": {{messages}}
+}`;
 const DEFAULT_OUTPUT_PATH = "$.choices[0].message.content";
 
 // ============================================================================
@@ -72,8 +72,6 @@ function getHttpConfig(config: AgentComponentConfig): HttpComponentConfig {
 function buildHttpConfig(
   url: string,
   method: HttpMethod,
-  inputs: DSLField[],
-  outputs: DSLField[],
   bodyTemplate: string,
   outputPath: string,
   headers: HttpHeader[],
@@ -84,8 +82,6 @@ function buildHttpConfig(
     description: "HTTP API endpoint",
     url,
     method,
-    inputs: inputs as HttpComponentConfig["inputs"],
-    outputs: outputs as HttpComponentConfig["outputs"],
     bodyTemplate,
     outputPath,
     headers: headers.length > 0 ? headers : undefined,
@@ -149,8 +145,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState(DEFAULT_URL);
   const [method, setMethod] = useState<HttpMethod>(DEFAULT_METHOD);
-  const [inputs, setInputs] = useState<DSLField[]>(DEFAULT_INPUTS);
-  const [outputs, setOutputs] = useState<DSLField[]>(DEFAULT_OUTPUTS);
   const [bodyTemplate, setBodyTemplate] = useState(DEFAULT_BODY_TEMPLATE);
   const [outputPath, setOutputPath] = useState(DEFAULT_OUTPUT_PATH);
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
@@ -169,12 +163,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     if (agentQuery.data) {
       const config = getHttpConfig(agentQuery.data.config);
       setName(agentQuery.data.name ?? "");
-      setUrl(config.url ?? DEFAULT_URL);
+      setUrl(config.url || DEFAULT_URL);
       setMethod(config.method ?? DEFAULT_METHOD);
-      setInputs(config.inputs ?? DEFAULT_INPUTS);
-      setOutputs(config.outputs ?? DEFAULT_OUTPUTS);
-      setBodyTemplate(config.bodyTemplate ?? DEFAULT_BODY_TEMPLATE);
-      setOutputPath(config.outputPath ?? DEFAULT_OUTPUT_PATH);
+      // Use || to also catch empty strings
+      setBodyTemplate(config.bodyTemplate || DEFAULT_BODY_TEMPLATE);
+      setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
       setHasUnsavedChanges(false);
@@ -183,8 +176,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setName("");
       setUrl(DEFAULT_URL);
       setMethod(DEFAULT_METHOD);
-      setInputs(DEFAULT_INPUTS);
-      setOutputs(DEFAULT_OUTPUTS);
       setBodyTemplate(DEFAULT_BODY_TEMPLATE);
       setOutputPath(DEFAULT_OUTPUT_PATH);
       setHeaders([]);
@@ -223,8 +214,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     const config = buildHttpConfig(
       url,
       method,
-      inputs,
-      outputs,
       bodyTemplate,
       outputPath,
       headers,
@@ -252,8 +241,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     name,
     url,
     method,
-    inputs,
-    outputs,
     bodyTemplate,
     outputPath,
     headers,
@@ -313,6 +300,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
           response: result.response,
           extractedOutput: result.extractedOutput,
           error: result.error,
+          status: result.status,
+          duration: result.duration,
+          responseHeaders: result.responseHeaders,
         };
       } catch (err) {
         return {
@@ -425,10 +415,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 >
                   <VStack gap={6} align="stretch">
                     <Field.Root>
-                      <Field.Label>Additional Body Fields (JSON)</Field.Label>
+                      <Field.Label>Request Body Template</Field.Label>
                       <Text fontSize="sm" color="gray.500" marginBottom={2}>
-                        When used in Scenarios or Workflows, all inputs are automatically
-                        passed in the body. Use this to define additional static fields.
+                        JSON body with mustache variables. Variables are replaced at runtime.
                       </Text>
                       <BodyTemplateEditor
                         value={bodyTemplate}
@@ -436,7 +425,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                           setBodyTemplate(v);
                           markDirty();
                         }}
-                        availableVariables={inputs}
                       />
                     </Field.Root>
                     <Field.Root>
@@ -494,7 +482,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   paddingX={6}
                   paddingY={4}
                 >
-                  <HttpTestPanel onTest={handleTest} />
+                  <HttpTestPanel
+                    onTest={handleTest}
+                    url={url}
+                    method={method}
+                    headers={headers}
+                    outputPath={outputPath}
+                    bodyTemplate={bodyTemplate}
+                  />
                 </Tabs.Content>
               </Tabs.Root>
             </VStack>
