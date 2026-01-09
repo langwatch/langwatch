@@ -168,8 +168,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   useEffect(() => {
     if (agentQuery.data) {
       const config = getHttpConfig(agentQuery.data.config);
-      setName(agentQuery.data.name);
-      setUrl(config.url);
+      setName(agentQuery.data.name ?? "");
+      setUrl(config.url ?? DEFAULT_URL);
       setMethod(config.method ?? DEFAULT_METHOD);
       setInputs(config.inputs ?? DEFAULT_INPUTS);
       setOutputs(config.outputs ?? DEFAULT_OUTPUTS);
@@ -215,7 +215,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
-  const isValid = name.trim().length > 0 && url.trim().length > 0;
+  const isValid = (name?.trim().length ?? 0) > 0 && (url?.trim().length ?? 0) > 0;
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
