@@ -26,10 +26,10 @@ export function OutputPathInput({
         disabled={disabled}
       />
       <Text fontSize="xs" color="gray.500">
-        Path to extract the agent response from the API response. <br />
-        <Text fontSize="xs" color="yellow.500">
-          Note: HTTP Agents must return text.
-        </Text>
+        Path to extract the agent response from the API response.
+      </Text>
+      <Text fontSize="xs" color="yellow.500">
+        Note: HTTP Agents must return text.
       </Text>
     </VStack>
   );
