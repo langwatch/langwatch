@@ -11,9 +11,9 @@ import {
   Separator,
   Spinner,
   Text,
-  Textarea,
   VStack,
 } from "@chakra-ui/react";
+
 import {
   Play,
   ChevronDown,
@@ -25,16 +25,20 @@ import {
 } from "lucide-react";
 import { useState, useCallback, useMemo } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { STANDARD_AGENT_VARIABLES } from "./BodyTemplateEditor";
+import {
+  TestMessagesBuilder,
+  messagesToJson,
+  type TestMessage,
+} from "./TestMessagesBuilder";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
-const DEFAULT_MESSAGES = `[{"role": "user", "content": "Hello"}]`;
+const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
 
 export type HttpTestResult = {
-    success: boolean;
-    response?: unknown;
-    extractedOutput?: string;
-    error?: string;
+  success: boolean;
+  response?: unknown;
+  extractedOutput?: string;
+  error?: string;
   status?: number;
   statusText?: string;
   duration?: number;
@@ -91,7 +95,13 @@ function getStatusColor(status: number): string {
 /**
  * CopyButton - Small button to copy text to clipboard
  */
-function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+function CopyButton({
+  text,
+  label = "Copy",
+}: {
+  text: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -134,13 +144,13 @@ function CollapsibleSection({
   return (
     <Collapsible.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
       <Collapsible.Trigger asChild>
-          <HStack gap={2} width="full">
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            <Text fontSize="sm" fontWeight="medium">
-              {title}
-            </Text>
-            {badge}
-          </HStack>
+        <HStack gap={2} width="full" mb={2}>
+          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <Text fontSize="sm" fontWeight="medium">
+            {title}
+          </Text>
+          {badge}
+        </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
         <Box paddingLeft={6} paddingY={2}>
@@ -251,7 +261,9 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
             </HStack>
           )}
         </HStack>
-        {responseString && <CopyButton text={responseString} label="Copy response" />}
+        {responseString && (
+          <CopyButton text={responseString} label="Copy response" />
+        )}
       </HStack>
 
       {/* Error Message */}
@@ -270,23 +282,24 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
       )}
 
       {/* Response Headers */}
-      {result.responseHeaders && Object.keys(result.responseHeaders).length > 0 && (
-        <CollapsibleSection title="Response Headers">
-          <Box
-            as="pre"
-            fontSize="xs"
-            fontFamily="mono"
-            bg="gray.50"
-            padding={2}
-            borderRadius="md"
-            overflow="auto"
-          >
-            {Object.entries(result.responseHeaders)
-              .map(([key, value]) => `${key}: ${value}`)
-              .join("\n")}
-          </Box>
-        </CollapsibleSection>
-      )}
+      {result.responseHeaders &&
+        Object.keys(result.responseHeaders).length > 0 && (
+          <CollapsibleSection title="Response Headers">
+            <Box
+              as="pre"
+              fontSize="xs"
+              fontFamily="mono"
+              bg="gray.50"
+              padding={2}
+              borderRadius="md"
+              overflow="auto"
+            >
+              {Object.entries(result.responseHeaders)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join("\n")}
+            </Box>
+          </CollapsibleSection>
+        )}
 
       {/* Response Body */}
       {result.response !== undefined && (
@@ -321,7 +334,10 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
             <Text fontSize="sm" fontWeight="medium" color="blue.700">
               Extracted Output (JSONPath)
             </Text>
-            <CopyButton text={result.extractedOutput} label="Copy extracted output" />
+            <CopyButton
+              text={result.extractedOutput}
+              label="Copy extracted output"
+            />
           </HStack>
           <Box
             as="pre"
@@ -368,18 +384,21 @@ export function HttpTestPanel({
 }: HttpTestPanelProps) {
   // Test variable values
   const [threadId, setThreadId] = useState(DEFAULT_THREAD_ID);
-  const [messages, setMessages] = useState(DEFAULT_MESSAGES);
+  const [messages, setMessages] = useState<TestMessage[]>(DEFAULT_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<HttpTestResult | null>(null);
+
+  // Convert messages to JSON string for template
+  const messagesJson = useMemo(() => messagesToJson(messages), [messages]);
 
   // Render the body template with current variable values
   const renderedBody = useMemo(() => {
     if (!bodyTemplate) return "{}";
     return renderTemplate(bodyTemplate, {
       threadId,
-      messages,
+      messages: messagesJson,
     });
-  }, [bodyTemplate, threadId, messages]);
+  }, [bodyTemplate, threadId, messagesJson]);
 
   // Validate rendered body is valid JSON
   const bodyValidation = useMemo(() => {
@@ -428,19 +447,9 @@ export function HttpTestPanel({
 
   return (
     <VStack align="stretch" gap={4} width="full">
-      {/* Test Variables */}
-      <Box
-        padding={4}
-        bg="gray.50"
-        borderRadius="md"
-        borderWidth="1px"
-        borderColor="gray.200"
-      >
-        <Text fontSize="sm" fontWeight="medium" marginBottom={3}>
-          Test Variables
-        </Text>
-        <VStack align="stretch" gap={3}>
-          <Field.Root>
+      <VStack align="stretch" gap={4}>
+        <Field.Root>
+          <HStack width="full">
             <Field.Label fontSize="xs">
               <Code fontSize="xs">{`{{threadId}}`}</Code>
             </Field.Label>
@@ -452,23 +461,18 @@ export function HttpTestPanel({
               fontFamily="mono"
               fontSize="sm"
             />
-          </Field.Root>
-      <Field.Root>
-            <Field.Label fontSize="xs">
-              <Code fontSize="xs">{`{{messages}}`}</Code>
-            </Field.Label>
-        <Textarea
-              value={messages}
-              onChange={(e) => setMessages(e.target.value)}
-              placeholder='[{"role": "user", "content": "Hello"}]'
-          fontFamily="mono"
-          fontSize="sm"
-              minHeight="80px"
-              resize="vertical"
+          </HStack>
+        </Field.Root>
+
+        {/* Messages Builder */}
+        <TestMessagesBuilder
+          messages={messages}
+          onChange={setMessages}
+          disabled={disabled}
         />
-      </Field.Root>
-        </VStack>
-      </Box>
+      </VStack>
+
+      <Separator />
 
       {/* Request Preview */}
       <RequestPreview
@@ -503,7 +507,9 @@ export function HttpTestPanel({
             <Alert.Description>
               <VStack align="start" gap={1}>
                 {headerValidation.errors.map((err, i) => (
-                  <Text key={i} fontSize="sm">{err}</Text>
+                  <Text key={i} fontSize="sm">
+                    {err}
+                  </Text>
                 ))}
               </VStack>
             </Alert.Description>

@@ -7,3 +7,9 @@ export { OutputPathInput, type OutputPathInputProps } from "./OutputPathInput";
 export { AuthConfigSection, type AuthConfigSectionProps } from "./AuthConfigSection";
 export { HeadersConfigSection, type HeadersConfigSectionProps } from "./HeadersConfigSection";
 export { HttpTestPanel, type HttpTestPanelProps } from "./HttpTestPanel";
+export {
+  TestMessagesBuilder,
+  messagesToJson,
+  type TestMessage,
+  type TestMessagesBuilderProps,
+} from "./TestMessagesBuilder";
