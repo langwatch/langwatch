@@ -79,12 +79,21 @@ export const EditModelProviderForm = ({
     };
   }, [modelProviderId, providerKey, providers]);
 
+  // Detect if provider is using environment variables (enabled but no stored customKeys)
+  // Must be computed before the hook call so we can pass it to the hook
+  // Handles both null and empty object {} cases
+  const isUsingEnvVars =
+    provider.enabled &&
+    (!provider.customKeys ||
+      Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
+
   // Use project data as primary source (auto-updates when organization.getAll is invalidated)
   // Effective defaults (project values with fallbacks) are computed inside the hook
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
     project,
+    isUsingEnvVars,
     onSuccess: () => {
       closeDrawer();
     },
@@ -105,6 +114,12 @@ export const EditModelProviderForm = ({
     // Clear previous errors
     setFieldErrors({});
     clearApiKeyError();
+    
+    // Skip validation if using env vars - fields are masked and shouldn't be validated
+    if (isUsingEnvVars) {
+      void actions.submit();
+      return;
+    }
     
     // Validate keys according to schema before submitting
     if (providerDefinition?.keysSchema) {
@@ -132,7 +147,7 @@ export const EditModelProviderForm = ({
     }
     
     void actions.submit();
-  }, [providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
+  }, [isUsingEnvVars, providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
 
   return (
     <VStack gap={4} align="start" width="full">

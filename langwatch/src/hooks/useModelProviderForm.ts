@@ -28,6 +28,7 @@ export type UseModelProviderFormParams = {
     topicClusteringModel?: string | null;
     embeddingsModel?: string | null;
   } | null | undefined;
+  isUsingEnvVars?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -77,6 +78,7 @@ export function useModelProviderForm(
     provider,
     projectId,
     project,
+    isUsingEnvVars,
     onSuccess,
     onError,
   } = params;
@@ -399,31 +401,38 @@ export function useModelProviderForm(
     setIsSaving(true);
     setErrors({});
     try {
-      // Validate keys according to schema if present
-      const keysSchema = providerDefinition?.keysSchema
-        ? z
-            .union([
-              providerDefinition.keysSchema,
-              z.object({ MANAGED: z.string() }),
-            ])
-            .optional()
-            .nullable()
-        : z.object({ MANAGED: z.string() }).optional().nullable();
-      const keysToValidate: Record<string, unknown> = { ...customKeys };
-      const parsed = (keysSchema as any).safeParse
-        ? (keysSchema as any).safeParse(keysToValidate)
-        : { success: true };
-      if (!parsed.success) {
-        setErrors({
-          customKeysRoot: fromZodError(parsed.error as ZodError).message,
-        });
-        setIsSaving(false);
-        return;
+      // Skip validation if using env vars - keys are from server env
+      if (!isUsingEnvVars) {
+        // Validate keys according to schema if present
+        const keysSchema = providerDefinition?.keysSchema
+          ? z
+              .union([
+                providerDefinition.keysSchema,
+                z.object({ MANAGED: z.string() }),
+              ])
+              .optional()
+              .nullable()
+          : z.object({ MANAGED: z.string() }).optional().nullable();
+        const keysToValidate: Record<string, unknown> = { ...customKeys };
+        const parsed = (keysSchema as any).safeParse
+          ? (keysSchema as any).safeParse(keysToValidate)
+          : { success: true };
+        if (!parsed.success) {
+          setErrors({
+            customKeysRoot: fromZodError(parsed.error as ZodError).message,
+          });
+          setIsSaving(false);
+          return;
+        }
       }
 
+      // When using env vars, send undefined to tell backend not to update customKeys
+      let customKeysToSend: Record<string, unknown> | undefined = isUsingEnvVars
+        ? undefined
+        : { ...customKeys };
+
       // Build custom keys to send (merge azure headers when applicable)
-      let customKeysToSend: Record<string, unknown> = { ...customKeys };
-      if (provider.provider === "azure") {
+      if (!isUsingEnvVars && provider.provider === "azure") {
         const headerMap: Record<string, string> = {};
         (extraHeaders ?? []).forEach((header) => {
           if (header.key.trim() && header.value.trim()) {
@@ -488,6 +497,7 @@ export function useModelProviderForm(
       setIsSaving(false);
     }
   }, [
+    isUsingEnvVars,
     customKeys,
     customModels,
     customEmbeddingsModels,

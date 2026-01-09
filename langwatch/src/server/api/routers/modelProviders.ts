@@ -85,6 +85,9 @@ export const modelProviderRouter = createTRPCRouter({
         providerSchema,
         z.object({ MANAGED: z.string() }),
       ]);
+      
+      
+      const customKeysProvided = customKeys !== undefined;
       let validatedKeys;
       try {
         validatedKeys = customKeys ? validator.parse(customKeys) : null;
@@ -131,34 +134,42 @@ export const modelProviderRouter = createTRPCRouter({
         >;
 
         if (existingModelProvider) {
-          // Smart merging: preserve masked standard keys, but replace extra headers completely
-          let mergedCustomKeys: Record<string, any> = validatedKeys ?? {};
-          if (validatedKeys && existingModelProvider.customKeys) {
-            const existingKeys = existingModelProvider.customKeys as Record<
-              string,
-              any
-            >;
+          // Determine what customKeys to save
+          let customKeysToSave: Record<string, any> | undefined;
+          
+          if (customKeysProvided) {
+            // Smart merging: preserve masked standard keys, but replace extra headers completely
+            let mergedCustomKeys: Record<string, any> = validatedKeys ?? {};
+            if (validatedKeys && existingModelProvider.customKeys) {
+              const existingKeys = existingModelProvider.customKeys as Record<
+                string,
+                any
+              >;
 
-            mergedCustomKeys = {
-              // Start with new keys (includes all extra headers)
-              ...validatedKeys,
-              // Override with existing values for masked standard keys
-              ...Object.fromEntries(
-                Object.entries(existingKeys)
-                  .filter(
-                    ([key, _value]) =>
-                      (validatedKeys as any)[key] === MASKED_KEY_PLACEHOLDER,
-                  )
-                  .map(([key, value]) => [key, value]),
-              ),
-            };
+              mergedCustomKeys = {
+                // Start with new keys (includes all extra headers)
+                ...validatedKeys,
+                // Override with existing values for masked standard keys
+                ...Object.fromEntries(
+                  Object.entries(existingKeys)
+                    .filter(
+                      ([key, _value]) =>
+                        (validatedKeys as any)[key] === MASKED_KEY_PLACEHOLDER,
+                    )
+                    .map(([key, value]) => [key, value]),
+                ),
+              };
+            }
+            customKeysToSave = mergedCustomKeys;
           }
+          // If customKeysProvided is false, customKeysToSave remains undefined
+          // and we don't update customKeys (preserves existing value)
 
           result = await tx.modelProvider.update({
             where: { id: existingModelProvider.id, projectId },
             data: {
               ...data,
-              customKeys: mergedCustomKeys,
+              ...(customKeysToSave !== undefined && { customKeys: customKeysToSave }),
               customModels: customModels ? customModels : [],
               customEmbeddingsModels: customEmbeddingsModels
                 ? customEmbeddingsModels
@@ -170,10 +181,11 @@ export const modelProviderRouter = createTRPCRouter({
           result = await tx.modelProvider.create({
             data: {
               ...data,
+              ...(customKeysProvided && validatedKeys && { customKeys: validatedKeys }),
               customModels: customModels ?? undefined,
               customEmbeddingsModels: customEmbeddingsModels ?? undefined,
               extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-            },
+            } as any,
           });
         }
 
@@ -280,12 +292,22 @@ export const getProjectModelProviders = async (
       where: { projectId },
     })
   )
-    .filter(
-      (modelProvider) =>
-        modelProvider.customKeys ??
-        modelProvider.enabled !==
-          defaultModelProviders[modelProvider.provider]?.enabled,
-    )
+    .filter((modelProvider) => {
+      // Keep if has custom keys
+      if (modelProvider.customKeys) return true;
+
+      // Keep if enabled status differs from default
+      const defaultProvider = defaultModelProviders[modelProvider.provider];
+      if (modelProvider.enabled !== defaultProvider?.enabled) return true;
+
+      // Keep if has custom models or embeddings (not default)
+      const customModels = modelProvider.customModels as string[] | null;
+      const customEmbeddings = modelProvider.customEmbeddingsModels as string[] | null;
+      const hasCustomModels = customModels && customModels.length > 0;
+      const hasCustomEmbeddings = customEmbeddings && customEmbeddings.length > 0;
+
+      return hasCustomModels || hasCustomEmbeddings;
+    })
     .reduce(
       (acc, modelProvider) => {
         const modelProvider_: MaybeStoredModelProvider = {
