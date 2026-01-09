@@ -57,6 +57,9 @@ function Page() {
         // Workflow agents can't be edited directly, just view
         openDrawer("workflowSelector", { urlParams: { agentId: agent.id } });
         break;
+      default: {
+        throw new Error(`Unhandled agent type: ${agent.type}`);
+      }
     }
   };
 
