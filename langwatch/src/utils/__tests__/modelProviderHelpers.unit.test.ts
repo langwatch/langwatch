@@ -1,0 +1,351 @@
+import { describe, it, expect } from "vitest";
+import {
+  getProviderFromModel,
+  getEffectiveDefaults,
+  isProviderEffectiveDefault,
+  isProviderDefaultModel,
+  isProviderUsedForDefaultModels,
+  getSchemaShape,
+  getDisplayKeysForProvider,
+  buildCustomKeyState,
+} from "../modelProviderHelpers";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_TOPIC_CLUSTERING_MODEL,
+  DEFAULT_EMBEDDINGS_MODEL,
+  MASKED_KEY_PLACEHOLDER,
+} from "../constants";
+
+describe("modelProviderHelpers", () => {
+  describe("getProviderFromModel", () => {
+    it("extracts provider key from model string", () => {
+      expect(getProviderFromModel("openai/gpt-4")).toBe("openai");
+      expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe("anthropic");
+      expect(getProviderFromModel("azure/gpt-4-turbo")).toBe("azure");
+    });
+
+    it("returns empty string for model without slash", () => {
+      expect(getProviderFromModel("gpt-4")).toBe("gpt-4");
+    });
+
+    it("handles empty string", () => {
+      expect(getProviderFromModel("")).toBe("");
+    });
+
+    it("handles model with multiple slashes", () => {
+      expect(getProviderFromModel("custom/namespace/model")).toBe("custom");
+    });
+  });
+
+  describe("getEffectiveDefaults", () => {
+    it("returns project defaults when all are set", () => {
+      const project = {
+        defaultModel: "openai/gpt-4o",
+        topicClusteringModel: "openai/gpt-4o-mini",
+        embeddingsModel: "openai/text-embedding-3-small",
+      };
+
+      const result = getEffectiveDefaults(project);
+
+      expect(result.defaultModel).toBe("openai/gpt-4o");
+      expect(result.topicClusteringModel).toBe("openai/gpt-4o-mini");
+      expect(result.embeddingsModel).toBe("openai/text-embedding-3-small");
+    });
+
+    it("returns DEFAULT_* constants when project values are null", () => {
+      const project = {
+        defaultModel: null,
+        topicClusteringModel: null,
+        embeddingsModel: null,
+      };
+
+      const result = getEffectiveDefaults(project);
+
+      expect(result.defaultModel).toBe(DEFAULT_MODEL);
+      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
+      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
+    });
+
+    it("returns DEFAULT_* constants when project is null", () => {
+      const result = getEffectiveDefaults(null);
+
+      expect(result.defaultModel).toBe(DEFAULT_MODEL);
+      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
+      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
+    });
+
+    it("returns DEFAULT_* constants when project is undefined", () => {
+      const result = getEffectiveDefaults(undefined);
+
+      expect(result.defaultModel).toBe(DEFAULT_MODEL);
+      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
+      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
+    });
+
+    it("mixes project values and defaults", () => {
+      const project = {
+        defaultModel: "anthropic/claude-sonnet-4",
+        topicClusteringModel: null,
+        embeddingsModel: undefined,
+      };
+
+      const result = getEffectiveDefaults(project);
+
+      expect(result.defaultModel).toBe("anthropic/claude-sonnet-4");
+      expect(result.topicClusteringModel).toBe(DEFAULT_TOPIC_CLUSTERING_MODEL);
+      expect(result.embeddingsModel).toBe(DEFAULT_EMBEDDINGS_MODEL);
+    });
+  });
+
+  describe("isProviderDefaultModel", () => {
+    it("returns true when provider matches default model", () => {
+      const project = { defaultModel: "openai/gpt-4o" };
+      expect(isProviderDefaultModel("openai", project)).toBe(true);
+    });
+
+    it("returns false when provider does not match default model", () => {
+      const project = { defaultModel: "anthropic/claude-sonnet-4" };
+      expect(isProviderDefaultModel("openai", project)).toBe(false);
+    });
+
+    it("uses DEFAULT_MODEL when project default is null", () => {
+      const project = { defaultModel: null };
+      const expectedProvider = DEFAULT_MODEL.split("/")[0];
+      expect(isProviderDefaultModel(expectedProvider!, project)).toBe(true);
+    });
+
+    it("uses DEFAULT_MODEL when project is null", () => {
+      const expectedProvider = DEFAULT_MODEL.split("/")[0];
+      expect(isProviderDefaultModel(expectedProvider!, null)).toBe(true);
+    });
+  });
+
+  describe("isProviderEffectiveDefault", () => {
+    it("returns true when provider is used for default model", () => {
+      const project = {
+        defaultModel: "openai/gpt-4o",
+        topicClusteringModel: "anthropic/claude-sonnet-4",
+        embeddingsModel: "anthropic/text-embedding",
+      };
+      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
+    });
+
+    it("returns true when provider is used for topic clustering model", () => {
+      const project = {
+        defaultModel: "anthropic/claude-sonnet-4",
+        topicClusteringModel: "openai/gpt-4o-mini",
+        embeddingsModel: "anthropic/text-embedding",
+      };
+      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
+    });
+
+    it("returns true when provider is used for embeddings model", () => {
+      const project = {
+        defaultModel: "anthropic/claude-sonnet-4",
+        topicClusteringModel: "anthropic/claude-sonnet-4",
+        embeddingsModel: "openai/text-embedding-3-small",
+      };
+      expect(isProviderEffectiveDefault("openai", project)).toBe(true);
+    });
+
+    it("returns false when provider is not used for any default", () => {
+      const project = {
+        defaultModel: "anthropic/claude-sonnet-4",
+        topicClusteringModel: "anthropic/claude-sonnet-4",
+        embeddingsModel: "anthropic/text-embedding",
+      };
+      expect(isProviderEffectiveDefault("openai", project)).toBe(false);
+    });
+
+    it("uses DEFAULT_* constants when project values are null", () => {
+      const project = {
+        defaultModel: null,
+        topicClusteringModel: null,
+        embeddingsModel: null,
+      };
+      const expectedProvider = DEFAULT_MODEL.split("/")[0];
+      expect(isProviderEffectiveDefault(expectedProvider!, project)).toBe(true);
+    });
+  });
+
+  describe("isProviderUsedForDefaultModels", () => {
+    it("returns true when provider matches default model", () => {
+      expect(
+        isProviderUsedForDefaultModels("openai", "openai/gpt-4o", null, null)
+      ).toBe(true);
+    });
+
+    it("returns true when provider matches topic clustering model", () => {
+      expect(
+        isProviderUsedForDefaultModels("openai", null, "openai/gpt-4o-mini", null)
+      ).toBe(true);
+    });
+
+    it("returns true when provider matches embeddings model", () => {
+      expect(
+        isProviderUsedForDefaultModels("openai", null, null, "openai/text-embedding-3-small")
+      ).toBe(true);
+    });
+
+    it("returns false when provider does not match any model", () => {
+      expect(
+        isProviderUsedForDefaultModels(
+          "azure",
+          "openai/gpt-4o",
+          "anthropic/claude-sonnet-4",
+          "openai/text-embedding-3-small"
+        )
+      ).toBe(false);
+    });
+
+    it("returns false when all models are null", () => {
+      expect(isProviderUsedForDefaultModels("openai", null, null, null)).toBe(
+        false
+      );
+    });
+  });
+
+  describe("getSchemaShape", () => {
+    it("returns shape from schema with shape property", () => {
+      const schema = {
+        shape: { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} },
+      };
+      expect(getSchemaShape(schema)).toEqual({
+        OPENAI_API_KEY: {},
+        OPENAI_BASE_URL: {},
+      });
+    });
+
+    it("returns shape from nested _def.schema.shape", () => {
+      const schema = {
+        _def: {
+          schema: {
+            shape: { ANTHROPIC_API_KEY: {} },
+          },
+        },
+      };
+      expect(getSchemaShape(schema)).toEqual({ ANTHROPIC_API_KEY: {} });
+    });
+
+    it("returns empty object for schema without shape", () => {
+      const schema = {};
+      expect(getSchemaShape(schema)).toEqual({});
+    });
+
+    it("returns empty object for null/undefined", () => {
+      expect(getSchemaShape(null)).toEqual({});
+      expect(getSchemaShape(undefined)).toEqual({});
+    });
+  });
+
+  describe("getDisplayKeysForProvider", () => {
+    const schemaShape = {
+      AZURE_OPENAI_API_KEY: {},
+      AZURE_OPENAI_ENDPOINT: {},
+      AZURE_API_GATEWAY_BASE_URL: {},
+      AZURE_API_GATEWAY_VERSION: {},
+      OPENAI_API_KEY: {},
+      OPENAI_BASE_URL: {},
+    };
+
+    it("returns gateway keys for Azure with API Gateway enabled", () => {
+      const result = getDisplayKeysForProvider("azure", true, schemaShape);
+      expect(result).toEqual({
+        AZURE_API_GATEWAY_BASE_URL: {},
+        AZURE_API_GATEWAY_VERSION: {},
+      });
+    });
+
+    it("returns standard keys for Azure with API Gateway disabled", () => {
+      const result = getDisplayKeysForProvider("azure", false, schemaShape);
+      expect(result).toEqual({
+        AZURE_OPENAI_API_KEY: {},
+        AZURE_OPENAI_ENDPOINT: {},
+      });
+    });
+
+    it("returns full schema shape for non-Azure providers", () => {
+      const openaiSchema = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const result = getDisplayKeysForProvider("openai", false, openaiSchema);
+      expect(result).toEqual(openaiSchema);
+    });
+
+    it("ignores useApiGateway for non-Azure providers", () => {
+      const openaiSchema = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const result = getDisplayKeysForProvider("openai", true, openaiSchema);
+      expect(result).toEqual(openaiSchema);
+    });
+  });
+
+  describe("buildCustomKeyState", () => {
+    it("returns stored keys when available", () => {
+      const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const storedKeys = {
+        OPENAI_API_KEY: "sk-stored123",
+        OPENAI_BASE_URL: "https://api.openai.com/v1",
+      };
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys);
+
+      expect(result).toEqual({
+        OPENAI_API_KEY: "sk-stored123",
+        OPENAI_BASE_URL: "https://api.openai.com/v1",
+      });
+    });
+
+    it("preserves previous keys when provided", () => {
+      const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const storedKeys = { OPENAI_API_KEY: "sk-old" };
+      const previousKeys = { OPENAI_API_KEY: "sk-user-typing" };
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
+
+      expect(result.OPENAI_API_KEY).toBe("sk-user-typing");
+    });
+
+    it("returns MANAGED keys unchanged", () => {
+      const displayKeyMap = { MANAGED: {} };
+      const storedKeys = {};
+      const previousKeys = { MANAGED: "true" };
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
+
+      expect(result).toEqual({ MANAGED: "true" });
+    });
+
+    it("shows MASKED_KEY_PLACEHOLDER for env var providers", () => {
+      const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const storedKeys = {};
+      const options = { providerEnabledWithEnvVars: true };
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
+
+      expect(result.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
+      expect(result.OPENAI_BASE_URL).toBe(""); // URL fields are not masked
+    });
+
+    it("returns empty strings for new provider", () => {
+      const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
+      const storedKeys = {};
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys);
+
+      expect(result).toEqual({ OPENAI_API_KEY: "", OPENAI_BASE_URL: "" });
+    });
+
+    it("does not show masked placeholder when stored keys exist", () => {
+      const displayKeyMap = { OPENAI_API_KEY: {} };
+      const storedKeys = { OPENAI_API_KEY: "sk-actual-key" };
+      const options = { providerEnabledWithEnvVars: true };
+
+      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
+
+      expect(result.OPENAI_API_KEY).toBe("sk-actual-key");
+    });
+
+    it("handles empty display key map", () => {
+      const result = buildCustomKeyState({}, {});
+      expect(result).toEqual({});
+    });
+  });
+});

@@ -122,14 +122,24 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendModelProviderKey, providers]);
 
-  const [state, actions] = useModelProviderForm({
-    provider,
-    projectId,
-    project: {
+  const projectForForm = useMemo(
+    () => ({
       defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
       topicClusteringModel: project?.topicClusteringModel ?? null,
       embeddingsModel: project?.embeddingsModel ?? null,
-    },
+    }),
+    [
+      meta?.defaultModel,
+      project?.defaultModel,
+      project?.topicClusteringModel,
+      project?.embeddingsModel,
+    ],
+  );
+
+  const [state, actions] = useModelProviderForm({
+    provider,
+    projectId,
+    project: projectForForm,
     onSuccess: () => {
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
