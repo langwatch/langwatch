@@ -93,6 +93,12 @@ type DrawerStackEntry = {
  */
 let drawerStack: DrawerStackEntry[] = [];
 
+/**
+ * Lock to prevent rapid double-open calls.
+ * Stores the drawer being opened; cleared after URL update settles.
+ */
+let openingDrawerLock: DrawerType | null = null;
+
 export const getDrawerStack = () => drawerStack;
 export const clearDrawerStack = () => {
   drawerStack = [];
@@ -211,10 +217,16 @@ export const useDrawer = () => {
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
     { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
   ) => {
-    // Guard: Skip if this drawer is already open (prevents double-open)
-    if (currentDrawer === drawer) {
+    // Guard: Skip if this drawer is already open or being opened
+    if (currentDrawer === drawer || openingDrawerLock === drawer) {
       return;
     }
+
+    // Set lock to prevent double-open race condition
+    openingDrawerLock = drawer;
+    setTimeout(() => {
+      openingDrawerLock = null;
+    }, 100);
 
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
