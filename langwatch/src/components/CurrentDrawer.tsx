@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
+import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   getComplexProps,
@@ -10,6 +11,17 @@ import { drawers } from "./drawerRegistry";
 
 // Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";
+
+/** Track which drawers are currently mounted via CurrentDrawer */
+const mountedByCurrentDrawer = new Set<string>();
+
+/**
+ * Check if a drawer type is already being rendered by CurrentDrawer.
+ * Call this in dev mode from drawer components to detect duplicate rendering.
+ */
+export function isDrawerMountedGlobally(drawerType: string): boolean {
+  return mountedByCurrentDrawer.has(drawerType);
+}
 
 type DrawerProps = {
   open: string;
@@ -29,6 +41,15 @@ export function CurrentDrawer() {
   const CurrentDrawerComponent = drawerType
     ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
     : undefined;
+
+  // Track mounted drawer for duplicate detection
+  useEffect(() => {
+    if (!drawerType) return;
+    mountedByCurrentDrawer.add(drawerType);
+    return () => {
+      mountedByCurrentDrawer.delete(drawerType);
+    };
+  }, [drawerType]);
 
   // Get props from multiple sources:
   // 1. URL query params (serializable props)

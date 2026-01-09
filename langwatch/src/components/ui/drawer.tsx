@@ -51,12 +51,20 @@ export const DrawerCloseTrigger = React.forwardRef<
   );
 });
 
-export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
+interface DrawerRootProps extends ChakraDrawer.RootProps {
+  /** Used for duplicate detection in dev mode */
+  "data-drawer-type"?: string;
+}
+
+export const DrawerRoot = function DrawerRoot(props: DrawerRootProps) {
+  const { "data-drawer-type": drawerType, ...rest } = props;
   return (
-    <ChakraDrawer.Root
-      {...props}
-      preventScroll={false}
-    />
+    <div data-drawer-type={drawerType}>
+      <ChakraDrawer.Root
+        {...rest}
+        preventScroll={false}
+      />
+    </div>
   );
 };
 
