@@ -34,7 +34,7 @@ export function CurrentDrawer() {
   // Dev warning: detect duplicate drawer rendering via DOM check
   useEffect(() => {
     if (!drawerType || process.env.NODE_ENV !== "development") return;
-    
+
     // Check after render settles
     const timer = setTimeout(() => {
       const drawerElements = document.querySelectorAll('[data-scope="drawer"][data-part="positioner"]');
@@ -46,7 +46,7 @@ export function CurrentDrawer() {
         );
       }
     }, 100);
-    
+
     return () => clearTimeout(timer);
   }, [drawerType]);
 
