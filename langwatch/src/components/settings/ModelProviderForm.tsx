@@ -42,10 +42,14 @@ export const EditModelProviderForm = ({
   const { project } = useOrganizationTeamProject();
 
   // Count enabled providers to determine if this is the only one
+  // Include the current provider being edited since it will be enabled when saved
   const enabledProvidersCount = useMemo(() => {
-    if (!providers) return 0;
-    return Object.values(providers).filter((p) => p.enabled).length;
-  }, [providers]);
+    if (!providers) return 1; // Current provider will be enabled when (if) saved
+    const currentlyEnabledCount = Object.values(providers).filter((p) => p.enabled).length;
+    // If the current provider is not already enabled, add 1 since it will be enabled when saved
+    const isCurrentProviderAlreadyEnabled = providers[providerKey]?.enabled ?? false;
+    return isCurrentProviderAlreadyEnabled ? currentlyEnabledCount : currentlyEnabledCount + 1;
+  }, [providers, providerKey]);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
