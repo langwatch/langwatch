@@ -1,6 +1,5 @@
 import {
   VStack,
-  Text,
   Box,
   Combobox,
   TagsInput,
@@ -10,69 +9,68 @@ import {
   useTagsInput,
   Field,
 } from "@chakra-ui/react";
-import React, { useCallback, useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import type {
   UseModelProviderFormState,
   UseModelProviderFormActions,
 } from "../../hooks/useModelProviderForm";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import {
+  getProviderModelOptions,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
 
+type ModelTagsInputProps = {
+  label: string;
+  placeholder: string;
+  values: string[];
+  options: { value: string; label: string }[];
+  onValuesChange: (values: string[]) => void;
+};
+
 /**
- * Renders a multi-input field for specifying custom model names.
- * Only visible for the "custom" provider type (e.g., LiteLLM proxy, self-hosted vLLM).
- * Users can add comma-separated model names or create them individually.
- * @param state - Form state containing custom model names
- * @param actions - Form actions for managing custom models
- * @param provider - The model provider configuration
+ * A reusable TagsInput component with Combobox for model selection.
  */
-export const CustomModelInputSection = ({
-  state,
-  actions,
-  provider,
-}: {
-  state: UseModelProviderFormState;
-  actions: UseModelProviderFormActions;
-  provider: MaybeStoredModelProvider;
-}) => {
+const ModelTagsInput = ({
+  label,
+  placeholder,
+  values,
+  options,
+  onValuesChange,
+}: ModelTagsInputProps) => {
   const inputId = useId();
   const controlRef = useRef<HTMLDivElement | null>(null);
 
-  const customModelValues = useMemo(
-    () => state.customModels.map((m) => m.value),
-    [state.customModels]
-  );
+  const optionValues = useMemo(() => options.map((o) => o.value), [options]);
 
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const { contains } = useFilter({ sensitivity: "base" });
   const { collection, filter } = useListCollection({
-    initialItems: [] as string[],
+    initialItems: optionValues,
     filter: contains,
   });
 
   const handleTagsValueChange = useCallback(
     (details: { value: string[] }) => {
-      actions.setCustomModels(
-        details.value.map((value) => ({ label: value, value }))
-      );
+      onValuesChange(details.value);
     },
-    [actions]
+    [onValuesChange]
   );
 
   const tags = useTagsInput({
     ids: { input: inputId },
-    value: customModelValues,
+    value: values,
     onValueChange: handleTagsValueChange,
   });
 
   useEffect(() => {
     const differs =
-      tags.value.length !== customModelValues.length ||
-      tags.value.some((value, index) => value !== customModelValues[index]);
+      tags.value.length !== values.length ||
+      tags.value.some((value, index) => value !== values[index]);
     if (differs) {
-      tags.setValue(customModelValues);
+      tags.setValue(values);
     }
-  }, [customModelValues, tags]);
+  }, [values, tags]);
 
   const handleComboboxInputChange = useCallback(
     (event: { inputValue: string }) => {
@@ -85,11 +83,11 @@ export const CustomModelInputSection = ({
     (event: { value?: string[] }) => {
       const nextValue = event.value?.[0];
       if (!nextValue) return;
-      if (!customModelValues.includes(nextValue)) {
+      if (!values.includes(nextValue)) {
         tags.addValue(nextValue);
       }
     },
-    [customModelValues, tags]
+    [values, tags]
   );
 
   const combobox = useCombobox({
@@ -105,50 +103,115 @@ export const CustomModelInputSection = ({
     onValueChange: handleComboboxValueChange,
   });
 
-  if (provider.provider !== "custom") {
-    return null;
-  }
+  return (
+    <Box width="full">
+      <SmallLabel>{label}</SmallLabel>
+      <Field.Root>
+        <Combobox.RootProvider value={combobox}>
+          <TagsInput.RootProvider value={tags} size="sm">
+            <TagsInput.Control ref={controlRef} maxHeight="120px" overflowY="auto">
+              {tags.value.map((tag, index) => (
+                <TagsInput.Item key={index} index={index} value={tag}>
+                  <TagsInput.ItemPreview borderRadius="md">
+                    <TagsInput.ItemText>{tag}</TagsInput.ItemText>
+                    <TagsInput.ItemDeleteTrigger />
+                  </TagsInput.ItemPreview>
+                  <TagsInput.ItemInput />
+                </TagsInput.Item>
+              ))}
+              <Combobox.Input unstyled asChild>
+                <TagsInput.Input placeholder={placeholder} />
+              </Combobox.Input>
+            </TagsInput.Control>
+            <TagsInput.HiddenInput />
+            <Combobox.Positioner>
+              <Combobox.Content borderRadius="md" maxHeight="200px" overflowY="auto">
+                {collection.items.length > 0 ? (
+                  collection.items.map((item) => (
+                    <Combobox.Item key={item} item={item}>
+                      <Combobox.ItemText>{item}</Combobox.ItemText>
+                    </Combobox.Item>
+                  ))
+                ) : (
+                  <Combobox.Empty>Type to add a model</Combobox.Empty>
+                )}
+              </Combobox.Content>
+            </Combobox.Positioner>
+          </TagsInput.RootProvider>
+        </Combobox.RootProvider>
+      </Field.Root>
+    </Box>
+  );
+};
+
+/**
+ * Renders model and embeddings model selection fields for all providers.
+ * Uses TagsInput with Combobox to allow selecting from known models or adding custom model names.
+ * @param state - Form state containing custom model names
+ * @param actions - Form actions for managing custom models
+ * @param provider - The model provider configuration
+ */
+export const CustomModelInputSection = ({
+  state,
+  actions,
+  provider,
+}: {
+  state: UseModelProviderFormState;
+  actions: UseModelProviderFormActions;
+  provider: MaybeStoredModelProvider;
+}) => {
+  const modelOptions = useMemo(
+    () => getProviderModelOptions(provider.provider, "chat"),
+    [provider.provider]
+  );
+
+  const embeddingsOptions = useMemo(
+    () => getProviderModelOptions(provider.provider, "embedding"),
+    [provider.provider]
+  );
+
+  const modelValues = useMemo(
+    () => state.customModels.map((m) => m.value),
+    [state.customModels]
+  );
+
+  const embeddingsValues = useMemo(
+    () => state.customEmbeddingsModels.map((m) => m.value),
+    [state.customEmbeddingsModels]
+  );
+
+  const handleModelsChange = useCallback(
+    (values: string[]) => {
+      actions.setCustomModels(values.map((v) => ({ label: v, value: v })));
+    },
+    [actions]
+  );
+
+  const handleEmbeddingsChange = useCallback(
+    (values: string[]) => {
+      actions.setCustomEmbeddingsModels(
+        values.map((v) => ({ label: v, value: v }))
+      );
+    },
+    [actions]
+  );
 
   return (
-    <VStack width="full" align="start" gap={2} paddingTop={4}>
-      <SmallLabel>Models</SmallLabel>
-      <Text fontSize="xs" color="gray.500">
-        Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that support the /chat/completions endpoint.
-      </Text>
-      <Box width="full">
-        <Field.Root>
-          <Combobox.RootProvider value={combobox}>
-            <TagsInput.RootProvider value={tags} size="sm">
-              <TagsInput.Control ref={controlRef}>
-                {tags.value.map((tag, index) => (
-                  <TagsInput.Item key={index} index={index} value={tag}>
-                    <TagsInput.ItemPreview
-                      borderRadius="md"
-                    >
-                      <TagsInput.ItemText>{tag}</TagsInput.ItemText>
-                      <TagsInput.ItemDeleteTrigger />
-                    </TagsInput.ItemPreview>
-                    <TagsInput.ItemInput />
-                  </TagsInput.Item>
-                ))}
-                <Combobox.Input unstyled asChild>
-                  <TagsInput.Input placeholder="Add custom model" />
-                </Combobox.Input>
-              </TagsInput.Control>
-              <TagsInput.HiddenInput />
-              <Combobox.Positioner>
-                <Combobox.Content borderRadius="md">
-                  <Combobox.Empty>
-                    <Text fontSize="sm" color="gray.500">
-                      Type to add a model
-                    </Text>
-                  </Combobox.Empty>
-                </Combobox.Content>
-              </Combobox.Positioner>
-            </TagsInput.RootProvider>
-          </Combobox.RootProvider>
-        </Field.Root>
-      </Box>
+    <VStack width="full" gap={4} paddingTop={4}>
+      <ModelTagsInput
+        label="Models"
+        placeholder="Add custom model"
+        values={modelValues}
+        options={modelOptions}
+        onValuesChange={handleModelsChange}
+      />
+      <ModelTagsInput
+        label="Embeddings Models"
+        placeholder="Add custom embeddings model"
+        values={embeddingsValues}
+        options={embeddingsOptions}
+        onValuesChange={handleEmbeddingsChange}
+      />
     </VStack>
   );
 };

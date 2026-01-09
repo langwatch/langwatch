@@ -1,8 +1,9 @@
-import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { Drawer } from "./ui/drawer";
 import { EditModelProviderForm } from "./settings/ModelProviderForm";
 import { modelProviders } from "../server/modelProviders/registry";
+import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { useModelProvidersSettings } from "../hooks/useModelProvidersSettings";
 
 type EditModelProviderDrawerProps = {
@@ -50,10 +51,13 @@ export const EditModelProviderDrawer = (props: EditModelProviderDrawerProps) => 
                 <HStack>
                     <Drawer.CloseTrigger />
                 </HStack>
-                <HStack>
-                    <Text paddingTop={5} fontSize="2xl">
-                        {title}
-                    </Text>
+                <HStack gap={3}>
+                    {provider && (
+                        <Box width="28px" height="28px">
+                            {modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]}
+                        </Box>
+                    )}
+                    <Heading as="h2">{title}</Heading>
                 </HStack>
                 </Drawer.Header>
                 <Drawer.Body>

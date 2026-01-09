@@ -38,6 +38,7 @@ export type UseModelProviderFormState = {
   displayKeys: Record<string, any>;
   extraHeaders: ExtraHeader[];
   customModels: SelectOption[];
+  customEmbeddingsModels: SelectOption[];
   useAsDefaultProvider: boolean;
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
@@ -58,6 +59,9 @@ export type UseModelProviderFormActions = {
   setExtraHeaderKey: (index: number, key: string) => void;
   setExtraHeaderValue: (index: number, value: string) => void;
   setCustomModels: (options: SelectOption[]) => void;
+  setCustomEmbeddingsModels: (options: SelectOption[]) => void;
+  addCustomModelsFromText: (text: string) => void;
+  addCustomEmbeddingsFromText: (text: string) => void;
   setUseAsDefaultProvider: (use: boolean) => void;
   setProjectDefaultModel: (model: string | null) => void;
   setProjectTopicClusteringModel: (model: string | null) => void;
@@ -361,6 +365,32 @@ export function useModelProviderForm(
     );
   }, []);
 
+  const addCustomModelsFromText = useCallback((text: string) => {
+    const newModels = text
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s) => ({ value: s, label: s }));
+    setCustomModels((prev) => {
+      const existingValues = new Set(prev.map((m) => m.value));
+      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
+      return [...prev, ...uniqueNew];
+    });
+  }, []);
+
+  const addCustomEmbeddingsFromText = useCallback((text: string) => {
+    const newModels = text
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s) => ({ value: s, label: s }));
+    setCustomEmbeddingsModels((prev) => {
+      const existingValues = new Set(prev.map((m) => m.value));
+      const uniqueNew = newModels.filter((m) => !existingValues.has(m.value));
+      return [...prev, ...uniqueNew];
+    });
+  }, []);
+
   const submit = useCallback(async () => {
     setIsSaving(true);
     setErrors({});
@@ -480,6 +510,7 @@ export function useModelProviderForm(
       displayKeys,
       extraHeaders,
       customModels,
+      customEmbeddingsModels,
       useAsDefaultProvider,
       projectDefaultModel,
       projectTopicClusteringModel,
@@ -497,6 +528,9 @@ export function useModelProviderForm(
       setExtraHeaderKey,
       setExtraHeaderValue,
       setCustomModels,
+      setCustomEmbeddingsModels,
+      addCustomModelsFromText,
+      addCustomEmbeddingsFromText,
       setUseAsDefaultProvider,
       setProjectDefaultModel,
       setProjectTopicClusteringModel,
