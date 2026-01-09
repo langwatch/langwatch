@@ -61,6 +61,8 @@ export const httpProxyRouter = createTRPCRouter({
       // Add auth headers
       if (auth) {
         switch (auth.type) {
+          case "none":
+            break;
           case "bearer":
             if (auth.token) {
               requestHeaders["Authorization"] = `Bearer ${auth.token}`;
@@ -79,6 +81,10 @@ export const httpProxyRouter = createTRPCRouter({
               requestHeaders["Authorization"] = `Basic ${encoded}`;
             }
             break;
+          default: {
+            const _exhaustive: never = auth.type;
+            throw new Error(`Unknown auth type: ${_exhaustive}`);
+          }
         }
       }
 
