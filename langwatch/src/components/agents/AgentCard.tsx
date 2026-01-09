@@ -60,7 +60,7 @@ export function AgentCard({
                 >
                   <MoreVertical size={16} />
                 </Menu.Trigger>
-                <Menu.Content className="js-inner-menu">
+                <Menu.Content className="js-inner-menu" portalled={false}>
                   {onEdit && (
                     <Menu.Item
                       value="edit"

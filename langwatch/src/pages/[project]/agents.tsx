@@ -120,7 +120,6 @@ function Page() {
                 key={agent.id}
                 agent={agent}
                 onClick={() => handleEditAgent(agent)}
-                onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
               />
             ))}
