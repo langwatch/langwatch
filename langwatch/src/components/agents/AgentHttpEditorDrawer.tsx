@@ -279,16 +279,49 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     onClose();
   };
 
-  // Test handler (placeholder - would need backend implementation)
+  // Test HTTP mutation
+  const testHttpMutation = api.agents.testHttp.useMutation();
+
+  // Test handler - calls the backend API
   const handleTest = useCallback(
-    async (_requestBody: string) => {
-      // TODO: Implement actual HTTP test via backend API
-      return {
-        success: false,
-        error: "Test functionality not yet implemented",
-      };
+    async (requestBody: string) => {
+      if (!project?.id) {
+        return { success: false, error: "No project selected" };
+      }
+
+      try {
+        const result = await testHttpMutation.mutateAsync({
+          projectId: project.id,
+          url,
+          method,
+          headers: headers.map((h) => ({ key: h.key, value: h.value })),
+          auth: auth
+            ? {
+                type: auth.type,
+                token: auth.type === "bearer" || auth.type === "api_key" ? auth.token : undefined,
+                headerName: auth.type === "api_key" ? auth.headerName : undefined,
+                username: auth.type === "basic" ? auth.username : undefined,
+                password: auth.type === "basic" ? auth.password : undefined,
+              }
+            : undefined,
+          body: requestBody,
+          outputPath,
+        });
+
+        return {
+          success: result.success,
+          response: result.response,
+          extractedOutput: result.extractedOutput,
+          error: result.error,
+        };
+      } catch (err) {
+        return {
+          success: false,
+          error: err instanceof Error ? err.message : "Test request failed",
+        };
+      }
     },
-    []
+    [project?.id, url, method, headers, auth, outputPath, testHttpMutation]
   );
 
   // Check if body tab has additional content beyond empty object
