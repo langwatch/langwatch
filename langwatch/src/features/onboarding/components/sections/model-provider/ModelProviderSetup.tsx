@@ -8,6 +8,7 @@ import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm"
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import {
+  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../../../../server/modelProviders/registry";
@@ -32,8 +33,6 @@ interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
   variant: "evaluations" | "prompts";
 }
-
-const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 const variantToDocsMapping: Record<"evaluations" | "prompts", string> = {
   evaluations: "/llm-evaluation/overview",
@@ -126,7 +125,11 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
-    projectDefaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
+    project: {
+      defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
+      topicClusteringModel: project?.topicClusteringModel ?? null,
+      embeddingsModel: project?.embeddingsModel ?? null,
+    },
     onSuccess: () => {
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
@@ -137,6 +140,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     },
   });
+
+  // Compute chat model options for the model settings component
+  const chatModelOptions = useMemo(
+    () => getProviderModelOptions(backendModelProviderKey, "chat"),
+    [backendModelProviderKey],
+  );
 
   const { fields: derivedFields } = useModelProviderFields(
     backendModelProviderKey,
@@ -186,7 +195,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     }
 
     // Base URL is set to default OpenAI URL, but no API key
-    if (baseUrl === OPENAI_DEFAULT_BASE_URL && !apiKey) {
+    if (baseUrl === getModelProvider("open_ai")?.defaultBaseUrl && !apiKey) {
       setOpenAiValidationError(
         "API Key is required when using the default OpenAI base URL",
       );
@@ -309,10 +318,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           <ModelProviderModelSettings
             modelProviderKey={modelProviderKey}
             customModels={state.customModels}
-            chatModelOptions={state.chatModelOptions}
-            defaultModel={state.defaultModel}
+            chatModelOptions={chatModelOptions}
+            defaultModel={state.projectDefaultModel}
             onCustomModelsChange={actions.setCustomModels}
-            onDefaultModelChange={actions.setDefaultModel}
+            onDefaultModelChange={actions.setProjectDefaultModel}
           />
 
           <DocsLinks

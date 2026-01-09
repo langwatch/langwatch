@@ -8,7 +8,8 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "open_ai",
     backendModelProviderKey: "openai",
     label: "OpenAI",
-    defaultModel: "gpt-5",
+    defaultModel: "gpt-5.2",
+    defaultBaseUrl: "https://api.openai.com/v1",
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -32,6 +33,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "anthropic",
     label: "Anthropic",
     defaultModel: "claude-sonnet-4-5",
+    defaultBaseUrl: "https://api.anthropic.com/v1",
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
       "/images/external-icons/anthropic-darktheme.svg",
@@ -55,6 +57,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "gemini",
     label: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
+    defaultBaseUrl: "https://generativelanguage.googleapis.com/v1",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
     externalDocsUrl: "https://ai.google.dev/",
     fieldMetadata: {
@@ -124,6 +127,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "deepseek",
     label: "DeepSeek",
     defaultModel: "deepseek-r1",
+    defaultBaseUrl: "https://api.deepseek.com/v1",
     icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
     externalDocsUrl: "https://www.deepseek.com/",
     fieldMetadata: {
@@ -137,6 +141,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "groq",
     backendModelProviderKey: "groq",
     label: "Groq",
+    defaultBaseUrl: "https://api.groq.com/openai/v1",
     icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
     externalDocsUrl: "https://groq.com/",
     fieldMetadata: {
@@ -151,6 +156,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "xai",
     label: "Grok (xAI)",
     defaultModel: "grok-4",
+    defaultBaseUrl: "https://api.x.ai/v1",
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
       "/images/external-icons/grok-darktheme.svg",
@@ -191,6 +197,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     key: "cerebras",
     backendModelProviderKey: "cerebras",
     label: "Cerebras",
+    defaultBaseUrl: "https://api.cerebras.ai/v1",
     icon: themedIcon(
       "/images/external-icons/cerebras-lighttheme.svg",
       "/images/external-icons/cerebras-darktheme.svg",
@@ -232,3 +239,10 @@ export function getModelProvider(
 ): ModelProviderSpec | undefined {
   return modelProviderRegistry.find((provider) => provider.key === key);
 }
+
+/** Default base URLs keyed by backendModelProviderKey for API validation */
+export const providerDefaultBaseUrls: Record<string, string> = Object.fromEntries(
+  modelProviderRegistry
+    .filter((p) => p.defaultBaseUrl)
+    .map((p) => [p.backendModelProviderKey, p.defaultBaseUrl!])
+);

@@ -183,7 +183,6 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                               if (hasProjectInRoute) {
                                 return currentRoute?.path
                                   .replace("[project]", project_.slug)
-                                  .replace(/\[.*?\]/g, "")
                                   .replace(/\/\/+/g, "/");
                               } else if (hasProjectInPath) {
                                 return currentPath.replace(
@@ -196,6 +195,18 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                                 }?return_to=${encodeURIComponent(currentPath)}`;
                               }
                             })()}
+                            onClick={() => {
+                              const currentPath = window.location.pathname;
+                              const hasProjectInPath = currentPath.includes(
+                                project.slug,
+                              );
+                              if (!hasProjectInPath) {
+                                localStorage.setItem(
+                                  "selectedProjectSlug",
+                                  JSON.stringify(project_.slug),
+                                );
+                              }
+                            }}
                             _hover={{
                               textDecoration: "none",
                             }}
