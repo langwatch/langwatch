@@ -9,11 +9,6 @@ import {
 import { Bot, Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
-import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
-import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
-import { AgentHttpEditorDrawer } from "~/components/agents/AgentHttpEditorDrawer";
-import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -30,7 +25,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
  */
 function Page() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer } = useDrawer();
   const utils = api.useContext();
 
   const agentsQuery = api.agents.getAll.useQuery(
@@ -120,6 +115,7 @@ function Page() {
                 key={agent.id}
                 agent={agent}
                 onClick={() => handleEditAgent(agent)}
+                onEdit={() => handleEditAgent(agent)}
                 onDelete={() => handleDeleteAgent(agent)}
               />
             ))}
@@ -127,12 +123,7 @@ function Page() {
         </VStack>
       )}
 
-      {/* Agent management drawers */}
-      <AgentListDrawer open={drawerOpen("agentList")} />
-      <AgentTypeSelectorDrawer open={drawerOpen("agentTypeSelector")} />
-      <AgentCodeEditorDrawer open={drawerOpen("agentCodeEditor")} />
-      <AgentHttpEditorDrawer open={drawerOpen("agentHttpEditor")} />
-      <WorkflowSelectorDrawer open={drawerOpen("workflowSelector")} />
+      {/* Drawers are rendered by CurrentDrawer in DashboardLayout */}
     </DashboardLayout>
   );
 }
