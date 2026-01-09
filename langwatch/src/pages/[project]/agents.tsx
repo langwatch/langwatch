@@ -12,6 +12,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
 import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
+import { AgentHttpEditorDrawer } from "~/components/agents/AgentHttpEditorDrawer";
 import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -48,6 +49,9 @@ function Page() {
     switch (agent.type) {
       case "code":
         openDrawer("agentCodeEditor", { urlParams: { agentId: agent.id } });
+        break;
+      case "http":
+        openDrawer("agentHttpEditor", { urlParams: { agentId: agent.id } });
         break;
       case "workflow":
         // Workflow agents can't be edited directly, just view
@@ -125,6 +129,7 @@ function Page() {
       <AgentListDrawer open={drawerOpen("agentList")} />
       <AgentTypeSelectorDrawer open={drawerOpen("agentTypeSelector")} />
       <AgentCodeEditorDrawer open={drawerOpen("agentCodeEditor")} />
+      <AgentHttpEditorDrawer open={drawerOpen("agentHttpEditor")} />
       <WorkflowSelectorDrawer open={drawerOpen("workflowSelector")} />
     </DashboardLayout>
   );
