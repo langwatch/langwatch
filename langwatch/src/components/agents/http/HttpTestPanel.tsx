@@ -11,14 +11,16 @@ import {
 } from "@chakra-ui/react";
 import { Play } from "lucide-react";
 import { useState, useCallback } from "react";
-import type { Field as DSLField } from "~/optimization_studio/types/dsl";
-import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
+
+const DEFAULT_TEST_BODY = `{
+  "messages": [{"role": "user", "content": "Hello"}]
+}`;
 
 export type HttpTestPanelProps = {
-  inputs: DSLField[];
-  onTest: (inputValues: Record<string, string>) => Promise<{
+  onTest: (requestBody: string) => Promise<{
     success: boolean;
     response?: unknown;
+    extractedOutput?: string;
     error?: string;
   }>;
   disabled?: boolean;
@@ -26,39 +28,26 @@ export type HttpTestPanelProps = {
 
 /**
  * Test panel for HTTP agents.
- * Provides input fields for each defined input and a test button.
+ * Provides a raw JSON body editor for testing requests.
  */
 export function HttpTestPanel({
-  inputs,
   onTest,
   disabled = false,
 }: HttpTestPanelProps) {
-  const [inputValues, setInputValues] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    for (const input of inputs) {
-      initial[input.identifier] = getDefaultValue(input.type);
-    }
-    return initial;
-  });
+  const [requestBody, setRequestBody] = useState(DEFAULT_TEST_BODY);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
     response?: unknown;
+    extractedOutput?: string;
     error?: string;
   } | null>(null);
-
-  const handleValueChange = useCallback(
-    (identifier: string, value: string) => {
-      setInputValues((prev) => ({ ...prev, [identifier]: value }));
-    },
-    []
-  );
 
   const handleTest = useCallback(async () => {
     setIsLoading(true);
     setResult(null);
     try {
-      const response = await onTest(inputValues);
+      const response = await onTest(requestBody);
       setResult(response);
     } catch (err) {
       setResult({
@@ -68,18 +57,27 @@ export function HttpTestPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [inputValues, onTest]);
+  }, [requestBody, onTest]);
 
   return (
     <VStack align="stretch" gap={4} width="full">
-      {/* Header */}
-      <HStack justify="space-between">
-        <VStack align="start" gap={0}>
-          <Text fontWeight="medium">Test Input Values</Text>
-          <Text fontSize="sm" color="gray.500">
-            Provide sample values for each input field
-          </Text>
-        </VStack>
+      {/* Request Body */}
+      <Field.Root>
+        <Field.Label>Request Body (JSON)</Field.Label>
+        <Textarea
+          value={requestBody}
+          onChange={(e) => setRequestBody(e.target.value)}
+          placeholder='{"messages": [{"role": "user", "content": "Hello, world!"}]}'
+          fontFamily="mono"
+          fontSize="sm"
+          minHeight="150px"
+          disabled={disabled}
+          data-testid="test-request-body"
+        />
+      </Field.Root>
+
+      {/* Test Button */}
+      <HStack justify="flex-end">
         <Button
           colorPalette="blue"
           onClick={handleTest}
@@ -91,37 +89,6 @@ export function HttpTestPanel({
         </Button>
       </HStack>
 
-      {/* Input Fields */}
-      <VStack align="stretch" gap={3}>
-        {inputs.map((input) => (
-          <Field.Root key={input.identifier}>
-            <Field.Label>
-              <HStack gap={2}>
-                <VariableTypeIcon type={input.type} size={14} />
-                <Text fontFamily="mono" fontSize="sm">
-                  {input.identifier}
-                </Text>
-                <Text fontSize="xs" color="gray.500">
-                  {TYPE_LABELS[input.type] ?? input.type}
-                </Text>
-              </HStack>
-            </Field.Label>
-            <Textarea
-              value={inputValues[input.identifier] ?? ""}
-              onChange={(e) =>
-                handleValueChange(input.identifier, e.target.value)
-              }
-              placeholder={getPlaceholder(input.type)}
-              fontFamily="mono"
-              fontSize="13px"
-              minHeight="60px"
-              resize="vertical"
-              disabled={disabled}
-            />
-          </Field.Root>
-        ))}
-      </VStack>
-
       {/* Result Display */}
       {result && (
         <Box>
@@ -131,17 +98,31 @@ export function HttpTestPanel({
               <Alert.Content>
                 <Alert.Title>Request Successful</Alert.Title>
                 <Alert.Description>
-                  <Box
-                    as="pre"
-                    fontSize="xs"
-                    fontFamily="mono"
-                    overflow="auto"
-                    maxHeight="200px"
-                    whiteSpace="pre-wrap"
-                    marginTop={2}
-                  >
-                    {JSON.stringify(result.response, null, 2)}
-                  </Box>
+                  <VStack align="stretch" gap={2} marginTop={2}>
+                    <Box
+                      as="pre"
+                      fontSize="xs"
+                      fontFamily="mono"
+                      overflow="auto"
+                      maxHeight="200px"
+                      whiteSpace="pre-wrap"
+                      bg="gray.50"
+                      padding={2}
+                      borderRadius="md"
+                    >
+                      {JSON.stringify(result.response, null, 2)}
+                    </Box>
+                    {result.extractedOutput && (
+                      <Box>
+                        <Text fontSize="xs" fontWeight="medium" color="gray.600">
+                          Extracted output:
+                        </Text>
+                        <Text fontSize="sm" fontFamily="mono">
+                          {result.extractedOutput}
+                        </Text>
+                      </Box>
+                    )}
+                  </VStack>
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
@@ -158,42 +139,4 @@ export function HttpTestPanel({
       )}
     </VStack>
   );
-}
-
-function getDefaultValue(type: string): string {
-  switch (type) {
-    case "list":
-    case "list[str]":
-      return '["example"]';
-    case "dict":
-      return "{}";
-    case "bool":
-      return "true";
-    case "float":
-    case "int":
-      return "0";
-    case "chat_messages":
-      return '[{"role": "user", "content": "Hello"}]';
-    default:
-      return "";
-  }
-}
-
-function getPlaceholder(type: string): string {
-  switch (type) {
-    case "list":
-    case "list[str]":
-      return '["item1", "item2"]';
-    case "dict":
-      return '{"key": "value"}';
-    case "bool":
-      return "true or false";
-    case "float":
-    case "int":
-      return "123";
-    case "chat_messages":
-      return '[{"role": "user", "content": "Hello"}]';
-    default:
-      return "Enter value...";
-  }
 }

@@ -22,18 +22,7 @@ import {
 } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import {
-  VariablesSection,
-  type Variable,
-  type AvailableSource,
-  type FieldMapping,
-} from "~/components/variables";
-import {
-  OutputsSection,
-  CODE_OUTPUT_TYPES,
-  type Output,
-  type OutputType,
-} from "~/components/outputs/OutputsSection";
+import type { AvailableSource, FieldMapping } from "~/components/variables";
 import type {
   TypedAgent,
   AgentComponentConfig,
@@ -62,15 +51,9 @@ import {
 
 const DEFAULT_URL = "https://api.example.com/agent/chat";
 const DEFAULT_METHOD: HttpMethod = "POST";
-const DEFAULT_INPUTS: DSLField[] = [
-  { identifier: "messages", type: "list" },
-  { identifier: "context", type: "dict" },
-];
+const DEFAULT_INPUTS: DSLField[] = [];
 const DEFAULT_OUTPUTS: DSLField[] = [{ identifier: "output", type: "str" }];
-const DEFAULT_BODY_TEMPLATE = `{
-  "messages": {{messages}},
-  "context": {{context}}
-}`;
+const DEFAULT_BODY_TEMPLATE = "{}";
 const DEFAULT_OUTPUT_PATH = "$.choices[0].message.content";
 
 // ============================================================================
@@ -174,7 +157,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [headers, setHeaders] = useState<HttpHeader[]>([]);
   const [auth, setAuth] = useState<HttpAuth | undefined>({ type: "none" });
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeTab, setActiveTab] = useState("io");
+  const [activeTab, setActiveTab] = useState("body");
 
   // Load existing agent if editing
   const agentQuery = api.agents.getById.useQuery(
@@ -283,38 +266,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
 
   const markDirty = () => setHasUnsavedChanges(true);
 
-  // Handle inputs change from VariablesSection
-  const handleInputsChange = useCallback((newVariables: Variable[]) => {
-    const newInputs: DSLField[] = newVariables.map((v) => ({
-      identifier: v.identifier,
-      type: v.type as DSLField["type"],
-    }));
-    setInputs(newInputs);
-    markDirty();
-  }, []);
-
-  // Handle outputs change from OutputsSection
-  const handleOutputsChange = useCallback((newOutputs: Output[]) => {
-    const newFields: DSLField[] = newOutputs.map((o) => ({
-      identifier: o.identifier,
-      type: o.type as DSLField["type"],
-    }));
-    setOutputs(newFields);
-    markDirty();
-  }, []);
-
-  // Convert DSL inputs to Variable[] for VariablesSection
-  const variablesForUI: Variable[] = inputs.map((input) => ({
-    identifier: input.identifier,
-    type: input.type,
-  }));
-
-  // Convert DSL outputs to Output[] for OutputsSection
-  const outputsForUI: Output[] = outputs.map((output) => ({
-    identifier: output.identifier,
-    type: output.type as OutputType,
-  }));
-
   const handleClose = () => {
     if (hasUnsavedChanges) {
       if (
@@ -330,7 +281,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
 
   // Test handler (placeholder - would need backend implementation)
   const handleTest = useCallback(
-    async (_inputValues: Record<string, string>) => {
+    async (_requestBody: string) => {
       // TODO: Implement actual HTTP test via backend API
       return {
         success: false,
@@ -340,8 +291,10 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     []
   );
 
-  // Check if body tab has content (for indicator dot)
-  const hasBodyContent = bodyTemplate.trim().length > 0 || outputPath.trim().length > 0;
+  // Check if body tab has additional content beyond empty object
+  const hasBodyContent =
+    (bodyTemplate.trim().length > 0 && bodyTemplate.trim() !== "{}") ||
+    outputPath.trim().length > 0;
 
   return (
     <Drawer.Root
@@ -428,7 +381,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 colorPalette="blue"
               >
                 <Tabs.List paddingX={6} borderBottomWidth="1px" borderColor="gray.200">
-                  <Tabs.Trigger value="io">I/O</Tabs.Trigger>
                   <Tabs.Trigger value="body">
                     <HStack gap={1}>
                       <Text>Body</Text>
@@ -447,36 +399,6 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   <Tabs.Trigger value="test">Test</Tabs.Trigger>
                 </Tabs.List>
 
-                {/* I/O Tab */}
-                <Tabs.Content
-                  value="io"
-                  flex={1}
-                  overflowY="auto"
-                  paddingX={6}
-                  paddingY={4}
-                >
-                  <VStack gap={6} align="stretch">
-                    <VariablesSection
-                      variables={variablesForUI}
-                      onChange={handleInputsChange}
-                      showMappings={false}
-                      availableSources={availableSources}
-                      canAddRemove={true}
-                      readOnly={false}
-                      title="Inputs"
-                      isMappingDisabled
-                    />
-                    <OutputsSection
-                      outputs={outputsForUI}
-                      onChange={handleOutputsChange}
-                      canAddRemove={true}
-                      readOnly={false}
-                      title="Outputs"
-                      availableTypes={CODE_OUTPUT_TYPES}
-                    />
-                  </VStack>
-                </Tabs.Content>
-
                 {/* Body Tab */}
                 <Tabs.Content
                   value="body"
@@ -487,7 +409,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 >
                   <VStack gap={6} align="stretch">
                     <Field.Root>
-                      <Field.Label>Body Template (JSON)</Field.Label>
+                      <Field.Label>Additional Body Fields (JSON)</Field.Label>
+                      <Text fontSize="sm" color="gray.500" marginBottom={2}>
+                        When used in Scenarios or Workflows, all inputs are automatically
+                        passed in the body. Use this to define additional static fields.
+                      </Text>
                       <BodyTemplateEditor
                         value={bodyTemplate}
                         onChange={(v) => {
@@ -552,7 +478,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                   paddingX={6}
                   paddingY={4}
                 >
-                  <HttpTestPanel inputs={inputs} onTest={handleTest} />
+                  <HttpTestPanel onTest={handleTest} />
                 </Tabs.Content>
               </Tabs.Root>
             </VStack>
