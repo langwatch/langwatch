@@ -35,10 +35,17 @@ export function AgentCard({
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger if clicking within menu
+    const target = e.target as HTMLElement;
+    if (target.closest(".js-inner-menu")) return;
+    onClick?.();
+  };
+
   return (
     <Card.Root
       variant="elevated"
-      onClick={onClick}
+      onClick={handleCardClick}
       cursor="pointer"
       height="142px"
       transition="all 0.2s ease-in-out"
