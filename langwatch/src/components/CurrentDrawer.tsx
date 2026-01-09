@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   getComplexProps,
@@ -42,8 +42,8 @@ export function CurrentDrawer() {
     ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
     : undefined;
 
-  // Track mounted drawer for duplicate detection
-  useEffect(() => {
+  // Track mounted drawer for duplicate detection (useLayoutEffect to run before children's useEffects)
+  useLayoutEffect(() => {
     if (!drawerType) return;
     mountedByCurrentDrawer.add(drawerType);
     return () => {
