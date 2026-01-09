@@ -4,6 +4,7 @@ import {
   Box,
   Field,
 } from "@chakra-ui/react";
+import { useMemo } from "react";
 import type {
   UseModelProviderFormState,
   UseModelProviderFormActions,
@@ -19,7 +20,7 @@ import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
 import { modelSelectorOptions } from "../ModelSelector";
 import { Tooltip } from "../ui/tooltip";
-import { isProviderEffectiveDefault } from "../../utils/modelProviderHelpers";
+import { isProviderDefaultModel } from "../../utils/modelProviderHelpers";
 import { ProviderModelSelector } from "./ProviderModelSelector";
 
 /**
@@ -52,8 +53,8 @@ export const DefaultProviderSection = ({
   providers: Record<string, MaybeStoredModelProvider> | undefined;
 }) => {
   // Determine if toggle should be disabled
-  // Uses effective defaults (project values with fallbacks to constants)
-  const isUsedForDefaults = isProviderEffectiveDefault(provider.provider, project);
+  // Only disable when provider is used for the Default Model (not embeddings or topic clustering)
+  const isUsedForDefaults = isProviderDefaultModel(provider.provider, project);
   const isOnlyEnabledProvider = enabledProvidersCount === 1;
   const isToggleDisabled = isUsedForDefaults || isOnlyEnabledProvider;
 
@@ -71,21 +72,56 @@ export const DefaultProviderSection = ({
   const providerName = modelProviders[provider.provider as keyof typeof modelProviders]?.name || provider.provider;
 
   // Get all models from modelSelectorOptions for this specific provider only
-  const chatOptions = modelSelectorOptions
-    .filter(
-      (option) =>
-        option.mode === "chat" &&
-        option.value.startsWith(`${provider.provider}/`)
-    )
-    .map((option) => option.value);
-  
-  const embeddingOptions = modelSelectorOptions
-    .filter((option) => {
-      if (option.mode !== "embedding") return false;
-      const providerKey = option.value.split("/")[0];
-      return providers?.[providerKey ?? ""]?.enabled === true;
-    })
-    .map((option) => option.value);
+  // Include custom models from state.customModels, formatted as provider/model-name
+  const chatOptions = useMemo(() => {
+    const registryModels = modelSelectorOptions
+      .filter(
+        (option) =>
+          option.mode === "chat" &&
+          option.value.startsWith(`${provider.provider}/`)
+      )
+      .map((option) => option.value);
+
+    // Add custom models from state, formatted with provider prefix
+    const customModels = state.customModels.map(
+      (model) => `${provider.provider}/${model.value}`
+    );
+
+    // Combine and deduplicate
+    return [...new Set([...registryModels, ...customModels])];
+  }, [provider.provider, state.customModels]);
+
+  // Get all embedding models from registry and custom embeddings from all enabled providers
+  const embeddingOptions = useMemo(() => {
+    // Get registry embedding models from all enabled providers
+    const registryModels = modelSelectorOptions
+      .filter((option) => {
+        if (option.mode !== "embedding") return false;
+        const providerKey = option.value.split("/")[0];
+        return providers?.[providerKey ?? ""]?.enabled === true;
+      })
+      .map((option) => option.value);
+
+    // Add custom embeddings models from all enabled providers
+    const customEmbeddings: string[] = [];
+    if (providers) {
+      for (const [providerKey, providerData] of Object.entries(providers)) {
+        if (providerData.enabled && providerData.embeddingsModels) {
+          providerData.embeddingsModels.forEach((model) => {
+            customEmbeddings.push(`${providerKey}/${model}`);
+          });
+        }
+      }
+    }
+
+    // Also include custom embeddings being edited in the current form state
+    state.customEmbeddingsModels.forEach((model) => {
+      customEmbeddings.push(`${provider.provider}/${model.value}`);
+    });
+
+    // Combine and deduplicate
+    return [...new Set([...registryModels, ...customEmbeddings])];
+  }, [providers, provider.provider, state.customEmbeddingsModels]);
 
   return (
     <VStack width="full" align="start" gap={4} paddingTop={4}>

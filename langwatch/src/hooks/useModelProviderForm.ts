@@ -10,7 +10,7 @@ import {
 import { api } from "../utils/api";
 import {
   getEffectiveDefaults,
-  isProviderEffectiveDefault,
+  isProviderDefaultModel,
   getSchemaShape,
   getDisplayKeysForProvider,
   buildCustomKeyState,
@@ -164,9 +164,9 @@ export function useModelProviderForm(
     ),
   );
 
-  // Auto-enable toggle if this provider is used for any effective default
+  // Auto-enable toggle if this provider is used for the Default Model (matching badge logic)
   const [useAsDefaultProvider, setUseAsDefaultProvider] =
-    useState<boolean>(() => isProviderEffectiveDefault(provider.provider, project));
+    useState<boolean>(() => isProviderDefaultModel(provider.provider, project));
   const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
     initialProjectDefaultModel,
   );
@@ -237,9 +237,9 @@ export function useModelProviderForm(
       ),
     );
 
-    // Auto-enable the toggle if this provider is currently being used for any effective default models
-    const isUsedForDefaults = isProviderEffectiveDefault(provider.provider, project);
-    setUseAsDefaultProvider(isUsedForDefaults);
+    // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
+    const isUsedForDefaultModel = isProviderDefaultModel(provider.provider, project);
+    setUseAsDefaultProvider(isUsedForDefaultModel);
     
     setProjectDefaultModel(initialProjectDefaultModel);
     setProjectTopicClusteringModel(initialProjectTopicClusteringModel);

@@ -1,48 +1,21 @@
-/**
- * Utility functions for working with model providers
- * These helpers extract provider information and check provider usage across the application
- */
-
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "./constants";
 
-/**
- * Extract the provider key from a model string
- * 
- * @param model - The full model identifier (e.g., "openai/gpt-4", "anthropic/claude-3")
- * @returns The provider key (e.g., "openai", "anthropic")
- * 
- * @example
- * getProviderFromModel("openai/gpt-4") // Returns: "openai"
- * getProviderFromModel("anthropic/claude-3-opus") // Returns: "anthropic"
- */
+/** Extracts provider key from model string (e.g., "openai/gpt-4" -> "openai") */
 export function getProviderFromModel(model: string): string {
   return model.split("/")[0] ?? "";
 }
 
-/**
- * Effective defaults for models - uses project values when set, otherwise falls back to constants
- */
 export type EffectiveDefaults = {
   defaultModel: string;
   topicClusteringModel: string;
   embeddingsModel: string;
 };
 
-/**
- * Get effective default models for a project
- * Returns project values when set, otherwise falls back to DEFAULT_* constants
- * 
- * @param project - The project object with optional default model fields
- * @returns The effective defaults to use throughout the application
- * 
- * @example
- * getEffectiveDefaults({ defaultModel: "anthropic/claude-3", topicClusteringModel: null, embeddingsModel: null })
- * // Returns: { defaultModel: "anthropic/claude-3", topicClusteringModel: DEFAULT_TOPIC_CLUSTERING_MODEL, embeddingsModel: DEFAULT_EMBEDDINGS_MODEL }
- */
+/** Returns project defaults with fallbacks to DEFAULT_* constants */
 export function getEffectiveDefaults(
   project: {
     defaultModel?: string | null;
@@ -57,14 +30,7 @@ export function getEffectiveDefaults(
   };
 }
 
-/**
- * Check if a provider is used for any of the effective default models
- * Uses the unified effective defaults logic (project values when set, otherwise constants)
- * 
- * @param providerKey - The provider key to check (e.g., "openai", "anthropic")
- * @param project - The project object with optional default model fields
- * @returns True if the provider is used for any effective default model
- */
+/** Checks if provider is used for ANY effective default (used for delete prevention) */
 export function isProviderEffectiveDefault(
   providerKey: string,
   project: {
@@ -82,13 +48,7 @@ export function isProviderEffectiveDefault(
   );
 }
 
-/**
- * Check if a provider is used for the Default Model only (not topic clustering or embeddings)
- * 
- * @param providerKey - The provider key to check (e.g., "openai", "anthropic")
- * @param project - The project object with optional default model field
- * @returns True if the provider is used for the default model
- */
+/** Checks if provider is used for the Default Model only (used for badge and toggle logic) */
 export function isProviderDefaultModel(
   providerKey: string,
   project: {
@@ -99,30 +59,7 @@ export function isProviderDefaultModel(
   return getProviderFromModel(effectiveDefault) === providerKey;
 }
 
-/**
- * Check if a provider is currently being used for any of the project's default models
- * 
- * @param providerKey - The provider key to check (e.g., "openai", "anthropic")
- * @param defaultModel - The project's default model (e.g., "openai/gpt-4")
- * @param topicClusteringModel - The project's topic clustering model
- * @param embeddingsModel - The project's embeddings model
- * @returns True if the provider is used for any default model, false otherwise
- * 
- * @example
- * isProviderUsedForDefaultModels(
- *   "openai",
- *   "openai/gpt-4",
- *   "openai/gpt-3.5-turbo",
- *   "openai/text-embedding-ada-002"
- * ) // Returns: true
- * 
- * isProviderUsedForDefaultModels(
- *   "anthropic",
- *   "openai/gpt-4",
- *   null,
- *   null
- * ) // Returns: false
- */
+/** Checks if provider matches any of the given model strings (used in delete dialog) */
 export function isProviderUsedForDefaultModels(
   providerKey: string,
   defaultModel: string | null,
@@ -144,9 +81,7 @@ export function isProviderUsedForDefaultModels(
   );
 }
 
-/**
- * Extract the underlying shape from a Zod schema to list credential keys.
- */
+/** Extracts shape from Zod schema for credential keys */
 export function getSchemaShape(schema: unknown): Record<string, unknown> {
   const s = schema as { shape?: Record<string, unknown>; _def?: { schema?: { shape?: Record<string, unknown> } } };
   if (s?.shape) return s.shape;
@@ -154,10 +89,7 @@ export function getSchemaShape(schema: unknown): Record<string, unknown> {
   return {};
 }
 
-/**
- * Determine which credential keys should be visible for the active provider and mode.
- * Azure has special handling for API Gateway vs direct API keys.
- */
+/** Returns visible credential keys for provider (Azure has special API Gateway handling) */
 export function getDisplayKeysForProvider(
   providerName: string,
   useApiGateway: boolean,
@@ -179,9 +111,7 @@ export function getDisplayKeysForProvider(
   return schemaShape;
 }
 
-/**
- * Build the credential form state while preserving prior user input when applicable.
- */
+/** Builds credential form state, preserving prior user input */
 export function buildCustomKeyState(
   displayKeyMap: Record<string, unknown>,
   storedKeys: Record<string, unknown>,

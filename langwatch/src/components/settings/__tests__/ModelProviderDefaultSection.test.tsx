@@ -73,7 +73,7 @@ vi.mock("../../ModelSelector", () => ({
 }));
 
 vi.mock("../../../utils/modelProviderHelpers", () => ({
-  isProviderEffectiveDefault: vi.fn(() => false),
+  isProviderDefaultModel: vi.fn(() => false),
 }));
 
 vi.mock("../../../server/modelProviders/registry", async () => {
@@ -97,7 +97,7 @@ vi.mock("../../../server/modelProviders/registry", async () => {
 });
 
 import { DefaultProviderSection } from "../ModelProviderDefaultSection";
-import { isProviderEffectiveDefault } from "../../../utils/modelProviderHelpers";
+import { isProviderDefaultModel } from "../../../utils/modelProviderHelpers";
 
 const mockActions = {
   setEnabled: vi.fn(),
@@ -109,6 +109,9 @@ const mockActions = {
   setExtraHeaderKey: vi.fn(),
   setExtraHeaderValue: vi.fn(),
   setCustomModels: vi.fn(),
+  setCustomEmbeddingsModels: vi.fn(),
+  addCustomModelsFromText: vi.fn(),
+  addCustomEmbeddingsFromText: vi.fn(),
   setUseAsDefaultProvider: vi.fn(),
   setProjectDefaultModel: vi.fn(),
   setProjectTopicClusteringModel: vi.fn(),
@@ -123,6 +126,7 @@ const createMockState = (overrides = {}) => ({
   displayKeys: {},
   extraHeaders: [],
   customModels: [],
+  customEmbeddingsModels: [],
   useAsDefaultProvider: false,
   projectDefaultModel: "openai/gpt-4o",
   projectTopicClusteringModel: "openai/gpt-4o-mini",
@@ -162,7 +166,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe("DefaultProviderSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(isProviderEffectiveDefault).mockReturnValue(false);
+    vi.mocked(isProviderDefaultModel).mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -249,8 +253,8 @@ describe("DefaultProviderSection", () => {
     expect(mockActions.setUseAsDefaultProvider).toHaveBeenCalledWith(true);
   });
 
-  it("disables toggle when provider is used for defaults", () => {
-    vi.mocked(isProviderEffectiveDefault).mockReturnValue(true);
+  it("disables toggle when provider is used for default model", () => {
+    vi.mocked(isProviderDefaultModel).mockReturnValue(true);
 
     renderWithProviders(
       <DefaultProviderSection

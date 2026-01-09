@@ -3,6 +3,7 @@ import {
   Input,
   Box,
   Field,
+  Text,
 } from "@chakra-ui/react";
 import React, { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
@@ -10,10 +11,24 @@ import { createListCollection } from "@chakra-ui/react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { Select } from "../ui/select";
 import { InputGroup } from "../ui/input-group";
+import { titleCase } from "../../utils/stringCasing";
+
+type ModelOption = {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+};
+
+type GroupedModelOptions = {
+  provider: string;
+  icon: React.ReactNode;
+  models: ModelOption[];
+}[];
 
 /**
  * A model selector that supports models from multiple providers.
  * Derives the provider icon from each model's prefix (e.g., "openai/gpt-4" -> openai icon).
+ * Groups models by provider for better organization.
  * Used in the model provider settings form to select default models.
  */
 export const ProviderModelSelector = React.memo(function ProviderModelSelector({
@@ -43,18 +58,48 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
     [options]
   );
 
-  // Filter models by search
-  const filteredModels = useMemo(() => 
-    selectOptions.filter(
-      (item) =>
-        item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-        item.value.toLowerCase().includes(modelSearch.toLowerCase())
-    ),
-    [selectOptions, modelSearch]
+  // Group models by provider
+  const groupedByProvider: GroupedModelOptions = useMemo(() => 
+    Object.entries(
+      selectOptions.reduce(
+        (acc, option) => {
+          const provider = option.value.split("/")[0]!;
+          if (!acc[provider]) {
+            acc[provider] = [];
+          }
+          acc[provider].push(option);
+          return acc;
+        },
+        {} as Record<string, ModelOption[]>
+      )
+    ).map(([provider, models]) => ({
+      provider,
+      icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+      models,
+    })),
+    [selectOptions]
   );
 
+  // Filter models by search and group by provider
+  const filteredGroups = useMemo(() => 
+    groupedByProvider
+      .map((group) => ({
+        ...group,
+        models: group.models.filter(
+          (item) =>
+            item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
+            item.value.toLowerCase().includes(modelSearch.toLowerCase())
+        ),
+      }))
+      .filter((group) => group.models.length > 0),
+    [groupedByProvider, modelSearch]
+  );
+
+  // Flatten for collection
+  const allFilteredModels = filteredGroups.flatMap((group) => group.models);
+
   const modelCollection = createListCollection({
-    items: filteredModels,
+    items: allFilteredModels,
   });
 
   const selectedItem = selectOptions.find((option) => option.value === model);
@@ -139,19 +184,26 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {filteredModels.map((item) => (
-          <Select.Item key={item.value} item={item}>
-            <HStack gap={2}>
-              {item.icon && (
+        {filteredGroups.map((group) => (
+          <Select.ItemGroup
+            key={group.provider}
+            label={
+              <HStack gap={2}>
                 <Box width="14px" minWidth="14px">
-                  {item.icon}
+                  {group.icon}
                 </Box>
-              )}
-              <Box fontSize={14} fontFamily="mono" paddingY="2px">
-                {item.label}
-              </Box>
-            </HStack>
-          </Select.Item>
+                <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+              </HStack>
+            }
+          >
+            {group.models.map((item) => (
+              <Select.Item key={item.value} item={item}>
+                <Box fontSize={14} fontFamily="mono" paddingY="2px">
+                  {item.label}
+                </Box>
+              </Select.Item>
+            ))}
+          </Select.ItemGroup>
         ))}
       </Select.Content>
     </Select.Root>

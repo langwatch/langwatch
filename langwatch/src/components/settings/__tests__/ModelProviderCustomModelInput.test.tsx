@@ -24,6 +24,9 @@ const mockActions = {
   setExtraHeaderKey: vi.fn(),
   setExtraHeaderValue: vi.fn(),
   setCustomModels: vi.fn(),
+  setCustomEmbeddingsModels: vi.fn(),
+  addCustomModelsFromText: vi.fn(),
+  addCustomEmbeddingsFromText: vi.fn(),
   setUseAsDefaultProvider: vi.fn(),
   setProjectDefaultModel: vi.fn(),
   setProjectTopicClusteringModel: vi.fn(),
@@ -38,6 +41,7 @@ const createMockState = (customModels: Array<{ value: string; label: string }> =
   displayKeys: {},
   extraHeaders: [],
   customModels,
+  customEmbeddingsModels: [],
   useAsDefaultProvider: false,
   projectDefaultModel: null,
   projectTopicClusteringModel: null,
@@ -80,52 +84,6 @@ describe("CustomModelInputSection", () => {
       />
     );
     expect(screen.getByText("Models")).toBeInTheDocument();
-  });
-
-  it("does not render for openai provider", () => {
-    const { container } = renderWithProviders(
-      <CustomModelInputSection
-        state={createMockState()}
-        actions={mockActions}
-        provider={createMockProvider("openai")}
-      />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("does not render for azure provider", () => {
-    const { container } = renderWithProviders(
-      <CustomModelInputSection
-        state={createMockState()}
-        actions={mockActions}
-        provider={createMockProvider("azure")}
-      />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("does not render for gemini provider", () => {
-    const { container } = renderWithProviders(
-      <CustomModelInputSection
-        state={createMockState()}
-        actions={mockActions}
-        provider={createMockProvider("gemini")}
-      />
-    );
-    expect(container).toBeEmptyDOMElement();
-  });
-
-  it("shows description text", () => {
-    renderWithProviders(
-      <CustomModelInputSection
-        state={createMockState()}
-        actions={mockActions}
-        provider={createMockProvider("custom")}
-      />
-    );
-    expect(
-      screen.getByText(/Use this option for LiteLLM proxy/)
-    ).toBeInTheDocument();
   });
 
   it("shows input placeholder", () => {

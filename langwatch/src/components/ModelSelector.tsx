@@ -255,13 +255,20 @@ export const ModelSelector = React.memo(function ModelSelector({
           >
             {group.models.map((item) => (
               <Select.Item key={item.value} item={item}>
-                <Box
-                  fontSize={size === "sm" ? 12 : 14}
-                  fontFamily="mono"
-                  paddingY={size === "sm" ? 0 : "2px"}
-                >
-                  {item.label}
-                </Box>
+                <HStack gap={2}>
+                  {item.icon && (
+                    <Box width="14px" minWidth="14px">
+                      {item.icon}
+                    </Box>
+                  )}
+                  <Box
+                    fontSize={size === "sm" ? 12 : 14}
+                    fontFamily="mono"
+                    paddingY={size === "sm" ? 0 : "2px"}
+                  >
+                    {item.label}
+                  </Box>
+                </HStack>
               </Select.Item>
             ))}
           </Select.ItemGroup>
