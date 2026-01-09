@@ -12,35 +12,35 @@ import { Select } from "../ui/select";
 import { InputGroup } from "../ui/input-group";
 
 /**
- * A simple model selector for a specific provider.
- * Shows only the models passed in options without fetching from API.
+ * A model selector that supports models from multiple providers.
+ * Derives the provider icon from each model's prefix (e.g., "openai/gpt-4" -> openai icon).
  * Used in the model provider settings form to select default models.
  */
 export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   model,
   options,
   onChange,
-  providerKey,
   size = "full",
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
-  providerKey: string;
   size?: "sm" | "md" | "full";
 }) {
   const [modelSearch, setModelSearch] = useState("");
 
-  const providerIcon = modelProviderIcons[providerKey as keyof typeof modelProviderIcons];
-
-  // Create model options with labels (model name without provider prefix)
+  // Create model options with labels and derive icon from each model's provider
   const selectOptions = useMemo(() => 
-    options.map((modelValue) => ({
-      label: modelValue.split("/").slice(1).join("/"),
-      value: modelValue,
-      icon: providerIcon,
-    })),
-    [options, providerIcon]
+    options.map((modelValue) => {
+      const modelProvider = modelValue.split("/")[0] ?? "";
+      const icon = modelProviderIcons[modelProvider as keyof typeof modelProviderIcons];
+      return {
+        label: modelValue.split("/").slice(1).join("/"),
+        value: modelValue,
+        icon,
+      };
+    }),
+    [options]
   );
 
   // Filter models by search
@@ -58,12 +58,13 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   });
 
   const selectedItem = selectOptions.find((option) => option.value === model);
+  const selectedIcon = selectedItem?.icon ?? modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
 
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
-      {providerIcon && (
+      {selectedIcon && (
         <Box minWidth="16px">
-          {providerIcon}
+          {selectedIcon}
         </Box>
       )}
       <Box
@@ -141,9 +142,9 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
         {filteredModels.map((item) => (
           <Select.Item key={item.value} item={item}>
             <HStack gap={2}>
-              {providerIcon && (
+              {item.icon && (
                 <Box width="14px" minWidth="14px">
-                  {providerIcon}
+                  {item.icon}
                 </Box>
               )}
               <Box fontSize={14} fontFamily="mono" paddingY="2px">

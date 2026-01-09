@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  EmptyState,
   Heading,
   HStack,
   Spacer,
@@ -36,7 +37,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
-import { isProviderUsedForDefaultModels, isProviderEffectiveDefault } from "../../utils/modelProviderHelpers";
+import { isProviderUsedForDefaultModels, isProviderEffectiveDefault, isProviderDefaultModel } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
   const { project, organization, organizations, hasPermission } =
@@ -49,16 +50,19 @@ export default function ModelsPage() {
   const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
   const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
   const updateMutation = api.modelProvider.update.useMutation();
-  const updateProject = api.project.update.useMutation();
   const [providerToDisable, setProviderToDisable] = useState<{
     id?: string;
     provider: string;
     name: string;
   } | null>(null);
 
-  // Check if provider is used for any of the effective default models
-  // Uses project values when set, otherwise falls back to DEFAULT_* constants
+  // Check if provider is used for the Default Model only (badge display)
   const isDefaultProvider = (providerKey: string) => {
+    return isProviderDefaultModel(providerKey, project);
+  };
+
+  // Check if provider is used for any default models (for delete prevention)
+  const isProviderUsedForAnyDefault = (providerKey: string) => {
     return isProviderEffectiveDefault(providerKey, project);
   };
 
@@ -86,13 +90,17 @@ export default function ModelsPage() {
       }));
   }, [providers]);
 
+  const enabledProviders = useMemo(() => {
+    if (!providers) return [];
+    return Object.values(providers).filter((provider) => provider.enabled);
+  }, [providers]);
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
-          {updateProject.isLoading && <Spinner />}
           {organizations && project && (
             <ProjectSelector organizations={organizations} project={project} />
           )}
@@ -137,6 +145,20 @@ export default function ModelsPage() {
 
         {isLoading ? (
           <Spinner />
+        ) : enabledProviders.length === 0 ? (
+          <EmptyState.Root width="full">
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <Plus size={24} />
+              </EmptyState.Indicator>
+              <VStack textAlign="center">
+                <EmptyState.Title>No model providers</EmptyState.Title>
+                <EmptyState.Description>
+                  Add a model provider to get started
+                </EmptyState.Description>
+              </VStack>
+            </EmptyState.Content>
+          </EmptyState.Root>
         ) : (
           <Table.Root width="full">
             <Table.Header>
@@ -146,10 +168,7 @@ export default function ModelsPage() {
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {providers &&
-                Object.values(providers)
-                  .filter((provider) => provider.enabled)
-                  .map((provider) => {
+              {enabledProviders.map((provider) => {
                     const providerIcon = modelProviderIcons[
                       provider.provider as keyof typeof modelProviderIcons
                     ];
@@ -244,7 +263,7 @@ export default function ModelsPage() {
               <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              {providerToDisable && isDefaultProvider(providerToDisable.provider) ? (
+              {providerToDisable && isProviderUsedForAnyDefault(providerToDisable.provider) ? (
                 <VStack gap={3} align="start">
                   <Text>
                     This provider is currently being used for one or more default models and cannot be deleted.
@@ -284,7 +303,7 @@ export default function ModelsPage() {
               <Button
                 colorPalette="red"
                 loading={updateMutation.isPending}
-                disabled={providerToDisable ? isDefaultProvider(providerToDisable.provider) : false}
+                disabled={providerToDisable ? isProviderUsedForAnyDefault(providerToDisable.provider) : false}
                 onClick={async () => {
                   if (!providerToDisable) return;
                   if (!project?.id) return;

@@ -83,6 +83,23 @@ export function isProviderEffectiveDefault(
 }
 
 /**
+ * Check if a provider is used for the Default Model only (not topic clustering or embeddings)
+ * 
+ * @param providerKey - The provider key to check (e.g., "openai", "anthropic")
+ * @param project - The project object with optional default model field
+ * @returns True if the provider is used for the default model
+ */
+export function isProviderDefaultModel(
+  providerKey: string,
+  project: {
+    defaultModel?: string | null;
+  } | null | undefined
+): boolean {
+  const effectiveDefault = project?.defaultModel ?? DEFAULT_MODEL;
+  return getProviderFromModel(effectiveDefault) === providerKey;
+}
+
+/**
  * Check if a provider is currently being used for any of the project's default models
  * 
  * @param providerKey - The provider key to check (e.g., "openai", "anthropic")

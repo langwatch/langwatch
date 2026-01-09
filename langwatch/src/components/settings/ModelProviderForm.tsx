@@ -176,6 +176,7 @@ export const EditModelProviderForm = ({
           provider={provider}
           enabledProvidersCount={enabledProvidersCount}
           project={project}
+          providers={providers}
         />
 
         <HStack width="full" justify="end">

@@ -37,6 +37,7 @@ export const DefaultProviderSection = ({
   provider,
   enabledProvidersCount,
   project,
+  providers,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
@@ -47,6 +48,7 @@ export const DefaultProviderSection = ({
     topicClusteringModel?: string | null;
     embeddingsModel?: string | null;
   } | null | undefined;
+  providers: Record<string, MaybeStoredModelProvider> | undefined;
 }) => {
   // Determine if toggle should be disabled
   // Uses effective defaults (project values with fallbacks to constants)
@@ -74,11 +76,11 @@ export const DefaultProviderSection = ({
     .map((option) => option.value);
   
   const embeddingOptions = modelSelectorOptions
-    .filter(
-      (option) =>
-        option.mode === "embedding" &&
-        option.value.startsWith(`${provider.provider}/`)
-    )
+    .filter((option) => {
+      if (option.mode !== "embedding") return false;
+      const providerKey = option.value.split("/")[0];
+      return providers?.[providerKey ?? ""]?.enabled === true;
+    })
     .map((option) => option.value);
 
   return (
@@ -105,8 +107,8 @@ export const DefaultProviderSection = ({
                   const defaultModel = DEFAULT_TOPIC_CLUSTERING_MODEL.startsWith(`${provider.provider}/`) ? DEFAULT_TOPIC_CLUSTERING_MODEL : chatOptions[0];
                   actions.setProjectTopicClusteringModel(defaultModel ?? null);
                 }
-                if (!state.projectEmbeddingsModel?.startsWith(`${provider.provider}/`) && embeddingOptions.length > 0) {
-                  const defaultModel = DEFAULT_EMBEDDINGS_MODEL.startsWith(`${provider.provider}/`) ? DEFAULT_EMBEDDINGS_MODEL : embeddingOptions[0];
+                if (!embeddingOptions.includes(state.projectEmbeddingsModel ?? "") && embeddingOptions.length > 0) {
+                  const defaultModel = embeddingOptions.includes(DEFAULT_EMBEDDINGS_MODEL) ? DEFAULT_EMBEDDINGS_MODEL : embeddingOptions[0];
                   actions.setProjectEmbeddingsModel(defaultModel ?? null);
                 }
               }
@@ -145,7 +147,6 @@ export const DefaultProviderSection = ({
               }
               options={chatOptions}
               onChange={(model) => actions.setProjectDefaultModel(model)}
-              providerKey={provider.provider}
             />
           </Field.Root>
 
@@ -164,7 +165,6 @@ export const DefaultProviderSection = ({
               onChange={(model) =>
                 actions.setProjectTopicClusteringModel(model)
               }
-              providerKey={provider.provider}
             />
           </Field.Root>
 
@@ -174,14 +174,9 @@ export const DefaultProviderSection = ({
               For embeddings to be used in topic clustering and evaluations
             </Text>
             <ProviderModelSelector
-              model={
-                state.projectEmbeddingsModel?.startsWith(`${provider.provider}/`)
-                  ? state.projectEmbeddingsModel
-                  : (embeddingOptions[0] ?? "")
-              }
+              model={state.projectEmbeddingsModel ?? embeddingOptions[0] ?? ""}
               options={embeddingOptions}
               onChange={(model) => actions.setProjectEmbeddingsModel(model)}
-              providerKey={provider.provider}
             />
           </Field.Root>
         </VStack>
