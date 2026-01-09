@@ -34,7 +34,6 @@ import type {
   HttpHeader,
   Field as DSLField,
 } from "~/optimization_studio/types/dsl";
-import { InputGroup } from "~/components/ui/input-group";
 
 import {
   HttpMethodSelector,
@@ -279,8 +278,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     onClose();
   };
 
-  // Test HTTP mutation
-  const testHttpMutation = api.agents.testHttp.useMutation();
+  // HTTP proxy mutation for testing
+  const httpProxyMutation = api.httpProxy.execute.useMutation();
 
   // Test handler - calls the backend API
   const handleTest = useCallback(
@@ -290,7 +289,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       }
 
       try {
-        const result = await testHttpMutation.mutateAsync({
+        const result = await httpProxyMutation.mutateAsync({
           projectId: project.id,
           url,
           method,
@@ -298,8 +297,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
           auth: auth
             ? {
                 type: auth.type,
-                token: auth.type === "bearer" || auth.type === "api_key" ? auth.token : undefined,
-                headerName: auth.type === "api_key" ? auth.headerName : undefined,
+                token: auth.type === "bearer" ? auth.token : undefined,
+                headerName: auth.type === "api_key" ? auth.header : undefined,
+                apiKeyValue: auth.type === "api_key" ? auth.value : undefined,
                 username: auth.type === "basic" ? auth.username : undefined,
                 password: auth.type === "basic" ? auth.password : undefined,
               }
@@ -321,13 +321,8 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         };
       }
     },
-    [project?.id, url, method, headers, auth, outputPath, testHttpMutation]
+    [project?.id, url, method, headers, auth, outputPath, httpProxyMutation]
   );
-
-  // Check if body tab has additional content beyond empty object
-  const hasBodyContent =
-    (bodyTemplate.trim().length > 0 && bodyTemplate.trim() !== "{}") ||
-    outputPath.trim().length > 0;
 
   return (
     <Drawer.Root
@@ -414,19 +409,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 colorPalette="blue"
               >
                 <Tabs.List paddingX={6} borderBottomWidth="1px" borderColor="gray.200">
-                  <Tabs.Trigger value="body">
-                    <HStack gap={1}>
-                      <Text>Body</Text>
-                      {hasBodyContent && (
-                        <Box
-                          width="6px"
-                          height="6px"
-                          borderRadius="full"
-                          bg="green.500"
-                        />
-                      )}
-                    </HStack>
-                  </Tabs.Trigger>
+                  <Tabs.Trigger value="body">Body</Tabs.Trigger>
                   <Tabs.Trigger value="auth">Auth</Tabs.Trigger>
                   <Tabs.Trigger value="headers">Headers</Tabs.Trigger>
                   <Tabs.Trigger value="test">Test</Tabs.Trigger>
