@@ -125,7 +125,9 @@ export function useModelProviderForm(
   }, [provider.provider, useApiGateway, originalSchemaShape]);
 
   const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
-    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}),
+    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}, undefined, {
+      providerEnabledWithEnvVars: provider.enabled,
+    }),
   );
 
   const [extraHeaders, setExtraHeaders] = useState<ExtraHeader[]>(
@@ -203,7 +205,9 @@ export function useModelProviderForm(
       originalSchemaShape,
     );
 
-    setCustomKeys(() => buildCustomKeyState(nextDisplayKeys, storedKeys));
+    setCustomKeys(() => buildCustomKeyState(nextDisplayKeys, storedKeys, undefined, {
+      providerEnabledWithEnvVars: provider.enabled,
+    }));
 
     let nextExtraHeaders = (provider.extraHeaders ?? []).map((header) => ({
       key: header.key,

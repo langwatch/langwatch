@@ -2,6 +2,8 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
+  KEY_CHECK,
+  MASKED_KEY_PLACEHOLDER,
 } from "./constants";
 
 /** Extracts provider key from model string (e.g., "openai/gpt-4" -> "openai") */
@@ -111,16 +113,23 @@ export function getDisplayKeysForProvider(
   return schemaShape;
 }
 
-/** Builds credential form state, preserving prior user input */
+/** Builds credential form state, preserving prior user input.
+ * When provider is enabled but has no stored keys (using env vars),
+ * API key fields will show MASKED_KEY_PLACEHOLDER.
+ */
 export function buildCustomKeyState(
   displayKeyMap: Record<string, unknown>,
   storedKeys: Record<string, unknown>,
   previousKeys?: Record<string, string>,
+  options?: { providerEnabledWithEnvVars?: boolean },
 ): Record<string, string> {
   if (previousKeys?.MANAGED) {
     return previousKeys;
   }
   const result: Record<string, string> = {};
+  const hasStoredKeys = Object.keys(storedKeys ?? {}).length > 0;
+  const isUsingEnvVars = options?.providerEnabledWithEnvVars && !hasStoredKeys;
+
   Object.keys(displayKeyMap ?? {}).forEach((key) => {
     if (
       previousKeys &&
@@ -134,7 +143,14 @@ export function buildCustomKeyState(
     }
 
     const storedValue = storedKeys[key];
-    result[key] = typeof storedValue === "string" ? storedValue : "";
+    if (typeof storedValue === "string") {
+      result[key] = storedValue;
+    } else if (isUsingEnvVars && KEY_CHECK.some((k) => key.includes(k))) {
+      // Provider is enabled via env vars - show MASKED for API key fields
+      result[key] = MASKED_KEY_PLACEHOLDER;
+    } else {
+      result[key] = "";
+    }
   });
 
   return result;
