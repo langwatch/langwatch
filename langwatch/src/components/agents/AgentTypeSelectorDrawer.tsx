@@ -77,6 +77,10 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
       case "http":
         openDrawer("agentHttpEditor");
         break;
+      default: {
+        const _exhaustive: never = type;
+        throw new Error(`Unhandled agent type: ${_exhaustive}`);
+      }
     }
   };
 

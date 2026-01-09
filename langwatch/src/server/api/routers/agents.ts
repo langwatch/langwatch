@@ -28,6 +28,10 @@ const getConfigInputSchema = (type: AgentType) => {
       return customComponentSchema;
     case "http":
       return httpComponentSchema;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown agent type: ${_exhaustive}`);
+    }
   }
 };
 
