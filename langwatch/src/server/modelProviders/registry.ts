@@ -1,12 +1,11 @@
 import type { ModelProvider } from "@prisma/client";
 import { z } from "zod";
-// @ts-ignore
-import * as llmModelCostsRaw from "./llmModelCosts.json";
 
-const llmModelCosts = llmModelCostsRaw as unknown as Record<
-  string,
-  { mode?: "chat" | "embedding"; litellm_provider: string }
->;
+import type { LLMModelEntry, LLMModelRegistry } from "./llmModels.types";
+// @ts-ignore - JSON import
+import * as llmModelsRaw from "./llmModels.json";
+
+const llmModels = llmModelsRaw as unknown as LLMModelRegistry;
 
 type ModelProviderDefinition = {
   name: string;
@@ -33,30 +32,100 @@ export type MaybeStoredModelProvider = Omit<
   extraHeaders?: { key: string; value: string }[] | null;
 };
 
-/** Validates URL format when value is present, allows empty/null/undefined */
-const optionalUrlField = () =>
-  z
-    .string()
-    .nullable()
-    .optional()
-    .refine(
-      (val) =>
-        !val || val.trim() === "" || z.string().url().safeParse(val).success,
-      { message: "Must be a valid URL (e.g., https://api.openai.com/v1)" },
-    );
+// ============================================================================
+// Model Registry Access Functions
+// ============================================================================
 
+/**
+ * Get all models from the registry
+ */
+export const getAllModels = (): Record<string, LLMModelEntry> => {
+  return llmModels.models;
+};
+
+/**
+ * Get a specific model by ID
+ */
+export const getModelById = (modelId: string): LLMModelEntry | undefined => {
+  return llmModels.models[modelId];
+};
+
+/**
+ * Get model metadata for a specific model
+ * Returns null if model not found
+ */
+export const getModelMetadata = (
+  modelId: string
+): {
+  supportedParameters: string[];
+  contextLength: number;
+  maxCompletionTokens: number | null;
+  defaultParameters: Record<string, unknown> | null;
+  pricing: LLMModelEntry["pricing"];
+  supportsImageInput: boolean;
+  supportsAudioInput: boolean;
+} | null => {
+  const model = llmModels.models[modelId];
+  if (!model) return null;
+
+  return {
+    supportedParameters: model.supportedParameters,
+    contextLength: model.contextLength,
+    maxCompletionTokens: model.maxCompletionTokens,
+    defaultParameters: model.defaultParameters,
+    pricing: model.pricing,
+    supportsImageInput: model.supportsImageInput,
+    supportsAudioInput: model.supportsAudioInput,
+  };
+};
+
+/**
+ * Get model options for a specific provider and mode
+ */
 export const getProviderModelOptions = (
   provider: string,
-  mode: "chat" | "embedding",
+  mode: "chat" | "embedding"
 ) => {
-  return Object.entries(allLitellmModels)
-    .filter(([key, _]) => key.split("/")[0] === provider)
-    .filter(([_, value]) => value.mode === mode)
-    .map(([key, _]) => ({
-      value: key.split("/").slice(1).join("/"),
-      label: key.split("/").slice(1).join("/"),
+  return Object.entries(llmModels.models)
+    .filter(([_, model]) => model.provider === provider && model.mode === mode)
+    .map(([_, model]) => ({
+      value: model.id.split("/").slice(1).join("/"),
+      label: model.id.split("/").slice(1).join("/"),
     }));
 };
+
+/**
+ * Get all models for a provider
+ */
+export const getModelsForProvider = (
+  provider: string
+): LLMModelEntry[] => {
+  return Object.values(llmModels.models).filter(
+    (model) => model.provider === provider
+  );
+};
+
+/**
+ * Get unique list of all providers in the registry
+ */
+export const getAllProviders = (): string[] => {
+  const providers = new Set(
+    Object.values(llmModels.models).map((model) => model.provider)
+  );
+  return Array.from(providers).sort();
+};
+
+/**
+ * Get registry metadata (updatedAt, modelCount)
+ */
+export const getRegistryMetadata = () => ({
+  updatedAt: llmModels.updatedAt,
+  modelCount: llmModels.modelCount,
+});
+
+// ============================================================================
+// Provider Definitions
+// ============================================================================
 
 export const modelProviders = {
   custom: {
@@ -65,7 +134,7 @@ export const modelProviders = {
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
       CUSTOM_API_KEY: z.string().nullable().optional(),
-      CUSTOM_BASE_URL: optionalUrlField(),
+      CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
     blurb:
@@ -78,7 +147,7 @@ export const modelProviders = {
     keysSchema: z
       .object({
         OPENAI_API_KEY: z.string().nullable().optional(),
-        OPENAI_BASE_URL: optionalUrlField(),
+        OPENAI_BASE_URL: z.string().nullable().optional(),
       })
       .superRefine((data, ctx) => {
         if (
@@ -100,7 +169,7 @@ export const modelProviders = {
     endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z.object({
       ANTHROPIC_API_KEY: z.string().min(1),
-      ANTHROPIC_BASE_URL: optionalUrlField(),
+      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -120,8 +189,8 @@ export const modelProviders = {
     keysSchema: z
       .object({
         AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
-        AZURE_OPENAI_ENDPOINT: optionalUrlField(),
-        AZURE_API_GATEWAY_BASE_URL: optionalUrlField(),
+        AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+        AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
       })
       .passthrough(),
@@ -187,85 +256,25 @@ export const modelProviders = {
   },
 } satisfies Record<string, ModelProviderDefinition>;
 
-export const allLitellmModels = (() => {
-  let models: Record<string, { mode: "chat" | "embedding" }> = {
-    ...Object.fromEntries(
-      Object.entries(llmModelCosts)
-        .filter(
-          ([key, value]) =>
-            value.litellm_provider in modelProviders &&
-            "mode" in value &&
-            (value.mode === "chat" || value.mode === "embedding") &&
-            // Remove double-slash models like /us/, or /eu/
-            (key.match(/\//g)?.length || 0) <= 1 &&
-            // Remove openai realtime and old models
-            !(
-              value.litellm_provider === "openai" &&
-              key.match(
-                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|^ft:|search|^chatgpt/,
-              )
-            ) &&
-            // Remove azure realtime and old models
-            !(
-              value.litellm_provider === "azure" &&
-              key.match(
-                /-realtime|computer-use|audio-preview|gpt-4-|gpt-3\.?5|mistral|command-r/,
-              )
-            ) &&
-            // Remove anthropic old models
-            !(
-              value.litellm_provider === "anthropic" &&
-              key.match(/^claude-3-(sonnet|haiku|opus)|claude-2|claude-instant/)
-            ) &&
-            // Remove gemini old models
-            !(
-              value.litellm_provider === "gemini" &&
-              key.match(
-                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro|-001$/,
-              )
-            ) &&
-            // Remove bedrock region-specific and old models
-            !(
-              value.litellm_provider === "bedrock" &&
-              key.match(
-                /^eu\.|^us\.|anthropic\.claude-3-\D|claude-v|claude-instant|llama2|llama3-70b|llama3-8b|llama3-1|titan-text/,
-              )
-            ) &&
-            // Remove groq old models
-            !(
-              value.litellm_provider === "groq" &&
-              key.match(/llama2|llama3-|llama-3\.1|llama-3\.2|gemma-7b/)
-            ),
-        )
-        .map(([key, value]) => {
-          return [
-            key.includes("/") ? key : value.litellm_provider + "/" + key,
-            {
-              mode: (value as any).mode as "chat" | "embedding",
-            },
-          ];
-        }),
-    ),
-  };
+// ============================================================================
+// Backward Compatibility - allLitellmModels
+// ============================================================================
 
-  // Remove dated models
-  models = Object.fromEntries(
-    Object.entries(models).filter(([key, _]) => {
-      const match = key.match(
-        /(.*?)-(\d{4}-\d{2}-\d{2}|\d{4}|\d{8}|\d{2}-\d{2})$/,
-      );
-      if (!match) return true;
-      const modelName = match[1];
-      return (
-        modelName &&
-        !(modelName in models) &&
-        !(`${modelName}-latest` in models)
-      );
-    }),
+/**
+ * Legacy export for backward compatibility
+ * Maps to the new registry format
+ */
+export const allLitellmModels: Record<string, { mode: "chat" | "embedding" }> =
+  Object.fromEntries(
+    Object.entries(llmModels.models).map(([id, model]) => [
+      id,
+      { mode: model.mode },
+    ])
   );
 
-  return models;
-})();
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 function isValidJson(value: string) {
   try {

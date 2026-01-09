@@ -149,7 +149,8 @@ export const ModelSelector = React.memo(function ModelSelector({
 
   const selectedItem = selectOptions.find((option) => option.value === model);
 
-  const isDeprecated = !selectedItem;
+  // Model might not be in the list if it's a custom model or unknown
+  const isUnknown = !selectedItem;
 
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
@@ -163,18 +164,10 @@ export const ModelSelector = React.memo(function ModelSelector({
         fontFamily="mono"
         lineClamp={1}
         wordBreak="break-all"
+        color={isUnknown ? "gray.500" : undefined}
       >
         {selectedItem?.label ?? model}
       </Box>
-      {isDeprecated && (
-        <Text
-          fontSize={size === "sm" ? 12 : 14}
-          fontFamily="mono"
-          color="gray.400"
-        >
-          (deprecated)
-        </Text>
-      )}
     </HStack>
   );
 

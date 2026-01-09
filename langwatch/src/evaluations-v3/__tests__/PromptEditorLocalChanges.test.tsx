@@ -167,6 +167,28 @@ vi.mock("~/utils/api", () => ({
           isLoading: false,
         }),
       },
+      getAllForProjectForFrontend: {
+        useQuery: () => ({
+          data: {
+            providers: { openai: { provider: "openai", enabled: true } },
+            modelMetadata: {
+              "openai/gpt-4": {
+                id: "openai/gpt-4",
+                name: "GPT-4",
+                provider: "openai",
+                supportedParameters: ["temperature", "top_p", "max_tokens"],
+                contextLength: 128000,
+                maxCompletionTokens: 8192,
+                defaultParameters: null,
+                supportsImageInput: false,
+                supportsAudioInput: false,
+                pricing: { inputCostPerToken: 0.00003, outputCostPerToken: 0.00006 },
+              },
+            },
+          },
+          isLoading: false,
+        }),
+      },
     },
   },
 }));

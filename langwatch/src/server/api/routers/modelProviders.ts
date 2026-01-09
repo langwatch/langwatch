@@ -1,17 +1,42 @@
 import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
+import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
+  getAllModels,
+  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
 } from "../../modelProviders/registry";
-import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import type { LLMModelEntry, ReasoningConfig } from "../../modelProviders/llmModels.types";
+import {
+  checkProjectPermission,
+  hasProjectPermission,
+} from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import {
   validateKeyWithCustomUrl,
   validateProviderApiKey,
 } from "./providerValidation";
+
+/**
+ * Simplified model metadata for frontend consumption
+ */
+export type ModelMetadataForFrontend = {
+  id: string;
+  name: string;
+  provider: string;
+  supportedParameters: string[];
+  contextLength: number;
+  maxCompletionTokens: number | null;
+  defaultParameters: Record<string, unknown> | null;
+  supportsImageInput: boolean;
+  supportsAudioInput: boolean;
+  pricing: LLMModelEntry["pricing"];
+  /** Reasoning/thinking configuration for reasoning models */
+  reasoningConfig?: ReasoningConfig;
+};
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -19,7 +44,6 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const service = ModelProviderService.create(ctx.prisma);
 
       const hasSetupPermission = await hasProjectPermission(
         ctx,
@@ -27,23 +51,19 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await service.getProjectModelProviders(
-        projectId,
-        hasSetupPermission,
-      );
+      return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const service = ModelProviderService.create(ctx.prisma);
       const hasSetupPermission = await hasProjectPermission(
         ctx,
         projectId,
         "project:update",
       );
-      return await service.getProjectModelProvidersForFrontend(
+      return await getProjectModelProvidersForFrontend(
         projectId,
         hasSetupPermission,
       );
@@ -94,12 +114,16 @@ export const modelProviderRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
-      const service = ModelProviderService.create(ctx.prisma);
-      return await service.deleteModelProvider({
-        id: input.id,
-        projectId: input.projectId,
-        provider: input.provider,
-      });
+      const { id, projectId, provider } = input;
+      if (id) {
+        return await ctx.prisma.modelProvider.delete({
+          where: { id, projectId },
+        });
+      } else {
+        return await ctx.prisma.modelProvider.deleteMany({
+          where: { provider, projectId },
+        });
+      }
     }),
 
   /**
@@ -144,28 +168,171 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 });
 
-/**
- * Gets all model providers for a project.
- * Delegates to ModelProviderService for business logic.
- */
 export const getProjectModelProviders = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const service = ModelProviderService.create(prisma);
-  return service.getProjectModelProviders(projectId, includeKeys);
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const defaultModelProviders: Record<string, MaybeStoredModelProvider> =
+    Object.fromEntries(
+      Object.entries(modelProviders)
+        .filter(([_providerKey, modelProvider]) => {
+          return modelProvider.enabledSince;
+        })
+        .map(([providerKey, modelProvider]) => {
+          const enabled =
+            modelProvider.enabledSince < project.createdAt &&
+            !!process.env[modelProvider.apiKey] &&
+            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
+
+          const modelProvider_: MaybeStoredModelProvider = {
+            provider: providerKey,
+            enabled,
+            disabledByDefault: !enabled,
+            customKeys: null,
+            models: getProviderModelOptions(providerKey, "chat").map(
+              (m) => m.value,
+            ),
+            embeddingsModels: getProviderModelOptions(
+              providerKey,
+              "embedding",
+            ).map((m) => m.value),
+            deploymentMapping: null,
+            extraHeaders: [],
+          };
+          return [providerKey, modelProvider_];
+        }),
+    );
+
+  const savedModelProviders = (
+    await prisma.modelProvider.findMany({
+      where: { projectId },
+    })
+  )
+    .filter((modelProvider) => {
+      // Keep if has custom keys
+      if (modelProvider.customKeys) return true;
+
+      // Keep if enabled status differs from default
+      const defaultProvider = defaultModelProviders[modelProvider.provider];
+      if (modelProvider.enabled !== defaultProvider?.enabled) return true;
+
+      // Keep if has custom models or embeddings (not default)
+      const customModels = modelProvider.customModels as string[] | null;
+      const customEmbeddings = modelProvider.customEmbeddingsModels as string[] | null;
+      const hasCustomModels = customModels && customModels.length > 0;
+      const hasCustomEmbeddings = customEmbeddings && customEmbeddings.length > 0;
+
+      return hasCustomModels || hasCustomEmbeddings;
+    })
+    .reduce(
+      (acc, modelProvider) => {
+        const modelProvider_: MaybeStoredModelProvider = {
+          id: modelProvider.id,
+          provider: modelProvider.provider,
+          enabled: modelProvider.enabled,
+          customKeys: modelProvider.customKeys,
+          models: modelProvider.customModels as string[] | null,
+          embeddingsModels: modelProvider.customEmbeddingsModels as
+            | string[]
+            | null,
+          deploymentMapping: modelProvider.deploymentMapping,
+          disabledByDefault:
+            defaultModelProviders[modelProvider.provider]?.disabledByDefault,
+          extraHeaders: modelProvider.extraHeaders as
+            | { key: string; value: string }[]
+            | null,
+        };
+
+        if (!includeKeys) {
+          modelProvider_.customKeys = null;
+        }
+
+        return {
+          ...acc,
+          [modelProvider.provider]: modelProvider_,
+        };
+      },
+      {} as Record<string, MaybeStoredModelProvider>,
+    );
+
+  return {
+    ...defaultModelProviders,
+    ...savedModelProviders,
+  };
 };
 
 /**
- * Gets model providers with API keys masked for frontend display.
- * Delegates to ModelProviderService for business logic.
+ * Get model metadata for all models, formatted for frontend consumption
  */
+export const getModelMetadataForFrontend = (): Record<
+  string,
+  ModelMetadataForFrontend
+> => {
+  const allModels = getAllModels();
+
+  return Object.fromEntries(
+    Object.entries(allModels).map(([id, model]) => [
+      id,
+      {
+        id: model.id,
+        name: model.name,
+        provider: model.provider,
+        supportedParameters: model.supportedParameters,
+        contextLength: model.contextLength,
+        maxCompletionTokens: model.maxCompletionTokens,
+        defaultParameters: model.defaultParameters,
+        supportsImageInput: model.supportsImageInput,
+        supportsAudioInput: model.supportsAudioInput,
+        pricing: model.pricing,
+        reasoningConfig: model.reasoningConfig,
+      },
+    ])
+  );
+};
+
+// Frontend-only function that masks API keys for security and includes model metadata
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const service = ModelProviderService.create(prisma);
-  return service.getProjectModelProvidersForFrontend(projectId, includeKeys);
+  const modelProvidersData = await getProjectModelProviders(projectId, includeKeys);
+
+  // Mask only API keys, keep URLs visible
+  const maskedProviders = { ...modelProvidersData };
+  if (includeKeys) {
+    for (const [provider, config] of Object.entries(maskedProviders)) {
+      if (config.customKeys) {
+        maskedProviders[provider] = {
+          ...config,
+          customKeys: Object.fromEntries(
+            Object.entries(config.customKeys).map(([key, value]) => [
+              key,
+              // Only mask values that look like API keys (contain "_KEY" pattern)
+              KEY_CHECK.some((k) => key.includes(k))
+                ? MASKED_KEY_PLACEHOLDER
+                : value,
+            ]),
+          ),
+        };
+      }
+    }
+  }
+
+  // Include model metadata for all models
+  const modelMetadata = getModelMetadataForFrontend();
+
+  return {
+    providers: maskedProviders,
+    modelMetadata,
+  };
 };
 
 const getModelOrDefaultEnvKey = (

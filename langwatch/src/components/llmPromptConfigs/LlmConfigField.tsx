@@ -1,5 +1,7 @@
 import { Box, Button, HStack, Spacer, Text } from "@chakra-ui/react";
-import { X } from "react-feather";
+import { X } from "lucide-react";
+import { useMemo } from "react";
+
 import { LLMConfigPopover } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
@@ -19,6 +21,30 @@ type LLMConfigFieldProps = {
 };
 
 /**
+ * Generate a human-readable subtitle from LLM config values
+ */
+function getConfigSubtitle(config: LLMConfig | undefined): string | undefined {
+  if (!config) return undefined;
+
+  // Priority: reasoning_effort > reasoning > temperature
+  if (config.reasoning_effort) {
+    const effort = config.reasoning_effort;
+    return `${effort.charAt(0).toUpperCase() + effort.slice(1)} effort`;
+  }
+
+  if ((config as Record<string, unknown>).reasoning) {
+    const reasoning = (config as Record<string, unknown>).reasoning as string;
+    return `${reasoning.charAt(0).toUpperCase() + reasoning.slice(1)} reasoning`;
+  }
+
+  if (config.temperature !== undefined && config.temperature !== null) {
+    return `Temp ${config.temperature}`;
+  }
+
+  return undefined;
+}
+
+/**
  * LLM Config field
  * Can be used outside of the form context (does not use react-hook-form)
  */
@@ -35,6 +61,12 @@ export function LLMConfigField({
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;
 
+  // Generate subtitle from config values
+  const subtitle = useMemo(
+    () => getConfigSubtitle(llmConfig),
+    [llmConfig]
+  );
+
   return (
     <>
       <HStack
@@ -45,7 +77,7 @@ export function LLMConfigField({
         opacity={modelOption?.isDisabled ? 0.5 : 1}
         marginBottom={1}
       >
-        <LLMModelDisplay model={model} />
+        <LLMModelDisplay model={model} subtitle={subtitle} />
         {allowDefault && llmConfig != undefined ? (
           <Tooltip
             content="Overriding default LLM, click to reset"
@@ -68,7 +100,7 @@ export function LLMConfigField({
               <Box minWidth="16px">
                 <HStack gap={2} align="center">
                   <Sliders2 size={16} />
-                  <Text>Switch Model</Text>
+                  <Text>Config</Text>
                 </HStack>
               </Box>
             </Button>

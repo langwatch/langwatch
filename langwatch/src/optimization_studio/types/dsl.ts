@@ -93,6 +93,13 @@ export const llmConfigSchema = z.object({
   model: z.string(),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
+  // Reasoning parameters (for reasoning models)
+  reasoning_effort: z.string().optional(),
+  reasoning: z.string().optional(),
+  // Other parameters
+  top_p: z.number().optional(),
+  frequency_penalty: z.number().optional(),
+  presence_penalty: z.number().optional(),
   litellm_params: z.record(z.string()).optional(),
 });
 
