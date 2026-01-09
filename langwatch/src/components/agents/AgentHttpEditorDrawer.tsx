@@ -14,7 +14,6 @@ import { LuArrowLeft } from "react-icons/lu";
 import { useState, useCallback, useEffect } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawerDuplicateWarning } from "~/hooks/useDrawerDuplicateWarning";
 import {
   useDrawer,
   getComplexProps,
@@ -124,8 +123,6 @@ export type AgentHttpEditorDrawerProps = {
  * Features a tabbed interface for I/O, Body, Auth, Headers, and Test.
  */
 export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
-  useDrawerDuplicateWarning("agentHttpEditor");
-  
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();

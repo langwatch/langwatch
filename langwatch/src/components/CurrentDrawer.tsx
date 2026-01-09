@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
-import { useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   getComplexProps,
@@ -11,17 +11,6 @@ import { drawers } from "./drawerRegistry";
 
 // Re-export for backward compatibility
 export { useDrawer } from "../hooks/useDrawer";
-
-/** Track which drawers are currently mounted via CurrentDrawer */
-const mountedByCurrentDrawer = new Set<string>();
-
-/**
- * Check if a drawer type is already being rendered by CurrentDrawer.
- * Call this in dev mode from drawer components to detect duplicate rendering.
- */
-export function isDrawerMountedGlobally(drawerType: string): boolean {
-  return mountedByCurrentDrawer.has(drawerType);
-}
 
 type DrawerProps = {
   open: string;
@@ -42,13 +31,23 @@ export function CurrentDrawer() {
     ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
     : undefined;
 
-  // Track mounted drawer for duplicate detection (useLayoutEffect to run before children's useEffects)
-  useLayoutEffect(() => {
-    if (!drawerType) return;
-    mountedByCurrentDrawer.add(drawerType);
-    return () => {
-      mountedByCurrentDrawer.delete(drawerType);
-    };
+  // Dev warning: detect duplicate drawer rendering via DOM check
+  useEffect(() => {
+    if (!drawerType || process.env.NODE_ENV !== "development") return;
+    
+    // Check after render settles
+    const timer = setTimeout(() => {
+      const drawerElements = document.querySelectorAll('[data-scope="drawer"][data-part="positioner"]');
+      if (drawerElements.length > 1) {
+        console.warn(
+          `[Drawer Duplicate] Multiple drawer positioners found (${drawerElements.length}). ` +
+            `"${drawerType}" may be rendered both by CurrentDrawer and explicitly in a page. ` +
+            `Remove the explicit drawer - CurrentDrawer handles it globally.`
+        );
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [drawerType]);
 
   // Get props from multiple sources:
