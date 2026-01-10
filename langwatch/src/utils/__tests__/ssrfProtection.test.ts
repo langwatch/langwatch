@@ -72,10 +72,6 @@ describe("isPrivateOrLocalhostIP", () => {
     it("blocks ::1", () => {
       expect(isPrivateOrLocalhostIP("::1")).toBe(true);
     });
-
-    it("blocks ::1 uppercase", () => {
-      expect(isPrivateOrLocalhostIP("::1")).toBe(true);
-    });
   });
 
   describe("when given IPv6 unspecified address", () => {
