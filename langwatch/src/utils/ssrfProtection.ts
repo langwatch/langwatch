@@ -542,6 +542,31 @@ export async function fetchWithResolvedIp(
 }
 
 /**
+ * Converts a low-level network error to a user-friendly message.
+ */
+function formatConnectionError(err: Error, hostname: string, port: number): Error {
+  const code = (err as NodeJS.ErrnoException).code;
+
+  switch (code) {
+    case "ECONNREFUSED":
+      return new Error(`Connection refused - is the server running at ${hostname}:${port}?`);
+    case "ENOTFOUND":
+      return new Error(`Could not resolve hostname: ${hostname}`);
+    case "ETIMEDOUT":
+      return new Error(`Connection timed out while connecting to ${hostname}:${port}`);
+    case "ECONNRESET":
+      return new Error(`Connection was reset by ${hostname}:${port}`);
+    case "CERT_HAS_EXPIRED":
+    case "DEPTH_ZERO_SELF_SIGNED_CERT":
+    case "UNABLE_TO_VERIFY_LEAF_SIGNATURE":
+      return new Error(`TLS certificate error for ${hostname}: ${err.message}`);
+    default:
+      // Include original message for unknown errors
+      return new Error(`Connection failed to ${hostname}:${port}: ${err.message}`);
+  }
+}
+
+/**
  * Makes an HTTP/HTTPS request with a custom agent for IP pinning.
  * This is necessary because Node.js fetch doesn't support custom agents directly.
  */
@@ -554,11 +579,23 @@ async function makeRequestWithAgent(
   // If we don't need a custom agent (development mode with unresolved IPs), use regular fetch
   if (!agent) {
     const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
-    return fetch(requestUrl, {
-      ...init,
-      headers,
-      redirect: "manual",
-    });
+    try {
+      return await fetch(requestUrl, {
+        ...init,
+        headers,
+        redirect: "manual",
+      });
+    } catch (err) {
+      // Wrap fetch errors with more context
+      if (err instanceof Error) {
+        const cause = (err as Error & { cause?: Error }).cause;
+        if (cause) {
+          throw formatConnectionError(cause, validated.hostname, validated.port);
+        }
+        throw formatConnectionError(err, validated.hostname, validated.port);
+      }
+      throw err;
+    }
   }
 
   return new Promise((resolve, reject) => {
@@ -611,10 +648,14 @@ async function makeRequestWithAgent(
         resolve(response);
       });
 
-      res.on("error", reject);
+      res.on("error", (err) => {
+        reject(formatConnectionError(err, validated.hostname, validated.port));
+      });
     });
 
-    req.on("error", reject);
+    req.on("error", (err) => {
+      reject(formatConnectionError(err, validated.hostname, validated.port));
+    });
 
     // Write body if present
     if (init?.body) {
