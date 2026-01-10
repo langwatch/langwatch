@@ -8,6 +8,20 @@ Feature: Credential Validation
     And I have access to a project
     And I have "project:manage" permission
 
+  @visual
+  Scenario: Masked API key display format
+    Given a provider has a configured API key
+    When I open the provider configuration drawer
+    Then the API key field shows "HAS_KEY" followed by masked characters
+    And the actual key value is not visible
+
+  @visual
+  Scenario: Validation error display
+    Given a validation error occurred
+    When I am on the provider configuration drawer
+    Then I see an error message near the invalid field
+    And the field is visually highlighted
+
   @integration
   Scenario: Validate API key against provider API
     Given I open the model provider configuration drawer for "openai"

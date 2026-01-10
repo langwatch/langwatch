@@ -7,6 +7,21 @@ Feature: Onboarding Flow
     Given I am a new user going through onboarding
     And I am on the model provider setup step
 
+  @visual
+  Scenario: Onboarding model provider form layout
+    When I am on the model provider setup step
+    Then I see a provider selector
+    And I see credential input fields
+    And I see a model selector
+    And I see a "Save" button
+
+  @visual
+  Scenario: Loading state during save
+    Given I clicked "Save"
+    When the save is in progress
+    Then the "Save" button shows a loading indicator
+    And the button is disabled
+
   @integration
   Scenario: Credential input persists during typing
     Given I am configuring the "openai" provider in onboarding

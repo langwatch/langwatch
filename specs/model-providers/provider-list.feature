@@ -8,6 +8,40 @@ Feature: Model Provider List Management
     And I have access to a project
     And I have "project:view" permission
 
+  @visual
+  Scenario: Model providers page layout
+    When I am on the Model Providers settings page
+    Then I see a page title "Model Providers"
+    And I see an "Add Model Provider" button
+    And I see a table for listing providers
+
+  @visual
+  Scenario: Provider row structure
+    Given providers are enabled in the project
+    When I am on the Model Providers settings page
+    Then each provider row shows:
+      | element       | type   |
+      | Provider icon | image  |
+      | Provider name | text   |
+      | Menu button   | button |
+
+  @visual
+  Scenario: Empty state appearance
+    Given no model providers are enabled
+    When I am on the Model Providers settings page
+    Then I see an empty state with:
+      | element     | content                              |
+      | Icon        | plus icon                            |
+      | Title       | No model providers                   |
+      | Description | Add a model provider to get started  |
+
+  @visual
+  Scenario: Loading state appearance
+    Given the providers are loading
+    When I am on the Model Providers settings page
+    Then I see a spinner
+    And the provider list is not visible
+
   @integration
   Scenario: Display enabled providers with icons and names
     Given I navigate to the Model Providers settings page
@@ -45,15 +79,6 @@ Feature: Model Provider List Management
     And the menu does not include "openai"
 
   @integration
-  Scenario: Show empty state when no providers enabled
-    Given I have no model providers enabled
-    When I navigate to the Model Providers settings page
-    Then I see an empty state
-    And the empty state shows a plus icon
-    And the empty state shows "No model providers" title
-    And the empty state shows "Add a model provider to get started" description
-
-  @integration
   Scenario: Disable "Add Model Provider" button without manage permission
     Given I do not have "project:manage" permission
     When I navigate to the Model Providers settings page
@@ -65,10 +90,3 @@ Feature: Model Provider List Management
     Given I have all available providers enabled
     When I navigate to the Model Providers settings page
     Then the "Add Model Provider" button is disabled
-
-  @integration
-  Scenario: Show loading state while fetching providers
-    Given the providers are loading
-    When I navigate to the Model Providers settings page
-    Then I see a spinner
-    And the provider list is not visible

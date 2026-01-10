@@ -8,6 +8,28 @@ Feature: Default Provider Settings
     And I have access to a project
     And I have "project:manage" permission
 
+  @visual
+  Scenario: Default provider toggle section
+    When I open the model provider configuration drawer for "openai"
+    Then I see a "Use as default for LangWatch features" toggle
+
+  @visual
+  Scenario: Model selectors when default toggle enabled
+    Given the default provider toggle is enabled
+    When I am on the provider configuration drawer
+    Then I see the following selectors:
+      | selector               |
+      | Default Model          |
+      | Topic Clustering Model |
+      | Embeddings Model       |
+
+  @visual
+  Scenario: Disabled toggle with tooltip
+    Given the provider is used for default models
+    When I open the model provider configuration drawer
+    Then the default toggle is disabled
+    And hovering shows a tooltip explaining why
+
   @integration
   Scenario: Toggle to set provider as default
     Given I open the model provider configuration drawer for "openai"

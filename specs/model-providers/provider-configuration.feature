@@ -8,6 +8,42 @@ Feature: Model Provider Configuration
     And I have access to a project
     And I have "project:manage" permission
 
+  @visual
+  Scenario: OpenAI provider form fields
+    When I open the model provider configuration drawer for "openai"
+    Then I see the following fields:
+      | field           | type       |
+      | OPENAI_API_KEY  | text input |
+      | OPENAI_BASE_URL | text input |
+    And I see a "Custom Models" input section
+    And I see a "Custom Embeddings" input section
+    And I see a "Save" button
+
+  @visual
+  Scenario: Azure provider form fields
+    When I open the model provider configuration drawer for "azure"
+    Then I see a "Use API Gateway" toggle
+    And I see an "Extra Headers" section
+    And I see a "Custom Models" input section
+    And I see a "Save" button
+
+  @visual
+  Scenario: Azure API Gateway toggle changes visible fields
+    When I open the model provider configuration drawer for "azure"
+    Then I see a "Use API Gateway" toggle
+    And toggling it changes which credential fields are displayed
+
+  @visual
+  Scenario: Extra headers section for Azure/Custom providers
+    When I open the model provider configuration drawer for "azure"
+    Then I see an "Extra Headers" section
+    And the section allows adding key-value pairs
+
+  @visual
+  Scenario: No extra headers section for standard providers
+    When I open the model provider configuration drawer for "openai"
+    Then I do not see an "Extra Headers" section
+
   @integration
   Scenario: Configure API keys with manual input
     Given I open the model provider configuration drawer for "openai"
@@ -64,11 +100,6 @@ Feature: Model Provider Configuration
     When I add an extra header with key "X-Custom-Header" and value "custom-value"
     And I click "Save"
     Then the extra header is saved
-
-  @integration
-  Scenario: Do not show extra headers section for non-Azure/Custom providers
-    Given I open the model provider configuration drawer for "openai"
-    Then I do not see an "Extra Headers" section
 
   @integration
   Scenario: Toggle API Gateway for Azure provider

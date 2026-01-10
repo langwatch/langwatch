@@ -8,6 +8,23 @@ Feature: Provider Deletion
     And I have access to a project
     And I have "project:manage" permission
 
+  @visual
+  Scenario: Delete confirmation dialog structure
+    When I open the delete dialog for a provider
+    Then I see a dialog with:
+      | element       |
+      | Dialog title  |
+      | Warning text  |
+      | Cancel button |
+      | Delete button |
+
+  @visual
+  Scenario: Blocked deletion dialog shows reasons
+    Given the provider is used for default models
+    When I open the delete dialog
+    Then I see blocking reasons as a bulleted list
+    And the "Delete" button appears disabled
+
   @integration
   Scenario: Show delete confirmation dialog
     Given I have "openai" provider enabled
