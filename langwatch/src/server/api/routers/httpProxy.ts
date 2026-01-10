@@ -3,7 +3,7 @@ import { JSONPath } from "jsonpath-plus";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { createLogger } from "~/utils/logger";
-import { validateUrlForSSRF } from "~/utils/ssrfProtection";
+import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 
 const logger = createLogger("langwatch:httpProxy");
 
@@ -113,23 +113,22 @@ export const httpProxyRouter = createTRPCRouter({
           };
         }
 
-        // Validate URL for SSRF protection
+        // Make the HTTP request with SSRF protection
+        // Uses atomic validate-and-fetch to eliminate TOCTOU DNS rebinding
+        const startTime = Date.now();
+        let response: Response;
         try {
-          await validateUrlForSSRF(url);
+          response = await ssrfSafeFetch(url, {
+            method,
+            headers: requestHeaders,
+            body: method !== "GET" ? JSON.stringify(parsedBody) : undefined,
+          });
         } catch (ssrfError) {
           return {
             success: false,
             error: ssrfError instanceof Error ? ssrfError.message : "URL validation failed",
           };
         }
-
-        // Make the HTTP request
-        const startTime = Date.now();
-        const response = await fetch(url, {
-          method,
-          headers: requestHeaders,
-          body: method !== "GET" ? JSON.stringify(parsedBody) : undefined,
-        });
         const duration = Date.now() - startTime;
 
         // Parse response

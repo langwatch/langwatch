@@ -1,8 +1,63 @@
+/**
+ * SSRF Protection Module
+ *
+ * Prevents Server-Side Request Forgery by validating URLs before fetching.
+ *
+ * ## What's Blocked
+ * - Cloud metadata endpoints (always): 169.254.169.254, metadata.google.internal, fd00:ec2::254
+ * - Private IPs (production): 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+ * - Link-local (production): 169.254.0.0/16, fe80::/10
+ * - Hostnames resolving to private IPs
+ *
+ * ## DNS Rebinding Protection
+ * Eliminates TOCTOU attacks by:
+ * 1. Resolving DNS once during validation
+ * 2. Returning resolved IP in SSRFValidationResult
+ * 3. Using resolved IP for actual fetch (not original hostname)
+ * 4. Setting Host header to original hostname for routing
+ *
+ * ## Development Mode
+ * - Without ALLOWED_PROXY_HOSTS: All localhost/private IPs allowed
+ * - With ALLOWED_PROXY_HOSTS: Only listed hosts bypass checks
+ * - DNS failures: Allowed (for debugging)
+ *
+ * ## Production Mode
+ * - DNS failures: Fail closed (throw error)
+ * - All private/localhost blocked
+ *
+ * ## Usage
+ * ```ts
+ * // Recommended: atomic validate-and-fetch
+ * const response = await ssrfSafeFetch(url, { method: "POST", body });
+ *
+ * // Or manual: validate then fetch with resolved IP
+ * const validated = await validateUrlForSSRF(url);
+ * const response = await fetchWithResolvedIp(validated, { method: "POST" });
+ * ```
+ *
+ * ## Environment Variables
+ * - ALLOWED_PROXY_HOSTS: Comma-separated allowlist for dev (e.g., "localhost,127.0.0.1")
+ * - NODE_ENV: "development" or "production"
+ *
+ * @module ssrfProtection
+ */
+
 import dns from "dns/promises";
 import { isIP } from "net";
 import { createLogger } from "./logger";
 
 const logger = createLogger("langwatch:ssrfProtection");
+
+export interface SSRFValidationResult {
+  /** Original URL for logging/display */
+  originalUrl: string;
+  /** URL rewritten to use the resolved IP (for actual fetch) */
+  resolvedUrl: string;
+  /** The resolved IP address */
+  resolvedIp: string;
+  /** Original hostname (needed for Host header) */
+  hostname: string;
+}
 
 /**
  * Checks if an IP address is private, localhost, or link-local
@@ -32,15 +87,16 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
 }
 
 /**
- * Validates URL for SSRF protection
- * Blocks requests to:
- * - Cloud metadata endpoints (always, even in dev)
- * - Private/localhost IPs (production only, unless in allowlist for dev)
- * - Hostnames that resolve to private IPs
+ * Validates URL for SSRF protection and returns resolved IP for safe fetching.
  *
- * @throws Error with user-friendly message if validation fails
+ * Returns the resolved IP so callers MUST use it for the actual request,
+ * eliminating the TOCTOU gap between DNS check and fetch.
+ *
+ * @throws Error with user-friendly message if validation fails or DNS resolution fails in production
  */
-export async function validateUrlForSSRF(url: string): Promise<void> {
+export async function validateUrlForSSRF(
+  url: string
+): Promise<SSRFValidationResult> {
   const isDevelopment = process.env.NODE_ENV === "development";
   const allowedDevHosts = process.env.ALLOWED_PROXY_HOSTS?.split(",") || [];
 
@@ -75,7 +131,7 @@ export async function validateUrlForSSRF(url: string): Promise<void> {
     );
   }
 
-  // In development, check if host is in allowlist
+  // In development, check if host is in allowlist - skip IP resolution
   if (isDevelopment && allowedDevHosts.length > 0) {
     const normalizedAllowed = allowedDevHosts.map((h) => h.trim().toLowerCase());
     if (normalizedAllowed.includes(hostname)) {
@@ -87,73 +143,201 @@ export async function validateUrlForSSRF(url: string): Promise<void> {
         },
         "Development mode: allowing request to allowlisted host"
       );
-      return; // Skip further checks for allowlisted dev hosts
+      // For allowlisted hosts in dev, use original URL (no IP pinning needed)
+      const ipVersion = isIP(hostname);
+      return {
+        originalUrl: url,
+        resolvedUrl: url,
+        resolvedIp: ipVersion !== 0 ? hostname : "allowlisted",
+        hostname,
+      };
     }
   }
 
   // Skip localhost/private IP checks in development (unless we have an allowlist)
   const skipPrivateChecks = isDevelopment && allowedDevHosts.length === 0;
 
+  // Check if hostname is a literal IP address
+  const ipVersion = isIP(hostname);
+  if (ipVersion !== 0) {
+    if (!skipPrivateChecks && isPrivateOrLocalhostIP(hostname)) {
+      logger.warn(
+        {
+          url,
+          hostname,
+          ipVersion,
+          reason: "private_ip_literal",
+        },
+        "SSRF attempt blocked: private or localhost IP address"
+      );
+      throw new Error(
+        "Access to private or localhost IP addresses is not allowed for security reasons"
+      );
+    }
+    // Already an IP, use as-is
+    return {
+      originalUrl: url,
+      resolvedUrl: url,
+      resolvedIp: hostname,
+      hostname,
+    };
+  }
+
+  // Resolve hostname to IP addresses and check all results
+  let allAddresses: string[] = [];
+  try {
+    // Check both A (IPv4) and AAAA (IPv6) records
+    const promises = [
+      dns.resolve(hostname, "A").catch(() => [] as string[]),
+      dns.resolve(hostname, "AAAA").catch(() => [] as string[]),
+    ];
+
+    const [ipv4Addresses = [], ipv6Addresses = []] =
+      await Promise.all(promises);
+    allAddresses = [...ipv4Addresses, ...ipv6Addresses];
+  } catch (dnsError) {
+    // DNS resolution completely failed
+    if (isDevelopment) {
+      logger.debug(
+        {
+          url,
+          hostname,
+          error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+        },
+        "DNS resolution failed during SSRF check in development"
+      );
+      // In development, allow proceeding with original URL
+      return {
+        originalUrl: url,
+        resolvedUrl: url,
+        resolvedIp: "unresolved-dev",
+        hostname,
+      };
+    }
+    // In production, fail closed
+    logger.error(
+      {
+        url,
+        hostname,
+        error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+      },
+      "DNS resolution failed during SSRF check - blocking request"
+    );
+    throw new Error(
+      "Unable to resolve hostname. Please verify the URL is correct and the server is reachable."
+    );
+  }
+
+  if (allAddresses.length === 0) {
+    if (isDevelopment) {
+      logger.debug(
+        { url, hostname },
+        "No DNS records found in development, allowing request"
+      );
+      return {
+        originalUrl: url,
+        resolvedUrl: url,
+        resolvedIp: "no-records-dev",
+        hostname,
+      };
+    }
+    logger.error(
+      { url, hostname },
+      "No DNS records found - blocking request"
+    );
+    throw new Error(
+      "Unable to resolve hostname. Please verify the URL is correct."
+    );
+  }
+
   if (!skipPrivateChecks) {
-    // Check if hostname is a literal IP address
-    const ipVersion = isIP(hostname);
-    if (ipVersion !== 0) {
-      if (isPrivateOrLocalhostIP(hostname)) {
-        logger.warn(
-          {
-            url,
-            hostname,
-            ipVersion,
-            reason: "private_ip_literal",
-          },
-          "SSRF attempt blocked: private or localhost IP address"
-        );
-        throw new Error(
-          "Access to private or localhost IP addresses is not allowed for security reasons"
-        );
-      }
-    } else {
-      // Resolve hostname to IP addresses and check all results
-      try {
-        // Check both A (IPv4) and AAAA (IPv6) records
-        const promises = [
-          dns.resolve(hostname, "A").catch(() => [] as string[]),
-          dns.resolve(hostname, "AAAA").catch(() => [] as string[]),
-        ];
-
-        const [ipv4Addresses = [], ipv6Addresses = []] = await Promise.all(promises);
-        const allAddresses = [...ipv4Addresses, ...ipv6Addresses];
-
-        if (allAddresses.length > 0) {
-          const privateAddresses = allAddresses.filter(isPrivateOrLocalhostIP);
-          if (privateAddresses.length > 0) {
-            logger.warn(
-              {
-                url,
-                hostname,
-                resolvedAddresses: allAddresses,
-                privateAddresses,
-                reason: "resolves_to_private_ip",
-              },
-              "SSRF attempt blocked: hostname resolves to private IP"
-            );
-            throw new Error(
-              "This hostname resolves to a private or localhost IP address, which is not allowed for security reasons"
-            );
-          }
-        }
-      } catch (dnsError) {
-        // DNS resolution failed - let fetch handle the actual network error
-        // This could be a legitimate network issue or non-existent domain
-        logger.debug(
-          {
-            url,
-            hostname,
-            error: dnsError instanceof Error ? dnsError.message : String(dnsError),
-          },
-          "DNS resolution failed during SSRF check, allowing request to proceed"
-        );
-      }
+    const privateAddresses = allAddresses.filter(isPrivateOrLocalhostIP);
+    if (privateAddresses.length > 0) {
+      logger.warn(
+        {
+          url,
+          hostname,
+          resolvedAddresses: allAddresses,
+          privateAddresses,
+          reason: "resolves_to_private_ip",
+        },
+        "SSRF attempt blocked: hostname resolves to private IP"
+      );
+      throw new Error(
+        "This hostname resolves to a private or localhost IP address, which is not allowed for security reasons"
+      );
     }
   }
+
+  // Use the first resolved IP for the actual request
+  const resolvedIp = allAddresses[0]!;
+
+  // Rewrite URL to use resolved IP
+  const resolvedParsedUrl = new URL(url);
+  // For IPv6, wrap in brackets
+  resolvedParsedUrl.hostname = isIP(resolvedIp) === 6 ? `[${resolvedIp}]` : resolvedIp;
+  const resolvedUrl = resolvedParsedUrl.toString();
+
+  logger.debug(
+    {
+      url,
+      hostname,
+      resolvedIp,
+      resolvedUrl,
+    },
+    "URL validated and resolved for SSRF-safe fetch"
+  );
+
+  return {
+    originalUrl: url,
+    resolvedUrl,
+    resolvedIp,
+    hostname,
+  };
+}
+
+export interface SSRFSafeFetchOptions extends RequestInit {
+  /** Use original URL for the request (for dev/allowlisted hosts) */
+  useOriginalUrl?: boolean;
+}
+
+/**
+ * Performs SSRF-validated fetch using the pre-resolved IP address.
+ * Eliminates TOCTOU by using the resolved IP from validateUrlForSSRF.
+ *
+ * @param validated - Result from validateUrlForSSRF
+ * @param init - Standard fetch options
+ */
+export async function fetchWithResolvedIp(
+  validated: SSRFValidationResult,
+  init?: SSRFSafeFetchOptions
+): Promise<Response> {
+  const headers = new Headers(init?.headers);
+
+  // If we resolved to an IP, set Host header to original hostname
+  // This is needed because we're connecting to the IP directly
+  if (validated.resolvedUrl !== validated.originalUrl && !headers.has("Host")) {
+    headers.set("Host", validated.hostname);
+  }
+
+  return fetch(validated.resolvedUrl, {
+    ...init,
+    headers,
+  });
+}
+
+/**
+ * Combined SSRF validation and fetch in a single atomic operation.
+ * This is the recommended way to make SSRF-safe requests.
+ *
+ * @param url - URL to fetch
+ * @param init - Standard fetch options
+ * @throws Error if SSRF validation fails or DNS resolution fails in production
+ */
+export async function ssrfSafeFetch(
+  url: string,
+  init?: RequestInit
+): Promise<Response> {
+  const validated = await validateUrlForSSRF(url);
+  return fetchWithResolvedIp(validated, init);
 }
