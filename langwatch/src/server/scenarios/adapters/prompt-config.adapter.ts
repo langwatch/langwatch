@@ -24,7 +24,7 @@ export class PromptConfigAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
-    console.log("PromptConfigAdapter.call", input);
+    logger.debug({ promptId: this.promptId, projectId: this.projectId }, "PromptConfigAdapter.call");
     try {
       // 1. Fetch prompt configuration
       const prompt = await this.promptService.getPromptByIdOrHandle({

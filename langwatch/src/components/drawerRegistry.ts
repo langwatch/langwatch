@@ -30,6 +30,7 @@ import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
+import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
@@ -63,6 +64,7 @@ export const drawers = {
   agentList: AgentListDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
+  agentHttpEditor: AgentHttpEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,

@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import qs from "qs";
+import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   getComplexProps,
@@ -29,6 +30,25 @@ export function CurrentDrawer() {
   const CurrentDrawerComponent = drawerType
     ? (drawers[drawerType] as React.FC<Record<string, unknown>>)
     : undefined;
+
+  // Dev warning: detect duplicate drawer rendering via DOM check
+  useEffect(() => {
+    if (!drawerType || process.env.NODE_ENV !== "development") return;
+
+    // Check after render settles
+    const timer = setTimeout(() => {
+      const drawerElements = document.querySelectorAll('[data-scope="drawer"][data-part="positioner"]');
+      if (drawerElements.length > 1) {
+        console.warn(
+          `[Drawer Duplicate] Multiple drawer positioners found (${drawerElements.length}). ` +
+            `"${drawerType}" may be rendered both by CurrentDrawer and explicitly in a page. ` +
+            `Remove the explicit drawer - CurrentDrawer handles it globally.`
+        );
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [drawerType]);
 
   // Get props from multiple sources:
   // 1. URL query params (serializable props)

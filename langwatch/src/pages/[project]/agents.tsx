@@ -9,10 +9,6 @@ import {
 import { Bot, Plus } from "lucide-react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { AgentListDrawer } from "~/components/agents/AgentListDrawer";
-import { AgentTypeSelectorDrawer } from "~/components/agents/AgentTypeSelectorDrawer";
-import { AgentCodeEditorDrawer } from "~/components/agents/AgentCodeEditorDrawer";
-import { WorkflowSelectorDrawer } from "~/components/agents/WorkflowSelectorDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -29,7 +25,7 @@ import type { TypedAgent } from "~/server/agents/agent.repository";
  */
 function Page() {
   const { project } = useOrganizationTeamProject();
-  const { openDrawer, drawerOpen } = useDrawer();
+  const { openDrawer } = useDrawer();
   const utils = api.useContext();
 
   const agentsQuery = api.agents.getAll.useQuery(
@@ -49,10 +45,16 @@ function Page() {
       case "code":
         openDrawer("agentCodeEditor", { urlParams: { agentId: agent.id } });
         break;
+      case "http":
+        openDrawer("agentHttpEditor", { urlParams: { agentId: agent.id } });
+        break;
       case "workflow":
         // Workflow agents can't be edited directly, just view
         openDrawer("workflowSelector", { urlParams: { agentId: agent.id } });
         break;
+      default: {
+        throw new Error(`Unhandled agent type: ${agent.type}`);
+      }
     }
   };
 
@@ -121,11 +123,7 @@ function Page() {
         </VStack>
       )}
 
-      {/* Agent management drawers */}
-      <AgentListDrawer open={drawerOpen("agentList")} />
-      <AgentTypeSelectorDrawer open={drawerOpen("agentTypeSelector")} />
-      <AgentCodeEditorDrawer open={drawerOpen("agentCodeEditor")} />
-      <WorkflowSelectorDrawer open={drawerOpen("workflowSelector")} />
+      {/* Drawers are rendered by CurrentDrawer in DashboardLayout */}
     </DashboardLayout>
   );
 }

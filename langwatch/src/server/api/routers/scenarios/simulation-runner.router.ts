@@ -2,10 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
 import { SimulationRunnerService } from "~/server/scenarios/simulation-runner.service";
-
-const projectSchema = z.object({
-  projectId: z.string(),
-});
+import { projectSchema } from "./schemas";
 
 /**
  * Target for scenario simulation.

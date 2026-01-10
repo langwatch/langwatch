@@ -3,10 +3,7 @@ import { z } from "zod";
 import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
-
-const projectSchema = z.object({
-  projectId: z.string(),
-});
+import { projectSchema } from "./schemas";
 
 const createScenarioSchema = projectSchema.extend({
   name: z.string().min(1),

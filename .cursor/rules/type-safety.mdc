@@ -1,0 +1,54 @@
+---
+alwaysApply: true
+---
+
+# Type Safety Patterns
+
+## Exhaustive Switch Statements
+
+When switching on union types (especially enums or discriminated unions), **always include an exhaustiveness check** in the default case:
+
+```typescript
+function handleAgentType(type: AgentType) {
+  switch (type) {
+    case "code":
+      return handleCode();
+    case "http":
+      return handleHttp();
+    case "workflow":
+      return handleWorkflow();
+    default: {
+      // Force compile error if new type added
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled type: ${_exhaustive}`);
+    }
+  }
+}
+```
+
+**Why:** TypeScript won't error on incomplete switches for `void` functions. The `never` assertion forces a compile-time error when new union members are added but not handled.
+
+**When to use:**
+- All switches on domain model types (AgentType, EvaluatorType, etc.)
+- Handler functions that route based on type
+- Schema selection based on type discriminators
+
+## Defensive State Initialization
+
+When loading data from external sources (API, DB), guard against unexpected nullish values:
+
+```typescript
+useEffect(() => {
+  if (data) {
+    setName(data.name ?? "");  // Not: setName(data.name)
+    setUrl(data.url ?? DEFAULT_URL);
+  }
+}, [data]);
+```
+
+**Why:** DB schemas may allow nullable fields, API responses may be malformed, and type assertions can lie. Defensive initialization prevents runtime crashes.
+
+**When to use:**
+- Loading data into React state
+- Hydrating forms from API responses
+- Any external data transformation

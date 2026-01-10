@@ -211,6 +211,11 @@ export const useDrawer = () => {
     props?: Partial<DrawerProps<T>> & { urlParams?: Record<string, string> },
     { replace, resetStack }: { replace?: boolean; resetStack?: boolean } = {},
   ) => {
+    // Guard: Skip if this drawer is already open
+    if (currentDrawer === drawer) {
+      return;
+    }
+
     // Extract urlParams and merge with props
     const { urlParams, ...drawerProps } = props ?? {};
     const allParams = { ...drawerProps, ...urlParams } as Record<

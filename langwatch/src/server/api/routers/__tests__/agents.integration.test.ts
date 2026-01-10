@@ -43,6 +43,17 @@ const workflowConfig = {
   workflow_id: "workflow_test_123",
 };
 
+const httpConfig = {
+  name: "HTTP Agent",
+  description: "External API endpoint",
+  url: "https://api.example.com/chat",
+  method: "POST" as const,
+  bodyTemplate: '{"query": "{{input}}"}',
+  outputPath: "$.result",
+  inputs: [{ identifier: "input", type: "str" as const }],
+  outputs: [{ identifier: "output", type: "str" as const }],
+};
+
 describe("Agents Endpoints", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
@@ -118,6 +129,24 @@ describe("Agents Endpoints", () => {
       expect(result.workflowId).toBe("workflow_test_123");
       const config = result.config as typeof workflowConfig;
       expect(config.isCustom).toBe(true);
+    });
+
+    it("creates an http agent with DSL-compatible config", async () => {
+      const result = await caller.agents.create({
+        projectId,
+        name: "HTTP Agent",
+        type: "http",
+        config: httpConfig,
+      });
+
+      expect(result.id).toMatch(/^agent_/);
+      expect(result.name).toBe("HTTP Agent");
+      expect(result.type).toBe("http");
+      const config = result.config as typeof httpConfig;
+      expect(config.url).toBe("https://api.example.com/chat");
+      expect(config.method).toBe("POST");
+      expect(config.bodyTemplate).toBeDefined();
+      expect(config.outputPath).toBe("$.result");
     });
   });
 
@@ -213,6 +242,31 @@ describe("Agents Endpoints", () => {
       const config = updated.config as typeof signatureConfig;
       expect(config.llm.model).toBe("gpt-4o");
       expect(config.llm.temperature).toBe(0.9);
+    });
+
+    it("updates http agent URL and method", async () => {
+      const created = await caller.agents.create({
+        projectId,
+        name: "HTTP Agent",
+        type: "http",
+        config: httpConfig,
+      });
+
+      const updatedConfig = {
+        ...httpConfig,
+        url: "https://api.example.com/v2/chat",
+        method: "PUT" as const,
+      };
+
+      const updated = await caller.agents.update({
+        id: created.id,
+        projectId,
+        config: updatedConfig,
+      });
+
+      const config = updated.config as typeof httpConfig;
+      expect(config.url).toBe("https://api.example.com/v2/chat");
+      expect(config.method).toBe("PUT");
     });
   });
 
