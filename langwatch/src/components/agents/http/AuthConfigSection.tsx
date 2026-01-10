@@ -51,7 +51,7 @@ export function AuthConfigSection({
     <VStack align="stretch" gap={4} width="full">
       <Field.Root>
         <Field.Label>Auth Type</Field.Label>
-        <NativeSelect.Root>
+        <NativeSelect.Root disabled={disabled}>
           <NativeSelect.Field
             value={authType}
             onChange={(e) => handleTypeChange(e.target.value as HttpAuthType)}
