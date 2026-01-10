@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.13.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.12.0...langwatch@v1.13.0) (2026-01-10)
+
+
+### Features
+
+* add http agent ([#1053](https://github.com/langwatch/langwatch/issues/1053)) ([02284be](https://github.com/langwatch/langwatch/commit/02284be2b3e02f9dac4f9cc7b9041e84f836454a))
+* **analytics:** track onboarding progress metrics in PostHog ([1533de5](https://github.com/langwatch/langwatch/commit/1533de5beede58f1f1c697b39c63160105f704fe))
+* refactor model providers UI to drawer-based ([#1050](https://github.com/langwatch/langwatch/issues/1050)) ([8c8df73](https://github.com/langwatch/langwatch/commit/8c8df73cc799cb82c6f8332c239ba66ffa74c3da))
+* walking skeleton for scenarios ([#1047](https://github.com/langwatch/langwatch/issues/1047)) ([f6acbb8](https://github.com/langwatch/langwatch/commit/f6acbb822696ff1818ee853825bb6c11db857953))
+
+
+### Bug Fixes
+
+* fix emojis without breaking multiline prompt evaluators anymore ([2d47925](https://github.com/langwatch/langwatch/commit/2d4792575b96679d10780d16088109ce3e30bd3c))
+* rework pie/donut data and colours ([#1055](https://github.com/langwatch/langwatch/issues/1055)) ([8d50910](https://github.com/langwatch/langwatch/commit/8d50910ca442e0cdcb5cb6007c37351a14bdacf2))
+
+
+### Miscellaneous
+
+* remove litellm enterprise deps, add license file generation ([792243a](https://github.com/langwatch/langwatch/commit/792243a4e936094e33141905b0544b60cbb77e28))
+
 ## [1.12.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.11.0...langwatch@v1.12.0) (2026-01-06)
 
 
