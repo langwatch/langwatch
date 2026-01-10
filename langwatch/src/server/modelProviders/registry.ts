@@ -209,7 +209,7 @@ export const allLitellmModels = (() => {
             !(
               value.litellm_provider === "gemini" &&
               key.match(
-                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro-001$/,
+                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro|-001$/,
               )
             ) &&
             // Remove bedrock region-specific and old models

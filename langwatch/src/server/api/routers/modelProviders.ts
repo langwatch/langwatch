@@ -1,18 +1,20 @@
 import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
-import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { prisma } from "../../db";
 import {
-  getProviderModelOptions,
   type MaybeStoredModelProvider,
   modelProviders,
 } from "../../modelProviders/registry";
+import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   checkProjectPermission,
   hasProjectPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { validateProviderApiKey } from "./providerValidation";
+
+// Create service instance with prisma
+const modelProviderService = ModelProviderService.create(prisma);
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -27,7 +29,7 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await getProjectModelProviders(projectId, hasSetupPermission);
+      return await modelProviderService.getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -39,7 +41,7 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         "project:update",
       );
-      return await getProjectModelProvidersForFrontend(
+      return await modelProviderService.getProjectModelProvidersForFrontend(
         projectId,
         hasSetupPermission,
       );
@@ -62,145 +64,18 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input, ctx }) => {
-      const {
-        id,
-        projectId,
-        provider,
-        enabled,
-        customKeys,
-        customModels,
-        customEmbeddingsModels,
-        extraHeaders,
-        defaultModel,
-      } = input;
-
-      if (!(provider in modelProviders)) {
-        throw new Error("Invalid provider");
-      }
-
-      const providerSchema =
-        modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
-      const validator = z.union([
-        providerSchema,
-        z.object({ MANAGED: z.string() }),
-      ]);
-      
-      
-      const customKeysProvided = customKeys !== undefined;
-      let validatedKeys;
-      try {
-        validatedKeys = customKeys ? validator.parse(customKeys) : null;
-
-        // Filter out null values for Azure provider to avoid saving nulls to database
-        if (provider === "azure" && validatedKeys) {
-          validatedKeys = Object.fromEntries(
-            Object.entries(validatedKeys).filter(
-              ([_, value]) => value !== null,
-            ),
-          );
-          // If all keys are filtered out, set to null
-          if (Object.keys(validatedKeys).length === 0) {
-            validatedKeys = null;
-          }
-        }
-      } catch {
-        throw new Error(`Invalid keys for ${provider}`);
-      }
-
-      const data = {
-        projectId,
-        provider,
-        enabled,
-        customModels,
-        customEmbeddingsModels,
-        extraHeaders,
-      };
-
-      const existingModelProvider = id
-        ? await ctx.prisma.modelProvider.findUnique({
-            where: { id, projectId },
-          })
-        : // TOOD: when we go support custom models, this should be skipped
-          await ctx.prisma.modelProvider.findFirst({
-            where: { provider, projectId },
-          });
-
-      const modelProviderResult = await ctx.prisma.$transaction(async (tx) => {
-        let result: Awaited<
-          ReturnType<
-            typeof tx.modelProvider.update | typeof tx.modelProvider.create
-          >
-        >;
-
-        if (existingModelProvider) {
-          // Determine what customKeys to save
-          let customKeysToSave: Record<string, any> | undefined;
-          
-          if (customKeysProvided) {
-            // Smart merging: preserve masked standard keys, but replace extra headers completely
-            let mergedCustomKeys: Record<string, any> = validatedKeys ?? {};
-            if (validatedKeys && existingModelProvider.customKeys) {
-              const existingKeys = existingModelProvider.customKeys as Record<
-                string,
-                any
-              >;
-
-              mergedCustomKeys = {
-                // Start with new keys (includes all extra headers)
-                ...validatedKeys,
-                // Override with existing values for masked standard keys
-                ...Object.fromEntries(
-                  Object.entries(existingKeys)
-                    .filter(
-                      ([key, _value]) =>
-                        (validatedKeys as any)[key] === MASKED_KEY_PLACEHOLDER,
-                    )
-                    .map(([key, value]) => [key, value]),
-                ),
-              };
-            }
-            customKeysToSave = mergedCustomKeys;
-          }
-          // If customKeysProvided is false, customKeysToSave remains undefined
-          // and we don't update customKeys (preserves existing value)
-
-          result = await tx.modelProvider.update({
-            where: { id: existingModelProvider.id, projectId },
-            data: {
-              ...data,
-              ...(customKeysToSave !== undefined && { customKeys: customKeysToSave }),
-              customModels: customModels ? customModels : [],
-              customEmbeddingsModels: customEmbeddingsModels
-                ? customEmbeddingsModels
-                : [],
-              extraHeaders: extraHeaders ? extraHeaders : [],
-            },
-          });
-        } else {
-          result = await tx.modelProvider.create({
-            data: {
-              ...data,
-              ...(customKeysProvided && validatedKeys && { customKeys: validatedKeys }),
-              customModels: customModels ?? undefined,
-              customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-              extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-            } as any,
-          });
-        }
-
-        // Update project's default model if provided
-        if (defaultModel !== void 0) {
-          await tx.project.update({
-            where: { id: projectId },
-            data: { defaultModel },
-          });
-        }
-
-        return result;
+    .mutation(async ({ input }) => {
+      return await modelProviderService.updateModelProvider({
+        id: input.id,
+        projectId: input.projectId,
+        provider: input.provider,
+        enabled: input.enabled,
+        customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+        customModels: input.customModels,
+        customEmbeddingsModels: input.customEmbeddingsModels,
+        extraHeaders: input.extraHeaders,
+        defaultModel: input.defaultModel,
       });
-
-      return modelProviderResult;
     }),
 
   delete: protectedProcedure
@@ -212,17 +87,12 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:delete"))
-    .mutation(async ({ input, ctx }) => {
-      const { id, projectId, provider } = input;
-      if (id) {
-        return await ctx.prisma.modelProvider.delete({
-          where: { id, projectId },
-        });
-      } else {
-        return await ctx.prisma.modelProvider.deleteMany({
-          where: { provider, projectId },
-        });
-      }
+    .mutation(async ({ input }) => {
+      return await modelProviderService.deleteModelProvider({
+        id: input.id,
+        projectId: input.projectId,
+        provider: input.provider,
+      });
     }),
 
   /**
@@ -244,138 +114,30 @@ export const modelProviderRouter = createTRPCRouter({
     }),
 });
 
+/**
+ * Gets all model providers for a project.
+ * Delegates to ModelProviderService for business logic.
+ * 
+ * @deprecated Use ModelProviderService.getProjectModelProviders directly
+ */
 export const getProjectModelProviders = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-  });
-
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  const defaultModelProviders: Record<string, MaybeStoredModelProvider> =
-    Object.fromEntries(
-      Object.entries(modelProviders)
-        .filter(([_providerKey, modelProvider]) => {
-          return modelProvider.enabledSince;
-        })
-        .map(([providerKey, modelProvider]) => {
-          const enabled =
-            modelProvider.enabledSince < project.createdAt &&
-            !!process.env[modelProvider.apiKey] &&
-            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
-
-          const modelProvider_: MaybeStoredModelProvider = {
-            provider: providerKey,
-            enabled,
-            disabledByDefault: !enabled,
-            customKeys: null,
-            models: getProviderModelOptions(providerKey, "chat").map(
-              (m) => m.value,
-            ),
-            embeddingsModels: getProviderModelOptions(
-              providerKey,
-              "embedding",
-            ).map((m) => m.value),
-            deploymentMapping: null,
-            extraHeaders: [],
-          };
-          return [providerKey, modelProvider_];
-        }),
-    );
-
-  const savedModelProviders = (
-    await prisma.modelProvider.findMany({
-      where: { projectId },
-    })
-  )
-    .filter((modelProvider) => {
-      // Keep if has custom keys
-      if (modelProvider.customKeys) return true;
-
-      // Keep if enabled status differs from default
-      const defaultProvider = defaultModelProviders[modelProvider.provider];
-      if (modelProvider.enabled !== defaultProvider?.enabled) return true;
-
-      // Keep if has custom models or embeddings (not default)
-      const customModels = modelProvider.customModels as string[] | null;
-      const customEmbeddings = modelProvider.customEmbeddingsModels as string[] | null;
-      const hasCustomModels = customModels && customModels.length > 0;
-      const hasCustomEmbeddings = customEmbeddings && customEmbeddings.length > 0;
-
-      return hasCustomModels || hasCustomEmbeddings;
-    })
-    .reduce(
-      (acc, modelProvider) => {
-        const modelProvider_: MaybeStoredModelProvider = {
-          id: modelProvider.id,
-          provider: modelProvider.provider,
-          enabled: modelProvider.enabled,
-          customKeys: modelProvider.customKeys,
-          models: modelProvider.customModels as string[] | null,
-          embeddingsModels: modelProvider.customEmbeddingsModels as
-            | string[]
-            | null,
-          deploymentMapping: modelProvider.deploymentMapping,
-          disabledByDefault:
-            defaultModelProviders[modelProvider.provider]?.disabledByDefault,
-          extraHeaders: modelProvider.extraHeaders as
-            | { key: string; value: string }[]
-            | null,
-        };
-
-        if (!includeKeys) {
-          modelProvider_.customKeys = null;
-        }
-
-        return {
-          ...acc,
-          [modelProvider.provider]: modelProvider_,
-        };
-      },
-      {} as Record<string, MaybeStoredModelProvider>,
-    );
-
-  return {
-    ...defaultModelProviders,
-    ...savedModelProviders,
-  };
+  return modelProviderService.getProjectModelProviders(projectId, includeKeys);
 };
 
-// Frontend-only function that masks API keys for security
+/**
+ * Gets model providers with API keys masked for frontend display.
+ * Delegates to ModelProviderService for business logic.
+ * 
+ * @deprecated Use ModelProviderService.getProjectModelProvidersForFrontend directly
+ */
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  const modelProviders = await getProjectModelProviders(projectId, includeKeys);
-
-  if (!includeKeys) {
-    return modelProviders;
-  }
-
-  // Mask only API keys, keep URLs visible
-  const maskedProviders = { ...modelProviders };
-  for (const [provider, config] of Object.entries(maskedProviders)) {
-    if (config.customKeys) {
-      maskedProviders[provider] = {
-        ...config,
-        customKeys: Object.fromEntries(
-          Object.entries(config.customKeys).map(([key, value]) => [
-            key,
-            // Only mask values that look like API keys (contain "_KEY" pattern)
-            KEY_CHECK.some((k) => key.includes(k))
-              ? MASKED_KEY_PLACEHOLDER
-              : value,
-          ]),
-        ),
-      };
-    }
-  }
-
-  return maskedProviders;
+  return modelProviderService.getProjectModelProvidersForFrontend(projectId, includeKeys);
 };
 
 const getModelOrDefaultEnvKey = (
