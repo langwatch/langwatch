@@ -116,3 +116,45 @@ Feature: Onboarding Flow
     Then I see an error message
     And I remain on the onboarding step
     And I can correct the configuration and try again
+
+  # API Key Validation Scenarios
+
+  @integration
+  Scenario: Validate API key before saving in onboarding
+    Given I am configuring the "openai" provider in onboarding
+    When I enter an invalid API key "sk-invalid"
+    And I click "Save"
+    Then the API key is validated against the provider API
+    And I see an API key validation error
+    And the provider is not saved
+
+  @integration
+  Scenario: Skip API key validation for env var providers in onboarding
+    Given I am configuring a provider that uses environment variables
+    And the provider is enabled via env vars with no stored customKeys
+    When I click "Save"
+    Then API key validation is skipped
+    And the provider is saved
+
+  @integration
+  Scenario: Clear API key validation error when user modifies field
+    Given I am configuring the "openai" provider in onboarding
+    And I see an API key validation error
+    When I start typing in the "OPENAI_API_KEY" field
+    Then the API key validation error is cleared
+
+  @visual
+  # no test
+  Scenario: Show API key validation error in onboarding form
+    Given an API key validation error occurred
+    When I am on the model provider setup step
+    Then I see the error message below the credential fields
+    And the error is styled as an error message
+
+  @visual
+  # no test
+  Scenario: Show loading state during API key validation
+    Given I clicked "Save"
+    When the API key is being validated
+    Then the "Save" button shows a loading indicator
+    And the button is disabled during validation

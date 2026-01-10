@@ -24,7 +24,7 @@ describe("modelProviderHelpers", () => {
       expect(getProviderFromModel("azure/gpt-4-turbo")).toBe("azure");
     });
 
-    it("returns empty string for model without slash", () => {
+    it("returns input unchanged when model has no slash", () => {
       expect(getProviderFromModel("gpt-4")).toBe("gpt-4");
     });
 

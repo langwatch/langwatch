@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Switch } from "../../../../../components/ui/switch";
+import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
@@ -122,6 +123,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendModelProviderKey, providers]);
 
+  // Detect if provider is using environment variables (enabled but no stored customKeys)
+  const isUsingEnvVars =
+    provider.enabled &&
+    (!provider.customKeys ||
+      Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
+
   const projectForForm = useMemo(
     () => ({
       defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
@@ -163,10 +170,23 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // API key validation hook
+  const {
+    validate: validateApiKey,
+    isValidating: isValidatingApiKey,
+    validationError: apiKeyValidationError,
+    clearError: clearApiKeyError,
+  } = useModelProviderApiKeyValidation(
+    backendModelProviderKey,
+    state.customKeys,
+    projectId,
+  );
+
   useEffect(() => {
     setOpenAiValidationError(void 0);
     setFieldErrors({});
-  }, [modelProviderKey]);
+    clearApiKeyError();
+  }, [modelProviderKey, clearApiKeyError]);
 
   const isOpenAiProvider = backendModelProviderKey === "openai";
 
@@ -216,7 +236,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     return true;
   }, [isOpenAiProvider, state.customKeys, handleOpenAiValidationClear]);
 
-  const handleSaveAndContinue = useCallback(() => {
+  const handleSaveAndContinue = useCallback(async () => {
     if (!validateOpenAi()) {
       return;
     }
@@ -224,6 +244,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     // Clear previous errors
     setFieldErrors({});
     handleOpenAiValidationClear();
+    clearApiKeyError();
 
     // Validate keys according to schema before submitting
     const providerDefinition = backendModelProviderKey
@@ -249,6 +270,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
+    // Skip API key validation if using env vars - fields are masked and shouldn't be validated
+    if (!isUsingEnvVars) {
+      const isValid = await validateApiKey();
+      if (!isValid) {
+        // Validation error is already set in the hook
+        return;
+      }
+    }
+
     void actions
       .setEnabled(true)
       .then(() => actions.submit())
@@ -261,6 +291,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     backendModelProviderKey,
     state.customKeys,
     handleOpenAiValidationClear,
+    clearApiKeyError,
+    isUsingEnvVars,
+    validateApiKey,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;
@@ -308,10 +341,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             fieldMetadata={meta.fieldMetadata}
             fieldErrors={fieldErrors}
             openAiValidationError={openAiValidationError}
+            apiKeyValidationError={apiKeyValidationError}
             isOpenAiProvider={isOpenAiProvider}
             onCustomKeyChange={handleCustomKeyChange}
             onFieldErrorClear={handleFieldErrorClear}
             onOpenAiValidationClear={handleOpenAiValidationClear}
+            onApiKeyValidationClear={clearApiKeyError}
           />
 
           {(backendModelProviderKey === "azure" ||
@@ -346,7 +381,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             <Button
               colorPalette="orange"
               onClick={handleSaveAndContinue}
-              loading={state.isSaving}
+              loading={state.isSaving || isValidatingApiKey}
               variant="surface"
               size="sm"
             >
