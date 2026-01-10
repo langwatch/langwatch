@@ -9,8 +9,9 @@
  *   (These may expose unauthenticated services when accessed from within the cloud)
  *
  * ## What's Blocked (Production Only)
- * - Private IPs: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
- * - Link-local: 169.254.0.0/16, fe80::/10
+ * - IPv4 private: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16
+ * - IPv6 private: ::1, ::, fc00::/7 (ULA), fe80::/10 (link-local)
+ * - IPv4-mapped IPv6: ::ffff:x.x.x.x (extracted and checked as IPv4)
  * - Hostnames resolving to private IPs
  *
  * ## DNS Rebinding Protection
@@ -99,11 +100,14 @@ export function isBlockedCloudDomain(hostname: string): boolean {
 }
 
 /**
- * Checks if an IP address is private, localhost, or link-local
+ * Checks if an IPv4 address is private, localhost, or link-local
  */
-export function isPrivateOrLocalhostIP(ip: string): boolean {
-  // Loopback (127.0.0.0/8, ::1)
-  if (ip.startsWith("127.") || ip === "::1" || ip === "0.0.0.0") return true;
+function isPrivateIPv4(ip: string): boolean {
+  // Loopback (127.0.0.0/8)
+  if (ip.startsWith("127.")) return true;
+
+  // Unspecified
+  if (ip === "0.0.0.0") return true;
 
   // Private ranges (10.0.0.0/8)
   if (ip.startsWith("10.")) return true;
@@ -118,11 +122,55 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
     if (second >= 16 && second <= 31) return true;
   }
 
-  // Link-local (169.254.0.0/16, fe80::/10)
+  // Link-local (169.254.0.0/16)
   if (ip.startsWith("169.254.")) return true;
-  if (ip.toLowerCase().startsWith("fe80:")) return true;
 
   return false;
+}
+
+/**
+ * Checks if an IP address (IPv4 or IPv6) is private, localhost, or link-local
+ */
+export function isPrivateOrLocalhostIP(ip: string): boolean {
+  const normalized = ip.toLowerCase();
+
+  // IPv6 loopback
+  if (normalized === "::1") return true;
+
+  // IPv6 unspecified (like 0.0.0.0)
+  if (normalized === "::") return true;
+
+  // IPv6 Unique Local Addresses (fc00::/7 covers both fc and fd prefixes)
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+
+  // IPv6 link-local (fe80::/10)
+  if (normalized.startsWith("fe80:")) return true;
+
+  // IPv4-mapped IPv6 addresses (::ffff:x.x.x.x or ::ffff:0:0 style)
+  // Format 1: ::ffff:192.168.1.1 (dotted decimal)
+  // Format 2: ::ffff:c0a8:0101 (hex representation of IPv4)
+  const ipv4MappedMatch = normalized.match(/^::ffff:(.+)$/);
+  if (ipv4MappedMatch && ipv4MappedMatch[1]) {
+    const mapped = ipv4MappedMatch[1];
+
+    // Check if it's dotted decimal format
+    if (mapped.includes(".")) {
+      return isPrivateIPv4(mapped);
+    }
+
+    // Hex format: ::ffff:7f00:0001 (127.0.0.1 in hex)
+    // Parse as two 16-bit hex values representing the IPv4 address
+    const hexMatch = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (hexMatch && hexMatch[1] && hexMatch[2]) {
+      const high = parseInt(hexMatch[1], 16);
+      const low = parseInt(hexMatch[2], 16);
+      const reconstructed = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+      return isPrivateIPv4(reconstructed);
+    }
+  }
+
+  // IPv4 checks
+  return isPrivateIPv4(ip);
 }
 
 /**
