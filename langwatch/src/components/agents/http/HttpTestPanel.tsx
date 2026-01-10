@@ -247,6 +247,7 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
         borderRadius="md"
         borderWidth="1px"
         borderColor={result.success ? "green.200" : "red.200"}
+        visibility={(result.status || result.duration || responseString) ? "visible" : "hidden"}
       >
         <HStack gap={3}>
           {result.status && (

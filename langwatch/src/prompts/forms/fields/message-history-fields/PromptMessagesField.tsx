@@ -15,14 +15,13 @@ import {
   type AvailableSource,
 } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
-import { AddMessageButton } from "./AddMessageButton";
+import { AddMessageButton } from "~/components/ui/messages";
 import {
   EditingModeTitle,
   getDefaultEditingMode,
   type PromptEditingMode,
 } from "./EditingModeTitle";
-import { MessageRoleLabel } from "./MessageRoleLabel";
-import { RemoveMessageButton } from "./RemoveMessageButton";
+import { MessageRoleLabel, RemoveMessageButton } from "~/components/ui/messages";
 
 // Re-export for backwards compatibility
 export type { PromptEditingMode } from "./EditingModeTitle";
