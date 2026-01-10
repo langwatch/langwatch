@@ -174,3 +174,45 @@ export function hasUserEnteredNewApiKey(
       value !== MASKED_KEY_PLACEHOLDER
   );
 }
+
+/**
+ * Detects if user has modified any non-API-key fields (like URLs).
+ * Used to determine if validation/save should run when using env vars.
+ *
+ * @param customKeys - The current form state
+ * @param initialKeys - The initial stored keys (empty for env var providers)
+ * @returns true if any non-API-key field has a non-empty value
+ */
+export function hasUserModifiedNonApiKeyFields(
+  customKeys: Record<string, string>,
+  initialKeys: Record<string, unknown>
+): boolean {
+  return Object.entries(customKeys).some(([key, value]) => {
+    // Skip API key fields
+    if (KEY_CHECK.some((k) => key.includes(k))) {
+      return false;
+    }
+    // Check if value is non-empty and different from initial
+    const initialValue = initialKeys[key];
+    const currentValue = value?.trim() ?? "";
+    const storedValue = typeof initialValue === "string" ? initialValue.trim() : "";
+    return currentValue !== "" && currentValue !== storedValue;
+  });
+}
+
+/**
+ * Filters customKeys to remove masked API keys before sending to backend.
+ * Used when env var provider has modified URL fields.
+ *
+ * @param customKeys - The form state containing API keys and other fields
+ * @returns Object with masked API keys removed
+ */
+export function filterMaskedApiKeys(
+  customKeys: Record<string, string>
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(customKeys).filter(
+      ([_, value]) => value !== MASKED_KEY_PLACEHOLDER
+    )
+  );
+}

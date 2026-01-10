@@ -109,12 +109,32 @@ Feature: Credential Validation
     And if valid, the provider is saved with the custom base URL
 
   @integration
-  Scenario: Show validation error for invalid base URL
+  Scenario: Reject invalid URL format in base URL field
     Given I open the model provider configuration drawer for "openai"
     When I enter a valid API key
-    And I enter an invalid base URL "not-a-url"
+    And I enter "not-a-valid-url" in the "OPENAI_BASE_URL" field
     And I click "Save"
-    Then I see a validation error for the base URL
+    Then I see a validation error with URL format example
+    And the provider is not saved
+
+  @integration
+  Scenario: Save custom URL when provider uses env vars
+    Given I have "openai" provider enabled via environment variable
+    When I open the model provider configuration drawer for "openai"
+    And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
+    And I enter "https://custom.openai.com/v1" in the "OPENAI_BASE_URL" field
+    And I click "Save"
+    Then the URL is validated for correct format
+    And the provider is saved with the custom base URL
+    And the API key from env vars is preserved
+
+  @integration
+  Scenario: Reject invalid URL when provider uses env vars
+    Given I have "openai" provider enabled via environment variable
+    When I open the model provider configuration drawer for "openai"
+    And I enter "not-a-valid-url" in the "OPENAI_BASE_URL" field
+    And I click "Save"
+    Then I see a validation error with URL format example
     And the provider is not saved
 
   @integration

@@ -16,7 +16,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
-import { hasUserEnteredNewApiKey } from "../../utils/modelProviderHelpers";
+import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../utils/modelProviderHelpers";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
@@ -122,14 +122,21 @@ export const EditModelProviderForm = ({
     const shouldValidateApiKey =
       !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
 
-    // Skip all validation if using env vars and user didn't enter new keys
-    if (isUsingEnvVars && !shouldValidateApiKey) {
+    // Check if user modified non-API-key fields (like URLs)
+    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
+      state.customKeys,
+      state.initialKeys
+    );
+
+    // Skip all validation only if using env vars AND no changes at all
+    if (isUsingEnvVars && !shouldValidateApiKey && !hasNonApiKeyChanges) {
       void actions.submit();
       return;
     }
     
     // Validate keys according to schema before submitting
-    if (providerDefinition?.keysSchema) {
+    // Run Zod validation if not using env vars OR if there are non-API-key changes
+    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
@@ -156,7 +163,7 @@ export const EditModelProviderForm = ({
     }
     
     void actions.submit();
-  }, [isUsingEnvVars, providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
+  }, [isUsingEnvVars, providerDefinition, state.customKeys, state.initialKeys, actions, validateApiKey, clearApiKeyError]);
 
   return (
     <VStack gap={4} align="start" width="full">

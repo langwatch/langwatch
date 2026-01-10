@@ -18,7 +18,7 @@ import {
   parseZodFieldErrors,
   type ZodErrorStructure,
 } from "../../../../../utils/zod";
-import { hasUserEnteredNewApiKey } from "../../../../../utils/modelProviderHelpers";
+import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../../../../utils/modelProviderHelpers";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -250,9 +250,15 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     const shouldValidateApiKey =
       !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
 
-    // Skip all validation if using env vars and user didn't enter new keys
+    // Check if user modified non-API-key fields (like URLs)
+    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
+      state.customKeys,
+      state.initialKeys
+    );
+
+    // Skip all validation only if using env vars AND no API key changes AND no URL changes
     // This prevents masked placeholder values from failing schema validation
-    if (isUsingEnvVars && !shouldValidateApiKey) {
+    if (isUsingEnvVars && !shouldValidateApiKey && !hasNonApiKeyChanges) {
       void actions
         .setEnabled(true)
         .then(() => actions.submit())

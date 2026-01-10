@@ -14,6 +14,8 @@ import {
   getSchemaShape,
   getDisplayKeysForProvider,
   buildCustomKeyState,
+  filterMaskedApiKeys,
+  hasUserModifiedNonApiKeyFields,
 } from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
@@ -37,6 +39,7 @@ export type UseModelProviderFormState = {
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
+  initialKeys: Record<string, unknown>;
   extraHeaders: ExtraHeader[];
   customModels: SelectOption[];
   customEmbeddingsModels: SelectOption[];
@@ -332,14 +335,7 @@ export function useModelProviderForm(
   );
 
   const setCustomKey = useCallback((key: string, value: string) => {
-    setCustomKeys((prev) => {
-      const next = { ...prev, [key]: value };
-      originalStoredKeysRef.current = {
-        ...originalStoredKeysRef.current,
-        [key]: value,
-      };
-      return next;
-    });
+    setCustomKeys((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const addExtraHeader = useCallback(() => {
@@ -401,8 +397,14 @@ export function useModelProviderForm(
     setIsSaving(true);
     setErrors({});
     try {
-      // Skip validation if using env vars - keys are from server env
-      if (!isUsingEnvVars) {
+      // Check if user modified non-API-key fields (like URLs) when using env vars
+      const hasNonApiKeyChanges = isUsingEnvVars && hasUserModifiedNonApiKeyFields(
+        customKeys,
+        originalStoredKeysRef.current
+      );
+
+      // Validate if not using env vars, OR if using env vars but has non-API-key changes
+      if (!isUsingEnvVars || hasNonApiKeyChanges) {
         // Validate keys according to schema if present
         const keysSchema = providerDefinition?.keysSchema
           ? z
@@ -426,10 +428,18 @@ export function useModelProviderForm(
         }
       }
 
-      // When using env vars, send undefined to tell backend not to update customKeys
-      let customKeysToSend: Record<string, unknown> | undefined = isUsingEnvVars
-        ? undefined
-        : { ...customKeys };
+      // Determine what customKeys to send:
+      // - Not using env vars: send all customKeys
+      // - Using env vars with non-API-key changes: send filtered keys (without masked API keys)
+      // - Using env vars without changes: send undefined (don't update)
+      let customKeysToSend: Record<string, unknown> | undefined;
+      if (!isUsingEnvVars) {
+        customKeysToSend = { ...customKeys };
+      } else if (hasNonApiKeyChanges) {
+        customKeysToSend = filterMaskedApiKeys(customKeys);
+      } else {
+        customKeysToSend = undefined;
+      }
 
       // Build custom keys to send (merge azure headers when applicable)
       if (!isUsingEnvVars && provider.provider === "azure") {
@@ -522,6 +532,7 @@ export function useModelProviderForm(
       useApiGateway,
       customKeys,
       displayKeys,
+      initialKeys: originalStoredKeysRef.current,
       extraHeaders,
       customModels,
       customEmbeddingsModels,
