@@ -239,14 +239,33 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   }, [isOpenAiProvider, state.customKeys, handleOpenAiValidationClear]);
 
   const handleSaveAndContinue = useCallback(async () => {
-    if (!validateOpenAi()) {
-      return;
-    }
-
     // Clear previous errors
     setFieldErrors({});
     handleOpenAiValidationClear();
     clearApiKeyError();
+
+    // Determine if we should validate API keys:
+    // - Always validate if not using env vars
+    // - Also validate if user entered a new API key (replacing masked env var key)
+    const shouldValidateApiKey =
+      !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
+
+    // Skip all validation if using env vars and user didn't enter new keys
+    // This prevents masked placeholder values from failing schema validation
+    if (isUsingEnvVars && !shouldValidateApiKey) {
+      void actions
+        .setEnabled(true)
+        .then(() => actions.submit())
+        .catch((err) =>
+          logger.error(err, "failed to submit model provider settings"),
+        );
+      return;
+    }
+
+    // Run OpenAI-specific validation
+    if (!validateOpenAi()) {
+      return;
+    }
 
     // Validate keys according to schema before submitting
     const providerDefinition = backendModelProviderKey
@@ -272,12 +291,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
-    // Determine if we should validate API keys:
-    // - Always validate if not using env vars
-    // - Also validate if user entered a new API key (replacing masked env var key)
-    const shouldValidateApiKey =
-      !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
-
+    // Validate API key against provider API
     if (shouldValidateApiKey) {
       const isValid = await validateApiKey();
       if (!isValid) {
