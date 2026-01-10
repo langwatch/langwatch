@@ -157,7 +157,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
               timestamp={trace.timestamps.started_at}
               paddingTop="20px"
             >
-              <Text paddingY="6px" marginBottom="38px">
+              <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
                   <Markdown className="markdown">
                     {translationState.translatedTextInput &&
@@ -166,7 +166,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                       : getExtractedInput(trace)}
                   </Markdown>
                 </RedactedField>
-              </Text>
+              </Box>
             </Message>
             <Message
               author={project?.name ?? ""}
