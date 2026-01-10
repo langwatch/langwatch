@@ -220,6 +220,14 @@ describe("isBlockedCloudDomain", () => {
     it("blocks app.localhost", () => {
       expect(isBlockedCloudDomain("app.localhost")).toBe(true);
     });
+
+    it("allows bare localhost (handled by private IP checks)", () => {
+      expect(isBlockedCloudDomain("localhost")).toBe(false);
+    });
+
+    it("allows bare local (handled by private IP checks)", () => {
+      expect(isBlockedCloudDomain("local")).toBe(false);
+    });
   });
 
   describe("when given legitimate external domains", () => {

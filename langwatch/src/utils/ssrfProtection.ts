@@ -102,10 +102,20 @@ const BLOCKED_CLOUD_DOMAINS = [
 ];
 
 /**
- * Checks if hostname matches a blocked cloud provider domain pattern
+ * Checks if hostname matches a blocked cloud provider domain pattern.
+ * Note: bare "localhost" and "local" are NOT blocked here - they are handled
+ * by the private IP checks which respect development mode settings.
  */
 export function isBlockedCloudDomain(hostname: string): boolean {
   const lowerHostname = hostname.toLowerCase();
+
+  // Don't block bare "localhost" or "local" - these are handled by private IP checks
+  // which properly respect development mode. We only want to block subdomains like
+  // "app.localhost" or "service.local" as cloud-internal domains.
+  if (lowerHostname === "localhost" || lowerHostname === "local") {
+    return false;
+  }
+
   return BLOCKED_CLOUD_DOMAINS.some(
     (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain)
   );
