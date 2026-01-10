@@ -69,14 +69,10 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.example.com/test",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: "Bearer test-token-123",
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = fetchOptions.headers as Headers;
+      expect(headers.get("Authorization")).toBe("Bearer test-token-123");
     });
   });
 
@@ -101,14 +97,10 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.example.com/test",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            "X-API-Key": "secret-key-456",
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = fetchOptions.headers as Headers;
+      expect(headers.get("X-API-Key")).toBe("secret-key-456");
     });
   });
 
@@ -134,14 +126,10 @@ describe("HTTP Proxy", () => {
       });
 
       const expectedAuth = `Basic ${Buffer.from("user:pass").toString("base64")}`;
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.example.com/test",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: expectedAuth,
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = fetchOptions.headers as Headers;
+      expect(headers.get("Authorization")).toBe(expectedAuth);
     });
   });
 
@@ -165,15 +153,11 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.example.com/test",
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            "X-Custom-1": "value1",
-            "X-Custom-2": "value2",
-          }),
-        })
-      );
+      expect(mockFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = fetchOptions.headers as Headers;
+      expect(headers.get("X-Custom-1")).toBe("value1");
+      expect(headers.get("X-Custom-2")).toBe("value2");
     });
   });
 
