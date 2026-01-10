@@ -120,6 +120,7 @@ const server = createServer(async (req, res) => {
       return;
     }
 
+
     console.log(
       `[${timestamp}] Generating: client=${clientId}, model=${model}, messages=${messages.length}`
     );
@@ -130,7 +131,7 @@ const server = createServer(async (req, res) => {
 
       const { text } = await generateText({
         model: openai(model),
-        messages: messages as Parameters<typeof generateText>[0]["messages"],
+        messages: messages as NonNullable<Parameters<typeof generateText>[0]["messages"]>,
       });
 
       console.log(`[${timestamp}] 200 Generation success`);
