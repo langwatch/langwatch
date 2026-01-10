@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.10.0...typescript-sdk@v0.10.1) (2026-01-10)
+
+
+### Miscellaneous
+
+* trigger release ([#1011](https://github.com/langwatch/langwatch/issues/1011)) ([6173f53](https://github.com/langwatch/langwatch/commit/6173f53b041d9ee7e6b930270224954ba3c6621e))
+
 ## [0.10.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.9.0...typescript-sdk@v0.10.0) (2025-12-15)
 
 
