@@ -42,6 +42,7 @@ import {
   HeadersConfigSection,
   HttpTestPanel,
 } from "./http";
+import { toaster } from "~/components/ui/toaster";
 
 // ============================================================================
 // Constants
@@ -191,6 +192,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       onSave?.(agent);
       onClose();
     },
+    onError: (error) => {
+      toaster.create({
+        title: "Error creating agent",
+        description: error.message,
+        type: "error",
+        meta: { closable: true },
+      });
+    },
   });
 
   const updateMutation = api.agents.update.useMutation({
@@ -202,6 +211,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       });
       onSave?.(agent);
       onClose();
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Error updating agent",
+        description: error.message,
+        type: "error",
+        meta: { closable: true },
+      });
     },
   });
 
