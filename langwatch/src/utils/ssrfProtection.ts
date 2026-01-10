@@ -3,10 +3,14 @@
  *
  * Prevents Server-Side Request Forgery by validating URLs before fetching.
  *
- * ## What's Blocked
- * - Cloud metadata endpoints (always): 169.254.169.254, metadata.google.internal, fd00:ec2::254
- * - Private IPs (production): 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
- * - Link-local (production): 169.254.0.0/16, fe80::/10
+ * ## What's Blocked (Always)
+ * - Cloud metadata endpoints: 169.254.169.254, metadata.google.internal, fd00:ec2::254
+ * - Cloud provider internal domains: *.amazonaws.com, *.googleapis.com, *.azure.com, etc.
+ *   (These may expose unauthenticated services when accessed from within the cloud)
+ *
+ * ## What's Blocked (Production Only)
+ * - Private IPs: 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+ * - Link-local: 169.254.0.0/16, fe80::/10
  * - Hostnames resolving to private IPs
  *
  * ## DNS Rebinding Protection
@@ -57,6 +61,41 @@ export interface SSRFValidationResult {
   resolvedIp: string;
   /** Original hostname (needed for Host header) */
   hostname: string;
+}
+
+/**
+ * Cloud provider internal domain patterns that should be blocked.
+ * These services may be unauthenticated when accessed from within the cloud environment.
+ */
+const BLOCKED_CLOUD_DOMAINS = [
+  // AWS
+  ".amazonaws.com",
+  ".aws.amazon.com",
+  ".compute.internal", // AWS internal DNS
+  // Google Cloud
+  ".googleapis.com",
+  ".cloud.google.com",
+  ".run.app", // Cloud Run
+  ".cloudfunctions.net", // Cloud Functions
+  // Azure
+  ".azure.com",
+  ".azurewebsites.net",
+  ".windows.net",
+  ".azure-api.net",
+  // Generic internal
+  ".internal",
+  ".local",
+  ".localhost",
+];
+
+/**
+ * Checks if hostname matches a blocked cloud provider domain pattern
+ */
+export function isBlockedCloudDomain(hostname: string): boolean {
+  const lowerHostname = hostname.toLowerCase();
+  return BLOCKED_CLOUD_DOMAINS.some(
+    (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain)
+  );
 }
 
 /**
@@ -128,6 +167,22 @@ export async function validateUrlForSSRF(
     );
     throw new Error(
       "Access to cloud metadata endpoints is not allowed for security reasons"
+    );
+  }
+
+  // Block cloud provider internal domains (always, even in dev)
+  // These may expose unauthenticated internal services when accessed from within the cloud
+  if (isBlockedCloudDomain(hostname)) {
+    logger.error(
+      {
+        url,
+        hostname,
+        reason: "cloud_internal_domain",
+      },
+      "SSRF attempt blocked: cloud provider internal domain"
+    );
+    throw new Error(
+      "Access to cloud provider internal domains is not allowed for security reasons"
     );
   }
 
