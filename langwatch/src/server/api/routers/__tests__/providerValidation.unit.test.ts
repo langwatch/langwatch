@@ -204,6 +204,23 @@ describe("validateProviderApiKey", () => {
       expect(result.valid).toBe(false);
       expect(result.error).toContain("Invalid API key");
     });
+
+    it("uses custom base URL when provided", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+      });
+
+      await validateProviderApiKey("anthropic", {
+        ANTHROPIC_API_KEY: "sk-ant-valid-key",
+        ANTHROPIC_BASE_URL: "https://custom-anthropic.example.com",
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://custom-anthropic.example.com/models",
+        expect.anything()
+      );
+    });
   });
 
   describe("Gemini validation", () => {

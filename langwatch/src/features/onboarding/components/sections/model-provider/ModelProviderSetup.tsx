@@ -18,6 +18,7 @@ import {
   parseZodFieldErrors,
   type ZodErrorStructure,
 } from "../../../../../utils/zod";
+import { hasUserEnteredNewApiKey } from "../../../../../utils/modelProviderHelpers";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -270,8 +271,13 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
-    // Skip API key validation if using env vars - fields are masked and shouldn't be validated
-    if (!isUsingEnvVars) {
+    // Determine if we should validate API keys:
+    // - Always validate if not using env vars
+    // - Also validate if user entered a new API key (replacing masked env var key)
+    const shouldValidateApiKey =
+      !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
+
+    if (shouldValidateApiKey) {
       const isValid = await validateApiKey();
       if (!isValid) {
         // Validation error is already set in the hook

@@ -117,6 +117,26 @@ Feature: Credential Validation
     Then I see a validation error for the base URL
     And the provider is not saved
 
+  @integration
+  Scenario: Validate manually-entered API key when provider uses env vars
+    Given I have "openai" provider enabled via environment variable
+    When I open the model provider configuration drawer for "openai"
+    And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
+    And I enter a new API key "sk-invalid-key"
+    And I click "Save"
+    Then the new API key is validated against the provider API
+    And I see an API key validation error
+    And the provider is not saved
+
+  @integration
+  Scenario: Validate Anthropic with custom base URL
+    Given I open the model provider configuration drawer for "anthropic"
+    When I enter a valid API key
+    And I enter "https://custom-anthropic.example.com" in the "ANTHROPIC_BASE_URL" field
+    And I click "Save"
+    Then the API key is validated against the custom base URL
+    And if valid, the provider is saved with the custom base URL
+
   @unit
   Scenario: Skip validation when no API key provided
     Given I am validating API keys

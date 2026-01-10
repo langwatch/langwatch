@@ -13,15 +13,13 @@ import {
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { validateProviderApiKey } from "./providerValidation";
 
-// Create service instance with prisma
-const modelProviderService = ModelProviderService.create(prisma);
-
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
+      const service = ModelProviderService.create(ctx.prisma);
 
       const hasSetupPermission = await hasProjectPermission(
         ctx,
@@ -29,19 +27,20 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await modelProviderService.getProjectModelProviders(projectId, hasSetupPermission);
+      return await service.getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
+      const service = ModelProviderService.create(ctx.prisma);
       const hasSetupPermission = await hasProjectPermission(
         ctx,
         projectId,
         "project:update",
       );
-      return await modelProviderService.getProjectModelProvidersForFrontend(
+      return await service.getProjectModelProvidersForFrontend(
         projectId,
         hasSetupPermission,
       );
@@ -64,8 +63,9 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:update"))
-    .mutation(async ({ input }) => {
-      return await modelProviderService.updateModelProvider({
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.updateModelProvider({
         id: input.id,
         projectId: input.projectId,
         provider: input.provider,
@@ -87,8 +87,9 @@ export const modelProviderRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:delete"))
-    .mutation(async ({ input }) => {
-      return await modelProviderService.deleteModelProvider({
+    .mutation(async ({ input, ctx }) => {
+      const service = ModelProviderService.create(ctx.prisma);
+      return await service.deleteModelProvider({
         id: input.id,
         projectId: input.projectId,
         provider: input.provider,
@@ -117,27 +118,25 @@ export const modelProviderRouter = createTRPCRouter({
 /**
  * Gets all model providers for a project.
  * Delegates to ModelProviderService for business logic.
- * 
- * @deprecated Use ModelProviderService.getProjectModelProviders directly
  */
 export const getProjectModelProviders = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  return modelProviderService.getProjectModelProviders(projectId, includeKeys);
+  const service = ModelProviderService.create(prisma);
+  return service.getProjectModelProviders(projectId, includeKeys);
 };
 
 /**
  * Gets model providers with API keys masked for frontend display.
  * Delegates to ModelProviderService for business logic.
- * 
- * @deprecated Use ModelProviderService.getProjectModelProvidersForFrontend directly
  */
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
   includeKeys = true,
 ) => {
-  return modelProviderService.getProjectModelProvidersForFrontend(projectId, includeKeys);
+  const service = ModelProviderService.create(prisma);
+  return service.getProjectModelProvidersForFrontend(projectId, includeKeys);
 };
 
 const getModelOrDefaultEnvKey = (

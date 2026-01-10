@@ -104,14 +104,16 @@ async function validateWithBearerToken(
  * Validates using Anthropic's x-api-key header authentication.
  *
  * @param apiKey - The API key to validate
+ * @param baseUrl - The user-provided base URL (may be empty)
  * @param defaultBaseUrl - The default base URL for Anthropic
  * @returns Promise resolving to validation result
  */
 async function validateWithAnthropicAuth(
   apiKey: string,
+  baseUrl: string,
   defaultBaseUrl: string,
 ): Promise<ValidationResult> {
-  const url = buildModelsEndpointUrl("", defaultBaseUrl);
+  const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
 
   try {
     const response = await fetch(url, {
@@ -246,7 +248,7 @@ export async function validateProviderApiKey(
     case "bearer":
       return validateWithBearerToken(apiKey, baseUrl, defaultBaseUrl);
     case "anthropic":
-      return validateWithAnthropicAuth(apiKey, defaultBaseUrl);
+      return validateWithAnthropicAuth(apiKey, baseUrl, defaultBaseUrl);
     case "gemini":
       return validateWithGeminiAuth(apiKey, defaultBaseUrl);
     default:

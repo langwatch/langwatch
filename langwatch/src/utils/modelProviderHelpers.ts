@@ -155,3 +155,22 @@ export function buildCustomKeyState(
 
   return result;
 }
+
+/**
+ * Detects if user has entered a new (non-masked) API key in the form.
+ * Used to determine if validation should run even when provider uses env vars.
+ *
+ * @param customKeys - The form state containing API keys
+ * @returns true if user entered a real API key value (not masked, not empty)
+ */
+export function hasUserEnteredNewApiKey(
+  customKeys: Record<string, string>
+): boolean {
+  return Object.entries(customKeys).some(
+    ([key, value]) =>
+      KEY_CHECK.some((k) => key.includes(k)) &&
+      value &&
+      value.trim() !== "" &&
+      value !== MASKED_KEY_PLACEHOLDER
+  );
+}

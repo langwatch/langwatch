@@ -16,6 +16,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
+import { hasUserEnteredNewApiKey } from "../../utils/modelProviderHelpers";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
@@ -114,9 +115,15 @@ export const EditModelProviderForm = ({
     // Clear previous errors
     setFieldErrors({});
     clearApiKeyError();
-    
-    // Skip validation if using env vars - fields are masked and shouldn't be validated
-    if (isUsingEnvVars) {
+
+    // Determine if we should validate API keys:
+    // - Always validate if not using env vars
+    // - Also validate if user entered a new API key (replacing masked env var key)
+    const shouldValidateApiKey =
+      !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
+
+    // Skip all validation if using env vars and user didn't enter new keys
+    if (isUsingEnvVars && !shouldValidateApiKey) {
       void actions.submit();
       return;
     }
@@ -139,11 +146,13 @@ export const EditModelProviderForm = ({
       }
     }
 
-    // Validate API key if provider supports it
-    const isValid = await validateApiKey();
-    if (!isValid) {
-      // Validation error is already set in the hook
-      return;
+    // Validate API key if provider supports it and we should validate
+    if (shouldValidateApiKey) {
+      const isValid = await validateApiKey();
+      if (!isValid) {
+        // Validation error is already set in the hook
+        return;
+      }
     }
     
     void actions.submit();

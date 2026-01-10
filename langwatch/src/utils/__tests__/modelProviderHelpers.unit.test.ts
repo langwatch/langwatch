@@ -8,6 +8,7 @@ import {
   getSchemaShape,
   getDisplayKeysForProvider,
   buildCustomKeyState,
+  hasUserEnteredNewApiKey,
 } from "../modelProviderHelpers";
 import {
   DEFAULT_MODEL,
@@ -346,6 +347,69 @@ describe("modelProviderHelpers", () => {
     it("handles empty display key map", () => {
       const result = buildCustomKeyState({}, {});
       expect(result).toEqual({});
+    });
+  });
+
+  describe("hasUserEnteredNewApiKey", () => {
+    it("returns true when user entered a new API key", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_API_KEY: "sk-new-key",
+        })
+      ).toBe(true);
+    });
+
+    it("returns false when API key is masked placeholder", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+        })
+      ).toBe(false);
+    });
+
+    it("returns false when API key is empty", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_API_KEY: "",
+        })
+      ).toBe(false);
+    });
+
+    it("returns false when API key is only whitespace", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_API_KEY: "   ",
+        })
+      ).toBe(false);
+    });
+
+    it("returns false when only non-key fields have values", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_BASE_URL: "https://api.example.com",
+        })
+      ).toBe(false);
+    });
+
+    it("returns true when any API key field has a new value", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
+          ANTHROPIC_API_KEY: "sk-ant-new-key",
+        })
+      ).toBe(true);
+    });
+
+    it("returns true for AWS credentials", () => {
+      expect(
+        hasUserEnteredNewApiKey({
+          AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",
+        })
+      ).toBe(true);
+    });
+
+    it("returns false for empty object", () => {
+      expect(hasUserEnteredNewApiKey({})).toBe(false);
     });
   });
 });

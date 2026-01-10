@@ -137,6 +137,16 @@ Feature: Onboarding Flow
     And the provider is saved
 
   @integration
+  Scenario: Validate manually-entered API key when env vars are configured
+    Given I am configuring a provider that uses environment variables
+    And the API key field shows "HAS_KEY••••••••••••••••••••••••"
+    When I enter a new API key "sk-invalid-key" replacing the masked value
+    And I click "Save"
+    Then the new API key is validated
+    And I see an API key validation error
+    And the provider is not saved
+
+  @integration
   Scenario: Clear API key validation error when user modifies field
     Given I am configuring the "openai" provider in onboarding
     And I see an API key validation error
