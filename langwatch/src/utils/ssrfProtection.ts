@@ -18,8 +18,14 @@
  * Eliminates TOCTOU attacks by:
  * 1. Resolving DNS once during validation
  * 2. Returning resolved IP in SSRFValidationResult
- * 3. Using resolved IP for actual fetch (not original hostname)
- * 4. Setting Host header to original hostname for routing
+ * 3. Using custom HTTP/HTTPS agents to connect to the resolved IP
+ * 4. Setting proper Host header and TLS servername for correct routing
+ *
+ * ## Redirect Protection
+ * HTTP redirects are validated before following:
+ * - Uses redirect: 'manual' to intercept redirects
+ * - Re-validates redirect URLs through SSRF checks
+ * - Limits redirect chain to 10 hops to prevent infinite loops
  *
  * ## Development Mode
  * - Without ALLOWED_PROXY_HOSTS: All localhost/private IPs allowed
@@ -48,6 +54,8 @@
  */
 
 import dns from "dns/promises";
+import http from "http";
+import https from "https";
 import { isIP } from "net";
 import { createLogger } from "./logger";
 
@@ -56,12 +64,16 @@ const logger = createLogger("langwatch:ssrfProtection");
 export interface SSRFValidationResult {
   /** Original URL for logging/display */
   originalUrl: string;
-  /** URL rewritten to use the resolved IP (for actual fetch) */
-  resolvedUrl: string;
   /** The resolved IP address */
   resolvedIp: string;
-  /** Original hostname (needed for Host header) */
+  /** Original hostname (needed for Host header and TLS SNI) */
   hostname: string;
+  /** Port number (defaults to 80 for HTTP, 443 for HTTPS) */
+  port: number;
+  /** Protocol (http: or https:) */
+  protocol: string;
+  /** Path including query string */
+  path: string;
 }
 
 /**
@@ -234,6 +246,12 @@ export async function validateUrlForSSRF(
     );
   }
 
+  // Extract port and path for later use
+  const port = parsedUrl.port
+    ? parseInt(parsedUrl.port, 10)
+    : (parsedUrl.protocol === "https:" ? 443 : 80);
+  const path = parsedUrl.pathname + parsedUrl.search;
+
   // In development, check if host is in allowlist - skip IP resolution
   if (isDevelopment && allowedDevHosts.length > 0) {
     const normalizedAllowed = allowedDevHosts.map((h) => h.trim().toLowerCase());
@@ -250,9 +268,11 @@ export async function validateUrlForSSRF(
       const ipVersion = isIP(hostname);
       return {
         originalUrl: url,
-        resolvedUrl: url,
         resolvedIp: ipVersion !== 0 ? hostname : "allowlisted",
         hostname,
+        port,
+        protocol: parsedUrl.protocol,
+        path,
       };
     }
   }
@@ -280,9 +300,11 @@ export async function validateUrlForSSRF(
     // Already an IP, use as-is
     return {
       originalUrl: url,
-      resolvedUrl: url,
       resolvedIp: hostname,
       hostname,
+      port,
+      protocol: parsedUrl.protocol,
+      path,
     };
   }
 
@@ -312,9 +334,11 @@ export async function validateUrlForSSRF(
       // In development, allow proceeding with original URL
       return {
         originalUrl: url,
-        resolvedUrl: url,
         resolvedIp: "unresolved-dev",
         hostname,
+        port,
+        protocol: parsedUrl.protocol,
+        path,
       };
     }
     // In production, fail closed
@@ -339,9 +363,11 @@ export async function validateUrlForSSRF(
       );
       return {
         originalUrl: url,
-        resolvedUrl: url,
         resolvedIp: "no-records-dev",
         hostname,
+        port,
+        protocol: parsedUrl.protocol,
+        path,
       };
     }
     logger.error(
@@ -375,38 +401,62 @@ export async function validateUrlForSSRF(
   // Use the first resolved IP for the actual request
   const resolvedIp = allAddresses[0]!;
 
-  // Rewrite URL to use resolved IP
-  const resolvedParsedUrl = new URL(url);
-  // For IPv6, wrap in brackets
-  resolvedParsedUrl.hostname = isIP(resolvedIp) === 6 ? `[${resolvedIp}]` : resolvedIp;
-  const resolvedUrl = resolvedParsedUrl.toString();
-
   logger.debug(
     {
       url,
       hostname,
       resolvedIp,
-      resolvedUrl,
     },
     "URL validated and resolved for SSRF-safe fetch"
   );
 
   return {
     originalUrl: url,
-    resolvedUrl,
     resolvedIp,
     hostname,
+    port,
+    protocol: parsedUrl.protocol,
+    path,
   };
 }
 
+/** Maximum number of redirects to follow */
+const MAX_REDIRECTS = 10;
+
 export interface SSRFSafeFetchOptions extends RequestInit {
-  /** Use original URL for the request (for dev/allowlisted hosts) */
-  useOriginalUrl?: boolean;
+  /** Internal: current redirect count (do not set manually) */
+  _redirectCount?: number;
+}
+
+/**
+ * Creates an HTTP agent that connects to the resolved IP while preserving hostname.
+ */
+function createHttpAgent(resolvedIp: string): http.Agent {
+  return new http.Agent({
+    lookup: (_hostname, _options, callback) => {
+      // Override DNS lookup to use our pre-resolved IP
+      callback(null, resolvedIp, isIP(resolvedIp) === 6 ? 6 : 4);
+    },
+  });
+}
+
+/**
+ * Creates an HTTPS agent that connects to the resolved IP with proper TLS SNI.
+ */
+function createHttpsAgent(resolvedIp: string, hostname: string): https.Agent {
+  return new https.Agent({
+    servername: hostname, // Set SNI to original hostname for proper TLS certificate validation
+    lookup: (_hostname, _options, callback) => {
+      // Override DNS lookup to use our pre-resolved IP
+      callback(null, resolvedIp, isIP(resolvedIp) === 6 ? 6 : 4);
+    },
+  });
 }
 
 /**
  * Performs SSRF-validated fetch using the pre-resolved IP address.
- * Eliminates TOCTOU by using the resolved IP from validateUrlForSSRF.
+ * Eliminates TOCTOU by using custom agents that connect to the resolved IP.
+ * Uses redirect: 'manual' to validate redirect URLs before following.
  *
  * @param validated - Result from validateUrlForSSRF
  * @param init - Standard fetch options
@@ -416,16 +466,159 @@ export async function fetchWithResolvedIp(
   init?: SSRFSafeFetchOptions
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
+  const redirectCount = init?._redirectCount ?? 0;
 
-  // If we resolved to an IP, set Host header to original hostname
-  // This is needed because we're connecting to the IP directly
-  if (validated.resolvedUrl !== validated.originalUrl && !headers.has("Host")) {
+  // Set Host header to original hostname for proper virtual host routing
+  if (!headers.has("Host")) {
     headers.set("Host", validated.hostname);
   }
 
-  return fetch(validated.resolvedUrl, {
-    ...init,
-    headers,
+  // Determine if we need a custom agent (when we have a real resolved IP)
+  const needsCustomAgent = isIP(validated.resolvedIp) !== 0;
+
+  // Create appropriate agent for IP pinning
+  let agent: http.Agent | https.Agent | undefined;
+  if (needsCustomAgent) {
+    if (validated.protocol === "https:") {
+      agent = createHttpsAgent(validated.resolvedIp, validated.hostname);
+    } else {
+      agent = createHttpAgent(validated.resolvedIp);
+    }
+  }
+
+  // Make the request using Node's http/https modules for proper agent support
+  const response = await makeRequestWithAgent(validated, headers, init, agent);
+
+  // Handle redirects manually to validate redirect URLs
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (location) {
+      if (redirectCount >= MAX_REDIRECTS) {
+        throw new Error(`Too many redirects (max ${MAX_REDIRECTS})`);
+      }
+
+      // Resolve relative redirects against original URL
+      const redirectUrl = new URL(location, validated.originalUrl).toString();
+
+      logger.debug(
+        {
+          originalUrl: validated.originalUrl,
+          redirectUrl,
+          redirectCount: redirectCount + 1,
+        },
+        "Following redirect with SSRF validation"
+      );
+
+      // Validate the redirect URL through SSRF checks
+      const redirectValidated = await validateUrlForSSRF(redirectUrl);
+
+      // Follow redirect with GET method (standard behavior for 301/302/303)
+      const redirectInit: SSRFSafeFetchOptions = {
+        ...init,
+        _redirectCount: redirectCount + 1,
+      };
+
+      // Convert to GET for 303 or POST redirects (standard HTTP behavior)
+      if (response.status === 303 || (response.status !== 307 && response.status !== 308 && init?.method === "POST")) {
+        redirectInit.method = "GET";
+        redirectInit.body = undefined;
+      }
+
+      return fetchWithResolvedIp(redirectValidated, redirectInit);
+    }
+  }
+
+  return response;
+}
+
+/**
+ * Makes an HTTP/HTTPS request with a custom agent for IP pinning.
+ * This is necessary because Node.js fetch doesn't support custom agents directly.
+ */
+async function makeRequestWithAgent(
+  validated: SSRFValidationResult,
+  headers: Headers,
+  init?: SSRFSafeFetchOptions,
+  agent?: http.Agent | https.Agent
+): Promise<Response> {
+  // If we don't need a custom agent (development mode with unresolved IPs), use regular fetch
+  if (!agent) {
+    const requestUrl = `${validated.protocol}//${validated.hostname}:${validated.port}${validated.path}`;
+    return fetch(requestUrl, {
+      ...init,
+      headers,
+      redirect: "manual",
+    });
+  }
+
+  return new Promise((resolve, reject) => {
+    const isHttps = validated.protocol === "https:";
+    const requestModule = isHttps ? https : http;
+
+    // Convert Headers to plain object
+    const headerObj: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      headerObj[key] = value;
+    });
+
+    const requestOptions: http.RequestOptions | https.RequestOptions = {
+      hostname: validated.hostname,
+      port: validated.port,
+      path: validated.path,
+      method: init?.method ?? "GET",
+      headers: headerObj,
+      agent,
+    };
+
+    const req = requestModule.request(requestOptions, (res) => {
+      const chunks: Buffer[] = [];
+
+      res.on("data", (chunk: Buffer) => {
+        chunks.push(chunk);
+      });
+
+      res.on("end", () => {
+        const body = Buffer.concat(chunks);
+
+        // Convert Node.js response to Web Response
+        const responseHeaders = new Headers();
+        for (const [key, value] of Object.entries(res.headers)) {
+          if (value !== undefined) {
+            if (Array.isArray(value)) {
+              value.forEach(v => responseHeaders.append(key, v));
+            } else {
+              responseHeaders.set(key, value);
+            }
+          }
+        }
+
+        const response = new Response(body, {
+          status: res.statusCode ?? 200,
+          statusText: res.statusMessage ?? "",
+          headers: responseHeaders,
+        });
+
+        resolve(response);
+      });
+
+      res.on("error", reject);
+    });
+
+    req.on("error", reject);
+
+    // Write body if present
+    if (init?.body) {
+      if (typeof init.body === "string") {
+        req.write(init.body);
+      } else if (init.body instanceof Buffer) {
+        req.write(init.body);
+      } else if (init.body instanceof ArrayBuffer) {
+        req.write(Buffer.from(init.body));
+      }
+      // Note: Streams and other body types would need additional handling
+    }
+
+    req.end();
   });
 }
 

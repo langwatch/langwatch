@@ -3,16 +3,25 @@
  *
  * Integration tests for HTTP Proxy endpoint.
  * Tests HTTP request execution with auth, headers, and JSONPath extraction.
+ *
+ * Note: These tests mock ssrfSafeFetch to bypass SSRF validation since
+ * SSRF protection has its own dedicated unit tests. This allows us to
+ * focus on testing the HTTP proxy functionality.
  */
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 
+// Mock ssrfSafeFetch to bypass SSRF validation in tests
+const mockSsrfSafeFetch = vi.fn();
+vi.mock("~/utils/ssrfProtection", () => ({
+  ssrfSafeFetch: (...args: unknown[]) => mockSsrfSafeFetch(...args),
+}));
+
 describe("HTTP Proxy", () => {
   const projectId = "test-project-id";
   let caller: ReturnType<typeof appRouter.createCaller>;
-  const mockFetch = vi.fn();
 
   beforeAll(async () => {
     const user = await getTestUser();
@@ -26,13 +35,11 @@ describe("HTTP Proxy", () => {
   });
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    // Mock fetch per test
-    vi.stubGlobal('fetch', mockFetch);
+    mockSsrfSafeFetch.mockReset();
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.clearAllMocks();
   });
 
   describe("when request body is invalid JSON", () => {
@@ -51,12 +58,12 @@ describe("HTTP Proxy", () => {
 
   describe("when auth type is bearer", () => {
     it("adds Authorization Bearer header", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ result: "success" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "success" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       await caller.httpProxy.execute({
         projectId,
@@ -69,21 +76,21 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-      const headers = fetchOptions.headers as Headers;
-      expect(headers.get("Authorization")).toBe("Bearer test-token-123");
+      expect(mockSsrfSafeFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
+      expect(fetchOptions.headers).toBeDefined();
+      expect((fetchOptions.headers as Record<string, string>)["Authorization"]).toBe("Bearer test-token-123");
     });
   });
 
   describe("when auth type is api_key", () => {
     it("adds custom header with api key value", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ result: "success" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "success" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       await caller.httpProxy.execute({
         projectId,
@@ -97,21 +104,20 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-      const headers = fetchOptions.headers as Headers;
-      expect(headers.get("X-API-Key")).toBe("secret-key-456");
+      expect(mockSsrfSafeFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
+      expect((fetchOptions.headers as Record<string, string>)["X-API-Key"]).toBe("secret-key-456");
     });
   });
 
   describe("when auth type is basic", () => {
     it("adds Authorization Basic header with base64 encoding", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ result: "success" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "success" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       await caller.httpProxy.execute({
         projectId,
@@ -126,21 +132,20 @@ describe("HTTP Proxy", () => {
       });
 
       const expectedAuth = `Basic ${Buffer.from("user:pass").toString("base64")}`;
-      expect(mockFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-      const headers = fetchOptions.headers as Headers;
-      expect(headers.get("Authorization")).toBe(expectedAuth);
+      expect(mockSsrfSafeFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
+      expect((fetchOptions.headers as Record<string, string>)["Authorization"]).toBe(expectedAuth);
     });
   });
 
   describe("when custom headers provided", () => {
     it("adds all custom headers to request", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ result: "success" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "success" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       await caller.httpProxy.execute({
         projectId,
@@ -153,28 +158,27 @@ describe("HTTP Proxy", () => {
         body: "{}",
       });
 
-      expect(mockFetch).toHaveBeenCalled();
-      const [, fetchOptions] = mockFetch.mock.calls[0] as [string, RequestInit];
-      const headers = fetchOptions.headers as Headers;
-      expect(headers.get("X-Custom-1")).toBe("value1");
-      expect(headers.get("X-Custom-2")).toBe("value2");
+      expect(mockSsrfSafeFetch).toHaveBeenCalled();
+      const [, fetchOptions] = mockSsrfSafeFetch.mock.calls[0] as [string, RequestInit];
+      expect((fetchOptions.headers as Record<string, string>)["X-Custom-1"]).toBe("value1");
+      expect((fetchOptions.headers as Record<string, string>)["X-Custom-2"]).toBe("value2");
     });
   });
 
   describe("when outputPath extracts value", () => {
     it("extracts string using JSONPath", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({
           data: {
             nested: {
               value: "extracted text",
             },
           },
-        }),
-      });
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -189,12 +193,12 @@ describe("HTTP Proxy", () => {
     });
 
     it("returns undefined when path not found", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ data: "value" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ data: "value" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -209,16 +213,16 @@ describe("HTTP Proxy", () => {
     });
 
     it("stringifies non-string values", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({
           data: {
             obj: { key: "value" },
           },
-        }),
-      });
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -235,13 +239,13 @@ describe("HTTP Proxy", () => {
 
   describe("when request fails", () => {
     it("returns error for non-2xx HTTP status", async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ error: "Resource not found" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ error: "Resource not found" }), {
+          status: 404,
+          statusText: "Not Found",
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -256,7 +260,7 @@ describe("HTTP Proxy", () => {
     });
 
     it("returns error for network failure", async () => {
-      mockFetch.mockRejectedValue(new Error("Network timeout"));
+      mockSsrfSafeFetch.mockRejectedValue(new Error("Network timeout"));
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -272,12 +276,12 @@ describe("HTTP Proxy", () => {
 
   describe("when request succeeds", () => {
     it("returns response data and metadata", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "application/json"]]),
-        json: async () => ({ result: "success" }),
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "success" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
@@ -293,12 +297,12 @@ describe("HTTP Proxy", () => {
     });
 
     it("handles text responses", async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        status: 200,
-        headers: new Map([["content-type", "text/plain"]]),
-        text: async () => "plain text response",
-      });
+      mockSsrfSafeFetch.mockResolvedValue(
+        new Response("plain text response", {
+          status: 200,
+          headers: { "content-type": "text/plain" },
+        })
+      );
 
       const result = await caller.httpProxy.execute({
         projectId,
