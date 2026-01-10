@@ -148,6 +148,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     provider,
     projectId,
     project: projectForForm,
+    isUsingEnvVars,
     onSuccess: () => {
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
