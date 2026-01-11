@@ -806,6 +806,62 @@ describe("Orchestrator Integration", () => {
         }
       }
     }, 120000);
+
+    it("stops quickly even with many rows when abort is requested immediately", async () => {
+      // This test verifies that abort is responsive even with many pending cells
+      const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+      // Create 20 rows - without abort this would take a long time
+      const datasetRows = Array.from({ length: 20 }, (_, i) => ({
+        question: `Say number ${i + 1}`,
+        expected: `${i + 1}`,
+      }));
+      const datasetColumns = [
+        { id: "question", name: "question", type: "string" },
+        { id: "expected", name: "expected", type: "string" },
+      ];
+
+      const input: OrchestratorInput = {
+        projectId: project.id,
+        scope: { type: "full" },
+        state,
+        datasetRows,
+        datasetColumns,
+        loadedPrompts: new Map(),
+        loadedAgents: new Map(),
+      };
+
+      const events: EvaluationV3Event[] = [];
+      let runId: string | undefined;
+      const startTime = Date.now();
+
+      for await (const event of runOrchestrator(input)) {
+        events.push(event);
+
+        if (event.type === "execution_started") {
+          runId = event.runId;
+          // Request abort immediately after execution starts
+          await abortManager.requestAbort(runId);
+        }
+      }
+
+      const duration = Date.now() - startTime;
+
+      // Should end with stopped event
+      const lastEvent = events[events.length - 1];
+      expect(lastEvent?.type).toBe("stopped");
+      if (lastEvent?.type === "stopped") {
+        expect(lastEvent.reason).toBe("user");
+      }
+
+      // Should complete in reasonable time (not waiting for all 20 rows)
+      // With 5 concurrent cells and immediate abort, should be under 60s
+      // (just waiting for in-flight cells to complete)
+      expect(duration).toBeLessThan(60000);
+
+      // Should have fewer results than total rows
+      const targetResults = events.filter((e) => e.type === "target_result");
+      expect(targetResults.length).toBeLessThan(20);
+    }, 120000);
   });
 
   describe("empty row handling", () => {

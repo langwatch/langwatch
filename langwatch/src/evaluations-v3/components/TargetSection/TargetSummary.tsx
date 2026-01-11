@@ -400,16 +400,13 @@ export const TargetSummary = memo(function TargetSummary({
           </HStack>
         )}
 
-        {/* Average latency (compact) - with caret to indicate more details */}
+        {/* Average latency (compact) */}
         {aggregates.averageLatency !== null && (
           <HStack gap={1}>
             <LuClock />
             <Text fontWeight="medium">
               {formatLatency(aggregates.averageLatency)}
             </Text>
-            {aggregates.latencyStats && (
-              <LuChevronRight size={12} style={{ opacity: 0.5 }} />
-            )}
           </HStack>
         )}
 
@@ -420,9 +417,6 @@ export const TargetSummary = memo(function TargetSummary({
           !isRunning && (
             <HStack gap={1}>
               <Text color="gray.500">{formatCost(aggregates.totalCost)}</Text>
-              {aggregates.costStats && (
-                <LuChevronRight size={12} style={{ opacity: 0.5 }} />
-              )}
             </HStack>
           )}
 

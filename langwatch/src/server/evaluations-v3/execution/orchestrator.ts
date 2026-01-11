@@ -126,13 +126,15 @@ export const generateCells = (
 
 /**
  * Executes a single cell and yields events.
+ * @param isAborted - Optional function to check if execution should be aborted
  */
 export async function* executeCell(
   cell: ExecutionCell,
   projectId: string,
   datasetColumns: Array<{ id: string; name: string; type: string }>,
   loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
-  resultMapperConfig?: ResultMapperConfig
+  resultMapperConfig?: ResultMapperConfig,
+  isAborted?: () => Promise<boolean>
 ): AsyncGenerator<EvaluationV3Event> {
   // Emit cell_started
   yield {
@@ -184,6 +186,7 @@ export async function* executeCell(
     await studioBackendPostEvent({
       projectId,
       message: enrichedEvent,
+      isAborted,
       onEvent: (serverEvent) => {
         targetEvents.push(serverEvent);
 
@@ -212,9 +215,20 @@ export async function* executeCell(
       }
     }
 
+    // Check abort before executing evaluators
+    if (isAborted && await isAborted()) {
+      logger.debug({ cell: cell.rowIndex, targetId: cell.targetId }, "Cell aborted after target execution");
+      return;
+    }
+
     // Execute evaluators if target succeeded and we have evaluators
     if (!targetFailed && targetOutput && Object.keys(evaluatorNodeIds).length > 0) {
       for (const [evaluatorId, evaluatorNodeId] of Object.entries(evaluatorNodeIds)) {
+        // Check abort before each evaluator
+        if (isAborted && await isAborted()) {
+          logger.debug({ cell: cell.rowIndex, evaluatorId }, "Cell aborted before evaluator execution");
+          return;
+        }
         try {
           // Build evaluator inputs from target output and dataset
           const evaluatorInputs = buildEvaluatorInputs(
@@ -245,6 +259,7 @@ export async function* executeCell(
           await studioBackendPostEvent({
             projectId,
             message: enrichedEvaluatorEvent,
+            isAborted,
             onEvent: (serverEvent) => {
               evaluatorEvents.push(serverEvent);
             },
@@ -560,9 +575,19 @@ export async function* runOrchestrator(
             // Get loaded data for this target
             const loadedData = getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents);
 
+            // Create abort checker bound to this run
+            const checkAbort = () => abortManager.isAborted(runId);
+
             // Execute cell and collect events
             let cellFailed = false;
-            for await (const event of executeCell(cell, projectId, datasetColumns, loadedData, resultMapperConfig)) {
+            let cellAborted = false;
+            for await (const event of executeCell(cell, projectId, datasetColumns, loadedData, resultMapperConfig, checkAbort)) {
+              // Check abort during cell processing
+              if (await abortManager.isAborted(runId)) {
+                cellAborted = true;
+                break;
+              }
+
               pushEvent(event);
 
               // Process for storage
@@ -577,6 +602,11 @@ export async function* runOrchestrator(
               if (event.type === "target_result" && event.cost) {
                 totalCost += event.cost;
               }
+            }
+
+            // If aborted mid-cell, signal abort at the orchestrator level
+            if (cellAborted) {
+              aborted = true;
             }
 
             completed++;
@@ -655,25 +685,28 @@ export async function* runOrchestrator(
     }
   }
 
-  const finishedAt = Date.now();
+  // Only emit done if not aborted
+  if (!aborted) {
+    const finishedAt = Date.now();
 
-  // Emit done with summary
-  const summary: ExecutionSummary = {
-    runId,
-    totalCells,
-    completedCells,
-    failedCells,
-    duration: finishedAt - startTime,
-    timestamps: {
-      startedAt: startTime,
-      finishedAt,
-    },
-  };
+    // Emit done with summary
+    const summary: ExecutionSummary = {
+      runId,
+      totalCells,
+      completedCells,
+      failedCells,
+      duration: finishedAt - startTime,
+      timestamps: {
+        startedAt: startTime,
+        finishedAt,
+      },
+    };
 
-  yield {
-    type: "done",
-    summary,
-  };
+    yield {
+      type: "done",
+      summary,
+    };
+  }
 }
 
 /**

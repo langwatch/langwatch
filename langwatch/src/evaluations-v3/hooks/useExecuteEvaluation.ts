@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
@@ -6,6 +6,8 @@ import { toaster } from "~/components/ui/toaster";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import type { EvaluationV3Event, ExecutionScope, ExecutionRequest } from "~/server/evaluations-v3/execution/types";
 import type { EvaluationResults } from "../types";
+import { computeExecutionCells, createExecutionCellSet } from "../utils/executionScope";
+import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 
 // ============================================================================
 // Types
@@ -48,19 +50,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const [totalCost, setTotalCost] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  // Ref to track accumulated results during execution
-  const resultsRef = useRef<{
-    targetOutputs: Record<string, unknown[]>;
-    targetMetadata: Record<string, Array<{ cost?: number; duration?: number; traceId?: string }>>;
-    evaluatorResults: Record<string, Record<string, unknown[]>>;
-    errors: Record<string, string[]>;
-  }>({
-    targetOutputs: {},
-    targetMetadata: {},
-    evaluatorResults: {},
-    errors: {},
-  });
-
   // Get store state and actions
   const {
     experimentId,
@@ -92,7 +81,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const activeDataset = datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
   /**
-   * Helper to update target output in accumulated results
+   * Helper to update target output in the store.
+   * Uses functional update to properly merge with existing state.
    */
   const updateTargetOutput = useCallback(
     (
@@ -101,68 +91,90 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       output: unknown,
       metadata?: { cost?: number; duration?: number; traceId?: string }
     ) => {
-      const current = resultsRef.current;
-      if (!current.targetOutputs[targetId]) {
-        current.targetOutputs[targetId] = [];
-      }
-      current.targetOutputs[targetId]![rowIndex] = output;
+      // Use the store's setState directly for atomic updates
+      useEvaluationsV3Store.setState((state) => {
+        // Deep copy the target's array, or create new if doesn't exist
+        const existingOutputs = state.results.targetOutputs[targetId] ?? [];
+        const newOutputs = [...existingOutputs];
+        newOutputs[rowIndex] = output;
 
-      // Update metadata if provided
-      if (metadata) {
-        if (!current.targetMetadata[targetId]) {
-          current.targetMetadata[targetId] = [];
+        // Deep copy metadata if provided
+        let newMetadata = state.results.targetMetadata;
+        if (metadata) {
+          const existingMeta = state.results.targetMetadata[targetId] ?? [];
+          const newMeta = [...existingMeta];
+          newMeta[rowIndex] = metadata;
+          newMetadata = {
+            ...state.results.targetMetadata,
+            [targetId]: newMeta,
+          };
         }
-        current.targetMetadata[targetId]![rowIndex] = metadata;
-      }
 
-      // Update store
-      setResults({
-        targetOutputs: { ...current.targetOutputs },
-        targetMetadata: { ...current.targetMetadata },
+        return {
+          results: {
+            ...state.results,
+            targetOutputs: {
+              ...state.results.targetOutputs,
+              [targetId]: newOutputs,
+            },
+            targetMetadata: newMetadata,
+          },
+        };
       });
     },
-    [setResults]
+    []
   );
 
   /**
-   * Helper to update target error in accumulated results
+   * Helper to update target error in the store.
    */
   const updateTargetError = useCallback(
     (rowIndex: number, targetId: string, errorMsg: string) => {
-      const current = resultsRef.current;
-      if (!current.errors[targetId]) {
-        current.errors[targetId] = [];
-      }
-      current.errors[targetId]![rowIndex] = errorMsg;
+      useEvaluationsV3Store.setState((state) => {
+        const existingErrors = state.results.errors[targetId] ?? [];
+        const newErrors = [...existingErrors];
+        newErrors[rowIndex] = errorMsg;
 
-      // Update store
-      setResults({
-        errors: { ...current.errors },
+        return {
+          results: {
+            ...state.results,
+            errors: {
+              ...state.results.errors,
+              [targetId]: newErrors,
+            },
+          },
+        };
       });
     },
-    [setResults]
+    []
   );
 
   /**
-   * Helper to update evaluator result in accumulated results
+   * Helper to update evaluator result in the store.
    */
   const updateEvaluatorResult = useCallback(
     (rowIndex: number, targetId: string, evaluatorId: string, result: unknown) => {
-      const current = resultsRef.current;
-      if (!current.evaluatorResults[targetId]) {
-        current.evaluatorResults[targetId] = {};
-      }
-      if (!current.evaluatorResults[targetId]![evaluatorId]) {
-        current.evaluatorResults[targetId]![evaluatorId] = [];
-      }
-      current.evaluatorResults[targetId]![evaluatorId]![rowIndex] = result;
+      useEvaluationsV3Store.setState((state) => {
+        const existingTargetResults = state.results.evaluatorResults[targetId] ?? {};
+        const existingEvalResults = existingTargetResults[evaluatorId] ?? [];
+        const newEvalResults = [...existingEvalResults];
+        newEvalResults[rowIndex] = result;
 
-      // Update store
-      setResults({
-        evaluatorResults: { ...current.evaluatorResults },
+        return {
+          results: {
+            ...state.results,
+            evaluatorResults: {
+              ...state.results.evaluatorResults,
+              [targetId]: {
+                ...existingTargetResults,
+                [evaluatorId]: newEvalResults,
+              },
+            },
+          },
+        };
       });
     },
-    [setResults]
+    []
   );
 
   /**
@@ -246,12 +258,12 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
         case "stopped":
           setStatus("stopped");
-          setResults({ status: "idle" }); // Reset to idle on stop
+          // Note: executingCells will be cleared by the execute function's cleanup
           break;
 
         case "done":
           setStatus("completed");
-          setResults({ status: "success" });
+          // Note: executingCells will be cleared by the execute function's cleanup
           break;
       }
     },
@@ -281,24 +293,58 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       setStatus("running");
       setError(null);
       setTotalCost(0);
-      setProgress({ completed: 0, total: 0 });
 
-      // Reset accumulated results
-      resultsRef.current = {
-        targetOutputs: {},
-        targetMetadata: {},
-        evaluatorResults: {},
-        errors: {},
-      };
-
-      // Clear previous results and set to running
-      setResults({
-        status: "running",
-        targetOutputs: {},
-        targetMetadata: {},
-        evaluatorResults: {},
-        errors: {},
+      // Compute which cells will be executed (single source of truth)
+      const datasetRows = activeDataset.inline?.records
+        ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
+        : activeDataset.savedRecords ?? [];
+      
+      const executionCells = computeExecutionCells({
+        scope,
+        targetIds: targets.map((t) => t.id),
+        datasetRows,
       });
+      const executingCellsSet = createExecutionCellSet(executionCells);
+
+      // Set progress based on actual cells to execute
+      setProgress({ completed: 0, total: executionCells.length });
+
+      // For full execution, clear all results
+      // For partial execution, preserve existing results AND merge executingCells
+      const isFullExecution = scope.type === "full";
+
+      if (isFullExecution) {
+        // Clear all results and set to running
+        setResults({
+          status: "running",
+          executingCells: executingCellsSet,
+          progress: 0,
+          total: executionCells.length,
+          targetOutputs: {},
+          targetMetadata: {},
+          evaluatorResults: {},
+          errors: {},
+        });
+      } else {
+        // Partial execution: merge new executingCells with any existing ones
+        // This allows running multiple targets/cells concurrently
+        useEvaluationsV3Store.setState((state) => {
+          const existingCells = state.results.executingCells;
+          const mergedCells = existingCells
+            ? new Set([...existingCells, ...executingCellsSet])
+            : executingCellsSet;
+
+          return {
+            results: {
+              ...state.results,
+              status: "running",
+              executingCells: mergedCells,
+              // Note: progress/total are per-execution, not merged
+              // The UI should derive progress from executingCells + actual results
+            },
+          };
+        });
+      }
 
       // Build dataset for request
       const datasetColumns = activeDataset.columns ?? [];
@@ -342,6 +388,31 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         scope,
       };
 
+      // Helper to remove this execution's cells from executingCells when done
+      const cleanupExecutingCells = () => {
+        useEvaluationsV3Store.setState((state) => {
+          if (!state.results.executingCells) return state;
+
+          // Remove only the cells from THIS execution
+          const remainingCells = new Set(
+            [...state.results.executingCells].filter(
+              (cellKey) => !executingCellsSet.has(cellKey)
+            )
+          );
+
+          // If no cells remain, set to undefined and status to idle/success
+          const hasRemainingCells = remainingCells.size > 0;
+
+          return {
+            results: {
+              ...state.results,
+              executingCells: hasRemainingCells ? remainingCells : undefined,
+              status: hasRemainingCells ? state.results.status : "success",
+            },
+          };
+        });
+      };
+
       try {
         await fetchSSE<EvaluationV3Event>({
           endpoint: "/api/evaluations/v3/execute",
@@ -353,8 +424,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           chunkTimeout: 300_000, // 5min between events
           onError: (err) => {
             setStatus("error");
-            setResults({ status: "error" });
             setError(err.message);
+            cleanupExecutingCells();
             toaster.create({
               title: "Execution Failed",
               description: err.message,
@@ -362,11 +433,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             });
           },
         });
+
+        // Clean up this execution's cells when SSE completes
+        cleanupExecutingCells();
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
-        setResults({ status: "error" });
         setError(message);
+        cleanupExecutingCells();
       }
     },
     [
@@ -417,12 +491,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     setProgress({ completed: 0, total: 0 });
     setTotalCost(0);
     setError(null);
-    resultsRef.current = {
-      targetOutputs: {},
-      targetMetadata: {},
-      evaluatorResults: {},
-      errors: {},
-    };
     clearResults();
   }, [clearResults]);
 

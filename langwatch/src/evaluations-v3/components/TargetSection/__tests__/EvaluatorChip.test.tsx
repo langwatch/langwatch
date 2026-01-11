@@ -49,12 +49,13 @@ describe("EvaluatorChip", () => {
       expect(container.querySelector(".chakra-spinner")).toBeNull();
     });
 
-    it("shows spinner when target has output but evaluator result is undefined", () => {
+    it("shows spinner when target has output but evaluator result is undefined and execution is running", () => {
       const { container } = render(
         <EvaluatorChip
           evaluator={createEvaluator()}
           result={undefined}
           targetHasOutput={true}
+          isExecutionRunning={true}
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
@@ -64,6 +65,23 @@ describe("EvaluatorChip", () => {
       // Should show spinner (running state)
       // Chakra spinner has class "chakra-spinner"
       expect(container.querySelector(".chakra-spinner")).not.toBeNull();
+    });
+
+    it("shows pending (gray circle) when target has output but execution is stopped", () => {
+      const { container } = render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={undefined}
+          targetHasOutput={true}
+          isExecutionRunning={false}
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      // Should NOT show spinner - execution has stopped
+      expect(container.querySelector(".chakra-spinner")).toBeNull();
     });
 
     it("shows spinner when result indicates running status", () => {

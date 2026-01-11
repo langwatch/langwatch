@@ -578,4 +578,74 @@ describe("TargetCellContent", () => {
       });
     });
   });
+
+  describe("Loading State (Skeleton)", () => {
+    it("shows skeleton when isLoading is true and no output", () => {
+      const target = createTarget();
+
+      render(
+        <TargetCellContent
+          target={target}
+          output={undefined}
+          evaluatorResults={{}}
+          row={0}
+          isLoading={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
+      const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
+      expect(skeletons.length).toBeGreaterThan(0);
+
+      // Should NOT show "No output" text
+      expect(screen.queryByText("No output")).not.toBeInTheDocument();
+    });
+
+    it("shows skeleton when isLoading is true EVEN WITH existing output", () => {
+      const target = createTarget();
+
+      render(
+        <TargetCellContent
+          target={target}
+          output="This is existing output that should be hidden during loading"
+          evaluatorResults={{}}
+          row={0}
+          isLoading={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
+      const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
+      expect(skeletons.length).toBeGreaterThan(0);
+
+      // Should NOT show the existing output text
+      expect(
+        screen.queryByText("This is existing output that should be hidden during loading")
+      ).not.toBeInTheDocument();
+    });
+
+    it("shows output when isLoading is false", () => {
+      const target = createTarget();
+
+      render(
+        <TargetCellContent
+          target={target}
+          output="Completed output"
+          evaluatorResults={{}}
+          row={0}
+          isLoading={false}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      // Should NOT show skeleton
+      const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
+      expect(skeletons.length).toBe(0);
+
+      // Should show the output
+      expect(screen.getByText("Completed output")).toBeInTheDocument();
+    });
+  });
 });

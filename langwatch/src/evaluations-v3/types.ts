@@ -233,6 +233,12 @@ export type EvaluationResults = {
   status: EvaluationResultStatus;
   progress?: number;
   total?: number;
+  /**
+   * Set of cells currently being executed.
+   * Key format: "rowIndex:targetId"
+   * This is the single source of truth for determining which cells show loading state.
+   */
+  executingCells?: Set<string>;
   // Per-row results
   targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
   // Per-row metadata (cost, duration, traceId)
@@ -503,6 +509,13 @@ export type TableMeta = {
   handleRunTarget?: (targetId: string) => void;
   handleRunRow?: (rowIndex: number) => void;
   handleRunCell?: (rowIndex: number, targetId: string) => void;
+  handleStopExecution?: () => void;
+  /** Whether any execution is currently running */
+  isExecutionRunning?: boolean;
+  /** Check if a specific target has cells being executed */
+  isTargetExecuting?: (targetId: string) => boolean;
+  /** Check if a specific cell is being executed */
+  isCellExecuting?: (rowIndex: number, targetId: string) => boolean;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;

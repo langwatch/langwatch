@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { Play, Trash2, X } from "lucide-react";
+import { Button, HStack, Text } from "@chakra-ui/react";
+import { Play, Square, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -15,15 +15,20 @@ import {
 export type SelectionToolbarProps = {
   selectedCount: number;
   onRun: () => void;
+  onStop?: () => void;
   onDelete: () => void;
   onClear: () => void;
+  /** Whether these specific rows are currently being executed */
+  isRunning?: boolean;
 };
 
 export function SelectionToolbar({
   selectedCount,
   onRun,
+  onStop,
   onDelete,
   onClear,
+  isRunning = false,
 }: SelectionToolbarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -36,6 +41,14 @@ export function SelectionToolbar({
   const handleConfirmDelete = () => {
     onDelete();
     setShowDeleteConfirm(false);
+  };
+
+  const handleRunClick = () => {
+    if (isRunning && onStop) {
+      onStop();
+    } else {
+      onRun();
+    }
   };
 
   return (
@@ -51,6 +64,7 @@ export function SelectionToolbar({
         boxShadow="lg"
         gap={3}
         zIndex={100}
+        bg="white"
       >
         <Text fontSize="sm" data-testid="selection-count">
           {selectedCount} selected
@@ -58,15 +72,24 @@ export function SelectionToolbar({
         <Button
           size="sm"
           variant="ghost"
-          onClick={onRun}
+          onClick={handleRunClick}
           data-testid="selection-run-btn"
         >
-          <Play size={16} /> Run
+          {isRunning ? (
+            <>
+              <Square size={16} /> Stop
+            </>
+          ) : (
+            <>
+              <Play size={16} /> Run
+            </>
+          )}
         </Button>
         <Button
           size="sm"
           variant="ghost"
           onClick={handleDeleteClick}
+          disabled={isRunning}
           data-testid="selection-delete-btn"
         >
           <Trash2 size={16} /> Delete

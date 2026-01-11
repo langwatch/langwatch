@@ -38,6 +38,8 @@ type EvaluatorChipProps = {
   hasMissingMappings?: boolean;
   /** Whether the target has finished and this evaluator should be running */
   targetHasOutput?: boolean;
+  /** Whether the overall execution is still running */
+  isExecutionRunning?: boolean;
   onEdit: () => void;
   onRemove: () => void;
 };
@@ -47,14 +49,18 @@ export function EvaluatorChip({
   result,
   hasMissingMappings = false,
   targetHasOutput = false,
+  isExecutionRunning = false,
   onEdit,
   onRemove,
 }: EvaluatorChipProps) {
   const parsed = parseEvaluationResult(result);
 
-  // If target has finished but evaluator hasn't returned yet, show as running
+  // If target has finished but evaluator hasn't returned yet AND execution is still running, show as running
+  // If execution has stopped but we have no result, show as pending (skipped)
   const status =
-    parsed.status === "pending" && targetHasOutput ? "running" : parsed.status;
+    parsed.status === "pending" && targetHasOutput && isExecutionRunning
+      ? "running"
+      : parsed.status;
   const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];

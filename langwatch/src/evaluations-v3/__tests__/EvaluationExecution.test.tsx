@@ -13,6 +13,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { createExecutionCellSet } from "../utils/executionScope";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
 vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
@@ -702,10 +703,18 @@ describe("Evaluation Execution", () => {
     it("shows progress during execution", async () => {
       setupStoreWithConfiguredEvaluation();
 
+      // Create executingCells set for all 3 rows of target-1
+      const executingCells = createExecutionCellSet([
+        { rowIndex: 0, targetId: "target-1" },
+        { rowIndex: 1, targetId: "target-1" },
+        { rowIndex: 2, targetId: "target-1" },
+      ]);
+
       // Set running state with partial progress
       // Progress shows completed rows (target + all evaluators done)
       useEvaluationsV3Store.getState().setResults({
         status: "running",
+        executingCells,
         progress: 1,
         total: 3,
         targetOutputs: {
