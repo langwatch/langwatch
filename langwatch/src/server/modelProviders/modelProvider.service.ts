@@ -323,7 +323,7 @@ export class ModelProviderService {
     try {
       validatedKeys = validator.parse(customKeys);
     } catch {
-      throw new Error(`Invalid keys for ${provider}`);
+      throw new Error(`Invalid API key configuration for ${provider}. Please verify your credentials.`);
     }
 
     // Filter out null values for Azure provider

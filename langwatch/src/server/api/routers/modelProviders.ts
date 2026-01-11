@@ -11,7 +11,7 @@ import {
   hasProjectPermission,
 } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { validateProviderApiKey } from "./providerValidation";
+import { validateProviderApiKey, validateKeyWithCustomUrl } from "./providerValidation";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -112,6 +112,24 @@ export const modelProviderRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { provider, customKeys } = input;
       return validateProviderApiKey(provider, customKeys);
+    }),
+
+  /**
+   * Validates a stored or env var API key against a custom or default base URL.
+   * Gets API key from DB or env var and validates against the provided URL (or default if not provided).
+   */
+  validateKeyWithCustomUrl: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        provider: z.string(),
+        customBaseUrl: z.string().optional(),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .query(async ({ input, ctx }) => {
+      const { projectId, provider, customBaseUrl } = input;
+      return validateKeyWithCustomUrl(projectId, provider, customBaseUrl, ctx.prisma);
     }),
 });
 

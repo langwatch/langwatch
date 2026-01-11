@@ -175,6 +175,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   // API key validation hook
   const {
     validate: validateApiKey,
+    validateWithCustomUrl,
     isValidating: isValidatingApiKey,
     validationError: apiKeyValidationError,
     clearError: clearApiKeyError,
@@ -244,11 +245,24 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     handleOpenAiValidationClear();
     clearApiKeyError();
 
-    // Determine if we should validate API keys:
-    // - Always validate if not using env vars
-    // - Also validate if user entered a new API key (replacing masked env var key)
-    const shouldValidateApiKey =
-      !isUsingEnvVars || hasUserEnteredNewApiKey(state.customKeys);
+    // Run OpenAI-specific validation
+    if (!validateOpenAi()) {
+      return;
+    }
+
+    // Get provider definition for schema and endpoint key
+    const providerDefinition = backendModelProviderKey
+      ? modelProvidersRegistry[backendModelProviderKey]
+      : void 0;
+
+    // Get custom base URL if provided
+    const endpointKey = providerDefinition?.endpointKey;
+    const customBaseUrl = endpointKey
+      ? state.customKeys[endpointKey]?.trim() || undefined
+      : undefined;
+
+    // Check if user entered a new API key
+    const userEnteredNewApiKey = hasUserEnteredNewApiKey(state.customKeys);
 
     // Check if user modified non-API-key fields (like URLs)
     const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
@@ -256,29 +270,8 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       state.initialKeys
     );
 
-    // Skip all validation only if using env vars AND no API key changes AND no URL changes
-    // This prevents masked placeholder values from failing schema validation
-    if (isUsingEnvVars && !shouldValidateApiKey && !hasNonApiKeyChanges) {
-      void actions
-        .setEnabled(true)
-        .then(() => actions.submit())
-        .catch((err) =>
-          logger.error(err, "failed to submit model provider settings"),
-        );
-      return;
-    }
-
-    // Run OpenAI-specific validation
-    if (!validateOpenAi()) {
-      return;
-    }
-
     // Validate keys according to schema before submitting
-    const providerDefinition = backendModelProviderKey
-      ? modelProvidersRegistry[backendModelProviderKey]
-      : void 0;
-
-    if (providerDefinition?.keysSchema) {
+    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
@@ -288,7 +281,6 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       const result = keysSchema.safeParse(keysToValidate);
 
       if (!result.success) {
-        // Parse the Zod error to get field-specific errors
         const parsedErrors = parseZodFieldErrors(
           result.error as ZodErrorStructure,
         );
@@ -297,30 +289,42 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
-    // Validate API key against provider API
-    if (shouldValidateApiKey) {
+    const submitForm = () => {
+      void actions
+        .setEnabled(true)
+        .then(() => actions.submit())
+        .catch((err) =>
+          logger.error(err, "failed to submit model provider settings"),
+        );
+    };
+
+    // ALWAYS validate API key on save
+    if (userEnteredNewApiKey) {
+      // User entered new API key - validate it (against custom or default URL)
       const isValid = await validateApiKey();
-      if (!isValid) {
-        // Validation error is already set in the hook
-        return;
-      }
+      if (!isValid) return;
+    } else if (customBaseUrl) {
+      // Stored/env key + custom URL - validate against custom URL
+      const isValid = await validateWithCustomUrl(customBaseUrl);
+      if (!isValid) return;
+    } else {
+      // Stored/env key + default URL - validate against default URL
+      const isValid = await validateWithCustomUrl();
+      if (!isValid) return;
     }
 
-    void actions
-      .setEnabled(true)
-      .then(() => actions.submit())
-      .catch((err) =>
-        logger.error(err, "failed to submit model provider settings"),
-      );
+    submitForm();
   }, [
     validateOpenAi,
     actions,
     backendModelProviderKey,
     state.customKeys,
+    state.initialKeys,
     handleOpenAiValidationClear,
     clearApiKeyError,
     isUsingEnvVars,
     validateApiKey,
+    validateWithCustomUrl,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;

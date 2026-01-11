@@ -129,12 +129,13 @@ Feature: Onboarding Flow
     And the provider is not saved
 
   @integration
-  Scenario: Skip API key validation for env var providers in onboarding
+  Scenario: Validate env var API key in onboarding
     Given I am configuring a provider that uses environment variables
     And the provider is enabled via env vars with no stored customKeys
     When I click "Save"
-    Then API key validation is skipped
-    And the provider is saved
+    Then the env var API key is validated against the provider API
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
 
   @integration
   Scenario: Validate manually-entered API key when env vars are configured

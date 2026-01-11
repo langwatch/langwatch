@@ -281,16 +281,16 @@ export function useModelProviderForm(
           customEmbeddingsModels: provider.embeddingsModels ?? [],
         });
         onSuccess?.();
-      } catch (err) {
-        onError?.(err);
-        toaster.create({
-          title: "Failed to update provider",
-          description: String(err),
-          type: "error",
-          duration: 4000,
-          meta: { closable: true },
-        });
-      }
+    } catch (err) {
+      onError?.(err);
+      toaster.create({
+        title: "Failed to update provider",
+        description: err instanceof Error ? err.message : String(err),
+        type: "error",
+        duration: 4000,
+        meta: { closable: true },
+      });
+    }
     },
     [
       onSuccess,
@@ -498,7 +498,7 @@ export function useModelProviderForm(
       onError?.(err);
       toaster.create({
         title: "Failed to save settings",
-        description: String(err),
+        description: err instanceof Error ? err.message : String(err),
         type: "error",
         duration: 4000,
         meta: { closable: true },

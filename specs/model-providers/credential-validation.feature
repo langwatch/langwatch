@@ -32,14 +32,15 @@ Feature: Credential Validation
     And if invalid, I see a validation error
 
   @integration
-  Scenario: Skip validation when API key is masked placeholder
+  Scenario: Validate stored API key when custom URL is provided
     Given I have "openai" provider configured with API key "sk-actual123"
     When I open the model provider configuration drawer for "openai"
     And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
-    And I change only the base URL
+    And I enter "https://custom.openai.com/v1" in the "OPENAI_BASE_URL" field
     And I click "Save"
-    Then validation is skipped for the masked API key
-    And the provider is saved without re-validating the API key
+    Then the stored API key is validated against the custom base URL
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
 
   @integration
   Scenario: Show masked placeholder for env var providers
@@ -50,13 +51,31 @@ Feature: Credential Validation
     And the field appears as if it has a value
 
   @integration
-  Scenario: Skip validation for env var providers
+  Scenario: Always validate env var API key on save
     Given I have "openai" provider enabled via environment variable
     When I open the model provider configuration drawer for "openai"
     And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
-    And I click "Save"
-    Then validation is skipped
-    And the provider is saved without validating the API key
+    And I click "Save" without making any changes
+    Then the env var API key is validated against the OpenAI API
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
+
+  @integration
+  Scenario: Always validate stored API key on save
+    Given I have "openai" provider configured with API key "sk-actual123"
+    When I open the model provider configuration drawer for "openai"
+    And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
+    And I click "Save" without making any changes
+    Then the stored API key is validated against the OpenAI API
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
+
+  @integration
+  Scenario: Show error when no API key is available
+    Given "openai" provider has no stored API key and no env var set
+    When I try to save the provider
+    Then I see an error: "No API key found for openai. Please enter an API key."
+    And the provider is not saved
 
   @integration
   Scenario: Show field-level validation errors for invalid schema
@@ -118,15 +137,15 @@ Feature: Credential Validation
     And the provider is not saved
 
   @integration
-  Scenario: Save custom URL when provider uses env vars
+  Scenario: Validate env var API key against custom URL
     Given I have "openai" provider enabled via environment variable
     When I open the model provider configuration drawer for "openai"
     And I see "HAS_KEY••••••••••••••••••••••••" in the API key field
     And I enter "https://custom.openai.com/v1" in the "OPENAI_BASE_URL" field
     And I click "Save"
-    Then the URL is validated for correct format
-    And the provider is saved with the custom base URL
-    And the API key from env vars is preserved
+    Then the env var API key is validated against the custom base URL
+    And if valid, the provider is saved
+    And if invalid, I see a validation error
 
   @integration
   Scenario: Reject invalid URL when provider uses env vars
