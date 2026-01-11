@@ -1,9 +1,25 @@
 import { join } from "path";
 import { configDefaults, defineConfig } from "vitest/config";
+import { config } from "dotenv";
+import os from "os";
+
+config();
+
+const getMaxWorkers = (): number | undefined => {
+  if (process.env.VITEST_MAX_WORKERS) {
+    return parseInt(process.env.VITEST_MAX_WORKERS, 10);
+  }
+  if (process.env.VITEST_CPU_PERCENT) {
+    const percent = parseInt(process.env.VITEST_CPU_PERCENT, 10) / 100;
+    return Math.max(1, Math.floor(os.cpus().length * percent));
+  }
+  return undefined;
+};
 
 export default defineConfig({
   test: {
     watch: false,
+    maxWorkers: getMaxWorkers(),
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
