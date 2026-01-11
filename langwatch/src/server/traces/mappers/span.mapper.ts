@@ -45,7 +45,16 @@ function toJsonSerializable(value: unknown): unknown {
 function extractInput(
   spanAttributes: NormalizedAttributes
 ): SpanInputOutput | null {
-  // Try gen_ai semantic conventions first
+  // Priority 1: gen_ai.input.messages (canonical GenAI semantic convention)
+  const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
+  if (genAiInputMessages !== undefined) {
+    return {
+      type: "chat_messages",
+      value: toJsonSerializable(genAiInputMessages) as ChatMessage[],
+    };
+  }
+
+  // Try legacy gen_ai semantic conventions
   const genAiInput =
     spanAttributes["gen_ai.prompt"] ??
     spanAttributes["gen_ai.request.messages"];
@@ -73,7 +82,7 @@ function extractInput(
   }
 
   // Try generic input attribute
-  const input = spanAttributes["input"] ?? spanAttributes["langwatch.input"];
+  const input = spanAttributes.input ?? spanAttributes["langwatch.input"];
   if (input !== undefined) {
     if (typeof input === "string") {
       return { type: "text", value: input };
@@ -100,7 +109,16 @@ function extractInput(
 function extractOutput(
   spanAttributes: NormalizedAttributes
 ): SpanInputOutput | null {
-  // Try gen_ai semantic conventions first
+  // Priority 1: gen_ai.output.messages (canonical GenAI semantic convention)
+  const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
+  if (genAiOutputMessages !== undefined) {
+    return {
+      type: "chat_messages",
+      value: toJsonSerializable(genAiOutputMessages) as ChatMessage[],
+    };
+  }
+
+  // Try legacy gen_ai semantic conventions
   const genAiOutput =
     spanAttributes["gen_ai.completion"] ??
     spanAttributes["gen_ai.response.messages"];
@@ -128,7 +146,7 @@ function extractOutput(
   }
 
   // Try generic output attribute
-  const output = spanAttributes["output"] ?? spanAttributes["langwatch.output"];
+  const output = spanAttributes.output ?? spanAttributes["langwatch.output"];
   if (output !== void 0) {
     if (typeof output === "string") {
       return { type: "text", value: output };
@@ -274,7 +292,7 @@ function extractError(
  * Extracts params from span attributes.
  * Filters out known semantic convention keys to get custom params.
  */
-function extractParams(
+function _extractParams(
   spanAttributes: NormalizedAttributes
 ): Record<string, unknown> | null {
   const knownKeys = new Set([

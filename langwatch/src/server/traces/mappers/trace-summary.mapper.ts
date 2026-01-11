@@ -8,6 +8,7 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
   "thread.id": "thread_id",
   "langwatch.thread_id": "thread_id",
   "langgraph.thread_id": "thread_id",
+  "gen_ai.conversation.id": "thread_id",
   "user.id": "user_id",
   "langwatch.user_id": "user_id",
   "customer.id": "customer_id",
@@ -94,11 +95,178 @@ export function mapAttributesToMetadata(
 }
 
 /**
+ * Common field names used for input text in state objects (e.g., LangGraph).
+ */
+const INPUT_FIELD_NAMES = [
+  "question",
+  "input",
+  "query",
+  "message",
+  "content",
+  "text",
+  "prompt",
+  "user_input",
+] as const;
+
+/**
+ * Common field names used for output text in state objects (e.g., LangGraph).
+ */
+const OUTPUT_FIELD_NAMES = [
+  "final_answer",
+  "output",
+  "answer",
+  "response",
+  "result",
+  "content",
+  "message",
+  "text",
+  "assistant_response",
+] as const;
+
+/**
+ * Extracts text from a state object by looking for common field names.
+ *
+ * @param obj - The state object to extract from
+ * @param fieldNames - Array of field names to try (in priority order)
+ * @returns The extracted text, or null if not found
+ */
+function extractTextFromStateObject(
+  obj: Record<string, unknown>,
+  fieldNames: readonly string[]
+): string | null {
+  for (const field of fieldNames) {
+    const value = obj[field];
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extracts text content from a single message object.
+ * Handles various message formats: OpenAI, Anthropic, generic.
+ *
+ * @param msg - The message object to extract content from
+ * @returns The extracted text content, or null if not found
+ */
+function extractMessageContent(msg: unknown): string | null {
+  if (typeof msg !== "object" || msg === null) return null;
+  const obj = msg as Record<string, unknown>;
+
+  // Check for content field (OpenAI format)
+  if (typeof obj.content === "string") return obj.content;
+
+  // Check for text field
+  if (typeof obj.text === "string") return obj.text;
+
+  // Handle content array (multimodal messages)
+  if (Array.isArray(obj.content)) {
+    const texts = obj.content
+      .filter((p: unknown): p is Record<string, unknown> =>
+        typeof p === "object" && p !== null
+      )
+      .map((p) => {
+        if (typeof p.text === "string") return p.text;
+        if (typeof p.content === "string") return p.content;
+        return null;
+      })
+      .filter((t): t is string => typeof t === "string");
+    return texts.length > 0 ? texts.join("\n") : null;
+  }
+
+  return null;
+}
+
+/**
+ * Type guard for LangWatch structured value format.
+ * Used by DSPy, LangGraph, and other frameworks.
+ */
+function isStructuredValue(
+  data: unknown
+): data is { type: string; value: unknown } {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "type" in data &&
+    "value" in data &&
+    typeof (data as Record<string, unknown>).type === "string"
+  );
+}
+
+/**
+ * Extracts human-readable text from various message formats.
+ * Handles: chat messages arrays, structured values, state objects.
+ *
+ * @param data - The data to extract text from
+ * @param mode - Whether extracting input or output (affects field priority)
+ * @returns The extracted text, or null if extraction failed
+ */
+function extractTextFromMessages(
+  data: unknown,
+  mode: "input" | "output" = "input"
+): string | null {
+  // Handle LangWatch structured value wrapper: {type: "json"|"chat_messages", value: ...}
+  if (isStructuredValue(data)) {
+    const { type, value } = data;
+
+    if (type === "chat_messages" && Array.isArray(value)) {
+      // Extract text from chat messages array
+      const texts = value
+        .map((msg) => extractMessageContent(msg))
+        .filter((t): t is string => t !== null);
+      return texts.length > 0 ? texts.join("\n") : null;
+    }
+
+    if (type === "json" && typeof value === "object" && value !== null) {
+      // Extract text from state object using common field names
+      const fieldNames = mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
+      return extractTextFromStateObject(value as Record<string, unknown>, fieldNames);
+    }
+
+    // For other types, try to extract from the value
+    if (typeof value === "string") {
+      return value;
+    }
+  }
+
+  // Handle array of messages directly
+  if (Array.isArray(data)) {
+    const texts = data
+      .map((msg) => extractMessageContent(msg))
+      .filter((t): t is string => t !== null);
+    return texts.length > 0 ? texts.join("\n") : null;
+  }
+
+  // Handle single message object
+  if (typeof data === "object" && data !== null) {
+    return extractMessageContent(data);
+  }
+
+  return null;
+}
+
+/**
  * Parses the computed input string to TraceInput format.
+ * Attempts to extract text from chat message formats.
+ *
+ * @param computedInput - The computed input string from ClickHouse
+ * @returns TraceInput with extracted text value
  */
 function parseComputedInput(computedInput: string | null): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
+  }
+
+  // Try to parse as JSON and extract text from chat messages
+  try {
+    const parsed = JSON.parse(computedInput);
+    const text = extractTextFromMessages(parsed, "input");
+    if (text) {
+      return { value: text };
+    }
+  } catch {
+    // Not JSON, use as-is
   }
 
   return {
@@ -108,10 +276,25 @@ function parseComputedInput(computedInput: string | null): TraceInput | undefine
 
 /**
  * Parses the computed output string to TraceOutput format.
+ * Attempts to extract text from chat message formats.
+ *
+ * @param computedOutput - The computed output string from ClickHouse
+ * @returns TraceOutput with extracted text value
  */
 function parseComputedOutput(computedOutput: string | null): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
+  }
+
+  // Try to parse as JSON and extract text from chat messages
+  try {
+    const parsed = JSON.parse(computedOutput);
+    const text = extractTextFromMessages(parsed, "output");
+    if (text) {
+      return { value: text };
+    }
+  } catch {
+    // Not JSON, use as-is
   }
 
   return {
