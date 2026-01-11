@@ -296,7 +296,8 @@ const extractTraceAttributes = (
     }
 
     // Thread/User context from span attributes
-    const threadId = spanAttrs[ATTR_KEYS.LANGWATCH_THREAD_ID];
+    // After canonicalization, thread IDs are stored as gen_ai.conversation.id
+    const threadId = spanAttrs[ATTR_KEYS.GEN_AI_CONVERSATION_ID];
     const userId = spanAttrs[ATTR_KEYS.LANGWATCH_USER_ID];
     const customerId = spanAttrs[ATTR_KEYS.LANGWATCH_CUSTOMER_ID];
 

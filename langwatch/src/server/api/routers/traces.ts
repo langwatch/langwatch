@@ -1,15 +1,8 @@
-import type {
-  SearchResponse,
-  SearchTotalHits,
-  Sort,
-} from "@elastic/elasticsearch/lib/api/types";
-import { on } from "events";
-import { type PrismaClient, PublicShareResourceTypes } from "@prisma/client";
+import { on } from "node:events";
+import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
-import type { Session } from "next-auth";
 import { z } from "zod";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { sseService } from "~/server/services/sse.service";
 import { createLogger } from "~/utils/logger";
 
@@ -18,26 +11,14 @@ import {
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
-import {
-  aggregateTraces,
-  getTraceById,
-  getTracesGroupedByThreadId,
-  searchTraces,
-} from "~/server/elasticsearch/traces";
-import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
-import { ClickHouseTraceService } from "~/server/traces/clickhouse-trace.service";
 import { sharedFiltersInputSchema } from "../../analytics/types";
-import { esClient, TRACE_INDEX } from "../../elasticsearch";
-import type { Protections } from "../../elasticsearch/protections";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types.generated";
-import type { ElasticSearchTrace, Trace } from "../../tracer/types";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { generateTracesPivotQueryConditions } from "./analytics/common";
-
+import { TraceService } from "~/server/traces/trace.service";
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
   pageSize: z.number().optional(),
@@ -62,117 +43,87 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Try ClickHouse first if enabled for this project
-      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
-      const clickHouseResult = await clickHouseService.getAllTracesForProject(
-        input,
-        protections
-      );
-
-      if (clickHouseResult !== null) {
-        return clickHouseResult;
-      }
-
-      // Fall back to Elasticsearch
-      return await getAllTracesForProject({ input, ctx });
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getAllTracesForProject(input, protections);
     }),
+
   getById: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      }),
+      })
     )
     .query(async ({ ctx, input }) => {
-      const trace = await getTraceById({
-        connConfig: { projectId: input.projectId },
-        traceId: input.traceId,
-        includeEvaluations: false,
-        includeSpans: false,
-        protections: await getUserProtectionsForProject(ctx, {
-          projectId: input.projectId,
-        }),
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
       });
+
+      const traceService = TraceService.create(ctx.prisma);
+      const trace = await traceService.getById(
+        input.projectId,
+        input.traceId,
+        protections
+      );
+
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
       }
 
       return trace;
     }),
+
   getEvaluations: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      }),
+      })
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      return (
-        await getEvaluationsMultiple({
-          projectId: input.projectId,
-          traceIds: [input.traceId],
-          protections,
-        })
-      )[input.traceId];
+
+      const traceService = TraceService.create(ctx.prisma);
+      const evaluations = await traceService.getEvaluationsMultiple(
+        input.projectId,
+        [input.traceId],
+        protections
+      );
+
+      return evaluations[input.traceId];
     }),
+
   getEvaluationsMultiple: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
         traceIds: z.array(z.string()),
-      }),
+      })
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
       });
-      return getEvaluationsMultiple({
-        projectId: input.projectId,
-        traceIds: input.traceIds,
-        protections,
-      });
+
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getEvaluationsMultiple(
+        input.projectId,
+        input.traceIds,
+        protections
+      );
     }),
+
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
-      const { pivotIndexConditions } =
-        generateTracesPivotQueryConditions(input);
-
-      const result = await aggregateTraces({
-        connConfig: { projectId: input.projectId },
-        search: {
-          index: TRACE_INDEX.for(input.startDate),
-          query: {
-            bool: {
-              must: pivotIndexConditions,
-              should: void 0,
-              must_not: void 0,
-              filter: void 0,
-            },
-          },
-          aggs: {
-            topicCounts: {
-              terms: {
-                field: "metadata.topic_id",
-                size: 10000,
-              },
-            },
-            subtopicCounts: {
-              terms: {
-                field: "metadata.subtopic_id",
-                size: 10000,
-              },
-            },
-          },
-        },
-      });
+      const traceService = TraceService.create(ctx.prisma);
+      const result = await traceService.getTopicCounts(input);
 
       const topicsMap = Object.fromEntries(
         (
@@ -182,12 +133,12 @@ export const tracesRouter = createTRPCRouter({
             },
             select: { id: true, name: true, parentId: true },
           })
-        ).map((topic) => [topic.id, topic]),
+        ).map((topic) => [topic.id, topic])
       );
 
       const mapBuckets = (
-        buckets: Array<{ key: string; doc_count: number }>,
-        includeParent = false,
+        buckets: Array<{ key: string; count: number }>,
+        includeParent = false
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
@@ -199,7 +150,7 @@ export const tracesRouter = createTRPCRouter({
               {
                 id: bucket.key,
                 name: topic.name,
-                count: bucket.doc_count,
+                count: bucket.count,
                 ...(includeParent && { parentId: topic.parentId }),
               },
             ];
@@ -209,7 +160,7 @@ export const tracesRouter = createTRPCRouter({
             name: string;
             count: number;
             parentId?: string | null;
-          }[],
+          }[]
         );
       };
 
@@ -218,58 +169,28 @@ export const tracesRouter = createTRPCRouter({
 
       return { topicCounts, subtopicCounts };
     }),
+
   getCustomersAndLabels: protectedProcedure
     .input(tracesFilterInput)
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const result = await aggregateTraces({
-        connConfig: { projectId: input.projectId },
-        search: {
-          index: TRACE_INDEX.for(input.startDate),
-          query: {
-            term: {
-              project_id: input.projectId,
-            },
-          },
-          aggs: {
-            customers: {
-              terms: {
-                field: "metadata.customer_id",
-                size: 10000,
-              },
-            },
-            labels: {
-              terms: {
-                field: "metadata.labels",
-                size: 10000,
-              },
-            },
-          },
-        },
-        protections,
-      });
-
-      return {
-        customers: result.customers.map((bucket) => bucket.key),
-        labels: result.labels.map((bucket) => bucket.key),
-      };
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getCustomersAndLabels(input);
     }),
+
   getTracesByThreadId: publicProcedure
     .input(
       z.object({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-      }),
+      })
     )
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      }),
+      })
     )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
@@ -278,11 +199,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const tracesGrouped = await getTracesGroupedByThreadId({
-        connConfig: { projectId },
+      const traceService = TraceService.create(ctx.prisma);
+      const tracesGrouped = await traceService.getTracesByThreadId(
+        projectId,
         threadId,
-        protections,
-      });
+        protections
+      );
 
       if (!ctx.publiclyShared) {
         return tracesGrouped;
@@ -300,8 +222,8 @@ export const tracesRouter = createTRPCRouter({
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id,
-        ),
+          (publicShare) => publicShare.resourceId === trace.trace_id
+        )
       );
 
       return filteredTraces;
@@ -316,20 +238,8 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Try ClickHouse first if enabled for this project
-      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
-      const clickHouseResult = await clickHouseService.getTracesWithSpans(
-        projectId,
-        traceIds,
-        protections
-      );
-
-      if (clickHouseResult !== null) {
-        return clickHouseResult;
-      }
-
-      // Fall back to Elasticsearch
-      return getTracesWithSpans(projectId, traceIds, protections);
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getTracesWithSpans(projectId, traceIds, protections);
     }),
 
   getTracesWithSpansByThreadIds: protectedProcedure
@@ -341,43 +251,12 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Fetch all traces with the given thread_ids
-      const traces = await searchTraces({
-        connConfig: { projectId },
-        protections,
-        search: {
-          index: TRACE_INDEX.all,
-          size: 1000,
-          query: {
-            bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                { terms: { "metadata.thread_id": threadIds } },
-              ],
-              should: void 0,
-              must_not: void 0,
-            },
-          },
-          sort: [
-            {
-              "timestamps.started_at": {
-                order: "asc",
-              },
-            },
-          ],
-          // Remove embeddings to reduce payload size
-          _source: {
-            excludes: [
-              "input.embeddings",
-              "input.embeddings.embeddings",
-              "output.embeddings",
-              "output.embeddings.embeddings",
-            ],
-          },
-        },
-      });
-
-      return traces;
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getTracesWithSpansByThreadIds(
+        projectId,
+        threadIds,
+        protections
+      );
     }),
 
   getSampleTracesDataset: protectedProcedure
@@ -386,37 +265,37 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         query: z.string().optional(),
         sortBy: z.string().optional(),
-      }),
+      })
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllTracesForProject({
-        input: {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      const traceService = TraceService.create(ctx.prisma);
+      const { groups } = await traceService.getAllTracesForProject(
+        {
           ...input,
           groupBy: "none",
           pageSize: 10,
         },
-        ctx,
-      });
+        protections
+      );
+
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
+        group.map((trace) => trace.trace_id)
       );
 
       if (traceIds.length === 0) {
         return [];
       }
 
-      const { projectId } = input;
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const traceWithSpans = await getTracesWithSpans(
-        projectId,
+      return traceService.getTracesWithSpans(
+        input.projectId,
         traceIds,
-        protections,
+        protections
       );
-
-      return traceWithSpans;
     }),
 
   getSampleTraces: protectedProcedure
@@ -429,20 +308,26 @@ export const tracesRouter = createTRPCRouter({
           .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
-      }),
+      })
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
-      const { groups } = await getAllTracesForProject({
-        input: {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      const traceService = TraceService.create(ctx.prisma);
+      const { groups } = await traceService.getAllTracesForProject(
+        {
           ...input,
           groupBy: "none",
           pageSize: 100,
         },
-        ctx,
-      });
+        protections
+      );
+
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id),
+        group.map((trace) => trace.trace_id)
       );
 
       if (traceIds.length === 0) {
@@ -452,13 +337,10 @@ export const tracesRouter = createTRPCRouter({
       const { projectId, evaluatorType, preconditions, expectedResults } =
         input;
 
-      const protections = await getUserProtectionsForProject(ctx, {
-        projectId: input.projectId,
-      });
-      const traceWithSpans = await getTracesWithSpans(
+      const traceWithSpans = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
-        protections,
+        protections
       );
 
       const passedPreconditions = traceWithSpans.filter(
@@ -468,11 +350,11 @@ export const tracesRouter = createTRPCRouter({
             evaluatorType,
             trace,
             trace.spans ?? [],
-            preconditions,
-          ),
+            preconditions
+          )
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
-        (trace) => trace.trace_id,
+        (trace) => trace.trace_id
       );
 
       let samples = shuffle(passedPreconditions)
@@ -482,11 +364,11 @@ export const tracesRouter = createTRPCRouter({
         samples = samples.concat(
           shuffle(
             traceWithSpans.filter(
-              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
-            ),
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
+            )
           )
             .slice(0, expectedResults - samples.length)
-            .map((sample) => ({ ...sample, passesPreconditions: false })),
+            .map((sample) => ({ ...sample, passesPreconditions: false }))
         );
       }
 
@@ -497,7 +379,7 @@ export const tracesRouter = createTRPCRouter({
     .input(
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
-      }),
+      })
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ ctx, input }) => {
@@ -505,33 +387,20 @@ export const tracesRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      // Try ClickHouse first if enabled for this project
-      const clickHouseService = ClickHouseTraceService.create(ctx.prisma);
-      const clickHouseResult = await clickHouseService.getAllTracesForProject(
+      const traceService = TraceService.create(ctx.prisma);
+      return traceService.getAllTracesForProject(
         {
           ...input,
           pageOffset: input.pageOffset ?? 0,
           pageSize: input.pageSize ?? 10_000,
         },
-        protections
+        protections,
+        {
+          downloadMode: true,
+          includeSpans: input.includeSpans,
+          scrollId: input.scrollId,
+        }
       );
-
-      if (clickHouseResult !== null) {
-        return clickHouseResult;
-      }
-
-      // Fall back to Elasticsearch
-      return await getAllTracesForProject({
-        input: {
-          ...input,
-          pageOffset: input.pageOffset ?? 0,
-          pageSize: input.pageSize ?? 10_000,
-        },
-        ctx,
-        downloadMode: true,
-        includeSpans: input.includeSpans,
-        scrollId: input.scrollId,
-      });
     }),
 
   onTraceUpdate: protectedProcedure
@@ -545,9 +414,13 @@ export const tracesRouter = createTRPCRouter({
 
       try {
         for await (const eventArgs of on(emitter, "trace_updated", {
+          // @ts-expect-error - signal is not typed
           signal: opts.signal,
         })) {
-          logger.debug({ projectId, event: eventArgs[0] }, "SSE event received");
+          logger.debug(
+            { projectId, event: eventArgs[0] },
+            "SSE event received"
+          );
           yield eventArgs[0];
         }
         logger.info({ projectId }, "SSE subscription ended normally");
@@ -557,340 +430,3 @@ export const tracesRouter = createTRPCRouter({
       }
     }),
 });
-
-export const getAllTracesForProject = async ({
-  input,
-  ctx,
-  downloadMode = false,
-  includeSpans = false,
-  scrollId = undefined,
-}: {
-  input: z.infer<typeof getAllForProjectInput>;
-  ctx: {
-    prisma: PrismaClient;
-    session: Session | null;
-    publiclyShared?: boolean;
-  };
-  downloadMode?: boolean;
-  includeSpans?: boolean;
-  scrollId?: string | null;
-}) => {
-  const { pivotIndexConditions } = generateTracesPivotQueryConditions({
-    ...input,
-  });
-
-  let pageSize = input.pageSize ? input.pageSize : 25;
-  const pageOffset = input.pageOffset ? input.pageOffset : 0;
-
-  let totalHits = 0;
-  if (input.updatedAt !== undefined && input.updatedAt >= 0) {
-    pageSize = 10_000;
-  }
-
-  const protections = await getUserProtectionsForProject(
-    {
-      prisma: ctx.prisma,
-      session: ctx.session,
-      publiclyShared: ctx.publiclyShared,
-    },
-    { projectId: input.projectId },
-  );
-
-  let tracesResult: SearchResponse<ElasticSearchTrace>;
-  if (scrollId) {
-    const client = await esClient({ projectId: input.projectId });
-    tracesResult = await client.scroll({
-      scroll_id: scrollId,
-      scroll: "1m",
-    });
-  } else {
-    const client = await esClient({ projectId: input.projectId });
-    tracesResult = await client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.for(input.startDate),
-      from: downloadMode ? undefined : pageOffset,
-      size: pageSize,
-      scroll: downloadMode ? "1m" : undefined,
-      _source: {
-        excludes: [
-          "input.embeddings",
-          "input.embeddings.embeddings",
-          "output.embeddings",
-          "output.embeddings.embeddings",
-          ...(includeSpans ? [] : ["spans"]),
-        ],
-      },
-      body: {
-        query: pivotIndexConditions,
-        ...(input.sortBy
-          ? input.sortBy.startsWith("random.")
-            ? {
-                sort: {
-                  _script: {
-                    type: "number",
-                    script: {
-                      source: "Math.random()",
-                    },
-                    order: input.sortDirection ?? "desc",
-                  },
-                } as Sort,
-              }
-            : input.sortBy.startsWith("evaluations.")
-              ? {
-                  sort: {
-                    "evaluations.score": {
-                      order: input.sortDirection ?? "desc",
-                      nested: {
-                        path: "evaluations",
-                        filter: {
-                          term: {
-                            "evaluations.evaluator_id":
-                              input.sortBy.split(".")[1],
-                          },
-                        },
-                      },
-                    },
-                  } as Sort,
-                }
-              : {
-                  sort: {
-                    [input.sortBy]: {
-                      order: input.sortDirection ?? "desc",
-                    },
-                  } as Sort,
-                }
-          : {
-              sort: {
-                "timestamps.started_at": {
-                  order: "desc",
-                },
-              } as Sort,
-            }),
-      },
-    });
-  }
-
-  const traces = tracesResult.hits.hits
-    .map((hit) => hit._source!)
-    .map((t) => transformElasticSearchTraceToTrace(t, protections));
-
-  if (input.groupBy === "thread_id") {
-    const threadIds = traces.map((t) => t.metadata.thread_id).filter(Boolean);
-    const existingTraceIds = new Set(traces.map((t) => t.trace_id));
-
-    if (threadIds.length > 0) {
-      const tracesFromThreadId = await searchTraces({
-        connConfig: { projectId: input.projectId },
-        search: {
-          index: TRACE_INDEX.all,
-          size: 50,
-          query: {
-            bool: {
-              filter: [
-                { terms: { "metadata.thread_id": threadIds } },
-                { term: { project_id: input.projectId } },
-              ],
-              should: void 0,
-              must_not: void 0,
-            },
-          },
-        },
-        protections,
-      });
-      const filteredTracesByThreadId = tracesFromThreadId.filter(
-        (trace) => !existingTraceIds.has(trace.trace_id),
-      );
-
-      traces.unshift(...filteredTracesByThreadId);
-    }
-
-    // If no specific sort order was requested by the user (i.e., input.sortBy is falsy),
-    // and traces might have been reordered by the unshift operation above (due to groupBy === "thread_id"),
-    // re-apply the default sort order by timestamps.started_at descending.
-    if (!input.sortBy) {
-      sortTracesByTimestampDesc(traces);
-    }
-  }
-
-  totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
-
-  const evaluations = Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
-  );
-
-  const tracesWithGuardrails = transformTracesWithGuardrails(traces);
-  const groups = groupTraces(input.groupBy, tracesWithGuardrails);
-
-  return {
-    groups,
-    totalHits,
-    traceChecks: evaluations,
-    scrollId: tracesResult._scroll_id,
-  };
-};
-
-export const getTracesWithSpans = async (
-  projectId: string,
-  traceIds: string[],
-  protections: Protections,
-) => {
-  const traces = await searchTraces({
-    connConfig: { projectId },
-    protections,
-    search: {
-      index: TRACE_INDEX.all,
-      size: 1000,
-      query: {
-        bool: {
-          filter: [
-            { term: { project_id: projectId } },
-            { terms: { trace_id: traceIds } },
-          ],
-          should: void 0,
-          must_not: void 0,
-        },
-      },
-      sort: [
-        {
-          "timestamps.started_at": {
-            order: "asc",
-          },
-        },
-      ],
-      // Remove embeddings to reduce payload size
-      _source: {
-        excludes: [
-          "input.embeddings",
-          "input.embeddings.embeddings",
-          "output.embeddings",
-          "output.embeddings.embeddings",
-        ],
-      },
-    },
-  });
-
-  return traces;
-};
-
-const groupTraces = <T extends Trace>(
-  groupBy: string | undefined,
-  traces: T[],
-) => {
-  const groups: T[][] = [];
-
-  const groupingKeyPresent = (trace: T) => {
-    if (groupBy === "user_id") {
-      return !!trace.metadata.user_id;
-    }
-    if (groupBy === "thread_id") {
-      return !!trace.metadata.thread_id;
-    }
-
-    return false;
-  };
-
-  const matchesGroup = (trace: T, member: T) => {
-    if (groupBy === "user_id") {
-      return trace.metadata.user_id === member.metadata.user_id;
-    }
-    if (groupBy === "thread_id") {
-      return trace.metadata.thread_id === member.metadata.thread_id;
-    }
-
-    return false;
-  };
-
-  for (const trace of traces) {
-    if (!groupingKeyPresent(trace)) {
-      groups.push([trace]);
-      continue;
-    }
-
-    let grouped = false;
-    for (const group of groups) {
-      for (const member of group) {
-        if (!groupingKeyPresent(member)) continue;
-
-        if (matchesGroup(trace, member)) {
-          group.push(trace);
-          grouped = true;
-          break;
-        }
-      }
-      if (grouped) break;
-    }
-    if (!grouped) {
-      groups.push([trace]);
-    }
-  }
-
-  return groups;
-};
-
-export const getEvaluationsMultiple = async (input: {
-  projectId: string;
-  traceIds: string[];
-  protections: Protections;
-}) => {
-  const { projectId, traceIds, protections } = input;
-
-  const traces = await searchTraces({
-    connConfig: { projectId },
-    search: {
-      index: TRACE_INDEX.all,
-      size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
-      _source: ["trace_id", "evaluations"],
-      query: {
-        bool: {
-          filter: [
-            { terms: { trace_id: traceIds } },
-            { term: { project_id: projectId } },
-          ],
-          should: void 0,
-          must_not: void 0,
-        },
-      },
-    },
-    protections,
-  });
-
-  return Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
-  );
-};
-
-// Helper function to sort traces by timestamp in descending order
-const sortTracesByTimestampDesc = (traces: Trace[]) => {
-  traces.sort((a, b) => {
-    const timeA = a.timestamps?.started_at;
-    const timeB = b.timestamps?.started_at;
-
-    // new Date(null/undefined/invalid string).getTime() results in NaN
-    const dateAValue = timeA ? new Date(timeA).getTime() : NaN;
-    const dateBValue = timeB ? new Date(timeB).getTime() : NaN;
-
-    // Handle NaN cases (invalid or missing dates) by sorting them to the end.
-    const aIsNaN = isNaN(dateAValue);
-    const bIsNaN = isNaN(dateBValue);
-
-    if (aIsNaN && bIsNaN) return 0; // Both are NaN, treat as equal
-    if (aIsNaN) return 1; // a is NaN, so b comes first
-    if (bIsNaN) return -1; // b is NaN, so a comes first
-
-    return dateBValue - dateAValue; // Descending order for valid dates
-  });
-};
-
-/**
- * Transform traces to include guardrail information
- */
-function transformTracesWithGuardrails(
-  traces: Trace[],
-): TraceWithGuardrail[] {
-  return traces.map((trace) => {
-    return {
-      ...trace,
-      lastGuardrail: void 0,
-      annotations: void 0,
-    };
-  });
-}

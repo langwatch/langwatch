@@ -1,10 +1,10 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type {
   IExportTraceServiceRequest,
-  // @ts-ignore
+  // @ts-expect-error
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import * as crypto from "crypto";
+import * as crypto from "node:crypto";
 import { getLangWatchTracer } from "langwatch";
 import { type NextRequest, NextResponse } from "next/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -188,7 +188,7 @@ async function handleTracesRequest(req: NextRequest) {
 
       // For ClickHouse, ingest raw OTEL spans directly (bypasses otel.traces.ts transformation)
       let clickHouseTask: Promise<void> | null = null;
-      if (project.featureClickHouse) {
+      if (project.featureEventSourcingTraceIngestion) {
         clickHouseTask = traceRequestCollectionService.handleOtlpTraceRequest(
           project.id,
           traceRequest,

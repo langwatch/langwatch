@@ -3,10 +3,11 @@ import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import {
   getAllForProjectInput,
-  getAllTracesForProject,
 } from "../../../server/api/routers/traces";
+import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
+import { TraceService } from "../../../server/traces/trace.service";
 import { toLLMModeTrace } from "./[id]";
 
 export const config = {
@@ -24,13 +25,13 @@ const paramsSchema = getAllForProjectInput
   .extend({
     startDate: z.union([
       z.number(),
-      z.string().refine((val) => !isNaN(Date.parse(val)), {
+      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
         message: "Invalid date format for startDate",
       }),
     ]),
     endDate: z.union([
       z.number(),
-      z.string().refine((val) => !isNaN(Date.parse(val)), {
+      z.string().refine((val) => !Number.isNaN(Date.parse(val)), {
         message: "Invalid date format for endDate",
       }),
     ]),
@@ -70,8 +71,12 @@ export default async function handler(
   }
 
   const pageSize = Math.min(params.pageSize ?? 1000, 1000);
-  const results = await getAllTracesForProject({
-    input: {
+  const protections = await getProtectionsForProject(prisma, {
+    projectId: project.id,
+  });
+  const traceService = TraceService.create(prisma);
+  const results = await traceService.getAllTracesForProject(
+    {
       ...params,
       projectId: project.id,
       startDate:
@@ -84,16 +89,12 @@ export default async function handler(
           : params.endDate,
       pageSize,
     },
-    ctx: {
-      prisma,
-      publiclyShared: false,
-
-      // We don't care about user level permissions here, as we're access the data via API key
-      session: null,
-    },
-    downloadMode: !params.llmMode,
-    scrollId: params.scrollId ?? undefined,
-  });
+    protections,
+    {
+      downloadMode: !params.llmMode,
+      scrollId: params.scrollId ?? undefined,
+    }
+  );
   let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
 
   if (params.llmMode) {

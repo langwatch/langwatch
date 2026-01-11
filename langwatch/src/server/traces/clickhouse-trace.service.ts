@@ -4,15 +4,27 @@ import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import {
+import type {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
-import type { Evaluation, Trace } from "~/server/tracer/types";
+import type { Evaluation, Span, Trace } from "~/server/tracer/types";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { createLogger } from "~/utils/logger";
-import { mapNormalizedSpansToSpans, mapTraceSummaryToTrace } from "./mappers";
+import {
+  mapNormalizedSpansToSpans,
+  mapTraceSummaryToTrace,
+  applyTraceProtections,
+} from "./mappers";
 import { getLangWatchTracer } from "langwatch";
+import type {
+  AggregationFiltersInput,
+  CustomersAndLabelsResult,
+  GetAllTracesForProjectInput,
+  PromptStudioSpanResult,
+  TopicCountsResult,
+  TracesForProjectResult,
+} from "./types";
 
 /**
  * Cursor structure for keyset pagination.
@@ -30,38 +42,11 @@ interface ClickHouseScrollCursor {
 }
 
 /**
- * Input parameters for getAllTracesForProject from ClickHouse.
- * Mirrors the shape expected by the router's getAllForProjectInput.
- */
-export interface GetAllTracesForProjectInput {
-  projectId: string;
-  startDate?: number;
-  endDate?: number;
-  pageOffset?: number;
-  pageSize?: number;
-  groupBy?: string;
-  sortBy?: string;
-  sortDirection?: string;
-  scrollId?: string | null;
-}
-
-/**
- * Result structure for getAllTracesForProject.
- * Mirrors the shape returned by the existing ES-based implementation.
- */
-export interface TracesForProjectResult {
-  groups: TraceWithGuardrail[][];
-  totalHits: number;
-  traceChecks: Record<string, Evaluation[]>;
-  scrollId?: string;
-}
-
-/**
  * Service for fetching traces from ClickHouse.
  *
  * This service provides a ClickHouse-based alternative to the Elasticsearch
  * trace fetching logic. It:
- * 1. Checks if ClickHouse is enabled for the project (via project.featureClickHouse)
+ * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via project.featureClickHouseDataSourceTraces flag)
  * 2. Fetches trace summaries and spans using a JOIN query
  * 3. Maps the ClickHouse types to the legacy Trace/Span types
  *
@@ -102,15 +87,15 @@ export class ClickHouseTraceService {
 
         const project = await this.prisma.project.findUnique({
           where: { id: projectId },
-          select: { featureClickHouse: true },
+          select: { featureClickHouseDataSourceTraces: true },
         });
 
         span.setAttribute(
           "project.feature.clickhouse",
-          project?.featureClickHouse === true
+          project?.featureClickHouseDataSourceTraces === true
         );
 
-        return project?.featureClickHouse === true;
+        return project?.featureClickHouseDataSourceTraces === true;
       }
     );
   }
@@ -124,20 +109,20 @@ export class ClickHouseTraceService {
    *
    * @param projectId - The project ID
    * @param traceIds - Array of trace IDs to fetch
-   * @param _protections - Field redaction protections (for future use)
+   * @param protections - Field redaction protections
    * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
    */
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
-    _protections: Protections
+    protections: Protections
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.isClickHouseEnabled",
+      "ClickHouseTraceService.getTracesWithSpans",
       {
         attributes: { "tenant.id": projectId },
       },
-      async (span) => {
+      async () => {
         // Check if ClickHouse is enabled
         const isEnabled = await this.isClickHouseEnabled(projectId);
         if (!isEnabled || !this.clickHouseClient) {
@@ -160,7 +145,7 @@ export class ClickHouseTraceService {
             traceIds
           );
 
-          // Map to legacy Trace format
+          // Map to legacy Trace format and apply protections
           const traces: Trace[] = [];
           for (const [_traceId, { summary, spans }] of tracesWithSpans) {
             const mappedSpans = mapNormalizedSpansToSpans(spans);
@@ -169,10 +154,9 @@ export class ClickHouseTraceService {
               mappedSpans,
               projectId
             );
-            traces.push(trace);
+            // Apply redaction protections
+            traces.push(applyTraceProtections(trace, protections));
           }
-
-          // TODO: Apply protections/redaction to the traces
 
           this.logger.debug(
             { projectId, traceCount: traces.length },
@@ -188,7 +172,171 @@ export class ClickHouseTraceService {
             },
             "Failed to fetch traces from ClickHouse"
           );
-          throw error;
+          throw new Error("Failed to fetch traces with spans");
+        }
+      }
+    );
+  }
+
+  /**
+   * Get traces by thread ID.
+   *
+   * Queries trace_summaries using the Attributes map to find traces
+   * with matching thread_id (stored under various attribute keys).
+   *
+   * Returns null if:
+   * - ClickHouse client is not available
+   * - ClickHouse is not enabled for this project
+   *
+   * @param projectId - The project ID
+   * @param threadId - The thread ID to search for
+   * @param protections - Field redaction protections
+   * @returns Array of Trace objects, or null if ClickHouse is not enabled
+   */
+  async getTracesByThreadId(
+    projectId: string,
+    threadId: string,
+    protections: Protections
+  ): Promise<Trace[] | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getTracesByThreadId",
+      {
+        attributes: { "tenant.id": projectId, "thread.id": threadId },
+      },
+      async () => {
+        // Check if ClickHouse is enabled
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        this.logger.debug(
+          { projectId, threadId },
+          "Fetching traces by thread ID from ClickHouse"
+        );
+
+        try {
+          // Query trace_summaries for traces with matching thread_id
+          // Thread ID can be stored under different attribute keys
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT TraceId
+              FROM trace_summaries FINAL
+              WHERE TenantId = {tenantId:String}
+                AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+              ORDER BY CreatedAt ASC
+              LIMIT 1000
+            `,
+            query_params: {
+              tenantId: projectId,
+              threadId,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          const traceIds = rows.map((r) => r.TraceId);
+
+          if (traceIds.length === 0) {
+            return [];
+          }
+
+          // Fetch full traces with spans
+          return this.getTracesWithSpans(projectId, traceIds, protections);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              threadId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch traces by thread ID from ClickHouse"
+          );
+          throw new Error("Failed to fetch traces by thread ID");
+        }
+      }
+    );
+  }
+
+  /**
+   * Get traces with spans by multiple thread IDs.
+   *
+   * Queries trace_summaries using the Attributes map to find traces
+   * with matching thread_ids (stored under various attribute keys).
+   *
+   * Returns null if:
+   * - ClickHouse client is not available
+   * - ClickHouse is not enabled for this project
+   *
+   * @param projectId - The project ID
+   * @param threadIds - Array of thread IDs to search for
+   * @param protections - Field redaction protections
+   * @returns Array of Trace objects with spans, or null if ClickHouse is not enabled
+   */
+  async getTracesWithSpansByThreadIds(
+    projectId: string,
+    threadIds: string[],
+    protections: Protections
+  ): Promise<Trace[] | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getTracesWithSpansByThreadIds",
+      {
+        attributes: { "tenant.id": projectId, "thread.count": threadIds.length },
+      },
+      async () => {
+        // Check if ClickHouse is enabled
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        if (threadIds.length === 0) {
+          return [];
+        }
+
+        this.logger.debug(
+          { projectId, threadIdCount: threadIds.length },
+          "Fetching traces by thread IDs from ClickHouse"
+        );
+
+        try {
+          // Query trace_summaries for traces with matching thread_ids
+          // Thread ID can be stored under different attribute keys
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT TraceId
+              FROM trace_summaries FINAL
+              WHERE TenantId = {tenantId:String}
+                AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+              ORDER BY CreatedAt ASC
+              LIMIT 1000
+            `,
+            query_params: {
+              tenantId: projectId,
+              threadIds,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          const traceIds = rows.map((r) => r.TraceId);
+
+          if (traceIds.length === 0) {
+            return [];
+          }
+
+          // Fetch full traces with spans
+          return this.getTracesWithSpans(projectId, traceIds, protections);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              threadIds,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch traces by thread IDs from ClickHouse"
+          );
+          throw new Error("Failed to fetch traces by thread IDs");
         }
       }
     );
@@ -205,16 +353,16 @@ export class ClickHouseTraceService {
    * - ClickHouse is not enabled for this project
    *
    * @param input - Query parameters including filters, pagination, and sorting
-   * @param _protections - Field redaction protections (for future use)
+   * @param protections - Field redaction protections
    * @returns TracesForProjectResult or null if ClickHouse is not enabled
    */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
-    _protections: Protections
+    protections: Protections
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
-      async (span) => {
+      async (_span) => {
         // Check if ClickHouse is enabled
         const isEnabled = await this.isClickHouseEnabled(input.projectId);
         if (!isEnabled || !this.clickHouseClient) {
@@ -297,6 +445,7 @@ export class ClickHouseTraceService {
               pageSize,
               sortDirection,
               cursor,
+              protections,
               input.startDate,
               input.endDate
             );
@@ -367,10 +516,429 @@ export class ClickHouseTraceService {
             },
             "Failed to fetch all traces from ClickHouse"
           );
-          throw error;
+          throw new Error("Failed to fetch all traces for project");
         }
       }
     );
+  }
+
+  /**
+   * Get topic and subtopic counts for a project.
+   *
+   * Returns null if ClickHouse is not enabled for the project.
+   *
+   * @param input - Filter parameters including projectId and date range
+   * @returns TopicCountsResult or null if ClickHouse is not enabled
+   */
+  async getTopicCounts(
+    input: AggregationFiltersInput
+  ): Promise<TopicCountsResult | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getTopicCounts",
+      { attributes: { "tenant.id": input.projectId } },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(input.projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        try {
+          // Build date filter conditions
+          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          if (input.startDate) {
+            conditions.push(
+              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+            );
+          }
+          if (input.endDate) {
+            conditions.push(
+              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+            );
+          }
+
+          const whereClause = conditions.join(" AND ");
+
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT
+                TopicId,
+                SubTopicId,
+                count() as count
+              FROM trace_summaries FINAL
+              WHERE ${whereClause}
+                AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
+              GROUP BY TopicId, SubTopicId
+            `,
+            query_params: {
+              tenantId: input.projectId,
+              startDate: input.startDate ?? 0,
+              endDate: input.endDate ?? Date.now(),
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{
+            TopicId: string | null;
+            SubTopicId: string | null;
+            count: string;
+          }>;
+
+          // Aggregate counts by topic and subtopic
+          const topicCountsMap = new Map<string, number>();
+          const subtopicCountsMap = new Map<string, number>();
+
+          for (const row of rows) {
+            if (row.TopicId) {
+              const current = topicCountsMap.get(row.TopicId) ?? 0;
+              topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
+            }
+            if (row.SubTopicId) {
+              const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
+              subtopicCountsMap.set(row.SubTopicId, current + parseInt(row.count, 10));
+            }
+          }
+
+          return {
+            topicCounts: Array.from(topicCountsMap.entries()).map(
+              ([key, count]) => ({ key, count })
+            ),
+            subtopicCounts: Array.from(subtopicCountsMap.entries()).map(
+              ([key, count]) => ({ key, count })
+            ),
+          };
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId: input.projectId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch topic counts from ClickHouse"
+          );
+          throw new Error("Failed to fetch topic counts");
+        }
+      }
+    );
+  }
+
+  /**
+   * Get unique customers and labels for a project.
+   *
+   * Returns null if ClickHouse is not enabled for the project.
+   *
+   * @param input - Filter parameters including projectId and date range
+   * @returns CustomersAndLabelsResult or null if ClickHouse is not enabled
+   */
+  async getCustomersAndLabels(
+    input: AggregationFiltersInput
+  ): Promise<CustomersAndLabelsResult | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getCustomersAndLabels",
+      { attributes: { "tenant.id": input.projectId } },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(input.projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        try {
+          // Build date filter conditions
+          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          if (input.startDate) {
+            conditions.push(
+              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+            );
+          }
+          if (input.endDate) {
+            conditions.push(
+              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+            );
+          }
+
+          const whereClause = conditions.join(" AND ");
+
+          // Query for unique customer IDs
+          const customerResult = await this.clickHouseClient.query({
+            query: `
+              SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
+              FROM trace_summaries FINAL
+              WHERE ${whereClause}
+                AND Attributes['langwatch.customer_id'] != ''
+              LIMIT 10000
+            `,
+            query_params: {
+              tenantId: input.projectId,
+              startDate: input.startDate ?? 0,
+              endDate: input.endDate ?? Date.now(),
+            },
+            format: "JSONEachRow",
+          });
+
+          const customerRows = (await customerResult.json()) as Array<{
+            customer_id: string;
+          }>;
+
+          // Query for unique labels
+          // Labels are stored as JSON array in langwatch.labels attribute
+          const labelsResult = await this.clickHouseClient.query({
+            query: `
+              SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
+              FROM trace_summaries FINAL
+              WHERE ${whereClause}
+                AND Attributes['langwatch.labels'] != ''
+              LIMIT 10000
+            `,
+            query_params: {
+              tenantId: input.projectId,
+              startDate: input.startDate ?? 0,
+              endDate: input.endDate ?? Date.now(),
+            },
+            format: "JSONEachRow",
+          });
+
+          const labelsRows = (await labelsResult.json()) as Array<{
+            labels_json: string;
+          }>;
+
+          // Parse labels from JSON arrays
+          const labelsSet = new Set<string>();
+          for (const row of labelsRows) {
+            try {
+              const labels = JSON.parse(row.labels_json);
+              if (Array.isArray(labels)) {
+                for (const label of labels) {
+                  if (typeof label === "string") {
+                    labelsSet.add(label);
+                  }
+                }
+              }
+            } catch {
+              // If not valid JSON, treat as single label
+              labelsSet.add(row.labels_json);
+            }
+          }
+
+          return {
+            customers: customerRows.map((r) => r.customer_id),
+            labels: Array.from(labelsSet),
+          };
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId: input.projectId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch customers and labels from ClickHouse"
+          );
+          throw new Error("Failed to fetch customers and labels");
+        }
+      }
+    );
+  }
+
+  /**
+   * Get a span for prompt studio by span ID.
+   *
+   * Returns null if:
+   * - ClickHouse is not enabled for the project
+   * - The span is not found
+   * - The span is not an LLM span
+   *
+   * @param projectId - The project ID
+   * @param spanId - The span ID to find
+   * @param protections - Field redaction protections
+   * @returns PromptStudioSpanResult or null
+   */
+  async getSpanForPromptStudio(
+    projectId: string,
+    spanId: string,
+    protections: Protections
+  ): Promise<PromptStudioSpanResult | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.getSpanForPromptStudio",
+      { attributes: { "tenant.id": projectId, "span.id": spanId } },
+      async () => {
+        const isEnabled = await this.isClickHouseEnabled(projectId);
+        if (!isEnabled || !this.clickHouseClient) {
+          return null;
+        }
+
+        try {
+          // Query for the span
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT
+                ss.SpanId,
+                ss.TraceId,
+                ss.SpanName,
+                ss.SpanAttributes,
+                ss.StartTime,
+                ss.EndTime,
+                ss.DurationMs,
+                ss.StatusCode,
+                ss.StatusMessage
+              FROM stored_spans ss
+              WHERE ss.TenantId = {tenantId:String}
+                AND ss.SpanId = {spanId:String}
+              LIMIT 1
+            `,
+            query_params: {
+              tenantId: projectId,
+              spanId,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{
+            SpanId: string;
+            TraceId: string;
+            SpanName: string;
+            SpanAttributes: Record<string, unknown>;
+            StartTime: number;
+            EndTime: number;
+            DurationMs: number;
+            StatusCode: number | null;
+            StatusMessage: string | null;
+          }>;
+
+          const row = rows[0];
+          if (!row) {
+            return null;
+          }
+
+          // Check if this is an LLM span by looking at attributes
+          const spanType = row.SpanAttributes["langwatch.span.type"] as string | undefined;
+          if (spanType !== "llm") {
+            return null;
+          }
+
+          // Extract span data from attributes
+          return this.extractPromptStudioDataFromClickHouse(row, protections);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              spanId,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to fetch span for prompt studio from ClickHouse"
+          );
+          throw new Error("Failed to fetch span for prompt studio");
+        }
+      }
+    );
+  }
+
+  /**
+   * Extract prompt studio data from ClickHouse span row.
+   * @internal
+   */
+  private extractPromptStudioDataFromClickHouse(
+    row: {
+      SpanId: string;
+      TraceId: string;
+      SpanName: string;
+      SpanAttributes: Record<string, unknown>;
+      StartTime: number;
+      EndTime: number;
+      DurationMs: number;
+      StatusCode: number | null;
+      StatusMessage: string | null;
+    },
+    _protections: Protections
+  ): PromptStudioSpanResult {
+    const attrs = row.SpanAttributes;
+    const messages: PromptStudioSpanResult["messages"] = [];
+
+    // Extract input messages from gen_ai.prompt or langwatch.input
+    const inputStr =
+      (attrs["gen_ai.prompt"] as string) ??
+      (attrs["langwatch.input"] as string);
+    if (inputStr) {
+      try {
+        const parsed = JSON.parse(inputStr);
+        if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
+          messages.push(...parsed.value);
+        } else if (typeof parsed.value === "string") {
+          messages.push({ role: "user", content: parsed.value });
+        } else if (typeof parsed === "string") {
+          messages.push({ role: "user", content: parsed });
+        }
+      } catch {
+        messages.push({ role: "user", content: inputStr });
+      }
+    }
+
+    // Extract output messages from gen_ai.completion or langwatch.output
+    const outputStr =
+      (attrs["gen_ai.completion"] as string) ??
+      (attrs["langwatch.output"] as string);
+    if (outputStr) {
+      try {
+        const parsed = JSON.parse(outputStr);
+        if (parsed.type === "chat_messages" && Array.isArray(parsed.value)) {
+          messages.push(...parsed.value);
+        } else if (typeof parsed.value === "string") {
+          messages.push({ role: "assistant", content: parsed.value });
+        } else if (typeof parsed === "string") {
+          messages.push({ role: "assistant", content: parsed });
+        }
+      } catch {
+        messages.push({ role: "assistant", content: outputStr });
+      }
+    }
+
+    // Extract LLM config
+    const model = (attrs["gen_ai.response.model"] as string) ??
+      (attrs["gen_ai.request.model"] as string) ??
+      (attrs["llm.model"] as string) ??
+      null;
+    const temperature = attrs["gen_ai.request.temperature"] as number ?? null;
+    const maxTokens = attrs["gen_ai.request.max_tokens"] as number ?? null;
+    const topP = attrs["gen_ai.request.top_p"] as number ?? null;
+    const vendor = (attrs["gen_ai.system"] as string) ?? null;
+
+    const systemPrompt = messages.find((m) => m.role === "system")?.content;
+
+    // Extract metrics
+    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
+    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as number | undefined;
+
+    // Build error if present
+    let error: Span["error"] | null = null;
+    if (row.StatusCode === 2) {
+      error = {
+        has_error: true,
+        message: row.StatusMessage ?? "Unknown error",
+        stacktrace: [],
+      };
+    }
+
+    return {
+      spanId: row.SpanId,
+      traceId: row.TraceId,
+      spanName: row.SpanName ?? null,
+      messages,
+      llmConfig: {
+        model,
+        systemPrompt,
+        temperature,
+        maxTokens,
+        topP,
+        litellmParams: {},
+      },
+      vendor,
+      error,
+      timestamps: {
+        started_at: row.StartTime,
+        finished_at: row.EndTime,
+      },
+      metrics: promptTokens !== undefined || completionTokens !== undefined
+        ? {
+            prompt_tokens: promptTokens,
+            completion_tokens: completionTokens,
+          }
+        : null,
+    };
   }
 
   /**
@@ -382,6 +950,7 @@ export class ClickHouseTraceService {
     pageSize: number,
     sortDirection: "asc" | "desc",
     cursor: ClickHouseScrollCursor | null,
+    protections: Protections,
     startDate?: number,
     endDate?: number
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
@@ -390,7 +959,7 @@ export class ClickHouseTraceService {
       {
         attributes: { "tenant.id": projectId },
       },
-      async (span) => {
+      async (_span) => {
         if (!this.clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
@@ -444,7 +1013,7 @@ export class ClickHouseTraceService {
         const countResult = await this.clickHouseClient.query({
           query: `
         SELECT count(DISTINCT ts.TraceId) as total
-        FROM trace_summaries ts
+        FROM trace_summaries ts FINAL
         WHERE ${whereClause.replace(/\(toUnixTimestamp64Milli.*\)/, "1=1")}
       `,
           query_params: {
@@ -487,7 +1056,7 @@ export class ClickHouseTraceService {
           ts.Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(ts.LastUpdatedAt) AS ts_LastUpdatedAt
-        FROM trace_summaries ts
+        FROM trace_summaries ts FINAL
         WHERE ${whereClause}
         ORDER BY ts.CreatedAt ${orderDirection}, ts.TraceId ${orderDirection}
         LIMIT {pageSize:UInt32}
@@ -518,7 +1087,7 @@ export class ClickHouseTraceService {
           traceIds
         );
 
-        // Map to Trace objects
+        // Map to Trace objects and apply protections
         const traces: Trace[] = [];
         for (const row of summaryRows) {
           const traceData = tracesWithSpans.get(row.ts_TraceId);
@@ -529,12 +1098,14 @@ export class ClickHouseTraceService {
               mappedSpans,
               projectId
             );
-            traces.push(trace);
+            // Apply redaction protections
+            traces.push(applyTraceProtections(trace, protections));
           } else {
             // Create trace without spans if not found
             const summary = this.rowToTraceSummaryRecord(row);
             const trace = mapTraceSummaryToTrace(summary, [], projectId);
-            traces.push(trace);
+            // Apply redaction protections
+            traces.push(applyTraceProtections(trace, protections));
           }
         }
 
@@ -631,7 +1202,7 @@ export class ClickHouseTraceService {
       {
         attributes: { "tenant.id": projectId },
       },
-      async (span) => {
+      async (_span) => {
         if (!this.clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
@@ -695,7 +1266,7 @@ export class ClickHouseTraceService {
           ss.DroppedAttributesCount AS ss_DroppedAttributesCount,
           ss.DroppedEventsCount AS ss_DroppedEventsCount,
           ss.DroppedLinksCount AS ss_DroppedLinksCount
-        FROM trace_summaries ts
+        FROM trace_summaries ts FINAL
         LEFT JOIN stored_spans ss ON ts.TenantId = ss.TenantId AND ts.TraceId = ss.TraceId
         WHERE ts.TenantId = {tenantId:String}
           AND ts.TraceId IN ({traceIds:Array(String)})
