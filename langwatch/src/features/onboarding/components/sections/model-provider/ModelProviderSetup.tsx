@@ -3,6 +3,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { Switch } from "../../../../../components/ui/switch";
+import { useModelProviderApiKeyValidation } from "../../../../../hooks/useModelProviderApiKeyValidation";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
@@ -17,6 +18,7 @@ import {
   parseZodFieldErrors,
   type ZodErrorStructure,
 } from "../../../../../utils/zod";
+import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../../../../utils/modelProviderHelpers";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -122,14 +124,31 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backendModelProviderKey, providers]);
 
-  const [state, actions] = useModelProviderForm({
-    provider,
-    projectId,
-    project: {
+  // Detect if provider is using environment variables (enabled but no stored customKeys)
+  const isUsingEnvVars =
+    provider.enabled &&
+    (!provider.customKeys ||
+      Object.keys(provider.customKeys as Record<string, unknown>).length === 0);
+
+  const projectForForm = useMemo(
+    () => ({
       defaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
       topicClusteringModel: project?.topicClusteringModel ?? null,
       embeddingsModel: project?.embeddingsModel ?? null,
-    },
+    }),
+    [
+      meta?.defaultModel,
+      project?.defaultModel,
+      project?.topicClusteringModel,
+      project?.embeddingsModel,
+    ],
+  );
+
+  const [state, actions] = useModelProviderForm({
+    provider,
+    projectId,
+    project: projectForForm,
+    isUsingEnvVars,
     onSuccess: () => {
       if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
@@ -153,10 +172,24 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  // API key validation hook
+  const {
+    validate: validateApiKey,
+    validateWithCustomUrl,
+    isValidating: isValidatingApiKey,
+    validationError: apiKeyValidationError,
+    clearError: clearApiKeyError,
+  } = useModelProviderApiKeyValidation(
+    backendModelProviderKey,
+    state.customKeys,
+    projectId,
+  );
+
   useEffect(() => {
     setOpenAiValidationError(void 0);
     setFieldErrors({});
-  }, [modelProviderKey]);
+    clearApiKeyError();
+  }, [modelProviderKey, clearApiKeyError]);
 
   const isOpenAiProvider = backendModelProviderKey === "openai";
 
@@ -206,21 +239,39 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     return true;
   }, [isOpenAiProvider, state.customKeys, handleOpenAiValidationClear]);
 
-  const handleSaveAndContinue = useCallback(() => {
+  const handleSaveAndContinue = useCallback(async () => {
+    // Clear previous errors
+    setFieldErrors({});
+    handleOpenAiValidationClear();
+    clearApiKeyError();
+
+    // Run OpenAI-specific validation
     if (!validateOpenAi()) {
       return;
     }
 
-    // Clear previous errors
-    setFieldErrors({});
-    handleOpenAiValidationClear();
-
-    // Validate keys according to schema before submitting
+    // Get provider definition for schema and endpoint key
     const providerDefinition = backendModelProviderKey
       ? modelProvidersRegistry[backendModelProviderKey]
       : void 0;
 
-    if (providerDefinition?.keysSchema) {
+    // Get custom base URL if provided
+    const endpointKey = providerDefinition?.endpointKey;
+    const customBaseUrl = endpointKey
+      ? state.customKeys[endpointKey]?.trim() || undefined
+      : undefined;
+
+    // Check if user entered a new API key
+    const userEnteredNewApiKey = hasUserEnteredNewApiKey(state.customKeys);
+
+    // Check if user modified non-API-key fields (like URLs)
+    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
+      state.customKeys,
+      state.initialKeys
+    );
+
+    // Validate keys according to schema before submitting
+    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
@@ -230,7 +281,6 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       const result = keysSchema.safeParse(keysToValidate);
 
       if (!result.success) {
-        // Parse the Zod error to get field-specific errors
         const parsedErrors = parseZodFieldErrors(
           result.error as ZodErrorStructure,
         );
@@ -239,18 +289,42 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
       }
     }
 
-    void actions
-      .setEnabled(true)
-      .then(() => actions.submit())
-      .catch((err) =>
-        logger.error(err, "failed to submit model provider settings"),
-      );
+    const submitForm = () => {
+      void actions
+        .setEnabled(true)
+        .then(() => actions.submit())
+        .catch((err) =>
+          logger.error(err, "failed to submit model provider settings"),
+        );
+    };
+
+    // ALWAYS validate API key on save
+    if (userEnteredNewApiKey) {
+      // User entered new API key - validate it (against custom or default URL)
+      const isValid = await validateApiKey();
+      if (!isValid) return;
+    } else if (customBaseUrl) {
+      // Stored/env key + custom URL - validate against custom URL
+      const isValid = await validateWithCustomUrl(customBaseUrl);
+      if (!isValid) return;
+    } else {
+      // Stored/env key + default URL - validate against default URL
+      const isValid = await validateWithCustomUrl();
+      if (!isValid) return;
+    }
+
+    submitForm();
   }, [
     validateOpenAi,
     actions,
     backendModelProviderKey,
     state.customKeys,
+    state.initialKeys,
     handleOpenAiValidationClear,
+    clearApiKeyError,
+    isUsingEnvVars,
+    validateApiKey,
+    validateWithCustomUrl,
   ]);
 
   if (!meta || !backendModelProviderKey) return null;
@@ -298,10 +372,12 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             fieldMetadata={meta.fieldMetadata}
             fieldErrors={fieldErrors}
             openAiValidationError={openAiValidationError}
+            apiKeyValidationError={apiKeyValidationError}
             isOpenAiProvider={isOpenAiProvider}
             onCustomKeyChange={handleCustomKeyChange}
             onFieldErrorClear={handleFieldErrorClear}
             onOpenAiValidationClear={handleOpenAiValidationClear}
+            onApiKeyValidationClear={clearApiKeyError}
           />
 
           {(backendModelProviderKey === "azure" ||
@@ -336,7 +412,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             <Button
               colorPalette="orange"
               onClick={handleSaveAndContinue}
-              loading={state.isSaving}
+              loading={state.isSaving || isValidatingApiKey}
               variant="surface"
               size="sm"
             >

@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
 import { modelProviders } from "../../modelProviders/registry";
@@ -104,14 +105,16 @@ async function validateWithBearerToken(
  * Validates using Anthropic's x-api-key header authentication.
  *
  * @param apiKey - The API key to validate
+ * @param baseUrl - The user-provided base URL (may be empty)
  * @param defaultBaseUrl - The default base URL for Anthropic
  * @returns Promise resolving to validation result
  */
 async function validateWithAnthropicAuth(
   apiKey: string,
+  baseUrl: string,
   defaultBaseUrl: string,
 ): Promise<ValidationResult> {
-  const url = buildModelsEndpointUrl("", defaultBaseUrl);
+  const url = buildModelsEndpointUrl(baseUrl, defaultBaseUrl);
 
   try {
     const response = await fetch(url, {
@@ -177,6 +180,67 @@ async function validateWithGeminiAuth(
         "Failed to validate API key. Please check your network connection.",
     };
   }
+}
+
+/**
+ * Validates an API key against a custom URL or default URL.
+ * Gets API key from stored DB value OR env var (whichever exists).
+ *
+ * @param projectId - The project ID to look up stored keys
+ * @param provider - The provider key (e.g., "openai", "anthropic")
+ * @param customBaseUrl - Optional custom base URL to validate against. If not provided, uses default URL.
+ * @param prisma - Prisma client instance
+ * @returns Promise resolving to validation result
+ */
+export async function validateKeyWithCustomUrl(
+  projectId: string,
+  provider: string,
+  customBaseUrl: string | undefined,
+  prisma: PrismaClient,
+): Promise<ValidationResult> {
+  const providerDef = modelProviders[provider as keyof typeof modelProviders];
+  if (!providerDef) {
+    return { valid: true }; // Unknown provider, skip validation
+  }
+
+  if (SKIP_VALIDATION.has(provider)) {
+    return { valid: true };
+  }
+
+  const apiKeyField = providerDef.apiKey;
+  const endpointField = providerDef.endpointKey;
+
+  // Try to get stored API key from DB
+  const storedProvider = await prisma.modelProvider.findFirst({
+    where: { projectId, provider },
+    select: { customKeys: true },
+  });
+
+  const storedKeys = storedProvider?.customKeys as Record<string, string> | null;
+  let apiKey = storedKeys?.[apiKeyField]?.trim() ?? "";
+
+  // Fallback to env var if no stored key
+  if (!apiKey) {
+    apiKey = process.env[apiKeyField]?.trim() ?? "";
+  }
+
+  if (!apiKey) {
+    return {
+      valid: false,
+      error: `No API key found for ${provider}. Please enter an API key.`,
+    };
+  }
+
+  // Build customKeys with the retrieved API key and optional custom URL
+  const customKeys: Record<string, string> = {
+    [apiKeyField]: apiKey,
+  };
+  if (endpointField && customBaseUrl) {
+    customKeys[endpointField] = customBaseUrl;
+  }
+  // Note: if customBaseUrl is not provided, validateProviderApiKey will use the default URL
+
+  return validateProviderApiKey(provider, customKeys);
 }
 
 /**
@@ -246,7 +310,7 @@ export async function validateProviderApiKey(
     case "bearer":
       return validateWithBearerToken(apiKey, baseUrl, defaultBaseUrl);
     case "anthropic":
-      return validateWithAnthropicAuth(apiKey, defaultBaseUrl);
+      return validateWithAnthropicAuth(apiKey, baseUrl, defaultBaseUrl);
     case "gemini":
       return validateWithGeminiAuth(apiKey, defaultBaseUrl);
     default:
