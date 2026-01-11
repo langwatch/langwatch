@@ -1,7 +1,6 @@
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import type {
   IExportTraceServiceRequest,
-  // @ts-expect-error
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import * as crypto from "node:crypto";
