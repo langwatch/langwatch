@@ -24,6 +24,7 @@ import {
 } from "react-hook-form";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
@@ -112,7 +113,7 @@ export const TeamForm = ({
           <Spacer />
           {team && (
             <Link href={`/settings/members`} asChild>
-              <Button colorPalette="gray">Manage organization members</Button>
+              <Button variant="outline" size="sm">Manage organization members</Button>
             </Link>
           )}
         </HStack>
@@ -224,6 +225,8 @@ export const TeamForm = ({
                 <Table.Cell colSpan={4}>
                   <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     onClick={() => {
                       members.append({
                         userId: undefined,
@@ -250,16 +253,7 @@ export const TeamForm = ({
         )}
         {team && (
           <>
-            <HStack width="full" marginTop={2}>
-              <Heading>Projects</Heading>
-              <Spacer />
-              <Link href={`/onboarding/${team.slug}/project`} asChild>
-                <Button colorPalette="gray">
-                  <Plus size={20} />
-                  Add new project
-                </Button>
-              </Link>
-            </HStack>
+            <TeamFormProjects team={team} />
             <Table.Root variant="line" width="full" size="md">
               <Table.Header>
                 <Table.Row>
@@ -275,3 +269,22 @@ export const TeamForm = ({
     </form>
   );
 };
+
+function TeamFormProjects({
+  team,
+}: {
+  team: TeamWithProjectsAndMembersAndUsers;
+}): React.ReactElement {
+  const { openDrawer } = useDrawer();
+
+  return (
+    <HStack width="full" marginTop={2}>
+      <Heading>Projects</Heading>
+      <Spacer />
+      <Button variant="outline" size="sm" onClick={() => openDrawer("createProject")}>
+        <Plus size={20} />
+        Add new project
+      </Button>
+    </HStack>
+  );
+}

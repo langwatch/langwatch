@@ -17,6 +17,7 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
@@ -39,8 +40,8 @@ function ProjectsList({
 }: {
   organization: FullyLoadedOrganization;
 }) {
-  const { project } = useOrganizationTeamProject();
-  const { hasPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
@@ -73,12 +74,12 @@ function ProjectsList({
                       usage.data.projectsCount <
                         usage.data.activePlan.maxProjects ||
                       usage.data.activePlan.overrideAddingLimitations ? (
-                        <Link href={`/onboarding/${team.slug}/project`} asChild>
-                          <PageLayout.HeaderButton>
-                            <Plus size={20} />
-                            <Text>Add new project</Text>
-                          </PageLayout.HeaderButton>
-                        </Link>
+                        <PageLayout.HeaderButton
+                          onClick={() => openDrawer("createProject")}
+                        >
+                          <Plus size={20} />
+                          <Text>Add new project</Text>
+                        </PageLayout.HeaderButton>
                       ) : (
                         <Tooltip
                           content="You reached the limit of max new projects, click to upgrade your plan to add more projects"

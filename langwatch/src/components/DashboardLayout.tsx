@@ -20,6 +20,7 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
+import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -241,6 +242,7 @@ export const AddProjectButton = ({
   organization: Organization;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -252,17 +254,14 @@ export const AddProjectButton = ({
 
   return !usage.data ||
     usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
-    <Link
-      href={`/onboarding/${team.slug}/project`}
-      _hover={{
-        textDecoration: "none",
-      }}
+    <Menu.Item
+      value={`new-project-${team.slug}`}
+      fontSize="14px"
+      onClick={() => openDrawer("createProject")}
     >
-      <Menu.Item value={`new-project-${team.slug}`} fontSize="14px">
-        <Plus />
-        New Project
-      </Menu.Item>
-    </Link>
+      <Plus />
+      New Project
+    </Menu.Item>
   ) : (
     <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
