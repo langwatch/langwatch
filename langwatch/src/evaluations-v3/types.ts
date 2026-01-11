@@ -218,6 +218,15 @@ export type TargetConfig = Omit<
 
 export type EvaluationResultStatus = "idle" | "running" | "success" | "error";
 
+/**
+ * Per-row metadata for a target execution (cost, duration, trace info).
+ */
+export type TargetRowMetadata = {
+  cost?: number;
+  duration?: number;
+  traceId?: string;
+};
+
 export type EvaluationResults = {
   runId?: string;
   versionId?: string;
@@ -226,6 +235,8 @@ export type EvaluationResults = {
   total?: number;
   // Per-row results
   targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
+  // Per-row metadata (cost, duration, traceId)
+  targetMetadata: Record<string, TargetRowMetadata[]>; // targetId -> array of metadata per row
   // Evaluator results nested by target
   evaluatorResults: Record<string, Record<string, unknown[]>>; // targetId -> evaluatorId -> array of results per row
   errors: Record<string, string[]>; // targetId -> array of errors per row
@@ -464,7 +475,12 @@ export type TableRowData = {
   dataset: Record<string, string>;
   targets: Record<
     string,
-    { output: unknown; evaluators: Record<string, unknown> }
+    {
+      output: unknown;
+      evaluators: Record<string, unknown>;
+      error?: string | null;
+      isLoading?: boolean;
+    }
   >;
 };
 
@@ -483,6 +499,10 @@ export type TableMeta = {
   openTargetEditor: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
+  // Execution handlers
+  handleRunTarget?: (targetId: string) => void;
+  handleRunRow?: (rowIndex: number) => void;
+  handleRunCell?: (rowIndex: number, targetId: string) => void;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;
@@ -505,8 +525,16 @@ export const createInitialInlineDataset = (): InlineDataset => ({
     { id: "expected_output", name: "expected_output", type: "string" },
   ],
   records: {
-    input: ["", "", ""],
-    expected_output: ["", "", ""],
+    input: [
+      "How do I update my billing information?",
+      "I'm having trouble logging into my account",
+      "What are your business hours?",
+    ],
+    expected_output: [
+      "You can update your billing information by going to Settings > Billing in your account dashboard. From there, click 'Edit Payment Method' to make changes. Let me know if you need any help!",
+      "I'm sorry to hear you're having trouble logging in. Let's get this sorted out. Could you try resetting your password using the 'Forgot Password' link on the login page? If that doesn't work, let me know and I can help further.",
+      "We're available Monday through Friday, 9 AM to 6 PM in your local timezone. You can also reach us anytime through this chat or by email at support@company.com.",
+    ],
   },
 });
 
@@ -524,6 +552,7 @@ export const createInitialDataset = (): DatasetReference => ({
 export const createInitialResults = (): EvaluationResults => ({
   status: "idle",
   targetOutputs: {},
+  targetMetadata: {},
   evaluatorResults: {},
   errors: {},
 });
