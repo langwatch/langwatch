@@ -68,6 +68,10 @@ describe("Dataset inline editing", () => {
   describe("Cancel cell edit with Escape", () => {
     it("reverts to original value on Escape", async () => {
       const user = userEvent.setup();
+
+      // Get the initial store value before any edits
+      const initialValue = getActiveDatasetRecords()?.["input"]?.[0];
+
       renderCell("original", 0, "input");
 
       // Enter edit mode
@@ -83,7 +87,7 @@ describe("Dataset inline editing", () => {
 
       // Should revert - the store value should not be updated
       const records = getActiveDatasetRecords();
-      expect(records?.["input"]?.[0]).toBe("");
+      expect(records?.["input"]?.[0]).toBe(initialValue);
     });
   });
 
@@ -126,6 +130,10 @@ describe("Dataset inline editing", () => {
   describe("Undo cell edit", () => {
     it("undoes cell edit via store temporal", async () => {
       const user = userEvent.setup();
+
+      // Get the initial store value before any edits
+      const initialValue = getActiveDatasetRecords()?.["input"]?.[0];
+
       renderCell("", 0, "input");
 
       // Make an edit
@@ -146,10 +154,10 @@ describe("Dataset inline editing", () => {
       // Trigger undo via store
       useEvaluationsV3Store.temporal.getState().undo();
 
-      // Value should be reverted
+      // Value should be reverted to initial value
       await waitFor(() => {
         const records = getActiveDatasetRecords();
-        expect(records?.["input"]?.[0]).toBe("");
+        expect(records?.["input"]?.[0]).toBe(initialValue);
       });
     });
   });
@@ -157,6 +165,10 @@ describe("Dataset inline editing", () => {
   describe("Redo cell edit", () => {
     it("redoes cell edit after undo", async () => {
       const user = userEvent.setup();
+
+      // Get the initial store value before any edits
+      const initialValue = getActiveDatasetRecords()?.["input"]?.[0];
+
       renderCell("", 0, "input");
 
       // Make an edit
@@ -177,7 +189,7 @@ describe("Dataset inline editing", () => {
       useEvaluationsV3Store.temporal.getState().undo();
 
       await waitFor(() => {
-        expect(getActiveDatasetRecords()?.["input"]?.[0]).toBe("");
+        expect(getActiveDatasetRecords()?.["input"]?.[0]).toBe(initialValue);
       });
 
       // Redo

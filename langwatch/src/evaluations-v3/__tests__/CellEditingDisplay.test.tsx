@@ -75,6 +75,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {
@@ -153,13 +158,14 @@ describe("Cell editing display - inline dataset", () => {
 
     // Find the first input cell (row 0, column 'input')
     const cell = screen.getByTestId("cell-0-input");
-    expect(cell).toHaveTextContent("");
+    // Cell has initial sample data from createInitialInlineDataset
 
     // Double-click to enter edit mode
     await user.dblClick(cell);
 
-    // Find the textarea and type
+    // Find the textarea and clear it, then type new value
     const textarea = await screen.findByRole("textbox");
+    await user.clear(textarea);
     await user.type(textarea, "test value");
 
     // Press Enter to save

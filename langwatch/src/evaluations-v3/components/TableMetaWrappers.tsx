@@ -85,6 +85,7 @@ export const TargetHeaderFromMeta = ({
       target={target}
       onEdit={meta?.openTargetEditor}
       onRemove={meta?.handleRemoveTarget}
+      onRun={meta?.handleRunTarget ? () => meta.handleRunTarget?.(targetId) : undefined}
     />
   );
 };
@@ -99,7 +100,13 @@ export const TargetCellFromMeta = ({
   tableMeta,
 }: {
   targetId: string;
-  data: { output: unknown; evaluators: Record<string, unknown> } | undefined;
+  data: {
+    output: unknown;
+    evaluators: Record<string, unknown>;
+    error?: string | null;
+    isLoading?: boolean;
+    traceId?: string | null;
+  } | undefined;
   rowIndex: number;
   tableMeta: TableMeta | undefined;
 }) => {
@@ -112,6 +119,9 @@ export const TargetCellFromMeta = ({
       target={target}
       output={data?.output}
       evaluatorResults={data?.evaluators ?? {}}
+      error={data?.error}
+      isLoading={data?.isLoading}
+      traceId={data?.traceId}
       row={rowIndex}
       onAddEvaluator={tableMeta?.handleAddEvaluator}
     />

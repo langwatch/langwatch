@@ -4,6 +4,7 @@ import {
   Circle,
   HStack,
   Icon,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -12,6 +13,7 @@ import {
   LuChevronDown,
   LuPencil,
   LuTrash2,
+  LuCircleX,
 } from "react-icons/lu";
 import { keyframes } from "@emotion/react";
 
@@ -34,6 +36,8 @@ type EvaluatorChipProps = {
   result: unknown;
   /** Whether this evaluator has missing required mappings */
   hasMissingMappings?: boolean;
+  /** Whether the target has finished and this evaluator should be running */
+  targetHasOutput?: boolean;
   onEdit: () => void;
   onRemove: () => void;
 };
@@ -42,19 +46,38 @@ export function EvaluatorChip({
   evaluator,
   result,
   hasMissingMappings = false,
+  targetHasOutput = false,
   onEdit,
   onRemove,
 }: EvaluatorChipProps) {
-  const { status, score, label, details } = parseEvaluationResult(result);
+  const parsed = parseEvaluationResult(result);
+
+  // If target has finished but evaluator hasn't returned yet, show as running
+  const status =
+    parsed.status === "pending" && targetHasOutput ? "running" : parsed.status;
+  const { score, label, details } = parsed;
 
   const statusColor = EVALUATION_STATUS_COLORS[status];
 
   // Format inline result display
   const getInlineResult = () => {
     if (status === "pending") return null;
+
+    // Show spinner when running
+    if (status === "running") {
+      return <Spinner size="xs" color="gray.500" />;
+    }
+
+    // Show error icon for error status
+    if (status === "error") {
+      return (
+        <Icon as={LuCircleX} color={statusColor} boxSize="12px" />
+      );
+    }
+
     if (score !== undefined) {
       return (
-        <Text fontSize="10px" fontWeight="semibold" color={statusColor}>
+        <Text fontSize="10px" fontWeight="semibold">
           {score.toFixed(2)}
         </Text>
       );
@@ -64,7 +87,6 @@ export function EvaluatorChip({
         <Text
           fontSize="10px"
           fontWeight="medium"
-          color={statusColor}
           maxWidth="60px"
           truncate
         >
@@ -94,11 +116,17 @@ export function EvaluatorChip({
           }}
         >
           <HStack gap={1.5}>
-            {/* Status indicator dot */}
-            <Circle size="6px" bg={statusColor} flexShrink={0} />
+            {/* Status indicator - spinning for running, static for others */}
+            {status === "running" ? (
+              <Box flexShrink={0}>
+                <Spinner size="xs" color="gray.500" marginBottom="-2px" />
+              </Box>
+            ) : (
+              <Circle size="10px" bg={statusColor} flexShrink={0} />
+            )}
             <Text>{evaluator.name}</Text>
-            {/* Inline result (score or label) */}
-            {getInlineResult()}
+            {/* Inline result (score, label, or error icon) */}
+            {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}
             {hasMissingMappings && (
               <Icon
@@ -119,7 +147,7 @@ export function EvaluatorChip({
           </HStack>
         </Button>
       </Menu.Trigger>
-      <Menu.Content minWidth="220px">
+      <Menu.Content minWidth="220px" maxWidth="360px">
         {/* Result section (if there's a result) */}
         {status !== "pending" && (
           <>
@@ -141,7 +169,6 @@ export function EvaluatorChip({
                     <Text
                       fontSize="12px"
                       fontWeight="semibold"
-                      color={statusColor}
                     >
                       {score.toFixed(2)}
                     </Text>
@@ -155,7 +182,6 @@ export function EvaluatorChip({
                     <Text
                       fontSize="12px"
                       fontWeight="semibold"
-                      color={statusColor}
                     >
                       {label}
                     </Text>

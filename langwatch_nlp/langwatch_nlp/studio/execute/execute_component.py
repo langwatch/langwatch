@@ -1,3 +1,4 @@
+import time
 import dspy
 import sentry_sdk
 from langwatch_nlp.studio.dspy import TemplateAdapter
@@ -23,6 +24,7 @@ async def execute_component(event: ExecuteComponentPayload):
     node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
     disable_dsp_caching()
 
+    started_at = int(time.time() * 1000)
     yield start_component_event(node, event.trace_id)
 
     do_not_trace = not event.workflow.enable_tracing
@@ -53,7 +55,7 @@ async def execute_component(event: ExecuteComponentPayload):
 
         cost = result.cost if hasattr(result, "cost") else None
 
-        yield end_component_event(node, event.trace_id, result, cost)
+        yield end_component_event(node, event.trace_id, result, cost, started_at=started_at)
     except Exception as e:
         import traceback
 

@@ -62,6 +62,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {

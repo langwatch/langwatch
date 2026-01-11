@@ -344,9 +344,22 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
     workflow_version_id: { type: "keyword" },
     progress: { type: "integer" },
     total: { type: "integer" },
+    targets: {
+      type: "nested",
+      properties: {
+        id: { type: "keyword" },
+        name: { type: "keyword" },
+        type: { type: "keyword" },
+        prompt_id: { type: "keyword" },
+        prompt_version: { type: "integer" },
+        agent_id: { type: "keyword" },
+        model: { type: "keyword" },
+      },
+    },
     dataset: {
       properties: {
         index: { type: "integer" },
+        target_id: { type: "keyword" },
         trace_id: { type: "keyword" },
         entry: { type: FLATENNED_TYPE } as any,
         predicted: { type: FLATENNED_TYPE } as any,
@@ -360,6 +373,7 @@ export const batchEvaluationMapping: ElasticSearchMappingFrom<ESBatchEvaluation>
       properties: {
         evaluator: { type: "keyword" },
         name: { type: "keyword" },
+        target_id: { type: "keyword" },
         status: { type: "keyword" },
         index: { type: "integer" },
         score: { type: "float" },

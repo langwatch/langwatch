@@ -94,6 +94,25 @@ export type DSPyRunsSummary = {
   created_at: number;
 };
 
+/**
+ * Target metadata stored in batch evaluation for Evaluations V3.
+ * Captures the state of targets at execution time so we can display
+ * results even after targets are modified or deleted.
+ */
+export type ESBatchEvaluationTarget = {
+  id: string;
+  name: string;
+  type: "prompt" | "agent";
+  /** For prompt targets: the prompt config ID */
+  prompt_id?: string | null;
+  /** For prompt targets: the specific version used */
+  prompt_version?: number | null;
+  /** For agent targets: the agent ID */
+  agent_id?: string | null;
+  /** Model used (for prompt targets) */
+  model?: string | null;
+};
+
 export type ESBatchEvaluation = {
   project_id: string;
   experiment_id: string;
@@ -101,8 +120,12 @@ export type ESBatchEvaluation = {
   workflow_version_id?: string | null;
   progress?: number | null;
   total?: number | null;
+  /** For Evaluations V3: stores target configurations at execution time */
+  targets?: ESBatchEvaluationTarget[] | null;
   dataset: {
     index: number;
+    /** For Evaluations V3: identifies which target produced this result */
+    target_id?: string | null;
     entry: Record<string, any>;
     predicted?: Record<string, any>;
     cost?: number | null;
@@ -113,6 +136,8 @@ export type ESBatchEvaluation = {
   evaluations: {
     evaluator: string;
     name?: string | null;
+    /** For Evaluations V3: identifies which target this evaluation is for */
+    target_id?: string | null;
     status: "processed" | "skipped" | "error";
     index: number;
     duration?: number | null;

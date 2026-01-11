@@ -32,10 +32,12 @@ type EvaluatorDbConfig = {
 };
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
+import { isRowEmpty } from "../utils/emptyRowDetection";
 import {
   convertToUIMapping,
   convertFromUIMapping,
@@ -163,6 +165,31 @@ export function EvaluationsV3Table({
     setActiveDataset,
   });
 
+  // Execution hook for running evaluations
+  const { execute } = useExecuteEvaluation();
+
+  // Execution handlers for partial execution
+  const handleRunTarget = useCallback(
+    (targetId: string) => {
+      void execute({ type: "target", targetId });
+    },
+    [execute]
+  );
+
+  const handleRunRow = useCallback(
+    (rowIndex: number) => {
+      void execute({ type: "rows", rowIndices: [rowIndex] });
+    },
+    [execute]
+  );
+
+  const handleRunCell = useCallback(
+    (rowIndex: number, targetId: string) => {
+      void execute({ type: "cell", rowIndex, targetId });
+    },
+    [execute]
+  );
+
   // Get the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
@@ -277,59 +304,86 @@ export function EvaluationsV3Table({
     [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
   );
 
+  /**
+   * Helper to add an evaluator to the workbench from a Prisma Evaluator.
+   * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
+   */
+  const addEvaluatorToWorkbench = useCallback(
+    (evaluator: Evaluator) => {
+      // Extract evaluator config from the Prisma evaluator
+      const config = evaluator.config as EvaluatorDbConfig | null;
+
+      // Check if this evaluator is already added globally
+      const existingEvaluator = evaluators.find(
+        (e) => e.dbEvaluatorId === evaluator.id
+      );
+
+      // If already exists, no need to add again (it applies to all targets)
+      if (existingEvaluator) {
+        return;
+      }
+
+      // Get the evaluator definition to derive inputs from requiredFields/optionalFields
+      const evaluatorType = config?.evaluatorType;
+      const evaluatorDef = evaluatorType
+        ? AVAILABLE_EVALUATORS[evaluatorType]
+        : undefined;
+
+      // Derive inputs from evaluator definition's required and optional fields
+      const inputFields = [
+        ...(evaluatorDef?.requiredFields ?? []),
+        ...(evaluatorDef?.optionalFields ?? []),
+      ];
+
+      // Create a new EvaluatorConfig from the Prisma evaluator
+      const evaluatorConfig: EvaluatorConfig = {
+        id: `evaluator_${Date.now()}`,
+        evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
+        name: evaluator.name,
+        settings: config?.settings ?? {},
+        inputs: inputFields.map((field) => ({
+          identifier: field,
+          type: "str" as const, // Default all evaluator inputs to string
+        })),
+        mappings: {},
+        dbEvaluatorId: evaluator.id,
+      };
+
+      // Add the evaluator globally (applies to all targets automatically)
+      addEvaluator(evaluatorConfig);
+    },
+    [evaluators, addEvaluator]
+  );
+
   // Handler for opening the evaluator selector (evaluators apply to ALL targets)
   const handleAddEvaluator = useCallback(
     () => {
-      // Set up flow callback to handle evaluator selection
+      // Set up flow callback to handle evaluator selection (existing evaluator)
       setFlowCallbacks("evaluatorList", {
-        onSelect: (evaluator: Evaluator) => {
-          // Extract evaluator config from the Prisma evaluator
-          const config = evaluator.config as EvaluatorDbConfig | null;
+        onSelect: addEvaluatorToWorkbench,
+      });
 
-          // Check if this evaluator is already added globally
-          const existingEvaluator = evaluators.find(
-            (e) => e.dbEvaluatorId === evaluator.id
-          );
+      // Set up flow callback to handle newly created evaluator
+      // When user creates a new evaluator via the editor drawer, we need to:
+      // 1. Fetch the newly created evaluator from DB
+      // 2. Add it to the workbench
+      setFlowCallbacks("evaluatorEditor", {
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-          // If already exists, no need to add again (it applies to all targets)
-          if (existingEvaluator) {
-            return;
+          if (evaluator) {
+            addEvaluatorToWorkbench(evaluator);
           }
-
-          // Get the evaluator definition to derive inputs from requiredFields/optionalFields
-          const evaluatorType = config?.evaluatorType;
-          const evaluatorDef = evaluatorType
-            ? AVAILABLE_EVALUATORS[evaluatorType]
-            : undefined;
-
-          // Derive inputs from evaluator definition's required and optional fields
-          const inputFields = [
-            ...(evaluatorDef?.requiredFields ?? []),
-            ...(evaluatorDef?.optionalFields ?? []),
-          ];
-
-          // Create a new EvaluatorConfig from the Prisma evaluator
-          const evaluatorConfig: EvaluatorConfig = {
-            id: `evaluator_${Date.now()}`,
-            evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
-            name: evaluator.name,
-            settings: config?.settings ?? {},
-            inputs: inputFields.map((field) => ({
-              identifier: field,
-              type: "str" as const, // Default all evaluator inputs to string
-            })),
-            mappings: {},
-            dbEvaluatorId: evaluator.id,
-          };
-
-          // Add the evaluator globally (applies to all targets automatically)
-          addEvaluator(evaluatorConfig);
         },
       });
 
       openDrawer("evaluatorList");
     },
-    [openDrawer, evaluators, addEvaluator],
+    [openDrawer, addEvaluatorToWorkbench, trpcUtils.evaluators.getById, project?.id],
   );
 
   // Handler for removing a target from the workbench
@@ -461,31 +515,49 @@ export function EvaluationsV3Table({
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): TableRowData[] => {
-    return Array.from({ length: displayRowCount }, (_, index) => ({
-      rowIndex: index,
-      dataset: Object.fromEntries(
+    return Array.from({ length: displayRowCount }, (_, index) => {
+      // Build dataset values for this row
+      const datasetValues = Object.fromEntries(
         datasetColumns.map((col) => [
           col.id,
           getCellValue(activeDatasetId, index, col.id),
         ]),
-      ),
-      targets: Object.fromEntries(
-        targets.map((target) => [
-          target.id,
-          {
-            output: results.targetOutputs[target.id]?.[index] ?? null,
-            // All evaluators apply to all targets
-            evaluators: Object.fromEntries(
-              evaluators.map((evaluator) => [
-                evaluator.id,
-                results.evaluatorResults[target.id]?.[evaluator.id]?.[index] ??
-                  null,
-              ]),
-            ),
-          },
-        ]),
-      ),
-    }));
+      );
+
+      // Check if this row is empty - empty rows don't get executed
+      const rowIsEmpty = isRowEmpty(datasetValues);
+
+      return {
+        rowIndex: index,
+        dataset: datasetValues,
+        targets: Object.fromEntries(
+          targets.map((target) => [
+            target.id,
+            {
+              output: results.targetOutputs[target.id]?.[index] ?? null,
+              // All evaluators apply to all targets
+              evaluators: Object.fromEntries(
+                evaluators.map((evaluator) => [
+                  evaluator.id,
+                  results.evaluatorResults[target.id]?.[evaluator.id]?.[index] ??
+                    null,
+                ]),
+              ),
+              // Error for this target/row
+              error: results.errors[target.id]?.[index] ?? null,
+              // Loading if execution is running, row is not empty, and no output yet
+              isLoading:
+                results.status === "running" &&
+                !rowIsEmpty &&
+                !results.targetOutputs[target.id]?.[index] &&
+                !results.errors[target.id]?.[index],
+              // Trace ID for viewing the execution trace
+              traceId: results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
+            },
+          ]),
+        ),
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
   }, [
     activeDatasetId,
@@ -526,6 +598,10 @@ export function EvaluationsV3Table({
       openTargetEditor,
       handleRemoveTarget,
       handleAddEvaluator,
+      // Execution handlers
+      handleRunTarget,
+      handleRunRow,
+      handleRunCell,
       // Selection data
       selectedRows,
       allSelected,
@@ -542,6 +618,9 @@ export function EvaluationsV3Table({
       openTargetEditor,
       handleRemoveTarget,
       handleAddEvaluator,
+      handleRunTarget,
+      handleRunRow,
+      handleRunCell,
       selectedRows,
       allSelected,
       someSelected,

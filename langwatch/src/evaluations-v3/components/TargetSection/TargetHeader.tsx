@@ -1,15 +1,6 @@
-import {
-  Box,
-  Button,
-  Circle,
-  HStack,
-  Icon,
-  IconButton,
-  Spacer,
-  Text,
-} from "@chakra-ui/react";
+import { Box, Button, Circle, HStack, Icon, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   LuChevronDown,
   LuCircleAlert,
@@ -28,6 +19,10 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { TargetConfig } from "../../types";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { computeTargetAggregates } from "../../utils/computeAggregates";
+import { isRowEmpty } from "../../utils/emptyRowDetection";
+import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import { TargetSummary } from "./TargetSummary";
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -82,6 +77,33 @@ export const TargetHeader = memo(function TargetHeader({
   // Check if there are missing mappings for the active dataset
   const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
+
+  // Get results, evaluators, and dataset for computing aggregates
+  const { results, evaluators, activeDataset } = useEvaluationsV3Store((state) => ({
+    results: state.results,
+    evaluators: state.evaluators,
+    activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
+  }));
+
+  // Count non-empty rows (empty rows are skipped during execution)
+  const nonEmptyRowCount = useMemo(() => {
+    if (!activeDataset?.inline?.records) return 0;
+    const rows = transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records);
+    return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row)).length;
+  }, [activeDataset?.inline?.records]);
+
+  // Compute aggregate statistics using non-empty row count
+  const aggregates = useMemo(
+    () => computeTargetAggregates(target.id, results, evaluators, nonEmptyRowCount),
+    [target.id, results, evaluators, nonEmptyRowCount]
+  );
+
+  // Show aggregates only when we have results or errors or running
+  const hasAggregates = 
+    aggregates.completedRows > 0 || 
+    aggregates.errorRows > 0 ||
+    aggregates.totalCost !== null ||
+    results.status === "running";
 
   // Get the latest version for this prompt (to determine if target is at "latest")
   const { latestVersion } = useLatestPromptVersion({
@@ -229,33 +251,41 @@ export const TargetHeader = memo(function TargetHeader({
 
       <Spacer />
 
+      {/* Summary statistics (positioned on the right before play button) */}
+      {hasAggregates && (
+        <TargetSummary
+          aggregates={aggregates}
+          isRunning={results.status === "running"}
+        />
+      )}
+
       {/* Play button on far right */}
-      <Tooltip
-        content={hasMissingMappings ? "Configure missing mappings first" : "Run evaluation"}
-        positioning={{ placement: "top" }}
-        openDelay={200}
-      >
-        <IconButton
-          aria-label="Run evaluation for this target"
-          size="xs"
-          variant="ghost"
-          onClick={(e) => {
-            e.stopPropagation();
-            // If there are missing mappings, open the drawer instead of running
-            if (hasMissingMappings) {
-              onEdit?.(target);
-            } else {
-              onRun?.(target);
-            }
-          }}
-          data-testid="target-play-button"
-          minWidth="auto"
-          height="auto"
-          padding={1}
+        <Tooltip
+          content={hasMissingMappings ? "Configure missing mappings first" : "Run evaluation"}
+          positioning={{ placement: "top" }}
+          openDelay={200}
         >
-          <LuPlay size={14} />
-        </IconButton>
-      </Tooltip>
+          <IconButton
+            aria-label="Run evaluation for this target"
+            size="xs"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              // If there are missing mappings, open the drawer instead of running
+              if (hasMissingMappings) {
+                onEdit?.(target);
+              } else {
+                onRun?.(target);
+              }
+            }}
+            data-testid="target-play-button"
+            minWidth="auto"
+            height="auto"
+            padding={1}
+          >
+            <LuPlay size={14} />
+          </IconButton>
+        </Tooltip>
     </HStack>
   );
 });

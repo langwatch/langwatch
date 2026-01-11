@@ -244,9 +244,19 @@ export class LlmConfigRepository {
 
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
-      throw new NotFoundError(
-        `Prompt config has no versions. ID: ${idOrHandle}`,
-      );
+      if (params.version) {
+        throw new NotFoundError(
+          `Prompt version ${params.version} not found for prompt ${idOrHandle}`,
+        );
+      } else if (params.versionId) {
+        throw new NotFoundError(
+          `Prompt version ID ${params.versionId} not found for prompt ${idOrHandle}`,
+        );
+      } else {
+        throw new NotFoundError(
+          `Prompt config has no versions. ID: ${idOrHandle}`,
+        );
+      }
     }
 
     config.handle = this.removeHandlePrefixes(

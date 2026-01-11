@@ -67,6 +67,7 @@ export const useAutosaveEvaluationsV3 = () => {
     results: {
       status: "idle",
       targetOutputs: {},
+      targetMetadata: {},
       evaluatorResults: {},
       errors: {},
     },

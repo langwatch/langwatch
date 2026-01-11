@@ -781,6 +781,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       results: {
         status: "idle",
         targetOutputs: {},
+        targetMetadata: {},
         evaluatorResults: {},
         errors: {},
       },
