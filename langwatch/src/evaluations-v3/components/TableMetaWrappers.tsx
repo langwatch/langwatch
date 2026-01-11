@@ -80,12 +80,18 @@ export const TargetHeaderFromMeta = ({
 
   if (!target) return null;
 
+  // Check if THIS specific target has any cells being executed
+  // Only show running state if there are cells for this target in executingCells
+  const isThisTargetRunning = meta?.isExecutionRunning && meta?.isTargetExecuting?.(targetId);
+
   return (
     <TargetHeader
       target={target}
       onEdit={meta?.openTargetEditor}
       onRemove={meta?.handleRemoveTarget}
       onRun={meta?.handleRunTarget ? () => meta.handleRunTarget?.(targetId) : undefined}
+      onStop={meta?.handleStopExecution}
+      isRunning={isThisTargetRunning}
     />
   );
 };
@@ -106,6 +112,7 @@ export const TargetCellFromMeta = ({
     error?: string | null;
     isLoading?: boolean;
     traceId?: string | null;
+    duration?: number | null;
   } | undefined;
   rowIndex: number;
   tableMeta: TableMeta | undefined;
@@ -122,8 +129,12 @@ export const TargetCellFromMeta = ({
       error={data?.error}
       isLoading={data?.isLoading}
       traceId={data?.traceId}
+      duration={data?.duration}
+      isExecutionRunning={tableMeta?.isExecutionRunning}
       row={rowIndex}
       onAddEvaluator={tableMeta?.handleAddEvaluator}
+      onRunCell={tableMeta?.handleRunCell ? () => tableMeta.handleRunCell?.(rowIndex, targetId) : undefined}
+      onStopCell={tableMeta?.handleStopExecution}
     />
   );
 };

@@ -38,6 +38,7 @@ import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
+import { isCellInExecution } from "../utils/executionScope";
 import {
   convertToUIMapping,
   convertFromUIMapping,
@@ -166,7 +167,7 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const { execute } = useExecuteEvaluation();
+  const { execute, abort, status, progress } = useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -189,6 +190,14 @@ export function EvaluationsV3Table({
     },
     [execute]
   );
+
+  // Handler for stopping execution
+  const handleStopExecution = useCallback(() => {
+    void abort();
+  }, [abort]);
+
+  // Check if execution is running
+  const isExecutionRunning = status === "running" || results.status === "running";
 
   // Get the active dataset
   const activeDataset = useMemo(
@@ -488,6 +497,14 @@ export function EvaluationsV3Table({
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
 
+  // Handler for running selected rows
+  const handleRunSelectedRows = useCallback(() => {
+    const rowIndices = Array.from(selectedRows);
+    if (rowIndices.length > 0) {
+      void execute({ type: "rows", rowIndices });
+    }
+  }, [execute, selectedRows]);
+
   // Get columns from active dataset, filtering out hidden columns
   const allDatasetColumns = activeDataset?.columns ?? [];
   const datasetColumns = useMemo(
@@ -545,14 +562,15 @@ export function EvaluationsV3Table({
               ),
               // Error for this target/row
               error: results.errors[target.id]?.[index] ?? null,
-              // Loading if execution is running, row is not empty, and no output yet
+              // Loading if this specific cell is in the executing set
+              // Uses the executingCells set as single source of truth
               isLoading:
-                results.status === "running" &&
-                !rowIsEmpty &&
-                !results.targetOutputs[target.id]?.[index] &&
-                !results.errors[target.id]?.[index],
+                results.executingCells !== undefined &&
+                isCellInExecution(results.executingCells, index, target.id),
               // Trace ID for viewing the execution trace
               traceId: results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
+              // Duration/latency for this cell execution
+              duration: results.targetMetadata?.[target.id]?.[index]?.duration ?? null,
             },
           ]),
         ),
@@ -589,6 +607,30 @@ export function EvaluationsV3Table({
     [targets]
   );
 
+  // Helper to check if a specific target has cells being executed
+  const isTargetExecuting = useCallback(
+    (targetId: string): boolean => {
+      if (!results.executingCells) return false;
+      // Check if any cell for this target is in the executing set
+      for (let i = 0; i < rowCount; i++) {
+        if (isCellInExecution(results.executingCells, i, targetId)) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [results.executingCells, rowCount]
+  );
+
+  // Helper to check if a specific cell is being executed
+  const isCellExecuting = useCallback(
+    (rowIndex: number, targetId: string): boolean => {
+      if (!results.executingCells) return false;
+      return isCellInExecution(results.executingCells, rowIndex, targetId);
+    },
+    [results.executingCells]
+  );
+
   const tableMeta: TableMeta = useMemo(
     () => ({
       // Target data
@@ -602,6 +644,10 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleStopExecution,
+      isExecutionRunning,
+      isTargetExecuting,
+      isCellExecuting,
       // Selection data
       selectedRows,
       allSelected,
@@ -621,6 +667,10 @@ export function EvaluationsV3Table({
       handleRunTarget,
       handleRunRow,
       handleRunCell,
+      handleStopExecution,
+      isExecutionRunning,
+      isTargetExecuting,
+      isCellExecuting,
       selectedRows,
       allSelected,
       someSelected,
@@ -1038,9 +1088,11 @@ export function EvaluationsV3Table({
 
       <SelectionToolbar
         selectedCount={selectedRows.size}
-        onRun={() => console.log("Run selected:", Array.from(selectedRows))}
+        onRun={handleRunSelectedRows}
+        onStop={handleStopExecution}
         onDelete={() => deleteSelectedRows(activeDatasetId)}
         onClear={clearRowSelection}
+        isRunning={isExecutionRunning}
       />
 
       {/* Save as dataset drawer */}

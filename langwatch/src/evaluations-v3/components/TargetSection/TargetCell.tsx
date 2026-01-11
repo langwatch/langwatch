@@ -26,6 +26,7 @@ import {
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
+import { formatLatency } from "../../utils/computeAggregates";
 import type { TargetConfig, EvaluatorConfig } from "../../types";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
@@ -47,6 +48,8 @@ type TargetCellContentProps = {
   isLoading?: boolean;
   /** Trace ID for this execution (if available) */
   traceId?: string | null;
+  /** Duration/latency for this execution in milliseconds */
+  duration?: number | null;
   /** Whether the overall execution is running */
   isExecutionRunning?: boolean;
   onAddEvaluator?: () => void;
@@ -63,6 +66,7 @@ export function TargetCellContent({
   error,
   isLoading,
   traceId,
+  duration,
   isExecutionRunning,
   onAddEvaluator,
   onRunCell,
@@ -235,8 +239,9 @@ export function TargetCellContent({
 
   // Render output content - can be collapsed or expanded
   const renderOutput = (expanded: boolean) => {
-    // Loading state - show skeleton
-    if (isLoading && !output && !error) {
+    // Loading state - show skeleton whenever this cell is being executed
+    // This includes re-running cells that already have content
+    if (isLoading) {
       return (
         <VStack align="stretch" gap={1}>
           <Skeleton height="14px" width="80%" />
@@ -269,11 +274,7 @@ export function TargetCellContent({
       if (expanded) {
         // Expanded view - scrollable, no max height
         return (
-          <Box
-            flex={1}
-            overflowY="auto"
-            minHeight={0}
-          >
+          <Box flex={1} overflowY="auto" minHeight={0}>
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
               {isTruncated && (
@@ -369,7 +370,11 @@ export function TargetCellContent({
         justifyContent="flex-start"
         data-testid={`add-evaluator-button-${target.id}`}
         // When evaluators exist, show on hover only (unless in expanded view)
-        className={evaluators.length > 0 && !inExpandedView ? "cell-action-btn" : undefined}
+        className={
+          evaluators.length > 0 && !inExpandedView
+            ? "cell-action-btn"
+            : undefined
+        }
         opacity={evaluators.length > 0 && !inExpandedView ? 0 : 1}
         transition="opacity 0.15s"
       >
@@ -388,9 +393,39 @@ export function TargetCellContent({
     }
   }, [rawOutput]);
 
-  // Render action buttons (trace first, copy, then run)
+  // Render action buttons (latency, trace, copy, then run)
   const renderActionButtons = (inExpandedView: boolean) => (
-    <HStack position="absolute" top={-1} right={-1} gap={0.5} zIndex={1}>
+    <HStack
+      position="absolute"
+      top={-1}
+      right={-1}
+      gap={0.5}
+      zIndex={1}
+      className={inExpandedView ? undefined : "cell-action-btn"}
+      opacity={inExpandedView ? 1 : 0}
+      transition="opacity 0.15s"
+      bg="gray.50/90"
+      borderRadius="md"
+      px={0.5}
+    >
+      {/* Latency display - shows when duration is available */}
+      {duration !== null && duration !== undefined && (
+        <Tooltip
+          content={`Latency: ${formatLatency(duration)}`}
+          positioning={{ placement: "top" }}
+          openDelay={100}
+        >
+          <Text
+            fontSize="11px"
+            color="gray.500"
+            whiteSpace="nowrap"
+            px={1}
+            data-testid={`latency-${target.id}`}
+          >
+            {formatLatency(duration)}
+          </Text>
+        </Tooltip>
+      )}
       {/* Trace link button - left of copy button */}
       {traceId && (
         <Tooltip
@@ -401,13 +436,9 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            bg="gray.50"
             _hover={{ bg: "gray.200" }}
             onClick={handleViewTrace}
             data-testid={`trace-link-${target.id}`}
-            className={inExpandedView ? undefined : "cell-action-btn"}
-            opacity={inExpandedView ? 1 : 0}
-            transition="opacity 0.15s"
           >
             <LuListTree />
           </Button>
@@ -423,16 +454,12 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            bg="gray.50"
             _hover={{ bg: "gray.200" }}
             onClick={(e) => {
               e.stopPropagation();
               handleCopyOutput();
             }}
             data-testid={`copy-output-${target.id}`}
-            className={inExpandedView ? undefined : "cell-action-btn"}
-            opacity={inExpandedView ? 1 : 0}
-            transition="opacity 0.15s"
           >
             {hasCopied ? <LuCheck /> : <LuCopy />}
           </Button>
@@ -448,7 +475,6 @@ export function TargetCellContent({
           <Button
             size="xs"
             variant="ghost"
-            bg="gray.50"
             _hover={{ bg: "gray.200" }}
             onClick={(e) => {
               e.stopPropagation();
@@ -463,9 +489,6 @@ export function TargetCellContent({
               }
             }}
             data-testid={`run-cell-${target.id}`}
-            className={inExpandedView ? undefined : "cell-action-btn"}
-            opacity={inExpandedView ? 1 : 0}
-            transition="opacity 0.15s"
           >
             {isLoading ? <LuSquare size={12} /> : <LuPlay size={12} />}
           </Button>
