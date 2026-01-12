@@ -299,9 +299,11 @@ export class EventStoreMemory<EventType extends Event = Event>
       type: record.EventType as EventType["type"],
       version: record.EventVersion,
       data: payload,
-      metadata: {
-        processingTraceparent: record.ProcessingTraceparent || void 0,
-      },
+      ...(record.ProcessingTraceparent && {
+        metadata: {
+          processingTraceparent: record.ProcessingTraceparent,
+        },
+      }),
     } satisfies Event;
 
     return event as EventType;
