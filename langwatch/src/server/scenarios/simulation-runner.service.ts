@@ -5,6 +5,7 @@ import { ScenarioService } from "./scenario.service";
 import type { SimulationTarget } from "../api/routers/scenarios";
 import { createLogger } from "~/utils/logger";
 import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
+import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { env } from "~/env.mjs";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { DEFAULT_MODEL } from "~/utils/constants";
@@ -122,7 +123,15 @@ export class SimulationRunnerService {
       const judgeModel = await getVercelAIModel(projectId, defaultModel);
 
       // 4. Resolve target to adapter
+      logger.debug(
+        { targetType: target.type, referenceId: target.referenceId, projectId },
+        "Resolving target to adapter"
+      );
       const adapter = this.resolveAdapter(target, projectId);
+      logger.debug(
+        { adapterName: adapter.name, adapterRole: adapter.role },
+        "Adapter resolved"
+      );
 
       // 5. Run scenario with SDK
       logger.info(
@@ -182,8 +191,16 @@ export class SimulationRunnerService {
           this.promptService,
           projectId
         );
-      default:
-        throw new Error(`Unknown target type: ${target.type}`);
+      case "http":
+        return HttpAgentAdapter.create({
+          agentId: target.referenceId,
+          projectId,
+          prisma: this.prisma,
+        });
+      default: {
+        const _exhaustive: never = target.type;
+        throw new Error(`Unknown target type: ${_exhaustive}`);
+      }
     }
   }
 

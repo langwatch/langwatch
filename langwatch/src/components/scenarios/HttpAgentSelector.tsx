@@ -8,37 +8,48 @@ import { ChevronDown } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Listbox } from "../ui/listbox";
 import { Popover } from "../ui/popover";
-import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { api } from "../../utils/api";
 
-interface PromptSelectorProps {
+interface HttpAgentSelectorProps {
   value: string | null;
   onChange: (value: string | null) => void;
 }
 
 /**
- * Dropdown selector for prompts from the library.
+ * Dropdown selector for HTTP agents.
  * Uses Listbox with Popover pattern per Chakra recommendations.
  */
-export function PromptSelector({ value, onChange }: PromptSelectorProps) {
-  const { data: prompts } = useAllPromptsForProject();
+export function HttpAgentSelector({ value, onChange }: HttpAgentSelectorProps) {
+  const { project } = useOrganizationTeamProject();
+  const { data: agents } = api.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
+  // Filter to only HTTP agents
+  const httpAgents = useMemo(
+    () => agents?.filter((a) => a.type === "http") ?? [],
+    [agents],
+  );
+
   const collection = useMemo(() => {
-    const allItems = (prompts?.filter((p) => p.version > 0) ?? []).map((p) => ({
-      label: p.handle ?? p.id,
-      value: p.id,
+    const allItems = httpAgents.map((a) => ({
+      label: a.name,
+      value: a.id,
     }));
 
     const filteredItems = inputValue
       ? allItems.filter((item) =>
-          item.label.toLowerCase().includes(inputValue.toLowerCase())
+          item.label.toLowerCase().includes(inputValue.toLowerCase()),
         )
       : allItems;
 
     return createListCollection({ items: filteredItems });
-  }, [prompts, inputValue]);
+  }, [httpAgents, inputValue]);
 
   const listbox = useListbox({
     collection,
@@ -61,7 +72,7 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
     >
       <Popover.Trigger asChild>
         <Button ref={triggerRef} variant="outline" size="sm" minWidth="200px">
-          {selectedItem ? selectedItem.label : "Select prompt"}
+          {selectedItem ? selectedItem.label : "Select HTTP agent"}
           <ChevronDown size={14} />
         </Button>
       </Popover.Trigger>
@@ -74,7 +85,7 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
               px="3"
               bg="transparent"
               outline="0"
-              placeholder="Search prompts..."
+              placeholder="Search HTTP agents..."
               value={inputValue}
               onChange={(e) => setInputValue(e.currentTarget.value)}
             />
@@ -84,9 +95,9 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
               roundedTop="0"
               gap="0"
             >
-              {collection.items.map((prompt) => (
-                <Listbox.Item key={prompt.value} item={prompt}>
-                  <Listbox.ItemText>{prompt.label}</Listbox.ItemText>
+              {collection.items.map((agent) => (
+                <Listbox.Item key={agent.value} item={agent}>
+                  <Listbox.ItemText>{agent.label}</Listbox.ItemText>
                   <Listbox.ItemIndicator />
                 </Listbox.Item>
               ))}
