@@ -41,25 +41,27 @@ export function Conversation({
   );
 
   const modalTraceId =
-    threadTraces.data?.length && threadTraces.data?.length > 1
+    (router.query.trace as string) ||
+    (threadTraces.data?.length && threadTraces.data?.length > 1
       ? router.query["drawer.traceId"]
-      : undefined;
+      : undefined);
 
   useEffect(() => {
-    if (threadTraces.data && threadTraces.data?.length > 0) {
-      const container = document.getElementById(
-        "conversation-scroll-container",
-      )!;
-      if (container) {
-        container.scrollTop = (currentTraceRef.current?.offsetTop ?? 0) - 176;
-      } else {
-        document.body.scrollTop =
-          (currentTraceRef.current?.offsetTop ?? 0) - 56;
-      }
-    }
+    if (threadTraces.data && threadTraces.data?.length > 0 && modalTraceId) {
+      // Wait for DOM to render, then scroll to highlighted trace
+      const timeoutId = setTimeout(() => {
+        if (currentTraceRef.current) {
+          currentTraceRef.current.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+      }, 300);
 
+      return () => clearTimeout(timeoutId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!threadTraces.data]);
+  }, [threadTraces.data, modalTraceId]);
 
   return (
     <Box width="full" minWidth="800px" paddingX={6}>
@@ -94,7 +96,9 @@ export function Conversation({
                               : "other"
                       }
                       ref={
-                        trace.trace_id == traceId ? currentTraceRef : undefined
+                        trace.trace_id == (modalTraceId || traceId)
+                          ? currentTraceRef
+                          : undefined
                       }
                       highlighted={trace.trace_id == modalTraceId}
                     />

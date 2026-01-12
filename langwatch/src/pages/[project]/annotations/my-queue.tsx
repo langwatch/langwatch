@@ -89,31 +89,47 @@ export default function TraceAnnotations() {
   }
 
   return (
-    <DashboardLayout>
-      <VStack height="100%" width="full" padding={4}>
-        <Conversation
-          threadId={threadId ?? ""}
-          traceId={currentQueueItem?.trace?.trace_id ?? ""}
-        />
-        <Spacer />
-      </VStack>
-      {currentQueueItem?.trace && (
-        <Box
-          position="sticky"
-          bottom={0}
-          left={0}
-          right={0}
-          width="100%"
-          backgroundColor="white"
+    <DashboardLayout display="flex" flexDirection="column">
+      <VStack 
+        height="100%" 
+        width="full" 
+        gap={0} 
+        alignItems="stretch" 
+        position="relative"
+        flex="1"
+      >
+        <Box 
+          flex="1" 
+          overflowY="auto" 
+          padding={4}
+          paddingBottom={currentQueueItem?.trace ? "100px" : 4}
         >
-          <AnnotationQueuePicker
-            key={queueItemsKey}
-            queueItems={allQueueItems}
-            currentQueueItem={currentQueueItem}
-            refetchQueueItems={refetchQueueItems}
+          <Conversation
+            threadId={threadId ?? ""}
+            traceId={currentQueueItem?.trace?.trace_id ?? ""}
           />
         </Box>
-      )}
+        {currentQueueItem?.trace && (
+          <Box
+            position="absolute"
+            bottom={0}
+            left={0}
+            right={0}
+            width="full"
+            backgroundColor="white"
+            borderTop="1px solid"
+            borderColor="gray.200"
+            zIndex={10}
+          >
+            <AnnotationQueuePicker
+              key={queueItemsKey}
+              queueItems={allQueueItems}
+              currentQueueItem={currentQueueItem}
+              refetchQueueItems={refetchQueueItems}
+            />
+          </Box>
+        )}
+      </VStack>
     </DashboardLayout>
   );
 }
