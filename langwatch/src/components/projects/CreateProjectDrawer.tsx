@@ -1,4 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
+import { useRouter } from "next/router";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -11,10 +12,13 @@ import type { FrameworkKey, LanguageKey } from "./techStackOptions";
 export function CreateProjectDrawer({
   open = true,
   onClose,
+  navigateOnCreate = false,
 }: {
   open?: boolean;
   onClose?: () => void;
+  navigateOnCreate?: boolean;
 }): React.ReactElement {
+  const router = useRouter();
   const { organization } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
@@ -62,6 +66,10 @@ export function CreateProjectDrawer({
             type: "success",
             meta: { closable: true },
           });
+
+          if (navigateOnCreate) {
+            void router.push(`/${result.projectSlug}`);
+          }
 
           handleClose();
         },

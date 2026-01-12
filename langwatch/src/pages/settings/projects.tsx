@@ -62,55 +62,55 @@ function ProjectsList({
         align="start"
         maxWidth="1280px"
       >
+        <HStack width="full" justifyContent="space-between">
+          <Heading size="lg">Projects</Heading>
+          {hasPermission("project:create") &&
+            (!usage.data ||
+            usage.data.projectsCount < usage.data.activePlan.maxProjects ||
+            usage.data.activePlan.overrideAddingLimitations ? (
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("createProject")}
+              >
+                <Plus size={20} />
+                <Text>Add new project</Text>
+              </PageLayout.HeaderButton>
+            ) : (
+              <Tooltip
+                content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
+                positioning={{ placement: "top" }}
+              >
+                <Link
+                  href={`/settings/subscription`}
+                  _hover={{
+                    textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "new_project_limit_reached_2",
+                    });
+                  }}
+                >
+                  <Button
+                    background="gray.50"
+                    _hover={{ background: "gray.50" }}
+                    color="gray.400"
+                  >
+                    <HStack gap={2}>
+                      <Plus size={20} />
+                      <Text>Add new project</Text>
+                    </HStack>
+                  </Button>
+                </Link>
+              </Tooltip>
+            ))}
+        </HStack>
         <Table.Root variant="line" width="full" size="md">
           {organization.teams.map((team) => (
             <React.Fragment key={team.id}>
               <Table.Header key={team.id}>
                 <Table.Row>
-                  <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">
-                    {hasPermission("project:create") &&
-                      (!usage.data ||
-                      usage.data.projectsCount <
-                        usage.data.activePlan.maxProjects ||
-                      usage.data.activePlan.overrideAddingLimitations ? (
-                        <PageLayout.HeaderButton
-                          onClick={() => openDrawer("createProject")}
-                        >
-                          <Plus size={20} />
-                          <Text>Add new project</Text>
-                        </PageLayout.HeaderButton>
-                      ) : (
-                        <Tooltip
-                          content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
-                          positioning={{ placement: "top" }}
-                        >
-                          <Link
-                            href={`/settings/subscription`}
-                            _hover={{
-                              textDecoration: "none",
-                            }}
-                            onClick={() => {
-                              trackEvent("subscription_hook_click", {
-                                project_id: project?.id,
-                                hook: "new_project_limit_reached_2",
-                              });
-                            }}
-                          >
-                            <Button
-                              background="gray.50"
-                              _hover={{ background: "gray.50" }}
-                              color="gray.400"
-                            >
-                              <HStack gap={2}>
-                                <Plus size={20} />
-                                <Text>Add new project</Text>
-                              </HStack>
-                            </Button>
-                          </Link>
-                        </Tooltip>
-                      ))}
-                  </Table.ColumnHeader>
+                  <Table.ColumnHeader colSpan={2}>{team.name}</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <TeamProjectsList team={team} />

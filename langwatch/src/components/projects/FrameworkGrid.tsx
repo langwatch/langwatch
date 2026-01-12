@@ -1,5 +1,5 @@
 import { Box, Card, type CardRootProps, HStack, Icon, Text, VStack } from "@chakra-ui/react";
-import type React from "react";
+import React from "react";
 import { useColorModeValue } from "../../components/ui/color-mode";
 import { SelectableIconCard } from "../../features/onboarding/components/sections/shared/SelectableIconCard";
 import { Tooltip } from "../ui/tooltip";

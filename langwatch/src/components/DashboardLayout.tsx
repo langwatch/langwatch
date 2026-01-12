@@ -257,7 +257,7 @@ export const AddProjectButton = ({
     <Menu.Item
       value={`new-project-${team.slug}`}
       fontSize="14px"
-      onClick={() => openDrawer("createProject")}
+      onClick={() => openDrawer("createProject", { navigateOnCreate: true })}
     >
       <Plus />
       New Project
