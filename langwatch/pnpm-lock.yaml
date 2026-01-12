@@ -3283,7 +3283,7 @@ packages:
     engines: {node: '>=16.0.0'}
 
   '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.0.tgz':
-    resolution: {integrity: sha512-ZAGyxMRquiWK7ZJ5Js/0jCHC80p/+8xoGZarbKLzGq+ZuKyq0onF+QqzOKlXriuVFZkT2ct4goXFYD41L53dCA==, tarball: file:vendor/langwatch-scenario-0.4.0.tgz}
+    resolution: {integrity: sha512-BqX/8BMlFu5MgIjKevmeCCeb/UEkZasKr3kcmyyqn17Bwsw28SMsWWl7AmchGJ4UOKDr6MbkKCCEa7im5Zcb6Q==, tarball: file:vendor/langwatch-scenario-0.4.0.tgz}
     version: 0.4.0
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
