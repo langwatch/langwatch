@@ -1,7 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
-import type { CommandType } from "../../../library/domain/commandType";
-import type { Projection } from "../../../library/domain/types";
 import { PipelineBuilder } from "../builder";
 import {
   BASE_COMMAND_HANDLER_SCHEMA,
@@ -11,6 +8,7 @@ import {
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("Pipeline Builder Helper Functions", () => {
   beforeEach(() => {
@@ -31,12 +29,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("customDispatcher", HandlerClass)
         .build();
 
@@ -63,12 +62,13 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -83,55 +83,7 @@ describe("Pipeline Builder Helper Functions", () => {
       expect(calledWithContext).toBe(TestHandler);
     });
 
-    it("extracts makeJobId method when handler class has it", () => {
-      const { eventStore, factory } = createMinimalPipelineBuilder();
-      const createSpy = vi.spyOn(factory, "create");
-
-      class TestHandler {
-        static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
-
-        static getAggregateId(payload: TestCommandPayload): string {
-          return payload.id;
-        }
-
-        static makeJobId(payload: TestCommandPayload): string {
-          return `job-${payload.id}`;
-        }
-
-        async handle(): Promise<TestEvent[]> {
-          return [];
-        }
-      }
-
-      new PipelineBuilder<TestEvent, Projection>({
-        eventStore,
-        queueProcessorFactory: factory,
-      })
-        .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
-        .withCommand("testDispatcher", TestHandler)
-        .build();
-
-      expect(createSpy).toHaveBeenCalledWith(
-        expect.objectContaining({
-          makeJobId: expect.any(Function),
-        }),
-      );
-
-      const makeJobId = createSpy.mock.calls[0]?.[0]?.makeJobId;
-      expect(makeJobId).toBeDefined();
-      if (makeJobId) {
-        const payload: TestCommandPayload = {
-          tenantId: "tenant-1",
-          id: "aggregate-1",
-          value: 42,
-        };
-        const jobId = makeJobId(payload);
-        expect(jobId).toBe("job-aggregate-1");
-      }
-    });
-
-    it("does not extract makeJobId when handler class lacks the method", () => {
+    it("uses deduplication config from registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
@@ -140,40 +92,71 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      const customDeduplicationId = (payload: TestCommandPayload): string =>
+        `dedup-${payload.id}`;
+
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
-        .withCommand("testDispatcher", HandlerClass)
+        .withAggregateType("trace")
+        .withCommand("testDispatcher", HandlerClass, {
+          deduplication: { makeId: customDeduplicationId },
+        })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          makeJobId: void 0,
+          deduplication: { makeId: customDeduplicationId },
         }),
       );
     });
 
-    it("extracts delay number when handler class has delay property", () => {
+    it("does not have deduplication when not provided in options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 5000,
-      });
+      >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
+        .build();
+
+      expect(createSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deduplication: void 0,
+        }),
+      );
+    });
+
+    it("uses delay from registration options", () => {
+      const { eventStore, factory } = createMinimalPipelineBuilder();
+      const createSpy = vi.spyOn(factory, "create");
+
+      const HandlerClass = createTestCommandHandlerClass<
+        TestCommandPayload,
+        TestEvent
+      >({});
+
+      new PipelineBuilder<TestEvent>({
+        eventStore,
+        queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
+      })
+        .withName("test-pipeline")
+        .withAggregateType("trace")
+        .withCommand("testDispatcher", HandlerClass, { delay: 5000 })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -183,7 +166,7 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("does not extract delay when handler class lacks the property", () => {
+    it("does not have delay when not provided in options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
@@ -192,12 +175,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -230,12 +214,13 @@ describe("Pipeline Builder Helper Functions", () => {
         }
       }
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", TestHandler)
         .build();
 
@@ -270,12 +255,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -286,24 +272,23 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("extracts concurrency number when handler class has concurrency property", () => {
+    it("uses concurrency from registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        concurrency: 10,
-      });
+      >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
-        .withCommand("testDispatcher", HandlerClass)
+        .withAggregateType("trace")
+        .withCommand("testDispatcher", HandlerClass, { concurrency: 10 })
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -313,7 +298,7 @@ describe("Pipeline Builder Helper Functions", () => {
       );
     });
 
-    it("does not extract concurrency options when handler class lacks the property", () => {
+    it("does not have concurrency options when not provided in registration options", () => {
       const { eventStore, factory } = createMinimalPipelineBuilder();
       const createSpy = vi.spyOn(factory, "create");
 
@@ -322,12 +307,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestEvent
       >({});
 
-      new PipelineBuilder<TestEvent, Projection>({
+      new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock: createMockDistributedLock(),
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 

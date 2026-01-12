@@ -2,8 +2,22 @@ import { TriggerAction, type Project, type Trigger } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { processTraceBasedTrigger } from "../traceBasedTrigger";
 
-vi.mock("~/server/api/routers/traces", () => ({
+const mockTraceService = {
   getAllTracesForProject: vi.fn(),
+};
+
+vi.mock("~/server/traces/trace.service", () => ({
+  TraceService: {
+    create: vi.fn(() => mockTraceService),
+  },
+}));
+
+vi.mock("~/server/api/utils", () => ({
+  getProtectionsForProject: vi.fn().mockResolvedValue({
+    canSeeCosts: true,
+    canSeeCapturedInput: true,
+    canSeeCapturedOutput: true,
+  }),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -33,7 +47,6 @@ vi.mock("../utils", () => ({
   updateAlert: vi.fn(),
 }));
 
-import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { handleAddToAnnotationQueue } from "../actions/addToAnnotationQueue";
 import { handleAddToDataset } from "../actions/addToDataset";
 import { handleSendEmail } from "../actions/sendEmail";
@@ -66,7 +79,7 @@ describe("processTraceBasedTrigger", () => {
         actionParams: { members: [] },
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
           [
             {
@@ -85,7 +98,9 @@ describe("processTraceBasedTrigger", () => {
             },
           ],
         ],
-      } as any);
+        totalHits: 2,
+        traceChecks: {},
+      });
 
       vi.mocked(triggerSentForMany).mockResolvedValue([]);
 
@@ -109,7 +124,7 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
           [
             {
@@ -120,7 +135,9 @@ describe("processTraceBasedTrigger", () => {
             },
           ],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       vi.mocked(triggerSentForMany).mockResolvedValue([]);
 
@@ -147,16 +164,18 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
           [
             {
               trace_id: "trace-1",
               timestamps: { updated_at: 1000 },
-            } as any,
+            },
           ],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       vi.mocked(triggerSentForMany).mockResolvedValue([]);
 
@@ -182,11 +201,13 @@ describe("processTraceBasedTrigger", () => {
         actionParams: { members: ["user@example.com"] },
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } } as any],
+          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -210,11 +231,13 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } } as any],
+          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -233,11 +256,13 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } } as any],
+          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -256,11 +281,13 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
-          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } } as any],
+          [{ trace_id: "trace-1", timestamps: { updated_at: 1000 } }],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -279,9 +306,11 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [],
-      } as any);
+        totalHits: 0,
+        traceChecks: {},
+      });
 
       const result = await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -302,9 +331,11 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [],
-      } as any);
+        totalHits: 0,
+        traceChecks: {},
+      });
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
@@ -323,22 +354,24 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
           [
             {
               trace_id: "trace-1",
               timestamps: { updated_at: 1000 },
-            } as any,
+            },
           ],
           [
             {
               trace_id: "trace-2",
               timestamps: { updated_at: 2000 },
-            } as any,
+            },
           ],
         ],
-      } as any);
+        totalHits: 2,
+        traceChecks: {},
+      });
 
       vi.mocked(triggerSentForMany).mockResolvedValue([
         { traceId: "trace-1" } as any,
@@ -369,7 +402,7 @@ describe("processTraceBasedTrigger", () => {
         actionParams: {},
       } as unknown as Trigger;
 
-      vi.mocked(getAllTracesForProject).mockResolvedValue({
+      mockTraceService.getAllTracesForProject.mockResolvedValue({
         groups: [
           [
             {
@@ -377,10 +410,12 @@ describe("processTraceBasedTrigger", () => {
               input: { value: "test" },
               output: { value: "test" },
               timestamps: { updated_at: 1000 },
-            } as any,
+            },
           ],
         ],
-      } as any);
+        totalHits: 1,
+        traceChecks: {},
+      });
 
       vi.mocked(triggerSentForMany).mockResolvedValue([]);
 

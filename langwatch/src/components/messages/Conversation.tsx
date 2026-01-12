@@ -111,7 +111,7 @@ export function Conversation({
                 </Box>
               ) : null
             ) : null}
-            {trace.data && !threadTraces.data && (
+            {trace.data && (!threadTraces.data || threadTraces.data.length === 0) && (
               <TraceMessages
                 trace={trace.data}
                 highlighted={!!modalTraceId}

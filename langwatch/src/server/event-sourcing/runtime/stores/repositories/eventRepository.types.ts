@@ -9,6 +9,7 @@ export interface EventRecord {
   EventId: string;
   EventTimestamp: number;
   EventType: string;
+  EventVersion: string;
   EventPayload: unknown;
   ProcessingTraceparent: string;
 }
@@ -30,6 +31,21 @@ export interface EventRepository {
     tenantId: string,
     aggregateType: string,
     aggregateId: string,
+  ): Promise<EventRecord[]>;
+
+  /**
+   * Retrieves event records up to and including a specific event.
+   * Returns raw records without validation or transformation.
+   * Events are filtered where:
+   * - timestamp < upToTimestamp, OR
+   * - timestamp = upToTimestamp AND eventId <= upToEventId
+   */
+  getEventRecordsUpTo(
+    tenantId: string,
+    aggregateType: string,
+    aggregateId: string,
+    upToTimestamp: number,
+    upToEventId: string,
   ): Promise<EventRecord[]>;
 
   /**

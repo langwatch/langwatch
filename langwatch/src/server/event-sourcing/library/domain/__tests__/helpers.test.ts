@@ -8,11 +8,12 @@ import type { Event, Projection } from "../types";
 function createValidEvent(
   id = "event-1",
   aggregateId = "agg-1",
-  aggregateType: AggregateType = "span_ingestion",
+  aggregateType: AggregateType = "trace",
   tenantId: TenantId = createTenantId("tenant-1"),
   timestamp = 1000000,
   type: (typeof EVENT_TYPES)[number] = EVENT_TYPES[0]!,
   data: unknown = { value: "test" },
+  version = "2025-12-17",
 ): Event {
   return {
     id,
@@ -22,6 +23,7 @@ function createValidEvent(
     timestamp,
     type,
     data,
+    version,
   };
 }
 
@@ -29,7 +31,7 @@ function createValidProjection(
   id = "proj-1",
   aggregateId = "agg-1",
   tenantId: TenantId = createTenantId("tenant-1"),
-  version = 1,
+  version = "2025-12-17",
   data: unknown = { value: "test" },
 ): Projection {
   return {
@@ -60,7 +62,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -73,7 +75,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -86,7 +88,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -99,7 +101,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -112,7 +114,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
-        "span_ingestion",
+        "trace",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -256,7 +258,7 @@ describe("isProjection", () => {
         "proj-1",
         "agg-1",
         createTenantId("tenant-1"),
-        1,
+        "2025-12-17",
         "string data",
       );
       expect(isProjection(projection)).toBe(true);
@@ -267,7 +269,7 @@ describe("isProjection", () => {
         "proj-1",
         "agg-1",
         createTenantId("tenant-1"),
-        1,
+        "2025-12-17",
         42,
       );
       expect(isProjection(projection)).toBe(true);
@@ -278,7 +280,7 @@ describe("isProjection", () => {
         "proj-1",
         "agg-1",
         createTenantId("tenant-1"),
-        1,
+        "2025-12-17",
         { nested: { data: "value" } },
       );
       expect(isProjection(projection)).toBe(true);
@@ -289,7 +291,7 @@ describe("isProjection", () => {
         "proj-1",
         "agg-1",
         createTenantId("tenant-1"),
-        1,
+        "2025-12-17",
         [1, 2, 3],
       );
       expect(isProjection(projection)).toBe(true);
@@ -300,7 +302,7 @@ describe("isProjection", () => {
         "proj-1",
         "agg-1",
         createTenantId("tenant-1"),
-        1,
+        "2025-12-17",
         null,
       );
       expect(isProjection(projection)).toBe(true);

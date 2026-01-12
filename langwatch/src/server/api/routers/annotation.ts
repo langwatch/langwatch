@@ -20,7 +20,7 @@ import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
-import { getTracesWithSpans } from "./traces";
+import { TraceService } from "~/server/traces/trace.service";
 
 const scoreOptionSchema = z.object({
   value: z
@@ -61,7 +61,8 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   });
 
   // Get traces for queue items
-  const traces = await getTracesWithSpans(projectId, traceIds, protections);
+  const traceService = TraceService.create(ctx.prisma);
+  const traces = await traceService.getTracesWithSpans(projectId, traceIds, protections);
 
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
@@ -322,7 +323,7 @@ export const annotationRouter = createTRPCRouter({
         strict: true,
       });
 
-      if (slug == "all" || slug == "me" || slug == "my-queue") {
+      if (slug === "all" || slug === "me" || slug === "my-queue") {
         throw new TRPCError({
           code: "CONFLICT",
           message: "A annotation queue name is reserved.",
@@ -476,7 +477,8 @@ export const annotationRouter = createTRPCRouter({
         projectId: input.projectId,
       });
       const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
-      const traces = await getTracesWithSpans(
+      const traceService = TraceService.create(ctx.prisma);
+      const traces = await traceService.getTracesWithSpans(
         input.projectId,
         traceIds,
         protections,
@@ -683,7 +685,7 @@ export const annotationRouter = createTRPCRouter({
       });
 
       // Build the where condition based on the scenario
-      let whereCondition: any = {
+      const whereCondition: any = {
         projectId: input.projectId,
         doneAt:
           input.selectedAnnotations === "pending"

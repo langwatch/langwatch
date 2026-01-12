@@ -19,18 +19,16 @@ const isProd = process.env.NODE_ENV === "production";
 const spanProcessors = [] as Array<BatchSpanProcessor | SimpleSpanProcessor>;
 
 if (explicitEndpoint) {
+  // OTLPTraceExporter automatically reads OTEL_EXPORTER_OTLP_HEADERS from environment
+  // Format: "key1=value1,key2=value2" (e.g., "Authorization=Bearer token")
+  const exporter = new OTLPTraceExporter({
+    url: `${explicitEndpoint}/v1/traces`,
+  });
+
   if (isProd) {
-    spanProcessors.push(
-      new BatchSpanProcessor(
-        new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
-      ),
-    );
+    spanProcessors.push(new BatchSpanProcessor(exporter));
   } else {
-    spanProcessors.push(
-      new SimpleSpanProcessor(
-        new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
-      ),
-    );
+    spanProcessors.push(new SimpleSpanProcessor(exporter));
   }
 }
 
@@ -39,7 +37,7 @@ if (spanProcessors.length > 0) {
     langwatch: "disabled",
     attributes: {
       "service.name": "langwatch-backend",
-      "deployment.environment": process.env.NODE_ENV,
+      "deployment.environment": process.env.ENVIRONMENT,
     },
     resource: detectResources({
       detectors: [awsEksDetector],

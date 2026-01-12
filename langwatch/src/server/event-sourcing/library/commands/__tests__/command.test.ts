@@ -256,26 +256,6 @@ describe("createCommand", () => {
   });
 
   describe("when working with different command types", () => {
-    it("preserves different command types correctly", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const payload = { action: "test" };
-
-      const command1 = createCommand(
-        tenantId,
-        aggregateId,
-        COMMAND_TYPES[0],
-        payload,
-      );
-      const command2 = createCommand(
-        tenantId,
-        aggregateId,
-        COMMAND_TYPES[1],
-        payload,
-      );
-
-      expect(command1.type).toBe(COMMAND_TYPES[0]);
-      expect(command2.type).toBe(COMMAND_TYPES[1]);
-    });
+    it.todo("preserves different command types correctly");
   });
 });

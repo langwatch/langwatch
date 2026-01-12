@@ -235,10 +235,17 @@ model Project {
     analytics                Analytics[]
     archivedAt               DateTime?
     notifications            Notification[]
-    featureClickHouse        Boolean                             @default(false)
     agents                   Agent[]
     evaluators               Evaluator[]
     scenarios                Scenario[]
+
+    featureEventSourcingTraceIngestion      Boolean @default(false)
+    featureEventSourcingSimulationIngestion Boolean @default(false)
+    featureEventSourcingEvaluationIngestion Boolean @default(false)
+
+    featureClickHouseDataSourceTraces      Boolean @default(false)
+    featureClickHouseDataSourceSimulations Boolean @default(false)
+    featureClickHouseDataSourceEvaluations Boolean @default(false)
 
     @@index([teamId])
 }

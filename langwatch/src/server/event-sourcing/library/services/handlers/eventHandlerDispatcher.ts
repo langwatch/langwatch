@@ -10,6 +10,7 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import type { DistributedLock } from "../../utils/distributedLock";
 import type { CheckpointManager } from "../checkpoints/checkpointManager";
 import {
+  ConfigurationError,
   ErrorCategory,
   handleError,
   isSequentialOrderingError,
@@ -18,6 +19,7 @@ import {
 } from "../errorHandling";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
 import type { EventProcessorValidator } from "../validation/eventProcessorValidator";
+import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 
 /**
  * Dispatches events to registered event handlers.
@@ -39,8 +41,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
   private readonly validator: EventProcessorValidator<EventType>;
   private readonly checkpointManager: CheckpointManager<EventType>;
   private readonly queueManager: QueueProcessorManager<EventType>;
-  private readonly distributedLock?: DistributedLock;
+  private readonly distributedLock: DistributedLock;
   private readonly handlerLockTtlMs: number;
+  private readonly featureFlagService?: FeatureFlagServiceInterface;
 
   constructor({
     aggregateType,
@@ -51,6 +54,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     queueManager,
     distributedLock,
     handlerLockTtlMs = 30000,
+    featureFlagService,
   }: {
     aggregateType: AggregateType;
     eventHandlers?: Map<string, EventHandlerDefinition<EventType>>;
@@ -58,8 +62,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     validator: EventProcessorValidator<EventType>;
     checkpointManager: CheckpointManager<EventType>;
     queueManager: QueueProcessorManager<EventType>;
-    distributedLock?: DistributedLock;
+    distributedLock: DistributedLock;
     handlerLockTtlMs?: number;
+    featureFlagService?: FeatureFlagServiceInterface;
   }) {
     this.aggregateType = aggregateType;
     this.eventHandlers = eventHandlers;
@@ -67,8 +72,71 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     this.validator = validator;
     this.checkpointManager = checkpointManager;
     this.queueManager = queueManager;
+
+    // Validate that distributed lock is provided (required for correctness)
+    if (!distributedLock) {
+      throw new ConfigurationError(
+        "EventHandlerDispatcher",
+        "distributedLock is required. Concurrent event processing for the same aggregate requires a distributed lock to prevent race conditions and ensure correct failure handling. Please provide a DistributedLock implementation (e.g., Redis-based lock).",
+        {
+          aggregateType,
+        },
+      );
+    }
     this.distributedLock = distributedLock;
     this.handlerLockTtlMs = handlerLockTtlMs;
+    this.featureFlagService = featureFlagService;
+  }
+
+  /**
+   * Generates a feature flag key for a component.
+   * Pattern: es-{pipeline_name}-{component_type}-{component_name}-killswitch
+   */
+  private generateFeatureFlagKey(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+  ): string {
+    return `es-${this.aggregateType}-${componentType}-${componentName}-killswitch`;
+  }
+
+  /**
+   * Checks if a component is disabled via feature flag kill switch.
+   * Returns true if the component should be disabled.
+   */
+  private async isComponentDisabled(
+    componentType: "projection" | "eventHandler" | "command",
+    componentName: string,
+    tenantId: string,
+    customKey?: string,
+  ): Promise<boolean> {
+    if (!this.featureFlagService) {
+      return false; // No feature flag service, component is enabled
+    }
+
+    const flagKey =
+      customKey ?? this.generateFeatureFlagKey(componentType, componentName);
+
+    try {
+      const isDisabled = await this.featureFlagService.isEnabled(
+        flagKey,
+        tenantId,
+        false,
+      );
+      if (isDisabled) {
+        this.logger.info(
+          { componentName, componentType, tenantId, flagKey },
+          "Component disabled via feature flag kill switch",
+        );
+      }
+      return isDisabled;
+    } catch (error) {
+      // Log error but don't fail - default to enabled
+      this.logger.warn(
+        { componentName, componentType, tenantId, flagKey, error },
+        "Error checking feature flag, defaulting to enabled",
+      );
+      return false;
+    }
   }
 
   /**
@@ -177,6 +245,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               continue;
             }
 
+            // Check kill switch - if enabled, skip event handler processing
+            const isDisabled = await this.isComponentDisabled(
+              "eventHandler",
+              handlerName,
+              event.tenantId,
+              handlerDef.options.killSwitch?.customKey,
+            );
+            if (isDisabled) {
+              continue; // Skip this handler
+            }
+
             // Get event types this handler is interested in
             const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
 
@@ -263,6 +342,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             const handlerDef = this.eventHandlers?.get(handlerName);
             if (!handlerDef) {
               continue;
+            }
+
+            // Check kill switch - if enabled, skip event handler processing
+            const isDisabled = await this.isComponentDisabled(
+              "eventHandler",
+              handlerName,
+              event.tenantId,
+              handlerDef.options.killSwitch?.customKey,
+            );
+            if (isDisabled) {
+              continue; // Skip this handler
             }
 
             const handlerEventTypes = this.getHandlerEventTypes(handlerDef);
@@ -356,7 +446,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     if (!this.eventHandlers || this.eventHandlers.size === 0) {
       return [];
     }
-    return Array.from(this.eventHandlers.keys());
+    return Array.from(this.eventHandlers.entries())
+      .filter(([, handlerDef]) => !handlerDef.options.disabled)
+      .map(([name]) => name);
   }
 
   /**
@@ -560,24 +652,10 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             );
             // Continue to validateEventProcessing - it will check failures and return null,
             // but the idempotency checker will save a pending checkpoint first
-            // We need to skip the ordering check in validateEventProcessing since we already know it will fail
-            // But we want to let it save the pending checkpoint, so we'll pass skipOrderingCheck
-            // Actually, validateEventProcessing checks failures first, so it will return null before checking ordering
-            // So we can just continue and let it handle it
           } else {
             const previousSequenceNumber = sequenceNumber - 1;
 
             this.logger.debug(
-              {
-                handlerName,
-                eventId: event.id,
-                sequenceNumber,
-                previousSequenceNumber,
-              },
-              "Throwing ordering error",
-            );
-
-            this.logger.warn(
               {
                 handlerName,
                 eventId: event.id,
@@ -586,8 +664,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 previousSequenceNumber,
                 tenantId: event.tenantId,
               },
-              "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
+              "Previous event not yet processed, deferring (expected behavior)",
             );
+
             throw new SequentialOrderingError(
               previousSequenceNumber,
               sequenceNumber,
@@ -607,14 +686,17 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           this.handlerLockTtlMs,
         );
 
-        // Acquire distributed lock if configured (only after confirming previous event is processed)
+        // Acquire distributed lock (only after confirming previous event is processed)
         // Lock key format: handler:${tenantId}:${aggregateType}:${aggregateId}:${handlerName}
-        const lockKey = `handler:${event.tenantId}:${this.aggregateType}:${String(event.aggregateId)}:${handlerName}`;
-        const lockHandle = this.distributedLock
-          ? await this.distributedLock.acquire(lockKey, lockTtlMs)
-          : null;
+        const lockKey = `handler:${event.tenantId}:${
+          this.aggregateType
+        }:${String(event.aggregateId)}:${handlerName}`;
+        const lockHandle = await this.distributedLock.acquire(
+          lockKey,
+          lockTtlMs,
+        );
 
-        if (this.distributedLock && !lockHandle) {
+        if (!lockHandle) {
           throw new LockError(
             lockKey,
             "handleEvent",
@@ -629,17 +711,13 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
         }
 
         try {
-          // Validate event processing prerequisites (idempotency, failures)
-          // Note: ordering is already checked above in early check using the same method
-          // (getCheckpointBySequenceNumber) that orderingValidator uses, so it's safe to skip here.
-          // The lock acquisition above ensures no concurrent processing of the same aggregate.
+          // Validate event processing prerequisites (idempotency, failures, ordering)
           const validatedSequenceNumber =
             await this.validator.validateEventProcessing(
               handlerName,
               "handler",
               event,
               context,
-              { skipOrderingCheck: true },
             );
 
           // If validation returned null, processing should be skipped (already processed or has failures)
@@ -821,22 +899,20 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           throw error;
         } finally {
           // Always release lock, even on errors
-          if (lockHandle) {
-            try {
-              await this.distributedLock!.release(lockHandle);
-            } catch (error) {
-              // Handler execution already completed; lock release failure is non-critical
-              this.logger.error(
-                {
-                  handlerName,
-                  eventId: event.id,
-                  aggregateId: String(event.aggregateId),
-                  tenantId: event.tenantId,
-                  error: error instanceof Error ? error.message : String(error),
-                },
-                "Failed to release distributed lock after handler execution",
-              );
-            }
+          try {
+            await this.distributedLock.release(lockHandle);
+          } catch (error) {
+            // Handler execution already completed; lock release failure is non-critical
+            this.logger.error(
+              {
+                handlerName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+                error: error instanceof Error ? error.message : String(error),
+              },
+              "Failed to release distributed lock after handler execution",
+            );
           }
         }
       },

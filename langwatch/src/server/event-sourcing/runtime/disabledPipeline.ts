@@ -1,11 +1,12 @@
 import { createLogger } from "~/utils/logger";
-import type { AggregateType, Event, Projection } from "../library";
+import type { AggregateType, Event, ParentLink, Projection } from "../library";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../library/queues";
 import type { EventSourcingService } from "../library/services/eventSourcingService";
 import type {
+  PipelineMetadata,
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
@@ -66,20 +67,30 @@ class DisabledEventSourcingService {
  */
 export class DisabledPipeline<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
-> implements RegisteredPipeline<EventType, ProjectionType>
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
+> implements RegisteredPipeline<EventType, ProjectionTypes>
 {
   readonly name: string;
   readonly aggregateType: AggregateType;
-  readonly service: EventSourcingService<EventType, ProjectionType>;
+  readonly service: EventSourcingService<EventType, ProjectionTypes>;
   readonly commands: Record<string, EventSourcedQueueProcessor<any>>;
+  readonly parentLinks: ParentLink<EventType>[] = [];
+  readonly metadata: PipelineMetadata;
 
-  constructor(name: string, aggregateType: AggregateType) {
+  constructor(
+    name: string,
+    aggregateType: AggregateType,
+    metadata: PipelineMetadata,
+  ) {
     this.name = name;
     this.aggregateType = aggregateType;
+    this.metadata = metadata;
     this.service = new DisabledEventSourcingService(
       name,
-    ) as unknown as EventSourcingService<EventType, ProjectionType>;
+    ) as unknown as EventSourcingService<EventType, ProjectionTypes>;
 
     // Create a proxy that returns DisabledQueueProcessor for any command
     this.commands = new Proxy(
@@ -97,10 +108,7 @@ export class DisabledPipeline<
  * Builder that mimics PipelineBuilder API but builds DisabledPipeline.
  * Allows code to use the same builder pattern without errors when event sourcing is disabled.
  */
-export class DisabledPipelineBuilder<
-  EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
-> {
+export class DisabledPipelineBuilder<EventType extends Event = Event> {
   private _name = "unknown";
   private _aggregateType: AggregateType = "unknown" as AggregateType;
   private _hasLoggedWarning = false;
@@ -115,9 +123,7 @@ export class DisabledPipelineBuilder<
     }
   }
 
-  withName(
-    name: string,
-  ): DisabledPipelineBuilderWithName<EventType, ProjectionType> {
+  withName(name: string): DisabledPipelineBuilderWithName<EventType> {
     this._name = name;
     return new DisabledPipelineBuilderWithName(name);
   }
@@ -127,15 +133,12 @@ export class DisabledPipelineBuilder<
   }
 }
 
-export class DisabledPipelineBuilderWithName<
-  EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
-> {
+export class DisabledPipelineBuilderWithName<EventType extends Event = Event> {
   constructor(private readonly _name: string) {}
 
   withAggregateType(
     aggregateType: AggregateType,
-  ): DisabledPipelineBuilderWithNameAndType<EventType, ProjectionType> {
+  ): DisabledPipelineBuilderWithNameAndType<EventType> {
     return new DisabledPipelineBuilderWithNameAndType(
       this._name,
       aggregateType,
@@ -149,9 +152,19 @@ export class DisabledPipelineBuilderWithName<
 
 export class DisabledPipelineBuilderWithNameAndType<
   EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
+  ProjectionTypes extends Record<string, Projection> = Record<
+    string,
+    Projection
+  >,
 > {
   private _hasLoggedWarning = false;
+  private _projections: Array<{ name: string; handlerClassName: string }> = [];
+  private _eventHandlers: Array<{
+    name: string;
+    handlerClassName: string;
+    eventTypes?: string[];
+  }> = [];
+  private _commands: Array<{ name: string; handlerClassName: string }> = [];
 
   constructor(
     private readonly _name: string,
@@ -168,7 +181,11 @@ export class DisabledPipelineBuilderWithNameAndType<
     }
   }
 
-  withProjection(): this {
+  withProjection(name: string, HandlerClass: { name: string }): this {
+    this._projections.push({
+      name,
+      handlerClassName: HandlerClass.name,
+    });
     return this;
   }
 
@@ -176,25 +193,52 @@ export class DisabledPipelineBuilderWithNameAndType<
     return this;
   }
 
-  withEventHandler(): this {
+  withEventHandler(
+    name: string,
+    HandlerClass: { name: string },
+    options?: { eventTypes?: string[] },
+  ): this {
+    this._eventHandlers.push({
+      name,
+      handlerClassName: HandlerClass.name,
+      eventTypes: options?.eventTypes,
+    });
     return this;
   }
 
-  withCommand(): this {
+  withCommand(name: string, HandlerClass: { name: string }): this {
+    this._commands.push({
+      name,
+      handlerClassName: HandlerClass.name,
+    });
+    return this;
+  }
+
+  withParentLink(): this {
     return this;
   }
 
   build(): PipelineWithCommandHandlers<
-    RegisteredPipeline<EventType, ProjectionType>,
+    RegisteredPipeline<EventType, ProjectionTypes>,
     Record<string, EventSourcedQueueProcessor<any>>
   > {
     this.logWarningOnce();
-    const pipeline = new DisabledPipeline<EventType, ProjectionType>(
+
+    const metadata: PipelineMetadata = {
+      name: this._name,
+      aggregateType: this._aggregateType,
+      projections: this._projections,
+      eventHandlers: this._eventHandlers,
+      commands: this._commands,
+    };
+
+    const pipeline = new DisabledPipeline<EventType, ProjectionTypes>(
       this._name,
       this._aggregateType,
+      metadata,
     );
-    return pipeline as unknown as PipelineWithCommandHandlers<
-      RegisteredPipeline<EventType, ProjectionType>,
+    return pipeline as PipelineWithCommandHandlers<
+      RegisteredPipeline<EventType, ProjectionTypes>,
       Record<string, EventSourcedQueueProcessor<any>>
     >;
   }

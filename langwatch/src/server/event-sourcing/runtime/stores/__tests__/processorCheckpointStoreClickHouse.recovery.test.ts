@@ -11,8 +11,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
   const pipelineName = "test-pipeline";
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
   const eventType = EVENT_TYPES[0];
+  const eventVersion = "2025-12-17";
 
   let mockClickHouseClient: ClickHouseClient;
   let store: ProcessorCheckpointStoreClickHouse;
@@ -39,6 +40,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -425,10 +427,10 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         aggregateId,
       );
 
-      // Verify query includes ORDER BY EventTimestamp ASC
+      // Verify query includes ORDER BY SequenceNumber ASC (to maintain processing order)
       expect(mockClickHouseClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("ORDER BY EventTimestamp ASC"),
+          query: expect.stringContaining("ORDER BY SequenceNumber ASC"),
         }),
       );
 

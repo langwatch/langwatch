@@ -125,20 +125,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      clickhouse:
-        image: clickhouse/clickhouse-server:latest
-        ports:
-          - 8123:8123
-          - 9000:9000
-        env:
-          CLICKHOUSE_DB: default
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ci_password
-        options: >-
-          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      # ClickHouse is started manually via docker run (after checkout) to mount storage policy config
+      # See "Start ClickHouse with storage policy" step below
 
       elasticsearch:
         image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
@@ -199,6 +187,76 @@ jobs:
       - name: Setup Elasticsearch
         working-directory: langwatch
         run: pnpm elastic:migrate
+
+      - name: Install Goose migration tool
+        run: |
+          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
+          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
+          curl -fsSL "$GOOSE_URL" -o /tmp/goose
+          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
+          sudo mv /tmp/goose /usr/local/bin/goose
+          chmod +x /usr/local/bin/goose
+
+      - name: Start ClickHouse with storage policy
+        run: |
+          # Create storage policy config file
+          # Note: Storage policies can only be loaded at server startup, not via SYSTEM RELOAD CONFIG
+          # Each disk must have a unique name AND path - we define 'hot' and 'cold' disks with different paths
+          cat > /tmp/storage_policy.xml << 'EOF'
+          <clickhouse>
+              <storage_configuration>
+                  <disks>
+                      <hot>
+                          <path>/var/lib/clickhouse/hot/</path>
+                      </hot>
+                      <cold>
+                          <path>/var/lib/clickhouse/cold/</path>
+                      </cold>
+                  </disks>
+                  <policies>
+                      <local_primary>
+                          <volumes>
+                              <hot>
+                                  <disk>hot</disk>
+                              </hot>
+                              <cold>
+                                  <disk>cold</disk>
+                              </cold>
+                          </volumes>
+                      </local_primary>
+                  </policies>
+              </storage_configuration>
+          </clickhouse>
+          EOF
+
+          # Start ClickHouse container with config mounted (loads at startup)
+          docker run -d \
+            --name clickhouse \
+            --network host \
+            -e CLICKHOUSE_DB=default \
+            -e CLICKHOUSE_USER=default \
+            -e CLICKHOUSE_PASSWORD=ci_password \
+            -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
+            clickhouse/clickhouse-server:latest
+
+          # Wait for ClickHouse to be ready
+          echo "Waiting for ClickHouse to be ready..."
+          for i in {1..60}; do
+            if docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT 1" 2>/dev/null; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Attempt $i: Waiting for ClickHouse..."
+            sleep 1
+          done
+
+          # Verify storage policy is available
+          echo "Verifying storage policy..."
+          docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
+
+      - name: Run ClickHouse migrations
+        working-directory: langwatch
+        run: pnpm clickhouse:migrate
 
       - name: Run integration tests with coverage
         working-directory: langwatch

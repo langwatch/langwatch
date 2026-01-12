@@ -413,6 +413,19 @@ export function isSequentialOrderingError(error: unknown): boolean {
 }
 
 /**
+ * Type guard to check if an error is a LockError.
+ * Lock errors are expected when concurrent processes try to update the same resource.
+ */
+export function isLockError(error: unknown): boolean {
+  return (
+    error instanceof LockError ||
+    (typeof error === "object" &&
+      error !== null &&
+      (error as { name?: string }).name === "LockError")
+  );
+}
+
+/**
  * Extracts the previous sequence number from an ordering error.
  * Returns null if the error is not an ordering error.
  *
