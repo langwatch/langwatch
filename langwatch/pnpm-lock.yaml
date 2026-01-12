@@ -108,8 +108,8 @@ importers:
         specifier: ^2.0.2
         version: 2.0.2
       '@langwatch/scenario':
-        specifier: ^0.4.0
-        version: 0.4.0(00f74e7bf0ed0c3478ebfc061a714199)
+        specifier: file:vendor/langwatch-scenario-0.4.0.tgz
+        version: file:vendor/langwatch-scenario-0.4.0.tgz(00f74e7bf0ed0c3478ebfc061a714199)
       '@microlink/react-json-view':
         specifier: ^1.23.1
         version: 1.23.1(@types/react@19.0.10)(encoding@0.1.13)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -3282,8 +3282,9 @@ packages:
     resolution: {integrity: sha512-h9zbd+nfnxmCoSitXDwr0xpW9Ij62ZoYN8SxZlkddlBzZh0v2lwZI5lFmqMyrhUPlHnRJqCoqUFnZGRO3dvORA==}
     engines: {node: '>=16.0.0'}
 
-  '@langwatch/scenario@0.4.0':
-    resolution: {integrity: sha512-oiI0pZstURHKlqpJwCJ2SSoy1C0OOBTVCywNXAy2uEPYSMNQVBuID3QDSBo1FMq1+pO5tCLpZkOFepOFf9K3uw==}
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.0.tgz':
+    resolution: {integrity: sha512-ZAGyxMRquiWK7ZJ5Js/0jCHC80p/+8xoGZarbKLzGq+ZuKyq0onF+QqzOKlXriuVFZkT2ct4goXFYD41L53dCA==, tarball: file:vendor/langwatch-scenario-0.4.0.tgz}
+    version: 0.4.0
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
       ai: '>=5.0.0'
@@ -15906,7 +15907,7 @@ snapshots:
 
   '@langwatch/ksuid@2.0.2': {}
 
-  '@langwatch/scenario@0.4.0(00f74e7bf0ed0c3478ebfc061a714199)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.0.tgz(00f74e7bf0ed0c3478ebfc061a714199)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 2.0.89(zod@3.25.76)
@@ -20252,7 +20253,7 @@ snapshots:
       bytes: 3.1.2
       content-type: 1.0.5
       debug: 4.4.3
-      http-errors: 2.0.0
+      http-errors: 2.0.1
       iconv-lite: 0.7.2
       on-finished: 2.4.1
       qs: 6.14.1
@@ -21447,7 +21448,7 @@ snapshots:
       etag: 1.8.1
       finalhandler: 2.1.1
       fresh: 2.0.0
-      http-errors: 2.0.0
+      http-errors: 2.0.1
       merge-descriptors: 2.0.0
       mime-types: 3.0.2
       on-finished: 2.4.1
@@ -21459,7 +21460,7 @@ snapshots:
       router: 2.2.0
       send: 1.2.1
       serve-static: 2.2.1
-      statuses: 2.0.1
+      statuses: 2.0.2
       type-is: 2.0.1
       vary: 1.1.2
     transitivePeerDependencies:
@@ -21614,7 +21615,7 @@ snapshots:
       escape-html: 1.0.3
       on-finished: 2.4.1
       parseurl: 1.3.3
-      statuses: 2.0.1
+      statuses: 2.0.2
     transitivePeerDependencies:
       - supports-color
     optional: true
@@ -22200,7 +22201,7 @@ snapshots:
   https-proxy-agent@5.0.1:
     dependencies:
       agent-base: 6.0.2
-      debug: 4.4.1(supports-color@8.1.1)
+      debug: 4.4.3
     transitivePeerDependencies:
       - supports-color
 
