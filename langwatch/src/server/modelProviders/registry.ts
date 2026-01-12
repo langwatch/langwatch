@@ -33,6 +33,13 @@ export type MaybeStoredModelProvider = Omit<
   extraHeaders?: { key: string; value: string }[] | null;
 };
 
+/** Validates URL format when value is present, allows empty/null/undefined */
+const optionalUrlField = () =>
+  z.string().nullable().optional().refine(
+    (val) => !val || val.trim() === "" || z.string().url().safeParse(val).success,
+    { message: "Must be a valid URL (e.g., https://api.openai.com/v1)" }
+  );
+
 export const getProviderModelOptions = (
   provider: string,
   mode: "chat" | "embedding",
@@ -53,7 +60,7 @@ export const modelProviders = {
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
       CUSTOM_API_KEY: z.string().nullable().optional(),
-      CUSTOM_BASE_URL: z.string().nullable().optional(),
+      CUSTOM_BASE_URL: optionalUrlField(),
     }),
     enabledSince: new Date("2023-01-01"),
     blurb:
@@ -66,7 +73,7 @@ export const modelProviders = {
     keysSchema: z
       .object({
         OPENAI_API_KEY: z.string().nullable().optional(),
-        OPENAI_BASE_URL: z.string().nullable().optional(),
+        OPENAI_BASE_URL: optionalUrlField(),
       })
       .superRefine((data, ctx) => {
         if (
@@ -88,7 +95,7 @@ export const modelProviders = {
     endpointKey: "ANTHROPIC_BASE_URL",
     keysSchema: z.object({
       ANTHROPIC_API_KEY: z.string().min(1),
-      ANTHROPIC_BASE_URL: z.string().nullable().optional(),
+      ANTHROPIC_BASE_URL: optionalUrlField(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -108,8 +115,8 @@ export const modelProviders = {
     keysSchema: z
       .object({
         AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
-        AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
-        AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
+        AZURE_OPENAI_ENDPOINT: optionalUrlField(),
+        AZURE_API_GATEWAY_BASE_URL: optionalUrlField(),
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
       })
       .passthrough(),
@@ -209,7 +216,7 @@ export const allLitellmModels = (() => {
             !(
               value.litellm_provider === "gemini" &&
               key.match(
-                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro-001$/,
+                /gemini-1\.5-|learnlm-|gemma-2|gemini-exp|gemini-pro|-001$/,
               )
             ) &&
             // Remove bedrock region-specific and old models
