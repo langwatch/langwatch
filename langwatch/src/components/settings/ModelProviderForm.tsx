@@ -16,6 +16,7 @@ import {
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
+import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../utils/modelProviderHelpers";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
@@ -104,7 +105,7 @@ export const EditModelProviderForm = ({
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
-  const { validate: validateApiKey, isValidating: isValidatingApiKey, validationError: apiKeyValidationError, clearError: clearApiKeyError } = useModelProviderApiKeyValidation(
+  const { validate: validateApiKey, validateWithCustomUrl, isValidating: isValidatingApiKey, validationError: apiKeyValidationError, clearError: clearApiKeyError } = useModelProviderApiKeyValidation(
     provider.provider,
     state.customKeys,
     projectId,
@@ -114,15 +115,24 @@ export const EditModelProviderForm = ({
     // Clear previous errors
     setFieldErrors({});
     clearApiKeyError();
-    
-    // Skip validation if using env vars - fields are masked and shouldn't be validated
-    if (isUsingEnvVars) {
-      void actions.submit();
-      return;
-    }
-    
+
+    // Get custom base URL if provided
+    const endpointKey = providerDefinition?.endpointKey;
+    const customBaseUrl = endpointKey
+      ? state.customKeys[endpointKey]?.trim() || undefined
+      : undefined;
+
+    // Check if user entered a new API key
+    const userEnteredNewApiKey = hasUserEnteredNewApiKey(state.customKeys);
+
+    // Check if user modified non-API-key fields (like URLs)
+    const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
+      state.customKeys,
+      state.initialKeys
+    );
+
     // Validate keys according to schema before submitting
-    if (providerDefinition?.keysSchema) {
+    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
@@ -132,22 +142,29 @@ export const EditModelProviderForm = ({
       const result = keysSchema.safeParse(keysToValidate);
       
       if (!result.success) {
-        // Parse the Zod error to get field-specific errors
         const parsedErrors = parseZodFieldErrors(result.error as ZodErrorStructure);
         setFieldErrors(parsedErrors);
         return;
       }
     }
 
-    // Validate API key if provider supports it
-    const isValid = await validateApiKey();
-    if (!isValid) {
-      // Validation error is already set in the hook
-      return;
+    // ALWAYS validate API key on save
+    if (userEnteredNewApiKey) {
+      // User entered new API key - validate it (against custom or default URL)
+      const isValid = await validateApiKey();
+      if (!isValid) return;
+    } else if (customBaseUrl) {
+      // Stored/env key + custom URL - validate against custom URL
+      const isValid = await validateWithCustomUrl(customBaseUrl);
+      if (!isValid) return;
+    } else {
+      // Stored/env key + default URL - validate against default URL
+      const isValid = await validateWithCustomUrl();
+      if (!isValid) return;
     }
     
     void actions.submit();
-  }, [isUsingEnvVars, providerDefinition, state.customKeys, actions, validateApiKey, clearApiKeyError]);
+  }, [isUsingEnvVars, providerDefinition, state.customKeys, state.initialKeys, actions, validateApiKey, validateWithCustomUrl, clearApiKeyError]);
 
   return (
     <VStack gap={4} align="start" width="full">
