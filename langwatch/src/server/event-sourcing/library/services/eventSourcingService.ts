@@ -471,6 +471,13 @@ export class EventSourcingService<
           if (enrichedMetadata === event.metadata) {
             return event;
           }
+          // Only add metadata property if enrichedMetadata has content
+          const hasMetadata =
+            enrichedMetadata &&
+            Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
+          if (!hasMetadata) {
+            return event;
+          }
           return {
             ...event,
             metadata: enrichedMetadata,

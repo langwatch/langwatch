@@ -37,7 +37,8 @@ function toJsonSerializable(value: unknown): JsonSerializable {
     }
     return result;
   }
-  return value;
+
+  return value as JsonSerializable;
 }
 
 /**
