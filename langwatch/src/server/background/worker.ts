@@ -28,6 +28,9 @@ import { workerRestartsCounter } from "../metrics";
 import { WorkersRestart } from "./errors";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 
+import { startEventSourcingWorker } from "./workers/eventSourcingWorker";
+import type { EventSourcingJob } from "./types";
+
 const logger = createLogger("langwatch:workers");
 
 type Workers = {
@@ -36,6 +39,7 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+  eventSourcingWorker: Worker<EventSourcingJob, void, string> | undefined;
 };
 
 export const start = (
@@ -54,6 +58,7 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const eventSourcingWorker = startEventSourcingWorker();
 
     startMetricsServer();
     incrementWorkerRestartCount();
@@ -68,6 +73,7 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
+    eventSourcingWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -79,12 +85,14 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
+          eventSourcingWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
+            eventSourcingWorker?.close(),
           ]);
 
           setTimeout(() => {
@@ -101,6 +109,7 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
+        eventSourcingWorker,
       });
     }
   });

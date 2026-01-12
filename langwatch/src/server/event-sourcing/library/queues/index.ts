@@ -1,4 +1,5 @@
 export type {
+  DeduplicationConfig,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
   EventSourcedQueueProcessorOptions,

@@ -11,9 +11,7 @@ import { CheckpointRepositoryMemory } from "../../stores/repositories/checkpoint
 import { EventRepositoryMemory } from "../../stores/repositories/eventRepositoryMemory";
 import { PipelineBuilder } from "../builder";
 import {
-  createMockEventHandler,
   createMockEventPublisher,
-  createMockEventReactionHandler,
   createMockEventStore,
   createMockProjectionStore,
   createMockQueueProcessorFactory,
@@ -27,6 +25,7 @@ import {
   type TestEvent,
   testCommandPayloadSchema,
 } from "./testHelpers";
+import { createMockDistributedLock } from "../../../library/services/__tests__/testHelpers";
 
 describe("PipelineBuilder Integration Tests", () => {
   beforeEach(() => {
@@ -42,14 +41,18 @@ describe("PipelineBuilder Integration Tests", () => {
   describe("Complete Pipeline Build Contract", () => {
     it("builds pipeline with name, aggregateType, and service when minimal configuration provided", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion");
+        .withAggregateType("trace");
 
       const pipeline = builder.build();
 
       expect(pipeline.name).toBe("test-pipeline");
-      expect(pipeline.aggregateType).toBe("span_ingestion");
+      expect(pipeline.aggregateType).toBe("trace");
       expect(pipeline.service).toBeDefined();
       expect(pipeline.commands).toBeDefined();
     });
@@ -80,9 +83,13 @@ describe("PipelineBuilder Integration Tests", () => {
         createTestProjection("proj-id", "aggregate-1", tenantId),
       );
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withProjection("test-projection", HandlerClass);
 
       const pipeline = builder.build();
@@ -92,7 +99,7 @@ describe("PipelineBuilder Integration Tests", () => {
       expect(getEventsSpy).toHaveBeenCalledWith(
         "aggregate-1",
         { tenantId },
-        "span_ingestion",
+        "trace",
       );
       expect(handleSpy).toHaveBeenCalled();
       const callArgs = handleSpy.mock.calls[0];
@@ -117,9 +124,13 @@ describe("PipelineBuilder Integration Tests", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
       const context = { tenantId };
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventPublisher(publisher);
 
       const pipeline = builder.build();
@@ -142,9 +153,13 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const event = createTestEventForBuilder("aggregate-1", tenantId);
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventHandler("test-handler", HandlerClass);
 
       const pipeline = builder.build();
@@ -163,12 +178,14 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >();
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass);
 
       const pipeline = builder.build();
@@ -222,12 +239,14 @@ describe("PipelineBuilder Integration Tests", () => {
         createTestProjection("proj-id", "aggregate-1", tenantId),
       );
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withProjection("test-projection", ProjectionHandlerClass)
         .withEventPublisher(publisher)
         .withEventHandler("test-handler", EventHandlerClass)
@@ -236,7 +255,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const pipeline = builder.build();
 
       expect(pipeline.name).toBe("test-pipeline");
-      expect(pipeline.aggregateType).toBe("span_ingestion");
+      expect(pipeline.aggregateType).toBe("trace");
       expect(pipeline.service).toBeDefined();
       expect(pipeline.commands).toHaveProperty("testDispatcher");
 
@@ -256,19 +275,19 @@ describe("PipelineBuilder Integration Tests", () => {
       const event = createTestEventForBuilder("aggregate-1", tenantId);
       const context = { tenantId };
 
-      const builder = new PipelineBuilder<TestEvent, Projection>({ eventStore })
+      const distributedLock = createMockDistributedLock();
+      const builder = new PipelineBuilder<TestEvent>({
+        eventStore,
+        distributedLock,
+      })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion");
+        .withAggregateType("trace");
 
       const pipeline = builder.build();
 
       await pipeline.service.storeEvents([event], context);
 
-      expect(storeEventsSpy).toHaveBeenCalledWith(
-        [event],
-        context,
-        "span_ingestion",
-      );
+      expect(storeEventsSpy).toHaveBeenCalledWith([event], context, "trace");
     });
   });
 
@@ -289,12 +308,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -307,7 +328,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(storeEventsSpy).toHaveBeenCalledWith(events, {
         tenantId: createTenantId("tenant-1"),
@@ -332,12 +353,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventHandler("test-handler", EventHandlerClass)
         .withCommand("testDispatcher", HandlerClass)
         .build();
@@ -348,7 +371,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(handleSpy).toHaveBeenCalled();
     });
@@ -382,12 +405,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withProjection("test-projection", ProjectionHandlerClass)
         .withCommand("testDispatcher", HandlerClass)
         .build();
@@ -398,7 +423,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(getEventsSpy).toHaveBeenCalled();
       expect(handleSpy).toHaveBeenCalled();
@@ -423,12 +448,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventPublisher(publisher)
         .withCommand("testDispatcher", HandlerClass)
         .build();
@@ -439,7 +466,7 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 42,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload);
+      await pipeline.commands.testDispatcher?.send(payload);
 
       expect(publishSpy).toHaveBeenCalledWith(events, context);
     });
@@ -459,12 +486,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: async () => events,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -475,7 +504,7 @@ describe("PipelineBuilder Integration Tests", () => {
       };
 
       await expect(
-        pipeline.commands.testDispatcher!.send(payload),
+        pipeline.commands.testDispatcher?.send(payload),
       ).resolves.not.toThrow();
     });
 
@@ -491,12 +520,14 @@ describe("PipelineBuilder Integration Tests", () => {
         handleImpl: handleSpy,
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -512,8 +543,8 @@ describe("PipelineBuilder Integration Tests", () => {
         value: 43,
       };
 
-      await pipeline.commands.testDispatcher!.send(payload1);
-      await pipeline.commands.testDispatcher!.send(payload2);
+      await pipeline.commands.testDispatcher?.send(payload1);
+      await pipeline.commands.testDispatcher?.send(payload2);
 
       expect(handleSpy).toHaveBeenCalledTimes(2);
     });
@@ -528,12 +559,14 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >({});
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
-        .withName("span-ingestion")
-        .withAggregateType("span_ingestion")
+        .withName("trace-processing")
+        .withAggregateType("trace")
         .withCommand("recordSpan", HandlerClass)
         .withEventHandler(
           "trace-aggregation-trigger",
@@ -546,8 +579,8 @@ describe("PipelineBuilder Integration Tests", () => {
         )
         .build();
 
-      expect(pipeline.name).toBe("span-ingestion");
-      expect(pipeline.aggregateType).toBe("span_ingestion");
+      expect(pipeline.name).toBe("trace-processing");
+      expect(pipeline.aggregateType).toBe("trace");
       expect(pipeline.commands).toHaveProperty("recordSpan");
       expect(pipeline.service).toBeDefined();
     });
@@ -564,12 +597,14 @@ describe("PipelineBuilder Integration Tests", () => {
         dispatcherName: "triggerTraceAggregation",
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
-        .withName("trace-aggregation")
-        .withAggregateType("trace_aggregation")
+        .withName("trace-processing")
+        .withAggregateType("trace")
         .withProjection(
           "traceAggregationState",
           createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
@@ -577,8 +612,8 @@ describe("PipelineBuilder Integration Tests", () => {
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
-      expect(pipeline.name).toBe("trace-aggregation");
-      expect(pipeline.aggregateType).toBe("trace_aggregation");
+      expect(pipeline.name).toBe("trace-processing");
+      expect(pipeline.aggregateType).toBe("trace");
       expect(pipeline.commands).toHaveProperty("triggerTraceAggregation");
       expect(pipeline.service).toBeDefined();
     });
@@ -590,25 +625,21 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 1000,
-        concurrency: 5,
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        delay: 2000,
-        concurrency: 10,
-      });
+      >();
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("handler1", HandlerClass1)
         .withCommand("handler2", HandlerClass2)
         .build();
@@ -628,12 +659,14 @@ describe("PipelineBuilder Integration Tests", () => {
         dispatcherName: "staticDispatcherName",
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -659,12 +692,14 @@ describe("PipelineBuilder Integration Tests", () => {
         }
       }
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("recordSpan", RecordSpanCommandHandler)
         .build();
 
@@ -680,12 +715,14 @@ describe("PipelineBuilder Integration Tests", () => {
         TestEvent
       >({});
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("customName", HandlerClass)
         .build();
 
@@ -746,13 +783,15 @@ describe("PipelineBuilder Integration Tests", () => {
         },
       });
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withCommand("recordSpan", HandlerClass)
         .withEventHandler(
           "span-storage",
@@ -771,7 +810,7 @@ describe("PipelineBuilder Integration Tests", () => {
       };
 
       // Send command - should create events and process them
-      await pipeline.commands.recordSpan!.send(payload);
+      await pipeline.commands.recordSpan?.send(payload);
 
       // Get created processors
       const processors = factory.getCreatedProcessors();
@@ -784,7 +823,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const events = await eventStore.getEvents(
         aggregateId,
         { tenantId },
-        "span_ingestion",
+        "trace",
       );
       expect(events.length).toBeGreaterThan(0);
 
@@ -817,12 +856,14 @@ describe("PipelineBuilder Integration Tests", () => {
       const aggregateId1 = "aggregate-1";
       const aggregateId2 = "aggregate-2";
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withProjection("summary", ProjectionHandlerClass)
         .build();
 
@@ -885,12 +926,14 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withProjection("summary", ProjectionHandlerClass1)
         .withProjection("analytics", ProjectionHandlerClass2)
         .build();
@@ -923,13 +966,15 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventHandler("handler", HandlerClass)
         .build();
 
@@ -945,7 +990,7 @@ describe("PipelineBuilder Integration Tests", () => {
       await eventStore.storeEvents(
         [event1, event2, event3],
         { tenantId },
-        "span_ingestion",
+        "trace",
       );
 
       // Process events - should enforce sequential ordering
@@ -956,10 +1001,26 @@ describe("PipelineBuilder Integration Tests", () => {
       await pipeline.service.storeEvents([event3], { tenantId });
 
       // Verify handlers were called in order
+      // Use objectContaining to allow for optional metadata field that may be added during processing
       expect(handleSpy).toHaveBeenCalledTimes(3);
-      expect(handleSpy).toHaveBeenNthCalledWith(1, event1);
-      expect(handleSpy).toHaveBeenNthCalledWith(2, event2);
-      expect(handleSpy).toHaveBeenNthCalledWith(3, event3);
+      expect(handleSpy).toHaveBeenNthCalledWith(1, expect.objectContaining({
+        id: event1.id,
+        aggregateId: event1.aggregateId,
+        type: event1.type,
+        timestamp: event1.timestamp,
+      }));
+      expect(handleSpy).toHaveBeenNthCalledWith(2, expect.objectContaining({
+        id: event2.id,
+        aggregateId: event2.aggregateId,
+        type: event2.type,
+        timestamp: event2.timestamp,
+      }));
+      expect(handleSpy).toHaveBeenNthCalledWith(3, expect.objectContaining({
+        id: event3.id,
+        aggregateId: event3.aggregateId,
+        type: event3.type,
+        timestamp: event3.timestamp,
+      }));
 
       // Verify final checkpoint reflects the last processed event
       // Note: Checkpoint is per-aggregate, not per-event, so there's only one checkpoint
@@ -967,7 +1028,7 @@ describe("PipelineBuilder Integration Tests", () => {
         tenantId,
         "test-pipeline",
         "handler",
-        "span_ingestion",
+        "trace",
         aggregateId,
       );
       const finalCheckpoint =
@@ -993,13 +1054,15 @@ describe("PipelineBuilder Integration Tests", () => {
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const aggregateId = "aggregate-1";
 
-      const pipeline = new PipelineBuilder<TestEvent, Projection>({
+      const distributedLock = createMockDistributedLock();
+      const pipeline = new PipelineBuilder<TestEvent>({
         eventStore,
         queueProcessorFactory: factory,
         processorCheckpointStore: checkpointStore,
+        distributedLock,
       })
         .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
+        .withAggregateType("trace")
         .withEventHandler("handler", HandlerClass)
         .build();
 
@@ -1010,18 +1073,20 @@ describe("PipelineBuilder Integration Tests", () => {
       event2.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP + 1000;
 
       // Store events
-      await eventStore.storeEvents(
-        [event1, event2],
-        { tenantId },
-        "span_ingestion",
-      );
+      await eventStore.storeEvents([event1, event2], { tenantId }, "trace");
 
       // Process event1 - should succeed
       await pipeline.service.storeEvents([event1], { tenantId });
 
       // Verify event1 was processed
+      // Use objectContaining to allow for optional metadata field that may be added during processing
       expect(handleSpy).toHaveBeenCalledTimes(1);
-      expect(handleSpy).toHaveBeenCalledWith(event1);
+      expect(handleSpy).toHaveBeenCalledWith(expect.objectContaining({
+        id: event1.id,
+        aggregateId: event1.aggregateId,
+        type: event1.type,
+        timestamp: event1.timestamp,
+      }));
 
       // Try to process event2 before event1 checkpoint is saved - should still work
       // because we're using the same service instance and checkpoint store
@@ -1029,14 +1094,19 @@ describe("PipelineBuilder Integration Tests", () => {
 
       // Verify event2 was processed after event1
       expect(handleSpy).toHaveBeenCalledTimes(2);
-      expect(handleSpy).toHaveBeenLastCalledWith(event2);
+      expect(handleSpy).toHaveBeenLastCalledWith(expect.objectContaining({
+        id: event2.id,
+        aggregateId: event2.aggregateId,
+        type: event2.type,
+        timestamp: event2.timestamp,
+      }));
 
       // Verify sequence numbers are correct
       const checkpointKey2 = buildCheckpointKey(
         tenantId,
         "test-pipeline",
         "handler",
-        "span_ingestion",
+        "trace",
         aggregateId,
       );
       const checkpoint2 = await checkpointStore.loadCheckpoint(checkpointKey2);

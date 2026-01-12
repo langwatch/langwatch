@@ -508,7 +508,7 @@ describe("EventSourcingService - Concurrency Flows", () => {
             projectionStore,
           ),
         },
-        // No distributedLock provided
+        distributedLock: createMockDistributedLock(),
       });
 
       const result = await service.updateProjectionByName(
@@ -519,44 +519,6 @@ describe("EventSourcingService - Concurrency Flows", () => {
 
       expect(result).not.toBeNull();
       expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
-    });
-
-    it("warning is logged in production when lock not provided", () => {
-      const originalEnv = process.env.NODE_ENV;
-      // @ts-expect-error - NODE_ENV is read-only in types but mutable at runtime for testing
-      process.env.NODE_ENV = "production";
-
-      const logger = {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        fatal: vi.fn(),
-        trace: vi.fn(),
-        child: vi.fn().mockReturnThis(),
-        level: "info",
-        silent: false,
-      };
-
-      const eventStore = createMockEventStore<Event>();
-
-      new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        logger: logger as any,
-        // No distributedLock provided
-      });
-
-      expect(logger.warn).toHaveBeenCalledWith(
-        expect.objectContaining({
-          aggregateType,
-        }),
-        expect.stringContaining("without distributed lock in production"),
-      );
-
-      // @ts-expect-error - NODE_ENV is read-only in types but mutable at runtime for testing
-      process.env.NODE_ENV = originalEnv;
     });
 
     it("no warning in non-production when lock not provided", () => {
@@ -583,7 +545,7 @@ describe("EventSourcingService - Concurrency Flows", () => {
         aggregateType,
         eventStore,
         logger: logger as any,
-        // No distributedLock provided
+        distributedLock: createMockDistributedLock(),
       });
 
       expect(logger.warn).not.toHaveBeenCalled();

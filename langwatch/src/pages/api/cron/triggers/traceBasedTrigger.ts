@@ -1,5 +1,4 @@
 import { type Project, type Trigger, TriggerAction } from "@prisma/client";
-import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { prisma } from "~/server/db";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { handleAddToAnnotationQueue } from "./actions/addToAnnotationQueue";
@@ -13,6 +12,8 @@ import {
   triggerSentForMany,
   updateAlert,
 } from "./utils";
+import { TraceService } from "~/server/traces/trace.service";
+import { getProtectionsForProject } from "~/server/api/utils";
 
 export const processTraceBasedTrigger = async (
   trigger: Trigger,
@@ -53,18 +54,14 @@ export const processTraceBasedTrigger = async (
     projectId,
     filters: parsedFilters,
     updatedAt: lastRunAt,
-    startDate: new Date().getTime() - 1000 * 60 * 60 * 24,
-    endDate: new Date().getTime(),
+    startDate: Date.now()- 1000 * 60 * 60 * 24,
+    endDate: Date.now(),
   };
 
-  const traces = await getAllTracesForProject({
-    input,
-    ctx: {
-      prisma: prisma,
-      session: null,
-      publiclyShared: false,
-    },
-  });
+
+  const traceService = TraceService.create(prisma);
+  const protections = await getProtectionsForProject(prisma, { projectId });
+  const traces = await traceService.getAllTracesForProject(input, protections);
 
   const tracesToSend = await getTracesToSend(
     traces,

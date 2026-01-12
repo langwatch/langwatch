@@ -13,6 +13,7 @@ function createTestEvent(
   tenantId: TenantId,
   timestamp: number,
   type: (typeof EVENT_TYPES)[number] = EVENT_TYPES[0],
+  version = "2025-12-17",
 ): TestEvent {
   return {
     id,
@@ -20,6 +21,7 @@ function createTestEvent(
     aggregateType: "test-aggregate" as AggregateType,
     tenantId,
     timestamp,
+    version,
     type,
     data: { value: `event-${id}` },
   };

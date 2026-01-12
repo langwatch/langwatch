@@ -8,8 +8,9 @@ import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 describe("EventStoreMemory - Event ID Deduplication", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
-  const aggregateType: AggregateType = "span_ingestion";
+  const aggregateType: AggregateType = "trace";
   const eventType = EVENT_TYPES[0];
+  const eventVersion = "2025-12-17";
 
   let store: EventStoreMemory;
 
@@ -28,6 +29,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         timestamp,
@@ -40,6 +42,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 2 },
           void 0,
           timestamp,
@@ -73,6 +76,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: "first" },
         void 0,
         timestamp,
@@ -85,6 +89,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: "second" },
           void 0,
           timestamp,
@@ -98,6 +103,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: "third" },
           void 0,
           timestamp,
@@ -129,6 +135,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         timestamp,
@@ -140,6 +147,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 2 },
           void 0,
           timestamp,
@@ -153,6 +161,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 3 },
           void 0,
           timestamp,
@@ -183,6 +192,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -193,6 +203,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         2000, // Different timestamp = different Event ID
@@ -223,6 +234,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         timestamp,
@@ -235,6 +247,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
           aggregateId,
           tenantId,
           eventType,
+          eventVersion,
           { value: 2 },
           void 0,
           timestamp,
@@ -266,6 +279,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 1 },
         void 0,
         1000,
@@ -276,6 +290,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { value: 2 },
         void 0,
         2000, // Different timestamp = different Event ID

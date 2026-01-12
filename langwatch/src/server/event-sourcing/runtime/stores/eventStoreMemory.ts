@@ -102,6 +102,60 @@ export class EventStoreMemory<EventType extends Event = Event>
     }));
   }
 
+  async getEventsUpTo(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    upToEvent: EventType,
+  ): Promise<readonly EventType[]> {
+    // Validate tenant context
+    EventUtils.validateTenantId(context, "EventStoreMemory.getEventsUpTo");
+
+    // Get event records up to and including the specified event from repository
+    const records = await this.repository.getEventRecordsUpTo(
+      context.tenantId,
+      aggregateType,
+      aggregateId,
+      upToEvent.timestamp,
+      upToEvent.id,
+    );
+
+    // Transform records to events
+    const events = records.map((record) =>
+      this.recordToEvent(record, aggregateId),
+    );
+
+    // Sort by timestamp first to ensure consistent ordering
+    const sortedEvents = [...events].sort((a, b) => {
+      if (a.timestamp !== b.timestamp) {
+        return a.timestamp - b.timestamp;
+      }
+      // If timestamps are equal, sort by id for stability
+      return a.id.localeCompare(b.id);
+    });
+
+    // Deduplicate by Event ID (keep first occurrence when sorted by timestamp)
+    const seenEventIds = new Set<string>();
+    const deduplicatedEvents = sortedEvents.filter((event) => {
+      if (!event.id) {
+        // If no Event ID, keep the event (shouldn't happen but handle gracefully)
+        return true;
+      }
+      if (seenEventIds.has(event.id)) {
+        return false; // Skip duplicate
+      }
+      seenEventIds.add(event.id);
+      return true;
+    });
+
+    // Deep clone to prevent mutation
+    return deduplicatedEvents.map((event) => ({
+      ...event,
+      data: JSON.parse(JSON.stringify(event.data)),
+      metadata: { ...event.metadata },
+    }));
+  }
+
   async countEventsBefore(
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
@@ -243,10 +297,13 @@ export class EventStoreMemory<EventType extends Event = Event>
       tenantId: createTenantId(record.TenantId),
       timestamp: timestampMs,
       type: record.EventType as EventType["type"],
+      version: record.EventVersion,
       data: payload,
-      metadata: {
-        processingTraceparent: record.ProcessingTraceparent || void 0,
-      },
+      ...(record.ProcessingTraceparent && {
+        metadata: {
+          processingTraceparent: record.ProcessingTraceparent,
+        },
+      }),
     } satisfies Event;
 
     return event as EventType;
@@ -263,6 +320,7 @@ export class EventStoreMemory<EventType extends Event = Event>
       EventId: event.id,
       EventTimestamp: event.timestamp,
       EventType: event.type,
+      EventVersion: event.version,
       EventPayload: event.data ?? {},
       ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
     };

@@ -10,7 +10,11 @@ import {
  * Starts testcontainers before all tests and ensures clean state.
  */
 export async function setup(): Promise<void> {
-  await startTestContainers();
+  try {
+    await startTestContainers();
+  } catch (error) {
+    throw error;
+  }
   // Clean up any leftover data from previous test runs
   await cleanupTestData();
 }

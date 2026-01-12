@@ -7,6 +7,7 @@ import { EventUtils } from "../event.utils";
 describe("EventUtils - Event ID", () => {
   const tenantId = createTenantId("test-tenant");
   const aggregateId = "test-aggregate";
+  const eventVersion = "2025-12-17";
   const aggregateType = "test_aggregate" as AggregateType;
   const eventType = EVENT_TYPES[0];
 
@@ -18,6 +19,7 @@ describe("EventUtils - Event ID", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { test: "data" },
         void 0,
         timestamp,
@@ -43,6 +45,7 @@ describe("EventUtils - Event ID", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { test: "data" },
         void 0,
         timestamp1,
@@ -53,6 +56,7 @@ describe("EventUtils - Event ID", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { test: "data" },
         void 0,
         timestamp2, // Different timestamp = different Event ID
@@ -72,6 +76,7 @@ describe("EventUtils - Event ID", () => {
         customAggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { test: "data" },
         void 0,
         timestamp,
@@ -93,6 +98,7 @@ describe("EventUtils - Event ID", () => {
         aggregateId,
         tenantId,
         eventType,
+        eventVersion,
         { test: "data" },
         void 0,
         timestamp,

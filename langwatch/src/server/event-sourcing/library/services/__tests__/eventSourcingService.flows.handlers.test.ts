@@ -13,6 +13,7 @@ import {
   createTestEvent,
   setupTestEnvironment,
   TEST_CONSTANTS,
+  createMockDistributedLock,
 } from "./testHelpers";
 
 describe("EventSourcingService - Handler Flows", () => {
@@ -57,6 +58,7 @@ describe("EventSourcingService - Handler Flows", () => {
         },
         processorCheckpointStore: checkpointStore,
         logger: logger as any,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event = createTestEvent(
@@ -102,6 +104,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         logger: logger as any,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event = createTestEvent(
@@ -136,6 +139,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler1: createMockEventHandlerDefinition("handler1", handler1),
           handler2: createMockEventHandlerDefinition("handler2", handler2),
         },
+        distributedLock: createMockDistributedLock(),
       });
 
       const event = createTestEvent(
@@ -166,6 +170,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -246,6 +251,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event1 = createTestEvent(
@@ -292,6 +298,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event = createTestEvent(
@@ -357,6 +364,7 @@ describe("EventSourcingService - Handler Flows", () => {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
         processorCheckpointStore: checkpointStore,
+        distributedLock: createMockDistributedLock(),
       });
 
       const event = createTestEvent(
