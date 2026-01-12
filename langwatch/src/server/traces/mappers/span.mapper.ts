@@ -1,6 +1,6 @@
 import type {
-  NormalizedSpan,
   NormalizedAttributes,
+  NormalizedSpan,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import {
   NormalizedStatusCode,
@@ -8,20 +8,22 @@ import {
 import type {
   BaseSpan,
   ChatMessage,
-  Span,
-  SpanTypes,
-  SpanInputOutput,
-  SpanTimestamps,
-  SpanMetrics,
   ErrorCapture,
   RAGChunk,
+  Span,
+  SpanInputOutput,
+  SpanMetrics,
+  SpanTimestamps,
+  SpanTypes,
 } from "~/server/tracer/types";
+
+type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
 
 /**
  * Converts attribute values to JSON-serializable format.
  * Handles bigint conversion to number.
  */
-function toJsonSerializable(value: unknown): unknown {
+function toJsonSerializable(value: unknown): JsonSerializable {
   if (typeof value === "bigint") {
     return Number(value);
   }
@@ -47,7 +49,7 @@ function extractInput(
 ): SpanInputOutput | null {
   // Priority 1: gen_ai.input.messages (canonical GenAI semantic convention)
   const genAiInputMessages = spanAttributes["gen_ai.input.messages"];
-  if (genAiInputMessages !== undefined) {
+  if (genAiInputMessages !== void 0) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiInputMessages) as ChatMessage[],
@@ -58,7 +60,7 @@ function extractInput(
   const genAiInput =
     spanAttributes["gen_ai.prompt"] ??
     spanAttributes["gen_ai.request.messages"];
-  if (genAiInput !== undefined) {
+  if (genAiInput !== void 0) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiInput) as ChatMessage[],
@@ -68,34 +70,22 @@ function extractInput(
   // Try LLM semantic conventions
   const llmInput =
     spanAttributes["llm.input_messages"] ?? spanAttributes["llm.prompts"];
-  if (llmInput !== undefined) {
+  if (llmInput !== void 0) {
     return {
       type: "json",
-      value: toJsonSerializable(llmInput) as
-        | string
-        | number
-        | boolean
-        | null
-        | Record<string, unknown>
-        | unknown[],
+      value: toJsonSerializable(llmInput),
     };
   }
 
   // Try generic input attribute
   const input = spanAttributes.input ?? spanAttributes["langwatch.input"];
-  if (input !== undefined) {
+  if (input !== void 0) {
     if (typeof input === "string") {
       return { type: "text", value: input };
     }
     return {
       type: "json",
-      value: toJsonSerializable(input) as
-        | string
-        | number
-        | boolean
-        | null
-        | Record<string, unknown>
-        | unknown[],
+      value: toJsonSerializable(input),
     };
   }
 
@@ -111,7 +101,7 @@ function extractOutput(
 ): SpanInputOutput | null {
   // Priority 1: gen_ai.output.messages (canonical GenAI semantic convention)
   const genAiOutputMessages = spanAttributes["gen_ai.output.messages"];
-  if (genAiOutputMessages !== undefined) {
+  if (genAiOutputMessages !== void 0) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiOutputMessages) as ChatMessage[],
@@ -122,7 +112,7 @@ function extractOutput(
   const genAiOutput =
     spanAttributes["gen_ai.completion"] ??
     spanAttributes["gen_ai.response.messages"];
-  if (genAiOutput !== undefined) {
+  if (genAiOutput !== void 0) {
     return {
       type: "chat_messages",
       value: toJsonSerializable(genAiOutput) as ChatMessage[],
@@ -132,16 +122,10 @@ function extractOutput(
   // Try LLM semantic conventions
   const llmOutput =
     spanAttributes["llm.output_messages"] ?? spanAttributes["llm.completions"];
-  if (llmOutput !== undefined) {
+  if (llmOutput !== void 0) {
     return {
       type: "json",
-      value: toJsonSerializable(llmOutput) as
-        | string
-        | number
-        | boolean
-        | null
-        | Record<string, unknown>
-        | unknown[],
+      value: toJsonSerializable(llmOutput),
     };
   }
 
@@ -153,13 +137,7 @@ function extractOutput(
     }
     return {
       type: "json",
-      value: toJsonSerializable(output) as
-        | string
-        | number
-        | boolean
-        | null
-        | Record<string, unknown>
-        | unknown[],
+      value: toJsonSerializable(output),
     };
   }
 
@@ -187,9 +165,9 @@ function extractMetrics(
   const tokensEstimated = spanAttributes["langwatch.tokens_estimated"];
 
   if (
-    promptTokens === undefined &&
-    completionTokens === undefined &&
-    cost === undefined
+    promptTokens === void 0 &&
+    completionTokens === void 0 &&
+    cost === void 0
   ) {
     return null;
   }
@@ -340,16 +318,16 @@ function _extractParams(
   const temperature =
     spanAttributes["gen_ai.request.temperature"] ??
     spanAttributes["llm.temperature"];
-  if (temperature !== undefined) params.temperature = temperature;
+  if (temperature !== void 0) params.temperature = temperature;
 
   const maxTokens =
     spanAttributes["gen_ai.request.max_tokens"] ??
     spanAttributes["llm.max_tokens"];
-  if (maxTokens !== undefined) params.max_tokens = maxTokens;
+  if (maxTokens !== void 0) params.max_tokens = maxTokens;
 
   const topP =
     spanAttributes["gen_ai.request.top_p"] ?? spanAttributes["llm.top_p"];
-  if (topP !== undefined) params.top_p = topP;
+  if (topP !== void 0) params.top_p = topP;
 
   // Add any other non-known attributes as custom params
   for (const [key, value] of Object.entries(spanAttributes)) {

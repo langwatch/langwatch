@@ -100,11 +100,15 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 Id,
                 TraceId AS AggregateId,
                 TenantId,
-                toUnixTimestamp64Milli(Timestamp) AS Timestamp,
                 TraceId,
                 SpanId,
                 ParentSpanId,
-                TraceState,
+                ParentTraceId,
+                ParentIsRemote,
+                Sampled,
+                toUnixTimestamp64Milli(StartTime) AS StartTime,
+                toUnixTimestamp64Milli(EndTime) AS EndTime,
+                DurationMs,
                 SpanName,
                 SpanKind,
                 ServiceName,
@@ -112,7 +116,6 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 ScopeName,
                 ScopeVersion,
                 SpanAttributes,
-                Duration,
                 StatusCode,
                 StatusMessage,
                 arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS \`Events.Timestamp\`,
@@ -120,8 +123,10 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 \`Events.Attributes\`,
                 \`Links.TraceId\`,
                 \`Links.SpanId\`,
-                \`Links.TraceState\`,
-                \`Links.Attributes\`
+                \`Links.Attributes\`,
+                DroppedAttributesCount,
+                DroppedEventsCount,
+                DroppedLinksCount
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
@@ -190,11 +195,15 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 Id,
                 TraceId AS AggregateId,
                 TenantId,
-                toUnixTimestamp64Milli(Timestamp) AS Timestamp,
                 TraceId,
                 SpanId,
                 ParentSpanId,
-                TraceState,
+                ParentTraceId,
+                ParentIsRemote,
+                Sampled,
+                toUnixTimestamp64Milli(StartTime) AS StartTime,
+                toUnixTimestamp64Milli(EndTime) AS EndTime,
+                DurationMs,
                 SpanName,
                 SpanKind,
                 ServiceName,
@@ -202,7 +211,6 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 ScopeName,
                 ScopeVersion,
                 SpanAttributes,
-                Duration,
                 StatusCode,
                 StatusMessage,
                 arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS \`Events.Timestamp\`,
@@ -210,12 +218,14 @@ export class SpanRepositoryClickHouse implements SpanRepository {
                 \`Events.Attributes\`,
                 \`Links.TraceId\`,
                 \`Links.SpanId\`,
-                \`Links.TraceState\`,
-                \`Links.Attributes\`
+                \`Links.Attributes\`,
+                DroppedAttributesCount,
+                DroppedEventsCount,
+                DroppedLinksCount
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              ORDER BY Timestamp ASC
+              ORDER BY StartTime ASC
             `,
             query_params: {
               tenantId,
