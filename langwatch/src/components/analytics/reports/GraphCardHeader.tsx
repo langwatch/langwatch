@@ -66,9 +66,16 @@ export function GraphCardHeader({
 
   const hasFilters = useMemo(
     () =>
-      !!(filters && typeof filters === "object" && Object.keys(filters).length > 0),
-    [filters]
+      !!(
+        filters &&
+        typeof filters === "object" &&
+        Object.keys(filters).length > 0
+      ),
+    [filters],
   );
+
+  // Check if this is a saved graph (has valid database ID)
+  const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
 
   return (
     <HStack
@@ -84,43 +91,46 @@ export function GraphCardHeader({
       </Text>
       <Spacer />
 
-      {/* Alert button/icon */}
-      {trigger && trigger.active ? (
-        <Tooltip
-          content={`Alert configured (${trigger.alertType ?? "INFO"})`}
-          positioning={{ placement: "top" }}
-          showArrow
-        >
-          <Box
-            padding={1}
-            cursor="pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              openDrawer("customGraphAlert", {
-                form,
-                graphId,
-              });
-            }}
-          >
-            <Bell width={18} color="black" />
-          </Box>
-        </Tooltip>
-      ) : (
-        <Button
-          variant="outline"
-          colorPalette="gray"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            openDrawer("customGraphAlert", {
-              form,
-              graphId,
-            });
-          }}
-        >
-          <Bell width={16} />
-          Add alert
-        </Button>
+      {isSavedGraph && (
+        <>
+          {trigger && trigger.active ? (
+            <Tooltip
+              content={`Alert configured (${trigger.alertType ?? "INFO"})`}
+              positioning={{ placement: "top" }}
+              showArrow
+            >
+              <Box
+                padding={1}
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openDrawer("customGraphAlert", {
+                    form,
+                    graphId,
+                  });
+                }}
+              >
+                <Bell width={18} color="black" />
+              </Box>
+            </Tooltip>
+          ) : (
+            <Button
+              variant="outline"
+              colorPalette="gray"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDrawer("customGraphAlert", {
+                  form,
+                  graphId,
+                });
+              }}
+            >
+              <Bell width={16} />
+              Add alert
+            </Button>
+          )}
+        </>
       )}
 
       {hasFilters && (
@@ -143,4 +153,3 @@ export function GraphCardHeader({
     </HStack>
   );
 }
-
