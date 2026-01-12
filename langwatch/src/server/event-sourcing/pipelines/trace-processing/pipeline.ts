@@ -30,11 +30,6 @@ export const traceProcessingPipelineDefinition =
     .withEventHandler("spanStorage", SpanStorageEventHandler, {
       eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
     })
-    // .withEventHandler("traceDailyUsage", TraceDailyUsageEventHandler, {
-    //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
-    //   delay: 5000,
-    //   disabled: !env.IS_SAAS,
-    // })
     // .withEventHandler("observabilityPush", ObservabilityPushEventHandler, {
     //   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
     //   // dependsOn: ["spanStorage", "traceSummary"],

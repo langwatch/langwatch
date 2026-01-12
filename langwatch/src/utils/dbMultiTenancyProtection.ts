@@ -26,12 +26,6 @@ const EXEMPT_MODELS = [
    * Notifications can be at organization or project level
    */
   "Notification",
-
-  /**
-   * These both have project id's, but are dealt with in a tx, + not sensitive data.
-   */
-  "ProjectDailyUsage",
-  "ProjectDailyUsageProcessedAggregates",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
