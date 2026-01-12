@@ -255,29 +255,6 @@ enum INVITE_STATUS {
     ACCEPTED
 }
 
-model ProjectDailyUsage {
-    id         String   @id
-    projectId  String
-    date       DateTime
-    traceCount Int      @default(0)
-
-    createdAt DateTime @default(now())
-    updatedAt DateTime @default(now()) @updatedAt
-
-    @@unique([projectId, date])
-}
-
-model ProjectDailyUsageProcessedAggregates {
-    id          String   @id
-    projectId   String
-    aggregateId String
-    date        DateTime
-
-    processedAt DateTime @default(now())
-
-    @@unique([projectId, aggregateId, date])
-}
-
 model OrganizationInvite {
     id              String               @id @default(nanoid())
     email           String
