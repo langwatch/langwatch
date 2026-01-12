@@ -1,4 +1,12 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import type { AnnotationQueueItem } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo, useState } from "react";
@@ -19,6 +27,7 @@ export default function TraceAnnotations() {
     allQueueItems: true,
   });
   const { project } = useOrganizationTeamProject();
+  const queryClient = api.useContext();
 
   const allQueueItems = useMemo(() => {
     const items = [...(assignedQueueItems ?? [])];
@@ -38,8 +47,6 @@ export default function TraceAnnotations() {
     currentQueueItem = allQueueItems[0];
   }
 
-  const queryClient = api.useContext();
-
   const refetchQueueItems = async () => {
     await queryClient.annotation.getOptimizedAnnotationQueues.invalidate();
     await queryClient.annotation.getPendingItemsCount.invalidate();
@@ -53,7 +60,10 @@ export default function TraceAnnotations() {
       projectId: project?.id ?? "",
       traceId: currentQueueItem?.trace?.trace_id ?? "",
     },
-    { enabled: !!project?.id },
+    {
+      enabled: !!project?.id && !!currentQueueItem?.trace?.trace_id,
+      refetchOnWindowFocus: false,
+    },
   );
 
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -61,8 +71,10 @@ export default function TraceAnnotations() {
   useEffect(() => {
     if (traceDetails.data?.metadata.thread_id) {
       setThreadId(traceDetails.data?.metadata.thread_id);
+    } else {
+      setThreadId(null);
     }
-  }, [traceDetails.data?.metadata.thread_id]);
+  }, [traceDetails.data?.metadata.thread_id, currentQueueItem?.id]);
 
   if (queuesLoading) {
     return <AnnotationsLayout />;
@@ -90,21 +102,23 @@ export default function TraceAnnotations() {
 
   return (
     <DashboardLayout display="flex" flexDirection="column">
-      <VStack 
-        height="100%" 
-        width="full" 
-        gap={0} 
-        alignItems="stretch" 
+      <VStack
+        height="100%"
+        width="full"
+        gap={0}
+        alignItems="stretch"
         position="relative"
         flex="1"
       >
-        <Box 
-          flex="1" 
-          overflowY="auto" 
+        <Box
+          flex="1"
+          overflowY="auto"
           padding={4}
           paddingBottom={currentQueueItem?.trace ? "100px" : 4}
+          position="relative"
         >
           <Conversation
+            key={currentQueueItem?.trace?.trace_id ?? currentQueueItem?.id}
             threadId={threadId ?? ""}
             traceId={currentQueueItem?.trace?.trace_id ?? ""}
           />
@@ -145,15 +159,21 @@ const AnnotationQueuePicker = ({
 }) => {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const [isNavigating, setIsNavigating] = useState(false);
 
   const currentQueueItemIndex = queueItems.findIndex(
     (item) => item.id === currentQueueItem.id,
   );
 
-  const navigateToQueue = (queueId: string) => {
-    void router.replace(
-      `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`,
-    );
+  const navigateToQueue = async (queueId: string, traceId?: string) => {
+    setIsNavigating(true);
+    const url = traceId
+      ? `/${project?.slug}/annotations/my-queue?queue-item=${queueId}&trace=${traceId}`
+      : `/${project?.slug}/annotations/my-queue?queue-item=${queueId}`;
+
+    await router.push(url);
+    // Add a small delay to ensure the route has fully updated
+    setTimeout(() => setIsNavigating(false), 100);
   };
 
   const markQueueItemDone = api.annotation.markQueueItemDone.useMutation();
@@ -169,9 +189,11 @@ const AnnotationQueuePicker = ({
           await refetchQueueItems();
           const nextItem = queueItems[currentQueueItemIndex + 1];
           if (nextItem) {
-            navigateToQueue(nextItem.id);
+            await navigateToQueue(nextItem.id);
           } else {
+            setIsNavigating(true);
             await router.replace(`/${project?.slug}/annotations/my-queue`);
+            setTimeout(() => setIsNavigating(false), 100);
           }
         },
       },
@@ -179,17 +201,38 @@ const AnnotationQueuePicker = ({
   };
 
   return (
-    <Box boxShadow="0px -3px 10px rgba(0, 0, 0, 0.05)" padding={5} width="full">
+    <Box
+      boxShadow="0px -3px 10px rgba(0, 0, 0, 0.05)"
+      padding={5}
+      width="full"
+      position="relative"
+    >
+      {isNavigating && (
+        <Box
+          position="absolute"
+          top={0}
+          left={0}
+          right={0}
+          bottom={0}
+          backgroundColor="whiteAlpha.800"
+          zIndex={20}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+        >
+          <Spinner />
+        </Box>
+      )}
       <VStack>
         <HStack gap={8}>
           <HStack gap={2}>
             <Button
               variant="outline"
-              disabled={currentQueueItemIndex === 0}
+              disabled={currentQueueItemIndex === 0 || isNavigating}
               onClick={() => {
                 const previousItem = queueItems[currentQueueItemIndex - 1];
                 if (previousItem) {
-                  navigateToQueue(previousItem.id);
+                  void navigateToQueue(previousItem.id);
                 }
               }}
             >
@@ -197,11 +240,13 @@ const AnnotationQueuePicker = ({
             </Button>
             <Button
               variant="outline"
-              disabled={currentQueueItemIndex === queueItems.length - 1}
+              disabled={
+                currentQueueItemIndex === queueItems.length - 1 || isNavigating
+              }
               onClick={() => {
                 const nextItem = queueItems[currentQueueItemIndex + 1];
                 if (nextItem) {
-                  navigateToQueue(nextItem.id);
+                  void navigateToQueue(nextItem.id);
                 }
               }}
             >
@@ -214,7 +259,9 @@ const AnnotationQueuePicker = ({
           <Button
             colorPalette="blue"
             disabled={
-              currentQueueItem.doneAt !== null || markQueueItemDone.isLoading
+              currentQueueItem.doneAt !== null ||
+              markQueueItemDone.isLoading ||
+              isNavigating
             }
             onClick={() => {
               void markQueueItemDoneMoveToNext();
