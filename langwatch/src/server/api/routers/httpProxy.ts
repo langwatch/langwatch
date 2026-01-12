@@ -116,7 +116,7 @@ export const httpProxyRouter = createTRPCRouter({
         // Make the HTTP request with SSRF protection
         // Uses atomic validate-and-fetch to eliminate TOCTOU DNS rebinding
         const startTime = Date.now();
-        let response: Response;
+        let response;
         try {
           response = await ssrfSafeFetch(url, {
             method,
