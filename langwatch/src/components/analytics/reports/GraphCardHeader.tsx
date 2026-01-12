@@ -66,12 +66,16 @@ export function GraphCardHeader({
 
   const hasFilters = useMemo(
     () =>
-      !!(filters && typeof filters === "object" && Object.keys(filters).length > 0),
-    [filters]
+      !!(
+        filters &&
+        typeof filters === "object" &&
+        Object.keys(filters).length > 0
+      ),
+    [filters],
   );
 
   // Check if this is a saved graph (has valid database ID)
-  const isSavedGraph = graphId && graphId !== "custom" && graph;
+  const isSavedGraph = !!(graphId && graphId !== "custom" && graph);
 
   return (
     <HStack
@@ -87,7 +91,6 @@ export function GraphCardHeader({
       </Text>
       <Spacer />
 
-      {/* Alert button/icon - only show for saved graphs */}
       {isSavedGraph && (
         <>
           {trigger && trigger.active ? (
@@ -150,4 +153,3 @@ export function GraphCardHeader({
     </HStack>
   );
 }
-
