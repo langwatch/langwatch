@@ -10,8 +10,8 @@ import {
 } from "@chakra-ui/react";
 import React from "react";
 import { Archive, MoreVertical, Plus } from "react-feather";
+import { ProjectAvatar } from "../../components/ProjectAvatar";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ProjectTechStackIcon } from "../../components/TechStack";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
@@ -164,7 +164,7 @@ export function TeamProjectsList({
           <Table.Cell>
             <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={teamProject.id}>
-                <ProjectTechStackIcon project={teamProject} />
+                <ProjectAvatar name={teamProject.name} />
                 <Link href={`/${teamProject.slug}/messages`}>
                   {teamProject.name}
                 </Link>

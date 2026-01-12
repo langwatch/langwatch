@@ -39,6 +39,7 @@ import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
+import { ProjectAvatar } from "./ProjectAvatar";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -75,22 +76,6 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
-const ProjectAvatar = ({
-  name,
-  size = "2xs",
-}: {
-  name: string;
-  size?: "2xs" | "xs" | "sm";
-}) => {
-  return (
-    <RandomColorAvatar
-      size={size}
-      name={name.slice(0, 1)}
-      width={size === "2xs" ? "20px" : undefined}
-      height={size === "2xs" ? "20px" : undefined}
-    />
-  );
-};
 
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
