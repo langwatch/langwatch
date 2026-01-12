@@ -125,20 +125,8 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      clickhouse:
-        image: clickhouse/clickhouse-server:latest
-        ports:
-          - 8123:8123
-          - 9000:9000
-        env:
-          CLICKHOUSE_DB: default
-          CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ci_password
-        options: >-
-          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      # ClickHouse is started manually via docker run (after checkout) to mount storage policy config
+      # See "Start ClickHouse with storage policy" step below
 
       elasticsearch:
         image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
@@ -209,23 +197,30 @@ jobs:
           sudo mv /tmp/goose /usr/local/bin/goose
           chmod +x /usr/local/bin/goose
 
-      - name: Configure ClickHouse storage policy
+      - name: Start ClickHouse with storage policy
         run: |
-          # Get ClickHouse container ID
-          CLICKHOUSE_CONTAINER=$(docker ps --filter "ancestor=clickhouse/clickhouse-server:latest" --format "{{.ID}}")
-          
           # Create storage policy config file
+          # Note: Storage policies can only be loaded at server startup, not via SYSTEM RELOAD CONFIG
+          # Each disk must have a unique name AND path - we define 'hot' and 'cold' disks with different paths
           cat > /tmp/storage_policy.xml << 'EOF'
           <clickhouse>
               <storage_configuration>
+                  <disks>
+                      <hot>
+                          <path>/var/lib/clickhouse/hot/</path>
+                      </hot>
+                      <cold>
+                          <path>/var/lib/clickhouse/cold/</path>
+                      </cold>
+                  </disks>
                   <policies>
                       <local_primary>
                           <volumes>
                               <hot>
-                                  <disk>default</disk>
+                                  <disk>hot</disk>
                               </hot>
                               <cold>
-                                  <disk>default</disk>
+                                  <disk>cold</disk>
                               </cold>
                           </volumes>
                       </local_primary>
@@ -233,15 +228,31 @@ jobs:
               </storage_configuration>
           </clickhouse>
           EOF
-          
-          # Copy config file into ClickHouse container
-          docker cp /tmp/storage_policy.xml $CLICKHOUSE_CONTAINER:/etc/clickhouse-server/config.d/storage_policy.xml
-          
-          # Set proper ownership (ClickHouse runs as clickhouse user)
-          docker exec $CLICKHOUSE_CONTAINER chown clickhouse:clickhouse /etc/clickhouse-server/config.d/storage_policy.xml
-          
-          # Reload ClickHouse configuration (using password from service container env)
-          docker exec -e CLICKHOUSE_PASSWORD=ci_password $CLICKHOUSE_CONTAINER clickhouse-client --password=ci_password --query "SYSTEM RELOAD CONFIG"
+
+          # Start ClickHouse container with config mounted (loads at startup)
+          docker run -d \
+            --name clickhouse \
+            --network host \
+            -e CLICKHOUSE_DB=default \
+            -e CLICKHOUSE_USER=default \
+            -e CLICKHOUSE_PASSWORD=ci_password \
+            -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
+            clickhouse/clickhouse-server:latest
+
+          # Wait for ClickHouse to be ready
+          echo "Waiting for ClickHouse to be ready..."
+          for i in {1..60}; do
+            if docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT 1" 2>/dev/null; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Attempt $i: Waiting for ClickHouse..."
+            sleep 1
+          done
+
+          # Verify storage policy is available
+          echo "Verifying storage policy..."
+          docker exec clickhouse clickhouse-client --password=ci_password --query "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
 
       - name: Run ClickHouse migrations
         working-directory: langwatch
