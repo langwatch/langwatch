@@ -189,4 +189,22 @@ describe("Project Creation Flow", () => {
       });
     });
   });
+
+  describe("when navigateOnCreate is true", () => {
+    it("navigates to the new project after creation", async () => {
+      const user = userEvent.setup();
+      mockMutate.mockImplementation((_data, { onSuccess }) => {
+        onSuccess({ projectSlug: "my-new-project" });
+      });
+
+      render(<CreateProjectDrawer open={true} navigateOnCreate={true} />);
+
+      await user.type(screen.getByLabelText(/project name/i), "Test");
+      await user.click(screen.getByRole("button", { name: /create/i }));
+
+      await waitFor(() => {
+        expect(mockRouterPush).toHaveBeenCalledWith("/my-new-project");
+      });
+    });
+  });
 });

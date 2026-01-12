@@ -69,6 +69,7 @@ export function CreateProjectDrawer({
 
           if (navigateOnCreate) {
             void router.push(`/${result.projectSlug}`);
+            return; // Don't call handleClose() - we're navigating away
           }
 
           handleClose();
