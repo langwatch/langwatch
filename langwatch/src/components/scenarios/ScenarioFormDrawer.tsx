@@ -111,14 +111,41 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     await form.handleSubmit(async (data) => {
       const savedScenario = await handleSave(data);
       if (!savedScenario) return;
-      const { setId } = await runMutation.mutateAsync({
+      const { setId, batchRunId } = await runMutation.mutateAsync({
         projectId: project.id,
         scenarioId: savedScenario.id,
         target: { type: targetType, referenceId: selectedTargetId },
       });
-      void router.push(`/${project.slug}/simulations/${setId}`);
+
+      // Poll for the run to appear, then redirect to the specific run
+      const pollForRun = async (attempts = 0): Promise<void> => {
+        const maxAttempts = 60; // 30 seconds max
+        if (attempts >= maxAttempts) {
+          // Fallback to set page if polling times out
+          void router.push(`/${project.slug}/simulations/${setId}`);
+          return;
+        }
+
+        const runs = await utils.scenarios.getBatchRunData.fetch({
+          projectId: project.id,
+          scenarioSetId: setId,
+          batchRunId,
+        });
+
+        if (runs.length > 0) {
+          const run = runs[0];
+          void router.push(
+            `/${project.slug}/simulations/${setId}/${run?.scenarioRunId}`
+          );
+        } else {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+          return pollForRun(attempts + 1);
+        }
+      };
+
+      void pollForRun();
     })();
-  }, [handleSave, project, selectedTargetId, targetType, runMutation, router]);
+  }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formRef.current;
     if (!form) return;

@@ -17,6 +17,7 @@ interface ExecuteParams {
   scenarioId: string;
   target: SimulationTarget;
   setId: string;
+  batchRunId: string;
 }
 
 /**
@@ -36,7 +37,7 @@ export class SimulationRunnerService {
    * Fire and forget - returns immediately, execution happens async.
    */
   async execute(params: ExecuteParams): Promise<void> {
-    const { projectId, scenarioId, target, setId } = params;
+    const { projectId, scenarioId, target, setId, batchRunId } = params;
 
     try {
       // 1. Fetch scenario
@@ -97,6 +98,7 @@ export class SimulationRunnerService {
           verbose: true,
         },
         {
+          batchRunId,
           langwatch: {
             endpoint: this.getLangWatchEndpoint(),
             apiKey: project.apiKey,

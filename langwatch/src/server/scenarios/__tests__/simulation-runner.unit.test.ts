@@ -88,6 +88,7 @@ describe("SimulationRunnerService", () => {
         scenarioId: "scen_123",
         target: { type: "prompt", referenceId: "prompt_123" },
         setId: "set_123",
+        batchRunId: "scenariobatch_test123",
       });
 
       expect(mockScenarioService.getById).toHaveBeenCalledWith({
@@ -111,6 +112,7 @@ describe("SimulationRunnerService", () => {
         scenarioId: "scen_123",
         target: { type: "prompt", referenceId: "prompt_123" },
         setId: "set_123",
+        batchRunId: "scenariobatch_test123",
       });
 
       expect(mockScenarioRun).toHaveBeenCalledWith(
@@ -135,6 +137,7 @@ describe("SimulationRunnerService", () => {
         scenarioId: "scen_123",
         target: { type: "prompt", referenceId: "prompt_123" },
         setId: "set_123",
+        batchRunId: "scenariobatch_test123",
       });
 
       expect(mockJudgeAgent).toHaveBeenCalledWith(
@@ -154,6 +157,7 @@ describe("SimulationRunnerService", () => {
         scenarioId: "scen_nonexistent",
         target: { type: "prompt", referenceId: "prompt_123" },
         setId: "set_123",
+        batchRunId: "scenariobatch_test123",
       });
 
       expect(mockScenarioRun).not.toHaveBeenCalled();
