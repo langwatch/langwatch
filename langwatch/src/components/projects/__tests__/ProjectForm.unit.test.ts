@@ -82,38 +82,5 @@ describe("ProjectForm validation logic", () => {
     });
   });
 
-  describe("when checking project limit", () => {
-    it("blocks creation when at max projects", () => {
-      const usage = {
-        projectsCount: 5,
-        activePlan: { maxProjects: 5, overrideAddingLimitations: false },
-      };
-      const isAtMax =
-        usage.projectsCount >= usage.activePlan.maxProjects &&
-        !usage.activePlan.overrideAddingLimitations;
-      expect(isAtMax).toBe(true);
-    });
-
-    it("allows creation when below max projects", () => {
-      const usage = {
-        projectsCount: 3,
-        activePlan: { maxProjects: 5, overrideAddingLimitations: false },
-      };
-      const isAtMax =
-        usage.projectsCount >= usage.activePlan.maxProjects &&
-        !usage.activePlan.overrideAddingLimitations;
-      expect(isAtMax).toBe(false);
-    });
-
-    it("allows creation when override is enabled", () => {
-      const usage = {
-        projectsCount: 5,
-        activePlan: { maxProjects: 5, overrideAddingLimitations: true },
-      };
-      const isAtMax =
-        usage.projectsCount >= usage.activePlan.maxProjects &&
-        !usage.activePlan.overrideAddingLimitations;
-      expect(isAtMax).toBe(false);
-    });
-  });
+  // Project limit tests moved to utils/__tests__/limits.unit.test.ts
 });

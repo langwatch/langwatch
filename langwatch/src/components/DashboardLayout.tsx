@@ -27,6 +27,7 @@ import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
@@ -237,12 +238,14 @@ export const AddProjectButton = ({
     },
   );
 
-  return !usage.data ||
-    usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
+  return canAddProjects(usage.data) ? (
     <Menu.Item
       value={`new-project-${team.slug}`}
       fontSize="14px"
-      onClick={() => openDrawer("createProject", { navigateOnCreate: true })}
+      onClick={() => openDrawer("createProject", {
+        navigateOnCreate: true,
+        defaultTeamId: team.id,
+      })}
     >
       <Plus />
       New Project

@@ -1,5 +1,5 @@
+import React from "react";
 import { HStack, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -7,18 +7,18 @@ import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
-import type { FrameworkKey, LanguageKey } from "./techStackOptions";
 
 export function CreateProjectDrawer({
   open = true,
   onClose,
   navigateOnCreate = false,
+  defaultTeamId,
 }: {
   open?: boolean;
   onClose?: () => void;
   navigateOnCreate?: boolean;
+  defaultTeamId?: string;
 }): React.ReactElement {
-  const router = useRouter();
   const { organization } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useContext();
@@ -34,7 +34,7 @@ export function CreateProjectDrawer({
   };
 
   const handleSubmit = (
-    data: ProjectFormData & { language: LanguageKey; framework: FrameworkKey },
+    data: ProjectFormData & { language: string; framework: string },
   ) => {
     if (!organization) return;
 
@@ -68,8 +68,9 @@ export function CreateProjectDrawer({
           });
 
           if (navigateOnCreate) {
-            void router.push(`/${result.projectSlug}`);
-            return; // Don't call handleClose() - we're navigating away
+            // Use hard redirect to ensure fresh data after project creation
+            window.location.href = `/${result.projectSlug}`;
+            return;
           }
 
           handleClose();
@@ -113,6 +114,7 @@ export function CreateProjectDrawer({
             onSubmit={handleSubmit}
             isLoading={createProject.isLoading}
             error={createProject.error?.message}
+            defaultTeamId={defaultTeamId}
           />
         </Drawer.Body>
       </Drawer.Content>

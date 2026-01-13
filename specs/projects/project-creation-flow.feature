@@ -13,8 +13,6 @@ Feature: Project Creation Flow
     Given the CreateProjectDrawer is open
     When I enter "My New Chatbot" as the project name
     And I select team "Engineering"
-    And I select language "Python"
-    And I select framework "OpenAI"
     And I click the "Create" button
     Then the project is created successfully
     And I see a success toast notification
@@ -25,18 +23,10 @@ Feature: Project Creation Flow
     When I enter "Analytics Bot" as the project name
     And I select "Create new team"
     And I enter "Analytics Team" as the new team name
-    And I select language "TypeScript"
-    And I select framework "Vercel AI SDK"
     And I click the "Create" button
     Then a new team "Analytics Team" is created
     And the project is created under "Analytics Team"
     And I see a success toast notification
-
-  Scenario: Created project has correct tech stack
-    Given I create a project with language "Python" and framework "LangChain"
-    When the project is created
-    Then the project's language is stored as "python"
-    And the project's framework is stored as "langchain"
 
   Scenario: Project creation calls correct API endpoint
     Given the CreateProjectDrawer is open with valid data
@@ -46,8 +36,8 @@ Feature: Project Creation Flow
       | field          | value             |
       | name           | the project name  |
       | teamId         | the selected team |
-      | language       | the language key  |
-      | framework      | the framework key |
+      | language       | "other"           |
+      | framework      | "other"           |
       | organizationId | current org id    |
 
   Scenario: Handle API error gracefully

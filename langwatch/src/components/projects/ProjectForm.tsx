@@ -1,3 +1,4 @@
+import React, { useEffect } from "react";
 import {
   Alert,
   Button,
@@ -9,20 +10,12 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { isAtMaxProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../ui/link";
-import { FrameworkGrid } from "./FrameworkGrid";
-import { LanguageGrid } from "./LanguageGrid";
-import {
-  getDefaultFramework,
-  isFrameworkAvailableForLanguage,
-  type FrameworkKey,
-  type LanguageKey,
-} from "./techStackOptions";
 
 export interface ProjectFormData {
   name: string;
@@ -31,17 +24,15 @@ export interface ProjectFormData {
 }
 
 export interface ProjectFormProps {
-  onSubmit: (data: ProjectFormData & { language: LanguageKey; framework: FrameworkKey }) => void;
+  onSubmit: (data: ProjectFormData & { language: string; framework: string }) => void;
   isLoading?: boolean;
   error?: string | null;
+  defaultTeamId?: string;
 }
 
 export function ProjectForm(props: ProjectFormProps): React.ReactElement {
-  const { onSubmit: onSubmitProp, isLoading = false, error } = props;
+  const { onSubmit: onSubmitProp, isLoading = false, error, defaultTeamId } = props;
   const { organization, project } = useOrganizationTeamProject();
-
-  const [language, setLanguage] = useState<LanguageKey>("python");
-  const [framework, setFramework] = useState<FrameworkKey>("openai");
 
   const {
     register,
@@ -75,28 +66,24 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   // Set default team when teams are loaded
   useEffect(() => {
     if (teams.data && teams.data.length > 0 && !teamId) {
+      // Use defaultTeamId if provided and valid, otherwise use first team
+      const teamIdToUse =
+        defaultTeamId && teams.data.some((t: { id: string }) => t.id === defaultTeamId)
+          ? defaultTeamId
+          : teams.data[0]?.id ?? "";
+
       reset((prev) => ({
         ...prev,
-        teamId: teams.data[0]?.id ?? "",
+        teamId: teamIdToUse,
       }));
     }
-  }, [teams.data, teamId, reset]);
-
-  // Update framework when language changes (if current is incompatible)
-  useEffect(() => {
-    if (!isFrameworkAvailableForLanguage(framework, language)) {
-      setFramework(getDefaultFramework(language));
-    }
-  }, [language, framework]);
+  }, [teams.data, teamId, reset, defaultTeamId]);
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data) => {
-    onSubmitProp({ ...data, language, framework });
+    onSubmitProp({ ...data, language: "other", framework: "other" });
   };
 
-  const isAtMaxProjects =
-    usage.data &&
-    usage.data.projectsCount >= usage.data.activePlan.maxProjects &&
-    !usage.data.activePlan.overrideAddingLimitations;
+  const atMaxProjects = isAtMaxProjects(usage.data);
 
   const showTeamSelector =
     teams.data?.some((team: { projects: unknown[] }) => team.projects.length > 0) ?? false;
@@ -105,7 +92,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
       <VStack align="stretch" gap={6}>
-        {isAtMaxProjects && (
+        {atMaxProjects && (
           <Alert.Root>
             <Alert.Indicator />
             <Alert.Content>
@@ -141,7 +128,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           <Field.Label>Project Name</Field.Label>
           <Input
             {...register("name", { required: "Project name is required" })}
-            placeholder="My AI Chatbot"
+            placeholder="AI Project"
           />
           {errors.name && (
             <Field.ErrorText>{errors.name.message}</Field.ErrorText>
@@ -184,17 +171,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           </>
         )}
 
-        <LanguageGrid
-          selectedLanguage={language}
-          onSelectLanguage={setLanguage}
-        />
-
-        <FrameworkGrid
-          selectedLanguage={language}
-          selectedFramework={framework}
-          onSelectFramework={setFramework}
-        />
-
         {error && (
           <Text color="red.500">{error}</Text>
         )}
@@ -205,7 +181,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             colorPalette="orange"
             type="submit"
             loading={isLoading}
-            disabled={isAtMaxProjects || isLoading}
+            disabled={atMaxProjects || isLoading}
           >
             Create
           </Button>

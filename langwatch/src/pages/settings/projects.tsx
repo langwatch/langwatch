@@ -24,6 +24,7 @@ import type {
   TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { canAddProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
@@ -65,9 +66,7 @@ function ProjectsList({
         <HStack width="full" justifyContent="space-between">
           <Heading size="lg">Projects</Heading>
           {hasPermission("project:create") &&
-            (!usage.data ||
-            usage.data.projectsCount < usage.data.activePlan.maxProjects ||
-            usage.data.activePlan.overrideAddingLimitations ? (
+            (canAddProjects(usage.data) ? (
               <PageLayout.HeaderButton
                 onClick={() => openDrawer("createProject")}
               >
@@ -165,7 +164,7 @@ export function TeamProjectsList({
             <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={teamProject.id}>
                 <ProjectAvatar name={teamProject.name} />
-                <Link href={`/${teamProject.slug}/messages`}>
+                <Link href={`/${teamProject.slug}`}>
                   {teamProject.name}
                 </Link>
               </HStack>

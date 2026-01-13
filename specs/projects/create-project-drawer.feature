@@ -37,8 +37,6 @@ Feature: Create Project Drawer
     When the CreateProjectDrawer opens
     Then I see a "Project Name" input field
     And I see a "Team" selector
-    And I see the language selection grid
-    And I see the framework selection grid
     And I see a "Create" or "Save" button
 
   Scenario: Team selector shows available teams
@@ -86,8 +84,6 @@ Feature: Create Project Drawer
     Given the CreateProjectDrawer is open
     When I enter a valid project name
     And I select a team
-    And I select a language
-    And I select a framework
     Then the submit button is enabled
 
   Scenario: Show new team name field when creating new team
@@ -114,6 +110,14 @@ Feature: Create Project Drawer
     When I try to submit the form
     Then creation is blocked
     And I see a message to upgrade
+
+  @unit
+  Scenario: Allow creation when plan has override enabled
+    Given my organization has reached the maximum project limit
+    But the plan has overrideAddingLimitations enabled
+    When the CreateProjectDrawer opens
+    Then the Create button is enabled
+    And I can submit the form successfully
 
   @visual
   Scenario: Show loading state during submission
