@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
 import { projectRouter } from "../project";
+import { createInnerTRPCContext } from "../../trpc";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
@@ -23,10 +24,12 @@ vi.mock("nanoid", () => ({
 // Mock the permission check to always allow
 vi.mock("../../rbac", () => ({
   hasProjectPermission: vi.fn(() => Promise.resolve(true)),
-  checkProjectPermission: () => async ({ ctx, next }: any) => {
-    ctx.permissionChecked = true;
-    return next();
-  },
+  checkProjectPermission:
+    () =>
+    async ({ ctx, next }: any) => {
+      ctx.permissionChecked = true;
+      return next();
+    },
 }));
 
 // Mock the audit log to avoid database writes
@@ -51,15 +54,19 @@ describe("project.regenerateApiKey mutation logic", () => {
     };
 
     // Create a caller with mocked context
-    const ctx = {
+    const ctx = createInnerTRPCContext({
       session: {
         user: { id: "test-user-id" },
         expires: "1",
       },
-      prisma: mockPrisma as unknown as PrismaClient,
+      req: undefined,
+      res: undefined,
       permissionChecked: true,
       publiclyShared: false,
-    };
+    });
+
+    // Override prisma with our mock
+    ctx.prisma = mockPrisma as unknown as PrismaClient;
 
     caller = projectRouter.createCaller(ctx);
   });
@@ -116,7 +123,8 @@ describe("project.regenerateApiKey mutation logic", () => {
     it("returns success with the new API key", async () => {
       // Arrange
       const projectId = "project_123";
-      const expectedApiKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
+      const expectedApiKey =
+        "sk-lw-mock48characterrandomstringforapikeygeneration";
 
       mockPrisma.project.update.mockResolvedValueOnce({
         id: projectId,
