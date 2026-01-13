@@ -117,6 +117,11 @@ export const projectRoutes = {
     title: "Simulations",
     parent: "simulations",
   },
+  simulations_run: {
+    path: "/[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]",
+    title: "Simulation Run",
+    parent: "simulations",
+  },
 } as const;
 
 export type Route = {
@@ -141,5 +146,22 @@ export function getRoutePath(params: {
 }): string {
   const { projectSlug, route } = params;
   const path = projectRoutes[route].path.replace("[project]", projectSlug);
+  return path.replace(/\/\/+/g, "/");
+}
+
+/**
+ * Build a route path with dynamic parameters.
+ * Replaces [param] placeholders with provided values.
+ */
+export function buildRoutePath(
+  route: keyof typeof projectRoutes,
+  params: Record<string, string>
+): string {
+  let path: string = projectRoutes[route].path;
+
+  for (const [key, value] of Object.entries(params)) {
+    path = path.replace(`[${key}]`, value);
+  }
+
   return path.replace(/\/\/+/g, "/");
 }

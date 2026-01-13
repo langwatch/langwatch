@@ -15,6 +15,8 @@ import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { api } from "../../utils/api";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
+import { pollForScenarioRun } from "../../utils/pollForScenarioRun";
+import { buildRoutePath } from "../../utils/routes";
 import { QuickTestBar } from "./QuickTestBar";
 import type { TargetType } from "./TargetTypeSelector";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
@@ -111,14 +113,39 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     await form.handleSubmit(async (data) => {
       const savedScenario = await handleSave(data);
       if (!savedScenario) return;
-      const { setId } = await runMutation.mutateAsync({
+      const { setId, batchRunId } = await runMutation.mutateAsync({
         projectId: project.id,
         scenarioId: savedScenario.id,
         target: { type: targetType, referenceId: selectedTargetId },
       });
-      void router.push(`/${project.slug}/simulations/${setId}`);
+
+      // Poll for the run to appear, then redirect to the specific run
+      const scenarioRunId = await pollForScenarioRun(
+        utils.scenarios.getBatchRunData.fetch,
+        { projectId: project.id, scenarioSetId: setId, batchRunId }
+      );
+
+      if (scenarioRunId) {
+        void router.push(
+          buildRoutePath("simulations_run", {
+            project: project.slug,
+            scenarioSetId: setId,
+            batchRunId,
+            scenarioRunId,
+          })
+        );
+      } else {
+        // Fallback to batch page if polling times out
+        void router.push(
+          buildRoutePath("simulations_batch", {
+            project: project.slug,
+            scenarioSetId: setId,
+            batchRunId,
+          })
+        );
+      }
     })();
-  }, [handleSave, project, selectedTargetId, targetType, runMutation, router]);
+  }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formRef.current;
     if (!form) return;

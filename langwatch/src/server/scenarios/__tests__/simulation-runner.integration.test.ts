@@ -112,6 +112,7 @@ describe("SimulationRunnerService Integration", () => {
         referenceId: prompt.id,
       },
       setId: "test-set-id",
+      batchRunId: "scenariobatch_test123",
     });
 
     // 5. Verify generateText was called at least once
@@ -156,6 +157,7 @@ describe("SimulationRunnerService Integration", () => {
         referenceId: prompt.id,
       },
       setId: "test-set-id",
+      batchRunId: "scenariobatch_test123",
     });
 
     // Should not call generateText if scenario doesn't exist
@@ -181,6 +183,7 @@ describe("SimulationRunnerService Integration", () => {
         referenceId: "nonexistent-prompt-id",
       },
       setId: "test-set-id",
+      batchRunId: "scenariobatch_test123",
     });
 
     // The error should be caught and logged, but execution should complete
@@ -223,6 +226,7 @@ describe("SimulationRunnerService Integration", () => {
         referenceId: prompt.id,
       },
       setId: "test-set-id",
+      batchRunId: "scenariobatch_test123",
     });
 
     // Verify ScenarioRunner.run was called with an adapter
@@ -231,8 +235,11 @@ describe("SimulationRunnerService Integration", () => {
         id: scenario.id,
         name: scenario.name,
         agents: expect.arrayContaining([
-          expect.objectContaining({ name: "PromptConfigAdapter" }),
+          expect.objectContaining({ role: "Agent" }), // PromptConfigAdapter
         ]),
+      }),
+      expect.objectContaining({
+        batchRunId: "scenariobatch_test123",
       })
     );
   });

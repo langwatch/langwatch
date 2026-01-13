@@ -1,5 +1,6 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { PromptService } from "../prompt-config/prompt.service";
 import { ScenarioService } from "./scenario.service";
 import type { SimulationTarget } from "../api/routers/scenarios";
@@ -10,64 +11,28 @@ import { env } from "~/env.mjs";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { DEFAULT_MODEL } from "~/utils/constants";
 
-const logger = createLogger("SimulationRunnerService");
+/** Default scenario set for local/quick runs */
+const DEFAULT_SIMULATION_SET_ID = "local-scenarios";
 
-/**
- * Simple mutex for serializing scenario executions.
- *
- * TODO: Remove this mutex once @langwatch/scenario SDK supports
- * programmatic config via ScenarioConfig.langwatch option.
- * See: https://github.com/langwatch/scenario/issues/203
- */
-class Mutex {
-  private queue: (() => void)[] = [];
-  private locked = false;
-
-  async acquire(): Promise<() => void> {
-    return new Promise((resolve) => {
-      const tryAcquire = () => {
-        if (!this.locked) {
-          this.locked = true;
-          resolve(() => this.release());
-        } else {
-          this.queue.push(tryAcquire);
-        }
-      };
-      tryAcquire();
-    });
-  }
-
-  private release(): void {
-    const next = this.queue.shift();
-    if (next) {
-      next();
-    } else {
-      this.locked = false;
-    }
-  }
+/** Generates a unique batch run ID for grouping scenario executions */
+export function generateBatchRunId(): string {
+  return `scenariobatch_${nanoid()}`;
 }
+
+const logger = createLogger("SimulationRunnerService");
 
 interface ExecuteParams {
   projectId: string;
   scenarioId: string;
   target: SimulationTarget;
   setId: string;
+  batchRunId: string;
 }
 
 /**
  * Service for running scenarios against targets.
  */
 export class SimulationRunnerService {
-  /**
-   * Mutex to serialize scenario executions.
-   * Required because @langwatch/scenario SDK reads LANGWATCH_API_KEY
-   * and LANGWATCH_ENDPOINT from process.env, not from config.
-   *
-   * TODO: Remove once SDK supports ScenarioConfig.langwatch option.
-   * See: https://github.com/langwatch/scenario/issues/203
-   */
-  private static readonly executionMutex = new Mutex();
-
   private readonly scenarioService: ScenarioService;
   private readonly promptService: PromptService;
 
@@ -81,14 +46,7 @@ export class SimulationRunnerService {
    * Fire and forget - returns immediately, execution happens async.
    */
   async execute(params: ExecuteParams): Promise<void> {
-    const { projectId, scenarioId, target, setId } = params;
-
-    // Acquire mutex to ensure only one scenario runs at a time
-    // This allows us to safely mutate process.env for SDK config
-    const release = await SimulationRunnerService.executionMutex.acquire();
-    const originalApiKey = process.env.LANGWATCH_API_KEY;
-    const originalEndpoint = process.env.LANGWATCH_ENDPOINT;
-    const originalHeadless = process.env.SCENARIO_HEADLESS;
+    const { projectId, scenarioId, target, setId, batchRunId } = params;
 
     try {
       // 1. Fetch scenario
@@ -102,7 +60,7 @@ export class SimulationRunnerService {
         return;
       }
 
-      // 2. Fetch project config and configure SDK env vars
+      // 2. Fetch project config
       // TODO: We should use the project service or repository instead of prisma directly
       const project = await this.prisma.project.findUnique({
         where: { id: projectId },
@@ -112,10 +70,6 @@ export class SimulationRunnerService {
       if (!project?.apiKey) {
         throw new Error(`Project ${projectId} not found or has no API key`);
       }
-
-      process.env.LANGWATCH_API_KEY = project.apiKey;
-      process.env.LANGWATCH_ENDPOINT = this.getLangWatchEndpoint();
-      process.env.SCENARIO_HEADLESS = "true"; // Prevent browser opening on server
 
       // 3. Get project's default model for simulator and judge agents
       const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
@@ -139,23 +93,33 @@ export class SimulationRunnerService {
         "Starting scenario execution"
       );
 
-      const result = await ScenarioRunner.run({
-        id: scenarioId,
-        name: scenario.name,
-        description: scenario.situation,
-        setId: setId,
-        agents: [
-          adapter,
-          ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-          ScenarioRunner.judgeAgent({ model: judgeModel, criteria: scenario.criteria }),
-        ],
-        verbose: true,
-      });
+      const result = await ScenarioRunner.run(
+        {
+          id: scenarioId,
+          name: scenario.name,
+          description: scenario.situation,
+          setId,
+          agents: [
+            adapter,
+            ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
+            ScenarioRunner.judgeAgent({ model: judgeModel, criteria: scenario.criteria }),
+          ],
+          verbose: true,
+        },
+        {
+          batchRunId,
+          langwatch: {
+            endpoint: this.getLangWatchEndpoint(),
+            apiKey: project.apiKey,
+          },
+        }
+      );
 
       logger.info(
         {
           scenarioId,
           setId,
+          runId: result.runId,
           success: result.success,
           reasoning: result.reasoning,
         },
@@ -166,12 +130,6 @@ export class SimulationRunnerService {
         { error, scenarioId, projectId, setId },
         "Scenario execution failed"
       );
-    } finally {
-      // Restore original env vars and release mutex
-      process.env.LANGWATCH_API_KEY = originalApiKey;
-      process.env.LANGWATCH_ENDPOINT = originalEndpoint;
-      process.env.SCENARIO_HEADLESS = originalHeadless;
-      release();
     }
   }
 

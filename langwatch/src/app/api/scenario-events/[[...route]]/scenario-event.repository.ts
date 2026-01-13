@@ -62,6 +62,11 @@ export class ScenarioEventRepository {
     await client.index({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: elasticsearchEvent,
+      // Wait for the next ES refresh cycle (up to 1s) before returning.
+      // This ensures the event is searchable immediately after the API returns,
+      // which is required for polling to find newly created scenario runs.
+      // Using "wait_for" instead of "true" avoids blocking other indexing operations.
+      refresh: "wait_for",
     });
   }
 
