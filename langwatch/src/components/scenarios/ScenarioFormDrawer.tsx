@@ -115,67 +115,62 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     },
     [project?.id, scenario, createMutation, updateMutation],
   );
-  const handleSaveAndRun = useCallback(async () => {
-    const form = formRef.current;
-    if (!form || !project?.id) return;
-    if (!selectedTarget) {
-      toaster.create({
-        title: "Select a target",
-        description:
-          "Please select a prompt or agent to run the scenario against.",
-        type: "warning",
-        meta: { closable: true },
-      });
-      return;
-    }
-    await form.handleSubmit(async (data) => {
-      const savedScenario = await handleSave(data);
-      if (!savedScenario) return;
-
-      // Persist the target selection for this scenario
-      persistTarget(selectedTarget);
-
-      const { setId, batchRunId } = await runMutation.mutateAsync({
-        projectId: project.id,
-        scenarioId: savedScenario.id,
-        target: { type: selectedTarget.type, referenceId: selectedTarget.id },
-      });
-
-      // Poll for the run to appear, then redirect to the specific run
-      const scenarioRunId = await pollForScenarioRun(
-        utils.scenarios.getBatchRunData.fetch,
-        { projectId: project.id, scenarioSetId: setId, batchRunId },
-      );
-
-      if (scenarioRunId) {
-        void router.push(
-          buildRoutePath("simulations_run", {
-            project: project.slug,
-            scenarioSetId: setId,
-            batchRunId,
-            scenarioRunId,
-          }),
-        );
-      } else {
-        // Fallback to batch page if polling times out
-        void router.push(
-          buildRoutePath("simulations_batch", {
-            project: project.slug,
-            scenarioSetId: setId,
-            batchRunId,
-          }),
-        );
+  const handleSaveAndRun = useCallback(
+    async (target: TargetValue) => {
+      const form = formRef.current;
+      if (!form || !project?.id) return;
+      if (!target) {
+        toaster.create({
+          title: "Select a target",
+          description:
+            "Please select a prompt or agent to run the scenario against.",
+          type: "warning",
+          meta: { closable: true },
+        });
+        return;
       }
-    })();
-  }, [
-    handleSave,
-    project,
-    selectedTarget,
-    persistTarget,
-    runMutation,
-    router,
-    utils,
-  ]);
+      await form.handleSubmit(async (data) => {
+        const savedScenario = await handleSave(data);
+        if (!savedScenario) return;
+
+        // Persist the target selection for this scenario
+        persistTarget(target);
+
+        const { setId, batchRunId } = await runMutation.mutateAsync({
+          projectId: project.id,
+          scenarioId: savedScenario.id,
+          target: { type: target.type, referenceId: target.id },
+        });
+
+        // Poll for the run to appear, then redirect to the specific run
+        const scenarioRunId = await pollForScenarioRun(
+          utils.scenarios.getBatchRunData.fetch,
+          { projectId: project.id, scenarioSetId: setId, batchRunId },
+        );
+
+        if (scenarioRunId) {
+          void router.push(
+            buildRoutePath("simulations_run", {
+              project: project.slug,
+              scenarioSetId: setId,
+              batchRunId,
+              scenarioRunId,
+            }),
+          );
+        } else {
+          // Fallback to batch page if polling times out
+          void router.push(
+            buildRoutePath("simulations_batch", {
+              project: project.slug,
+              scenarioSetId: setId,
+              batchRunId,
+            }),
+          );
+        }
+      })();
+    },
+    [handleSave, project, persistTarget, runMutation, router, utils],
+  );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formRef.current;
     if (!form) return;
