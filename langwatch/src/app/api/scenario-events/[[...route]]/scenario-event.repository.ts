@@ -62,6 +62,7 @@ export class ScenarioEventRepository {
     await client.index({
       index: SCENARIO_EVENTS_INDEX.alias,
       body: elasticsearchEvent,
+      refresh: "wait_for", // Ensure event is immediately searchable
     });
   }
 
