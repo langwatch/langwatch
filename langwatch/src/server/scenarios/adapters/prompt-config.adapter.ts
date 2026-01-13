@@ -20,7 +20,6 @@ export class PromptConfigAdapter extends AgentAdapter {
     private readonly projectId: string,
   ) {
     super();
-    this.name = "PromptConfigAdapter";
   }
 
   async call(input: AgentInput): Promise<string> {

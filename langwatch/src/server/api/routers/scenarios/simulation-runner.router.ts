@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
-import { SimulationRunnerService } from "~/server/scenarios/simulation-runner.service";
+import {
+  SimulationRunnerService,
+  generateBatchRunId,
+} from "~/server/scenarios/simulation-runner.service";
 import { projectSchema } from "./schemas";
 import { createLogger } from "~/utils/logger";
 
@@ -46,6 +49,7 @@ export const simulationRunnerRouter = createTRPCRouter({
       );
 
       const setId = "local-scenarios";
+      const batchRunId = generateBatchRunId();
 
       const runnerService = SimulationRunnerService.create(ctx.prisma);
 
@@ -55,9 +59,10 @@ export const simulationRunnerRouter = createTRPCRouter({
         scenarioId: input.scenarioId,
         target: input.target,
         setId,
+        batchRunId,
       });
 
-      return { setId };
+      return { setId, batchRunId };
     }),
 });
 
