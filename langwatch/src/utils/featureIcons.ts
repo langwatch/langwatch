@@ -5,15 +5,17 @@
 import {
   BookText,
   CheckSquare,
+  FileText,
   Home,
   ListTree,
+  type LucideIcon,
   Pencil,
   Play,
+  PlayCircle,
   Settings,
   Table,
   TrendingUp,
   Workflow,
-  type LucideIcon,
 } from "lucide-react";
 
 export type FeatureKey =
@@ -21,6 +23,8 @@ export type FeatureKey =
   | "analytics"
   | "traces"
   | "simulations"
+  | "scenarios"
+  | "simulation_runs"
   | "evaluations"
   | "workflows"
   | "prompts"
@@ -58,6 +62,16 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Play,
     color: "pink.500",
     label: "Simulations",
+  },
+  scenarios: {
+    icon: FileText,
+    color: "pink.500",
+    label: "Scenarios",
+  },
+  simulation_runs: {
+    icon: PlayCircle,
+    color: "pink.500",
+    label: "Runs",
   },
   evaluations: {
     icon: CheckSquare,
@@ -102,4 +116,3 @@ export const recentItemTypeToFeature: Record<string, FeatureKey> = {
   annotation: "annotations",
   simulation: "simulations",
 };
-

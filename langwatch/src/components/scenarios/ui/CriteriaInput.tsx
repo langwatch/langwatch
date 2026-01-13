@@ -6,6 +6,7 @@ type CriteriaInputProps = {
   value: string[];
   onChange: (value: string[]) => void;
   placeholder?: string;
+  disabled?: boolean;
 };
 
 /**
@@ -16,6 +17,7 @@ export function CriteriaInput({
   value,
   onChange,
   placeholder = "Add a criterion...",
+  disabled = false,
 }: CriteriaInputProps) {
   const [inputValue, setInputValue] = useState("");
 
@@ -30,6 +32,12 @@ export function CriteriaInput({
     onChange(value.filter((_, i) => i !== index));
   };
 
+  const handleUpdate = (index: number, newValue: string) => {
+    const updated = [...value];
+    updated[index] = newValue;
+    onChange(updated);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -42,20 +50,29 @@ export function CriteriaInput({
       {/* Existing criteria */}
       {value.map((criterion, index) => (
         <HStack key={index} gap={2}>
-          <Input value={criterion} size="sm" readOnly flex={1} bg="gray.50" />
+          <Input
+            value={criterion}
+            size="sm"
+            flex={1}
+            disabled={disabled}
+            onChange={(e) => handleUpdate(index, e.target.value)}
+          />
           <button
             type="button"
             onClick={() => handleRemove(index)}
+            disabled={disabled}
             style={{
-              cursor: "pointer",
+              cursor: disabled ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               padding: "8px",
               background: "transparent",
               border: "none",
               color: "var(--chakra-colors-gray-400)",
+              opacity: disabled ? 0.5 : 1,
             }}
             onMouseOver={(e) =>
+              !disabled &&
               (e.currentTarget.style.color = "var(--chakra-colors-red-500)")
             }
             onMouseOut={(e) =>
@@ -91,7 +108,3 @@ export function CriteriaInput({
     </VStack>
   );
 }
-
-
-
-

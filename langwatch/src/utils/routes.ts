@@ -112,6 +112,16 @@ export const projectRoutes = {
     path: "/[project]/simulations",
     title: "Simulations",
   },
+  simulation_runs: {
+    path: "/[project]/simulations",
+    title: "Runs",
+    parent: "simulations",
+  },
+  scenarios: {
+    path: "/[project]/simulations/scenarios",
+    title: "Scenarios",
+    parent: "simulations",
+  },
   simulations_batch: {
     path: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
     title: "Simulations",
@@ -155,7 +165,7 @@ export function getRoutePath(params: {
  */
 export function buildRoutePath(
   route: keyof typeof projectRoutes,
-  params: Record<string, string>
+  params: Record<string, string>,
 ): string {
   let path: string = projectRoutes[route].path;
 
