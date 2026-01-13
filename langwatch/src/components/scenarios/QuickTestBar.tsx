@@ -1,24 +1,20 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { PromptSelector } from "./PromptSelector";
-import { HttpAgentSelector } from "./HttpAgentSelector";
-import { TargetTypeSelector, type TargetType } from "./TargetTypeSelector";
+import { TargetSelector, type TargetValue } from "./TargetSelector";
 
 interface QuickTestBarProps {
-  targetType: TargetType;
-  onTargetTypeChange: (type: TargetType) => void;
-  selectedTargetId: string | null;
-  onTargetIdChange: (value: string | null) => void;
+  value: TargetValue;
+  onChange: (value: TargetValue) => void;
+  onCreateAgent?: () => void;
 }
 
 /**
  * Quick Test section in the scenario editor footer.
- * Allows selecting a target type (prompt or HTTP agent) and the specific target.
+ * Uses unified TargetSelector for selecting prompts or HTTP agents.
  */
 export function QuickTestBar({
-  targetType,
-  onTargetTypeChange,
-  selectedTargetId,
-  onTargetIdChange,
+  value,
+  onChange,
+  onCreateAgent,
 }: QuickTestBarProps) {
   return (
     <HStack gap={4}>
@@ -28,19 +24,13 @@ export function QuickTestBar({
         textTransform="uppercase"
         color="gray.500"
       >
-        Quick Test
+        Run Against
       </Text>
-      <HStack gap={2}>
-        <TargetTypeSelector value={targetType} onChange={onTargetTypeChange} />
-        {targetType === "prompt" ? (
-          <PromptSelector value={selectedTargetId} onChange={onTargetIdChange} />
-        ) : (
-          <HttpAgentSelector
-            value={selectedTargetId}
-            onChange={onTargetIdChange}
-          />
-        )}
-      </HStack>
+      <TargetSelector
+        value={value}
+        onChange={onChange}
+        onCreateAgent={onCreateAgent}
+      />
     </HStack>
   );
 }

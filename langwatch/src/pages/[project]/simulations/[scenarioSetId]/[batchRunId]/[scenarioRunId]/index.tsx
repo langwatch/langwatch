@@ -1,8 +1,10 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
-import { ArrowLeft, Clock, Edit2 } from "lucide-react";
-import React, { useState } from "react";
+import { ArrowLeft, Clock, Edit2, Play } from "lucide-react";
+import { useRouter } from "next/router";
+import React, { useCallback, useState } from "react";
+import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import {
   CustomCopilotKitChat,
   PreviousRunsList,
@@ -11,19 +13,27 @@ import {
   SimulationLayout,
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { pollForScenarioRun } from "~/utils/pollForScenarioRun";
+import { buildRoutePath } from "~/utils/routes";
 
 // Main component
 export default function IndividualScenarioRunPage() {
+  const router = useRouter();
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
+  const [runModalOpen, setRunModalOpen] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
   const { openDrawer, drawerOpen } = useDrawer();
+  const utils = api.useContext();
+  const runMutation = api.scenarios.run.useMutation();
   // Fetch scenario run data using the correct API
   const { data: scenarioState } = api.scenarios.getRunState.useQuery(
     {
@@ -42,8 +52,72 @@ export default function IndividualScenarioRunPage() {
   // Check if the scenario exists in our database
   const { data: scenarioExists } = api.scenarios.getById.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project?.id && !!scenarioId }
+    { enabled: !!project?.id && !!scenarioId },
   );
+
+  // Target selection persistence for "Run Again"
+  const {
+    target: persistedTarget,
+    setTarget: persistTarget,
+    hasPersistedTarget,
+  } = useScenarioTarget(scenarioId);
+
+  // Handle running the scenario again
+  const handleRunAgain = useCallback(
+    async (target: TargetValue, remember: boolean) => {
+      if (!project?.id || !scenarioId || !target) return;
+
+      if (remember) {
+        persistTarget(target);
+      }
+
+      try {
+        const { setId, batchRunId: newBatchRunId } =
+          await runMutation.mutateAsync({
+            projectId: project.id,
+            scenarioId,
+            target: { type: target.type, referenceId: target.id },
+          });
+
+        // Poll for the run to appear, then redirect
+        const newScenarioRunId = await pollForScenarioRun(
+          utils.scenarios.getBatchRunData.fetch,
+          {
+            projectId: project.id,
+            scenarioSetId: setId,
+            batchRunId: newBatchRunId,
+          },
+        );
+
+        if (newScenarioRunId) {
+          void router.push(
+            buildRoutePath("simulations_run", {
+              project: project.slug,
+              scenarioSetId: setId,
+              batchRunId: newBatchRunId,
+              scenarioRunId: newScenarioRunId,
+            }),
+          );
+        }
+      } catch (error) {
+        console.error("Failed to run scenario:", error);
+      }
+
+      setRunModalOpen(false);
+    },
+    [project, scenarioId, persistTarget, runMutation, router, utils],
+  );
+
+  // Handle "Run Again" button click
+  const handleRunAgainClick = useCallback(() => {
+    if (hasPersistedTarget && persistedTarget) {
+      // Run immediately with persisted target
+      void handleRunAgain(persistedTarget, true);
+    } else {
+      // Show modal to select target
+      setRunModalOpen(true);
+    }
+  }, [hasPersistedTarget, persistedTarget, handleRunAgain]);
 
   if (!scenarioRunId) {
     return null;
@@ -83,18 +157,29 @@ export default function IndividualScenarioRunPage() {
 
               <HStack gap={2}>
                 {scenarioExists && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      openDrawer("scenarioEditor", {
-                        urlParams: { scenarioId: scenarioId ?? "" },
-                      });
-                    }}
-                  >
-                    <Edit2 size={14} />
-                    Edit Scenario
-                  </Button>
+                  <>
+                    <Button
+                      colorPalette="blue"
+                      size="sm"
+                      onClick={handleRunAgainClick}
+                      loading={runMutation.isPending}
+                    >
+                      <Play size={14} />
+                      Run Again
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        openDrawer("scenarioEditor", {
+                          urlParams: { scenarioId: scenarioId ?? "" },
+                        });
+                      }}
+                    >
+                      <Edit2 size={14} />
+                      Edit Scenario
+                    </Button>
+                  </>
                 )}
                 <Button
                   variant="outline"
@@ -212,6 +297,14 @@ export default function IndividualScenarioRunPage() {
       </PageLayout.Container>
 
       <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
+
+      <RunScenarioModal
+        open={runModalOpen}
+        onClose={() => setRunModalOpen(false)}
+        onRun={handleRunAgain}
+        initialTarget={persistedTarget}
+        isLoading={runMutation.isPending}
+      />
     </SimulationLayout>
   );
 }
