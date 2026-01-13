@@ -43,7 +43,9 @@ export async function pollForScenarioRun(
 
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
+      logger.debug("Fetching batch run data", { attempt });
       const runs = await fetchBatchRunData(params);
+      logger.debug("Fetch completed", { attempt, runsCount: runs.length });
 
       if (attempt % 10 === 0) {
         logger.debug("Polling attempt", {
