@@ -1,3 +1,7 @@
+import { createLogger } from "./logger";
+
+const logger = createLogger("pollForScenarioRun");
+
 const POLLING_INTERVAL_MS = 500;
 const POLLING_MAX_DURATION_MS = 30_000;
 const MAX_POLLING_ATTEMPTS = Math.ceil(
@@ -36,7 +40,8 @@ export async function pollForScenarioRun(
       const runs = await fetchBatchRunData(params);
 
       if (attempt % 10 === 0) {
-        console.log("[pollForScenarioRun] Polling attempt", attempt, {
+        logger.debug("Polling attempt", {
+          attempt,
           runsCount: runs.length,
           firstRun: runs[0]
             ? {
@@ -53,7 +58,7 @@ export async function pollForScenarioRun(
 
         // Check for error states first
         if (run.status === "ERROR" || run.status === "FAILED") {
-          console.log("[pollForScenarioRun] Run errored", run.status);
+          logger.info("Run errored", { status: run.status, scenarioRunId: run.scenarioRunId });
           return {
             success: false,
             error: "run_error",
@@ -64,9 +69,10 @@ export async function pollForScenarioRun(
         // Return success if we have messages to show or run is complete
         const hasMessages = run.messages && run.messages.length > 0;
         if (hasMessages || run.status === "SUCCESS") {
-          console.log("[pollForScenarioRun] Run ready", {
+          logger.info("Run ready", {
             status: run.status,
             hasMessages,
+            scenarioRunId: run.scenarioRunId,
           });
           return { success: true, scenarioRunId: run.scenarioRunId };
         }
@@ -74,14 +80,14 @@ export async function pollForScenarioRun(
         // Run exists but no messages yet and not terminal - keep polling
       }
     } catch (error) {
-      console.error("[pollForScenarioRun] Fetch error:", error);
+      logger.error("Fetch error", { error });
       // Continue polling on error
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL_MS));
   }
 
-  console.log("[pollForScenarioRun] Timed out after", MAX_POLLING_ATTEMPTS, "attempts");
+  logger.warn("Timed out", { maxAttempts: MAX_POLLING_ATTEMPTS });
 
   return { success: false, error: "timeout" };
 }
