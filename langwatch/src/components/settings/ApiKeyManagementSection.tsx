@@ -32,7 +32,6 @@ export function ApiKeyManagementSection({
       setNewApiKey(data.apiKey);
       setShowNewKey(true);
       void apiContext.organization.getAll.invalidate();
-      void apiContext.project.getById.invalidate();
 
       toaster.create({
         title: "API Key Regenerated",

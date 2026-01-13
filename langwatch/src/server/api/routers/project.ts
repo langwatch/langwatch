@@ -1,4 +1,5 @@
 import {
+  Prisma,
   type PrismaClient,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
@@ -243,28 +244,35 @@ export const projectRouter = createTRPCRouter({
       // Generate new API key
       const newApiKey = generateApiKey();
 
-      // Update the project with new API key
-      const project = await prisma.project.update({
-        where: { id: input.projectId },
-        data: {
-          apiKey: newApiKey,
-          updatedAt: new Date(),
-        },
-        select: {
-          apiKey: true,
-          id: true,
-          slug: true,
-        },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found",
+      try {
+        // Update the project with new API key
+        // Note: updatedAt is handled automatically by Prisma @updatedAt
+        const project = await prisma.project.update({
+          where: { id: input.projectId },
+          data: {
+            apiKey: newApiKey,
+          },
+          select: {
+            apiKey: true,
+            id: true,
+            slug: true,
+          },
         });
-      }
 
-      return { success: true, apiKey: project.apiKey };
+        return { success: true, apiKey: project.apiKey };
+      } catch (error) {
+        // Prisma throws P2025 when no record is found
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Project not found",
+          });
+        }
+        throw error;
+      }
     }),
   update: protectedProcedure
     .input(
