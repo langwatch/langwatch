@@ -13,6 +13,7 @@ interface PollForRunParams {
 interface ScenarioRun {
   scenarioRunId: string;
   status?: string;
+  messages?: unknown[];
 }
 
 type FetchBatchRunData = (params: PollForRunParams) => Promise<ScenarioRun[]>;
@@ -22,8 +23,8 @@ export type PollResult =
   | { success: false; error: "timeout" | "run_error"; scenarioRunId?: string };
 
 /**
- * Polls for a scenario run to complete after execution starts.
- * Waits for terminal state (SUCCESS, ERROR, FAILED) before returning.
+ * Polls for a scenario run to have content or reach terminal state.
+ * Returns when: has messages (something to show), or ERROR/FAILED/SUCCESS.
  * Returns success with scenarioRunId, or error with reason.
  */
 export async function pollForScenarioRun(
@@ -34,28 +35,53 @@ export async function pollForScenarioRun(
     try {
       const runs = await fetchBatchRunData(params);
 
+      if (attempt % 10 === 0) {
+        console.log("[pollForScenarioRun] Polling attempt", attempt, {
+          runsCount: runs.length,
+          firstRun: runs[0]
+            ? {
+                scenarioRunId: runs[0].scenarioRunId,
+                status: runs[0].status,
+                messagesCount: runs[0].messages?.length ?? 0,
+              }
+            : null,
+        });
+      }
+
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
         const run = runs[0];
-        // Check for terminal states
+
+        // Check for error states first
         if (run.status === "ERROR" || run.status === "FAILED") {
+          console.log("[pollForScenarioRun] Run errored", run.status);
           return {
             success: false,
             error: "run_error",
             scenarioRunId: run.scenarioRunId,
           };
         }
-        if (run.status === "SUCCESS") {
+
+        // Return success if we have messages to show or run is complete
+        const hasMessages = run.messages && run.messages.length > 0;
+        if (hasMessages || run.status === "SUCCESS") {
+          console.log("[pollForScenarioRun] Run ready", {
+            status: run.status,
+            hasMessages,
+          });
           return { success: true, scenarioRunId: run.scenarioRunId };
         }
-        // Still IN_PROGRESS or PENDING - keep polling
+
+        // Run exists but no messages yet and not terminal - keep polling
       }
     } catch (error) {
-      console.error("Failed to fetch batch run data:", error);
+      console.error("[pollForScenarioRun] Fetch error:", error);
       // Continue polling on error
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL_MS));
   }
+
+  console.log("[pollForScenarioRun] Timed out after", MAX_POLLING_ATTEMPTS, "attempts");
 
   return { success: false, error: "timeout" };
 }
