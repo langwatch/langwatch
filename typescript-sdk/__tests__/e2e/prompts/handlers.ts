@@ -7,9 +7,12 @@ export const http = createOpenApiHttp<paths>({
 });
 
 export const handles = [
-  http.get("/api/prompts/{id}", ({ params, response }) => {
+  http.get("/api/prompts/{id}", ({ params, request, response }) => {
+    const url = new URL(request.url);
+    const versionParam = url.searchParams.get("version");
     const prompt = promptResponseFactory.build({
       id: params.id,
+      ...(versionParam && { version: parseInt(versionParam, 10) }),
     });
     return response(200).json(prompt);
   }),

@@ -124,7 +124,7 @@ export const syncCommand = async (): Promise<void> => {
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await promptsApiService.get(name);
+          const prompt = await promptsApiService.get(name, { version: versionSpec });
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)

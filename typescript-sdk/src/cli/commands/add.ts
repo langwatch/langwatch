@@ -98,7 +98,7 @@ export const addCommand = async (
 
     try {
       // Fetch the prompt from the API
-      const prompt = await promptsApiService.get(name);
+      const prompt = await promptsApiService.get(name, { version });
 
       if (!prompt) {
         spinner.fail();
