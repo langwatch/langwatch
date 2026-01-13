@@ -162,24 +162,27 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 }),
               );
             } else if (result.error === "run_error") {
+              const runPath = result.scenarioRunId
+                ? buildRoutePath("simulations_run", {
+                    project: project.slug,
+                    scenarioSetId: setId,
+                    batchRunId,
+                    scenarioRunId: result.scenarioRunId,
+                  })
+                : null;
               toaster.create({
                 title: "Scenario run failed",
                 description:
                   "The scenario run encountered an error. Check the run details for more information.",
                 type: "error",
                 meta: { closable: true },
+                action: runPath
+                  ? {
+                      label: "View Details",
+                      onClick: () => void router.push(runPath),
+                    }
+                  : undefined,
               });
-              // Still redirect to show the error details
-              if (result.scenarioRunId) {
-                void router.push(
-                  buildRoutePath("simulations_run", {
-                    project: project.slug,
-                    scenarioSetId: setId,
-                    batchRunId,
-                    scenarioRunId: result.scenarioRunId,
-                  }),
-                );
-              }
             } else {
               toaster.create({
                 title: "Run timed out",

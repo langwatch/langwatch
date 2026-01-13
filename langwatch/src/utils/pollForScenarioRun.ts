@@ -22,7 +22,8 @@ export type PollResult =
   | { success: false; error: "timeout" | "run_error"; scenarioRunId?: string };
 
 /**
- * Polls for a scenario run to appear after execution starts.
+ * Polls for a scenario run to complete after execution starts.
+ * Waits for terminal state (SUCCESS, ERROR, FAILED) before returning.
  * Returns success with scenarioRunId, or error with reason.
  */
 export async function pollForScenarioRun(
@@ -35,7 +36,7 @@ export async function pollForScenarioRun(
 
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
         const run = runs[0];
-        // Check if run has errored
+        // Check for terminal states
         if (run.status === "ERROR" || run.status === "FAILED") {
           return {
             success: false,
@@ -43,8 +44,10 @@ export async function pollForScenarioRun(
             scenarioRunId: run.scenarioRunId,
           };
         }
-        // Run found and not errored
-        return { success: true, scenarioRunId: run.scenarioRunId };
+        if (run.status === "SUCCESS") {
+          return { success: true, scenarioRunId: run.scenarioRunId };
+        }
+        // Still IN_PROGRESS or PENDING - keep polling
       }
     } catch (error) {
       console.error("Failed to fetch batch run data:", error);
