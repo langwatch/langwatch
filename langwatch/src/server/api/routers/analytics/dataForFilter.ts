@@ -1,8 +1,7 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import { esClient, TRACE_INDEX } from "../../../elasticsearch";
+import { FilterService } from "../../../filters/filter.service";
 import { availableFilters } from "../../../filters/registry";
 import { filterFieldsEnum } from "../../../filters/types";
 import { checkProjectPermission } from "../../rbac";
@@ -19,7 +18,7 @@ export const dataForFilter = protectedProcedure
     }),
   )
   .use(checkProjectPermission("analytics:view"))
-  .query(async ({ input }) => {
+  .query(async ({ input, ctx }) => {
     const { field, key, subkey } = input;
 
     if (availableFilters[field].requiresKey && !key) {
@@ -45,23 +44,17 @@ export const dataForFilter = protectedProcedure
       },
     });
 
-    const client = await esClient({ projectId: input.projectId });
-    const response = await client.search({
-      index: TRACE_INDEX.for(input.startDate),
-      body: {
-        size: 0,
-        query: pivotIndexConditions,
-        aggs: availableFilters[field].listMatch.aggregation(
-          input.query,
-          key,
-          subkey,
-        ) as Record<string, AggregationsAggregationContainer>,
-      },
+    const filterService = FilterService.create(ctx.prisma);
+    const results = await filterService.getFilterOptions({
+      projectId: input.projectId,
+      field,
+      query: input.query,
+      key,
+      subkey,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      pivotIndexConditions,
     });
-
-    const results = availableFilters[field].listMatch.extract(
-      (response.aggregations ?? {}) as any,
-    );
 
     return { options: results };
   });
