@@ -3,13 +3,16 @@ import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
 import { SimulationRunnerService } from "~/server/scenarios/simulation-runner.service";
 import { projectSchema } from "./schemas";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("SimulationRunnerRouter");
 
 /**
  * Target for scenario simulation.
- * Extensible: add new types as needed (llm, http, workflow, etc.)
+ * Extensible: add new types as needed (llm, workflow, etc.)
  */
 export const simulationTargetSchema = z.object({
-  type: z.enum(["prompt"]),
+  type: z.enum(["prompt", "http"]),
   referenceId: z.string(),
 });
 
@@ -32,6 +35,16 @@ export const simulationRunnerRouter = createTRPCRouter({
     .input(runScenarioSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
+      logger.debug(
+        {
+          projectId: input.projectId,
+          scenarioId: input.scenarioId,
+          targetType: input.target.type,
+          targetReferenceId: input.target.referenceId,
+        },
+        "scenarios.run mutation called",
+      );
+
       const setId = "local-scenarios";
 
       const runnerService = SimulationRunnerService.create(ctx.prisma);

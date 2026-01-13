@@ -16,6 +16,7 @@ import { api } from "../../utils/api";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { QuickTestBar } from "./QuickTestBar";
+import type { TargetType } from "./TargetTypeSelector";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
 export type ScenarioFormDrawerProps = {
@@ -35,7 +36,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const params = useDrawerParams();
   const utils = api.useContext();
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
-  const [selectedPromptId, setSelectedPromptId] = useState<string[]>([]);
+  const [targetType, setTargetType] = useState<TargetType>("prompt");
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const runMutation = api.scenarios.run.useMutation();
   const scenarioId = params.scenarioId;
   const isOpen = props.open !== false && props.open !== undefined;
@@ -97,11 +99,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const handleSaveAndRun = useCallback(async () => {
     const form = formRef.current;
     if (!form || !project?.id) return;
-    const promptId = selectedPromptId[0];
-    if (!promptId) {
+    if (!selectedTargetId) {
       toaster.create({
-        title: "Select a prompt",
-        description: "Please select a prompt to run the scenario against.",
+        title: targetType === "prompt" ? "Select a prompt" : "Select an HTTP agent",
+        description: `Please select a ${targetType === "prompt" ? "prompt" : "HTTP agent"} to run the scenario against.`,
         type: "warning",
         meta: { closable: true },
       });
@@ -113,11 +114,11 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       const { setId } = await runMutation.mutateAsync({
         projectId: project.id,
         scenarioId: savedScenario.id,
-        target: { type: "prompt", referenceId: promptId },
+        target: { type: targetType, referenceId: selectedTargetId },
       });
       void router.push(`/${project.slug}/simulations/${setId}`);
     })();
-  }, [handleSave, project, selectedPromptId, runMutation, router]);
+  }, [handleSave, project, selectedTargetId, targetType, runMutation, router]);
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formRef.current;
     if (!form) return;
@@ -174,8 +175,13 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         {/* Bottom Bar */}
         <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
           <QuickTestBar
-            selectedPromptId={selectedPromptId}
-            onPromptChange={setSelectedPromptId}
+            targetType={targetType}
+            onTargetTypeChange={(type) => {
+              setTargetType(type);
+              setSelectedTargetId(null);
+            }}
+            selectedTargetId={selectedTargetId}
+            onTargetIdChange={setSelectedTargetId}
           />
           <HStack gap={2}>
             <Button
