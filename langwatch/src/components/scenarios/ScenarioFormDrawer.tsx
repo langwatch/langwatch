@@ -41,6 +41,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -144,28 +145,52 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           });
 
           // Poll for the run to appear, then redirect to the specific run
-          const scenarioRunId = await pollForScenarioRun(
-            utils.scenarios.getBatchRunData.fetch,
-            { projectId: project.id, scenarioSetId: setId, batchRunId },
-          );
-
-          if (scenarioRunId) {
-            void router.push(
-              buildRoutePath("simulations_run", {
-                project: project.slug,
-                scenarioSetId: setId,
-                batchRunId,
-                scenarioRunId,
-              }),
+          setIsPolling(true);
+          try {
+            const result = await pollForScenarioRun(
+              utils.scenarios.getBatchRunData.fetch,
+              { projectId: project.id, scenarioSetId: setId, batchRunId },
             );
-          } else {
-            toaster.create({
-              title: "Run timed out",
-              description:
-                "The scenario run took too long to start. Please try again.",
-              type: "error",
-              meta: { closable: true },
-            });
+
+            if (result.success) {
+              void router.push(
+                buildRoutePath("simulations_run", {
+                  project: project.slug,
+                  scenarioSetId: setId,
+                  batchRunId,
+                  scenarioRunId: result.scenarioRunId,
+                }),
+              );
+            } else if (result.error === "run_error") {
+              toaster.create({
+                title: "Scenario run failed",
+                description:
+                  "The scenario run encountered an error. Check the run details for more information.",
+                type: "error",
+                meta: { closable: true },
+              });
+              // Still redirect to show the error details
+              if (result.scenarioRunId) {
+                void router.push(
+                  buildRoutePath("simulations_run", {
+                    project: project.slug,
+                    scenarioSetId: setId,
+                    batchRunId,
+                    scenarioRunId: result.scenarioRunId,
+                  }),
+                );
+              }
+            } else {
+              toaster.create({
+                title: "Run timed out",
+                description:
+                  "The scenario run took too long to start. Please try again.",
+                type: "error",
+                meta: { closable: true },
+              });
+            }
+          } finally {
+            setIsPolling(false);
           }
         })();
       } catch (error) {
@@ -200,7 +225,8 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const isSubmitting =
     createMutation.isPending ||
     updateMutation.isPending ||
-    runMutation.isPending;
+    runMutation.isPending ||
+    isPolling;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
     () => scenario ?? undefined,
     [scenario],
