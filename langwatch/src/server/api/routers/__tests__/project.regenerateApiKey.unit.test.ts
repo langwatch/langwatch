@@ -29,6 +29,11 @@ vi.mock("../../rbac", () => ({
   },
 }));
 
+// Mock the audit log to avoid database writes
+vi.mock("../../../auditLog", () => ({
+  auditLog: vi.fn(() => Promise.resolve()),
+}));
+
 describe("project.regenerateApiKey mutation logic", () => {
   let mockPrisma: {
     project: {
