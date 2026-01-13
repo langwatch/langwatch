@@ -10,6 +10,7 @@ import type {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { generateClickHouseFilterConditions } from "~/server/filters/clickhouse-registry";
 import type { Evaluation, Span, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
 import {
@@ -441,6 +442,19 @@ export class ClickHouseTraceService {
             this.logger.debug("No scrollId provided in request");
           }
 
+          // Generate filter conditions from input.filters
+          const { conditions: filterConditions, hasUnsupportedFilters } =
+            generateClickHouseFilterConditions(input.filters ?? {});
+
+          // If there are unsupported filters, fall back to Elasticsearch
+          if (hasUnsupportedFilters) {
+            this.logger.debug(
+              { projectId: input.projectId },
+              "Filters contain unsupported fields for ClickHouse, falling back to Elasticsearch"
+            );
+            return null;
+          }
+
           // Build the query with keyset pagination
           const { traces, totalHits, lastTrace } =
             await this.fetchTracesWithPagination(
@@ -451,6 +465,7 @@ export class ClickHouseTraceService {
               protections,
               input.startDate,
               input.endDate,
+              filterConditions
             );
 
           // Generate new scrollId from last trace
@@ -971,6 +986,7 @@ export class ClickHouseTraceService {
     protections: Protections,
     startDate?: number,
     endDate?: number,
+    filterConditions?: string[]
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -995,6 +1011,11 @@ export class ClickHouseTraceService {
           conditions.push(
             "ts.CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
           );
+        }
+
+        // User-specified filter conditions
+        if (filterConditions && filterConditions.length > 0) {
+          conditions.push(...filterConditions);
         }
 
         // Keyset pagination condition
