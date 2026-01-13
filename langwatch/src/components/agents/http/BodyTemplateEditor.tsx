@@ -16,10 +16,6 @@ export type BodyTemplateEditorProps = {
   disabled?: boolean;
 };
 
-/**
- * JSON body template editor with mustache-style variable interpolation.
- * Variables: {{threadId}}, {{messages}}
- */
 export function BodyTemplateEditor({
   value,
   onChange,

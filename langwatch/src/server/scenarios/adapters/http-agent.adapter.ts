@@ -228,13 +228,13 @@ export class HttpAgentAdapter extends AgentAdapter {
       input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
     );
 
-    const lastMessage = input.messages[input.messages.length - 1];
-    if (lastMessage) {
+    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
+    if (lastUserMessage) {
       body = body.replace(
         /\{\{\s*input\s*\}\}/g,
-        typeof lastMessage.content === "string"
-          ? lastMessage.content
-          : JSON.stringify(lastMessage.content),
+        typeof lastUserMessage.content === "string"
+          ? lastUserMessage.content
+          : JSON.stringify(lastUserMessage.content),
       );
     }
 

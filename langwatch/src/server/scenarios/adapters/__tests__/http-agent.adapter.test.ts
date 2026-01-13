@@ -220,7 +220,7 @@ describe("HttpAgentAdapter", () => {
       expect(body.thread).toBe("my-thread-123");
     });
 
-    it("replaces {{input}} with last message content", async () => {
+    it("replaces {{input}} with last user message content", async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -239,13 +239,116 @@ describe("HttpAgentAdapter", () => {
         createAgentInput([
           { role: "user", content: "First message" },
           { role: "assistant", content: "Response" },
-          { role: "user", content: "Last message here" },
+          { role: "user", content: "Last user message" },
         ]),
       );
 
       const callArgs = mockFetch.mock.calls[0];
       const body = JSON.parse(callArgs?.[1]?.body as string);
-      expect(body.input).toBe("Last message here");
+      expect(body.input).toBe("Last user message");
+    });
+
+    it("extracts last user message even when assistant message comes after", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      const agent = createHttpAgent({
+        bodyTemplate: '{"input": "{{input}}"}',
+      });
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+
+      await adapter.call(
+        createAgentInput([
+          { role: "user", content: "User question" },
+          { role: "assistant", content: "This is the last message but not user" },
+        ]),
+      );
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      expect(body.input).toBe("User question");
+    });
+
+    it("leaves {{input}} unreplaced when messages array is empty", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      const agent = createHttpAgent({
+        bodyTemplate: '{"input": "{{input}}"}',
+      });
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+
+      await adapter.call(createAgentInput([]));
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs?.[1]?.body as string;
+      expect(body).toBe('{"input": "{{input}}"}');
+    });
+
+    it("leaves {{input}} unreplaced when no user messages exist", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      const agent = createHttpAgent({
+        bodyTemplate: '{"input": "{{input}}"}',
+      });
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+
+      await adapter.call(
+        createAgentInput([
+          { role: "assistant", content: "Only assistant messages" },
+          { role: "system", content: "System message" },
+        ]),
+      );
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs?.[1]?.body as string;
+      expect(body).toBe('{"input": "{{input}}"}');
+    });
+
+    it("stringifies non-string content for {{input}}", async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      const agent = createHttpAgent({
+        bodyTemplate: '{"input": {{input}}}',
+      });
+      const repository = createMockAgentRepository(agent);
+      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+
+      const structuredContent = [{ type: "text", text: "Hello world" }];
+      await adapter.call(
+        createAgentInput([
+          { role: "user", content: structuredContent as unknown as string },
+        ]),
+      );
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      expect(body.input).toEqual(structuredContent);
     });
 
     it("uses default body when template is undefined", async () => {
