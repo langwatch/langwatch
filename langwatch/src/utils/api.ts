@@ -15,10 +15,11 @@ import { createTRPCNext } from "@trpc/next";
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 import superjson from "superjson";
 
+import { sseLink } from "./sseLink";
 import type { AppRouter } from "~/server/api/root";
 
 const getBaseUrl = () => {
-  if (typeof window !== "undefined") return ""; // browser should use relative url
+  if (typeof window !== "undefined") return window.location.origin; // browser should use origin for full URLs
   if (process.env.BASE_HOST) return `https://${process.env.BASE_HOST}`; // SSR should use base host
   return `http://localhost:${process.env.PORT ?? 5560}`; // dev SSR should use localhost
 };
@@ -48,20 +49,32 @@ export const api = createTRPCNext<AppRouter>({
             process.env.NODE_ENV === "development" ||
             (opts.direction === "down" && opts.result instanceof Error),
         }),
+        // Split subscriptions to SSE link, everything else to HTTP
         splitLink({
           condition(op) {
-            // check for context property `skipBatch`
-            return op.context.skipBatch === true;
+            return op.type === 'subscription';
           },
-          // when condition is true, use normal request
-          true: httpLink({
-            url: `${getBaseUrl()}/api/trpc`,
+          true: sseLink({
+            url: getBaseUrl(),
+            transformPath: (path) => `/api/sse/${path}`,
+            maxReconnectAttempts: 5,
+            reconnectDelay: 1000,
           }),
-          // when condition is false, use batching
-          false: httpBatchLink({
-            url: `${getBaseUrl()}/api/trpc`,
-            // Split batches if URL would exceed this length to avoid 431 errors
-            maxURLLength: 4000,
+          false: splitLink({
+            condition(op) {
+              // check for context property `skipBatch`
+              return op.context.skipBatch === true;
+            },
+            // when condition is true, use normal request
+            true: httpLink({
+              url: `${getBaseUrl()}/api/trpc`,
+            }),
+            // when condition is false, use batching
+            false: httpBatchLink({
+              url: `${getBaseUrl()}/api/trpc`,
+              // Split batches if URL would exceed this length to avoid 431 errors
+              maxURLLength: 4000,
+            }),
           }),
         }),
       ],

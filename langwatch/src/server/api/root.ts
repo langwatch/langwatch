@@ -5,6 +5,7 @@ import { dependencies } from "../../injection/dependencies.server";
 import { agentsRouter } from "./routers/agents";
 import { analyticsRouter } from "./routers/analytics";
 import { evaluatorsRouter } from "./routers/evaluators";
+import { httpProxyRouter } from "./routers/httpProxy";
 import { annotationRouter } from "./routers/annotation";
 import { annotationScoreRouter } from "./routers/annotationScore";
 import { batchRecordRouter } from "./routers/batchRecord";
@@ -29,7 +30,7 @@ import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
-import { scenarioRouter } from "./routers/scenario";
+import { scenarioRouter } from "./routers/scenarios";
 import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
@@ -47,6 +48,7 @@ import { workflowRouter } from "./routers/workflows";
 export const appRouter = createTRPCRouter({
   agents: agentsRouter,
   evaluators: evaluatorsRouter,
+  httpProxy: httpProxyRouter,
   organization: organizationRouter,
   project: projectRouter,
   team: teamRouter,

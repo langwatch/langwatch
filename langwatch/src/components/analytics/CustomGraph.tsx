@@ -15,7 +15,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
 import numeral from "numeral";
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import { LuShield } from "react-icons/lu";
 import {
   Area,
@@ -175,7 +175,12 @@ const CustomGraph_ = React.memo(
     const { daysDifference } = usePeriodSelector();
 
     const timeScale = useMemo(() => {
-      const timeScale_ = summaryGraphTypes.includes(input.graphType)
+      // Force "full" only for summary charts to get aggregated data
+      // Pie and donut charts use numeric timeScale with pipeline (same as stacked charts)
+      // When timeScale is a number with groupBy and no pipeline, the backend returns empty buckets
+      // But with a pipeline, numeric timeScale works correctly
+      const shouldUseFull = input.graphType === "summary";
+      const timeScale_ = shouldUseFull
         ? "full"
         : input.timeScale === "full"
         ? input.timeScale
@@ -193,6 +198,42 @@ const CustomGraph_ = React.memo(
       return timeScale_;
     }, [input.graphType, input.timeScale, daysDifference]);
 
+    // For pie and donut charts without a pipeline, add a default pipeline to get grouped data
+    // The backend requires a pipeline to populate grouped buckets
+    const queryInput = useMemo((): CustomGraphInput => {
+      if (
+        (input.graphType === "pie" || input.graphType === "donnut") &&
+        input.groupBy &&
+        !input.series.some((s) => s.pipeline)
+      ) {
+        // Helper to add pipeline while preserving literal types
+        const addPipeline = (series: Series): Series => {
+          // Explicitly construct object to preserve literal types
+          const result = {
+            metric: series.metric,
+            aggregation: series.aggregation,
+            key: series.key,
+            subkey: series.subkey,
+            filters: series.filters,
+            asPercent: series.asPercent,
+            name: series.name,
+            colorSet: series.colorSet,
+            pipeline: {
+              field: "trace_id" as const,
+              aggregation: "sum" as const,
+            },
+          } satisfies Series;
+          return result;
+        };
+
+        return {
+          ...input,
+          series: input.series.map(addPipeline),
+        };
+      }
+      return input;
+    }, [input]);
+
     const timeseries = api.analytics.getTimeseries.useQuery(
       {
         ...filterParams,
@@ -200,14 +241,15 @@ const CustomGraph_ = React.memo(
           ...filterParams.filters,
           ...filters,
         },
-        ...input,
+        ...queryInput,
         timeScale,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       { ...queryOpts, enabled: queryOpts.enabled && load },
     );
 
-    const currentAndPreviousData = shapeDataForGraph(input, timeseries);
+    // Use queryInput for shapeDataForGraph to match the query that was sent
+    const currentAndPreviousData = shapeDataForGraph(queryInput, timeseries);
     const expectedKeys = Array.from(
       new Set(
         currentAndPreviousData?.flatMap((entry) =>
@@ -243,6 +285,7 @@ const CustomGraph_ = React.memo(
         values.reduce((acc, value) => acc + value, 0),
       ]),
     );
+
     const sortedKeys = expectedKeys
       .filter((key) => keysToSum[key]! !== 0)
       .toSorted((a, b) => {
@@ -252,8 +295,11 @@ const CustomGraph_ = React.memo(
         return totalB - totalA;
       });
 
+    // Use queryInput.series for seriesByKey to match the keys generated from the query
+    // This ensures donut charts with added pipeline have matching keys
+    const seriesForKeyMapping = queryInput.series;
     const seriesByKey = Object.fromEntries(
-      input.series.map((series, index) => {
+      seriesForKeyMapping.map((series, index) => {
         const key = [
           index,
           series.metric,
@@ -267,26 +313,45 @@ const CustomGraph_ = React.memo(
 
         return [key, series];
       }),
+    ) as unknown as Record<string, Series>;
+
+    const nameForSeries = useCallback(
+      (aggKey: string) => {
+        const { series, groupKey } = getSeries(seriesByKey, aggKey);
+
+        const group =
+          input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
+        const groupName = groupKey
+          ? `${
+              hideGroupLabel ? "" : group?.label.toLowerCase() + " "
+            }${groupKey}`
+          : "";
+        return input.series.length > 1
+          ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
+          : groupName
+          ? uppercaseFirstLetter(groupName)
+              .replace("Evaluation passed passed", "Evaluation Passed")
+              .replace("Evaluation passed failed", "Evaluation Failed")
+              .replace("Contains error", "Traces")
+              .replace(/^Evaluation label /i, "")
+          : series?.name ?? aggKey;
+      },
+      [seriesByKey, input.groupBy, input.series.length, hideGroupLabel],
     );
 
-    const nameForSeries = (aggKey: string) => {
-      const { series, groupKey } = getSeries(seriesByKey, aggKey);
-
-      const group =
-        input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-      const groupName = groupKey
-        ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "}${groupKey}`
-        : "";
-      return input.series.length > 1
-        ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
-        : groupName
-        ? uppercaseFirstLetter(groupName)
-            .replace("Evaluation passed passed", "Evaluation Passed")
-            .replace("Evaluation passed failed", "Evaluation Failed")
-            .replace("Contains error", "Traces")
-            .replace(/^Evaluation label /i, "")
-        : series?.name ?? aggKey;
-    };
+    // Calculate pie/donut data using shapeDataForSummary (same logic as summary charts)
+    const pieData = useMemo(() => {
+      if (input.graphType === "pie" || input.graphType === "donnut") {
+        const summaryData = shapeDataForSummary(
+          input,
+          seriesByKey,
+          timeseries,
+          nameForSeries,
+        );
+        return summaryData.current.filter((item) => item.value > 0);
+      }
+      return [];
+    }, [input, seriesByKey, timeseries, nameForSeries]);
 
     const colorForSeries = (aggKey: string, index: number): string => {
       const { series, groupKey } = getSeries(seriesByKey, aggKey);
@@ -309,7 +374,9 @@ const CustomGraph_ = React.memo(
           "without error": positive,
         };
 
-        const color = getColor(colorSet, colorMap[groupKey] ?? neutral);
+        const colorIndex = colorMap[groupKey] ?? neutral;
+        const color = getColor(colorSet, colorIndex);
+
         return color;
       }
 
@@ -364,6 +431,7 @@ const CustomGraph_ = React.memo(
       if (payload.dataKey === "date") {
         return formatDate(value as string);
       }
+
       const { series } = getSeries(
         seriesByKey,
         payload.payload?.key ?? (payload.dataKey as string),
@@ -475,13 +543,6 @@ const CustomGraph_ = React.memo(
     }
 
     if (input.graphType === "pie" || input.graphType === "donnut") {
-      const summaryData = shapeDataForSummary(
-        input,
-        seriesByKey,
-        timeseries,
-        nameForSeries,
-      );
-
       return container(
         <ResponsiveContainer
           key={currentAndPreviousDataFilled ? input.graphId : "loading"}
@@ -489,14 +550,14 @@ const CustomGraph_ = React.memo(
         >
           <PieChart>
             <Pie
-              data={summaryData.current}
+              data={pieData}
               nameKey="name"
               dataKey="value"
               labelLine={false}
               label={pieChartPercentageLabel as any}
               innerRadius={input.graphType === "donnut" ? "50%" : 0}
             >
-              {summaryData.current.map((entry, index) => (
+              {pieData.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
                   fill={colorForSeries(entry.key, index)}
@@ -680,61 +741,67 @@ const CustomGraph_ = React.memo(
               overflow: "auto",
             }}
           />
-          {(sortedKeys ?? []).map((aggKey, index) => (
-            <React.Fragment key={aggKey}>
-              {/* @ts-ignore */}
-              <GraphElement
-                key={aggKey}
-                type="linear"
-                dataKey={aggKey}
-                stroke={colorForSeries(aggKey, index)}
-                stackId={
-                  ["stacked_bar", "stacked_area"].includes(input.graphType)
-                    ? "same"
-                    : undefined
-                }
-                fill={colorForSeries(aggKey, index)}
-                strokeWidth={2.5}
-                dot={false}
-                activeDot={input.graphType !== "scatter" ? { r: 8 } : undefined}
-                name={nameForSeries(aggKey)}
-                line={
-                  input.graphType === "scatter" && input.connected
-                    ? true
-                    : undefined
-                }
-              />
-              {input.includePrevious && (
-                // @ts-ignore
+          {(sortedKeys ?? []).map((aggKey, index) => {
+            const strokeColor = colorForSeries(aggKey, index);
+            const fillColor = colorForSeries(aggKey, index);
+            return (
+              <React.Fragment key={aggKey}>
+                {/* @ts-ignore */}
                 <GraphElement
-                  key={"previous>" + aggKey}
+                  key={aggKey}
                   type="linear"
-                  dataKey={"previous>" + aggKey}
+                  dataKey={aggKey}
+                  stroke={strokeColor}
                   stackId={
                     ["stacked_bar", "stacked_area"].includes(input.graphType)
                       ? "same"
                       : undefined
                   }
-                  stroke={colorForSeries(aggKey, index) + "99"}
-                  fill={colorForSeries(aggKey, index) + "99"}
+                  fill={fillColor}
                   strokeWidth={2.5}
-                  strokeDasharray={
-                    input.graphType !== "scatter" ? "5 5" : undefined
-                  }
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
                   }
-                  name={"Previous " + nameForSeries(aggKey)}
+                  name={nameForSeries(aggKey)}
                   line={
                     input.graphType === "scatter" && input.connected
                       ? true
                       : undefined
                   }
                 />
-              )}
-            </React.Fragment>
-          ))}
+                {input.includePrevious && (
+                  // @ts-ignore
+                  <GraphElement
+                    key={"previous>" + aggKey}
+                    type="linear"
+                    dataKey={"previous>" + aggKey}
+                    stackId={
+                      ["stacked_bar", "stacked_area"].includes(input.graphType)
+                        ? "same"
+                        : undefined
+                    }
+                    stroke={colorForSeries(aggKey, index) + "99"}
+                    fill={colorForSeries(aggKey, index) + "99"}
+                    strokeWidth={2.5}
+                    strokeDasharray={
+                      input.graphType !== "scatter" ? "5 5" : undefined
+                    }
+                    dot={false}
+                    activeDot={
+                      input.graphType !== "scatter" ? { r: 8 } : undefined
+                    }
+                    name={"Previous " + nameForSeries(aggKey)}
+                    line={
+                      input.graphType === "scatter" && input.connected
+                        ? true
+                        : undefined
+                    }
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
         </GraphComponent>
       </ResponsiveContainer>,
     );
@@ -790,7 +857,20 @@ const getSeries = (seriesByKey: Record<string, Series>, aggKey: string) => {
     groupKey = parts[0];
     seriesKey = parts[1]!;
   }
-  const series = seriesByKey[seriesKey];
+
+  // Try exact match first
+  let series = seriesByKey[seriesKey];
+
+  // If no exact match, try to find a series that starts with the seriesKey
+  // This handles cases where the aggKey doesn't include the series.key suffix
+  if (!series) {
+    const matchingKey = Object.keys(seriesByKey).find(
+      (key) => key.startsWith(seriesKey + "/") || key === seriesKey,
+    );
+    if (matchingKey) {
+      series = seriesByKey[matchingKey];
+    }
+  }
 
   return { series, groupKey };
 };
@@ -847,11 +927,14 @@ const shapeDataForSummary = (
       const { series } = getSeries(seriesByKey, aggKey);
       const metric = series?.metric && getMetric(series.metric);
 
+      // Sum all values across all time periods for summary charts
+      const totalValue = values.reduce((sum, value) => sum + (value ?? 0), 0);
+
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
         metric,
-        value: values[0] ?? 0,
+        value: totalValue,
       };
     });
   };
@@ -892,12 +975,21 @@ const flattenGroupData = (
   date: string;
 } & Record<string, number>)[] => {
   const groupBy = input.groupBy;
+
   if (groupBy) {
     return data.map((entry) => {
       const buckets = entry[groupBy] as unknown as Record<
         string,
         Record<string, number>
       >;
+
+      // Handle case where buckets might be empty or undefined
+      if (!buckets || Object.keys(buckets).length === 0) {
+        return {
+          date: entry.date,
+        };
+      }
+
       const aggregations = Object.fromEntries(
         Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
           return Object.entries(bucket).map(([metricKey, metricValue]) => {

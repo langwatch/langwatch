@@ -37,6 +37,7 @@ dependencies = [
 dev = [
     "pytest >= 8.3.3, < 8.4",
     "pandas >= 2.2.3, < 2.3",
+    "pip-licenses>=5.5.0",
     "pytest-httpx >= 0.30.0",
     "pytest-asyncio >= 0.23.8, < 0.24",
     "ipykernel >= 6.29.5, < 7",

@@ -5,6 +5,7 @@ import time
 import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
+from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import truncate_object_recursively
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
@@ -193,7 +194,7 @@ class LangWatchDSPy:
             raise ValueError(
                 "API key is not valid, please try to login again with langwatch.login()"
             )
-        response.raise_for_status()
+        better_raise_for_status(response)
 
         if optimizer and evaluator:
             raise ValueError("You can only provide an optimizer or an evaluator, not both.")
@@ -386,7 +387,7 @@ class LangWatchDSPy:
             data=json.dumps(data),  # type: ignore
             timeout=60,
         )
-        response.raise_for_status()
+        better_raise_for_status(response)
         self.steps_buffer = []
 
     def tracer(self, trace: LangWatchTrace):

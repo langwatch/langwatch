@@ -13,6 +13,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
+import { titleCase } from "../utils/stringCasing";
 import { InputGroup } from "./ui/input-group";
 import { Select } from "./ui/select";
 
@@ -40,6 +41,12 @@ export const allModelOptions = modelSelectorOptions.map(
   (option) => option.value,
 );
 
+export type GroupedModelOptions = {
+  provider: string;
+  icon: React.ReactNode;
+  models: ModelOption[];
+}[];
+
 export const useModelSelectionOptions = (
   options: string[],
   model: string,
@@ -57,27 +64,47 @@ export const useModelSelectionOptions = (
     mode,
   );
 
-  const selectOptions: Record<string, ModelOption> = Object.fromEntries(
-    customModels.map((model): [string, ModelOption] => {
-      const provider = model.split("/")[0]!;
-      const modelName = model.split("/").slice(1).join("/");
+  // Filter to only include models from enabled providers
+  const enabledModels = customModels.filter((modelValue) => {
+    const provider = modelValue.split("/")[0]!;
+    return modelProviders.data?.[provider]?.enabled;
+  });
 
-      return [
-        model,
-        {
-          label: modelName,
-          value: model,
-          icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
-          isDisabled: !modelProviders.data?.[provider]?.enabled,
-          mode: mode,
-        },
-      ];
-    }),
-  );
+  const selectOptions: ModelOption[] = enabledModels.map((modelValue) => {
+    const provider = modelValue.split("/")[0]!;
+    const modelName = modelValue.split("/").slice(1).join("/");
 
-  const modelOption = selectOptions[model];
+    return {
+      label: modelName,
+      value: modelValue,
+      icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+      isDisabled: false,
+      mode: mode,
+    };
+  });
 
-  return { modelOption, selectOptions: Object.values(selectOptions) };
+  // Group models by provider
+  const groupedByProvider: GroupedModelOptions = Object.entries(
+    selectOptions.reduce(
+      (acc, option) => {
+        const provider = option.value.split("/")[0]!;
+        if (!acc[provider]) {
+          acc[provider] = [];
+        }
+        acc[provider].push(option);
+        return acc;
+      },
+      {} as Record<string, ModelOption[]>,
+    ),
+  ).map(([provider, models]) => ({
+    provider,
+    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+    models,
+  }));
+
+  const modelOption = selectOptions.find((opt) => opt.value === model);
+
+  return { modelOption, selectOptions, groupedByProvider };
 };
 
 export const ModelSelector = React.memo(function ModelSelector({
@@ -93,41 +120,39 @@ export const ModelSelector = React.memo(function ModelSelector({
   size?: "sm" | "md" | "full";
   mode?: "chat" | "embedding";
 }) {
-  const { selectOptions } = useModelSelectionOptions(options, model, mode);
+  const { selectOptions, groupedByProvider } = useModelSelectionOptions(
+    options,
+    model,
+    mode,
+  );
 
   const [modelSearch, setModelSearch] = useState("");
 
-  const options_ = selectOptions.map((option) => ({
-    label: option.label,
-    value: option.value,
-    icon: option.icon,
-    isDisabled: option.isDisabled,
-    mode: option.mode,
-  }));
+  // Filter models by search and group by provider
+  const filteredGroups = groupedByProvider
+    .map((group) => ({
+      ...group,
+      models: group.models.filter(
+        (item) =>
+          item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
+          item.value.toLowerCase().includes(modelSearch.toLowerCase()),
+      ),
+    }))
+    .filter((group) => group.models.length > 0);
+
+  // Flatten for collection (needed by Chakra Select)
+  const allFilteredModels = filteredGroups.flatMap((group) => group.models);
 
   const modelCollection = createListCollection({
-    items: options_.filter(
-      (item) =>
-        item.label.toLowerCase().includes(modelSearch.toLowerCase()) ||
-        item.value.toLowerCase().includes(modelSearch.toLowerCase()),
-    ),
+    items: allFilteredModels,
   });
 
-  const selectedItem = options_.find((option) => option.value === model);
-
-  const isDisabled = selectOptions.find(
-    (option) => option.value === selectedItem?.value,
-  )?.isDisabled;
+  const selectedItem = selectOptions.find((option) => option.value === model);
 
   const isDeprecated = !selectedItem;
 
   const selectValueText = (
-    <HStack
-      overflow="hidden"
-      gap={2}
-      align="center"
-      opacity={isDisabled ? 0.5 : 1}
-    >
+    <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
         <Box minWidth={size === "sm" ? "14px" : "16px"}>
           {selectedItem.icon}
@@ -141,13 +166,13 @@ export const ModelSelector = React.memo(function ModelSelector({
       >
         {selectedItem?.label ?? model}
       </Box>
-      {(isDisabled ?? isDeprecated) && (
+      {isDeprecated && (
         <Text
           fontSize={size === "sm" ? 12 : 14}
           fontFamily="mono"
           color="gray.400"
         >
-          {isDeprecated ? "(deprecated)" : "(disabled)"}
+          (deprecated)
         </Text>
       )}
     </HStack>
@@ -193,10 +218,7 @@ export const ModelSelector = React.memo(function ModelSelector({
         background="white"
         padding={0}
       >
-        <Select.ValueText
-          // @ts-ignore
-          placeholder={selectValueText}
-        >
+        <Select.ValueText placeholder={selectValueText}>
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
@@ -219,35 +241,37 @@ export const ModelSelector = React.memo(function ModelSelector({
             </InputGroup>
           </Box>
         </Field.Root>
-        {modelCollection.items.map((item) => (
-          <Select.Item key={item.value} item={item}>
-            <HStack
-              gap={3}
-              align="center"
-              paddingY={size === "sm" ? 0 : "2px"}
-              alignItems="start"
-            >
-              <Box width="14px" minWidth="14px" paddingTop="3px">
-                {item.icon}
-              </Box>
-              <Box fontSize={size === "sm" ? 12 : 14} fontFamily="mono">
-                {item.label}
-                {item.isDisabled && (
-                  <>
-                    {" "}
-                    <Text
-                      display="inline-block"
-                      fontSize={size === "sm" ? 12 : 14}
-                      fontFamily="mono"
-                      color="gray.400"
-                    >
-                      (disabled)
-                    </Text>
-                  </>
-                )}
-              </Box>
-            </HStack>
-          </Select.Item>
+        {filteredGroups.map((group) => (
+          <Select.ItemGroup
+            key={group.provider}
+            label={
+              <HStack gap={2}>
+                <Box width="14px" minWidth="14px">
+                  {group.icon}
+                </Box>
+                <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+              </HStack>
+            }
+          >
+            {group.models.map((item) => (
+              <Select.Item key={item.value} item={item}>
+                <HStack gap={2}>
+                  {item.icon && (
+                    <Box width="14px" minWidth="14px">
+                      {item.icon}
+                    </Box>
+                  )}
+                  <Box
+                    fontSize={size === "sm" ? 12 : 14}
+                    fontFamily="mono"
+                    paddingY={size === "sm" ? 0 : "2px"}
+                  >
+                    {item.label}
+                  </Box>
+                </HStack>
+              </Select.Item>
+            ))}
+          </Select.ItemGroup>
         ))}
       </Select.Content>
     </Select.Root>

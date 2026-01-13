@@ -8,9 +8,7 @@ import { EVENT_TYPES } from "../../../domain/eventType";
 import type { Event } from "../../../domain/types";
 import type { EventSourcedQueueProcessor } from "../../../queues";
 import {
-  createMockEventHandler,
   createMockEventHandlerDefinition,
-  createMockEventReactionHandler,
   createMockProjectionDefinition,
   createTestAggregateType,
   createTestEvent,
@@ -63,27 +61,8 @@ describe("QueueProcessorManager", () => {
     vi.restoreAllMocks();
   });
 
-  describe("createDefaultJobId", () => {
-    it("creates job ID in correct format", () => {
-      const manager = new QueueProcessorManager({
-        aggregateType,
-      });
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-        EVENT_TYPES[0],
-        TEST_CONSTANTS.BASE_TIMESTAMP,
-      );
-
-      const jobId = manager.createDefaultJobId(event);
-
-      expect(jobId).toBe(
-        `${TEST_CONSTANTS.BASE_TIMESTAMP}:${tenantId}:${TEST_CONSTANTS.AGGREGATE_ID}:${aggregateType}:0`,
-      );
-    });
-  });
+  // Note: createDefaultDeduplicationId is now a private method.
+  // The deduplication ID format is tested through the queue initialization tests.
 
   describe("initializeHandlerQueues", () => {
     it("does nothing when queue factory is not provided", () => {
@@ -134,8 +113,8 @@ describe("QueueProcessorManager", () => {
       );
     });
 
-    it("uses handler's makeJobId when provided", () => {
-      const customJobId = vi.fn().mockReturnValue("custom-job-id");
+    it("uses handler's deduplication config when provided", () => {
+      const customDeduplicationId = vi.fn().mockReturnValue("custom-dedup-id");
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -152,7 +131,7 @@ describe("QueueProcessorManager", () => {
 
       const handlers = {
         handler1: createMockEventHandlerDefinition("handler1", void 0, {
-          makeJobId: customJobId,
+          deduplication: { makeId: customDeduplicationId },
         }),
       };
       const handleEventCallback = vi.fn();
@@ -161,12 +140,12 @@ describe("QueueProcessorManager", () => {
 
       expect(queueFactory.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          makeJobId: customJobId,
+          deduplication: { makeId: customDeduplicationId },
         }),
       );
     });
 
-    it("uses default job ID when handler's makeJobId not provided", () => {
+    it("uses default deduplication ID when handler's deduplication not provided", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -189,8 +168,8 @@ describe("QueueProcessorManager", () => {
       manager.initializeHandlerQueues(handlers, handleEventCallback);
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
-      expect(createCall?.makeJobId).toBeDefined();
-      expect(typeof createCall?.makeJobId).toBe("function");
+      expect(createCall?.deduplication).toBeDefined();
+      expect(typeof createCall?.deduplication?.makeId).toBe("function");
     });
 
     it("passes handler options (delay, concurrency) to queue factory", () => {
@@ -282,7 +261,7 @@ describe("QueueProcessorManager", () => {
       );
     });
 
-    it("uses event ID as job ID for projections", () => {
+    it("uses default deduplication ID for projections", () => {
       const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
         send: vi.fn().mockResolvedValue(void 0),
         close: vi.fn().mockResolvedValue(void 0),
@@ -308,15 +287,104 @@ describe("QueueProcessorManager", () => {
       );
 
       const createCall = queueFactory.create.mock.calls[0]?.[0];
-      expect(createCall?.makeJobId).toBeDefined();
+      expect(createCall?.deduplication).toBeDefined();
+      expect(typeof createCall?.deduplication?.makeId).toBe("function");
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         aggregateType,
         tenantId,
       );
-      const jobId = createCall?.makeJobId?.(event);
-      expect(jobId).toBe(event.id);
+      const dedupId = createCall?.deduplication?.makeId?.(event);
+      // Default format: ${tenantId}:${aggregateType}:${aggregateId}
+      expect(dedupId).toBe(`${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`);
+    });
+
+    it("uses custom deduplication config when provided", () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const customDeduplicationId = vi.fn(
+        (event: Event) => `custom-${event.aggregateId}`,
+      );
+
+      const projections = {
+        projection1: createMockProjectionDefinition("projection1", void 0, void 0, {
+          deduplication: { makeId: customDeduplicationId },
+        }),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
+      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
+      expect(createCall?.deduplication?.makeId).toBe(customDeduplicationId);
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+      const dedupId = createCall?.deduplication?.makeId?.(event);
+      expect(dedupId).toBe(`custom-${TEST_CONSTANTS.AGGREGATE_ID}`);
+      expect(customDeduplicationId).toHaveBeenCalledWith(event);
+    });
+
+    it("falls back to default deduplication when deduplication is not provided", () => {
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueFactory = {
+        create: vi.fn().mockReturnValue(mockQueueProcessor),
+      };
+
+      const manager = new QueueProcessorManager({
+        aggregateType,
+        queueProcessorFactory: queueFactory as any,
+      });
+
+      const projections = {
+        projection1: createMockProjectionDefinition(
+          "projection1",
+          void 0,
+          void 0,
+          {},
+        ),
+      };
+      const processProjectionEventCallback = vi.fn();
+
+      manager.initializeProjectionQueues(
+        projections,
+        processProjectionEventCallback,
+      );
+
+      const createCall = queueFactory.create.mock.calls[0]?.[0];
+      expect(createCall?.deduplication).toBeDefined();
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+      const dedupId = createCall?.deduplication?.makeId?.(event);
+      // Default format: ${tenantId}:${aggregateType}:${aggregateId}
+      expect(dedupId).toBe(`${tenantId}:${aggregateType}:${TEST_CONSTANTS.AGGREGATE_ID}`);
     });
   });
 

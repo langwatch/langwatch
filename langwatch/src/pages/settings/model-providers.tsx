@@ -1,460 +1,330 @@
 import {
-  Alert,
+  Badge,
   Box,
   Button,
-  Card,
-  Field,
-  Grid,
-  GridItem,
+  EmptyState,
   Heading,
   HStack,
-  Input,
-  Skeleton,
   Spacer,
   Spinner,
+  Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React, { useEffect } from "react";
-import { Eye, EyeOff, Plus, Trash2 } from "react-feather";
-import CreatableSelect from "react-select/creatable";
-import { ProjectSelector } from "../../components/DashboardLayout";
+import { useMemo, useState } from "react";
+import { useEffect } from "react";
+import { Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
   modelSelectorOptions,
 } from "../../components/ModelSelector";
-import { PermissionAlert } from "../../components/PermissionAlert";
 import SettingsLayout from "../../components/SettingsLayout";
-import { SmallLabel } from "../../components/SmallLabel";
-import { Switch } from "../../components/ui/switch";
-import { useDefaultModel } from "../../hooks/useDefaultModel";
+import { ProjectSelector } from "../../components/DashboardLayout";
+import { Dialog } from "../../components/ui/dialog";
+import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { useDrawer } from "~/hooks/useDrawer";
+import { api } from "~/utils/api";
 import { useEmbeddingsModel } from "../../hooks/useEmbeddingsModel";
-import { useModelProviderForm } from "../../hooks/useModelProviderForm";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTopicClusteringModel } from "../../hooks/useTopicClusteringModel";
-import { dependencies } from "../../injection/dependencies.client";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
-import {
-  getProviderModelOptions,
-  type MaybeStoredModelProvider,
-  modelProviders as modelProvidersRegistry,
-} from "../../server/modelProviders/registry";
+import { modelProviders as modelProvidersRegistry } from "../../server/modelProviders/registry";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
-  DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
-  KEY_CHECK,
 } from "../../utils/constants";
-
-// (moved: multi-create logic now lives inside the per-provider hook)
+import { isProviderUsedForDefaultModels, isProviderEffectiveDefault, isProviderDefaultModel } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
-  const { project, organizations, hasPermission } =
+  const { project, organization, organizations, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   const { providers, isLoading, refetch } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
-  return (
-    <SettingsLayout>
-      <VStack gap={4} width="full" align="start">
-        <VStack align="start" gap={1} width="full">
-          <HStack width="full">
-            <Heading>Model Providers</Heading>
+  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+  const isProviderDrawerOpen = isDrawerOpen("editModelProvider");
+  const updateMutation = api.modelProvider.update.useMutation();
+  const [providerToDisable, setProviderToDisable] = useState<{
+    id?: string;
+    provider: string;
+    name: string;
+  } | null>(null);
 
-            <Spacer />
-            {/* aggregate spinner removed; per-row loading shown inline */}
-            {organizations && project && (
-              <ProjectSelector
-                organizations={organizations}
-                project={project}
-              />
-            )}
-          </HStack>
-        </VStack>
+  // Check if provider is used for the Default Model only (badge display)
+  const isDefaultProvider = (providerKey: string) => {
+    return isProviderDefaultModel(providerKey, project);
+  };
 
-        <VStack gap={0} width="full">
-          {isLoading &&
-            Array.from({
-              length: Object.keys(modelProvidersRegistry).length,
-            }).map((_, index) => (
-              <Box
-                key={index}
-                width="full"
-                borderBottomWidth="1px"
-                _last={{ border: "none" }}
-                paddingY={6}
-              >
-                <Skeleton width="full" height="28px" />
-              </Box>
-            ))}
+  // Check if provider is used for any default models (for delete prevention)
+  const isProviderUsedForAnyDefault = (providerKey: string) => {
+    return isProviderEffectiveDefault(providerKey, project);
+  };
 
-          {providers &&
-            hasModelProvidersManagePermission &&
-            Object.values(providers).map((provider, index) => (
-              <ModelProviderRow
-                key={index}
-                provider={provider}
-                refetch={refetch}
-              />
-            ))}
-          {!hasModelProvidersManagePermission && (
-            <PermissionAlert permission="project:manage" />
-          )}
-        </VStack>
-
-        <VStack width="full" align="start" gap={6} paddingTop={2}>
-          <VStack gap={2} marginTop={2} align="start" width="full">
-            <Heading size="md" as="h2">
-              Default Models
-            </Heading>
-            <Text fontSize="sm" color="gray.500">
-              Configure the default models used on workflows, evaluations and
-              other LangWatch features.
-            </Text>
-          </VStack>
-          <VStack gap={0} width="full" align="stretch">
-            {!hasModelProvidersManagePermission ? (
-              <PermissionAlert permission="project:manage" />
-            ) : (
-              <>
-                <DefaultModel />
-                <TopicClusteringModel />
-                <EmbeddingsModel />
-              </>
-            )}
-          </VStack>
-        </VStack>
-      </VStack>
-    </SettingsLayout>
-  );
-}
-
-function ModelProviderRow({
-  provider,
-  refetch,
-}: {
-  provider: MaybeStoredModelProvider;
-  refetch: () => Promise<any>;
-}) {
-  const { project, organization } = useOrganizationTeamProject();
-  const [state, actions] = useModelProviderForm({
-    provider,
-    projectId: project?.id,
-    onSuccess: () => {
-      void refetch();
-    },
-  });
-
-  const providerDefinition =
-    modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
-    ];
-
-  const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: project?.id ?? "",
-    organizationId: organization?.id ?? "",
-    provider,
-  });
-  const ManagedModelProviderAny = ManagedModelProvider as any;
+  const utils = api.useContext();
 
   useEffect(() => {
-    if (ManagedModelProviderAny) {
-      actions.setManaged(true);
+    if (!isProviderDrawerOpen) {
+      // Refetch both providers and organization data when drawer closes
+      void refetch();
+      void utils.organization.getAll.invalidate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(state.customKeys)]);
+  }, [isProviderDrawerOpen]);
+
+  const notEnabledProviders = useMemo(() => {
+    return Object.keys(modelProvidersRegistry)
+      .filter((providerKey) => {
+        const providerData = providers?.[providerKey as keyof typeof providers];
+        return !providerData?.enabled;
+      })
+      .map((providerKey) => ({
+        provider: providerKey as keyof typeof modelProvidersRegistry,
+        name: modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry]?.name ?? providerKey,
+        icon: modelProviderIcons[providerKey as keyof typeof modelProviderIcons],
+      }));
+  }, [providers]);
+
+  const enabledProviders = useMemo(() => {
+    if (!providers) return [];
+    return Object.values(providers).filter((provider) => provider.enabled);
+  }, [providers]);
 
   return (
-    <Box
-      width="full"
-      borderBottomWidth="1px"
-      _last={{ border: "none" }}
-      paddingY={2}
-    >
-      <HorizontalFormControl
-        label={
-          <HStack paddingLeft={0} marginBottom={2}>
-            <Box
-              width="24px"
-              height="24px"
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-            >
-              {
-                modelProviderIcons[
-                  provider.provider as keyof typeof modelProviderIcons
-                ]
-              }
-            </Box>
-            <Text>{providerDefinition?.name || provider.provider}</Text>
-          </HStack>
-        }
-        helper={(providerDefinition as any)?.blurb ?? ""}
-      >
-        <VStack align="start" width="full" gap={4} paddingRight={4}>
-          <HStack align="start" width="full" gap={4}>
-            <HStack gap={6}>
-              <Field.Root>
-                <Switch
-                  onCheckedChange={(details) => {
-                    void actions.setEnabled(details.checked);
-                  }}
-                  checked={state.enabled}
-                >
-                  Enabled
-                </Switch>
-              </Field.Root>
-              {state.isToggling && <Spinner size="sm" />}
-            </HStack>
-            {provider.provider === "azure" && state.enabled && (
-              <Field.Root>
-                <Switch
-                  onCheckedChange={(details) => {
-                    actions.setUseApiGateway(details.checked);
-                  }}
-                  checked={state.useApiGateway}
-                >
-                  Use API Gateway
-                </Switch>
-              </Field.Root>
-            )}
-          </HStack>
-
-          {state.enabled && (
-            <>
-              {ManagedModelProviderAny ? (
-                React.createElement(ManagedModelProviderAny, { provider })
-              ) : (
-                <Field.Root invalid={!!state.errors.customKeysRoot}>
-                  <Grid
-                    templateColumns="auto auto"
-                    gap={4}
-                    rowGap={2}
-                    paddingTop={4}
-                    width="full"
-                  >
-                    <GridItem color="gray.500">
-                      <SmallLabel>Key</SmallLabel>
-                    </GridItem>
-                    <GridItem color="gray.500">
-                      <SmallLabel>Value</SmallLabel>
-                    </GridItem>
-                    {Object.keys(state.displayKeys).map((key) => (
-                      <React.Fragment key={key}>
-                        <GridItem alignContent="center" fontFamily="monospace">
-                          {key}
-                        </GridItem>
-                        <GridItem>
-                          <Input
-                            value={state.customKeys[key] ?? ""}
-                            onChange={(e) =>
-                              actions.setCustomKey(key, e.target.value)
-                            }
-                            type={
-                              KEY_CHECK.some((k) => key.includes(k))
-                                ? "password"
-                                : "text"
-                            }
-                            autoComplete="off"
-                            placeholder={
-                              (state.displayKeys as any)[key]?._def
-                                ?.typeName === "ZodOptional"
-                                ? "optional"
-                                : undefined
-                            }
-                          />
-                        </GridItem>
-                      </React.Fragment>
-                    ))}
-                  </Grid>
-                  <Field.ErrorText>
-                    {state.errors.customKeysRoot}
-                  </Field.ErrorText>
-                </Field.Root>
-              )}
-
-              {(provider.provider === "azure" ||
-                provider.provider === "custom") &&
-                state.enabled && (
-                  <VStack width="full" align="start" paddingTop={4}>
-                    {state.extraHeaders.length > 0 && (
-                      <Grid
-                        templateColumns="auto auto auto auto"
-                        gap={4}
-                        rowGap={2}
-                        width="full"
-                      >
-                        <GridItem color="gray.500" colSpan={4}>
-                          <SmallLabel>Extra Headers</SmallLabel>
-                        </GridItem>
-                        {state.extraHeaders.map((h, index) => (
-                          <React.Fragment key={index}>
-                            <GridItem>
-                              <Input
-                                value={h.key}
-                                onChange={(e) =>
-                                  actions.setExtraHeaderKey(
-                                    index,
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Header name"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Input
-                                value={h.value}
-                                onChange={(e) =>
-                                  actions.setExtraHeaderValue(
-                                    index,
-                                    e.target.value,
-                                  )
-                                }
-                                type={h.concealed ? "password" : "text"}
-                                placeholder="Header value"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() =>
-                                  actions.toggleExtraHeaderConcealed(index)
-                                }
-                              >
-                                {h.concealed ? (
-                                  <EyeOff size={16} />
-                                ) : (
-                                  <Eye size={16} />
-                                )}
-                              </Button>
-                            </GridItem>
-                            <GridItem>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="red"
-                                onClick={() => actions.removeExtraHeader(index)}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </GridItem>
-                          </React.Fragment>
-                        ))}
-                      </Grid>
-                    )}
-
-                    <HStack width="full" justify="end">
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        onClick={actions.addExtraHeader}
-                      >
-                        <Plus size={16} />
-                        Add Header
-                      </Button>
-                    </HStack>
-                  </VStack>
-                )}
-
-              <VStack width="full" gap={4}>
-                <Box width="full" maxWidth="408px">
-                  <SmallLabel>Models</SmallLabel>
-                  <CreatableSelect
-                    value={state.customModels}
-                    onChange={(v) => actions.setCustomModels((v as any) ?? [])}
-                    onCreateOption={(text) =>
-                      actions.addCustomModelsFromText(text)
-                    }
-                    isMulti
-                    options={getProviderModelOptions(provider.provider, "chat")}
-                    placeholder="Add custom model"
-                  />
-                </Box>
-                {(provider.provider === "openai" ||
-                  provider.provider === "azure" ||
-                  provider.provider === "gemini" ||
-                  provider.provider === "bedrock") && (
-                  <>
-                    <Box width="full">
-                      <SmallLabel>Embeddings Models</SmallLabel>
-                      <CreatableSelect
-                        value={state.customEmbeddingsModels}
-                        onChange={(v) =>
-                          actions.setCustomEmbeddingsModels((v as any) ?? [])
-                        }
-                        onCreateOption={(text) =>
-                          actions.addCustomEmbeddingsFromText(text)
-                        }
-                        isMulti
-                        options={getProviderModelOptions(
-                          provider.provider,
-                          "embedding",
-                        )}
-                        placeholder="Add custom embeddings model"
-                      />
-                    </Box>
-                  </>
-                )}
-              </VStack>
-
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  loading={state.isSaving}
-                  onClick={() => {
-                    void actions.submit();
-                  }}
-                >
-                  Save
-                </Button>
-              </HStack>
-            </>
+    <SettingsLayout>
+      <VStack gap={6} width="full" align="start">
+        <HStack width="full" marginTop={2}>
+          <Heading as="h2">Model Providers</Heading>
+          <Spacer />
+          {organizations && project && (
+            <ProjectSelector organizations={organizations} project={project} />
           )}
-        </VStack>
-      </HorizontalFormControl>
-    </Box>
-  );
-}
+          <Menu.Root>
+            <Tooltip
+              content="You need model provider manage permissions to add new providers."
+              disabled={hasModelProvidersManagePermission}
+            >
+              <Menu.Trigger asChild>
+                <PageLayout.HeaderButton 
+                  disabled={!hasModelProvidersManagePermission || notEnabledProviders.length === 0}
+                >
+                  <Plus /> Add Model Provider
+                </PageLayout.HeaderButton>
+              </Menu.Trigger>
+            </Tooltip>
+            <Menu.Content>
+              {notEnabledProviders.map((provider) => (
+                <Menu.Item
+                  key={provider.provider}
+                  value={provider.provider}
+                  onClick={() => {
+                    if (!project?.id) return;
+                    openDrawer("editModelProvider", {
+                      projectId: project.id,
+                      organizationId: organization?.id,
+                      providerKey: provider.provider,
+                    });
+                  }}
+                >
+                  <HStack gap={3}>
+                    <Box width="20px" height="20px">
+                      {provider.icon}
+                    </Box>
+                    <Text>{provider.name}</Text>
+                  </HStack>
+                </Menu.Item>
+              ))}
+            </Menu.Content>
+          </Menu.Root>
+        </HStack>
 
-function DefaultModel() {
-  const { project } = useOrganizationTeamProject();
-  const hook = useDefaultModel({
-    projectId: project?.id,
-    initialValue: project?.defaultModel ?? DEFAULT_MODEL,
-  });
+        {isLoading ? (
+          <Spinner />
+        ) : enabledProviders.length === 0 ? (
+          <EmptyState.Root width="full">
+            <EmptyState.Content>
+              <EmptyState.Indicator>
+                <Plus size={24} />
+              </EmptyState.Indicator>
+              <VStack textAlign="center">
+                <EmptyState.Title>No model providers</EmptyState.Title>
+                <EmptyState.Description>
+                  Add a model provider to get started
+                </EmptyState.Description>
+              </VStack>
+            </EmptyState.Content>
+          </EmptyState.Root>
+        ) : (
+          <Table.Root width="full">
+            <Table.Header>
+              <Table.Row>
+                <Table.ColumnHeader>Provider</Table.ColumnHeader>
+                <Table.ColumnHeader />
+              </Table.Row>
+            </Table.Header>
+            <Table.Body>
+              {enabledProviders.map((provider) => {
+                    const providerIcon = modelProviderIcons[
+                      provider.provider as keyof typeof modelProviderIcons
+                    ];
+                    const providerSpec = modelProvidersRegistry[
+                      provider.provider as keyof typeof modelProvidersRegistry
+                    ];
 
-  return (
-    <HorizontalFormControl
-      label="Default Model"
-      helper="For general tasks within LangWatch"
-      paddingY={4}
-      borderBottomWidth="1px"
-    >
-      <HStack>
-        <ModelSelector
-          model={hook.value}
-          options={modelSelectorOptions
-            .filter((option) => option.mode === "chat")
-            .map((option) => option.value)}
-          onChange={(model) => {
-            hook.setValue(model);
-            void hook.update(model);
+                    return (
+                      <Table.Row key={provider.id ?? provider.provider}>
+                        <Table.Cell>
+                          <HStack gap={3} align="center">
+                            <Box width="24px" height="24px">
+                              {providerIcon}
+                            </Box>
+                            <Text>{providerSpec?.name ?? provider.provider}</Text>
+                            {isDefaultProvider(provider.provider) && (
+                              <Badge colorPalette="blue">Default Model</Badge>
+                            )}
+                          </HStack>
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          <Menu.Root>
+                            <Tooltip
+                              content="You need model provider manage permissions to edit or delete providers."
+                              disabled={hasModelProvidersManagePermission}
+                            >
+                              <Menu.Trigger asChild>
+                                <Button 
+                                  variant="ghost"
+                                  disabled={!hasModelProvidersManagePermission}
+                                >
+                                  <MoreVertical />
+                                </Button>
+                              </Menu.Trigger>
+                            </Tooltip>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  openDrawer("editModelProvider", {
+                                    projectId: project?.id,
+                                    organizationId: organization?.id,
+                                    modelProviderId: provider.id,
+                                    providerKey: provider.provider,
+                                  });
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Edit size={14} />
+                                  Edit Provider
+                                </Box>
+                              </Menu.Item>
+                              <Menu.Item
+                                value="disable"
+                                color="red"
+                                // css={{ color: "var(--chakra-colors-red-600)" }}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setProviderToDisable({
+                                    id: provider.id ?? undefined,
+                                    provider: provider.provider,
+                                    name: providerSpec?.name ?? provider.provider,
+                                  });
+                                }}
+                              >
+                                <Box display="flex" alignItems="center" gap={2}>
+                                  <Trash2 size={14} />
+                                  Delete Provider
+                                </Box>
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </Table.Cell>
+                      </Table.Row>
+                    );
+                  })}
+            </Table.Body>
+          </Table.Root>
+        )}
+
+        <Dialog.Root
+          open={!!providerToDisable}
+          onOpenChange={(details) => {
+            if (!details.open) {
+              setProviderToDisable(null);
+            }
           }}
-          mode="chat"
-        />
-        {hook.isSaving && <Spinner size="sm" marginRight={2} />}
-      </HStack>
-    </HorizontalFormControl>
+        >
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>Delete {providerToDisable?.name}?</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              {providerToDisable && isProviderUsedForAnyDefault(providerToDisable.provider) ? (
+                <VStack gap={3} align="start">
+                  <Text>
+                    This provider is currently being used for one or more default models and cannot be deleted.
+                  </Text>
+                  <Text fontWeight="medium">
+                    Please change the following before deleting:
+                  </Text>
+                  <VStack gap={2} align="start" paddingLeft={4}>
+                    {isProviderUsedForDefaultModels(
+                      providerToDisable.provider,
+                      project?.defaultModel ?? null,
+                      null,
+                      null
+                    ) && <Text>• Default Model</Text>}
+                    {isProviderUsedForDefaultModels(
+                      providerToDisable.provider,
+                      null,
+                      null,
+                      project?.embeddingsModel ?? null
+                    ) && <Text>• Embeddings Model</Text>}
+                    {isProviderUsedForDefaultModels(
+                      providerToDisable.provider,
+                      null,
+                      project?.topicClusteringModel ?? null,
+                      null
+                    ) && <Text>• Topic Clustering Model</Text>}
+                  </VStack>
+                </VStack>
+              ) : (
+                <Text>This provider will no longer be available for use.</Text>
+              )}
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Dialog.ActionTrigger asChild>
+                <Button variant="outline">Cancel</Button>
+              </Dialog.ActionTrigger>
+              <Button
+                colorPalette="red"
+                loading={updateMutation.isPending}
+                disabled={providerToDisable ? isProviderUsedForAnyDefault(providerToDisable.provider) : false}
+                onClick={async () => {
+                  if (!providerToDisable) return;
+                  if (!project?.id) return;
+                  await updateMutation.mutateAsync({
+                    id: providerToDisable.id,
+                    projectId: project.id,
+                    provider: providerToDisable.provider,
+                    enabled: false,
+                  });
+                  setProviderToDisable(null);
+                  await refetch();
+                }}
+              >
+                Delete
+              </Button>
+            </Dialog.Footer>
+            <Dialog.CloseTrigger />
+          </Dialog.Content>
+        </Dialog.Root>
+      </VStack>
+    </SettingsLayout>
   );
 }
 
@@ -521,3 +391,4 @@ export function EmbeddingsModel() {
     </HorizontalFormControl>
   );
 }
+

@@ -24,6 +24,7 @@ from tqdm import tqdm
 import pandas as pd
 
 from langwatch.types import Money
+from langwatch.utils.exceptions import better_raise_for_status
 
 
 class EvaluationResult(BaseModel):
@@ -150,7 +151,7 @@ class BatchEvaluation:
             raise ValueError(
                 "API key is not valid, please try to login again with langwatch.login()"
             )
-        response.raise_for_status()
+        better_raise_for_status(response)
         experiment_path = response.json()["path"]
         self.experiment_slug = response.json()["slug"]
 
@@ -368,7 +369,7 @@ class BatchEvaluation:
             json=body,
             timeout=60,
         )
-        response.raise_for_status()
+        better_raise_for_status(response)
 
     def wait_for_completion(self):
         async def wait_for_completion(self):
@@ -414,7 +415,7 @@ async def run_evaluation(
 
         async with httpx.AsyncClient(timeout=900) as client:
             response = await client.post(**request_params)
-            response.raise_for_status()
+            better_raise_for_status(response)
 
         result = response.json()
 
@@ -462,7 +463,7 @@ def get_dataset(
 
     with httpx.Client(timeout=300) as client:
         response = client.get(**request_params)
-        response.raise_for_status()
+        better_raise_for_status(response)
 
     result = response.json()
 

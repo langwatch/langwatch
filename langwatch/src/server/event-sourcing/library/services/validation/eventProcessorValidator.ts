@@ -1,4 +1,4 @@
-import { getLangWatchTracer } from "langwatch";
+
 import { createLogger } from "~/utils/logger";
 import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
@@ -18,9 +18,6 @@ import { SequenceNumberCalculator } from "./sequenceNumberCalculator";
  * Shared validation logic used by both handlers and projections.
  */
 export class EventProcessorValidator<EventType extends Event = Event> {
-  private readonly tracer = getLangWatchTracer(
-    "langwatch.trace-processing.event-processor-validator",
-  );
   private readonly sequenceNumberCalculator: SequenceNumberCalculator<EventType>;
   private readonly idempotencyChecker: IdempotencyChecker<EventType>;
   private readonly orderingValidator: OrderingValidator<EventType>;
@@ -78,20 +75,40 @@ export class EventProcessorValidator<EventType extends Event = Event> {
   }
 
   /**
+   * Computes the sequence number for an event from a pre-loaded events array.
+   * Sequence numbers are 1-indexed and represent the position of the event
+   * in chronological order within the aggregate.
+   *
+   * @param event - The event to compute the sequence number for
+   * @param events - Pre-loaded events array for the aggregate (must be sorted chronologically)
+   * @returns The sequence number (1-indexed)
+   * @throws {Error} If the event is not found in the events array
+   */
+  computeSequenceNumberFromEvents(
+    event: EventType,
+    events: readonly EventType[],
+  ): number {
+    return this.sequenceNumberCalculator.computeSequenceNumberFromEvents(
+      event,
+      events,
+    );
+  }
+
+  /**
    * Validates event processing prerequisites and returns sequence number.
    *
    * Performs shared validation logic for both handlers and projections:
    * - Sequence number computation
    * - Idempotency check (already processed) and atomic claim
    * - Failed events check (skips gracefully)
-   * - Sequential ordering validation (throws on violations, unless skipOrderingCheck is true)
+   * - Sequential ordering validation (throws on violations)
    *
    * @param processorName - Name of the processor (handler or projection)
    * @param processorType - Type of processor ("handler" or "projection")
    * @param event - Event to validate
    * @param context - Event store read context
    * @param options - Optional validation options
-   * @param options.skipOrderingCheck - If true, skips ordering validation (useful when ordering was already checked earlier)
+   * @param options.events - Pre-loaded events array. If provided, uses this to compute sequence number instead of querying the event store.
    * @returns Sequence number if validation passes, null if processing should be skipped (already processed or has failures)
    * @throws {Error} If sequential ordering is violated or sequence number computation fails
    */
@@ -100,12 +117,21 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     processorType: "handler" | "projection",
     event: EventType,
     context: EventStoreReadContext<EventType>,
-    options?: { skipOrderingCheck?: boolean },
+    options?: { events?: readonly EventType[] },
   ): Promise<number | null> {
     // Compute sequence number for this event
     let sequenceNumber: number;
     try {
-      sequenceNumber = await this.computeEventSequenceNumber(event, context);
+      if (options?.events) {
+        // Use pre-loaded events array to compute sequence number
+        sequenceNumber = this.computeSequenceNumberFromEvents(
+          event,
+          options.events,
+        );
+      } else {
+        // Fall back to querying the event store
+        sequenceNumber = await this.computeEventSequenceNumber(event, context);
+      }
     } catch (error) {
       this.logger.error(
         {
@@ -162,15 +188,12 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     }
 
     // Enforce ordering: check if the immediate predecessor has been processed
-    // Skip if ordering was already validated earlier (e.g., in early check before lock acquisition)
-    if (!options?.skipOrderingCheck) {
-      await this.orderingValidator.validateOrdering(
-        processorName,
-        processorType,
-        event,
-        sequenceNumber,
-      );
-    }
+    await this.orderingValidator.validateOrdering(
+      processorName,
+      processorType,
+      event,
+      sequenceNumber,
+    );
 
     return sequenceNumber;
   }

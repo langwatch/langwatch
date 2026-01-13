@@ -11,6 +11,7 @@ import type { ComponentProps } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { EditModelProviderDrawer } from "./EditModelProviderDrawer";
 import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
@@ -29,11 +30,13 @@ import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
 import { AgentCodeEditorDrawer } from "./agents/AgentCodeEditorDrawer";
+import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
 import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorCategorySelectorDrawer } from "./evaluators/EvaluatorCategorySelectorDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { EvaluatorEditorDrawer } from "./evaluators/EvaluatorEditorDrawer";
+import { ScenarioFormDrawer } from "./scenarios/ScenarioFormDrawer";
 
 /**
  * Map of drawer names to their React components.
@@ -43,6 +46,7 @@ export const drawers = {
   traceDetails: TraceDetailsDrawer,
   batchEvaluation: BatchEvaluationDrawer,
   trigger: TriggerDrawer,
+  editModelProvider: EditModelProviderDrawer,
   addOrEditAnnotationScore: AddOrEditAnnotationScoreDrawer,
   addAnnotationQueue: AddAnnotationQueueDrawer,
   addDatasetRecord: AddDatasetRecordDrawerV2,
@@ -60,6 +64,7 @@ export const drawers = {
   agentList: AgentListDrawer,
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
+  agentHttpEditor: AgentHttpEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
   evaluatorList: EvaluatorListDrawer,
   evaluatorCategorySelector: EvaluatorCategorySelectorDrawer,
@@ -67,6 +72,8 @@ export const drawers = {
   evaluatorEditor: EvaluatorEditorDrawer,
   // Workflow selector specifically for evaluators (same component, different context)
   workflowSelectorForEvaluator: WorkflowSelectorDrawer,
+  // Scenarios
+  scenarioEditor: ScenarioFormDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

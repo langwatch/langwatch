@@ -807,6 +807,90 @@ def test_langwatch_evaluator_with_settings():
 
 
 @pytest.mark.integration
+def test_langwatch_evaluator_llm_boolean_with_multiline_prompt():
+    disable_dsp_caching()
+    workflow = copy.deepcopy(simple_workflow)
+    workflow.nodes.append(
+        EvaluatorNode(
+            id="llm_as_a_judge_boolean",
+            data=Evaluator(
+                name="Llmasajudgeboolean",
+                cls="LangWatchEvaluator",
+                evaluator="langevals/llm_boolean",
+                inputs=[
+                    Field(
+                        identifier="input",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                ],
+                outputs=[],
+                parameters=[
+                    Field(
+                        identifier="max_tokens",
+                        type=FieldType.int,
+                        optional=None,
+                        value=128000,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                    Field(
+                        identifier="prompt",
+                        type=FieldType.str,
+                        optional=None,
+                        value="""You are a specialized llm as a judge
+
+                        Evaluate if the answer is correct or not""",
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                    Field(
+                        identifier="model",
+                        type=FieldType.str,
+                        optional=None,
+                        value="openai/gpt-4o-mini",
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    ),
+                ],
+            ),
+            type="evaluator",
+        )
+    )
+    workflow.edges.append(
+        Edge(
+            id="e0-1",
+            source="generate_answer",
+            sourceHandle="outputs.answer",
+            target="llm_as_a_judge_boolean",
+            targetHandle="inputs.input",
+            type="default",
+        )
+    )
+
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
+
+    assert result.cost > 0
+    assert result.duration > 0
+    assert result.evaluations["llm_as_a_judge_boolean"].status == "skipped"
+
+
+@pytest.mark.integration
 def test_parse_workflow_with_until_node():
     disable_dsp_caching()
 
@@ -1278,3 +1362,90 @@ def test_parse_node_with_reserved_keywords():
         )
 
     assert "pass_" in result["and_"]
+
+
+@pytest.mark.integration
+def test_parse_workflow_with_emoji_in_conversation_history():
+    """Test that emoji surrogate pairs in conversation history are properly handled."""
+    disable_dsp_caching()
+
+    workflow = copy.deepcopy(simple_workflow)
+    # Replace generate_query with an LLM node that has emoji in conversation history
+    workflow.nodes = [
+        node for node in workflow.nodes if node.id != "generate_query"
+    ]
+    workflow.nodes.append(
+        SignatureNode(
+            id="generate_query",
+            data=Signature(
+                name="GenerateQuery",
+                cls=None,
+                parameters=[
+                    llm_field,
+                    Field(
+                        identifier="instructions",
+                        type=FieldType.str,
+                        optional=None,
+                        value="You are a helpful assistant that replies in emojis",
+                        desc=None,
+                        prefix=None,
+                    ),
+                    Field(
+                        identifier="messages",
+                        type=FieldType.chat_messages,
+                        optional=None,
+                        # Emojis as surrogate pairs: 👋😊❓
+                        value=[
+                            {"role": "user", "content": "{{question}}"},
+                            {"role": "user", "content": "hi"},
+                            {"role": "assistant", "content": "\ud83d\udc4b\ud83d\ude0a\u2753"},
+                            {"role": "user", "content": "wazup"},
+                        ],
+                        desc=None,
+                        prefix=None,
+                    ),
+                ],
+                inputs=[
+                    Field(
+                        identifier="question",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    )
+                ],
+                outputs=[
+                    Field(
+                        identifier="query",
+                        type=FieldType.str,
+                        optional=None,
+                        value=None,
+                        desc=None,
+                        prefix=None,
+                        hidden=None,
+                    )
+                ],
+                execution_state=None,
+            ),
+            type="signature",
+        )
+    )
+
+    class_name, code, _ = parse_workflow(workflow, format=True, debug_level=1)
+
+    # Verify that the emoji surrogate pairs were properly converted
+    assert "👋" in code or "\ud83d\udc4b" not in code, "Surrogate pairs should be converted to actual emojis"
+
+    with materialized_component_class(
+        component_code=code, class_name=class_name
+    ) as Module:
+        instance = Module()  # type: ignore
+        result: PredictionWithEvaluationAndMetadata = instance(
+            question="What is the capital of France?",
+            gold_answer="Paris",
+        )
+
+    assert result.cost > 0
+    assert result.duration > 0

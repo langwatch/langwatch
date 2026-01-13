@@ -4,6 +4,35 @@ export interface EventSourcedQueueProcessorOptions {
   concurrency?: number;
 }
 
+/**
+ * Configuration for job deduplication.
+ * When enabled, jobs with the same deduplication ID will be deduplicated within the TTL window.
+ */
+export interface DeduplicationConfig<Payload> {
+  /**
+   * Function to generate deduplication ID from payload.
+   * Jobs with the same deduplication ID will be deduplicated within the TTL window.
+   */
+  makeId: (payload: Payload) => string;
+  /**
+   * TTL for deduplication in milliseconds.
+   * @default 200
+   */
+  ttlMs?: number;
+  /**
+   * Whether to extend the TTL when a new job with the same deduplication ID is added.
+   * When true, enables Debounce Mode where new jobs replace existing ones and reset the TTL.
+   * @default true
+   */
+  extend?: boolean;
+  /**
+   * Whether to replace the job data when a new job with the same deduplication ID is added.
+   * When true, enables Debounce Mode where the latest job data is used.
+   * @default true
+   */
+  replace?: boolean;
+}
+
 export interface EventSourcedQueueDefinition<Payload> {
   /**
    * Base name for the queue and job.
@@ -11,12 +40,6 @@ export interface EventSourcedQueueDefinition<Payload> {
    * Job name will be `name` (without braces).
    */
   name: string;
-  /**
-   * Optional job ID factory for idempotency.
-   * When the same jobId is used, BullMQ will automatically replace the existing job
-   * if it hasn't been processed yet. This is useful for batching/debouncing.
-   */
-  makeJobId?: (payload: Payload) => string;
   /**
    * Domain-specific processor that runs inside the worker.
    */
@@ -29,10 +52,14 @@ export interface EventSourcedQueueDefinition<Payload> {
 
   /**
    * Optional delay in milliseconds before processing the job.
-   * Useful for batching/debouncing where later jobs can override earlier ones
-   * (when combined with makeJobId). BullMQ will replace waiting jobs with the same jobId.
    */
   delay?: number;
+
+  /**
+   * Optional deduplication configuration.
+   * When set, jobs with the same deduplication ID will be deduplicated within the TTL window.
+   */
+  deduplication?: DeduplicationConfig<Payload>;
 
   /**
    * Optional function to extract span attributes from the payload.

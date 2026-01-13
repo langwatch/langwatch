@@ -1,5 +1,5 @@
 import { Box,Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Bot, Code, MessageSquare, MoreVertical, Workflow } from "lucide-react";
+import { Bot, Code, Globe, MessageSquare, MoreVertical, Workflow } from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { Menu } from "../ui/menu";
@@ -8,12 +8,14 @@ import { formatTimeAgo } from "~/utils/formatTimeAgo";
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,
   code: Code,
+  http: Globe,
   workflow: Workflow,
 };
 
 const agentTypeLabels: Record<string, string> = {
   signature: "Prompt",
   code: "Code",
+  http: "HTTP",
   workflow: "Workflow",
 };
 
@@ -33,10 +35,17 @@ export function AgentCard({
   const Icon = agentTypeIcons[agent.type] ?? Bot;
   const typeLabel = agentTypeLabels[agent.type] ?? agent.type;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger if clicking within menu
+    const target = e.target as HTMLElement;
+    if (target.closest(".js-inner-menu")) return;
+    onClick?.();
+  };
+
   return (
     <Card.Root
       variant="elevated"
-      onClick={onClick}
+      onClick={handleCardClick}
       cursor="pointer"
       height="142px"
       transition="all 0.2s ease-in-out"
@@ -58,7 +67,7 @@ export function AgentCard({
                 >
                   <MoreVertical size={16} />
                 </Menu.Trigger>
-                <Menu.Content className="js-inner-menu">
+                <Menu.Content className="js-inner-menu" portalled={false}>
                   {onEdit && (
                     <Menu.Item
                       value="edit"

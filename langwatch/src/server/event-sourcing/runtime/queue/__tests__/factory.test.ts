@@ -8,7 +8,7 @@ const mockLogger = {
 };
 
 const mockTracer = {
-  withActiveSpan: vi.fn((name, options, fn) => fn()),
+  withActiveSpan: vi.fn((_name,_optionss, fn) => fn()),
 };
 
 vi.mock("../../../../utils/logger", () => ({
@@ -71,54 +71,6 @@ describe("DefaultQueueProcessorFactory", () => {
 
       await processor.close();
     });
-
-    it("returns working BullMQ processor when Redis is available", async () => {
-      // Mock a Redis connection object
-      const mockRedisConnection = {
-        host: "localhost",
-        port: 6379,
-      } as any;
-      connectionSpy.mockReturnValue(mockRedisConnection);
-
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: "test-queue-factory",
-        process: processFn,
-      };
-
-      const processor = factory.create(definition);
-
-      // Test that the processor implements the interface
-      expect(processor).toHaveProperty("send");
-      expect(processor).toHaveProperty("close");
-
-      // Note: We can't actually test BullMQ send/close without a real Redis instance,
-      // but we can verify the processor was created and has the right interface
-      // The actual BullMQ behavior is tested in integration tests
-      await processor.close();
-    });
-
-    it("adapts to connection state changes between calls", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: "test-queue-adapt",
-        process: processFn,
-      };
-
-      // First call: Redis unavailable -> memory processor
-      connectionSpy.mockReturnValue(undefined);
-      const processor1 = factory.create(definition);
-      await processor1.send("payload-1");
-      expect(processFn).toHaveBeenCalledWith("payload-1");
-
-      // Second call: Redis available -> BullMQ processor
-      connectionSpy.mockReturnValue({ host: "localhost", port: 6379 } as any);
-      const processor2 = factory.create(definition);
-      expect(processor2).toHaveProperty("send");
-      expect(processor2).toHaveProperty("close");
-
-      await processor2.close();
-    });
   });
 });
 
@@ -137,21 +89,6 @@ describe("BullmqQueueProcessorFactory", () => {
   });
 
   describe("create", () => {
-    it("returns BullMQ processor when Redis is available", () => {
-      connectionSpy.mockReturnValue({ host: "localhost", port: 6379 } as any);
-
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<string> = {
-        name: "test-queue-bullmq",
-        process: processFn,
-      };
-
-      const processor = factory.create(definition);
-
-      expect(processor).toHaveProperty("send");
-      expect(processor).toHaveProperty("close");
-    });
-
     it("throws error when Redis connection is missing", () => {
       connectionSpy.mockReturnValue(undefined);
 

@@ -23,6 +23,10 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
   ): Promise<CheckpointRecord | null> {
     try {
       // Use FINAL to get the latest version from ReplacingMergeTree
+      // Exclude failed checkpoints - they are a separate concern and should not
+      // be returned by this method which loads "current state"
+      // With ORDER BY (TenantId, CheckpointKey, Status), we need to explicitly
+      // filter by Status to avoid non-deterministic results
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
@@ -41,6 +45,8 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateId
           FROM processor_checkpoints FINAL
           WHERE CheckpointKey = {checkpointKey:String}
+            AND Status != 'failed'
+          ORDER BY SequenceNumber DESC
           LIMIT 1
         `,
         query_params: {
@@ -129,16 +135,20 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     try {
       // Query for checkpoints that prove the requested sequence was processed.
       //
-      // With ReplacingMergeTree, there's only ONE row per checkpoint key (the latest).
+      // With ORDER BY (TenantId, CheckpointKey, Status), we have separate partitions
+      // for each Status. Failed checkpoints are in a separate partition and must be
+      // explicitly excluded to prevent them from being counted as "processed".
+      //
       // When event N+1 starts processing, it saves a "pending" checkpoint that REPLACES
-      // the "processed" checkpoint from event N. This means we can't just look for
-      // a "processed" checkpoint with the exact sequence number.
+      // the "processed" checkpoint from event N (within the same Status partition).
+      // This means we can't just look for a "processed" checkpoint with the exact sequence number.
       //
       // Logic:
       // 1. If we find a "processed" checkpoint with seq >= requested, the requested seq is done
       // 2. If we find a "pending" checkpoint with seq > requested, the requested seq must be done
       //    (otherwise the higher sequence couldn't have started processing)
-      // 3. If we find a "pending" checkpoint with seq = requested, it's currently processing
+      // 3. A "pending" checkpoint with seq = requested means it's STILL processing - NOT valid
+      // 4. Failed checkpoints are explicitly excluded (Status != 'failed')
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
@@ -157,11 +167,11 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
             AggregateId
           FROM processor_checkpoints FINAL
           WHERE CheckpointKey = {checkpointKey:String}
-            AND SequenceNumber >= {sequenceNumber:UInt64}
             AND Status != 'failed'
+            AND SequenceNumber >= {sequenceNumber:UInt64}
             AND (
               Status = 'processed'
-              OR (Status = 'pending' AND SequenceNumber >= {sequenceNumber:UInt64})
+              OR (Status = 'pending' AND SequenceNumber > {sequenceNumber:UInt64})
             )
           ORDER BY SequenceNumber ASC
           LIMIT 1
@@ -243,6 +253,9 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     checkpointKey: string,
   ): Promise<CheckpointRecord[]> {
     try {
+      // With ORDER BY (TenantId, CheckpointKey, Status), failed checkpoints are in
+      // a separate partition. Multiple failed SequenceNumbers can coexist.
+      // Order by SequenceNumber to return failures in processing order.
       const result = await this.clickHouseClient.query({
         query: `
           SELECT
@@ -262,7 +275,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
           FROM processor_checkpoints FINAL
           WHERE CheckpointKey = {checkpointKey:String}
             AND Status = 'failed'
-          ORDER BY EventTimestamp ASC
+          ORDER BY SequenceNumber ASC
         `,
         query_params: {
           checkpointKey,

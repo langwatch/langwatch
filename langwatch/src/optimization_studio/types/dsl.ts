@@ -425,6 +425,55 @@ export const customComponentSchema = baseComponentSchema.extend({
   versions: z.record(z.any()).optional(),
 });
 
+// TODO: Move schemas and exports to their own files
+/**
+ * Schema for HTTP header key-value pairs
+ */
+export const httpHeaderSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+/**
+ * Schema for HTTP authentication configuration
+ */
+export const httpAuthSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("none") }),
+  z.object({ type: z.literal("bearer"), token: z.string() }),
+  z.object({ type: z.literal("api_key"), header: z.string(), value: z.string() }),
+  z.object({ type: z.literal("basic"), username: z.string(), password: z.string() }),
+]);
+
+/**
+ * HTTP methods supported by HTTP agents
+ */
+export const HTTP_METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+
+/**
+ * HTTP authentication types
+ */
+export type HttpAuthType = "none" | "bearer" | "api_key" | "basic";
+export type HttpAuth = z.infer<typeof httpAuthSchema>;
+export type HttpHeader = z.infer<typeof httpHeaderSchema>;
+
+/**
+ * Schema for HTTP component node data
+ * Used for "http" type agents that call external APIs
+ *
+ * Note: URL validation is relaxed to allow progressive typing in UI.
+ * Full URL validation should happen on save in the drawer.
+ */
+export const httpComponentSchema = baseComponentSchema.extend({
+  url: z.string().min(1, "URL is required"),
+  method: z.enum(HTTP_METHODS).default("POST"),
+  headers: z.array(httpHeaderSchema).optional(),
+  auth: httpAuthSchema.optional(),
+  bodyTemplate: z.string().optional(),
+  outputPath: z.string().optional(),
+  timeoutMs: z.number().positive().optional(),
+});
+
 /**
  * Union type for all valid agent config types
  * These match the existing Component types so they're directly usable in DSL
@@ -432,3 +481,4 @@ export const customComponentSchema = baseComponentSchema.extend({
 export type SignatureComponentConfig = z.infer<typeof signatureComponentSchema>;
 export type CodeComponentConfig = z.infer<typeof codeComponentSchema>;
 export type CustomComponentConfig = z.infer<typeof customComponentSchema>;
+export type HttpComponentConfig = z.infer<typeof httpComponentSchema>;

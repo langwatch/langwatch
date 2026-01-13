@@ -7,7 +7,7 @@ test-integration:
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -m integration $(filter-out $@,$(MAKECMDGOALS))
 
 install: ensure-uv
-	uv sync --all-extras
+	uv sync --all-extras && uv pip uninstall litellm-enterprise litellm-proxy-extras
 
 ensure-uv:
 	@if ! command -v uv &> /dev/null; then \
@@ -16,8 +16,12 @@ ensure-uv:
 
 start: install
 	@echo "Starting the server..."
-	@uv run watchmedo auto-restart -p 'none' --signal SIGTERM -- \
+	@uv run --no-sync watchmedo auto-restart -p 'none' --signal SIGTERM -- \
 		uvicorn langwatch_nlp.main:app --host 0.0.0.0 --port 5561 --timeout-keep-alive 70 \
 		--reload --reload-dir . --reload-dir ../python-sdk $(filter-out $@,$(MAKECMDGOALS))
 
-
+licenses:
+	@echo "Generating licenses..."
+	@uv run pip-licenses --summary
+	@uv run pip-licenses --format=json --with-license-file > langwatch_nlp_licenses.json
+	@echo "Full licenses report saved to langwatch_nlp_licenses.json"

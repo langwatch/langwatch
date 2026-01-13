@@ -14,10 +14,12 @@ interface ModelProviderCredentialFieldsProps {
   fieldMetadata?: Record<string, FieldMetadata>;
   fieldErrors: Record<string, string>;
   openAiValidationError?: string;
+  apiKeyValidationError?: string;
   isOpenAiProvider: boolean;
   onCustomKeyChange: (key: string, value: string) => void;
   onFieldErrorClear: (key: string) => void;
   onOpenAiValidationClear: () => void;
+  onApiKeyValidationClear?: () => void;
 }
 
 export const ModelProviderCredentialFields: React.FC<
@@ -29,10 +31,12 @@ export const ModelProviderCredentialFields: React.FC<
   fieldMetadata,
   fieldErrors,
   openAiValidationError,
+  apiKeyValidationError,
   isOpenAiProvider,
   onCustomKeyChange,
   onFieldErrorClear,
   onOpenAiValidationClear,
+  onApiKeyValidationClear,
 }: ModelProviderCredentialFieldsProps) => {
   const credentialKeys = useMemo(
     () => Object.keys(displayKeys ?? {}),
@@ -96,6 +100,9 @@ export const ModelProviderCredentialFields: React.FC<
                   if (isOpenAiProvider && openAiValidationError) {
                     onOpenAiValidationClear();
                   }
+                  if (apiKeyValidationError && onApiKeyValidationClear) {
+                    onApiKeyValidationClear();
+                  }
                 }}
                 showVisibilityToggle={isPassword}
                 ariaLabel={key}
@@ -111,6 +118,11 @@ export const ModelProviderCredentialFields: React.FC<
       {isOpenAiProvider && openAiValidationError && (
         <Field.Root invalid>
           <Field.ErrorText>{openAiValidationError}</Field.ErrorText>
+        </Field.Root>
+      )}
+      {apiKeyValidationError && (
+        <Field.Root invalid>
+          <Field.ErrorText>{apiKeyValidationError}</Field.ErrorText>
         </Field.Root>
       )}
     </VStack>

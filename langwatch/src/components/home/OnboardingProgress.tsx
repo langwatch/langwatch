@@ -8,6 +8,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
+import { useAnalytics } from "react-contextual-analytics";
 import {
   LuCheck,
   LuDatabase,
@@ -200,12 +202,54 @@ function StepItem({ step, onClick }: StepItemProps) {
 export function OnboardingProgress() {
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const { emit } = useAnalytics();
 
   const { data: checkStatus, isLoading } =
     api.integrationsChecks.getCheckStatus.useQuery(
       { projectId: project?.id ?? "" },
       { enabled: !!project?.id },
     );
+
+  // Track onboarding status when data first loads
+  // Using isLoading as trigger - tracks once when loading completes
+  useEffect(() => {
+    if (isLoading || !checkStatus || !project?.id) return;
+
+    const steps = buildOnboardingSteps(checkStatus, project.slug);
+    const completedSteps = steps.filter((s) => s.complete);
+    const completionPercentage = calculateCompletionPercentage(steps);
+
+    emit("viewed", "onboarding_progress", {
+      // Use project_id as the grouping dimension
+      project_id: project.id,
+
+      // Overall metrics
+      completion_percentage: completionPercentage,
+      completed_tasks_count: completedSteps.length,
+      total_tasks_count: steps.length,
+      all_complete: completionPercentage === 100,
+
+      // Individual task completion (booleans for filtering)
+      has_first_message: checkStatus.firstMessage,
+      has_team_members: (checkStatus.teamMembers ?? 0) > 1,
+      has_model_providers: (checkStatus.modelProviders ?? 0) > 0,
+      has_prompts: (checkStatus.prompts ?? 0) > 0,
+      has_simulations: (checkStatus.simulations ?? 0) > 0,
+      has_evaluations: (checkStatus.evaluations ?? 0) > 0,
+      has_workflows: (checkStatus.workflows ?? 0) > 0,
+      has_datasets: (checkStatus.datasets ?? 0) > 0,
+
+      // Raw counts (for seeing actual usage depth)
+      count_team_members: checkStatus.teamMembers ?? 0,
+      count_model_providers: checkStatus.modelProviders ?? 0,
+      count_prompts: checkStatus.prompts ?? 0,
+      count_simulations: checkStatus.simulations ?? 0,
+      count_evaluations: checkStatus.evaluations ?? 0,
+      count_workflows: checkStatus.workflows ?? 0,
+      count_datasets: checkStatus.datasets ?? 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
   if (isLoading || !checkStatus || !project) {
     return null;
@@ -220,6 +264,12 @@ export function OnboardingProgress() {
   }
 
   const handleStepClick = (step: OnboardingStep) => {
+    emit("clicked", "onboarding_step", {
+      project_id: project.id,
+      step_key: step.key,
+      step_title: step.title,
+      step_complete: step.complete,
+    });
     void router.push(step.href);
   };
 

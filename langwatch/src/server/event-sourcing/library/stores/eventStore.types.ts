@@ -80,6 +80,27 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
   ): Promise<readonly EventType[]>;
 
   /**
+   * Retrieves events for a given aggregate up to and including a specific event.
+   * Returns all events that come before or equal to the specified event in chronological order.
+   *
+   * @param aggregateId - The aggregate to fetch events for
+   * @param context - Security context with required tenantId
+   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
+   * @param upToEvent - The event to fetch up to (inclusive)
+   * @returns Readonly array of events up to and including the specified event, typically ordered by timestamp
+   * @throws {Error} If tenantId is missing or invalid, or if the specified event is not found
+   *
+   * **Security:** Implementations MUST call validateTenantId(context, 'getEventsUpTo')
+   * before executing the query to ensure tenant isolation.
+   */
+  getEventsUpTo(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    upToEvent: EventType,
+  ): Promise<readonly EventType[]>;
+
+  /**
    * Counts events that come before a given event in chronological order.
    * Used to compute sequence numbers for event ordering.
    *

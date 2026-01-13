@@ -12,6 +12,7 @@ from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
+from langwatch.utils.exceptions import EvaluatorException, better_raise_for_status
 from pydantic import BaseModel
 
 from langwatch.types import (
@@ -101,7 +102,7 @@ def evaluate(
         try:
             with httpx.Client(timeout=900) as client:
                 response = client.post(**request_params)
-                response.raise_for_status()
+                better_raise_for_status(response, cls=EvaluatorException)
         except Exception as e:
             return _handle_exception(e, span, as_guardrail)
 
@@ -156,7 +157,7 @@ async def async_evaluate(
         try:
             async with httpx.AsyncClient(timeout=900) as client:
                 response = await client.post(**request_params)
-                response.raise_for_status()
+                better_raise_for_status(response)
         except Exception as e:
             return _handle_exception(e, span, as_guardrail)
 

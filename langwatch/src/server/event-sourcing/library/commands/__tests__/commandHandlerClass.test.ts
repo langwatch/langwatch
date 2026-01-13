@@ -78,6 +78,7 @@ describe("CommandHandlerClass", () => {
               timestamp: 1234567890,
               type: EVENT_TYPES[0],
               data: { result: "success" },
+              version: "2025-12-17",
             },
           ];
         }
@@ -240,6 +241,7 @@ describe("CommandHandlerClass", () => {
               timestamp: 1234567890,
               type: EVENT_TYPES[0],
               data: { result: "async" },
+              version: "2025-12-17",
             },
           ]);
         }
@@ -283,6 +285,7 @@ describe("CommandHandlerClass", () => {
               timestamp: 1234567890,
               type: EVENT_TYPES[0],
               data: { result: "sync" },
+              version: "2025-12-17",
             },
           ];
         }

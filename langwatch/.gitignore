@@ -68,3 +68,5 @@ node_modules/
 
 # GDPR compliance reports (contain PII)
 /reports/
+
+licenses.json

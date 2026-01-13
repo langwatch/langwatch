@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.8.0...python-sdk@v0.8.1) (2026-01-06)
+
+
+### Bug Fixes
+
+* improve backend error capturing of whole python-sdk to forward the human readable error message, and improve auto parsing of contexts for evaluation ([7ed0623](https://github.com/langwatch/langwatch/commit/7ed06235ecf14091c4cad33a5331a4d0819e9a27))
+* reraise when 'error' is not available ([40530a2](https://github.com/langwatch/langwatch/commit/40530a2de08ce796dcc4ad9a0a97cd661044dbf1))
+
+
+### Miscellaneous
+
+* trigger release ([#1011](https://github.com/langwatch/langwatch/issues/1011)) ([6173f53](https://github.com/langwatch/langwatch/commit/6173f53b041d9ee7e6b930270224954ba3c6621e))
+
 ## [0.8.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.7.2...python-sdk@v0.8.0) (2025-12-16)
 
 

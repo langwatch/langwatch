@@ -24,6 +24,7 @@ export interface ModelProviderSpec {
   backendModelProviderKey: ServerModelProviderKey;
   key: ModelProviderKey;
   defaultModel?: string | null;
+  defaultBaseUrl?: string;
   label: string;
   icon: IconData;
   externalDocsUrl?: string;

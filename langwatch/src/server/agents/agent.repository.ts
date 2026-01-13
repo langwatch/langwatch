@@ -4,15 +4,17 @@ import {
   signatureComponentSchema,
   codeComponentSchema,
   customComponentSchema,
+  httpComponentSchema,
   type SignatureComponentConfig,
   type CodeComponentConfig,
   type CustomComponentConfig,
+  type HttpComponentConfig,
 } from "~/optimization_studio/types/dsl";
 
 /**
- * Agent types enum - matches ComponentType for signature/code/custom(workflow)
+ * Agent types enum - matches ComponentType for signature/code/custom(workflow)/http
  */
-export const agentTypeSchema = z.enum(["signature", "code", "workflow"]);
+export const agentTypeSchema = z.enum(["signature", "code", "workflow", "http"]);
 export type AgentType = z.infer<typeof agentTypeSchema>;
 
 /**
@@ -21,7 +23,8 @@ export type AgentType = z.infer<typeof agentTypeSchema>;
 export type AgentComponentConfig =
   | SignatureComponentConfig
   | CodeComponentConfig
-  | CustomComponentConfig;
+  | CustomComponentConfig
+  | HttpComponentConfig;
 
 /**
  * Get the appropriate config schema based on agent type
@@ -34,6 +37,12 @@ const getConfigSchemaForType = (type: AgentType) => {
       return codeComponentSchema;
     case "workflow":
       return customComponentSchema;
+    case "http":
+      return httpComponentSchema;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unknown agent type: ${_exhaustive}`);
+    }
   }
 };
 

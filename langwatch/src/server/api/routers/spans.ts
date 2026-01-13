@@ -2,9 +2,7 @@ import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import { TRACE_INDEX } from "~/server/elasticsearch";
-import { getTraceById, searchTraces } from "~/server/elasticsearch/traces";
-import type { ChatMessage, LLMSpan } from "~/server/tracer/types";
+import { TraceService } from "~/server/traces/trace.service";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
@@ -23,13 +21,17 @@ export const spansRouter = createTRPCRouter({
         projectId: input.projectId,
       });
 
-      const trace = await getTraceById({
-        connConfig: { projectId: input.projectId },
-        traceId: input.traceId,
-        protections,
-        includeSpans: true,
-      });
-      if (!trace?.spans) {
+      const traceService = TraceService.create(ctx.prisma);
+      const traces = await traceService.getTracesWithSpans(input.projectId, [input.traceId], protections);
+      if (traces.length === 0) {
+        return [];
+      }
+
+      const trace = traces.find((t) => t.trace_id === input.traceId);
+      if (!trace) {
+        return [];
+      }
+      if (!trace.spans) {
         return [];
       }
 
@@ -65,138 +67,20 @@ export const spansRouter = createTRPCRouter({
         projectId,
       });
 
-      // Find the trace containing this span using nested query
-      const traces = await searchTraces({
-        connConfig: { projectId },
-        protections,
-        search: {
-          index: TRACE_INDEX.all,
-          size: 1,
-          query: {
-            bool: {
-              filter: [
-                { term: { project_id: projectId } },
-                {
-                  nested: {
-                    path: "spans",
-                    query: {
-                      bool: {
-                        must: [
-                          { term: { "spans.span_id": spanId } },
-                          { term: { "spans.type": "llm" } },
-                        ],
-                      },
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      });
+      const traceService = TraceService.create(ctx.prisma);
+      const result = await traceService.getSpanForPromptStudio(
+        projectId,
+        spanId,
+        protections
+      );
 
-      const trace = traces[0];
-
-      if (!trace) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
-      }
-
-      const span = trace.spans?.find((s) => s.span_id === spanId);
-      if (!span) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Span not found." });
-      }
-
-      if (span.type !== "llm") {
+      if (!result) {
         throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Span is not an LLM span.",
+          code: "NOT_FOUND",
+          message: "Span not found or is not an LLM span.",
         });
       }
 
-      // Extract messages
-      const messages: Array<ChatMessage> = [];
-
-      // Handle input: convert all input types to chat messages
-      if (
-        span.input?.type === "chat_messages" &&
-        Array.isArray(span.input.value)
-      ) {
-        // Input is already formatted as chat messages
-        messages.push(...span.input.value);
-      } else if (typeof span.input?.value === "string") {
-        // Input is a plain string (type: "text", "raw", or undefined)
-        // Convert to a user message to preserve the prompt
-        messages.push({ role: "user", content: span.input.value });
-      } else if (span.input?.value != null) {
-        // Input is a structured object (type: "json" or other)
-        // Serialize to JSON and store as user message
-        messages.push({
-          role: "user",
-          content: JSON.stringify(span.input.value),
-        });
-      }
-
-      // Handle output: convert all output types to chat messages
-      if (
-        span.output?.type === "chat_messages" &&
-        Array.isArray(span.output.value)
-      ) {
-        messages.push(...span.output.value);
-      } else if (
-        span.output?.type === "json" &&
-        Array.isArray(span.output.value) &&
-        span.output.value.length > 0 &&
-        typeof span.output.value[0] === "string"
-      ) {
-        // If output type is json and it's an array of strings, treat first string as assistant reply
-        messages.push({
-          role: "assistant",
-          content: span.output.value[0],
-        });
-      } else if (span.output?.value) {
-        const content =
-          typeof span.output.value === "string"
-            ? span.output.value
-            : JSON.stringify(span.output.value);
-        messages.push({ role: "assistant", content });
-      }
-
-      // Extract LLM config
-      const params = span.params ?? {};
-      const systemPrompt = messages.find((m) => m.role === "system")?.content;
-      const llmConfig = {
-        model: (span as LLMSpan).model ?? null,
-        systemPrompt,
-        temperature: params.temperature ?? null,
-        maxTokens: params.max_tokens ?? params.maxTokens ?? null,
-        topP: params.top_p ?? params.topP ?? null,
-        litellmParams: {} as Record<string, any>,
-      };
-
-      const excludeKeys = new Set([
-        "temperature",
-        "max_tokens",
-        "maxTokens",
-        "top_p",
-        "topP",
-        "_keys",
-      ]);
-      Object.entries(params).forEach(([key, value]) => {
-        if (!excludeKeys.has(key)) {
-          llmConfig.litellmParams[key] = value;
-        }
-      });
-
-      return {
-        spanId: span.span_id,
-        traceId: trace.trace_id,
-        spanName: span.name ?? null,
-        messages,
-        llmConfig,
-        vendor: (span as LLMSpan).vendor ?? null,
-        error: span.error ?? null,
-        timestamps: span.timestamps,
-        metrics: span.metrics ?? null,
-      };
+      return result;
     }),
 });
