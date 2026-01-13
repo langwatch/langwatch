@@ -38,7 +38,7 @@ describe("isAtMaxProjects", () => {
       expect(isAtMaxProjects(usage)).toBe(false);
     });
 
-    it("returns false when override is undefined (treated as false)", () => {
+    it("returns true when override is undefined (no override)", () => {
       const usage: UsageData = {
         projectsCount: 5,
         activePlan: { maxProjects: 5 },

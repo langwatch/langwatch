@@ -127,7 +127,10 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
         <Field.Root invalid={!!errors.name}>
           <Field.Label>Project Name</Field.Label>
           <Input
-            {...register("name", { required: "Project name is required" })}
+            {...register("name", {
+              required: "Project name is required",
+              validate: (v) => v.trim().length > 0 || "Project name is required",
+            })}
             placeholder="AI Project"
           />
           {errors.name && (
@@ -160,6 +163,8 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                 <Input
                   {...register("newTeamName", {
                     required: teamId === "NEW" ? "Team name is required" : false,
+                    validate: (v) =>
+                      teamId !== "NEW" || (v?.trim().length ?? 0) > 0 || "Team name is required",
                   })}
                   placeholder="Engineering Team"
                 />
