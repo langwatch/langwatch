@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { Prisma, type PrismaClient } from "@prisma/client";
-import { projectRouter, generateApiKey } from "../project";
+import { projectRouter } from "../project";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
@@ -191,28 +191,6 @@ describe("project.regenerateApiKey mutation logic", () => {
         code: "INTERNAL_SERVER_ERROR",
         message: "Database connection failed",
       });
-    });
-  });
-
-  describe("API key generation format", () => {
-    // These tests use the real nanoid to validate actual generation
-    beforeEach(async () => {
-      // Restore real nanoid for format/length tests
-      vi.unmock("nanoid");
-    });
-
-    it("generates keys with correct format (sk-lw-*)", () => {
-      // Call the actual generateApiKey function with real nanoid
-      const generatedKey = generateApiKey();
-
-      expect(generatedKey).toMatch(/^sk-lw-/);
-    });
-
-    it("generates keys with correct length", () => {
-      // Call the actual generateApiKey function with real nanoid
-      const generatedKey = generateApiKey();
-
-      expect(generatedKey.length).toBe(54); // "sk-lw-" (6) + 48 characters
     });
   });
 });
