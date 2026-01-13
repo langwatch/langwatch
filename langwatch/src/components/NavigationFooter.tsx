@@ -5,7 +5,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import { useRouter } from "next/router";
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
-import type { AppRouter } from "../../server/api/root";
+import type { AppRouter } from "../server/api/root";
 
 // Constants
 const DEFAULT_PAGE_SIZE = 25;
@@ -24,7 +24,10 @@ interface CursorInfo {
 /**
  * Safely parses a URL query parameter to a number with fallback
  */
-const parseQueryNumber = (value: string | string[] | undefined, fallback: number): number => {
+const parseQueryNumber = (
+  value: string | string[] | undefined,
+  fallback: number,
+): number => {
   if (typeof value === "string") {
     const parsed = parseInt(value, 10);
     return isNaN(parsed) ? fallback : parsed;
@@ -65,21 +68,23 @@ export const useMessagesNavigationFooter = () => {
   const [cursorPageNumber, setCursorPageNumber] = useState<number>(1);
 
   // Safely parse URL parameters
-  const pageOffset = useMemo(() =>
-    parseQueryNumber(router.query.pageOffset, 0),
-    [router.query.pageOffset]
+  const pageOffset = useMemo(
+    () => parseQueryNumber(router.query.pageOffset, 0),
+    [router.query.pageOffset],
   );
 
-  const pageSize = useMemo(() =>
-    parseQueryNumber(router.query.pageSize, DEFAULT_PAGE_SIZE),
-    [router.query.pageSize]
+  const pageSize = useMemo(
+    () => parseQueryNumber(router.query.pageSize, DEFAULT_PAGE_SIZE),
+    [router.query.pageSize],
   );
 
   const urlScrollId = router.query.scrollId as string | null;
   const useCursorPagination = !!urlScrollId;
 
   const cursorInfo = useMemo(() => decodeCursor(urlScrollId), [urlScrollId]);
-  const estimatedTotalPages = Math.ceil(totalHits / (cursorInfo?.pageSize || pageSize));
+  const estimatedTotalPages = Math.ceil(
+    totalHits / (cursorInfo?.pageSize || pageSize),
+  );
 
   // Reset cursor page number when switching pagination modes
   useEffect(() => {
@@ -92,26 +97,29 @@ export const useMessagesNavigationFooter = () => {
    * Navigate to the next page
    * @param currentResponseScrollId - Scroll ID from the current response (for cursor pagination)
    */
-  const nextPage = useCallback((currentResponseScrollId?: string | null) => {
-    if (currentResponseScrollId) {
-      // Cursor-based pagination
-      setCursorPageNumber(prev => prev + 1);
-      void router.push({
-        pathname: router.pathname,
-        query: { ...router.query, scrollId: currentResponseScrollId },
-      });
-    } else if (useCursorPagination) {
-      // In cursor mode but no more results
-      return;
-    } else {
-      // Offset-based pagination
-      const newOffset = pageOffset + pageSize;
-      void router.push({
-        pathname: router.pathname,
-        query: { ...router.query, pageOffset: newOffset.toString() },
-      });
-    }
-  }, [router, pageOffset, pageSize, useCursorPagination]);
+  const nextPage = useCallback(
+    (currentResponseScrollId?: string | null) => {
+      if (currentResponseScrollId) {
+        // Cursor-based pagination
+        setCursorPageNumber((prev) => prev + 1);
+        void router.push({
+          pathname: router.pathname,
+          query: { ...router.query, scrollId: currentResponseScrollId },
+        });
+      } else if (useCursorPagination) {
+        // In cursor mode but no more results
+        return;
+      } else {
+        // Offset-based pagination
+        const newOffset = pageOffset + pageSize;
+        void router.push({
+          pathname: router.pathname,
+          query: { ...router.query, pageOffset: newOffset.toString() },
+        });
+      }
+    },
+    [router, pageOffset, pageSize, useCursorPagination],
+  );
 
   /**
    * Navigate to the previous page
@@ -138,36 +146,48 @@ export const useMessagesNavigationFooter = () => {
    * Change the page size and reset pagination
    * @param size - New page size
    */
-  const changePageSize = useCallback((size: number) => {
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageSize: size.toString(), pageOffset: "0", scrollId: undefined },
-    });
-  }, [router]);
+  const changePageSize = useCallback(
+    (size: number) => {
+      void router.push({
+        pathname: router.pathname,
+        query: {
+          ...router.query,
+          pageSize: size.toString(),
+          pageOffset: "0",
+          scrollId: undefined,
+        },
+      });
+    },
+    [router],
+  );
 
   /**
    * Hook to update total hits from TRPC query result
    * @param traceGroups - TRPC query result
    */
-  const useUpdateTotalHits = useCallback((
-    traceGroups: UseTRPCQueryResult<
-      inferRouterOutputs<AppRouter>["traces"]["getAllForProject"],
-      TRPCClientErrorLike<AppRouter>
-    >,
+  const useUpdateTotalHits = <T extends { totalHits?: number }>(
+    queryResult: UseTRPCQueryResult<T, TRPCClientErrorLike<AppRouter>>,
   ) => {
     useEffect(() => {
-      if (traceGroups.isFetched && traceGroups.data) {
-        setTotalHits(traceGroups.data.totalHits ?? 0);
+      if (queryResult.isFetched) {
+        const totalHits: number = queryResult.data?.totalHits ?? 0;
+        setTotalHits(totalHits);
       }
-    }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
-  }, []);
+    }, [queryResult.data?.totalHits, queryResult.isFetched, queryResult.data]);
+  };
 
   // Reset pagination when search query changes
   useEffect(() => {
     void router.push({
       pathname: router.pathname,
-      query: { ...router.query, pageOffset: "0", pageSize: DEFAULT_PAGE_SIZE.toString(), scrollId: undefined },
+      query: {
+        ...router.query,
+        pageOffset: "0",
+        pageSize: DEFAULT_PAGE_SIZE.toString(),
+        scrollId: undefined,
+      },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.query.query]); // Note: This might need adjustment based on your query param name
 
   return {
@@ -230,8 +250,10 @@ export function MessagesNavigationFooter({
               borderColor="black"
               borderRadius="lg"
             >
-              {PAGE_SIZE_OPTIONS.map(size => (
-                <option key={size} value={size.toString()}>{size}</option>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size.toString()}>
+                  {size}
+                </option>
               ))}
             </NativeSelect.Field>
             <NativeSelect.Indicator />
@@ -241,11 +263,12 @@ export function MessagesNavigationFooter({
 
       <HStack gap={3} paddingRight={3}>
         <Text flexShrink={0}>
-          {useCursorPagination ? (
-            `Page ${cursorPageNumber} of ~${estimatedTotalPages} (${totalHits} total items)`
-          ) : (
-            `${pageOffset + 1}-${Math.min(pageOffset + pageSize, totalHits)} of ${totalHits} items`
-          )}
+          {useCursorPagination
+            ? `Page ${cursorPageNumber} of ~${estimatedTotalPages} (${totalHits} total items)`
+            : `${pageOffset + 1}-${Math.min(
+                pageOffset + pageSize,
+                totalHits,
+              )} of ${totalHits} items`}
         </Text>
         <HStack gap={0}>
           <Button
@@ -253,8 +276,12 @@ export function MessagesNavigationFooter({
             padding={0}
             onClick={prevPage}
             disabled={isPrevDisabled}
-            aria-label={useCursorPagination ? "Go to first page" : "Go to previous page"}
-            title={useCursorPagination ? "Go to first page" : "Go to previous page"}
+            aria-label={
+              useCursorPagination ? "Go to first page" : "Go to previous page"
+            }
+            title={
+              useCursorPagination ? "Go to first page" : "Go to previous page"
+            }
           >
             <ChevronLeft />
           </Button>
@@ -274,3 +301,6 @@ export function MessagesNavigationFooter({
   );
 }
 
+// Backward compatibility exports
+export const useNavigationFooter = useMessagesNavigationFooter;
+export const NavigationFooter = MessagesNavigationFooter;

@@ -60,7 +60,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
   const experimentsSlugMap = useMemo(() => {
     return Object.fromEntries(
-      experiments.data?.map((experiment) => [experiment.id, experiment.slug]) ??
+      experiments.data?.experiments?.map((experiment) => [experiment.id, experiment.slug]) ??
         [],
     );
   }, [experiments.data]);
@@ -193,7 +193,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                 if (!project || !monitor.experimentId) return;
 
                                 if (hasPermission("evaluations:manage")) {
-                                  const experiment = experiments.data?.find(
+                                  const experiment = experiments.data?.experiments?.find(
                                     (e) => e.id === monitor.experimentId,
                                   );
                                   if (experiment) {
