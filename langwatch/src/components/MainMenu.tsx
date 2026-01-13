@@ -8,6 +8,7 @@ import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
 import { useTableView } from "./messages/HeaderButtons";
+import { CollapsibleMenuGroup } from "./sidebar/CollapsibleMenuGroup";
 import { SideMenuLink } from "./sidebar/SideMenuLink";
 import { SupportMenu } from "./sidebar/SupportMenu";
 import { UsageIndicator } from "./sidebar/UsageIndicator";
@@ -96,13 +97,37 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
-            <PageMenuLink
-              path={projectRoutes.simulations.path}
+            <CollapsibleMenuGroup
               icon={featureIcons.simulations.icon}
               label={projectRoutes.simulations.title}
               project={project}
-              isActive={router.pathname.includes("/simulations")}
               showLabel={showExpanded}
+              children={[
+                {
+                  icon: featureIcons.scenarios.icon,
+                  label: projectRoutes.scenarios.title,
+                  href: project
+                    ? projectRoutes.scenarios.path.replace(
+                        "[project]",
+                        project.slug
+                      )
+                    : "/auth/signin",
+                  isActive: router.pathname.includes("/simulations/scenarios"),
+                },
+                {
+                  icon: featureIcons.simulation_runs.icon,
+                  label: projectRoutes.simulation_runs.title,
+                  href: project
+                    ? projectRoutes.simulation_runs.path.replace(
+                        "[project]",
+                        project.slug
+                      )
+                    : "/auth/signin",
+                  isActive:
+                    router.pathname.includes("/simulations") &&
+                    !router.pathname.includes("/simulations/scenarios"),
+                },
+              ]}
             />
             <PageMenuLink
               path={projectRoutes.evaluations.path}
