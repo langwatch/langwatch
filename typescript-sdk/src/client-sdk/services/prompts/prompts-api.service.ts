@@ -95,12 +95,17 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   get = async (id: string, options?: { version?: string }): Promise<PromptResponse> => {
+    // Parse version to number, skip for "latest" or invalid values
+    const versionNumber = options?.version && options.version !== "latest"
+      ? parseInt(options.version, 10)
+      : undefined;
+
     const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}",
       {
         params: { path: { id } },
         query: {
-          version: options?.version,
+          version: Number.isNaN(versionNumber) ? undefined : versionNumber,
         },
       },
     );

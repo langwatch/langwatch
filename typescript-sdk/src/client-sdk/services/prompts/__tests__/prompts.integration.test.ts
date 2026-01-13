@@ -26,8 +26,13 @@ const http = createOpenApiHttp<paths>({
 });
 
 const handlers = [
-  http.get("/api/prompts/{id}", ({ params, response }) => {
-    const prompt = promptResponseFactory.build({ id: params.id });
+  http.get("/api/prompts/{id}", ({ params, request, response }) => {
+    const url = new URL(request.url);
+    const versionParam = url.searchParams.get("version");
+    const prompt = promptResponseFactory.build({
+      id: params.id,
+      ...(versionParam && { version: parseInt(versionParam, 10) }),
+    });
     return response(200).json(prompt);
   }),
   http.post("/api/prompts", async ({ request, response }) => {
