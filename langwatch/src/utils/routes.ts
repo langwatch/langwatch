@@ -124,7 +124,7 @@ export const projectRoutes = {
   },
   simulations_batch: {
     path: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
-    title: "Simulations",
+    title: "Runs",
     parent: "simulations",
   },
   simulations_run: {

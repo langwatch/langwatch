@@ -173,12 +173,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
               toaster.create({
                 title: "Scenario run failed",
                 description:
-                  "The scenario run encountered an error. Check the run details for more information.",
+                  "The scenario encountered an error during execution.",
                 type: "error",
                 meta: { closable: true },
                 action: runPath
                   ? {
-                      label: "View Details",
+                      label: "View failed run",
                       onClick: () => void router.push(runPath),
                     }
                   : undefined,

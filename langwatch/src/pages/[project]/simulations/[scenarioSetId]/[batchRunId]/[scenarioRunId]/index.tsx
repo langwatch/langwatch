@@ -80,7 +80,7 @@ export default function IndividualScenarioRunPage() {
           });
 
         // Poll for the run to appear, then redirect
-        const newScenarioRunId = await pollForScenarioRun(
+        const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
           {
             projectId: project.id,
@@ -89,13 +89,13 @@ export default function IndividualScenarioRunPage() {
           },
         );
 
-        if (newScenarioRunId) {
+        if (result.success) {
           void router.push(
             buildRoutePath("simulations_run", {
               project: project.slug,
               scenarioSetId: setId,
               batchRunId: newBatchRunId,
-              scenarioRunId: newScenarioRunId,
+              scenarioRunId: result.scenarioRunId,
             }),
           );
         }
