@@ -107,13 +107,6 @@ export function SaveAndRunMenu({
       <Portal>
         <Popover.Content width="320px" padding={0}>
           <VStack gap={0} align="stretch">
-            {/* Header */}
-            <Box padding={3} borderBottomWidth="1px" borderColor="gray.200">
-              <Text fontSize="sm" fontWeight="medium">
-                Choose what to run against
-              </Text>
-            </Box>
-
             {/* Search Input */}
             <Box padding={2} borderBottomWidth="1px" borderColor="gray.200">
               <Input
@@ -138,7 +131,7 @@ export function SaveAndRunMenu({
                   paddingY={2}
                   bg="gray.50"
                 >
-                  Run with Prompt
+                  Run against Prompt
                 </Text>
                 {filteredPrompts.length === 0 ? (
                   <Text
@@ -211,7 +204,7 @@ export function SaveAndRunMenu({
                   paddingY={2}
                   bg="gray.50"
                 >
-                  Run with HTTP Agent
+                  Run against HTTP Agent
                 </Text>
                 {filteredAgents.length === 0 ? (
                   <Text

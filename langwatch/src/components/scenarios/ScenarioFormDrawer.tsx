@@ -129,45 +129,54 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
         return;
       }
-      await form.handleSubmit(async (data) => {
-        const savedScenario = await handleSave(data);
-        if (!savedScenario) return;
+      try {
+        await form.handleSubmit(async (data) => {
+          const savedScenario = await handleSave(data);
+          if (!savedScenario) return;
 
-        // Persist the target selection for this scenario
-        persistTarget(target);
+          // Persist the target selection for this scenario
+          persistTarget(target);
 
-        const { setId, batchRunId } = await runMutation.mutateAsync({
-          projectId: project.id,
-          scenarioId: savedScenario.id,
-          target: { type: target.type, referenceId: target.id },
+          const { setId, batchRunId } = await runMutation.mutateAsync({
+            projectId: project.id,
+            scenarioId: savedScenario.id,
+            target: { type: target.type, referenceId: target.id },
+          });
+
+          // Poll for the run to appear, then redirect to the specific run
+          const scenarioRunId = await pollForScenarioRun(
+            utils.scenarios.getBatchRunData.fetch,
+            { projectId: project.id, scenarioSetId: setId, batchRunId },
+          );
+
+          if (scenarioRunId) {
+            void router.push(
+              buildRoutePath("simulations_run", {
+                project: project.slug,
+                scenarioSetId: setId,
+                batchRunId,
+                scenarioRunId,
+              }),
+            );
+          } else {
+            toaster.create({
+              title: "Run timed out",
+              description:
+                "The scenario run took too long to start. Please try again.",
+              type: "error",
+              meta: { closable: true },
+            });
+          }
+        })();
+      } catch (error) {
+        toaster.create({
+          title: "Failed to run scenario",
+          description:
+            error instanceof Error ? error.message : "An error occurred",
+          type: "error",
+          meta: { closable: true },
         });
-
-        // Poll for the run to appear, then redirect to the specific run
-        const scenarioRunId = await pollForScenarioRun(
-          utils.scenarios.getBatchRunData.fetch,
-          { projectId: project.id, scenarioSetId: setId, batchRunId },
-        );
-
-        if (scenarioRunId) {
-          void router.push(
-            buildRoutePath("simulations_run", {
-              project: project.slug,
-              scenarioSetId: setId,
-              batchRunId,
-              scenarioRunId,
-            }),
-          );
-        } else {
-          // Fallback to batch page if polling times out
-          void router.push(
-            buildRoutePath("simulations_batch", {
-              project: project.slug,
-              scenarioSetId: setId,
-              batchRunId,
-            }),
-          );
-        }
-      })();
+      }
     },
     [handleSave, project, persistTarget, runMutation, router, utils],
   );
