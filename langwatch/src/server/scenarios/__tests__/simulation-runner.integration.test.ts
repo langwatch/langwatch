@@ -235,8 +235,11 @@ describe("SimulationRunnerService Integration", () => {
         id: scenario.id,
         name: scenario.name,
         agents: expect.arrayContaining([
-          expect.objectContaining({ name: "PromptConfigAdapter" }),
+          expect.objectContaining({ role: "Agent" }), // PromptConfigAdapter
         ]),
+      }),
+      expect.objectContaining({
+        batchRunId: "scenariobatch_test123",
       })
     );
   });

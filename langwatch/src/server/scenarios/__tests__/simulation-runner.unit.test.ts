@@ -118,6 +118,9 @@ describe("SimulationRunnerService", () => {
       expect(mockScenarioRun).toHaveBeenCalledWith(
         expect.objectContaining({
           description: situation,
+        }),
+        expect.objectContaining({
+          batchRunId: "scenariobatch_test123",
         })
       );
     });
