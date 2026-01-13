@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TRPCError } from "@trpc/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
+import { projectRouter, generateApiKey } from "../project";
 
 /**
  * Unit tests for project.regenerateApiKey mutation
@@ -11,10 +12,21 @@ import { Prisma } from "@prisma/client";
  * - Error handling for other Prisma errors
  */
 
-// Mock the generateApiKey function
+// Mock nanoid to control API key generation
 vi.mock("nanoid", () => ({
   nanoid: vi.fn(() => "mock-nano-id"),
-  customAlphabet: vi.fn(() => () => "mock48characterrandomstringforapikeygeneration"),
+  customAlphabet: vi.fn(
+    () => () => "mock48characterrandomstringforapikeygeneration",
+  ),
+}));
+
+// Mock the permission check to always allow
+vi.mock("../../rbac", () => ({
+  hasProjectPermission: vi.fn(() => Promise.resolve(true)),
+  checkProjectPermission: () => async ({ ctx, next }: any) => {
+    ctx.permissionChecked = true;
+    return next();
+  },
 }));
 
 describe("project.regenerateApiKey mutation logic", () => {
@@ -23,6 +35,7 @@ describe("project.regenerateApiKey mutation logic", () => {
       update: ReturnType<typeof vi.fn>;
     };
   };
+  let caller: ReturnType<typeof projectRouter.createCaller>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,10 +44,23 @@ describe("project.regenerateApiKey mutation logic", () => {
         update: vi.fn(),
       },
     };
+
+    // Create a caller with mocked context
+    const ctx = {
+      session: {
+        user: { id: "test-user-id" },
+        expires: "1",
+      },
+      prisma: mockPrisma as unknown as PrismaClient,
+      permissionChecked: true,
+      publiclyShared: false,
+    };
+
+    caller = projectRouter.createCaller(ctx);
   });
 
   describe("when project exists", () => {
-    it("generates a new API key", async () => {
+    it("generates a new API key with correct format", async () => {
       // Arrange
       const projectId = "project_123";
       mockPrisma.project.update.mockResolvedValueOnce({
@@ -44,84 +70,62 @@ describe("project.regenerateApiKey mutation logic", () => {
       });
 
       // Act
-      const result = await mockPrisma.project.update({
-        where: { id: projectId },
-        data: {
-          apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
-        },
-        select: {
-          apiKey: true,
-          id: true,
-          slug: true,
-        },
-      });
+      const result = await caller.regenerateApiKey({ projectId });
 
       // Assert
+      expect(result.success).toBe(true);
       expect(result.apiKey).toMatch(/^sk-lw-/);
-      expect(result.apiKey.length).toBeGreaterThan(10);
+      expect(result.apiKey).toBe(
+        "sk-lw-mock48characterrandomstringforapikeygeneration",
+      );
     });
 
-    it("updates the project with the new API key", async () => {
+    it("calls prisma.project.update with the new API key", async () => {
       // Arrange
       const projectId = "project_123";
-      const newApiKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
-
       mockPrisma.project.update.mockResolvedValueOnce({
         id: projectId,
-        apiKey: newApiKey,
+        apiKey: "sk-lw-mock48characterrandomstringforapikeygeneration",
         slug: "test-project",
       });
 
       // Act
-      await mockPrisma.project.update({
-        where: { id: projectId },
-        data: { apiKey: newApiKey },
-        select: {
-          apiKey: true,
-          id: true,
-          slug: true,
-        },
-      });
+      await caller.regenerateApiKey({ projectId });
 
       // Assert
-      expect(mockPrisma.project.update).toHaveBeenCalledWith({
-        where: { id: projectId },
-        data: { apiKey: newApiKey },
-        select: {
-          apiKey: true,
-          id: true,
-          slug: true,
-        },
-      });
+      expect(mockPrisma.project.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: projectId },
+          data: {
+            apiKey: expect.stringMatching(/^sk-lw-/),
+          },
+          select: {
+            apiKey: true,
+            id: true,
+            slug: true,
+          },
+        }),
+      );
     });
 
     it("returns success with the new API key", async () => {
       // Arrange
       const projectId = "project_123";
-      const newApiKey = "sk-lw-newkeygeneratedhere123456789012345678";
+      const expectedApiKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
 
       mockPrisma.project.update.mockResolvedValueOnce({
         id: projectId,
-        apiKey: newApiKey,
+        apiKey: expectedApiKey,
         slug: "test-project",
       });
 
       // Act
-      const result = await mockPrisma.project.update({
-        where: { id: projectId },
-        data: { apiKey: newApiKey },
-        select: {
-          apiKey: true,
-          id: true,
-          slug: true,
-        },
-      });
+      const result = await caller.regenerateApiKey({ projectId });
 
-      // Assert - Simulating the mutation return
-      const response = { success: true, apiKey: result.apiKey };
-      expect(response).toEqual({
+      // Assert
+      expect(result).toEqual({
         success: true,
-        apiKey: newApiKey,
+        apiKey: expectedApiKey,
       });
     });
   });
@@ -140,28 +144,13 @@ describe("project.regenerateApiKey mutation logic", () => {
 
       mockPrisma.project.update.mockRejectedValueOnce(prismaError);
 
-      // Act & Assert
-      try {
-        await mockPrisma.project.update({
-          where: { id: projectId },
-          data: { apiKey: "new-key" },
-          select: { apiKey: true, id: true, slug: true },
-        });
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        // Simulate the error handling logic from the mutation
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2025"
-        ) {
-          const trpcError = new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-          expect(trpcError.code).toBe("NOT_FOUND");
-          expect(trpcError.message).toBe("Project not found");
-        }
-      }
+      // Act & Assert - Call actual mutation and verify it throws correct error
+      await expect(
+        caller.regenerateApiKey({ projectId }),
+      ).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
     });
   });
 
@@ -179,28 +168,13 @@ describe("project.regenerateApiKey mutation logic", () => {
 
       mockPrisma.project.update.mockRejectedValueOnce(prismaError);
 
-      // Act & Assert
-      try {
-        await mockPrisma.project.update({
-          where: { id: projectId },
-          data: { apiKey: "new-key" },
-          select: { apiKey: true, id: true, slug: true },
-        });
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        // Simulate the error handling logic from the mutation
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2025"
-        ) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-        }
-        // Should reach here and re-throw
-        expect(error).toBe(prismaError);
-      }
+      // Act & Assert - tRPC wraps non-P2025 errors as INTERNAL_SERVER_ERROR
+      await expect(
+        caller.regenerateApiKey({ projectId }),
+      ).rejects.toMatchObject({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Connection error",
+      });
     });
 
     it("re-throws non-Prisma errors", async () => {
@@ -210,38 +184,35 @@ describe("project.regenerateApiKey mutation logic", () => {
 
       mockPrisma.project.update.mockRejectedValueOnce(genericError);
 
-      // Act & Assert
-      try {
-        await mockPrisma.project.update({
-          where: { id: projectId },
-          data: { apiKey: "new-key" },
-          select: { apiKey: true, id: true, slug: true },
-        });
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        // Simulate the error handling logic from the mutation
-        if (
-          error instanceof Prisma.PrismaClientKnownRequestError &&
-          error.code === "P2025"
-        ) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-        }
-        // Should reach here and re-throw
-        expect(error).toBe(genericError);
-      }
+      // Act & Assert - tRPC wraps generic errors as INTERNAL_SERVER_ERROR
+      await expect(
+        caller.regenerateApiKey({ projectId }),
+      ).rejects.toMatchObject({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Database connection failed",
+      });
     });
   });
 
   describe("API key generation format", () => {
+    // These tests use the real nanoid to validate actual generation
+    beforeEach(async () => {
+      // Restore real nanoid for format/length tests
+      vi.unmock("nanoid");
+    });
+
     it("generates keys with correct format (sk-lw-*)", () => {
-      // This tests the generateApiKey function indirectly
-      const generatedKey = "sk-lw-mock48characterrandomstringforapikeygeneration";
+      // Call the actual generateApiKey function with real nanoid
+      const generatedKey = generateApiKey();
 
       expect(generatedKey).toMatch(/^sk-lw-/);
-      expect(generatedKey.length).toBe(52); // "sk-lw-" (6) + 46 characters in this mock
+    });
+
+    it("generates keys with correct length", () => {
+      // Call the actual generateApiKey function with real nanoid
+      const generatedKey = generateApiKey();
+
+      expect(generatedKey.length).toBe(54); // "sk-lw-" (6) + 48 characters
     });
   });
 });

@@ -638,7 +638,7 @@ export const projectRouter = createTRPCRouter({
     }),
 });
 
-const generateApiKey = (): string => {
+export const generateApiKey = (): string => {
   const alphabet =
     "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
   const randomPart = customAlphabet(alphabet, 48)();
