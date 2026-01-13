@@ -220,7 +220,7 @@ describe("HttpAgentAdapter", () => {
       expect(body.thread).toBe("my-thread-123");
     });
 
-    it("replaces {{lastMessage}} with last message content", async () => {
+    it("replaces {{input}} with last message content", async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -230,7 +230,7 @@ describe("HttpAgentAdapter", () => {
       );
 
       const agent = createHttpAgent({
-        bodyTemplate: '{"input": "{{lastMessage}}"}',
+        bodyTemplate: '{"input": "{{input}}"}',
       });
       const repository = createMockAgentRepository(agent);
       const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });

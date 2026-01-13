@@ -231,7 +231,7 @@ export class HttpAgentAdapter extends AgentAdapter {
     const lastMessage = input.messages[input.messages.length - 1];
     if (lastMessage) {
       body = body.replace(
-        /\{\{\s*lastMessage\s*\}\}/g,
+        /\{\{\s*input\s*\}\}/g,
         typeof lastMessage.content === "string"
           ? lastMessage.content
           : JSON.stringify(lastMessage.content),

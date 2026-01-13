@@ -5,6 +5,7 @@ import { Box, Code, Text, Textarea, VStack } from "@chakra-ui/react";
  * These are provided at runtime by the Scenario/Workflow execution.
  */
 export const STANDARD_AGENT_VARIABLES = [
+  { name: "input", description: "The user's input message to the agent" },
   { name: "threadId", description: "Unique identifier for the conversation thread" },
   { name: "messages", description: "Array of chat messages in OpenAI format" },
 ] as const;
