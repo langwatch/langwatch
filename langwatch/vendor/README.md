@@ -17,7 +17,7 @@ published to npm to allow faster iteration during development.
 
 To update a vendored package:
 
-1. In the source repo (e.g., scenario-ts), run `pnpm pack`
+1. In the source repo (https://github.com/langwatch/scenario), navigate to the `/javascript` directory and run `pnpm buildpack`
 2. Copy the generated `.tgz` file to this directory
 3. Update the dependency in `package.json` to point to the new tarball
 4. Run `pnpm install` to update the lockfile
