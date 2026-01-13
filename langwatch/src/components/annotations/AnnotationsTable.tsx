@@ -133,9 +133,9 @@ export const AnnotationsTable = ({
       }))
     : transformToUnifiedQueueItems(assignedQueueItems || []);
 
-  const openAnnotationQueue = (queueItemId: string) => {
+  const openAnnotationQueue = (queueItemId: string, traceId: string) => {
     void router.push(
-      `/${project?.slug}/annotations/my-queue?queue-item=${queueItemId}`,
+      `/${project?.slug}/annotations/my-queue?queue-item=${queueItemId}&trace=${traceId}`,
     );
   };
 
@@ -154,7 +154,7 @@ export const AnnotationsTable = ({
     if (isDone ?? doneAt) {
       openTraceDrawer(traceId);
     } else {
-      openAnnotationQueue(queueItemId);
+      openAnnotationQueue(queueItemId, traceId);
     }
   };
 
