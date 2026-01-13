@@ -35,30 +35,36 @@ export async function pollForScenarioRun(
   fetchBatchRunData: FetchBatchRunData,
   params: PollForRunParams,
 ): Promise<PollResult> {
-  logger.info("Starting poll", {
-    projectId: params.projectId,
-    scenarioSetId: params.scenarioSetId,
-    batchRunId: params.batchRunId,
-  });
+  logger.info(
+    {
+      projectId: params.projectId,
+      scenarioSetId: params.scenarioSetId,
+      batchRunId: params.batchRunId,
+    },
+    "Starting poll",
+  );
 
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
-      logger.info("Fetching batch run data", { attempt });
+      logger.info({ attempt }, "Fetching batch run data");
       const runs = await fetchBatchRunData(params);
-      logger.info("Fetch completed", { attempt, runsCount: runs.length });
+      logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
 
       if (attempt % 10 === 0) {
-        logger.info("Polling attempt", {
-          attempt,
-          runsCount: runs.length,
-          firstRun: runs[0]
-            ? {
-                scenarioRunId: runs[0].scenarioRunId,
-                status: runs[0].status,
-                messagesCount: runs[0].messages?.length ?? 0,
-              }
-            : null,
-        });
+        logger.info(
+          {
+            attempt,
+            runsCount: runs.length,
+            firstRun: runs[0]
+              ? {
+                  scenarioRunId: runs[0].scenarioRunId,
+                  status: runs[0].status,
+                  messagesCount: runs[0].messages?.length ?? 0,
+                }
+              : null,
+          },
+          "Polling attempt",
+        );
       }
 
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
@@ -66,7 +72,7 @@ export async function pollForScenarioRun(
 
         // Check for error states first
         if (run.status === "ERROR" || run.status === "FAILED") {
-          logger.info("Run errored", { status: run.status, scenarioRunId: run.scenarioRunId });
+          logger.info({ status: run.status, scenarioRunId: run.scenarioRunId }, "Run errored");
           return {
             success: false,
             error: "run_error",
@@ -77,25 +83,24 @@ export async function pollForScenarioRun(
         // Return success if we have messages to show or run is complete
         const hasMessages = run.messages && run.messages.length > 0;
         if (hasMessages || run.status === "SUCCESS") {
-          logger.info("Run ready", {
-            status: run.status,
-            hasMessages,
-            scenarioRunId: run.scenarioRunId,
-          });
+          logger.info(
+            { status: run.status, hasMessages, scenarioRunId: run.scenarioRunId },
+            "Run ready",
+          );
           return { success: true, scenarioRunId: run.scenarioRunId };
         }
 
         // Run exists but no messages yet and not terminal - keep polling
       }
     } catch (error) {
-      logger.error("Fetch error", { error });
+      logger.error({ error }, "Fetch error");
       // Continue polling on error
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL_MS));
   }
 
-  logger.warn("Timed out", { maxAttempts: MAX_POLLING_ATTEMPTS });
+  logger.warn({ maxAttempts: MAX_POLLING_ATTEMPTS }, "Timed out");
 
   return { success: false, error: "timeout" };
 }
