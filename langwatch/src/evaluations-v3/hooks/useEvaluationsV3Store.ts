@@ -7,6 +7,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 
 import {
   createInitialState,
+  createInitialResults,
   type TargetConfig,
   type CellPosition,
   type DatasetColumn,
@@ -1092,6 +1093,20 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     const state = wizardState as Record<string, unknown>;
 
+    // Load persisted results if available
+    const persistedResults = state.results as Record<string, unknown> | undefined;
+    const loadedResults = persistedResults
+      ? {
+          ...createInitialResults(),
+          runId: persistedResults.runId as string | undefined,
+          versionId: persistedResults.versionId as string | undefined,
+          targetOutputs: (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
+          targetMetadata: (persistedResults.targetMetadata as Record<string, Array<{ cost?: number; duration?: number; traceId?: string }>>) ?? {},
+          evaluatorResults: (persistedResults.evaluatorResults as Record<string, Record<string, unknown[]>>) ?? {},
+          errors: (persistedResults.errors as Record<string, string[]>) ?? {},
+        }
+      : undefined;
+
     set((current) => ({
       ...current,
       experimentId: (state.experimentId as string) ?? current.experimentId,
@@ -1102,6 +1117,8 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
       // Support loading old state format (agents) and new format (targets)
       targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
+      // Load persisted results if available
+      results: loadedResults ?? current.results,
     }));
   },
 

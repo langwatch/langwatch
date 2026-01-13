@@ -1,0 +1,289 @@
+/**
+ * Tests for BatchEvaluationResultsTable component
+ *
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { render, screen, cleanup } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
+import type { BatchEvaluationData } from "../types";
+
+// Mock the drawer hook
+vi.mock("~/hooks/useDrawer", () => ({
+  useDrawer: () => ({
+    openDrawer: vi.fn(),
+  }),
+}));
+
+// Wrapper with Chakra provider
+const Wrapper = ({ children }: { children: ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+// Helper to create test data
+const createTestData = (
+  overrides: Partial<BatchEvaluationData> = {}
+): BatchEvaluationData => ({
+  runId: "run-1",
+  experimentId: "exp-1",
+  projectId: "proj-1",
+  createdAt: Date.now(),
+  datasetColumns: [
+    { name: "input", hasImages: false },
+    { name: "expected", hasImages: false },
+  ],
+  targetColumns: [
+    {
+      id: "target-1",
+      name: "GPT-4o",
+      type: "prompt",
+      outputFields: ["response"],
+    },
+  ],
+  evaluatorIds: ["eval-1"],
+  evaluatorNames: { "eval-1": "Exact Match" },
+  rows: [
+    {
+      index: 0,
+      datasetEntry: { input: "What is 2+2?", expected: "4" },
+      targets: {
+        "target-1": {
+          targetId: "target-1",
+          output: { response: "4" },
+          cost: 0.001,
+          duration: 500,
+          error: null,
+          traceId: "trace-1",
+          evaluatorResults: [
+            {
+              evaluatorId: "eval-1",
+              evaluatorName: "Exact Match",
+              status: "processed",
+              score: 1.0,
+              passed: true,
+            },
+          ],
+        },
+      },
+    },
+  ],
+  ...overrides,
+});
+
+describe("BatchEvaluationResultsTable", () => {
+  beforeEach(() => {
+    cleanup();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("Loading State", () => {
+    it("shows skeleton when loading", () => {
+      render(<BatchEvaluationResultsTable data={null} isLoading />, {
+        wrapper: Wrapper,
+      });
+
+      // Check for skeleton elements
+      const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
+      expect(skeletons.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Empty State", () => {
+    it("shows empty message when no data", () => {
+      render(<BatchEvaluationResultsTable data={null} isLoading={false} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("No results to display")).toBeInTheDocument();
+    });
+
+    it("shows empty message when rows is empty", () => {
+      const data = createTestData({ rows: [] });
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("No results to display")).toBeInTheDocument();
+    });
+  });
+
+  describe("Column Headers", () => {
+    it("renders row number column (empty header, shows row numbers in cells)", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      // Row number column has empty header but shows numbers in cells
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    it("renders dataset column headers", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByText("expected")).toBeInTheDocument();
+    });
+
+    it("renders target column headers", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+    });
+  });
+
+  describe("Row Data", () => {
+    it("renders row number", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("1")).toBeInTheDocument();
+    });
+
+    it("renders dataset values", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
+      // Note: "4" appears multiple times (expected, output)
+      expect(screen.getAllByText("4").length).toBeGreaterThan(0);
+    });
+
+    it("renders target output", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      // The output is JSON stringified
+      expect(screen.getByText(/response/)).toBeInTheDocument();
+    });
+
+    it("renders evaluator chips", () => {
+      const data = createTestData();
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
+    });
+  });
+
+  describe("Multiple Rows", () => {
+    it("renders all rows", () => {
+      const data = createTestData({
+        rows: [
+          {
+            index: 0,
+            datasetEntry: { input: "Row 1 input", expected: "output1" },
+            targets: {
+              "target-1": {
+                targetId: "target-1",
+                output: { response: "Response 1" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+            },
+          },
+          {
+            index: 1,
+            datasetEntry: { input: "Row 2 input", expected: "output2" },
+            targets: {
+              "target-1": {
+                targetId: "target-1",
+                output: { response: "Response 2" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+            },
+          },
+        ],
+      });
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("Row 1 input")).toBeInTheDocument();
+      expect(screen.getByText("Row 2 input")).toBeInTheDocument();
+      expect(screen.getByText("1")).toBeInTheDocument();
+      expect(screen.getByText("2")).toBeInTheDocument();
+    });
+  });
+
+  describe("Multiple Targets", () => {
+    it("renders columns for each target", () => {
+      const data = createTestData({
+        targetColumns: [
+          { id: "target-1", name: "GPT-4o", type: "prompt", outputFields: [] },
+          { id: "target-2", name: "Claude", type: "prompt", outputFields: [] },
+        ],
+        rows: [
+          {
+            index: 0,
+            datasetEntry: { input: "Hello", expected: "Hi" },
+            targets: {
+              "target-1": {
+                targetId: "target-1",
+                output: { response: "Hi from GPT" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+              "target-2": {
+                targetId: "target-2",
+                output: { response: "Hi from Claude" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+            },
+          },
+        ],
+      });
+
+      render(<BatchEvaluationResultsTable data={data} />, {
+        wrapper: Wrapper,
+      });
+
+      expect(screen.getByText("GPT-4o")).toBeInTheDocument();
+      expect(screen.getByText("Claude")).toBeInTheDocument();
+      expect(screen.getByText(/Hi from GPT/)).toBeInTheDocument();
+      expect(screen.getByText(/Hi from Claude/)).toBeInTheDocument();
+    });
+  });
+});

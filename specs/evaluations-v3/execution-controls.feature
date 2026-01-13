@@ -59,6 +59,17 @@ Feature: Evaluation Execution Controls
     And both targets show running state
     And top-level button shows stop
 
+  Scenario: Concurrent executions are fully isolated
+    Given Target 1 is being executed (showing skeletons)
+    When I click the play button on target "Target 2" header
+    Then Target 2 cells show loading skeletons
+    And Target 1 cells STILL show loading skeletons (not cleared)
+    When Target 1 completes
+    Then Target 1 shows results
+    And Target 2 still shows loading skeletons
+    When Target 2 completes
+    Then both targets show their respective results
+
   # ===========================================================================
   # Cell-Level Run Button
   # ===========================================================================
@@ -152,3 +163,34 @@ Feature: Evaluation Execution Controls
     When I click the "Run" button in the selection toolbar
     Then execution starts with 0 cells
     And completion is immediate
+
+  # ===========================================================================
+  # Re-running Cells with Existing Results
+  # ===========================================================================
+
+  Scenario: Re-running a cell with existing output shows skeleton
+    Given row 0, Target 1 has existing output "Previous result"
+    When I hover over that cell and click the play button
+    Then the cell shows a loading skeleton (output is hidden)
+    When execution completes with new output "New result"
+    Then the cell shows "New result"
+
+  Scenario: Re-running a column with existing results shows skeletons
+    Given Target 1 has results for all 3 rows
+    When I click the play button on Target 1 header
+    Then all 3 Target 1 cells show loading skeletons
+    And Target 2 cells remain unchanged with their existing content
+
+  Scenario: Re-running selected rows with existing results shows skeletons
+    Given all cells have existing results
+    And I select rows 1 and 2
+    When I click the "Run" button in the selection toolbar
+    Then rows 1 and 2 show loading skeletons for both targets
+    And row 0 keeps showing its existing results
+
+  Scenario: Partial re-run does not erase other results
+    Given Target 1 and Target 2 both have results
+    When I re-run only Target 1
+    And Target 1 execution completes with new results
+    Then Target 1 shows the new results
+    And Target 2 STILL shows its original results (not erased)

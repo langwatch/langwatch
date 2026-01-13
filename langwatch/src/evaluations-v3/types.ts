@@ -219,13 +219,20 @@ export type TargetConfig = Omit<
 export type EvaluationResultStatus = "idle" | "running" | "success" | "error";
 
 /**
- * Per-row metadata for a target execution (cost, duration, trace info).
+ * Schema for per-row metadata for a target execution.
+ * This is the source of truth - TypeScript type is derived from this.
  */
-export type TargetRowMetadata = {
-  cost?: number;
-  duration?: number;
-  traceId?: string;
-};
+export const targetRowMetadataSchema = z.object({
+  cost: z.number().optional(),
+  duration: z.number().optional(),
+  traceId: z.string().optional(),
+});
+
+/**
+ * Per-row metadata for a target execution (cost, duration, trace info).
+ * Derived from targetRowMetadataSchema - keeps types in sync automatically.
+ */
+export type TargetRowMetadata = z.infer<typeof targetRowMetadataSchema>;
 
 export type EvaluationResults = {
   runId?: string;
@@ -239,13 +246,14 @@ export type EvaluationResults = {
    * This is the single source of truth for determining which cells show loading state.
    */
   executingCells?: Set<string>;
-  // Per-row results
-  targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
-  // Per-row metadata (cost, duration, traceId)
-  targetMetadata: Record<string, TargetRowMetadata[]>; // targetId -> array of metadata per row
-  // Evaluator results nested by target
-  evaluatorResults: Record<string, Record<string, unknown[]>>; // targetId -> evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // targetId -> array of errors per row
+  // Per-row results - arrays can have holes (undefined) for rows not yet executed
+  targetOutputs: Record<string, Array<unknown>>;
+  // Per-row metadata - arrays can have holes (undefined/null) for rows not yet executed
+  targetMetadata: Record<string, Array<TargetRowMetadata | null | undefined>>;
+  // Evaluator results nested by target - arrays can have holes
+  evaluatorResults: Record<string, Record<string, Array<unknown>>>;
+  // Per-row errors - arrays can have holes (undefined) for rows without errors
+  errors: Record<string, Array<string | null | undefined>>;
 };
 
 // ============================================================================

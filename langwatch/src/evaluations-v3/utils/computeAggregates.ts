@@ -257,35 +257,9 @@ export const formatPassRate = (passRate: number | null): string => {
   return `${Math.round(passRate)}%`;
 };
 
-/**
- * Formats a score for display.
- */
-export const formatScore = (score: number | null): string => {
-  if (score === null) return "-";
-  return score.toFixed(2);
-};
-
-/**
- * Formats a cost in USD for display.
- */
-export const formatCost = (cost: number | null): string => {
-  if (cost === null) return "-";
-  if (cost < 0.01) {
-    return `$${cost.toFixed(6)}`;
-  }
-  if (cost < 1) {
-    return `$${cost.toFixed(4)}`;
-  }
-  return `$${cost.toFixed(2)}`;
-};
-
-/**
- * Formats latency (duration) in milliseconds for display.
- */
-export const formatLatency = (latencyMs: number | null): string => {
-  if (latencyMs === null) return "-";
-  if (latencyMs < 1000) {
-    return `${Math.round(latencyMs)}ms`;
-  }
-  return `${(latencyMs / 1000).toFixed(1)}s`;
-};
+// Re-export shared formatters for backward compatibility
+export {
+  formatScore,
+  formatCost,
+  formatLatency,
+} from "~/components/shared/formatters";

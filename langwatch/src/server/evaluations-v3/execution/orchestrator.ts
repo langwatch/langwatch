@@ -16,6 +16,7 @@ import { mapNlpEvent, mapErrorEvent, type ResultMapperConfig } from "./resultMap
 import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
 import { abortManager } from "./abortManager";
 import { createSemaphore } from "./semaphore";
+import { generateHumanReadableId } from "~/utils/humanReadableId";
 import type {
   ExecutionScope,
   ExecutionCell,
@@ -366,7 +367,8 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 export async function* runOrchestrator(
   input: OrchestratorInput
 ): AsyncGenerator<EvaluationV3Event> {
-  const runId = `run_${nanoid()}`;
+  // Generate a human-readable run ID like "swift-fox-42"
+  const runId = generateHumanReadableId();
   const {
     projectId,
     experimentId,
@@ -457,10 +459,13 @@ export async function* runOrchestrator(
     if (!repository) return;
 
     if (event.type === "target_result") {
+      // Get the dataset row entry for this row index
+      const datasetEntry = datasetRows[event.rowIndex] ?? {};
+      
       pendingDataset.push({
         index: event.rowIndex,
         target_id: event.targetId,
-        entry: {},
+        entry: datasetEntry,
         predicted: event.output ? { output: event.output } : undefined,
         cost: event.cost ?? null,
         duration: event.duration ?? null,

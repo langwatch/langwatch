@@ -1,154 +1,23 @@
-import { Box, Circle, HStack, Icon, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { memo } from "react";
 import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
-import type { MetricStats, TargetAggregate } from "../../utils/computeAggregates";
+import {
+  LatencyStatsTooltip,
+  CostStatsTooltip,
+} from "~/components/shared/MetricStatsTooltip";
+import {
+  PassRateCircle,
+  getPassRateGradientColor,
+} from "~/components/shared/PassRateIndicator";
+import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
   formatCost,
   formatLatency,
   formatPassRate,
   formatScore,
 } from "../../utils/computeAggregates";
-
-/**
- * Renders a statistical breakdown tooltip for latency.
- */
-const LatencyStatsTooltip = ({ stats }: { stats: MetricStats }) => (
-  <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
-    <HStack justify="space-between">
-      <Text color="white/60">Min</Text>
-      <Text>{formatLatency(stats.min)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Avg</Text>
-      <Text>{formatLatency(stats.avg)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Median (p50)</Text>
-      <Text>{formatLatency(stats.median)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p75</Text>
-      <Text>{formatLatency(stats.p75)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p90</Text>
-      <Text>{formatLatency(stats.p90)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p95</Text>
-      <Text>{formatLatency(stats.p95)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p99</Text>
-      <Text>{formatLatency(stats.p99)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Max</Text>
-      <Text>{formatLatency(stats.max)}</Text>
-    </HStack>
-    <Box borderTopWidth="1px" borderColor="gray.500" marginY={1} />
-    <HStack justify="space-between">
-      <Text color="white/60">Total</Text>
-      <Text fontWeight="medium">{formatLatency(stats.total)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Count</Text>
-      <Text>{stats.count}</Text>
-    </HStack>
-  </VStack>
-);
-
-/**
- * Renders a statistical breakdown tooltip for cost.
- */
-const CostStatsTooltip = ({ stats }: { stats: MetricStats }) => (
-  <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
-    <HStack justify="space-between">
-      <Text color="white/60">Min</Text>
-      <Text>{formatCost(stats.min)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Avg</Text>
-      <Text>{formatCost(stats.avg)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Median (p50)</Text>
-      <Text>{formatCost(stats.median)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p75</Text>
-      <Text>{formatCost(stats.p75)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p90</Text>
-      <Text>{formatCost(stats.p90)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p95</Text>
-      <Text>{formatCost(stats.p95)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">p99</Text>
-      <Text>{formatCost(stats.p99)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Max</Text>
-      <Text>{formatCost(stats.max)}</Text>
-    </HStack>
-    <Box borderTopWidth="1px" borderColor="gray.500" marginY={1} />
-    <HStack justify="space-between">
-      <Text color="white/60">Total</Text>
-      <Text fontWeight="medium">{formatCost(stats.total)}</Text>
-    </HStack>
-    <HStack justify="space-between">
-      <Text color="white/60">Count</Text>
-      <Text>{stats.count}</Text>
-    </HStack>
-  </VStack>
-);
-
-/**
- * Get a color that interpolates from red (0%) to orange (50%) to green (100%)
- * based on the pass rate percentage.
- */
-const getPassRateGradientColor = (passRate: number): string => {
-  // Clamp to 0-100
-  const rate = Math.max(0, Math.min(100, passRate));
-
-  if (rate <= 50) {
-    // Red to Orange: 0% = red, 50% = orange
-    // Red: rgb(239, 68, 68) -> Orange: rgb(245, 158, 11)
-    const t = rate / 50;
-    const r = Math.round(239 + (245 - 239) * t);
-    const g = Math.round(68 + (158 - 68) * t);
-    const b = Math.round(68 + (11 - 68) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  } else {
-    // Orange to Green: 50% = orange, 100% = green
-    // Orange: rgb(245, 158, 11) -> Green: rgb(34, 197, 94)
-    const t = (rate - 50) / 50;
-    const r = Math.round(245 + (34 - 245) * t);
-    const g = Math.round(158 + (197 - 158) * t);
-    const b = Math.round(11 + (94 - 11) * t);
-    return `rgb(${r}, ${g}, ${b})`;
-  }
-};
-
-/**
- * Colored circle indicator for pass rate.
- * Size is slightly larger than default (10px vs 8px).
- */
-const PassRateCircle = ({
-  passRate,
-  size = "10px",
-}: {
-  passRate: number;
-  size?: string;
-}) => (
-  <Circle size={size} bg={getPassRateGradientColor(passRate)} flexShrink={0} />
-);
 
 type TargetSummaryProps = {
   aggregates: TargetAggregate;

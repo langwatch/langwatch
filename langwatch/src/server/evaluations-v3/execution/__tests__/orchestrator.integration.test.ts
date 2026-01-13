@@ -1028,4 +1028,186 @@ describe("Orchestrator Integration", () => {
       }
     }, 30000);
   });
+
+  describe("Elasticsearch Storage", () => {
+    it("stores full evaluation run results to Elasticsearch when saveToEs is true", async () => {
+      // Import required modules for ES verification
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+
+      // Create a real experiment in the database (required for ES storage)
+      const experimentId = `exp_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "ES Storage Test",
+          slug: `es-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")], [createEvaluatorConfig()]);
+        const datasetRows = [
+          { question: "Say hello", expected: "hello" },
+          { question: "Say world", expected: "world" },
+        ];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,  // Pass experiment ID to enable storage
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          saveToEs: true,  // Enable ES storage!
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+        if (doneEvent?.type !== "done") throw new Error("Expected done event");
+
+        // Get the run ID from the execution_started event
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify data was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        // Verify the stored data
+        expect(storedRun).not.toBeNull();
+        expect(storedRun?.run_id).toBe(runId);
+        expect(storedRun?.experiment_id).toBe(experimentId);
+        expect(storedRun?.project_id).toBe(project.id);
+
+        // Verify targets were stored
+        expect(storedRun?.targets).toBeDefined();
+        expect(storedRun?.targets?.length).toBeGreaterThanOrEqual(1);
+        expect(storedRun?.targets?.[0]?.name).toBe("GPT-4o Mini");
+
+        // Verify dataset entries were stored with actual input values
+        expect(storedRun?.dataset).toBeDefined();
+        expect(storedRun?.dataset?.length).toBe(2);
+        
+        // Verify dataset entries contain the input data (not just empty objects)
+        const datasetEntries = storedRun?.dataset ?? [];
+        const firstEntry = datasetEntries.find((d) => d.index === 0);
+        const secondEntry = datasetEntries.find((d) => d.index === 1);
+        
+        expect(firstEntry?.entry).toBeDefined();
+        expect(firstEntry?.entry?.question).toBe("Say hello");
+        
+        expect(secondEntry?.entry).toBeDefined();
+        expect(secondEntry?.entry?.question).toBe("Say world");
+
+        // Verify evaluations were stored
+        expect(storedRun?.evaluations).toBeDefined();
+        expect(storedRun?.evaluations?.length).toBe(2); // 2 rows, 1 evaluator each
+
+        // Verify timestamps
+        expect(storedRun?.timestamps.created_at).toBeDefined();
+        expect(storedRun?.timestamps.finished_at).toBeDefined();
+
+        // Clean up - delete the ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import("~/server/elasticsearch");
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        // Clean up experiment
+        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+      }
+    }, 120000);
+
+    it("does not store to Elasticsearch when saveToEs is false", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+
+      const experimentId = `exp_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "No ES Storage Test",
+          slug: `no-es-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        const state = createTestState([createTargetConfig("target-1", "GPT-4o Mini")]);
+        const datasetRows = [{ question: "Say hello", expected: "hello" }];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts: new Map(),
+          loadedAgents: new Map(),
+          saveToEs: false,  // Explicitly disabled
+        };
+
+        const events = await collectEvents(input);
+
+        // Get run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait a bit
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // Verify nothing was stored
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        expect(storedRun).toBeNull();
+      } finally {
+        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+      }
+    }, 60000);
+  });
 });

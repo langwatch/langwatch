@@ -320,7 +320,11 @@ export function TargetCellContent({
               className="cell-fade-overlay"
               css={{
                 background:
-                  "linear-gradient(to bottom, transparent, var(--cell-bg, white))",
+                  "linear-gradient(to bottom, transparent, white)",
+                "tr:hover &": {
+                  background:
+                    "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+                },
               }}
             />
           )}

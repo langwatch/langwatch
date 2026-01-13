@@ -167,6 +167,10 @@ app.post(
     // Stream SSE events
     return streamSSE(c, async (stream) => {
       try {
+        // Only save to Elasticsearch for full runs (not single cell/row/target executions)
+        const isFullRun = request.scope.type === "full";
+        const shouldSaveToEs = !!request.experimentId && isFullRun;
+
         const orchestrator = runOrchestrator({
           projectId,
           experimentId: request.experimentId,
@@ -176,7 +180,7 @@ app.post(
           datasetColumns,
           loadedPrompts: loadedPrompts as any,
           loadedAgents: loadedAgents as any,
-          saveToEs: !!request.experimentId,
+          saveToEs: shouldSaveToEs,
         });
 
         for await (const event of orchestrator) {

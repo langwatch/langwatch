@@ -293,6 +293,21 @@ Feature: Evaluation execution - Backend
     Then the 5 completed results are saved to Elasticsearch
     And stopped_at timestamp is set
 
+  Scenario: Abort cancels in-flight LLM requests
+    Given a cell is currently streaming a response from the LLM
+    When abort is requested
+    Then the stream reader is cancelled immediately
+    And no more events are processed from that stream
+    And the cell is marked as stopped
+
+  Scenario: Abort responds quickly even with many queued cells
+    Given 100 cells are queued for execution
+    And only 5 are currently in-flight
+    When abort is requested immediately
+    Then execution stops within seconds
+    And at most 5-10 cells complete (those in-flight)
+    And the remaining 90+ cells never start
+
   # ==========================================================================
   # Elasticsearch Storage
   # ==========================================================================

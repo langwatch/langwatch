@@ -3,7 +3,8 @@ import { ExperimentType } from "@prisma/client";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
-import { BatchEvaluationV2 } from "../../../components/experiments/BatchEvaluationV2";
+import { BatchEvaluationResults } from "../../../components/batch-evaluation-results";
+// Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification
 import { DSPyExperiment } from "../../../components/experiments/DSPyExperiment";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
@@ -32,8 +33,9 @@ export default function ExperimentPage() {
           <DSPyExperiment project={project} experiment={experiment.data} />
         ) : experiment.data.type === ExperimentType.BATCH_EVALUATION ? (
           <BatchEvaluation project={project} experiment={experiment.data} />
-        ) : experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ? (
-          <BatchEvaluationV2 project={project} experiment={experiment.data} />
+        ) : experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
+          experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
+          <BatchEvaluationResults project={project} experiment={experiment.data} />
         ) : (
           <div>Unknown experiment type</div>
         ))}

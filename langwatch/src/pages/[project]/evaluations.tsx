@@ -261,106 +261,70 @@ function EvaluationsV2() {
                               </Table.Row>
                             ))
                           : experiments.data
-                          ? experiments.data.experiments?.map(
-                              (experiment, i) => (
-                                <Table.Row
-                                  cursor="pointer"
-                                  onClick={() => {
-                                    if (experiment.wizardState) {
-                                      void router.push({
-                                        pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
-                                      });
-                                    } else {
-                                      void router.push({
-                                        pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                      });
-                                    }
-                                  }}
-                                  key={i}
-                                >
-                                  <Table.Cell>
-                                    <OverflownTextWithTooltip
-                                      lineClamp={1}
-                                      wordBreak="break-word"
-                                    >
-                                      {experiment.name ?? experiment.slug}
-                                    </OverflownTextWithTooltip>
-                                  </Table.Cell>
-                                  <Table.Cell whiteSpace="nowrap">
-                                    <Badge
-                                      colorPalette="gray"
-                                      variant="outline"
-                                    >
-                                      {experiment.wizardState?.task
-                                        ? taskTypeToLabel[
-                                            experiment.wizardState.task
-                                          ]
-                                        : experimentTypeToLabel[
-                                            experiment.type
-                                          ]}
-                                    </Badge>
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    <OverflownTextWithTooltip
-                                      lineClamp={1}
-                                      wordBreak="break-word"
-                                    >
-                                      {experiment.dataset?.name ?? "-"}
-                                    </OverflownTextWithTooltip>
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.primaryMetric ? (
-                                      <>
-                                        <Text
-                                          as="span"
-                                          fontSize="xs"
-                                          color="gray.600"
-                                        >
-                                          {
-                                            experiment.runsSummary.primaryMetric
-                                              .name
-                                          }
-                                          : &nbsp;
-                                        </Text>
-                                        <Text as="span" fontWeight="semibold">
-                                          {formatEvaluationSummary(
-                                            experiment.runsSummary
-                                              .primaryMetric,
-                                            true,
-                                          )}
-                                        </Text>
-                                      </>
-                                    ) : (
-                                      "-"
-                                    )}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.count || ""}
-                                  </Table.Cell>
-                                  <Table.Cell>
-                                    {experiment.runsSummary.latestRun
-                                      ?.timestamps && (
-                                      <>
-                                        {getFinishedAt(
-                                          experiment.runsSummary.latestRun
-                                            .timestamps,
-                                          new Date().getTime(),
-                                        ) ? (
-                                          <HStack color="green.500">
-                                            <LuCircleCheckBig size={16} />
-                                            Completed
-                                          </HStack>
-                                        ) : experiment.runsSummary.latestRun
-                                            .timestamps.stopped_at ? (
-                                          <HStack color="red.500">
-                                            <LuCircleX size={16} />
-                                            Stopped
-                                          </HStack>
-                                        ) : (
-                                          <HStack color="blue.500">
-                                            <LuClock size={16} />
-                                            Running
-                                          </HStack>
+                          ? experiments.data?.map((experiment, i) => (
+                              <Table.Row
+                                cursor="pointer"
+                                onClick={() => {
+                                  // EVALUATIONS_V3 type goes to the V3 workbench page
+                                  if (experiment.type === "EVALUATIONS_V3") {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/evaluations/v3/${experiment.slug}`,
+                                    });
+                                  } else if (experiment.wizardState) {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                    });
+                                  } else {
+                                    void router.push({
+                                      pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                    });
+                                  }
+                                }}
+                                key={i}
+                              >
+                                <Table.Cell>
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.name ?? experiment.slug}
+                                  </OverflownTextWithTooltip>
+                                </Table.Cell>
+                                <Table.Cell whiteSpace="nowrap">
+                                  <Badge colorPalette="gray" variant="outline">
+                                    {experiment.wizardState?.task
+                                      ? taskTypeToLabel[
+                                          experiment.wizardState.task
+                                        ]
+                                      : experimentTypeToLabel[experiment.type]}
+                                  </Badge>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  <OverflownTextWithTooltip
+                                    lineClamp={1}
+                                    wordBreak="break-word"
+                                  >
+                                    {experiment.dataset?.name ?? "-"}
+                                  </OverflownTextWithTooltip>
+                                </Table.Cell>
+                                <Table.Cell>
+                                  {experiment.runsSummary.primaryMetric ? (
+                                    <>
+                                      <Text
+                                        as="span"
+                                        fontSize="xs"
+                                        color="gray.600"
+                                      >
+                                        {
+                                          experiment.runsSummary.primaryMetric
+                                            .name
+                                        }
+                                        : &nbsp;
+                                      </Text>
+                                      <Text as="span" fontWeight="semibold">
+                                        {formatEvaluationSummary(
+                                          experiment.runsSummary.primaryMetric,
+                                          true,
                                         )}
                                       </>
                                     )}
