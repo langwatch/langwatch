@@ -63,7 +63,7 @@ export type HttpTestPanelProps = {
 /**
  * Renders a body template by replacing {{variable}} placeholders
  */
-function renderTemplate(
+export function renderTemplate(
   template: string,
   variables: Record<string, string>
 ): string {
@@ -77,7 +77,7 @@ function renderTemplate(
 /**
  * Formats duration in human-readable form
  */
-function formatDuration(ms: number): string {
+export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(2)}s`;
 }
@@ -85,7 +85,7 @@ function formatDuration(ms: number): string {
 /**
  * Returns color for HTTP status code
  */
-function getStatusColor(status: number): string {
+export function getStatusColor(status: number): string {
   if (status >= 200 && status < 300) return "green";
   if (status >= 300 && status < 400) return "blue";
   if (status >= 400 && status < 500) return "orange";
@@ -240,31 +240,35 @@ function ResponseDisplay({ result }: { result: HttpTestResult }) {
   return (
     <VStack align="stretch" gap={3}>
       {/* Status Bar */}
-      <HStack
-        justify="space-between"
-        padding={3}
-        bg={result.success ? "green.50" : "red.50"}
-        borderRadius="md"
-        borderWidth="1px"
-        borderColor={result.success ? "green.200" : "red.200"}
-      >
-        <HStack gap={3}>
-          {result.status && (
-            <Badge colorPalette={getStatusColor(result.status)} size="lg">
-              {result.status} {result.statusText ?? ""}
-            </Badge>
-          )}
-          {result.duration !== undefined && (
-            <HStack gap={1} color="gray.600" fontSize="sm">
-              <Clock size={14} />
-              <Text>{formatDuration(result.duration)}</Text>
-            </HStack>
+      {(result.status !== undefined ||
+        result.duration !== undefined ||
+        responseString) && (
+        <HStack
+          justify="space-between"
+          padding={3}
+          bg={result.success ? "green.50" : "red.50"}
+          borderRadius="md"
+          borderWidth="1px"
+          borderColor={result.success ? "green.200" : "red.200"}
+        >
+          <HStack gap={3}>
+            {result.status !== undefined && (
+              <Badge colorPalette={getStatusColor(result.status)} size="lg">
+                {result.status} {result.statusText ?? ""}
+              </Badge>
+            )}
+            {result.duration !== undefined && (
+              <HStack gap={1} color="gray.600" fontSize="sm">
+                <Clock size={14} />
+                <Text>{formatDuration(result.duration)}</Text>
+              </HStack>
+            )}
+          </HStack>
+          {responseString && (
+            <CopyButton text={responseString} label="Copy response" />
           )}
         </HStack>
-        {responseString && (
-          <CopyButton text={responseString} label="Copy response" />
-        )}
-      </HStack>
+      )}
 
       {/* Error Message */}
       {result.error && (

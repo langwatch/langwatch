@@ -221,6 +221,7 @@
     "superjson": "^1.13.1",
     "tiktoken": "^1.0.18",
     "ts-pattern": "^5.9.0",
+    "undici": "^7.18.2",
     "use-debounce": "^10.0.0",
     "usehooks-ts": "^2.14.0",
     "watch": "^1.0.2",
