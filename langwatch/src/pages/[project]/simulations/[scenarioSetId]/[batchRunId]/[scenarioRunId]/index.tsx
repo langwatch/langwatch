@@ -1,6 +1,8 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { ArrowLeft, Clock, Edit2 } from "lucide-react";
 import React, { useState } from "react";
-import { ArrowLeft, Clock } from "react-feather";
+import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
+import { useDrawer } from "~/hooks/useDrawer";
 import {
   CustomCopilotKitChat,
   PreviousRunsList,
@@ -21,6 +23,7 @@ export default function IndividualScenarioRunPage() {
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
+  const { openDrawer, drawerOpen } = useDrawer();
   // Fetch scenario run data using the correct API
   const { data: scenarioState } = api.scenarios.getRunState.useQuery(
     {
@@ -35,6 +38,12 @@ export default function IndividualScenarioRunPage() {
 
   const results = scenarioState?.results;
   const scenarioId = scenarioState?.scenarioId;
+
+  // Check if the scenario exists in our database
+  const { data: scenarioExists } = api.scenarios.getById.useQuery(
+    { projectId: project?.id ?? "", id: scenarioId ?? "" },
+    { enabled: !!project?.id && !!scenarioId }
+  );
 
   if (!scenarioRunId) {
     return null;
@@ -67,19 +76,35 @@ export default function IndividualScenarioRunPage() {
                     }}
                   >
                     <ArrowLeft size={14} />
-                    <Text>Back to Grid View</Text>
+                    <Text>View All</Text>
                   </Button>
                 </VStack>
               )}
 
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPreviousRuns((prev) => !prev)}
-              >
-                <Clock size={14} />
-                Previous Runs
-              </Button>
+              <HStack gap={2}>
+                {scenarioExists && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      openDrawer("scenarioEditor", {
+                        urlParams: { scenarioId: scenarioId ?? "" },
+                      });
+                    }}
+                  >
+                    <Edit2 size={14} />
+                    Edit Scenario
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPreviousRuns((prev) => !prev)}
+                >
+                  <Clock size={14} />
+                  Previous Runs
+                </Button>
+              </HStack>
             </HStack>
           </Box>
           {/* Single Card Container */}
@@ -185,6 +210,8 @@ export default function IndividualScenarioRunPage() {
           </Box>
         </VStack>
       </PageLayout.Container>
+
+      <ScenarioFormDrawer open={drawerOpen("scenarioEditor")} />
     </SimulationLayout>
   );
 }
