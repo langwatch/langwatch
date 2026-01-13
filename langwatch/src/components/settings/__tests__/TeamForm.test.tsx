@@ -15,10 +15,11 @@ vi.mock("../../../hooks/useDrawer", () => ({
 
 describe("TeamForm Projects Section", () => {
   describe("when clicking Add new project button", () => {
-    it("calls openDrawer with createProject", () => {
-      // The button now calls openDrawer("createProject") instead of navigating
-      mockOpenDrawer("createProject");
-      expect(mockOpenDrawer).toHaveBeenCalledWith("createProject");
+    it("calls openDrawer with createProject and defaultTeamId", () => {
+      // The button calls openDrawer with team context for pre-selection
+      const teamId = "team-123";
+      mockOpenDrawer("createProject", { defaultTeamId: teamId });
+      expect(mockOpenDrawer).toHaveBeenCalledWith("createProject", { defaultTeamId: teamId });
     });
   });
 

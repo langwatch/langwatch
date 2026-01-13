@@ -281,7 +281,7 @@ function TeamFormProjects({
     <HStack width="full" marginTop={2}>
       <Heading>Projects</Heading>
       <Spacer />
-      <Button variant="outline" size="sm" onClick={() => openDrawer("createProject")}>
+      <Button variant="outline" size="sm" onClick={() => openDrawer("createProject", { defaultTeamId: team.id })}>
         <Plus size={20} />
         Add new project
       </Button>

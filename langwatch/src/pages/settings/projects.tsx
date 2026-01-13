@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Archive, MoreVertical, Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "lucide-react";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";

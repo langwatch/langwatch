@@ -163,8 +163,6 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                 <Input
                   {...register("newTeamName", {
                     required: teamId === "NEW" ? "Team name is required" : false,
-                    validate: (v) =>
-                      teamId !== "NEW" || (v?.trim().length ?? 0) > 0 || "Team name is required",
                   })}
                   placeholder="Engineering Team"
                 />
