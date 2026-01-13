@@ -1,5 +1,6 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
+import { nanoid } from "nanoid";
 import { PromptService } from "../prompt-config/prompt.service";
 import { ScenarioService } from "./scenario.service";
 import type { SimulationTarget } from "../api/routers/scenarios";
@@ -9,6 +10,14 @@ import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { env } from "~/env.mjs";
 import { getVercelAIModel } from "../modelProviders/utils";
 import { DEFAULT_MODEL } from "~/utils/constants";
+
+/** Default scenario set for local/quick runs */
+const DEFAULT_SIMULATION_SET_ID = "local-scenarios";
+
+/** Generates a unique batch run ID for grouping scenario executions */
+export function generateBatchRunId(): string {
+  return `scenariobatch_${nanoid()}`;
+}
 
 const logger = createLogger("SimulationRunnerService");
 

@@ -15,6 +15,7 @@ import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { api } from "../../utils/api";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
+import { pollForScenarioRun } from "../../utils/pollForScenarioRun";
 import { QuickTestBar } from "./QuickTestBar";
 import type { TargetType } from "./TargetTypeSelector";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
@@ -118,32 +119,19 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       });
 
       // Poll for the run to appear, then redirect to the specific run
-      const pollForRun = async (attempts = 0): Promise<void> => {
-        const maxAttempts = 60; // 30 seconds max
-        if (attempts >= maxAttempts) {
-          // Fallback to set page if polling times out
-          void router.push(`/${project.slug}/simulations/${setId}`);
-          return;
-        }
+      const scenarioRunId = await pollForScenarioRun(
+        utils.scenarios.getBatchRunData.fetch,
+        { projectId: project.id, scenarioSetId: setId, batchRunId }
+      );
 
-        const runs = await utils.scenarios.getBatchRunData.fetch({
-          projectId: project.id,
-          scenarioSetId: setId,
-          batchRunId,
-        });
-
-        if (runs.length > 0) {
-          const run = runs[0];
-          void router.push(
-            `/${project.slug}/simulations/${setId}/${run?.scenarioRunId}`
-          );
-        } else {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          return pollForRun(attempts + 1);
-        }
-      };
-
-      void pollForRun();
+      if (scenarioRunId) {
+        void router.push(
+          `/${project.slug}/simulations/${setId}/${scenarioRunId}`
+        );
+      } else {
+        // Fallback to set page if polling times out
+        void router.push(`/${project.slug}/simulations/${setId}`);
+      }
     })();
   }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils]);
   const handleSaveWithoutRunning = useCallback(async () => {

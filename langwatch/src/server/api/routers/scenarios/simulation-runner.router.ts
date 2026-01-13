@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { nanoid } from "nanoid";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkProjectPermission } from "../../rbac";
-import { SimulationRunnerService } from "~/server/scenarios/simulation-runner.service";
+import {
+  SimulationRunnerService,
+  generateBatchRunId,
+} from "~/server/scenarios/simulation-runner.service";
 import { projectSchema } from "./schemas";
 import { createLogger } from "~/utils/logger";
 
@@ -47,7 +49,7 @@ export const simulationRunnerRouter = createTRPCRouter({
       );
 
       const setId = "local-scenarios";
-      const batchRunId = `scenariobatch_${nanoid()}`;
+      const batchRunId = generateBatchRunId();
 
       const runnerService = SimulationRunnerService.create(ctx.prisma);
 
