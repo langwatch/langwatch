@@ -564,12 +564,16 @@ const CustomGraph_ = React.memo(
                 />
               ))}
             </Pie>
-            <Tooltip formatter={tooltipValueFormatter} />
+            <Tooltip
+              formatter={tooltipValueFormatter}
+              wrapperStyle={{ zIndex: 1000 }}
+            />
             <Legend
               wrapperStyle={{
                 padding: "0 2rem",
                 maxHeight: "15%",
                 overflow: "auto",
+                zIndex: 1,
               }}
             />
           </PieChart>
@@ -644,7 +648,10 @@ const CustomGraph_ = React.memo(
                 return numeral(value).format(yAxisValueFormat);
               }}
             />
-            <Tooltip formatter={tooltipValueFormatter} />
+            <Tooltip
+              formatter={tooltipValueFormatter}
+              wrapperStyle={{ zIndex: 1000 }}
+            />
             <Bar dataKey="value">
               {summaryData.current.map((entry, index) => (
                 <Cell
@@ -733,12 +740,14 @@ const CustomGraph_ = React.memo(
                   : "")
               );
             }}
+            wrapperStyle={{ zIndex: 1000 }}
           />
           <Legend
             wrapperStyle={{
               padding: "0 2rem",
               maxHeight: "15%",
               overflow: "auto",
+              zIndex: 1,
             }}
           />
           {(sortedKeys ?? []).map((aggKey, index) => {
