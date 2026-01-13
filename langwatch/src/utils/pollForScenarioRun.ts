@@ -35,6 +35,12 @@ export async function pollForScenarioRun(
   fetchBatchRunData: FetchBatchRunData,
   params: PollForRunParams,
 ): Promise<PollResult> {
+  logger.info("Starting poll", {
+    projectId: params.projectId,
+    scenarioSetId: params.scenarioSetId,
+    batchRunId: params.batchRunId,
+  });
+
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
       const runs = await fetchBatchRunData(params);
