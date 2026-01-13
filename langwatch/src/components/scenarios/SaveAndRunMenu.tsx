@@ -107,6 +107,13 @@ export function SaveAndRunMenu({
       <Portal>
         <Popover.Content width="320px" padding={0}>
           <VStack gap={0} align="stretch">
+            {/* Header */}
+            <Box padding={3} borderBottomWidth="1px" borderColor="gray.200">
+              <Text fontSize="sm" fontWeight="medium">
+                Choose what to run against
+              </Text>
+            </Box>
+
             {/* Search Input */}
             <Box padding={2} borderBottomWidth="1px" borderColor="gray.200">
               <Input
