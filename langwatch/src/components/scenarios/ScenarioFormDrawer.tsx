@@ -1,14 +1,12 @@
 import { Grid, GridItem, Heading } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
-import { pollForScenarioRun } from "../../utils/pollForScenarioRun";
-import { buildRoutePath } from "../../utils/routes";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -27,13 +25,15 @@ export type ScenarioFormDrawerProps = {
  * Bottom bar with Quick Test and Save and Run.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
-  const runMutation = api.scenarios.run.useMutation();
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
   const scenarioId = params.scenarioId;
 
   // Target selection with localStorage persistence
@@ -41,7 +41,6 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -138,63 +137,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Persist the target selection for this scenario
           persistTarget(target);
 
-          const { setId, batchRunId } = await runMutation.mutateAsync({
-            projectId: project.id,
-            scenarioId: savedScenario.id,
-            target: { type: target.type, referenceId: target.id },
-          });
-
-          // Poll for the run to appear, then redirect to the specific run
-          setIsPolling(true);
-          try {
-            const result = await pollForScenarioRun(
-              utils.scenarios.getBatchRunData.fetch,
-              { projectId: project.id, scenarioSetId: setId, batchRunId },
-            );
-
-            if (result.success) {
-              void router.push(
-                buildRoutePath("simulations_run", {
-                  project: project.slug,
-                  scenarioSetId: setId,
-                  batchRunId,
-                  scenarioRunId: result.scenarioRunId,
-                }),
-              );
-            } else if (result.error === "run_error") {
-              const runPath = result.scenarioRunId
-                ? buildRoutePath("simulations_run", {
-                    project: project.slug,
-                    scenarioSetId: setId,
-                    batchRunId,
-                    scenarioRunId: result.scenarioRunId,
-                  })
-                : null;
-              toaster.create({
-                title: "Scenario run failed",
-                description:
-                  "The scenario encountered an error during execution.",
-                type: "error",
-                meta: { closable: true },
-                action: runPath
-                  ? {
-                      label: "View failed run",
-                      onClick: () => void router.push(runPath),
-                    }
-                  : undefined,
-              });
-            } else {
-              toaster.create({
-                title: "Run timed out",
-                description:
-                  "The scenario run took too long to start. Please try again.",
-                type: "error",
-                meta: { closable: true },
-              });
-            }
-          } finally {
-            setIsPolling(false);
-          }
+          await runScenario(savedScenario.id, target);
         })();
       } catch (error) {
         toaster.create({
@@ -206,7 +149,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project, persistTarget, runMutation, router, utils],
+    [handleSave, project?.id, persistTarget, runScenario],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formRef.current;
@@ -226,10 +169,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     formRef.current = form;
   }, []);
   const isSubmitting =
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    runMutation.isPending ||
-    isPolling;
+    createMutation.isPending || updateMutation.isPending || isRunning;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
     () => scenario ?? undefined,
     [scenario],

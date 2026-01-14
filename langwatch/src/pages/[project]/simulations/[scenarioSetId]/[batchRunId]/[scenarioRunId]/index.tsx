@@ -1,7 +1,6 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ArrowLeft, Clock, Edit2, Play } from "lucide-react";
-import { useRouter } from "next/router";
-import React, { useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
@@ -14,26 +13,26 @@ import {
 } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useRunScenario } from "~/hooks/useRunScenario";
 import { useScenarioTarget } from "~/hooks/useScenarioTarget";
 import "@copilotkit/react-ui/styles.css";
 import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { pollForScenarioRun } from "~/utils/pollForScenarioRun";
-import { buildRoutePath } from "~/utils/routes";
 
 // Main component
 export default function IndividualScenarioRunPage() {
-  const router = useRouter();
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
   const [runModalOpen, setRunModalOpen] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { scenarioSetId, batchRunId } = useSimulationRouter();
   const { openDrawer, drawerOpen } = useDrawer();
-  const utils = api.useContext();
-  const runMutation = api.scenarios.run.useMutation();
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
   // Fetch scenario run data using the correct API
   const { data: scenarioState } = api.scenarios.getRunState.useQuery(
     {
@@ -65,47 +64,21 @@ export default function IndividualScenarioRunPage() {
   // Handle running the scenario again
   const handleRunAgain = useCallback(
     async (target: TargetValue, remember: boolean) => {
-      if (!project?.id || !scenarioId || !target) return;
+      if (!scenarioId || !target) return;
 
       if (remember) {
         persistTarget(target);
       }
 
       try {
-        const { setId, batchRunId: newBatchRunId } =
-          await runMutation.mutateAsync({
-            projectId: project.id,
-            scenarioId,
-            target: { type: target.type, referenceId: target.id },
-          });
-
-        // Poll for the run to appear, then redirect
-        const result = await pollForScenarioRun(
-          utils.scenarios.getBatchRunData.fetch,
-          {
-            projectId: project.id,
-            scenarioSetId: setId,
-            batchRunId: newBatchRunId,
-          },
-        );
-
-        if (result.success) {
-          void router.push(
-            buildRoutePath("simulations_run", {
-              project: project.slug,
-              scenarioSetId: setId,
-              batchRunId: newBatchRunId,
-              scenarioRunId: result.scenarioRunId,
-            }),
-          );
-        }
+        await runScenario(scenarioId, target);
       } catch (error) {
         console.error("Failed to run scenario:", error);
       }
 
       setRunModalOpen(false);
     },
-    [project, scenarioId, persistTarget, runMutation, router, utils],
+    [scenarioId, persistTarget, runScenario],
   );
 
   // Handle "Run Again" button click
@@ -162,7 +135,7 @@ export default function IndividualScenarioRunPage() {
                       colorPalette="blue"
                       size="sm"
                       onClick={handleRunAgainClick}
-                      loading={runMutation.isPending}
+                      loading={isRunning}
                     >
                       <Play size={14} />
                       Run Again
@@ -303,7 +276,7 @@ export default function IndividualScenarioRunPage() {
         onClose={() => setRunModalOpen(false)}
         onRun={handleRunAgain}
         initialTarget={persistedTarget}
-        isLoading={runMutation.isPending}
+        isLoading={isRunning}
       />
     </SimulationLayout>
   );
