@@ -1,0 +1,35 @@
+import { definePipeline } from "../../library";
+import { ScheduleEvaluationCommand } from "./commands/scheduleEvaluationCommand";
+import { StartEvaluationCommand } from "./commands/startEvaluationCommand";
+import { CompleteEvaluationCommand } from "./commands/completeEvaluationCommand";
+import { EvaluationStateProjectionHandler } from "./projections";
+import type { EvaluationProcessingEvent } from "./schemas/events";
+
+/**
+ * Evaluation processing pipeline definition (static, no runtime dependencies).
+ *
+ * This pipeline uses evaluation-level aggregates (aggregateId = evaluationId).
+ * It tracks the lifecycle of individual evaluations (scheduled → started → completed)
+ * and enables detection of stuck evaluations.
+ *
+ * Commands:
+ * - scheduleEvaluation: Emits EvaluationScheduledEvent when job is queued
+ * - startEvaluation: Emits EvaluationStartedEvent when execution begins
+ * - completeEvaluation: Emits EvaluationCompletedEvent when execution finishes
+ *
+ * This is a static definition that can be safely imported without triggering
+ * ClickHouse/Redis connections. It gets registered with the runtime in
+ * the eventSourcing.ts file.
+ */
+export const evaluationProcessingPipelineDefinition =
+  definePipeline<EvaluationProcessingEvent>()
+    .withName("evaluation_processing")
+    .withAggregateType("evaluation")
+    .withProjection("evaluationState", EvaluationStateProjectionHandler, {
+      // Small delay to batch multiple rapid updates to the same evaluation
+      delay: 500,
+    })
+    .withCommand("scheduleEvaluation", ScheduleEvaluationCommand)
+    .withCommand("startEvaluation", StartEvaluationCommand)
+    .withCommand("completeEvaluation", CompleteEvaluationCommand)
+    .build();
