@@ -1,6 +1,5 @@
 import { EvaluationExecutionMode } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { nanoid } from "nanoid";
 import { ZodError, z } from "zod";
 import { slugify } from "~/utils/slugify";
 import {
@@ -11,6 +10,8 @@ import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { checkPreconditionsSchema } from "../../evaluations/types.generated";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -77,7 +78,7 @@ export const monitorsRouter = createTRPCRouter({
 
       const newCheck = await prisma.monitor.create({
         data: {
-          id: `eval_${nanoid()}`,
+          id: generate(KSUID_RESOURCES.MONITOR).toString(),
           projectId,
           name,
           checkType,

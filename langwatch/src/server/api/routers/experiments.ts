@@ -45,6 +45,7 @@ import {
   copyWorkflowWithDatasets,
   saveOrCommitWorkflowVersion,
 } from "./workflows";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -203,7 +204,7 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
       const isNewExperiment = !input.experimentId;
-      const experimentId = input.experimentId ?? generate("eval").toString();
+      const experimentId = input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
       // For new experiments, use the ID as the slug (guaranteed unique)
       // For existing experiments, keep the same slug to avoid breaking URLs
@@ -608,14 +609,14 @@ export const experimentsRouter = createTRPCRouter({
 
       const versionIds = dspySteps.hits.hits
         .map((hit) => {
-          return hit._source!.workflow_version_id!;
+          return hit._source?.workflow_version_id!;
         })
         .filter(Boolean);
 
       const versionsMap = await getVersionMap(input.projectId, versionIds);
 
       const result: DSPyRunsSummary[] = (
-        dspySteps.aggregations!.runs as any
+        dspySteps.aggregations?.runs as any
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
@@ -664,7 +665,7 @@ export const experimentsRouter = createTRPCRouter({
                 (a, b) => a.timestamps.created_at - b.timestamps.created_at,
               ),
             created_at: Math.min(
-              ...steps.map((hit) => hit._source!.timestamps.created_at),
+              ...steps.map((hit) => hit._source?.timestamps.created_at),
             ),
           };
         })
@@ -782,7 +783,7 @@ export const experimentsRouter = createTRPCRouter({
         }
       }
 
-      const result = batchEvaluationRun!.hits.hits[0]?._source;
+      const result = batchEvaluationRun?.hits.hits[0]?._source;
       if (!result) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -1312,7 +1313,7 @@ const getExperimentBatchEvaluationRuns = async (
 
   const versionIds = batchEvaluationRuns.hits.hits
     .map((hit) => {
-      return hit._source!.workflow_version_id!;
+      return hit._source?.workflow_version_id!;
     })
     .filter(Boolean);
 
@@ -1321,7 +1322,7 @@ const getExperimentBatchEvaluationRuns = async (
   const runs = batchEvaluationRuns.hits.hits.map((hit) => {
     const source = hit._source!;
 
-    const runAgg = (batchEvaluationRuns.aggregations!.runs as any).buckets.find(
+    const runAgg = (batchEvaluationRuns.aggregations?.runs as any).buckets.find(
       (bucket: any) => bucket.key === source.run_id,
     );
 
@@ -1383,7 +1384,7 @@ const getExperimentBatchEvaluationRuns = async (
       if (!(run.experiment_id in acc)) {
         acc[run.experiment_id] = [];
       }
-      acc[run.experiment_id]!.push(run);
+      acc[run.experiment_id]?.push(run);
       return acc;
     },
     {} as Record<string, (typeof runs)[number][]>,

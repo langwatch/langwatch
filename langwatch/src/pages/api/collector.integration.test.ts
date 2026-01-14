@@ -2,9 +2,8 @@ import type { Project } from "@prisma/client";
 import type { Worker } from "bullmq";
 import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createMocks } from "node-mocks-http";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DEFAULT_EMBEDDINGS_MODEL } from "~/utils/constants";
+import { DEFAULT_EMBEDDINGS_MODEL, KSUID_RESOURCES } from "~/utils/constants";
 import type { CollectorJob } from "../../server/background/types";
 import { startCollectorWorker } from "../../server/background/workers/collectorWorker";
 import {
@@ -24,6 +23,7 @@ import {
   waitForResult,
 } from "../../utils/testUtils";
 import handler from "./collector";
+import { generate } from "@langwatch/ksuid";
 
 const sampleSpan: LLMSpan = {
   type: "llm",
@@ -363,7 +363,7 @@ describe.skip("Collector API Endpoint", () => {
       return trace;
     });
 
-    expect(indexedRagTrace.spans![1]).toMatchObject({
+    expect(indexedRagTrace.spans?.[1]).toMatchObject({
       input: {
         type: "text",
         value: '"What is the capital of France?"',
@@ -398,7 +398,7 @@ describe.skip("Collector API Endpoint", () => {
         "Paris is the capital of France.",
       ] as any,
       timestamps: sampleSpan.timestamps,
-      // @ts-ignore
+      // @ts-expect-error
       outputs: [],
     };
     const llmSpan: LLMSpan = {
@@ -413,7 +413,7 @@ describe.skip("Collector API Endpoint", () => {
           { role: "user", content: "What is the capital of France?" },
         ],
       },
-      // @ts-ignore
+      // @ts-expect-error
       outputs: [
         {
           type: "chat_messages",
@@ -457,7 +457,7 @@ describe.skip("Collector API Endpoint", () => {
       return trace;
     });
 
-    expect(indexedRagTrace.spans![1]!.contexts).toMatchObject([
+    expect(indexedRagTrace.spans?.[1]?.contexts).toMatchObject([
       {
         document_id: expect.any(String),
         content: "France is a country in Europe.",
@@ -558,7 +558,7 @@ describe.skip("Collector API Endpoint", () => {
       span_id: `span_${nanoid()}`,
     };
 
-    const builtInEvaluationId = `eval_${nanoid()}`;
+    const builtInEvaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
     const traceData: CollectorRESTParams = {
       trace_id: traceId,
       spans: [llmSpan],

@@ -1,5 +1,4 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import { nanoid } from "nanoid";
 import type { NextApiRequest, NextApiResponse } from "next";
 import type { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
@@ -28,6 +27,8 @@ import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
 } from "../../../dataset/evaluate";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 
 const logger = createLogger("langwatch:evaluations:evaluate");
 
@@ -200,7 +201,7 @@ export async function handleEvaluatorCall(
 
   // Generate evaluationId for event sourcing tracking
   const evaluationId =
-    storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`;
+    storedEvaluator?.id ?? params.evaluation_id ?? generate(KSUID_RESOURCES.EVALUATION).toString();
   const evaluatorId =
     storedEvaluator?.id ??
     params.evaluator_id ??
@@ -290,7 +291,7 @@ export async function handleEvaluatorCall(
   if ("cost" in result && result.cost) {
     await prisma.cost.create({
       data: {
-        id: `cost_${nanoid()}`,
+        id: generate(KSUID_RESOURCES.COST).toString(),
         projectId: project.id,
         costType: isGuardrail ? CostType.GUARDRAIL : CostType.TRACE_CHECK,
         costName: storedEvaluator?.name ?? checkType,

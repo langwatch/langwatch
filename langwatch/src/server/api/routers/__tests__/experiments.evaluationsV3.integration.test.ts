@@ -5,7 +5,7 @@
  * Tests the actual saveEvaluationsV3 and getEvaluationsV3BySlug endpoints.
  */
 import { ExperimentType } from "@prisma/client";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -71,7 +71,7 @@ describe("Evaluations V3 Endpoints", () => {
       createdExperimentIds.push(result.id);
 
       // ID should start with eval_ (ksuid format)
-      expect(result.id).toMatch(/^eval_/);
+      expect(result.id).toMatch(/^evaluation_/);
       // Slug should be the last 8 characters of the ID (shorter URL)
       expect(result.slug).toBe(result.id.slice(-8));
       expect(result.slug).toHaveLength(8);
@@ -147,7 +147,7 @@ describe("Evaluations V3 Endpoints", () => {
       // Should use the provided slug instead of generating one
       expect(result.slug).toBe(customSlug);
       // ID should still be a ksuid
-      expect(result.id).toMatch(/^eval_/);
+      expect(result.id).toMatch(/^evaluation_/);
     });
 
     it("saves the workbenchState correctly", async () => {

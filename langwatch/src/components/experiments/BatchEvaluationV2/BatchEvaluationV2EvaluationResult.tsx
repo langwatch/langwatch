@@ -297,7 +297,7 @@ export function BatchEvaluationV2EvaluationResult({
       const formatEvalValue = (value: any) => {
         if (value === false) return "false";
         if (value === true) return "true";
-        return !isNaN(Number(value))
+        return !Number.isNaN(Number(value))
           ? numeral(Number(value)).format("0.[00]")
           : (value ?? "-");
       };
