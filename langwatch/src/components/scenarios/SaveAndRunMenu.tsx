@@ -171,14 +171,13 @@ export function SaveAndRunMenu({
                     </HStack>
                   ))
                 )}
-                {/* Add New Prompt Link */}
+                {/* Add New Prompt Link - opens in new tab to preserve scenario work */}
                 <Link
                   href={project ? `/${project.slug}/prompts` : "/"}
-                  passHref
-                  legacyBehavior
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
                   <HStack
-                    as="a"
                     paddingX={3}
                     paddingY={2}
                     cursor="pointer"
