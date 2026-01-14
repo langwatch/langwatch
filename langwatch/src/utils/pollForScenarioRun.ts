@@ -70,9 +70,16 @@ export async function pollForScenarioRun(
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
         const run = runs[0];
 
-        // Check for error states first
-        if (run.status === "ERROR" || run.status === "FAILED") {
-          logger.info({ status: run.status, scenarioRunId: run.scenarioRunId }, "Run errored");
+        // Check for error/cancelled states first
+        if (
+          run.status === "ERROR" ||
+          run.status === "FAILED" ||
+          run.status === "CANCELLED"
+        ) {
+          logger.info(
+            { status: run.status, scenarioRunId: run.scenarioRunId },
+            "Run terminated with error or cancelled",
+          );
           return {
             success: false,
             error: "run_error",
@@ -84,7 +91,11 @@ export async function pollForScenarioRun(
         const hasMessages = run.messages && run.messages.length > 0;
         if (hasMessages || run.status === "SUCCESS") {
           logger.info(
-            { status: run.status, hasMessages, scenarioRunId: run.scenarioRunId },
+            {
+              status: run.status,
+              hasMessages,
+              scenarioRunId: run.scenarioRunId,
+            },
             "Run ready",
           );
           return { success: true, scenarioRunId: run.scenarioRunId };

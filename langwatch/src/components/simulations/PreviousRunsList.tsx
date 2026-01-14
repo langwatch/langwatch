@@ -100,79 +100,70 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
         </EmptyState.Root>
       )}
 
-      {sortedRuns.length > 0
-        ? sortedRuns.map((run: ScenarioRunData) => (
-            <Box
-              key={run.scenarioRunId}
-              p={4}
-              borderRadius="md"
-              border="1px solid"
-              borderColor="gray.200"
-              cursor="pointer"
-              _hover={{ bg: "gray.100" }}
-              onClick={() => {
-                if (scenarioSetId && batchRunId) {
-                  goToSimulationRun({
-                    scenarioSetId,
-                    batchRunId,
-                    scenarioRunId: run.scenarioRunId,
-                  });
-                }
-              }}
+      {sortedRuns.map((run: ScenarioRunData) => (
+        <Box
+          key={run.scenarioRunId}
+          p={4}
+          borderRadius="md"
+          border="1px solid"
+          borderColor="gray.200"
+          cursor="pointer"
+          _hover={{ bg: "gray.100" }}
+          onClick={() => {
+            if (scenarioSetId && batchRunId) {
+              goToSimulationRun({
+                scenarioSetId,
+                batchRunId,
+                scenarioRunId: run.scenarioRunId,
+              });
+            }
+          }}
+        >
+          <VStack align="start" gap={3} w="100%">
+            {/* Status Badge and Timestamp Row */}
+            <Flex
+              align="start"
+              w="100%"
+              flexWrap="wrap"
+              gap={2}
+              alignItems="center"
             >
-              <VStack align="start" gap={3} w="100%">
-                {/* Status Badge and Timestamp Row */}
-                <Flex
-                  align="start"
-                  w="100%"
-                  flexWrap="wrap"
-                  gap={2}
-                  alignItems="center"
-                >
-                  <ScenarioRunStatusIcon
-                    status={run.status as ScenarioRunStatus}
-                    boxSize={12}
-                  />
-                  <Badge
-                    colorPalette={getStatusBadgeProps(run.status).colorPalette}
-                    variant="subtle"
-                    display="flex"
-                    alignItems="center"
-                    gap={1}
-                    px={2}
-                    py={1}
-                    borderRadius="md"
-                  >
-                    <Text fontSize="xs" fontWeight="medium">
-                      {getStatusBadgeProps(run.status).label}
-                    </Text>
-                  </Badge>
-                </Flex>
+              <ScenarioRunStatusIcon
+                status={run.status as ScenarioRunStatus}
+                boxSize={12}
+              />
+              <Badge
+                colorPalette={getStatusBadgeProps(run.status).colorPalette}
+                variant="subtle"
+                display="flex"
+                alignItems="center"
+                gap={1}
+                px={2}
+                py={1}
+                borderRadius="md"
+              >
+                <Text fontSize="xs" fontWeight="medium">
+                  {getStatusBadgeProps(run.status).label}
+                </Text>
+              </Badge>
+            </Flex>
 
-                {/* Metrics Row */}
-                <VStack align="start" gap={1} w="100%">
-                  <Box fontSize="xs" color="gray.600">
-                    <Text>
-                      Duration: {Math.round(run.durationInMs / 1000)}s
-                    </Text>
-                    <Text>
-                      Accuracy: {calculateAccuracyPercentage(run.results)}%
-                    </Text>
-                  </Box>
-                  <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
-                    {new Date(run.timestamp).toLocaleDateString()},{" "}
-                    {new Date(run.timestamp).toLocaleTimeString()}
-                  </Text>
-                </VStack>
-              </VStack>
-            </Box>
-          ))
-        : !isLoading &&
-          scenarioRunData?.data !== undefined && (
-            <Text color="gray.500" fontSize="sm">
-              No previous runs found
-            </Text>
-          )}
+            {/* Metrics Row */}
+            <VStack align="start" gap={1} w="100%">
+              <Box fontSize="xs" color="gray.600">
+                <Text>Duration: {Math.round(run.durationInMs / 1000)}s</Text>
+                <Text>
+                  Accuracy: {calculateAccuracyPercentage(run.results)}%
+                </Text>
+              </Box>
+              <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
+                {new Date(run.timestamp).toLocaleDateString()},{" "}
+                {new Date(run.timestamp).toLocaleTimeString()}
+              </Text>
+            </VStack>
+          </VStack>
+        </Box>
+      ))}
     </VStack>
   );
 }

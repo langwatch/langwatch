@@ -24,14 +24,14 @@ export function useRunScenario({
     async (scenarioId: string, target: TargetValue) => {
       if (!projectId || !projectSlug || !target) return;
 
-      const { setId, batchRunId } = await runMutation.mutateAsync({
-        projectId,
-        scenarioId,
-        target: { type: target.type, referenceId: target.id },
-      });
-
-      setIsPolling(true);
       try {
+        const { setId, batchRunId } = await runMutation.mutateAsync({
+          projectId,
+          scenarioId,
+          target: { type: target.type, referenceId: target.id },
+        });
+
+        setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
           { projectId, scenarioSetId: setId, batchRunId },
@@ -76,6 +76,13 @@ export function useRunScenario({
             meta: { closable: true },
           });
         }
+      } catch {
+        toaster.create({
+          title: "Failed to start scenario",
+          description: "An error occurred while starting the scenario run.",
+          type: "error",
+          meta: { closable: true },
+        });
       } finally {
         setIsPolling(false);
       }
