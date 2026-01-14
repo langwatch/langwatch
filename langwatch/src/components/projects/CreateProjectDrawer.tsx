@@ -7,6 +7,7 @@ import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { ProjectForm, type ProjectFormData } from "./ProjectForm";
+import { NEW_TEAM_VALUE } from "./projectFormValidation";
 
 export function CreateProjectDrawer({
   open = true,
@@ -42,7 +43,7 @@ export function CreateProjectDrawer({
       {
         organizationId: organization.id,
         name: data.name,
-        teamId: data.teamId === "NEW" ? undefined : data.teamId,
+        teamId: data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId,
         newTeamName: data.newTeamName,
         language: data.language,
         framework: data.framework,

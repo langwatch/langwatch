@@ -16,6 +16,11 @@ import { api } from "../../utils/api";
 import { isAtMaxProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../ui/link";
+import {
+  validateProjectName,
+  validateNewTeamName,
+  NEW_TEAM_VALUE,
+} from "./projectFormValidation";
 
 export interface ProjectFormData {
   name: string;
@@ -129,7 +134,7 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
           <Input
             {...register("name", {
               required: "Project name is required",
-              validate: (v) => v.trim().length > 0 || "Project name is required",
+              validate: validateProjectName,
             })}
             placeholder="AI Project"
           />
@@ -151,18 +156,18 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                       {team.name}
                     </option>
                   ))}
-                  <option value="NEW">(+) Create new team</option>
+                  <option value={NEW_TEAM_VALUE}>(+) Create new team</option>
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
             </Field.Root>
 
-            {teamId === "NEW" && (
+            {teamId === NEW_TEAM_VALUE && (
               <Field.Root invalid={!!errors.newTeamName}>
                 <Field.Label>New Team Name</Field.Label>
                 <Input
                   {...register("newTeamName", {
-                    required: teamId === "NEW" ? "Team name is required" : false,
+                    validate: (value) => validateNewTeamName(teamId, value),
                   })}
                   placeholder="Engineering Team"
                 />

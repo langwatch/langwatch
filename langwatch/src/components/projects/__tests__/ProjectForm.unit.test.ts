@@ -1,31 +1,13 @@
 /**
  * Unit tests for ProjectForm validation logic.
- * Tests the validation rules without rendering the form.
+ * Tests the extracted validation functions.
  */
 import { describe, it, expect } from "vitest";
-
-// Validation functions extracted from form logic
-function validateProjectName(name: string | undefined): string | null {
-  if (!name) return "Project name is required";
-  if (name.trim() === "") return "Project name is required";
-  return null;
-}
-
-function validateTeamId(teamId: string | undefined, showTeamSelector: boolean): string | null {
-  if (!showTeamSelector) return null;
-  if (!teamId) return "Team is required";
-  return null;
-}
-
-function validateNewTeamName(
-  teamId: string | undefined,
-  newTeamName: string | undefined,
-): string | null {
-  if (teamId !== "NEW") return null;
-  if (!newTeamName) return "Team name is required";
-  if (newTeamName.trim() === "") return "Team name is required";
-  return null;
-}
+import {
+  validateProjectName,
+  validateNewTeamName,
+  NEW_TEAM_VALUE,
+} from "../projectFormValidation";
 
 describe("ProjectForm validation logic", () => {
   describe("when validating project name", () => {
@@ -42,45 +24,37 @@ describe("ProjectForm validation logic", () => {
     });
 
     it("accepts valid project name", () => {
-      expect(validateProjectName("My Project")).toBeNull();
-    });
-  });
-
-  describe("when validating team selection", () => {
-    it("does not require team when selector is hidden", () => {
-      expect(validateTeamId(undefined, false)).toBeNull();
-    });
-
-    it("requires team when selector is visible", () => {
-      expect(validateTeamId(undefined, true)).toBe("Team is required");
-    });
-
-    it("accepts valid team id", () => {
-      expect(validateTeamId("team-123", true)).toBeNull();
+      expect(validateProjectName("My Project")).toBe(true);
     });
   });
 
   describe("when validating new team name", () => {
     it("does not require new team name when not creating new team", () => {
-      expect(validateNewTeamName("team-123", undefined)).toBeNull();
+      expect(validateNewTeamName("team-123", undefined)).toBe(true);
     });
 
     it("requires new team name when creating new team", () => {
-      expect(validateNewTeamName("NEW", undefined)).toBe("Team name is required");
+      expect(validateNewTeamName(NEW_TEAM_VALUE, undefined)).toBe(
+        "Team name is required"
+      );
     });
 
     it("rejects empty new team name", () => {
-      expect(validateNewTeamName("NEW", "")).toBe("Team name is required");
+      expect(validateNewTeamName(NEW_TEAM_VALUE, "")).toBe(
+        "Team name is required"
+      );
     });
 
     it("rejects whitespace-only new team name", () => {
-      expect(validateNewTeamName("NEW", "   ")).toBe("Team name is required");
+      expect(validateNewTeamName(NEW_TEAM_VALUE, "   ")).toBe(
+        "Team name is required"
+      );
     });
 
     it("accepts valid new team name", () => {
-      expect(validateNewTeamName("NEW", "Engineering")).toBeNull();
+      expect(validateNewTeamName(NEW_TEAM_VALUE, "Engineering")).toBe(true);
     });
   });
 
-  // Project limit tests moved to utils/__tests__/limits.unit.test.ts
+  // Project limit tests are in utils/__tests__/limits.unit.test.ts
 });
