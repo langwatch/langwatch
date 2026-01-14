@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React, { useMemo } from "react";
-import type { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { ScenarioRunStatusIcon } from "~/components/simulations/ScenarioRunStatusIcon";
 
@@ -18,6 +18,25 @@ import { LuCircleOff } from "react-icons/lu";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+function getStatusBadgeProps(status: string): {
+  colorPalette: string;
+  label: string;
+} {
+  switch (status) {
+    case ScenarioRunStatus.SUCCESS:
+      return { colorPalette: "green", label: "completed" };
+    case ScenarioRunStatus.FAILED:
+    case ScenarioRunStatus.ERROR:
+      return { colorPalette: "red", label: "failed" };
+    case ScenarioRunStatus.CANCELLED:
+      return { colorPalette: "gray", label: "cancelled" };
+    case ScenarioRunStatus.IN_PROGRESS:
+    case ScenarioRunStatus.PENDING:
+    default:
+      return { colorPalette: "orange", label: "running" };
+  }
+}
 
 function calculateAccuracyPercentage(
   results: ScenarioRunData["results"],
@@ -115,7 +134,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                     boxSize={12}
                   />
                   <Badge
-                    colorPalette={run.status === "SUCCESS" ? "green" : "orange"}
+                    colorPalette={getStatusBadgeProps(run.status).colorPalette}
                     variant="subtle"
                     display="flex"
                     alignItems="center"
@@ -125,7 +144,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                     borderRadius="md"
                   >
                     <Text fontSize="xs" fontWeight="medium">
-                      {run.status === "SUCCESS" ? "completed" : "running"}
+                      {getStatusBadgeProps(run.status).label}
                     </Text>
                   </Badge>
                 </Flex>
