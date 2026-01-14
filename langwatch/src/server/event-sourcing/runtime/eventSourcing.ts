@@ -9,6 +9,7 @@ import type {
   StaticPipelineDefinition,
 } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
+import { evaluationProcessingPipelineDefinition } from "../pipelines/evaluation-processing/pipeline";
 import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
@@ -140,7 +141,9 @@ export class EventSourcing {
     definition: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
   ): PipelineWithCommandHandlers<
     RegisteredPipeline<EventType, ProjectionTypes>,
-    Commands extends NoCommands
+    // Use [Commands] to prevent distributive conditional type behavior
+    // This ensures CommandsToProcessors receives the full union type, not each member individually
+    [Commands] extends [NoCommands]
       ? Record<string, EventSourcedQueueProcessor<any>>
       : CommandsToProcessors<Commands>
   > {
@@ -157,7 +160,7 @@ export class EventSourcing {
         // Define the return type for cleaner code
         type ReturnType = PipelineWithCommandHandlers<
           RegisteredPipeline<EventType, ProjectionTypes>,
-          Commands extends NoCommands
+          [Commands] extends [NoCommands]
             ? Record<string, EventSourcedQueueProcessor<any>>
             : CommandsToProcessors<Commands>
         >;
@@ -284,4 +287,8 @@ export const eventSourcing = EventSourcing.getInstance();
  */
 export const traceProcessingPipeline = eventSourcing.register(
   traceProcessingPipelineDefinition,
+);
+
+export const evaluationProcessingPipeline = eventSourcing.register(
+  evaluationProcessingPipelineDefinition,
 );
