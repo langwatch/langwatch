@@ -132,14 +132,14 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
 
                 {/* Metrics Row */}
                 <VStack align="start" gap={1} w="100%">
-                  <Text fontSize="xs" color="gray.600">
+                  <Box fontSize="xs" color="gray.600">
                     <Text>
                       Duration: {Math.round(run.durationInMs / 1000)}s
                     </Text>
                     <Text>
                       Accuracy: {calculateAccuracyPercentage(run.results)}%
                     </Text>
-                  </Text>
+                  </Box>
                   <Text fontSize="xs" color="gray.400" whiteSpace="nowrap">
                     {new Date(run.timestamp).toLocaleDateString()},{" "}
                     {new Date(run.timestamp).toLocaleTimeString()}
