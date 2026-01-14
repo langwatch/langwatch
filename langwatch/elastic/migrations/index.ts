@@ -22,6 +22,7 @@ import * as add_evaluation_thread_id_and_inputs from "./202510031800_add_evaluat
 import * as add_scenario_name_keyword from "./202512171410_add_scenario_name_keyword";
 import * as add_target_id_to_batch_evaluations from "./202601061400_add_target_id_to_batch_evaluations";
 import * as add_targets_to_batch_evaluations from "./202601061500_add_targets_to_batch_evaluations";
+import * as add_metadata_to_batch_evaluation_targets from "./202601161400_add_metadata_to_batch_evaluation_targets";
 
 // Create a mapping object with the original filenames as keys
 export const migrations = {
@@ -50,6 +51,8 @@ export const migrations = {
     add_target_id_to_batch_evaluations,
   "202601061500_add_targets_to_batch_evaluations":
     add_targets_to_batch_evaluations,
+  "202601161400_add_metadata_to_batch_evaluation_targets":
+    add_metadata_to_batch_evaluation_targets,
 };
 
 // Export the migrations object for use in other modules

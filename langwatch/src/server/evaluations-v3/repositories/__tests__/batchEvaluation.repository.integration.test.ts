@@ -116,6 +116,92 @@ describe("BatchEvaluationRepository Integration", () => {
       expect(result?.targets?.[1]?.type).toBe("agent");
     });
 
+    it("creates a batch evaluation with targets including metadata", async () => {
+      const runId = `run_${nanoid()}`;
+      createdRunIds.push(runId);
+
+      await repository.create({
+        projectId: project.id,
+        experimentId,
+        runId,
+        total: 5,
+        targets: [
+          {
+            id: "target-1",
+            name: "GPT-4o Warm",
+            type: "prompt",
+            prompt_id: "prompt-123",
+            prompt_version: 2,
+            model: "openai/gpt-4o",
+            metadata: {
+              temperature: 0.7,
+              max_tokens: 1000,
+              variant: "production",
+            },
+          },
+          {
+            id: "target-2",
+            name: "GPT-4o Cold",
+            type: "prompt",
+            prompt_id: "prompt-123",
+            prompt_version: 2,
+            model: "openai/gpt-4o",
+            metadata: {
+              temperature: 0.0,
+              max_tokens: 500,
+              variant: "conservative",
+            },
+          },
+          {
+            id: "target-3",
+            name: "Custom API",
+            type: "custom",
+            metadata: {
+              endpoint: "https://api.example.com/v1",
+              provider: "custom",
+              use_cache: true,
+            },
+          },
+        ],
+      });
+
+      // Wait for ES to index
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Verify it was created with metadata
+      const result = await repository.getByRunId({
+        projectId: project.id,
+        experimentId,
+        runId,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.targets).toHaveLength(3);
+
+      // Check first target metadata
+      const target1 = result?.targets?.find((t) => t.id === "target-1");
+      expect(target1?.name).toBe("GPT-4o Warm");
+      expect(target1?.type).toBe("prompt");
+      expect(target1?.metadata).toEqual({
+        temperature: 0.7,
+        max_tokens: 1000,
+        variant: "production",
+      });
+
+      // Check second target metadata
+      const target2 = result?.targets?.find((t) => t.id === "target-2");
+      expect(target2?.name).toBe("GPT-4o Cold");
+      expect(target2?.metadata?.temperature).toBe(0.0);
+      expect(target2?.metadata?.variant).toBe("conservative");
+
+      // Check custom target
+      const target3 = result?.targets?.find((t) => t.id === "target-3");
+      expect(target3?.name).toBe("Custom API");
+      expect(target3?.type).toBe("custom");
+      expect(target3?.metadata?.endpoint).toBe("https://api.example.com/v1");
+      expect(target3?.metadata?.use_cache).toBe(true);
+    });
+
     it("creates batch evaluation without targets (backward compatible)", async () => {
       const runId = `run_${nanoid()}`;
       createdRunIds.push(runId);
@@ -262,10 +348,10 @@ describe("BatchEvaluationRepository Integration", () => {
       });
 
       expect(result?.evaluations).toHaveLength(2);
-      
+
       const target1Eval = result?.evaluations?.find((e) => e.target_id === "target-1");
       const target2Eval = result?.evaluations?.find((e) => e.target_id === "target-2");
-      
+
       expect(target1Eval?.passed).toBe(true);
       expect(target2Eval?.passed).toBe(false);
     });
@@ -427,7 +513,7 @@ describe("BatchEvaluationRepository Integration", () => {
 
       // Should have at least the runs we created
       expect(results.length).toBeGreaterThanOrEqual(2);
-      
+
       // All results should be for this experiment
       for (const result of results) {
         expect(result.experiment_id).toBe(experimentId);

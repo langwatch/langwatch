@@ -8,6 +8,16 @@
 import type { ESBatchEvaluation, ESBatchEvaluationTarget } from "~/server/experiments/types";
 
 /**
+ * Run data with color assignment for comparison mode
+ */
+export type ComparisonRunData = {
+  runId: string;
+  color: string;
+  data: BatchEvaluationData | null;
+  isLoading: boolean;
+};
+
+/**
  * A single evaluator result for one row
  */
 export type BatchEvaluatorResult = {
@@ -60,7 +70,7 @@ export type BatchResultRow = {
 export type BatchTargetColumn = {
   id: string;
   name: string;
-  type: "prompt" | "agent" | "legacy";
+  type: "prompt" | "agent" | "custom" | "legacy";
   /** For prompts: the config ID */
   promptId?: string | null;
   /** For prompts: the version used */
@@ -69,6 +79,8 @@ export type BatchTargetColumn = {
   agentId?: string | null;
   /** Model used */
   model?: string | null;
+  /** Flexible metadata for comparison and analysis */
+  metadata?: Record<string, string | number | boolean> | null;
   /** Output field names */
   outputFields: string[];
 };
@@ -154,11 +166,12 @@ export const transformBatchEvaluationData = (
     targetColumns = targets.map((target) => ({
       id: target.id,
       name: target.name,
-      type: target.type,
+      type: target.type === "custom" ? "custom" : target.type,
       promptId: target.prompt_id,
       promptVersion: target.prompt_version,
       agentId: target.agent_id,
       model: target.model,
+      metadata: target.metadata,
       outputFields: detectOutputFields(dataset, target.id),
     }));
   } else {
@@ -247,7 +260,7 @@ export const transformBatchEvaluationData = (
 
       // Extract output for this target
       let output: Record<string, unknown> | null = null;
-      
+
       if (targetId === "_derived") {
         // Derived target for API evaluations: extract output from evaluator inputs
         const rowEvaluations = evaluationsByIndexAndTarget.get(`${i}:`) ?? [];
@@ -382,9 +395,9 @@ const extractOutputFromEvaluatorInputs = (
   // Try to find output from any evaluator's inputs
   for (const evaluation of evaluations) {
     if (!evaluation.inputs) continue;
-    
+
     const inputs = evaluation.inputs;
-    
+
     // Check for common output field names and return the first one found
     if ("output" in inputs && inputs.output !== undefined) {
       return { output: inputs.output };
@@ -402,7 +415,7 @@ const extractOutputFromEvaluatorInputs = (
       return { output: inputs.prediction };
     }
   }
-  
+
   return null;
 };
 

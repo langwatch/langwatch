@@ -29,13 +29,13 @@ const unwrapSingleOutputField = (
 ): unknown => {
   if (output === null || output === undefined) return output;
   if (typeof output !== "object") return output;
-  
+
   const keys = Object.keys(output);
   // Only unwrap if there's exactly one key and it's "output"
   if (keys.length === 1 && keys[0] === "output") {
     return output.output;
   }
-  
+
   return output;
 };
 
@@ -113,7 +113,7 @@ export function BatchTargetCell({
   // Format output for display
   // If output is an object with only an "output" key, unwrap it
   const unwrappedOutput = unwrapSingleOutputField(targetOutput.output);
-  
+
   const rawOutput =
     unwrappedOutput === null || unwrappedOutput === undefined
       ? ""
@@ -352,7 +352,8 @@ export function BatchTargetCell({
             top={`${expandedPosition.top - 8}px`}
             left={`${expandedPosition.left - 8}px`}
             width={`${Math.max(expandedPosition.width + 16, 250)}px`}
-            maxHeight="calc(100vh - 32px)"
+            maxHeight={`calc(100vh - ${expandedPosition.top - 8}px - 32px)`}
+            overflowY="auto"
             bg="white/75"
             backdropFilter="blur(8px)"
             borderRadius="md"

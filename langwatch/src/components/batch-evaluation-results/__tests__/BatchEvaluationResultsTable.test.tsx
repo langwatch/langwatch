@@ -5,6 +5,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen, cleanup } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
@@ -133,8 +134,10 @@ describe("BatchEvaluationResultsTable", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByText("input")).toBeInTheDocument();
-      expect(screen.getByText("expected")).toBeInTheDocument();
+      // Column names appear in both the table header and the column visibility popover
+      // Check that at least one instance exists
+      expect(screen.getAllByText("input").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("expected").length).toBeGreaterThan(0);
     });
 
     it("renders target column headers", () => {
@@ -284,6 +287,85 @@ describe("BatchEvaluationResultsTable", () => {
       expect(screen.getByText("Claude")).toBeInTheDocument();
       expect(screen.getByText(/Hi from GPT/)).toBeInTheDocument();
       expect(screen.getByText(/Hi from Claude/)).toBeInTheDocument();
+    });
+  });
+
+  describe("Column Visibility", () => {
+    it("hides columns when hiddenColumns prop includes column name", () => {
+      const data = createTestData({
+        datasetColumns: [
+          { name: "id", hasImages: false },
+          { name: "input", hasImages: false },
+        ],
+        rows: [
+          {
+            index: 0,
+            datasetEntry: { id: "row-123", input: "Test input" },
+            targets: {
+              "target-1": {
+                targetId: "target-1",
+                output: { response: "Test output" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+            },
+          },
+        ],
+      });
+
+      // Pass hidden columns via prop
+      const hiddenColumns = new Set(["id"]);
+
+      render(
+        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} />,
+        { wrapper: Wrapper }
+      );
+
+      // input column should be visible
+      expect(screen.getAllByText("input").length).toBeGreaterThan(0);
+      // Since id is hidden, we shouldn't see "row-123" in the table
+      expect(screen.queryByText("row-123")).not.toBeInTheDocument();
+    });
+
+    it("shows all columns when hiddenColumns is empty", () => {
+      const data = createTestData({
+        datasetColumns: [
+          { name: "id", hasImages: false },
+          { name: "input", hasImages: false },
+        ],
+        rows: [
+          {
+            index: 0,
+            datasetEntry: { id: "row-123", input: "Test input" },
+            targets: {
+              "target-1": {
+                targetId: "target-1",
+                output: { response: "Test output" },
+                cost: null,
+                duration: null,
+                error: null,
+                traceId: null,
+                evaluatorResults: [],
+              },
+            },
+          },
+        ],
+      });
+
+      // No hidden columns
+      const hiddenColumns = new Set<string>();
+
+      render(
+        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} />,
+        { wrapper: Wrapper }
+      );
+
+      // Both columns and their values should be visible
+      expect(screen.getByText("row-123")).toBeInTheDocument();
+      expect(screen.getByText("Test input")).toBeInTheDocument();
     });
   });
 });

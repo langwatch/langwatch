@@ -649,4 +649,132 @@ describe("transformBatchEvaluationData", () => {
       expect(result.targetColumns[0]?.id).toBe("end");
     });
   });
+
+  describe("API evaluations with explicit targets (multi-target comparison)", () => {
+    it("associates evaluator results with correct targets when targets are defined", () => {
+      // This is the exact structure from the Python SDK when comparing multiple targets
+      // Dataset entries are SHARED (no target_id on dataset)
+      // Evaluations have target_id to associate with specific targets
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: [
+          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
+          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
+          { id: "claude-3", name: "Claude-3", type: "custom", metadata: { model: "anthropic/claude-3" } },
+        ],
+        dataset: [
+          // Dataset entries are shared - no target_id
+          { index: 0, entry: { question: "What is AI?" } },
+          { index: 1, entry: { question: "Explain ML" } },
+        ],
+        evaluations: [
+          // Each evaluation has a target_id
+          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.95 },
+          { evaluator: "quality", name: "Quality", target_id: "gpt-3.5", status: "processed", index: 0, score: 0.70 },
+          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 0, score: 0.50 },
+          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 1, score: 0.90 },
+          { evaluator: "quality", name: "Quality", target_id: "gpt-3.5", status: "processed", index: 1, score: 0.60 },
+          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 1, score: 0.40 },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // Should have 3 target columns
+      expect(result.targetColumns).toHaveLength(3);
+      expect(result.targetColumns.map(t => t.id)).toEqual(["gpt-4", "gpt-3.5", "claude-3"]);
+
+      // Should have 2 rows
+      expect(result.rows).toHaveLength(2);
+
+      // Row 0: Each target should have its OWN evaluator results
+      const row0 = result.rows[0]!;
+      
+      // GPT-4 should have score 0.95
+      expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(1);
+      expect(row0.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.95);
+      
+      // GPT-3.5 should have score 0.70
+      expect(row0.targets["gpt-3.5"]?.evaluatorResults).toHaveLength(1);
+      expect(row0.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.70);
+      
+      // Claude-3 should have score 0.50
+      expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(1);
+      expect(row0.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.50);
+
+      // Row 1: Same structure, different scores
+      const row1 = result.rows[1]!;
+      
+      expect(row1.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.90);
+      expect(row1.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.60);
+      expect(row1.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.40);
+    });
+
+    it("handles multiple evaluators per target", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: [
+          { id: "gpt-4", name: "GPT-4", type: "custom" },
+          { id: "claude-3", name: "Claude-3", type: "custom" },
+        ],
+        dataset: [
+          { index: 0, entry: { question: "Test" } },
+        ],
+        evaluations: [
+          // GPT-4 has two evaluators
+          { evaluator: "latency", name: "Latency", target_id: "gpt-4", status: "processed", index: 0, score: 100 },
+          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.9 },
+          // Claude-3 has two evaluators
+          { evaluator: "latency", name: "Latency", target_id: "claude-3", status: "processed", index: 0, score: 200 },
+          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 0, score: 0.8 },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      const row0 = result.rows[0]!;
+      
+      // GPT-4 should have 2 evaluator results
+      expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(2);
+      expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(100);
+      expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "quality")?.score).toBe(0.9);
+      
+      // Claude-3 should have 2 evaluator results
+      expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(2);
+      expect(row0.targets["claude-3"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(200);
+      expect(row0.targets["claude-3"]?.evaluatorResults.find(e => e.evaluatorId === "quality")?.score).toBe(0.8);
+    });
+
+    it("correctly builds evaluatorNames map for targets with target_id", () => {
+      const data: ESBatchEvaluation = {
+        project_id: "proj-1",
+        experiment_id: "exp-1",
+        run_id: "run-1",
+        targets: [
+          { id: "gpt-4", name: "GPT-4", type: "custom" },
+        ],
+        dataset: [
+          { index: 0, entry: { question: "Test" } },
+        ],
+        evaluations: [
+          { evaluator: "quality", name: "Response Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.9 },
+        ],
+        timestamps: createTimestamps(),
+      };
+
+      const result = transformBatchEvaluationData(data);
+
+      // The evaluatorNames map should include the human-readable name
+      // Key format when target_id exists: "targetId:evaluatorId"
+      expect(result.evaluatorNames).toBeDefined();
+      // Should have at least one entry
+      expect(Object.keys(result.evaluatorNames).length).toBeGreaterThan(0);
+    });
+  });
 });

@@ -7,7 +7,12 @@
 
 // Main components
 export { BatchEvaluationResults } from "./BatchEvaluationResults";
-export { BatchEvaluationResultsTable } from "./BatchEvaluationResultsTable";
+export {
+  BatchEvaluationResultsTable,
+  ColumnVisibilityButton,
+  DEFAULT_HIDDEN_COLUMNS,
+  type ColumnVisibilityButtonProps,
+} from "./BatchEvaluationResultsTable";
 export { BatchTargetCell } from "./BatchTargetCell";
 export { BatchTargetHeader } from "./BatchTargetHeader";
 export { ExpandableDatasetCell } from "./ExpandableDatasetCell";

@@ -5,6 +5,7 @@ import { abortManager } from "../abortManager";
 import type { EvaluationV3Event, ExecutionScope } from "../types";
 import type { EvaluationsV3State, LocalPromptConfig, TargetConfig, EvaluatorConfig } from "~/evaluations-v3/types";
 import { createInitialUIState, createInitialResults } from "~/evaluations-v3/types";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { getTestProject } from "~/utils/testUtils";
 
 /**
@@ -1124,6 +1125,11 @@ describe("Orchestrator Integration", () => {
         expect(storedRun?.evaluations).toBeDefined();
         expect(storedRun?.evaluations?.length).toBe(2); // 2 rows, 1 evaluator each
 
+        // Verify evaluator name is stored (human-readable, not just ID)
+        const firstEvaluation = storedRun?.evaluations?.[0];
+        expect(firstEvaluation?.evaluator).toBe("eval-1");
+        expect(firstEvaluation?.name).toBe("Exact Match");
+
         // Verify timestamps
         expect(storedRun?.timestamps.created_at).toBeDefined();
         expect(storedRun?.timestamps.finished_at).toBeDefined();
@@ -1209,5 +1215,140 @@ describe("Orchestrator Integration", () => {
         await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
       }
     }, 60000);
+
+    it("stores model from loadedPrompts when target has no localPromptConfig", async () => {
+      const { prisma } = await import("~/server/db");
+      const { nanoid } = await import("nanoid");
+      const { getDefaultBatchEvaluationRepository } = await import("../../repositories/elasticsearchBatchEvaluation.repository");
+
+      const experimentId = `exp_${nanoid()}`;
+      const promptId = `prompt_${nanoid()}`;
+      await prisma.experiment.create({
+        data: {
+          id: experimentId,
+          projectId: project.id,
+          name: "Model From Loaded Prompt Test",
+          slug: `model-test-${nanoid(8)}`,
+          type: "EVALUATIONS_V3",
+        },
+      });
+
+      try {
+        // Create a target WITHOUT localPromptConfig (simulates saved prompt)
+        const targetWithoutLocalConfig: TargetConfig = {
+          id: "target-1",
+          type: "prompt",
+          name: "Saved Prompt Target",
+          promptId: promptId,  // Reference to saved prompt
+          promptVersionId: "version-1",
+          promptVersionNumber: 1,
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          mappings: {
+            "dataset-1": {
+              input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+            },
+          },
+          // NOTE: no localPromptConfig - this is the scenario we're testing
+        };
+
+        const state = createTestState([targetWithoutLocalConfig]);
+        const datasetRows = [{ question: "Say hello", expected: "hello" }];
+        const datasetColumns = [
+          { id: "question", name: "question", type: "string" },
+          { id: "expected", name: "expected", type: "string" },
+        ];
+
+        // Create a mock VersionedPrompt with a model
+        const mockVersionedPrompt: VersionedPrompt = {
+          id: promptId,
+          name: "Test Prompt",
+          handle: "test-prompt",
+          scope: "PROJECT",
+          version: 1,
+          versionId: "version-1",
+          versionCreatedAt: new Date(),
+          model: "openai/gpt-4-turbo",  // This should be stored
+          temperature: 0.7,
+          maxTokens: 100,
+          prompt: "You are a helpful assistant.",
+          projectId: project.id,
+          organizationId: "org-1",
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "{{input}}" },
+          ],
+          authorId: null,
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          updatedAt: new Date(),
+          createdAt: new Date(),
+        };
+
+        // Create loadedPrompts map with our mock prompt
+        const loadedPrompts = new Map<string, VersionedPrompt>();
+        loadedPrompts.set(promptId, mockVersionedPrompt);
+
+        const input: OrchestratorInput = {
+          projectId: project.id,
+          experimentId,
+          scope: { type: "full" },
+          state,
+          datasetRows,
+          datasetColumns,
+          loadedPrompts,  // Pass loaded prompts
+          loadedAgents: new Map(),
+          saveToEs: true,
+        };
+
+        const events = await collectEvents(input);
+
+        // Verify execution completed
+        const doneEvent = events.find((e) => e.type === "done");
+        expect(doneEvent).toBeDefined();
+
+        // Get the run ID
+        const startEvent = events.find((e) => e.type === "execution_started");
+        if (startEvent?.type !== "execution_started") throw new Error("Expected execution_started event");
+        const runId = startEvent.runId;
+
+        // Wait for ES to index
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Verify data was stored in Elasticsearch
+        const repository = getDefaultBatchEvaluationRepository();
+        const storedRun = await repository.getByRunId({
+          projectId: project.id,
+          experimentId,
+          runId,
+        });
+
+        // Verify the target has the model from loadedPrompts
+        expect(storedRun).not.toBeNull();
+        expect(storedRun?.targets).toBeDefined();
+        expect(storedRun?.targets?.length).toBe(1);
+        expect(storedRun?.targets?.[0]?.name).toBe("Saved Prompt Target");
+        expect(storedRun?.targets?.[0]?.model).toBe("openai/gpt-4-turbo");
+
+        // Clean up ES document
+        const { esClient, BATCH_EVALUATION_INDEX } = await import("~/server/elasticsearch");
+        const client = await esClient({ projectId: project.id });
+        await client.deleteByQuery({
+          index: BATCH_EVALUATION_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { project_id: project.id } },
+                  { term: { run_id: runId } },
+                ],
+              },
+            },
+          },
+        });
+      } finally {
+        await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+      }
+    }, 120000);
   });
 });

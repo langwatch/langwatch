@@ -403,15 +403,31 @@ export async function* runOrchestrator(
   const SAVE_THRESHOLD = 10; // Or every 10 events
 
   // Build target metadata for storage
-  const targetMetadata: ESBatchEvaluationTarget[] = state.targets.map((t) => ({
-    id: t.id,
-    name: t.name,
-    type: t.type,
-    prompt_id: t.promptId ?? null,
-    prompt_version: t.promptVersionNumber ?? null,
-    agent_id: t.dbAgentId ?? null,
-    model: t.localPromptConfig?.llm?.model ?? null,
-  }));
+  // For model: first check localPromptConfig, then fall back to loadedPrompts
+  const targetMetadata: ESBatchEvaluationTarget[] = state.targets.map((t) => {
+    let model: string | null = null;
+    // First check local prompt config (for edited prompts)
+    if (t.localPromptConfig?.llm?.model) {
+      model = t.localPromptConfig.llm.model;
+    }
+    // Otherwise, check loaded prompts (for saved prompts)
+    else if (t.type === "prompt" && t.promptId) {
+      const loadedPrompt = loadedPrompts.get(t.promptId);
+      if (loadedPrompt?.model) {
+        model = loadedPrompt.model;
+      }
+    }
+    
+    return {
+      id: t.id,
+      name: t.name,
+      type: t.type,
+      prompt_id: t.promptId ?? null,
+      prompt_version: t.promptVersionNumber ?? null,
+      agent_id: t.dbAgentId ?? null,
+      model,
+    };
+  });
 
   // Build config for result mapper - determines which evaluators have scores stripped
   const resultMapperConfig: ResultMapperConfig = {
@@ -474,8 +490,11 @@ export async function* runOrchestrator(
       });
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
+      // Find the evaluator config to get the human-readable name
+      const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
       pendingEvaluations.push({
         evaluator: event.evaluatorId,
+        name: evaluatorConfig?.name ?? null,
         target_id: event.targetId,
         index: event.rowIndex,
         status: result.status,

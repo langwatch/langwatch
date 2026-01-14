@@ -65,11 +65,24 @@ class EvaluationResult(BaseModel):
     traceback: Optional[List[str]] = Field(
         description="Traceback information for debugging", default=None
     )
+    target_id: Optional[str] = Field(
+        default=None, description="ID of the target this evaluation is for"
+    )
+
+
+class TargetInfo(BaseModel):
+    """Represents a registered target with its metadata."""
+
+    id: str
+    name: str
+    type: Literal["prompt", "agent", "custom"] = "custom"
+    metadata: Optional[Dict[str, Union[str, int, float, bool]]] = None
 
 
 class Batch(TypedDict):
     dataset: List[BatchEntry]
     evaluations: List[EvaluationResult]
+    targets: List[TargetInfo]
 
 
 class BatchEntry(BaseModel):
@@ -105,11 +118,14 @@ class Evaluation:
 
         # Sending results
         self.lock = threading.Lock()
-        self.batch: Batch = {"dataset": [], "evaluations": []}
+        self.batch: Batch = {"dataset": [], "evaluations": [], "targets": []}
         self.last_sent = 0
         self.debounce_interval = 1  # 1 second
         self.threads: List[threading.Thread] = []
         self.initialized = False
+
+        # Target registry - tracks registered targets and their metadata
+        self._targets: Dict[str, TargetInfo] = {}
 
     def init(self):
         if not langwatch.get_api_key():
@@ -327,6 +343,7 @@ class Evaluation:
             if (
                 len(self.batch["dataset"]) == 0
                 and len(self.batch["evaluations"]) == 0
+                and len(self.batch["targets"]) == 0
                 and not finished
             ):
                 return
@@ -340,7 +357,13 @@ class Evaluation:
                     del eval_["data"]
                 evaluations.append(eval_)
 
-            body = {
+            # Build targets array for API
+            targets = [
+                target.model_dump(exclude_none=True, exclude_unset=True)
+                for target in self.batch["targets"]
+            ]
+
+            body: Dict[str, Any] = {
                 "experiment_slug": self.experiment_slug,
                 "name": f"{self.name}",
                 "run_id": self.run_id,
@@ -356,6 +379,10 @@ class Evaluation:
                 },
             }
 
+            # Only include targets if we have any
+            if len(targets) > 0:
+                body["targets"] = targets
+
             if finished:
                 if not isinstance(body["timestamps"], dict):
                     body["timestamps"] = {}
@@ -370,7 +397,7 @@ class Evaluation:
             self.threads.append(thread)
 
             # Clear the batch and update the last sent time
-            self.batch = {"dataset": [], "evaluations": []}
+            self.batch = {"dataset": [], "evaluations": [], "targets": []}
             self.last_sent = time.time()
 
     @classmethod
@@ -402,6 +429,51 @@ class Evaluation:
 
         asyncio.run(wait_for_completion(self))
 
+    def _register_target(
+        self,
+        target: str,
+        metadata: Optional[Dict[str, Union[str, int, float, bool]]] = None,
+    ) -> str:
+        """
+        Register a target with its metadata. Returns the target ID.
+
+        If the target was already registered:
+        - If no new metadata is provided, the existing target is used
+        - If new metadata is provided and differs from existing, raises an error
+
+        Args:
+            target: The target name/ID
+            metadata: Optional metadata for this target (model, temperature, etc.)
+
+        Returns:
+            The target ID
+        """
+        with self.lock:
+            if target in self._targets:
+                existing = self._targets[target]
+                if metadata is not None:
+                    # Check if metadata matches
+                    existing_meta = existing.metadata or {}
+                    if existing_meta != metadata:
+                        raise ValueError(
+                            f"Target '{target}' was previously registered with different metadata.\n"
+                            f"Original: {existing_meta}\n"
+                            f"New: {metadata}\n"
+                            f"If you want to use different metadata, please use a different target name."
+                        )
+                return target
+
+            # Register new target
+            target_info = TargetInfo(
+                id=target,
+                name=target,
+                type="custom",
+                metadata=metadata,
+            )
+            self._targets[target] = target_info
+            self.batch["targets"].append(target_info)
+            return target
+
     def log(
         self,
         metric: str,
@@ -415,11 +487,40 @@ class Evaluation:
         duration: Optional[int] = None,
         cost: Optional[Money] = None,
         error: Optional[Exception] = None,
+        target: Optional[str] = None,
+        metadata: Optional[Dict[str, Union[str, int, float, bool]]] = None,
     ):
+        """
+        Log an evaluation metric result.
+
+        Args:
+            metric: Name of the metric being logged
+            index: Row index in the dataset (must be an integer)
+            data: Additional data/inputs for the evaluation
+            score: Numeric score (0-1 typically)
+            passed: Whether the evaluation passed
+            label: Label/category for the result
+            details: Human-readable description of the result
+            status: Status of the evaluation ("processed", "error", "skipped")
+            duration: Duration in milliseconds
+            cost: Cost of the evaluation
+            error: Exception if an error occurred
+            target: Optional target name for multi-target comparisons.
+                    First call with a target name registers it with the provided metadata.
+                    Subsequent calls with the same target can omit metadata.
+            metadata: Optional metadata for the target (model, temperature, etc.).
+                      Only used on the first call for each target.
+                      Raises error if conflicting metadata is provided for same target.
+        """
         try:
             index_ = int(cast(Any, index))
         except Exception:
             raise ValueError(f"Index must be an integer, got {index}")
+
+        # Register target if provided
+        target_id: Optional[str] = None
+        if target is not None:
+            target_id = self._register_target(target, metadata)
 
         eval = EvaluationResult(
             trace_id=format(
@@ -443,6 +544,7 @@ class Evaluation:
                 if error
                 else None
             ),
+            target_id=target_id,
         )
 
         with self.lock:

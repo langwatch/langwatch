@@ -14,6 +14,7 @@ import {
 } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
+import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
 import {
   LatencyStatsTooltip,
@@ -30,6 +31,8 @@ import type { BatchTargetColumn } from "./types";
 type BatchTargetHeaderProps = {
   target: BatchTargetColumn;
   aggregates: BatchTargetAggregate | null;
+  /** Color indicator to show next to target name (for chart correlation) */
+  colorIndicator?: string;
 };
 
 /**
@@ -199,6 +202,11 @@ const SummaryTooltipContent = ({
 
 /**
  * Compact summary badge shown in header.
+ *
+ * NOTE: We manually control tooltip open/close state with useInteractiveTooltip
+ * because this tooltip contains nested tooltips (for latency/cost stats).
+ * Chakra's built-in interactive behavior conflicts with nested tooltips,
+ * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 const SummaryBadge = memo(function SummaryBadge({
   aggregates,
@@ -210,15 +218,20 @@ const SummaryBadge = memo(function SummaryBadge({
     aggregates.errorRows > 0 ||
     aggregates.totalCost !== null;
 
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
+
   if (!hasResults) return null;
 
   return (
     <Tooltip
       content={<SummaryTooltipContent aggregates={aggregates} />}
-      contentProps={{ padding: 0 }}
+      contentProps={{
+        padding: 0,
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: handleMouseLeave,
+      }}
       positioning={{ placement: "bottom" }}
-      openDelay={100}
-      closeDelay={100}
+      open={isOpen}
       interactive
     >
       <HStack
@@ -233,6 +246,8 @@ const SummaryBadge = memo(function SummaryBadge({
         cursor="default"
         _hover={{ borderColor: "gray.300", bg: "gray.50" }}
         data-testid="target-summary-badge"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {(aggregates.overallPassRate !== null ||
           aggregates.overallAverageScore !== null) && (
@@ -294,6 +309,7 @@ const SummaryBadge = memo(function SummaryBadge({
 export const BatchTargetHeader = memo(function BatchTargetHeader({
   target,
   aggregates,
+  colorIndicator,
 }: BatchTargetHeaderProps) {
   // Determine icon based on target type
   const getTargetIcon = () => {
@@ -316,6 +332,16 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
   return (
     <HStack gap={2} width="full">
       <HStack gap={2} flex={1} minWidth={0}>
+        {/* Color indicator for chart correlation */}
+        {colorIndicator && (
+          <Box
+            width="10px"
+            height="10px"
+            borderRadius="sm"
+            bg={colorIndicator}
+            flexShrink={0}
+          />
+        )}
         <ColorfulBlockIcon
           color={getTargetColor()}
           size="xs"

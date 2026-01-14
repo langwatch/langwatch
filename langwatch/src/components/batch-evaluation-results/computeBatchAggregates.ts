@@ -123,10 +123,12 @@ export const computeBatchTargetAggregates = (
     if (!targetOutput) continue;
 
     // Count completed/error rows
+    // A row is "completed" if it has output, error, OR evaluator results
     const hasOutput = targetOutput.output !== null;
     const hasError = !!targetOutput.error;
+    const hasEvaluatorResults = targetOutput.evaluatorResults.length > 0;
 
-    if (hasOutput || hasError) {
+    if (hasOutput || hasError || hasEvaluatorResults) {
       completedRows++;
     }
     if (hasError) {

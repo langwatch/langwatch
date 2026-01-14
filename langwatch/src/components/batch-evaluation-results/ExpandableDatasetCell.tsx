@@ -230,7 +230,8 @@ export function ExpandableDatasetCell({
             top={`${expandedPosition.top - 8}px`}
             left={`${expandedPosition.left - 8}px`}
             width={`${Math.max(expandedPosition.width + 16, 250)}px`}
-            maxHeight="calc(100vh - 32px)"
+            maxHeight={`calc(100vh - ${expandedPosition.top - 8}px - 32px)`}
+            overflowY="auto"
             bg="white/75"
             backdropFilter="blur(8px)"
             borderRadius="md"

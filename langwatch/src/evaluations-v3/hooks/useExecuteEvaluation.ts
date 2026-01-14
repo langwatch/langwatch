@@ -110,6 +110,22 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           };
         }
 
+        // Remove this cell from executingCells since target output is now ready.
+        // This allows the cell to display its output immediately while evaluators
+        // continue running in the background (their chips show spinners independently).
+        let newExecutingCells = state.results.executingCells;
+        if (newExecutingCells) {
+          const cellKey = `${rowIndex}:${targetId}`;
+          if (newExecutingCells.has(cellKey)) {
+            newExecutingCells = new Set(newExecutingCells);
+            newExecutingCells.delete(cellKey);
+            // If no cells remain, set to undefined
+            if (newExecutingCells.size === 0) {
+              newExecutingCells = undefined;
+            }
+          }
+        }
+
         return {
           results: {
             ...state.results,
@@ -118,6 +134,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               [targetId]: newOutputs,
             },
             targetMetadata: newMetadata,
+            executingCells: newExecutingCells,
           },
         };
       });
@@ -135,6 +152,21 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const newErrors = [...existingErrors];
         newErrors[rowIndex] = errorMsg;
 
+        // Remove this cell from executingCells since we have a result (error).
+        // Same logic as updateTargetOutput - the cell should show the error,
+        // not a loading skeleton.
+        let newExecutingCells = state.results.executingCells;
+        if (newExecutingCells) {
+          const cellKey = `${rowIndex}:${targetId}`;
+          if (newExecutingCells.has(cellKey)) {
+            newExecutingCells = new Set(newExecutingCells);
+            newExecutingCells.delete(cellKey);
+            if (newExecutingCells.size === 0) {
+              newExecutingCells = undefined;
+            }
+          }
+        }
+
         return {
           results: {
             ...state.results,
@@ -142,6 +174,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               ...state.results.errors,
               [targetId]: newErrors,
             },
+            executingCells: newExecutingCells,
           },
         };
       });

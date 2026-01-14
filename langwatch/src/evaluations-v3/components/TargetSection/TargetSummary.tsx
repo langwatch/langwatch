@@ -3,6 +3,7 @@ import { memo } from "react";
 import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
+import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import {
   LatencyStatsTooltip,
   CostStatsTooltip,
@@ -27,11 +28,18 @@ type TargetSummaryProps = {
 /**
  * Compact summary display for target evaluation results.
  * Shows pass rate and score inline, with a hover tooltip for full details.
+ *
+ * NOTE: We manually control tooltip open/close state with useInteractiveTooltip
+ * because this tooltip contains nested tooltips (for latency/cost stats).
+ * Chakra's built-in interactive behavior conflicts with nested tooltips,
+ * so we handle the hover logic ourselves via contentProps mouse handlers.
  */
 export const TargetSummary = memo(function TargetSummary({
   aggregates,
   isRunning = false,
 }: TargetSummaryProps) {
+  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
+
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =
     aggregates.completedRows > 0 ||
@@ -212,10 +220,13 @@ export const TargetSummary = memo(function TargetSummary({
   return (
     <Tooltip
       content={tooltipContent}
-      contentProps={{ padding: 0 }}
+      contentProps={{
+        padding: 0,
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: handleMouseLeave,
+      }}
       positioning={{ placement: "bottom" }}
-      openDelay={100}
-      closeDelay={100}
+      open={isOpen}
       interactive
     >
       <HStack
@@ -230,6 +241,8 @@ export const TargetSummary = memo(function TargetSummary({
         cursor="default"
         _hover={{ borderColor: "gray.300", bg: "gray.50" }}
         data-testid="target-summary"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* Running progress */}
         {isRunning && aggregates.completedRows < aggregates.totalRows && (

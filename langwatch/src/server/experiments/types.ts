@@ -95,6 +95,14 @@ export type DSPyRunsSummary = {
 };
 
 /**
+ * Valid target types for batch evaluations.
+ * - prompt: LLM prompt target from Evaluations V3
+ * - agent: Agent target from Evaluations V3
+ * - custom: External target from API (Python SDK, etc.)
+ */
+export type ESBatchEvaluationTargetType = "prompt" | "agent" | "custom";
+
+/**
  * Target metadata stored in batch evaluation for Evaluations V3.
  * Captures the state of targets at execution time so we can display
  * results even after targets are modified or deleted.
@@ -102,7 +110,7 @@ export type DSPyRunsSummary = {
 export type ESBatchEvaluationTarget = {
   id: string;
   name: string;
-  type: "prompt" | "agent";
+  type: ESBatchEvaluationTargetType;
   /** For prompt targets: the prompt config ID */
   prompt_id?: string | null;
   /** For prompt targets: the specific version used */
@@ -111,6 +119,8 @@ export type ESBatchEvaluationTarget = {
   agent_id?: string | null;
   /** Model used (for prompt targets) */
   model?: string | null;
+  /** Flexible metadata for comparison and analysis (model name, temperature, etc.) */
+  metadata?: Record<string, string | number | boolean> | null;
 };
 
 export type ESBatchEvaluation = {
@@ -157,15 +167,24 @@ export type ESBatchEvaluation = {
   };
 };
 
+/**
+ * Target in REST API params - type is optional as it can be
+ * extracted from metadata or defaulted to "custom"
+ */
+export type ESBatchEvaluationTargetREST = Omit<ESBatchEvaluationTarget, "type"> & {
+  type?: ESBatchEvaluationTargetType;
+};
+
 export type ESBatchEvaluationRESTParams = Omit<
   Partial<ESBatchEvaluation>,
-  "project_id" | "experiment_id" | "timestamps"
+  "project_id" | "experiment_id" | "timestamps" | "targets"
 > & {
   experiment_id?: string | null;
   experiment_slug?: string | null;
   run_id: string | null;
   workflow_id?: string | null;
   name?: string | null;
+  targets?: ESBatchEvaluationTargetREST[] | null;
   timestamps?: {
     created_at?: number | null;
     finished_at?: number | null;
