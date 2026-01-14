@@ -132,7 +132,13 @@ export default async function handler(
     // Add event_details as attributes
     if (body.event_details) {
       for (const [key, value] of Object.entries(body.event_details)) {
-        attributes.push({ key: `event.details.${key}`, value: { stringValue: value } });
+        if (typeof value === 'string') {
+          attributes.push({ key: `event.details.${key}`, value: { stringValue: value } });
+        } else if (typeof value === 'number') {
+          attributes.push({ key: `event.details.${key}`, value: { doubleValue: value } });
+        } else if (value != null) {
+          attributes.push({ key: `event.details.${key}`, value: { stringValue: String(value) } });
+        }
       }
     }
 
