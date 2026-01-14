@@ -1,12 +1,4 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Input,
-  Portal,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
 import { BookText, ChevronDown, Globe, Plus } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
@@ -56,16 +48,19 @@ export function TargetSelector({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Filter prompts (only published ones with version > 0)
+  // Filter and sort prompts (only published ones with version > 0, sorted by updatedAt desc)
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
-    if (!searchValue) return publishedPrompts;
-    return publishedPrompts.filter((p) =>
+    const sorted = [...publishedPrompts].sort(
+      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+    );
+    if (!searchValue) return sorted;
+    return sorted.filter((p) =>
       (p.handle ?? p.id).toLowerCase().includes(searchValue.toLowerCase()),
     );
   }, [prompts, searchValue]);
 
-  // Filter HTTP agents
+  // Filter HTTP agents (already sorted by updatedAt desc from backend)
   const filteredAgents = useMemo(() => {
     const httpAgents = agents?.filter((a) => a.type === "http") ?? [];
     if (!searchValue) return httpAgents;
@@ -129,156 +124,168 @@ export function TargetSelector({
 
       <Portal>
         <Popover.Content width="300px" padding={0}>
-          <VStack gap={0} align="stretch">
-            {/* Search Input */}
-            <Box padding={2} borderBottomWidth="1px" borderColor="gray.200">
-              <Input
-                ref={inputRef}
-                size="sm"
-                placeholder="Search prompts or agents..."
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-              />
-            </Box>
+          {/* Search Input - Sticky at top */}
+          <Box
+            padding={2}
+            borderBottomWidth="1px"
+            borderColor="gray.200"
+            position="sticky"
+            top={0}
+            bg="white"
+            zIndex={10}
+          >
+            <Input
+              ref={inputRef}
+              size="sm"
+              placeholder="Search prompts or agents..."
+              value={searchValue}
+              onChange={(e) => setSearchValue(e.target.value)}
+            />
+          </Box>
 
-            {/* Scrollable Content */}
-            <Box maxHeight="300px" overflowY="auto">
-              {/* Prompts Section */}
-              <Box>
+          {/* Scrollable Content */}
+          <Box maxHeight="400px" overflowY="auto">
+            {/* Agents Section - First (typically fewer items) */}
+            <Box>
+              <Text
+                fontSize="xs"
+                fontWeight="bold"
+                textTransform="uppercase"
+                color="gray.500"
+                paddingX={3}
+                paddingY={2}
+                bg="gray.50"
+                position="sticky"
+                top={0}
+                zIndex={5}
+              >
+                HTTP Agents
+              </Text>
+              {filteredAgents.length === 0 ? (
                 <Text
-                  fontSize="xs"
-                  fontWeight="bold"
-                  textTransform="uppercase"
-                  color="gray.500"
+                  fontSize="sm"
+                  color="gray.400"
                   paddingX={3}
                   paddingY={2}
-                  bg="gray.50"
                 >
-                  Prompts
+                  {searchValue ? "No agents found" : "No agents available"}
                 </Text>
-                {filteredPrompts.length === 0 ? (
-                  <Text
-                    fontSize="sm"
-                    color="gray.400"
-                    paddingX={3}
-                    paddingY={2}
-                  >
-                    {searchValue ? "No prompts found" : "No prompts available"}
-                  </Text>
-                ) : (
-                  filteredPrompts.map((prompt) => (
-                    <HStack
-                      key={prompt.id}
-                      paddingX={3}
-                      paddingY={2}
-                      cursor="pointer"
-                      bg={
-                        value?.type === "prompt" && value.id === prompt.id
-                          ? "blue.50"
-                          : "transparent"
-                      }
-                      _hover={{ bg: "gray.100" }}
-                      onClick={() =>
-                        handleSelect({
-                          type: "prompt",
-                          id: prompt.id,
-                          label: prompt.handle ?? prompt.id,
-                        })
-                      }
-                    >
-                      <BookText
-                        size={14}
-                        color="var(--chakra-colors-gray-500)"
-                      />
-                      <Text fontSize="sm" flex={1}>
-                        {prompt.handle ?? prompt.id}
-                      </Text>
-                      {value?.type === "prompt" && value.id === prompt.id && (
-                        <Text color="blue.500" fontSize="sm">
-                          ✓
-                        </Text>
-                      )}
-                    </HStack>
-                  ))
-                )}
-                {/* Add New Prompt Link */}
-                <Link
-                  href={project ? `/${project.slug}/prompts` : "/"}
-                  passHref
-                  legacyBehavior
-                >
+              ) : (
+                filteredAgents.map((agent) => (
                   <HStack
-                    as="a"
+                    key={agent.id}
                     paddingX={3}
                     paddingY={2}
                     cursor="pointer"
+                    bg={
+                      value?.type === "http" && value.id === agent.id
+                        ? "blue.50"
+                        : "transparent"
+                    }
                     _hover={{ bg: "gray.100" }}
-                    borderTopWidth="1px"
-                    borderColor="gray.100"
-                    color="blue.500"
+                    onClick={() =>
+                      handleSelect({
+                        type: "http",
+                        id: agent.id,
+                        label: agent.name,
+                      })
+                    }
                   >
-                    <Plus size={14} />
-                    <Text fontSize="sm">Add New Prompt</Text>
+                    <Globe size={14} color="var(--chakra-colors-gray-500)" />
+                    <Text fontSize="sm" flex={1}>
+                      {agent.name}
+                    </Text>
+                    {value?.type === "http" && value.id === agent.id && (
+                      <Text color="blue.500" fontSize="sm">
+                        ✓
+                      </Text>
+                    )}
                   </HStack>
-                </Link>
-              </Box>
+                ))
+              )}
+              {/* Add New Agent Button */}
+              <HStack
+                paddingX={3}
+                paddingY={2}
+                cursor="pointer"
+                _hover={{ bg: "gray.100" }}
+                borderTopWidth="1px"
+                borderColor="gray.100"
+                color="blue.500"
+                onClick={handleCreateAgent}
+              >
+                <Plus size={14} />
+                <Text fontSize="sm">Add New Agent</Text>
+              </HStack>
+            </Box>
 
-              {/* Agents Section */}
-              <Box borderTopWidth="1px" borderColor="gray.200">
+            {/* Prompts Section */}
+            <Box borderTopWidth="1px" borderColor="gray.200">
+              <Text
+                fontSize="xs"
+                fontWeight="bold"
+                textTransform="uppercase"
+                color="gray.500"
+                paddingX={3}
+                paddingY={2}
+                bg="gray.50"
+                position="sticky"
+                top={0}
+                zIndex={5}
+              >
+                Prompts
+              </Text>
+              {filteredPrompts.length === 0 ? (
                 <Text
-                  fontSize="xs"
-                  fontWeight="bold"
-                  textTransform="uppercase"
-                  color="gray.500"
+                  fontSize="sm"
+                  color="gray.400"
                   paddingX={3}
                   paddingY={2}
-                  bg="gray.50"
                 >
-                  HTTP Agents
+                  {searchValue ? "No prompts found" : "No prompts available"}
                 </Text>
-                {filteredAgents.length === 0 ? (
-                  <Text
-                    fontSize="sm"
-                    color="gray.400"
+              ) : (
+                filteredPrompts.map((prompt) => (
+                  <HStack
+                    key={prompt.id}
                     paddingX={3}
                     paddingY={2}
+                    cursor="pointer"
+                    bg={
+                      value?.type === "prompt" && value.id === prompt.id
+                        ? "blue.50"
+                        : "transparent"
+                    }
+                    _hover={{ bg: "gray.100" }}
+                    onClick={() =>
+                      handleSelect({
+                        type: "prompt",
+                        id: prompt.id,
+                        label: prompt.handle ?? prompt.id,
+                      })
+                    }
                   >
-                    {searchValue ? "No agents found" : "No agents available"}
-                  </Text>
-                ) : (
-                  filteredAgents.map((agent) => (
-                    <HStack
-                      key={agent.id}
-                      paddingX={3}
-                      paddingY={2}
-                      cursor="pointer"
-                      bg={
-                        value?.type === "http" && value.id === agent.id
-                          ? "blue.50"
-                          : "transparent"
-                      }
-                      _hover={{ bg: "gray.100" }}
-                      onClick={() =>
-                        handleSelect({
-                          type: "http",
-                          id: agent.id,
-                          label: agent.name,
-                        })
-                      }
-                    >
-                      <Globe size={14} color="var(--chakra-colors-gray-500)" />
-                      <Text fontSize="sm" flex={1}>
-                        {agent.name}
+                    <BookText
+                      size={14}
+                      color="var(--chakra-colors-gray-500)"
+                    />
+                    <Text fontSize="sm" flex={1}>
+                      {prompt.handle ?? prompt.id}
+                    </Text>
+                    {value?.type === "prompt" && value.id === prompt.id && (
+                      <Text color="blue.500" fontSize="sm">
+                        ✓
                       </Text>
-                      {value?.type === "http" && value.id === agent.id && (
-                        <Text color="blue.500" fontSize="sm">
-                          ✓
-                        </Text>
-                      )}
-                    </HStack>
-                  ))
-                )}
-                {/* Add New Agent Button */}
+                    )}
+                  </HStack>
+                ))
+              )}
+              {/* Add New Prompt Link - opens in new tab to preserve scenario work */}
+              <Link
+                href={project ? `/${project.slug}/prompts` : "/"}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 <HStack
                   paddingX={3}
                   paddingY={2}
@@ -287,14 +294,13 @@ export function TargetSelector({
                   borderTopWidth="1px"
                   borderColor="gray.100"
                   color="blue.500"
-                  onClick={handleCreateAgent}
                 >
                   <Plus size={14} />
-                  <Text fontSize="sm">Add New Agent</Text>
+                  <Text fontSize="sm">Add New Prompt</Text>
                 </HStack>
-              </Box>
+              </Link>
             </Box>
-          </VStack>
+          </Box>
         </Popover.Content>
       </Portal>
     </Popover.Root>
