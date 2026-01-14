@@ -5,6 +5,8 @@ import { captureError } from "../../../utils/captureError";
 import { createLogger } from "../../../utils/logger";
 import { safeTruncate } from "../../../utils/truncate";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
+import { prisma } from "../../db";
+import { evaluationProcessingPipeline } from "../../event-sourcing/runtime/eventSourcing";
 import { connection } from "../../redis";
 import type { ElasticSearchEvaluation } from "../../tracer/types";
 import { runEvaluationJob } from "../workers/evaluationsWorker";
@@ -49,6 +51,30 @@ export const scheduleEvaluation = async ({
     trace: trace,
     status: "scheduled",
   });
+
+  // Emit evaluation scheduled event to event sourcing pipeline
+  const project = await prisma.project.findUnique({
+    where: { id: trace.project_id },
+    select: { featureEventSourcingEvaluationIngestion: true },
+  });
+  if (project?.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.scheduleEvaluation.send({
+        tenantId: trace.project_id,
+        evaluationId: check.evaluation_id,
+        evaluatorId: check.evaluator_id,
+        evaluatorType: check.type,
+        evaluatorName: check.name,
+        traceId: trace.trace_id,
+        isGuardrail: false,
+      });
+    } catch (error) {
+      logger.error(
+        { error, check, trace },
+        "Failed to emit evaluation scheduled event",
+      );
+    }
+  }
 
   const jobId = traceCheckIndexId({
     traceId: trace.trace_id,
@@ -200,4 +226,53 @@ export const updateEvaluationStatusInES = async ({
     },
     refresh: true,
   });
+
+  // Emit evaluation events to event sourcing pipeline based on status
+  // Skip "scheduled" status here since it's handled in scheduleEvaluation()
+  if (status !== "scheduled") {
+    const project = await prisma.project.findUnique({
+      where: { id: trace.project_id },
+      select: { featureEventSourcingEvaluationIngestion: true },
+    });
+    if (project?.featureEventSourcingEvaluationIngestion) {
+      try {
+        const evaluationId = check.evaluation_id ?? (check as any).id;
+        if (status === "in_progress") {
+          // Emit started event
+          await evaluationProcessingPipeline.commands.startEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            evaluatorId: check.evaluator_id ?? (check as any).id,
+            evaluatorType: check.type,
+            evaluatorName: check.name,
+            traceId: trace.trace_id,
+            isGuardrail: is_guardrail,
+          });
+        } else if (
+          status === "processed" ||
+          status === "error" ||
+          status === "skipped"
+        ) {
+          // Emit completed event
+          await evaluationProcessingPipeline.commands.completeEvaluation.send({
+            tenantId: trace.project_id,
+            evaluationId,
+            status,
+            score,
+            passed,
+            label,
+            details,
+            error: error
+              ? JSON.stringify(captureError(error))
+              : undefined,
+          });
+        }
+      } catch (eventError) {
+        logger.error(
+          { error: eventError, check, trace, status },
+          "Failed to emit evaluation event",
+        );
+      }
+    }
+  }
 };

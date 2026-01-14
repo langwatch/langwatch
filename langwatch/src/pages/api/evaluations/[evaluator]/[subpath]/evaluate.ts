@@ -11,6 +11,7 @@ import {
   runEvaluation,
 } from "../../../../../server/background/workers/evaluationsWorker";
 import { prisma } from "../../../../../server/db"; // Adjust the import based on your setup
+import { evaluationProcessingPipeline } from "../../../../../server/event-sourcing/runtime/eventSourcing";
 import type {
   EvaluatorTypes,
   SingleEvaluationResult,
@@ -197,6 +198,14 @@ export async function handleEvaluatorCall(
 
   let result: SingleEvaluationResult;
 
+  // Generate evaluationId for event sourcing tracking
+  const evaluationId =
+    storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`;
+  const evaluatorId =
+    storedEvaluator?.id ??
+    params.evaluator_id ??
+    evaluationNameAutoslug(params.name ?? checkType);
+
   const runEval = () =>
     runEvaluation({
       projectId: project.id,
@@ -204,6 +213,26 @@ export async function handleEvaluatorCall(
       data,
       settings,
     });
+
+  // Emit evaluation started event
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.startEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        evaluatorId,
+        evaluatorType: checkType,
+        evaluatorName: storedEvaluator?.name ?? params.name ?? undefined,
+        traceId: params.trace_id ?? undefined,
+        isGuardrail: isGuardrail ?? undefined,
+      });
+    } catch (eventError) {
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation started event",
+      );
+    }
+  }
 
   try {
     result = await runEval();
@@ -232,6 +261,30 @@ export async function handleEvaluatorCall(
       details: error instanceof Error ? error.message : "Internal error",
       traceback: [],
     };
+  }
+
+  // Emit evaluation completed event
+  if (project.featureEventSourcingEvaluationIngestion) {
+    try {
+      await evaluationProcessingPipeline.commands.completeEvaluation.send({
+        tenantId: project.id,
+        evaluationId,
+        status: result.status,
+        score: "score" in result ? result.score : undefined,
+        passed: "passed" in result ? result.passed : undefined,
+        label: "label" in result ? result.label : undefined,
+        details: "details" in result ? result.details : undefined,
+        error:
+          result.status === "error"
+            ? ("details" in result ? result.details : undefined)
+            : undefined,
+      });
+    } catch (eventError) {
+      logger.error(
+        { error: eventError, projectId: project.id, evaluationId },
+        "Failed to emit evaluation completed event",
+      );
+    }
   }
 
   if ("cost" in result && result.cost) {
@@ -274,12 +327,8 @@ export async function handleEvaluatorCall(
   if (params.trace_id) {
     await updateEvaluationStatusInES({
       check: {
-        evaluation_id:
-          storedEvaluator?.id ?? params.evaluation_id ?? `eval_${nanoid()}`,
-        evaluator_id:
-          storedEvaluator?.id ??
-          params.evaluator_id ??
-          evaluationNameAutoslug(params.name ?? checkType),
+        evaluation_id: evaluationId,
+        evaluator_id: evaluatorId,
         type: checkType as EvaluatorTypes,
         name: storedEvaluator?.name ?? params.name ?? checkType,
       },
