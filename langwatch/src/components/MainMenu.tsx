@@ -147,6 +147,16 @@ export const MainMenu = React.memo(function MainMenu({
                 showLabel={showExpanded}
               />
             )}
+            {showCollapsibleNav && (
+              <PageMenuLink
+                path={projectRoutes.agents.path}
+                icon={featureIcons.agents.icon}
+                label={projectRoutes.agents.title}
+                project={project}
+                isActive={router.pathname.includes("/agents")}
+                showLabel={showExpanded}
+              />
+            )}
             <PageMenuLink
               path={projectRoutes.evaluations.path}
               icon={featureIcons.evaluations.icon}

@@ -112,6 +112,10 @@ export const projectRoutes = {
     path: "/[project]/simulations",
     title: "Simulations",
   },
+  agents: {
+    path: "/[project]/agents",
+    title: "Agents",
+  },
   simulation_runs: {
     path: "/[project]/simulations",
     title: "Runs",

@@ -4,6 +4,7 @@
  */
 import {
   BookText,
+  Bot,
   CheckSquare,
   FileText,
   Home,
@@ -30,7 +31,8 @@ export type FeatureKey =
   | "prompts"
   | "datasets"
   | "annotations"
-  | "settings";
+  | "settings"
+  | "agents";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -102,6 +104,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Settings,
     color: "gray.600",
     label: "Settings",
+  },
+  agents: {
+    icon: Bot,
+    color: "cyan.500",
+    label: "Agents",
   },
 };
 

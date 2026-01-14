@@ -73,7 +73,7 @@ export const CollapsibleMenuGroup = ({
               gap={3}
               paddingX={3}
               borderRadius="lg"
-              backgroundColor={isAnyChildActive ? "gray.200" : "transparent"}
+              backgroundColor="transparent"
               _hover={{
                 backgroundColor: "gray.200",
               }}
