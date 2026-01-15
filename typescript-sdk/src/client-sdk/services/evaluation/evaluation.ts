@@ -47,6 +47,17 @@ const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
 
 /**
+ * AsyncLocalStorage for iteration context isolation.
+ * This stores the current item and index for each iteration,
+ * preventing race conditions in concurrent execution.
+ */
+type IterationContext = {
+  index: number;
+  item: unknown;
+};
+const iterationContextStorage = new AsyncLocalStorage<IterationContext>();
+
+/**
  * AsyncLocalStorage for target context isolation.
  * This allows log() calls inside withTarget() to automatically
  * infer the target without explicit specification.
@@ -84,13 +95,11 @@ export class Evaluation {
   // Current iteration context (for log/evaluate calls)
   private currentTraceId: string | null = null;
   private currentIndex: number | null = null;
-  
+
   // Track whether withTarget() was used in the current iteration
   // If so, we don't create dataset entries in executeItem()
-  private currentIterationUsedWithTarget = false;
-  
-  // Store the current dataset item for use in withTarget()
-  private currentDatasetItem: unknown = null;
+  // Note: This is now checked via iterationContextStorage to be thread-safe
+  private iterationUsedWithTarget = new Map<number, boolean>();
 
   private constructor(
     name: string,
@@ -250,56 +259,59 @@ export class Evaluation {
     let capturedTraceId: string | null = null;
 
     // Reset withTarget tracking for this iteration
-    this.currentIterationUsedWithTarget = false;
-    this.currentDatasetItem = item;
+    this.iterationUsedWithTarget.set(index, false);
 
-    await tracer.startActiveSpan(
-      "evaluation.iteration",
-      {
-        attributes: {
-          "evaluation.run_id": this.runId,
-          "evaluation.index": index,
+    // Set up iteration context (thread-safe via AsyncLocalStorage)
+    const iterationContext: IterationContext = { index, item };
+
+    await iterationContextStorage.run(iterationContext, async () => {
+      await tracer.startActiveSpan(
+        "evaluation.iteration",
+        {
+          attributes: {
+            "evaluation.run_id": this.runId,
+            "evaluation.index": index,
+          },
         },
-      },
-      async (otelSpan) => {
-        const span = createLangWatchSpan(otelSpan);
-        const spanContext = otelSpan.spanContext();
-        const traceId = spanContext.traceId;
+        async (otelSpan) => {
+          const span = createLangWatchSpan(otelSpan);
+          const spanContext = otelSpan.spanContext();
+          const traceId = spanContext.traceId;
 
-        // Set current context for log/evaluate calls
-        this.currentTraceId = traceId;
-        this.currentIndex = index;
-        capturedTraceId = traceId;
+          // Set current context for log/evaluate calls
+          this.currentTraceId = traceId;
+          this.currentIndex = index;
+          capturedTraceId = traceId;
 
-        try {
-          const ctx: RunContext<T> = { item, index, span };
-          const result = callback(ctx);
+          try {
+            const ctx: RunContext<T> = { item, index, span };
+            const result = callback(ctx);
 
-          if (result && typeof result.then === "function") {
-            await result;
+            if (result && typeof result.then === "function") {
+              await result;
+            }
+
+            span.setStatus({ code: SpanStatusCode.OK });
+          } catch (err) {
+            error = err instanceof Error ? err : new Error(String(err));
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: error.message,
+            });
+            span.recordException(error);
+            this.logger.error(`Evaluation error at index ${index}:`, error);
+          } finally {
+            span.end();
+            this.currentTraceId = null;
+            this.currentIndex = null;
           }
-
-          span.setStatus({ code: SpanStatusCode.OK });
-        } catch (err) {
-          error = err instanceof Error ? err : new Error(String(err));
-          span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: error.message,
-          });
-          span.recordException(error);
-          this.logger.error(`Evaluation error at index ${index}:`, error);
-        } finally {
-          span.end();
-          this.currentTraceId = null;
-          this.currentIndex = null;
-          this.currentDatasetItem = null;
         }
-      }
-    );
+      );
+    });
 
     // Only add a dataset entry if withTarget() was NOT used
     // When withTarget() is used, it creates its own dataset entries per target
-    if (!this.currentIterationUsedWithTarget) {
+    if (!this.iterationUsedWithTarget.get(index)) {
       const duration = Date.now() - startTime;
       const entry: BatchEntry = {
         index,
@@ -311,6 +323,9 @@ export class Evaluation {
 
       this.batch.dataset.push(entry);
     }
+
+    // Clean up
+    this.iterationUsedWithTarget.delete(index);
 
     this.progress++;
 
@@ -569,15 +584,16 @@ export class Evaluation {
     const callback =
       typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
 
+    // Get iteration context (thread-safe via AsyncLocalStorage)
+    const iterationContext = iterationContextStorage.getStore();
+    const index = iterationContext?.index ?? this.currentIndex ?? 0;
+    const currentItem = iterationContext?.item;
+
     // Mark that withTarget() was used - prevents executeItem from creating a dataset entry
-    this.currentIterationUsedWithTarget = true;
+    this.iterationUsedWithTarget.set(index, true);
 
     // Register target
     this.registerTarget(targetName, metadata ?? undefined);
-
-    // Get current index from run context (iteration context)
-    const runContext = targetContextStorage.getStore();
-    const index = runContext?.index ?? this.currentIndex ?? 0;
 
     const tracer = trace.getTracer("langwatch-evaluation");
     const startTime = Date.now();
@@ -648,9 +664,10 @@ export class Evaluation {
 
     // Create a dataset entry for this target execution (like Evaluations V3)
     // This captures per-target duration/latency properly
+    // Use currentItem from iteration context (thread-safe), NOT shared instance variable
     const entry: BatchEntry = {
       index,
-      entry: this.serializeItem(this.currentDatasetItem),
+      entry: this.serializeItem(currentItem),
       duration,
       error: callbackError?.message ?? null,
       trace_id: traceId,

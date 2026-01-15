@@ -394,6 +394,62 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
         ).rejects.toThrow("Test error");
       });
     });
+
+    it("captures correct item data for each target in concurrent execution", async () => {
+      const evaluation = await langwatch.evaluation.init(`test-withTarget-race-${Date.now()}`);
+
+      // Use distinct questions to verify correct association
+      const dataset = [
+        { question: "Question A" },
+        { question: "Question B" },
+        { question: "Question C" },
+      ];
+
+      const results: Array<{ index: number; target: string; question: string; response: string }> = [];
+
+      await evaluation.run(
+        dataset,
+        async ({ item, index }) => {
+          // Run all targets in parallel for this item
+          await Promise.all([
+            evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+              await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
+              results.push({ index, target: "gpt-4", question: item.question, response: `GPT-4: ${item.question}` });
+              return { output: `GPT-4: ${item.question}` };
+            }),
+            evaluation.withTarget("claude", { model: "anthropic/claude-3" }, async () => {
+              await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
+              results.push({ index, target: "claude", question: item.question, response: `Claude: ${item.question}` });
+              return { output: `Claude: ${item.question}` };
+            }),
+          ]);
+        },
+        { concurrency: 3 }
+      );
+
+      // Should have 6 results (3 items × 2 targets)
+      expect(results.length).toBe(6);
+
+      // Group by target
+      const gpt4Results = results.filter((r) => r.target === "gpt-4");
+      const claudeResults = results.filter((r) => r.target === "claude");
+
+      expect(gpt4Results.length).toBe(3);
+      expect(claudeResults.length).toBe(3);
+
+      // Verify each result has the correct question for its index
+      for (const r of gpt4Results) {
+        const expectedQuestion = dataset[r.index]!.question;
+        expect(r.question).toBe(expectedQuestion);
+        expect(r.response).toContain(expectedQuestion);
+      }
+
+      for (const r of claudeResults) {
+        const expectedQuestion = dataset[r.index]!.question;
+        expect(r.question).toBe(expectedQuestion);
+        expect(r.response).toContain(expectedQuestion);
+      }
+    });
   });
 });
 
@@ -417,6 +473,90 @@ describe("Evaluation Unit", () => {
 
       const id = generateHumanReadableId("_");
       expect(id).toMatch(/^[a-z]+_[a-z]+_[a-z]+$/);
+    });
+  });
+
+  describe("withTarget dataset entry capture", () => {
+    it("sends correct entry data for each target in concurrent execution", async () => {
+      // This test verifies the fix for the race condition where concurrent
+      // withTarget() calls would capture wrong item data due to shared state
+      const capturedBodies: Array<{ dataset: Array<{ index: number; target_id: string; entry: unknown; predicted: unknown }> }> = [];
+
+      // Mock fetch to capture API calls
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
+        const urlStr = typeof url === "string" ? url : url.toString();
+        if (urlStr.includes("experiment/init")) {
+          return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        }
+        if (urlStr.includes("log_results")) {
+          capturedBodies.push(JSON.parse(options?.body as string));
+          return new Response(JSON.stringify({}), { status: 200 });
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }) as typeof fetch;
+
+      try {
+        const { LangWatch } = await import("@/client-sdk");
+        const langwatch = new LangWatch({
+          apiKey: "test-key",
+          endpoint: "http://localhost:5560",
+        });
+
+        const dataset = [
+          { question: "Question A" },
+          { question: "Question B" },
+          { question: "Question C" },
+        ];
+
+        const evaluation = await langwatch.evaluation.init("test-entry-capture");
+
+        await evaluation.run(
+          dataset,
+          async ({ item, index }) => {
+            // Run targets in parallel - this is where the race condition would occur
+            await Promise.all([
+              evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+                await new Promise((r) => setTimeout(r, Math.random() * 50));
+                return `GPT-4: ${item.question}`;
+              }),
+              evaluation.withTarget("claude", { model: "anthropic/claude" }, async () => {
+                await new Promise((r) => setTimeout(r, Math.random() * 50));
+                return `Claude: ${item.question}`;
+              }),
+            ]);
+          },
+          { concurrency: 3 }
+        );
+
+        // Wait for final flush
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Collect all dataset entries from captured API calls
+        const allEntries = capturedBodies.flatMap((b) => b.dataset ?? []);
+
+        // Should have 6 entries (3 items × 2 targets)
+        expect(allEntries.length).toBe(6);
+
+        // No entries should have null entry
+        const nullEntries = allEntries.filter((e) => e.entry === null || e.entry === undefined);
+        expect(nullEntries.length).toBe(0);
+
+        // Verify each entry has the correct question for its index
+        for (const entry of allEntries) {
+          const expectedQuestion = dataset[entry.index]?.question;
+          expect((entry.entry as { question: string }).question).toBe(expectedQuestion);
+        }
+
+        // Verify predicted outputs match the question
+        for (const entry of allEntries) {
+          const expectedQuestion = dataset[entry.index]?.question;
+          const predicted = entry.predicted as { output: string } | null;
+          expect(predicted?.output).toContain(expectedQuestion);
+        }
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
     });
   });
 });
