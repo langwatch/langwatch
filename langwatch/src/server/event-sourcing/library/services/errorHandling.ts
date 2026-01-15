@@ -440,6 +440,26 @@ export function extractPreviousSequenceNumber(error: unknown): number | null {
 }
 
 /**
+ * Type guard to check if an error is a "No events found" validation error.
+ * This error occurs when events haven't yet become visible in ClickHouse
+ * due to replication lag, even though a checkpoint was created for them.
+ */
+export function isNoEventsFoundError(error: unknown): boolean {
+  if (error instanceof ValidationError) {
+    return error.reason.startsWith("No events found for aggregate");
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { name?: string }).name === "ValidationError"
+  ) {
+    const reason = (error as { reason?: string }).reason;
+    return typeof reason === "string" && reason.startsWith("No events found for aggregate");
+  }
+  return false;
+}
+
+/**
  * Handles an error according to its category.
  * If the error is a BaseEventSourcingError, uses its category and context.
  * Otherwise, uses the provided category and context.
