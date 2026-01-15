@@ -1023,26 +1023,39 @@ export function EvaluationsV3Table({
           </tr>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th key={header.id} style={{ width: header.getSize() }}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                  {/* Resize handle */}
-                  {header.column.getCanResize() && (
-                    <div
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                      className={`resizer ${
-                        header.column.getIsResizing() ? "isResizing" : ""
-                      }`}
-                    />
-                  )}
-                </th>
-              ))}
+              {headerGroup.headers.map((header) => {
+                // Extract target ID if this is a target column
+                const isTargetColumn = header.id.startsWith("target.");
+                const targetId = isTargetColumn
+                  ? header.id.replace("target.", "")
+                  : undefined;
+
+                return (
+                  <th
+                    key={header.id}
+                    style={{ width: header.getSize() }}
+                    // Add data attribute for target columns to enable scroll-to behavior
+                    {...(targetId && { "data-target-column": targetId })}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                    {/* Resize handle */}
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={`resizer ${
+                          header.column.getIsResizing() ? "isResizing" : ""
+                        }`}
+                      />
+                    )}
+                  </th>
+                );
+              })}
               {targets.length === 0 ? (
                 // Spacer column to match drawer width + default target column width
                 <th
