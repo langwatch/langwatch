@@ -103,9 +103,9 @@ function buildMigrationEnvVars(
     TERM: process.env.TERM,
   };
 
-  // Engine patterns - using {uuid} macro so ClickHouse auto-generates unique ZK paths
-  // These are generic building blocks; migrations complete them with version columns
-  const zkPath = "'/clickhouse/tables/{uuid}/{shard}', '{replica}'";
+  // Engine patterns - using {database} and {table} macros for unique ZK paths
+  // These are built-in ClickHouse macros that auto-substitute the actual names
+  const zkPath = "'/clickhouse/tables/{shard}/{database}/{table}', '{replica}'";
 
   const clickhouseVars: Record<string, string> = {
     CLICKHOUSE_DATABASE: config.database,
