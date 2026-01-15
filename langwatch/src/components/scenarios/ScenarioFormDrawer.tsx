@@ -234,6 +234,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Auto-select the newly created agent
           handleTargetChange({ type: "http", id: agent.id });
           setAgentDrawerOpen(false);
+          toaster.create({
+            title: "Agent created",
+            description: `"${agent.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
         }}
       />
 

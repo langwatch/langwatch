@@ -19,12 +19,6 @@ interface TargetSelectorProps {
   placeholder?: string;
 }
 
-type SelectableItem = {
-  type: "prompt" | "http";
-  id: string;
-  label: string;
-};
-
 /**
  * Unified target selector for scenarios.
  * Shows prompts and HTTP agents in grouped sections with search.
@@ -82,8 +76,8 @@ export function TargetSelector({
     return agent?.name ?? null;
   }, [value, prompts, agents]);
 
-  const handleSelect = (item: SelectableItem) => {
-    onChange({ type: item.type, id: item.id });
+  const handleSelect = (target: NonNullable<TargetValue>) => {
+    onChange(target);
     setOpen(false);
     setSearchValue("");
     triggerRef.current?.focus();
@@ -195,11 +189,7 @@ export function TargetSelector({
                     }
                     _hover={{ bg: "gray.100" }}
                     onClick={() =>
-                      handleSelect({
-                        type: "http",
-                        id: agent.id,
-                        label: agent.name,
-                      })
+                      handleSelect({ type: "http", id: agent.id })
                     }
                   >
                     <Globe size={14} color="var(--chakra-colors-gray-500)" />
@@ -269,11 +259,7 @@ export function TargetSelector({
                     }
                     _hover={{ bg: "gray.100" }}
                     onClick={() =>
-                      handleSelect({
-                        type: "prompt",
-                        id: prompt.id,
-                        label: prompt.handle ?? prompt.id,
-                      })
+                      handleSelect({ type: "prompt", id: prompt.id })
                     }
                   >
                     <BookText
