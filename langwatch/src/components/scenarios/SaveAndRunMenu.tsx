@@ -40,6 +40,7 @@ export function SaveAndRunMenu({
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Filter and sort prompts (only published ones with version > 0, sorted by updatedAt desc)
   const filteredPrompts = useMemo(() => {
@@ -94,7 +95,11 @@ export function SaveAndRunMenu({
       onOpenChange={(e) => {
         setOpen(e.open);
         if (e.open) {
-          setTimeout(() => inputRef.current?.focus(), 0);
+          // Focus search input and reset scroll when opening
+          setTimeout(() => {
+            inputRef.current?.focus();
+            scrollContainerRef.current?.scrollTo(0, 0);
+          }, 0);
         }
       }}
       positioning={{ placement: "top-end" }}
@@ -129,7 +134,7 @@ export function SaveAndRunMenu({
           </Box>
 
           {/* Scrollable Content */}
-          <Box maxHeight="400px" overflowY="auto">
+          <Box ref={scrollContainerRef} maxHeight="400px" overflowY="auto">
             {/* Agents Section - First (typically fewer items) */}
             <Box>
               <Text

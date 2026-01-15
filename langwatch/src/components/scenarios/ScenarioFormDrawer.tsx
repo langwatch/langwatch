@@ -245,6 +245,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Auto-select the newly created prompt
           handleTargetChange({ type: "prompt", id: prompt.id });
           setPromptDrawerOpen(false);
+          toaster.create({
+            title: "Prompt created",
+            description: `"${prompt.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
         }}
       />
     </Drawer.Root>
