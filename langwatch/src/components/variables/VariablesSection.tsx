@@ -16,6 +16,10 @@ import {
   TYPE_LABELS,
 } from "~/prompts/components/ui/VariableTypeIcon";
 import {
+  normalizeIdentifier,
+  generateUniqueIdentifier,
+} from "~/utils/identifierUtils";
+import {
   VariableMappingInput,
   type AvailableSource,
   type FieldMapping,
@@ -75,29 +79,6 @@ export type VariablesSectionProps = {
   disabledMappings?: Set<string>;
   /** Disable mapping input */
   isMappingDisabled?: boolean;
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const generateUniqueIdentifier = (
-  baseName: string,
-  existingIdentifiers: string[],
-): string => {
-  if (!existingIdentifiers.includes(baseName)) {
-    return baseName;
-  }
-
-  let counter = 1;
-  while (existingIdentifiers.includes(`${baseName}_${counter}`)) {
-    counter++;
-  }
-  return `${baseName}_${counter}`;
-};
-
-const normalizeIdentifier = (value: string): string => {
-  return value.replace(/ /g, "_").toLowerCase();
 };
 
 // ============================================================================

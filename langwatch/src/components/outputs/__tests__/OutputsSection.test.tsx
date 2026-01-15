@@ -317,4 +317,123 @@ describe("OutputsSection", () => {
       expect(screen.queryByTestId("remove-output-output1")).not.toBeInTheDocument();
     });
   });
+
+  describe("identifier normalization", () => {
+    it("normalizes identifier by removing dashes as user types", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with dashes
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "my-custom-score");
+
+      // Input value should be normalized (dashes removed)
+      expect(input).toHaveValue("mycustomscore");
+    });
+
+    it("normalizes identifier by replacing spaces with underscores", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with spaces
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "my score");
+
+      // Spaces should become underscores
+      expect(input).toHaveValue("my_score");
+    });
+
+    it("normalizes identifier by removing special characters", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with special characters
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "my@score!test#123");
+
+      // Special characters should be removed
+      expect(input).toHaveValue("myscoretest123");
+    });
+
+    it("normalizes identifier to lowercase", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with uppercase
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "MyScore");
+
+      // Should be lowercased
+      expect(input).toHaveValue("myscore");
+    });
+
+    it("preserves underscores in identifier", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with underscores
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "my_custom_score");
+
+      // Underscores should be preserved
+      expect(input).toHaveValue("my_custom_score");
+    });
+
+    it("saves normalized identifier on blur", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const outputs: Output[] = [{ identifier: "output", type: "str" }];
+      renderComponent({ outputs, onChange });
+
+      // Click to edit
+      const identifier = screen.getByText("output");
+      await user.click(identifier);
+
+      // Type identifier with dashes and blur
+      const input = screen.getByRole("textbox");
+      await user.clear(input);
+      await user.type(input, "my-score");
+      fireEvent.blur(input);
+
+      // Should save with normalized identifier
+      expect(onChange).toHaveBeenCalledWith([
+        expect.objectContaining({ identifier: "myscore", type: "str" }),
+      ]);
+    });
+  });
 });

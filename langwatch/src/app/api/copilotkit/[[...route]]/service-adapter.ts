@@ -22,10 +22,7 @@ import type { ChatMessage } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
-import {
-  extractStreamableOutput,
-  type OutputConfig,
-} from "./output-formatter";
+import { extractStreamableOutput, type OutputConfig } from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
 
@@ -72,7 +69,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     let nodeId: string;
     let traceId: string;
     let threadId: string;
-    let outputConfig: OutputConfig | undefined;
+    let outputConfigs: OutputConfig[] | undefined;
 
     try {
       // @ts-expect-error - Total hack
@@ -82,8 +79,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         variables: z.infer<typeof runtimeInputsSchema>;
       };
       threadId = fallbackThreadId;
-      // Capture the first output configuration for dynamic field lookup during streaming
-      outputConfig = formValues.version.configData.outputs?.[0];
+      // Capture all output configurations for dynamic field lookup during streaming
+      outputConfigs = formValues.version.configData.outputs;
       nodeId = "prompt_node";
       traceId = generateOtelTraceId();
       const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
@@ -213,7 +210,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
               // Stream incremental output deltas using dynamic field lookup
               const current = extractStreamableOutput(
                 state.outputs,
-                outputConfig
+                outputConfigs
               );
               if (
                 current !== undefined &&

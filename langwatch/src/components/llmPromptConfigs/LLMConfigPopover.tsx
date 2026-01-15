@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Settings, X } from "react-feather";
 import { useModelLimits } from "~/hooks/useModelLimits";
 import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
@@ -118,8 +118,16 @@ export function LLMConfigPopover({
     hasNonDefaultOutputs ?? false
   );
 
+  // Track user-initiated toggle to prevent race condition with sync effect
+  const userInitiatedToggleRef = useRef(false);
+
   // Sync state when outputs change externally (e.g., loading a prompt)
   useEffect(() => {
+    // Skip sync if user just toggled - let the outputs update first
+    if (userInitiatedToggleRef.current) {
+      userInitiatedToggleRef.current = false;
+      return;
+    }
     if (hasNonDefaultOutputs && !isStructuredOutputsEnabled) {
       setIsStructuredOutputsEnabled(true);
     }
@@ -128,6 +136,7 @@ export function LLMConfigPopover({
   const handleStructuredOutputsToggle = (checked: boolean) => {
     if (!onOutputsChange) return;
 
+    userInitiatedToggleRef.current = true;
     setIsStructuredOutputsEnabled(checked);
 
     if (!checked) {
@@ -255,6 +264,7 @@ export function LLMConfigPopover({
             >
               <HStack width="full" justify="flex-end">
                 <Switch
+                  data-testid="structured-outputs-switch"
                   checked={isStructuredOutputsEnabled}
                   onCheckedChange={({ checked }) =>
                     handleStructuredOutputsToggle(checked)

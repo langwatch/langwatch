@@ -208,6 +208,69 @@ describe("VariablesSection", () => {
       ]);
     });
 
+    it("removes dashes from identifier", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const variables: Variable[] = [{ identifier: "question", type: "str" }];
+      renderComponent({ variables, onChange, showMappings: false });
+
+      await user.click(screen.getByText("question"));
+      const inputs = screen.getAllByRole("textbox");
+      const editInput = inputs.find(
+        (input) => (input as HTMLInputElement).value === "question"
+      )!;
+      await user.clear(editInput);
+      await user.type(editInput, "my-custom-score");
+      fireEvent.blur(editInput);
+
+      // Dashes should be removed
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "mycustomscore", type: "str" },
+      ]);
+    });
+
+    it("removes special characters from identifier", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const variables: Variable[] = [{ identifier: "question", type: "str" }];
+      renderComponent({ variables, onChange, showMappings: false });
+
+      await user.click(screen.getByText("question"));
+      const inputs = screen.getAllByRole("textbox");
+      const editInput = inputs.find(
+        (input) => (input as HTMLInputElement).value === "question"
+      )!;
+      await user.clear(editInput);
+      await user.type(editInput, "my@score!test#123");
+      fireEvent.blur(editInput);
+
+      // Special characters should be removed
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "myscoretest123", type: "str" },
+      ]);
+    });
+
+    it("preserves underscores in identifier", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const variables: Variable[] = [{ identifier: "question", type: "str" }];
+      renderComponent({ variables, onChange, showMappings: false });
+
+      await user.click(screen.getByText("question"));
+      const inputs = screen.getAllByRole("textbox");
+      const editInput = inputs.find(
+        (input) => (input as HTMLInputElement).value === "question"
+      )!;
+      await user.clear(editInput);
+      await user.type(editInput, "my_custom_score");
+      fireEvent.blur(editInput);
+
+      // Underscores should be preserved
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "my_custom_score", type: "str" },
+      ]);
+    });
+
     it("does not allow duplicate identifiers", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();

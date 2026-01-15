@@ -8,47 +8,71 @@ Feature: Structured Outputs Streaming in Prompt Playground
     Given I am testing in the Prompt Playground chat
     And the prompt execution streams via CopilotKit service adapter
 
-  # Core functionality - different field names
-  Scenario: Streaming string output with custom field name
+  # Default "output" identifier - displays value as-is
+  Scenario: Default "output" identifier displays string value as-is
+    Given the output configuration has:
+      | identifier | type |
+      | output     | str  |
+    When the execution state updates with outputs:
+      | output | "Hello World" |
+    Then the stream receives content "Hello World"
+
+  Scenario: Default "output" identifier displays float value as-is
+    Given the output configuration has:
+      | identifier | type  |
+      | output     | float |
+    When the execution state updates with outputs:
+      | output | 0.95 |
+    Then the stream receives content "0.95"
+
+  Scenario: Default "output" identifier displays bool value as-is
+    Given the output configuration has:
+      | identifier | type |
+      | output     | bool |
+    When the execution state updates with outputs:
+      | output | true |
+    Then the stream receives content "true"
+
+  Scenario: Default "output" identifier displays json_schema as formatted JSON
+    Given the output configuration has:
+      | identifier | type        |
+      | output     | json_schema |
+    When the execution state updates with outputs:
+      | output | {"sentiment": "positive"} |
+    Then the stream receives formatted JSON content
+
+  # Custom identifiers - wrapped in JSON object with pretty-printing
+  Scenario: Custom identifier wraps string value in JSON object
     Given the output configuration has:
       | identifier | type |
       | result     | str  |
     When the execution state updates with outputs:
       | result | "Hello World" |
-    Then the stream receives content "Hello World"
+    Then the stream receives JSON-wrapped content with key "result" and value "Hello World"
 
-  Scenario: Streaming output with default "output" field name
-    Given the output configuration has:
-      | identifier | type |
-      | output     | str  |
-    When the execution state updates with outputs:
-      | output | "This works too" |
-    Then the stream receives content "This works too"
-
-  # Core functionality - different types
-  Scenario: Streaming float output converted to string
+  Scenario: Custom identifier wraps float value in JSON object
     Given the output configuration has:
       | identifier | type  |
       | score      | float |
     When the execution state updates with outputs:
       | score | 0.95 |
-    Then the stream receives content "0.95"
+    Then the stream receives JSON-wrapped content with key "score" and value 0.95
 
-  Scenario: Streaming boolean output converted to string
+  Scenario: Custom identifier wraps boolean value in JSON object
     Given the output configuration has:
       | identifier | type |
       | passed     | bool |
     When the execution state updates with outputs:
       | passed | true |
-    Then the stream receives content "true"
+    Then the stream receives JSON-wrapped content with key "passed" and value true
 
-  Scenario: Streaming json_schema output as formatted JSON
+  Scenario: Custom identifier wraps json_schema value in JSON object
     Given the output configuration has:
       | identifier | type        |
       | analysis   | json_schema |
     When the execution state updates with outputs:
       | analysis | {"sentiment": "positive", "confidence": 0.9} |
-    Then the stream receives formatted JSON content
+    Then the stream receives JSON-wrapped content with key "analysis" containing nested object
 
   # Edge cases
   Scenario: Empty outputs configuration
@@ -73,7 +97,7 @@ Feature: Structured Outputs Streaming in Prompt Playground
     Then no content is streamed
 
   # Incremental streaming (delta calculation)
-  Scenario: Incremental delta streaming for string output
+  Scenario: Incremental delta streaming for default output identifier
     Given the output configuration has:
       | identifier | type |
       | output     | str  |
@@ -90,14 +114,60 @@ Feature: Structured Outputs Streaming in Prompt Playground
       | " Wor"  |
       | "ld"    |
 
-  # Multiple outputs limitation (documented behavior)
-  Scenario: Multiple outputs - only first output streams
+  # Multiple outputs - combined into single JSON object
+  Scenario: Multiple outputs are combined into single JSON object
+    Given the output configuration has:
+      | identifier    | type  |
+      | complete_name | str   |
+      | score         | float |
+    When the execution state updates with outputs:
+      | complete_name | "Sergio Cardenas" |
+      | score         | 10                |
+    Then the stream receives JSON with all outputs combined:
+      """
+      {
+        "complete_name": "Sergio Cardenas",
+        "score": 10
+      }
+      """
+
+  Scenario: Multiple outputs with one null value only shows valid outputs
     Given the output configuration has:
       | identifier | type  |
-      | summary    | str   |
+      | name       | str   |
       | score      | float |
     When the execution state updates with outputs:
-      | summary | "Good result" |
-      | score   | 0.85          |
-    Then the stream receives content "Good result"
-    And the "score" output is not streamed
+      | name  | "Test" |
+      | score | null   |
+    Then the stream receives JSON-wrapped content with key "name" and value "Test"
+
+  # Identifier normalization (must match Python variable name rules)
+  @unit
+  Scenario: Identifier with dashes is normalized by removing dashes
+    Given the user enters output identifier "my-custom-score"
+    Then the identifier is normalized to "mycustomscore"
+    And the output displays with key "mycustomscore"
+
+  @unit
+  Scenario: Identifier with spaces is normalized to underscores
+    Given the user enters output identifier "my score"
+    Then the identifier is normalized to "my_score"
+    And the output displays with key "my_score"
+
+  @unit
+  Scenario: Identifier with special characters is normalized by removing them
+    Given the user enters output identifier "my@score!test"
+    Then the identifier is normalized to "myscoretest"
+    And the output displays with key "myscoretest"
+
+  @unit
+  Scenario: Identifier with uppercase is normalized to lowercase
+    Given the user enters output identifier "MyScore"
+    Then the identifier is normalized to "myscore"
+    And the output displays with key "myscore"
+
+  @unit
+  Scenario: Identifier with underscores is preserved
+    Given the user enters output identifier "my_custom_score"
+    Then the identifier is normalized to "my_custom_score"
+    And the output displays with key "my_custom_score"
