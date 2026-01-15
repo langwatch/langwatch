@@ -665,7 +665,7 @@ export const experimentsRouter = createTRPCRouter({
                 (a, b) => a.timestamps.created_at - b.timestamps.created_at,
               ),
             created_at: Math.min(
-              ...steps.map((hit) => hit._source?.timestamps.created_at),
+              ...steps.map((hit) => hit._source?.timestamps.created_at ?? 0),
             ),
           };
         })
@@ -764,7 +764,7 @@ export const experimentsRouter = createTRPCRouter({
       let batchEvaluationRun: SearchResponse<
         ESBatchEvaluation,
         Record<string, AggregationsAggregate>
-      >;
+      > | null = null;
       let attempts = 0;
       while (attempts < 3) {
         batchEvaluationRun = await client.search<ESBatchEvaluation>({
