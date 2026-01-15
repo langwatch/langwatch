@@ -8,7 +8,7 @@ import {
 import type { Scenario } from "@prisma/client";
 import { Play } from "lucide-react";
 import { useRouter } from "next/router";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
@@ -37,7 +37,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
-  const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
+  const [formInstance, setFormInstance] = useState<UseFormReturn<ScenarioFormData> | null>(null);
   const [targetType, setTargetType] = useState<TargetType>("prompt");
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const runMutation = api.scenarios.run.useMutation();
@@ -99,7 +99,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [project?.id, scenario, createMutation, updateMutation]
   );
   const handleSaveAndRun = useCallback(async () => {
-    const form = formRef.current;
+    const form = formInstance;
     if (!form || !project?.id) return;
     if (!selectedTargetId) {
       toaster.create({
@@ -145,9 +145,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         );
       }
     })();
-  }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils]);
+  }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils, formInstance]);
   const handleSaveWithoutRunning = useCallback(async () => {
-    const form = formRef.current;
+    const form = formInstance;
     if (!form) return;
     await form.handleSubmit(async (data) => {
       const saved = await handleSave(data);
@@ -159,9 +159,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     })();
-  }, [handleSave, scenario]);
+  }, [handleSave, scenario, formInstance]);
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
-    formRef.current = form;
+    setFormInstance(form);
   }, []);
   const isSubmitting = createMutation.isPending || updateMutation.isPending || runMutation.isPending;
   const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => scenario ?? undefined, [scenario]);
@@ -195,7 +195,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             </GridItem>
             {/* Right: Help Sidebar */}
             <GridItem overflowY="auto" padding={4} bg="gray.50">
-              <ScenarioEditorSidebar form={formRef.current} />
+              <ScenarioEditorSidebar form={formInstance} />
             </GridItem>
           </Grid>
         </Drawer.Body>

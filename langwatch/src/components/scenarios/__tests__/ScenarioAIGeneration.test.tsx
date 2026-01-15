@@ -3,86 +3,13 @@
  */
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Extract hooks and helpers for testing
-// These are duplicated here to test in isolation without component dependencies
-// ─────────────────────────────────────────────────────────────────────────────
-
-import { useState, useCallback } from "react";
-
-type GenerationStatus = "idle" | "generating" | "done" | "error";
-
-type GeneratedScenario = {
-  name: string;
-  situation: string;
-  criteria: string[];
-  labels: string[];
-};
-
-function usePromptHistory() {
-  const [history, setHistory] = useState<string[]>([]);
-
-  const addPrompt = useCallback((prompt: string) => {
-    setHistory((prev) => [...prev, prompt]);
-  }, []);
-
-  const hasHistory = history.length > 0;
-
-  return { history, addPrompt, hasHistory };
-}
-
-function useScenarioGeneration(projectId: string | undefined) {
-  const [status, setStatus] = useState<GenerationStatus>("idle");
-
-  const generate = useCallback(
-    async (
-      prompt: string,
-      currentScenario: GeneratedScenario | null
-    ): Promise<GeneratedScenario> => {
-      setStatus("generating");
-
-      try {
-        const response = await fetch("/api/scenario/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, currentScenario, projectId }),
-        });
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || "Failed to generate scenario");
-        }
-
-        const data = await response.json();
-        setStatus("done");
-        return data.scenario;
-      } catch (error) {
-        setStatus("error");
-        throw error;
-      }
-    },
-    [projectId]
-  );
-
-  return { generate, status };
-}
-
-function formHasContent(form: {
-  getValues: (field: string) => string | string[];
-}): boolean {
-  const name = (form.getValues("name") as string).trim();
-  const situation = (form.getValues("situation") as string).trim();
-  const criteria = form.getValues("criteria") as string[];
-
-  return name.length > 0 || situation.length > 0 || criteria.length > 0;
-}
-
-function extractProviderFromModel(modelId: string): string {
-  const PROVIDER_SEPARATOR = "/";
-  const UNKNOWN_PROVIDER = "unknown";
-  return modelId.split(PROVIDER_SEPARATOR)[0] ?? UNKNOWN_PROVIDER;
-}
+import {
+  usePromptHistory,
+  useScenarioGeneration,
+  formHasContent,
+  extractProviderFromModel,
+  type GeneratedScenario,
+} from "../ScenarioAIGeneration";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tests
@@ -216,6 +143,26 @@ describe("useScenarioGeneration", () => {
     expect(thrownError?.message).toBe("Custom error message");
   });
 
+  it("throws error when scenario is missing from response", async () => {
+    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+
+    const { result } = renderHook(() => useScenarioGeneration("project-123"));
+
+    let thrownError: Error | undefined;
+    await act(async () => {
+      try {
+        await result.current.generate("test prompt", null);
+      } catch (error) {
+        thrownError = error as Error;
+      }
+    });
+
+    expect(thrownError?.message).toBe("Invalid response: missing scenario data");
+  });
+
   it("sends correct payload to API", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
@@ -256,7 +203,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(false);
+    expect(formHasContent(mockForm as never)).toBe(false);
   });
 
   it("returns true when name has content", () => {
@@ -268,7 +215,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(true);
+    expect(formHasContent(mockForm as never)).toBe(true);
   });
 
   it("returns true when situation has content", () => {
@@ -280,7 +227,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(true);
+    expect(formHasContent(mockForm as never)).toBe(true);
   });
 
   it("returns true when criteria has items", () => {
@@ -291,7 +238,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(true);
+    expect(formHasContent(mockForm as never)).toBe(true);
   });
 
   it("returns false for whitespace-only name", () => {
@@ -303,7 +250,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(false);
+    expect(formHasContent(mockForm as never)).toBe(false);
   });
 
   it("returns false for whitespace-only situation", () => {
@@ -315,7 +262,7 @@ describe("formHasContent", () => {
       },
     };
 
-    expect(formHasContent(mockForm)).toBe(false);
+    expect(formHasContent(mockForm as never)).toBe(false);
   });
 });
 

@@ -33,10 +33,10 @@ type ScenarioAIGenerationProps = {
   form: UseFormReturn<ScenarioFormData> | null;
 };
 
-type GenerationStatus = "idle" | "generating" | "done" | "error";
+export type GenerationStatus = "idle" | "generating" | "done" | "error";
 type ViewMode = "prompt" | "input";
 
-type GeneratedScenario = {
+export type GeneratedScenario = {
   name: string;
   situation: string;
   criteria: string[];
@@ -47,7 +47,7 @@ type GeneratedScenario = {
 // Custom Hooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-function usePromptHistory() {
+export function usePromptHistory() {
   const [history, setHistory] = useState<string[]>([]);
 
   const addPrompt = useCallback((prompt: string) => {
@@ -59,7 +59,7 @@ function usePromptHistory() {
   return { history, addPrompt, hasHistory };
 }
 
-function useScenarioGeneration(projectId: string | undefined) {
+export function useScenarioGeneration(projectId: string | undefined) {
   const [status, setStatus] = useState<GenerationStatus>("idle");
 
   const generate = useCallback(
@@ -82,6 +82,9 @@ function useScenarioGeneration(projectId: string | undefined) {
         }
 
         const data = await response.json();
+        if (!data.scenario) {
+          throw new Error("Invalid response: missing scenario data");
+        }
         setStatus("done");
         return data.scenario;
       } catch (error) {
@@ -99,7 +102,7 @@ function useScenarioGeneration(projectId: string | undefined) {
 // Helper Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
-function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
+export function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
   const name = form.getValues("name").trim();
   const situation = form.getValues("situation").trim();
   const criteria = form.getValues("criteria");
@@ -107,7 +110,7 @@ function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
   return name.length > 0 || situation.length > 0 || criteria.length > 0;
 }
 
-function extractProviderFromModel(modelId: string): string {
+export function extractProviderFromModel(modelId: string): string {
   const PROVIDER_SEPARATOR = "/";
   const UNKNOWN_PROVIDER = "unknown";
   return modelId.split(PROVIDER_SEPARATOR)[0] ?? UNKNOWN_PROVIDER;
@@ -174,11 +177,11 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
       const scenario = await generate(input, currentScenario);
 
-      // Update form with generated data
-      form.setValue("name", scenario.name);
-      form.setValue("situation", scenario.situation);
-      form.setValue("criteria", scenario.criteria);
-      form.setValue("labels", scenario.labels);
+      // Update form with generated data (defensive defaults for unexpected API responses)
+      form.setValue("name", scenario.name ?? "");
+      form.setValue("situation", scenario.situation ?? "");
+      form.setValue("criteria", scenario.criteria ?? []);
+      form.setValue("labels", scenario.labels ?? []);
 
       addPrompt(input);
       setInput("");
