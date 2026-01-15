@@ -8,6 +8,7 @@ import { useRunScenario } from "../../hooks/useRunScenario";
 import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
+import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { SaveAndRunMenu } from "./SaveAndRunMenu";
@@ -41,6 +42,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     useScenarioTarget(scenarioId);
   const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
   const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
+  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
 
   // Initialize from persisted target when scenario loads
   useEffect(() => {
@@ -218,6 +220,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             onSaveAndRun={handleSaveAndRun}
             onSaveWithoutRunning={handleSaveWithoutRunning}
             onCreateAgent={() => setAgentDrawerOpen(true)}
+            onCreatePrompt={() => setPromptDrawerOpen(true)}
             isLoading={isSubmitting}
           />
         </Drawer.Footer>
@@ -231,6 +234,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           // Auto-select the newly created agent
           handleTargetChange({ type: "http", id: agent.id });
           setAgentDrawerOpen(false);
+        }}
+      />
+
+      {/* Prompt Creation Drawer */}
+      <PromptEditorDrawer
+        open={promptDrawerOpen}
+        onClose={() => setPromptDrawerOpen(false)}
+        onSave={(prompt) => {
+          // Auto-select the newly created prompt
+          handleTargetChange({ type: "prompt", id: prompt.id });
+          setPromptDrawerOpen(false);
         }}
       />
     </Drawer.Root>

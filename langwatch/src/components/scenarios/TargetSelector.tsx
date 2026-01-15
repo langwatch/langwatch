@@ -1,6 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text } from "@chakra-ui/react";
 import { BookText, ChevronDown, Globe, Plus } from "lucide-react";
-import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -16,6 +15,7 @@ interface TargetSelectorProps {
   value: TargetValue;
   onChange: (value: TargetValue) => void;
   onCreateAgent?: () => void;
+  onCreatePrompt?: () => void;
   placeholder?: string;
 }
 
@@ -34,6 +34,7 @@ export function TargetSelector({
   value,
   onChange,
   onCreateAgent,
+  onCreatePrompt,
   placeholder = "Select a prompt or agent...",
 }: TargetSelectorProps) {
   const { project } = useOrganizationTeamProject();
@@ -91,6 +92,12 @@ export function TargetSelector({
     setOpen(false);
     setSearchValue("");
     onCreateAgent?.();
+  };
+
+  const handleCreatePrompt = () => {
+    setOpen(false);
+    setSearchValue("");
+    onCreatePrompt?.();
   };
 
   return (
@@ -280,25 +287,20 @@ export function TargetSelector({
                   </HStack>
                 ))
               )}
-              {/* Add New Prompt Link - opens in new tab to preserve scenario work */}
-              <Link
-                href={project ? `/${project.slug}/prompts` : "/"}
-                target="_blank"
-                rel="noopener noreferrer"
+              {/* Add New Prompt */}
+              <HStack
+                paddingX={3}
+                paddingY={2}
+                cursor="pointer"
+                _hover={{ bg: "gray.100" }}
+                borderTopWidth="1px"
+                borderColor="gray.100"
+                color="blue.500"
+                onClick={handleCreatePrompt}
               >
-                <HStack
-                  paddingX={3}
-                  paddingY={2}
-                  cursor="pointer"
-                  _hover={{ bg: "gray.100" }}
-                  borderTopWidth="1px"
-                  borderColor="gray.100"
-                  color="blue.500"
-                >
-                  <Plus size={14} />
-                  <Text fontSize="sm">Add New Prompt</Text>
-                </HStack>
-              </Link>
+                <Plus size={14} />
+                <Text fontSize="sm">Add New Prompt</Text>
+              </HStack>
             </Box>
           </Box>
         </Popover.Content>
