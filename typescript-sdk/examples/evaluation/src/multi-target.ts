@@ -2,7 +2,13 @@
  * Multi-Target Comparison Example
  *
  * This example demonstrates how to compare different models/configurations
- * using the target and metadata parameters.
+ * using the withTarget() API for automatic tracing and metrics capture.
+ *
+ * Features demonstrated:
+ * - withTarget() for target-scoped spans
+ * - Automatic latency capture
+ * - Context inference for log() calls
+ * - Parallel target execution with Promise.all
  *
  * Run with: npm run start:multi-target
  */
@@ -24,35 +30,20 @@ const dataset = [
   { question: "How does photosynthesis work?" },
 ];
 
-// Simulated responses from different "models"
-const simulateGPT4 = async (question: string): Promise<{ text: string; latency: number }> => {
-  const latency = 200 + Math.random() * 300;
-  await new Promise((resolve) => setTimeout(resolve, latency));
-
-  return {
-    text: `[GPT-4 response to: ${question}] This is a detailed, nuanced answer...`,
-    latency,
-  };
+// Simulated LLM calls - replace with your actual LLM calls
+const simulateGPT4 = async (question: string): Promise<string> => {
+  await new Promise((resolve) => setTimeout(resolve, 200 + Math.random() * 300));
+  return `[GPT-4] This is a detailed, nuanced answer to: ${question}`;
 };
 
-const simulateGPT35 = async (question: string): Promise<{ text: string; latency: number }> => {
-  const latency = 100 + Math.random() * 150;
-  await new Promise((resolve) => setTimeout(resolve, latency));
-
-  return {
-    text: `[GPT-3.5 response to: ${question}] Quick answer here.`,
-    latency,
-  };
+const simulateGPT35 = async (question: string): Promise<string> => {
+  await new Promise((resolve) => setTimeout(resolve, 100 + Math.random() * 150));
+  return `[GPT-3.5] Quick answer to: ${question}`;
 };
 
-const simulateClaude = async (question: string): Promise<{ text: string; latency: number }> => {
-  const latency = 180 + Math.random() * 250;
-  await new Promise((resolve) => setTimeout(resolve, latency));
-
-  return {
-    text: `[Claude response to: ${question}] Thoughtful and careful response...`,
-    latency,
-  };
+const simulateClaude = async (question: string): Promise<string> => {
+  await new Promise((resolve) => setTimeout(resolve, 180 + Math.random() * 250));
+  return `[Claude] Thoughtful response to: ${question}`;
 };
 
 const main = async () => {
@@ -70,55 +61,44 @@ const main = async () => {
     async ({ item, index }) => {
       console.log(`\n[${index + 1}/${dataset.length}] "${item.question}"`);
 
-      // Test GPT-4
-      const gpt4Result = await simulateGPT4(item.question);
-      console.log(`  GPT-4: ${gpt4Result.latency.toFixed(0)}ms`);
-      evaluation.log("latency", {
-        index,
-        score: gpt4Result.latency,
-        target: "gpt-4",
-        metadata: { model: "openai/gpt-4", temperature: 0.7 },
-      });
-      evaluation.log("response_quality", {
-        index,
-        score: 0.9, // Simulated quality score
-        target: "gpt-4",
-      });
+      // Run all three models in parallel using withTarget()
+      // Each withTarget() creates its own span with automatic latency capture
+      const [gpt4Result, gpt35Result, claudeResult] = await Promise.all([
+        // GPT-4 target
+        evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+          const response = await simulateGPT4(item.question);
 
-      // Test GPT-3.5
-      const gpt35Result = await simulateGPT35(item.question);
-      console.log(`  GPT-3.5: ${gpt35Result.latency.toFixed(0)}ms`);
-      evaluation.log("latency", {
-        index,
-        score: gpt35Result.latency,
-        target: "gpt-3.5-turbo",
-        metadata: { model: "openai/gpt-3.5-turbo", temperature: 0.7 },
-      });
-      evaluation.log("response_quality", {
-        index,
-        score: 0.75,
-        target: "gpt-3.5-turbo",
-      });
+          // Log quality score - target and index are auto-inferred from context!
+          evaluation.log("response_quality", { score: 0.9 });
 
-      // Test Claude
-      const claudeResult = await simulateClaude(item.question);
-      console.log(`  Claude: ${claudeResult.latency.toFixed(0)}ms`);
-      evaluation.log("latency", {
-        index,
-        score: claudeResult.latency,
-        target: "claude-3",
-        metadata: { model: "anthropic/claude-3-sonnet", temperature: 0.5 },
-      });
-      evaluation.log("response_quality", {
-        index,
-        score: 0.85,
-        target: "claude-3",
-      });
+          return response;
+        }),
+
+        // GPT-3.5 target
+        evaluation.withTarget("gpt-3.5-turbo", { model: "openai/gpt-3.5-turbo" }, async () => {
+          const response = await simulateGPT35(item.question);
+          evaluation.log("response_quality", { score: 0.75 });
+          return response;
+        }),
+
+        // Claude target
+        evaluation.withTarget("claude-3", { model: "anthropic/claude-3-sonnet" }, async () => {
+          const response = await simulateClaude(item.question);
+          evaluation.log("response_quality", { score: 0.85 });
+          return response;
+        }),
+      ]);
+
+      // Log summary
+      console.log(`  GPT-4: ${gpt4Result.duration}ms`);
+      console.log(`  GPT-3.5: ${gpt35Result.duration}ms`);
+      console.log(`  Claude: ${claudeResult.duration}ms`);
     },
-    { concurrency: 1 } // Run sequentially to see clear output
+    { concurrency: 2 } // Process 2 dataset items at a time
   );
 
   console.log("\n✅ Comparison complete! Check LangWatch to see charts comparing the models.");
+  console.log("   Latency is automatically captured from each withTarget() span.");
 };
 
 main().catch(console.error);

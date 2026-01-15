@@ -33,6 +33,10 @@ export type {
   RunOptions,
   RunCallback,
   RunContext,
+  TargetContext,
+  TargetCallback,
+  TargetResult,
+  TargetExecutionContext,
 } from "./types";
 
 export {

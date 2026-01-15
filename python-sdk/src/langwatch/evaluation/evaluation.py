@@ -1,6 +1,8 @@
 from __future__ import annotations
 import asyncio
 from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 import json
 import threading
 import time
@@ -42,6 +44,35 @@ import urllib.parse
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 
 _tracer = trace.get_tracer(__name__)
+
+
+@dataclass
+class TargetContext:
+    """Context for the current target() execution."""
+
+    target_id: str
+    index: int
+    trace_id: str
+    predicted: Optional[Dict[str, Any]] = None  # Set via log_response()
+
+
+@dataclass
+class IterationContext:
+    """Context for the current iteration (index + item)."""
+
+    index: int
+    item: Any
+
+
+# ContextVar for target context isolation (works across threads)
+_target_context: ContextVar[Optional[TargetContext]] = ContextVar(
+    "_target_context", default=None
+)
+
+# ContextVar for iteration context (index + item) - thread-safe
+_iteration_context: ContextVar[Optional[IterationContext]] = ContextVar(
+    "_iteration_context", default=None
+)
 
 ItemT = TypeVar("ItemT")
 
@@ -91,6 +122,9 @@ class BatchEntry(BaseModel):
     duration: int
     error: Optional[str] = None
     trace_id: str
+    target_id: Optional[str] = None
+    cost: Optional[float] = None
+    predicted: Optional[Dict[str, Any]] = None
 
 
 class IterationInfo(TypedDict):
@@ -126,6 +160,10 @@ class Evaluation:
 
         # Target registry - tracks registered targets and their metadata
         self._targets: Dict[str, TargetInfo] = {}
+
+        # Track whether with_target() was used in the current iteration
+        # If so, we don't create row-level dataset entries
+        self._current_iteration_used_with_target = False
 
     def init(self):
         if not langwatch.get_api_key():
@@ -249,6 +287,14 @@ class Evaluation:
         item: Any,
         in_thread: bool = False,
     ) -> Iterator[Any]:
+        # Reset with_target tracking for this iteration
+        self._current_iteration_used_with_target = False
+
+        # Set iteration context (thread-safe via contextvars)
+        # This allows target() to access index/item without race conditions
+        iter_ctx = IterationContext(index=index, item=item)
+        iter_token = _iteration_context.set(iter_ctx)
+
         # Iteration will be None if we find ourselves in a parallel loop, but still
         # in the phase of collecting the evaluation.submit() processes. When in_thread,
         # then it's when we actually collect the iteration info.
@@ -290,7 +336,9 @@ class Evaluation:
                 # from being added to the batch and change the trace name
                 if not in_thread and len(self._futures) > 0:
                     iteration["trace"].update(name="evaluation.loop")
-                else:
+                # Only add row-level entry if with_target was NOT used
+                # When with_target is used, it creates per-target dataset entries instead
+                elif not self._current_iteration_used_with_target:
                     self._add_to_batch(iteration)
 
                 if iteration["error"] is not None:
@@ -299,6 +347,8 @@ class Evaluation:
                 raise e
             finally:
                 iteration["trace"].__exit__(None, None, None)
+                # Reset iteration context
+                _iteration_context.reset(iter_token)
 
     def _add_to_batch(self, iteration: IterationInfo):
         entry: Any = (
@@ -474,6 +524,190 @@ class Evaluation:
             self.batch["targets"].append(target_info)
             return target
 
+    @contextmanager
+    def target(
+        self,
+        name: str,
+        metadata: Optional[Dict[str, Union[str, int, float, bool]]] = None,
+    ) -> Iterator[None]:
+        """
+        Context manager for executing code within a target context.
+
+        Creates a dataset entry for this specific target execution, capturing
+        duration automatically. This enables proper per-target latency tracking
+        when comparing multiple models/configurations.
+
+        Inside this context, log() calls will automatically use this target
+        unless an explicit target is provided.
+
+        Args:
+            name: Unique identifier for the target
+            metadata: Optional metadata for comparison (e.g., {"model": "gpt-4"})
+
+        Example:
+            ```python
+            for index, row in evaluation.loop(df.iterrows()):
+                def evaluate(index, row):
+                    # Compare GPT-4 and Claude
+                    with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
+                        response = call_gpt4(row["question"])
+                        # target auto-inferred, use data= to record output
+                        evaluation.log("quality", index=index, score=0.95,
+                                       data={"output": response})
+
+                    with evaluation.target("claude", {"model": "anthropic/claude"}):
+                        response = call_claude(row["question"])
+                        evaluation.log("quality", index=index, score=0.85,
+                                       data={"output": response})
+
+                evaluation.submit(evaluate, index, row)
+            ```
+        """
+        # Mark that target() was used in this iteration
+        self._current_iteration_used_with_target = True
+
+        # Register target
+        self._register_target(name, metadata)
+
+        # Get index and item from iteration context (thread-safe via contextvars)
+        # This prevents race conditions when multiple threads are running evaluations
+        iter_ctx = _iteration_context.get()
+        if iter_ctx is not None:
+            index = iter_ctx.index
+            current_item = iter_ctx.item
+        else:
+            # Fallback to instance variables (for backwards compatibility / direct usage)
+            index = self._current_index
+            current_item = self._current_item
+
+        # Create trace for this target
+        target_trace = langwatch.trace(
+            name=f"evaluation.target.{name}",
+            metadata={
+                "thread_id": self.run_id,
+                "loop.index": str(index),
+                "target": name,
+            },
+        )
+
+        start_time = time.time()
+        error_occurred: Optional[Exception] = None
+        trace_id = ""
+
+        # Set up context for log() inference
+        ctx = TargetContext(
+            target_id=name,
+            index=index,
+            trace_id="",  # Will be set after entering trace
+        )
+        token = _target_context.set(ctx)
+
+        try:
+            target_trace.__enter__()
+            trace_id = target_trace.trace_id or ""
+            ctx.trace_id = trace_id
+
+            yield
+
+        except Exception as e:
+            error_occurred = e
+            raise
+        finally:
+            duration_ms = int((time.time() - start_time) * 1000)
+
+            # Create dataset entry for this target
+            # Use the captured current_item, NOT self._current_item (which may have changed)
+            entry_data: Any = (
+                current_item.to_dict()
+                if hasattr(current_item, "to_dict")
+                else (
+                    current_item.__dict__
+                    if hasattr(current_item, "__dict__")
+                    else (
+                        current_item[1].to_dict()
+                        if type(current_item) == tuple
+                        and hasattr(current_item[1], "to_dict")
+                        else (
+                            current_item[1].__dict__
+                            if type(current_item) == tuple
+                            and hasattr(current_item[1], "__dict__")
+                            else {
+                                "entry": json.dumps(
+                                    current_item, cls=SerializableWithStringFallback
+                                )
+                            }
+                        )
+                    )
+                )
+            )
+
+            # Get predicted output from context (set via log_response())
+            predicted = ctx.predicted
+
+            batch_entry = BatchEntry(
+                index=index,
+                entry=entry_data,
+                duration=duration_ms,
+                error=str(error_occurred) if error_occurred else None,
+                trace_id=trace_id,
+                target_id=name,
+                predicted=predicted,
+            )
+
+            with self.lock:
+                self.batch["dataset"].append(batch_entry)
+
+            # Close the trace
+            if error_occurred:
+                target_trace.update(error=error_occurred)
+            target_trace.__exit__(None, None, None)
+
+            # Reset context
+            _target_context.reset(token)
+
+            # Schedule send
+            if time.time() - self.last_sent >= self.debounce_interval:
+                self._send_batch()
+
+    def log_response(self, response: Union[str, Dict[str, Any]]) -> None:
+        """
+        Log the model's response/output for the current target.
+
+        Must be called inside a `target()` context. The response will be stored
+        in the dataset entry's `predicted` field, which is displayed in the
+        results table.
+
+        Args:
+            response: The model's output. Can be a string (will be wrapped as
+                     {"output": response}) or a dict with named outputs.
+
+        Example:
+            ```python
+            with evaluation.target("gpt-4", {"model": "openai/gpt-4"}):
+                response = call_gpt4(row["question"])
+                evaluation.log_response(response)  # Store the output
+                evaluation.log("quality", index=index, score=0.95)  # Log metrics
+            ```
+
+        Raises:
+            RuntimeError: If called outside of a target() context.
+        """
+        ctx = _target_context.get()
+        if ctx is None:
+            raise RuntimeError(
+                "log_response() must be called inside a target() context. "
+                "Example: with evaluation.target('my-target'): evaluation.log_response(response)"
+            )
+
+        # Normalize response to dict format
+        if isinstance(response, str):
+            ctx.predicted = {"output": response}
+        elif isinstance(response, dict):
+            ctx.predicted = response
+        else:
+            # Try to convert to string for other types
+            ctx.predicted = {"output": str(response)}
+
     def log(
         self,
         metric: str,
@@ -508,6 +742,7 @@ class Evaluation:
             target: Optional target name for multi-target comparisons.
                     First call with a target name registers it with the provided metadata.
                     Subsequent calls with the same target can omit metadata.
+                    If called inside with_target(), the target is auto-inferred from context.
             metadata: Optional metadata for the target (model, temperature, etc.).
                       Only used on the first call for each target.
                       Raises error if conflicting metadata is provided for same target.
@@ -517,16 +752,26 @@ class Evaluation:
         except Exception:
             raise ValueError(f"Index must be an integer, got {index}")
 
-        # Register target if provided
+        # Get target context (if inside with_target)
+        ctx = _target_context.get()
+
+        # Use context target if not explicitly provided
+        effective_target = target if target is not None else (ctx.target_id if ctx else None)
+
+        # Register target if provided (explicit or from context)
         target_id: Optional[str] = None
-        if target is not None:
-            target_id = self._register_target(target, metadata)
+        if effective_target is not None:
+            target_id = self._register_target(effective_target, metadata)
+
+        # Use trace_id from context if available
+        trace_id = (
+            ctx.trace_id
+            if ctx
+            else format(trace.get_current_span().get_span_context().trace_id, "x")
+        )
 
         eval = EvaluationResult(
-            trace_id=format(
-                trace.get_current_span().get_span_context().trace_id,
-                "x",
-            ),
+            trace_id=trace_id,
             name=metric,
             evaluator=metric,
             status=status if status else "error" if error else "processed",

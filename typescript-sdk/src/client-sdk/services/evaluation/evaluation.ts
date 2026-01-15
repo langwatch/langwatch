@@ -6,9 +6,10 @@
  * - Parallel execution with concurrency control
  * - Batched result sending
  * - Built-in evaluator support
- * - Multi-target comparison
+ * - Multi-target comparison with withTarget() context isolation
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { trace, context, SpanStatusCode } from "@opentelemetry/api";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
 import type { LangWatchSpan } from "@/observability-sdk/span/types";
@@ -36,10 +37,21 @@ import type {
   ExperimentInitResponse,
   LogResultsRequest,
   RunEvaluatorResponse,
+  TargetCallback,
+  TargetResult,
+  TargetExecutionContext,
+  TargetContext,
 } from "./types";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
+
+/**
+ * AsyncLocalStorage for target context isolation.
+ * This allows log() calls inside withTarget() to automatically
+ * infer the target without explicit specification.
+ */
+const targetContextStorage = new AsyncLocalStorage<TargetExecutionContext>();
 
 /**
  * Evaluation session for running batch evaluations
@@ -71,6 +83,14 @@ export class Evaluation {
 
   // Current iteration context (for log/evaluate calls)
   private currentTraceId: string | null = null;
+  private currentIndex: number | null = null;
+  
+  // Track whether withTarget() was used in the current iteration
+  // If so, we don't create dataset entries in executeItem()
+  private currentIterationUsedWithTarget = false;
+  
+  // Store the current dataset item for use in withTarget()
+  private currentDatasetItem: unknown = null;
 
   private constructor(
     name: string,
@@ -227,6 +247,11 @@ export class Evaluation {
   ): Promise<void> {
     const startTime = Date.now();
     let error: Error | undefined;
+    let capturedTraceId: string | null = null;
+
+    // Reset withTarget tracking for this iteration
+    this.currentIterationUsedWithTarget = false;
+    this.currentDatasetItem = item;
 
     await tracer.startActiveSpan(
       "evaluation.iteration",
@@ -241,8 +266,10 @@ export class Evaluation {
         const spanContext = otelSpan.spanContext();
         const traceId = spanContext.traceId;
 
-        // Set current trace ID for log/evaluate calls
+        // Set current context for log/evaluate calls
         this.currentTraceId = traceId;
+        this.currentIndex = index;
+        capturedTraceId = traceId;
 
         try {
           const ctx: RunContext<T> = { item, index, span };
@@ -264,21 +291,27 @@ export class Evaluation {
         } finally {
           span.end();
           this.currentTraceId = null;
+          this.currentIndex = null;
+          this.currentDatasetItem = null;
         }
       }
     );
 
-    // Add to batch
-    const duration = Date.now() - startTime;
-    const entry: BatchEntry = {
-      index,
-      entry: this.serializeItem(item),
-      duration,
-      error: error?.message ?? null,
-      trace_id: this.currentTraceId ?? this.getTraceIdFromContext(),
-    };
+    // Only add a dataset entry if withTarget() was NOT used
+    // When withTarget() is used, it creates its own dataset entries per target
+    if (!this.currentIterationUsedWithTarget) {
+      const duration = Date.now() - startTime;
+      const entry: BatchEntry = {
+        index,
+        entry: this.serializeItem(item),
+        duration,
+        error: error?.message ?? null,
+        trace_id: capturedTraceId ?? this.getTraceIdFromContext(),
+      };
 
-    this.batch.dataset.push(entry);
+      this.batch.dataset.push(entry);
+    }
+
     this.progress++;
 
     // Debounced send
@@ -291,21 +324,25 @@ export class Evaluation {
    * @param metric - Name of the metric
    * @param options - Metric options including index, score, passed, etc.
    *
+   * If called inside a withTarget() block, the target and index are automatically
+   * inferred from the context and don't need to be specified.
+   *
    * @example
    * ```typescript
-   * evaluation.log('accuracy', { index, score: 0.95 });
-   * evaluation.log('has_citation', { index, passed: true });
-   * evaluation.log('quality', {
-   *   index,
-   *   score: 0.8,
-   *   target: 'gpt4',
-   *   metadata: { model: 'gpt-4', temperature: 0.7 }
+   * // Explicit target (outside withTarget)
+   * evaluation.log('accuracy', { index, score: 0.95, target: 'gpt-4' });
+   *
+   * // Implicit target (inside withTarget)
+   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
+   *   evaluation.log('accuracy', { score: 0.95 }); // target and index auto-inferred
    * });
    * ```
    */
   log(metric: string, options: LogOptions): void {
+    // Get context from AsyncLocalStorage (if inside withTarget)
+    const targetContext = targetContextStorage.getStore();
+
     const {
-      index,
       data = {},
       score,
       passed,
@@ -315,17 +352,21 @@ export class Evaluation {
       duration,
       cost,
       error,
-      target,
+      // Use context values as defaults, allow explicit override
+      target = targetContext?.targetId,
       metadata,
+      index = targetContext?.index ?? options.index,
     } = options;
 
-    // Register target if provided
+    // Register target if provided (explicit or from context)
     let targetId: string | undefined;
     if (target) {
       targetId = this.registerTarget(target, metadata);
     }
 
-    const traceId = this.currentTraceId ?? this.getTraceIdFromContext();
+    // Use trace ID from context, then current iteration, then OTEL context
+    const traceId =
+      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
 
     const result: EvaluationResult = {
       name: metric,
@@ -355,33 +396,46 @@ export class Evaluation {
    * @param evaluatorSlug - The evaluator identifier (e.g., 'ragas/faithfulness')
    * @param options - Evaluator options including data and settings
    *
+   * If called inside a withTarget() block, the target and index are automatically
+   * inferred from the context and don't need to be specified.
+   *
    * @example
    * ```typescript
+   * // Inside withTarget() - target and index auto-inferred
+   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
+   *   await evaluation.evaluate('ragas/faithfulness', {
+   *     data: { input, output, contexts },
+   *   });
+   * });
+   *
+   * // Or explicit index/target
    * await evaluation.evaluate('ragas/faithfulness', {
    *   index,
-   *   data: {
-   *     input: item.question,
-   *     output: response.text,
-   *     contexts: response.contexts,
-   *   },
-   *   settings: { model: 'openai/gpt-4' },
+   *   data: { input, output, contexts },
+   *   target: 'gpt-4',
    * });
    * ```
    */
   async evaluate(evaluatorSlug: string, options: EvaluateOptions): Promise<void> {
+    // Get context from AsyncLocalStorage (if inside withTarget)
+    const targetContext = targetContextStorage.getStore();
+
     const {
-      index,
       data,
       settings,
       name,
       asGuardrail = false,
-      target,
+      // Use context values as defaults, allow explicit override
+      target = targetContext?.targetId,
       metadata,
+      index = targetContext?.index ?? options.index,
     } = options;
 
     const startTime = Date.now();
-    const traceId = this.currentTraceId ?? this.getTraceIdFromContext();
-    const spanId = this.getSpanIdFromContext();
+    // Use trace ID from context, then current iteration, then OTEL context
+    const traceId =
+      targetContext?.traceId ?? this.currentTraceId ?? this.getTraceIdFromContext();
+    const spanId = targetContext?.spanId ?? this.getSpanIdFromContext();
 
     try {
       const response = await fetch(
@@ -462,6 +516,160 @@ export class Evaluation {
   }
 
   /**
+   * Execute code within a target context with automatic tracing
+   *
+   * Creates a new span for this target execution and sets up context
+   * so that log() calls inside the callback automatically use this target.
+   * Duration and output are captured automatically.
+   *
+   * This creates a dataset entry per target (like Evaluations V3), enabling
+   * proper per-target latency and cost tracking.
+   *
+   * @param targetName - Unique identifier for the target
+   * @param metadata - Optional metadata for comparison (e.g., { model: 'gpt-4' })
+   * @param callback - Function to execute within the target context
+   * @returns The callback result along with captured metrics
+   *
+   * @example
+   * ```typescript
+   * await evaluation.run(dataset, async ({ item, index }) => {
+   *   // Compare GPT-4 and Claude on the same input
+   *   const [gpt4Result, claudeResult] = await Promise.all([
+   *     evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
+   *       const response = await openai.chat(item.question);
+   *       evaluation.log('quality', { score: 0.95 }); // target auto-inferred
+   *       return response;
+   *     }),
+   *     evaluation.withTarget('claude-3', { model: 'anthropic/claude-3' }, async () => {
+   *       const response = await anthropic.messages(item.question);
+   *       evaluation.log('quality', { score: 0.85 }); // target auto-inferred
+   *       return response;
+   *     }),
+   *   ]);
+   * });
+   * ```
+   */
+  async withTarget<R>(
+    targetName: string,
+    metadata: TargetMetadata | null,
+    callback: TargetCallback<R>
+  ): Promise<TargetResult<R>>;
+  async withTarget<R>(
+    targetName: string,
+    callback: TargetCallback<R>
+  ): Promise<TargetResult<R>>;
+  async withTarget<R>(
+    targetName: string,
+    metadataOrCallback: TargetMetadata | null | TargetCallback<R>,
+    maybeCallback?: TargetCallback<R>
+  ): Promise<TargetResult<R>> {
+    // Handle overloads
+    const metadata =
+      typeof metadataOrCallback === "function" ? null : metadataOrCallback;
+    const callback =
+      typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
+
+    // Mark that withTarget() was used - prevents executeItem from creating a dataset entry
+    this.currentIterationUsedWithTarget = true;
+
+    // Register target
+    this.registerTarget(targetName, metadata ?? undefined);
+
+    // Get current index from run context (iteration context)
+    const runContext = targetContextStorage.getStore();
+    const index = runContext?.index ?? this.currentIndex ?? 0;
+
+    const tracer = trace.getTracer("langwatch-evaluation");
+    const startTime = Date.now();
+    let result: R | undefined;
+    let traceId = "";
+    let spanId = "";
+    let callbackError: Error | undefined;
+
+    await tracer.startActiveSpan(
+      `evaluation.target.${targetName}`,
+      {
+        attributes: {
+          "evaluation.run_id": this.runId,
+          "evaluation.target": targetName,
+          "evaluation.index": index,
+        },
+      },
+      async (otelSpan) => {
+        const span = createLangWatchSpan(otelSpan);
+        const spanContext = otelSpan.spanContext();
+        traceId = spanContext.traceId;
+        spanId = spanContext.spanId;
+
+        // Set up the target execution context
+        const executionContext: TargetExecutionContext = {
+          targetId: targetName,
+          traceId,
+          spanId,
+          index,
+        };
+
+        try {
+          // Run callback within AsyncLocalStorage context
+          result = await targetContextStorage.run(executionContext, async () => {
+            const ctx: TargetContext = { span, traceId, spanId };
+            const callbackResult = callback(ctx);
+
+            if (callbackResult && typeof (callbackResult as Promise<R>).then === "function") {
+              return await callbackResult;
+            }
+            return callbackResult as R;
+          });
+
+          span.setStatus({ code: SpanStatusCode.OK });
+        } catch (err) {
+          callbackError = err instanceof Error ? err : new Error(String(err));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: callbackError.message,
+          });
+          span.recordException(callbackError);
+          throw err;
+        } finally {
+          span.end();
+        }
+      }
+    );
+
+    const duration = Date.now() - startTime;
+
+    // Serialize the result as "predicted" output (similar to Evaluations V3)
+    let predicted: Record<string, unknown> | null = null;
+    if (result !== undefined && result !== null) {
+      predicted = typeof result === "object"
+        ? (result as Record<string, unknown>)
+        : { output: result };
+    }
+
+    // Create a dataset entry for this target execution (like Evaluations V3)
+    // This captures per-target duration/latency properly
+    const entry: BatchEntry = {
+      index,
+      entry: this.serializeItem(this.currentDatasetItem),
+      duration,
+      error: callbackError?.message ?? null,
+      trace_id: traceId,
+      target_id: targetName,
+      predicted,
+    };
+
+    this.batch.dataset.push(entry);
+    this.scheduleSend();
+
+    return {
+      result: result!,
+      duration,
+      traceId,
+      spanId,
+    };
+  }
+
+  /**
    * Register a target for multi-target comparison
    */
   private registerTarget(name: string, metadata?: TargetMetadata): string {
@@ -531,6 +739,9 @@ export class Evaluation {
         duration: entry.duration,
         error: entry.error,
         trace_id: entry.trace_id,
+        target_id: entry.target_id ?? null,
+        cost: entry.cost ?? null,
+        predicted: entry.predicted ?? null,
       })),
       evaluations: this.batch.evaluations.map((e) => ({
         name: e.name,

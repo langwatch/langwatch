@@ -286,7 +286,13 @@ const processBatchEvaluation = async (
       for (newDataset in params.dataset) {
         boolean exists = false;
         for (d in ctx._source.dataset) {
-          if (d.index == newDataset.index) {
+          // Check index AND target_id for uniqueness (like evaluations)
+          // target_id can be null for single-target evaluations
+          def newTargetId = newDataset.target_id;
+          def existingTargetId = d.target_id;
+          boolean targetMatch = (newTargetId == null && existingTargetId == null) ||
+                                (newTargetId != null && newTargetId.equals(existingTargetId));
+          if (d.index == newDataset.index && targetMatch) {
             exists = true;
             break;
           }

@@ -71,6 +71,9 @@ export const batchEntrySchema = z.object({
   duration: z.number(),
   error: z.string().nullable().optional(),
   trace_id: z.string(),
+  target_id: z.string().nullable().optional(),
+  cost: z.number().nullable().optional(),
+  predicted: z.record(z.string(), z.unknown()).nullable().optional(),
 });
 
 // ============================================================================
@@ -127,6 +130,9 @@ export type LogResultsRequest = {
     duration: number;
     error?: string | null;
     trace_id: string;
+    target_id?: string | null;
+    cost?: number | null;
+    predicted?: Record<string, unknown> | null;
   }>;
   evaluations: Array<{
     name: string;
@@ -195,8 +201,11 @@ export type EvaluationInitOptions = {
  * Options for the log() method
  */
 export type LogOptions = {
-  /** Row index in the dataset */
-  index: number;
+  /**
+   * Row index in the dataset.
+   * Optional when called inside withTarget() - will be auto-inferred from context.
+   */
+  index?: number;
   /** Additional data/inputs for the evaluation */
   data?: Record<string, unknown>;
   /** Numeric score (typically 0-1) */
@@ -215,7 +224,10 @@ export type LogOptions = {
   cost?: number;
   /** Error if one occurred */
   error?: Error;
-  /** Target name for multi-target comparisons */
+  /**
+   * Target name for multi-target comparisons.
+   * Optional when called inside withTarget() - will be auto-inferred from context.
+   */
   target?: string;
   /** Metadata for the target (only used on first call per target) */
   metadata?: TargetMetadata;
@@ -225,8 +237,11 @@ export type LogOptions = {
  * Options for the evaluate() method (built-in evaluators)
  */
 export type EvaluateOptions = {
-  /** Row index in the dataset */
-  index: number;
+  /**
+   * Row index in the dataset.
+   * Optional when called inside withTarget() - will be auto-inferred from context.
+   */
+  index?: number;
   /** Data to pass to the evaluator */
   data: Record<string, unknown>;
   /** Evaluator settings */
@@ -235,7 +250,10 @@ export type EvaluateOptions = {
   name?: string;
   /** Whether to run as a guardrail */
   asGuardrail?: boolean;
-  /** Target name for multi-target comparisons */
+  /**
+   * Target name for multi-target comparisons.
+   * Optional when called inside withTarget() - will be auto-inferred from context.
+   */
   target?: string;
   /** Metadata for the target */
   metadata?: TargetMetadata;
@@ -275,4 +293,55 @@ export type IterationInfo = {
   startTime: number;
   traceId: string;
   error?: Error;
+};
+
+// ============================================================================
+// withTarget() Types
+// ============================================================================
+
+/**
+ * Context passed to the withTarget() callback
+ */
+export type TargetContext = {
+  /** The LangWatch span for this target execution */
+  span: import("@/observability-sdk/span/types").LangWatchSpan;
+  /** The trace ID for this target execution */
+  traceId: string;
+  /** The span ID for this target execution */
+  spanId: string;
+};
+
+/**
+ * Callback function for withTarget()
+ */
+export type TargetCallback<R> = (context: TargetContext) => Promise<R> | R;
+
+/**
+ * Result from withTarget() including captured metrics
+ */
+export type TargetResult<R> = {
+  /** The return value from the callback */
+  result: R;
+  /** Duration in milliseconds (automatically captured) */
+  duration: number;
+  /** Cost in USD (captured from span if available) */
+  cost?: number;
+  /** The trace ID for this execution */
+  traceId: string;
+  /** The span ID for this execution */
+  spanId: string;
+};
+
+/**
+ * Internal context stored in AsyncLocalStorage for target inference
+ */
+export type TargetExecutionContext = {
+  /** The target name (id) */
+  targetId: string;
+  /** The trace ID for the current span */
+  traceId: string;
+  /** The span ID for the current span */
+  spanId: string;
+  /** The current dataset index */
+  index: number;
 };

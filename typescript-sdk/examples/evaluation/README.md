@@ -52,15 +52,17 @@ This example:
 
 ### Multi-Target Comparison
 
-Demonstrates comparing different models/configurations:
+Demonstrates comparing different models/configurations using `withTarget()`:
 
 ```bash
 npm run start:multi-target
 ```
 
 This example:
-- Compares GPT-4, GPT-3.5, and Claude responses
-- Uses the `target` and `metadata` parameters
+- Uses `withTarget()` for target-scoped tracing
+- Automatically captures latency from span timing
+- Runs all targets in parallel with `Promise.all`
+- Context inference means `log()` calls don't need explicit target
 - Results show comparison charts in the LangWatch UI
 
 ## Key Concepts
@@ -103,7 +105,7 @@ evaluation.log("accuracy", { index, passed: true });
 // Numeric score
 evaluation.log("latency", { index, score: 150.5 });
 
-// With target for comparison
+// With target for comparison (explicit)
 evaluation.log("accuracy", {
   index,
   passed: true,
@@ -118,6 +120,41 @@ evaluation.log("response", {
   data: { input: "...", output: "..." },
 });
 ```
+
+### Using withTarget() for Multi-Target Comparison
+
+The `withTarget()` method creates a target-scoped span with automatic latency capture:
+
+```typescript
+await evaluation.run(dataset, async ({ item, index }) => {
+  // Run multiple targets in parallel
+  const [gpt4, claude] = await Promise.all([
+    evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
+      const response = await openai.chat(item.question);
+      
+      // Target and index are auto-inferred inside withTarget()!
+      evaluation.log("quality", { score: 0.95 });
+      
+      return response;
+    }),
+    
+    evaluation.withTarget("claude-3", { model: "anthropic/claude-3" }, async () => {
+      const response = await anthropic.messages(item.question);
+      evaluation.log("quality", { score: 0.85 });
+      return response;
+    }),
+  ]);
+  
+  // Latency is automatically captured from span duration
+  console.log(`GPT-4: ${gpt4.duration}ms, Claude: ${claude.duration}ms`);
+});
+```
+
+Benefits of `withTarget()`:
+- **Automatic latency capture** - Duration stored in dataset entry per target (like Evaluations V3)
+- **Context inference** - `log()` calls inside automatically use the target
+- **Parallel execution** - Use `Promise.all` for concurrent target testing
+- **Isolated tracing** - Each target gets its own span and dataset entry
 
 ### Using Built-in Evaluators
 

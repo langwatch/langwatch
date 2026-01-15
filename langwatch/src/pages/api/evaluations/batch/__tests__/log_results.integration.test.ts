@@ -530,6 +530,103 @@ describe("log_results API Integration", () => {
       expect(claude3Latency0?.score).toBe(120);
     });
 
+    it("stores dataset entries for multiple targets at same index", async () => {
+      const runId = `run_${nanoid()}`;
+      const experimentSlug = `test-multi-target-dataset-${nanoid(8)}`;
+      createdRunIds.push(runId);
+
+      // First batch - gpt-4 dataset entry at index 0
+      const { statusCode: status1 } = await callApi({
+        run_id: runId,
+        experiment_slug: experimentSlug,
+        targets: [
+          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
+          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
+          { id: "claude", name: "Claude", type: "custom", metadata: { model: "anthropic/claude-3" } },
+        ],
+        dataset: [
+          { index: 0, target_id: "gpt-4", entry: { question: "Q1" }, predicted: { output: "GPT-4 answer" }, duration: 500 },
+        ],
+        evaluations: [
+          { evaluator: "quality", target_id: "gpt-4", index: 0, status: "processed", score: 0.9 },
+        ],
+        progress: 1,
+        total: 3,
+      });
+
+      expect(status1).toBe(200);
+
+      const experiment = await getExperiment(experimentSlug);
+      expect(experiment).not.toBeNull();
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Second batch - gpt-3.5 dataset entry at same index 0
+      const { statusCode: status2 } = await callApi({
+        run_id: runId,
+        experiment_slug: experimentSlug,
+        targets: [],
+        dataset: [
+          { index: 0, target_id: "gpt-3.5", entry: { question: "Q1" }, predicted: { output: "GPT-3.5 answer" }, duration: 200 },
+        ],
+        evaluations: [
+          { evaluator: "quality", target_id: "gpt-3.5", index: 0, status: "processed", score: 0.8 },
+        ],
+        progress: 2,
+        total: 3,
+      });
+
+      expect(status2).toBe(200);
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Third batch - claude dataset entry at same index 0
+      const { statusCode: status3 } = await callApi({
+        run_id: runId,
+        experiment_slug: experimentSlug,
+        targets: [],
+        dataset: [
+          { index: 0, target_id: "claude", entry: { question: "Q1" }, predicted: { output: "Claude answer" }, duration: 300 },
+        ],
+        evaluations: [
+          { evaluator: "quality", target_id: "claude", index: 0, status: "processed", score: 0.85 },
+        ],
+        progress: 3,
+        total: 3,
+        timestamps: { finished_at: Date.now() },
+      });
+
+      expect(status3).toBe(200);
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Verify all dataset entries were stored (3 entries for the same index 0, different targets)
+      const stored = await getFromEs(experiment!.id, runId);
+      expect(stored).not.toBeNull();
+
+      // Should have 3 dataset entries (one per target)
+      expect(stored?.dataset).toHaveLength(3);
+
+      // Verify each target has its own dataset entry
+      const gpt4Entry = stored?.dataset?.find((d) => d.target_id === "gpt-4");
+      const gpt35Entry = stored?.dataset?.find((d) => d.target_id === "gpt-3.5");
+      const claudeEntry = stored?.dataset?.find((d) => d.target_id === "claude");
+
+      expect(gpt4Entry).toBeDefined();
+      expect(gpt35Entry).toBeDefined();
+      expect(claudeEntry).toBeDefined();
+
+      // Verify predicted outputs are correct
+      expect(gpt4Entry?.predicted?.output).toBe("GPT-4 answer");
+      expect(gpt35Entry?.predicted?.output).toBe("GPT-3.5 answer");
+      expect(claudeEntry?.predicted?.output).toBe("Claude answer");
+
+      // Verify durations are correct (different per target)
+      expect(gpt4Entry?.duration).toBe(500);
+      expect(gpt35Entry?.duration).toBe(200);
+      expect(claudeEntry?.duration).toBe(300);
+    });
+
     it("handles evaluations without target_id (single-target case)", async () => {
       const runId = `run_${nanoid()}`;
       const experimentSlug = `test-single-target-${nanoid(8)}`;
