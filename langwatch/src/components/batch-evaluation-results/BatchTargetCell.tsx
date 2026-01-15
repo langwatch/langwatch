@@ -174,19 +174,14 @@ export function BatchTargetCell({
         );
       }
 
-      // Collapsed view - fills available row height, clips with fade if overflowing
+      // Collapsed view with fade
       return (
-        <Box
-          position="relative"
-          flex={1}
-          minHeight={0}
-          cursor={isLikelyOverflowing ? "pointer" : undefined}
-          onClick={isLikelyOverflowing ? handleExpandOutput : undefined}
-        >
+        <Box position="relative">
           <Box
-            height="100%"
             maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
             overflow="hidden"
+            cursor={isLikelyOverflowing ? "pointer" : undefined}
+            onClick={isLikelyOverflowing ? handleExpandOutput : undefined}
           >
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
@@ -342,7 +337,6 @@ export function BatchTargetCell({
         position="relative"
         align="stretch"
         gap={2}
-        height="100%"
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
         {renderActionButtons(false)}

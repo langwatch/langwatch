@@ -130,20 +130,14 @@ export function ExpandableDatasetCell({
       );
     }
 
-    // Collapsed view - fills available row height, clips with fade if overflowing
-    // Using height: 100% lets it stretch to match taller cells in the same row
+    // Collapsed view with fade
     return (
-      <Box
-        position="relative"
-        height="100%"
-        minHeight={0}
-        cursor={isLikelyOverflowing ? "pointer" : undefined}
-        onClick={isLikelyOverflowing ? handleExpand : undefined}
-      >
+      <Box position="relative">
         <Box
-          height="100%"
           maxHeight={`${CELL_MAX_HEIGHT}px`}
           overflow="hidden"
+          cursor={isLikelyOverflowing ? "pointer" : undefined}
+          onClick={isLikelyOverflowing ? handleExpand : undefined}
         >
           <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
             {displayContent}

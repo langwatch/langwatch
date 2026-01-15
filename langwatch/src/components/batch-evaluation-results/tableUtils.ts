@@ -44,13 +44,6 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
     padding: "12px",
     verticalAlign: "top",
     fontSize: "13px",
-    // Setting height: 1px on td establishes a height context
-    // This allows children to use height: 100% correctly
-    height: "1px",
-  },
-  // Make cell content stretch to fill available height
-  "& td > div": {
-    height: "100%",
   },
   // First column (row number) should stay small
   "& td:first-of-type": {
