@@ -1,7 +1,8 @@
-import { Box, HStack, Text, VStack, type StackProps } from "@chakra-ui/react";
+import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { MODEL_ICON_SIZE } from "./constants";
 
 export interface LLMModelDisplayProps extends StackProps {
   model: string;
@@ -24,18 +25,18 @@ export function LLMModelDisplay({
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     model,
-    "chat"
+    "chat",
   );
 
   // Model is disabled if explicitly marked or if provider is disabled
   const isDisabled = modelOption?.isDisabled ?? false;
   // Unknown model (not in our list) - still show it but don't mark as deprecated
-  const isUnknown = !modelOption?.label;
+  const _isUnknown = !modelOption?.label;
 
   return (
     <HStack align="center" gap={2} {...props}>
       {modelOption?.icon && (
-        <Box width="14px" minWidth="14px">
+        <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
           {modelOption.icon}
         </Box>
       )}
@@ -44,7 +45,7 @@ export function LLMModelDisplay({
           label={
             isDisabled
               ? `${modelOption?.label ?? model} (disabled)`
-              : modelOption?.label ?? model
+              : (modelOption?.label ?? model)
           }
           fontSize={fontSize}
           fontFamily="mono"

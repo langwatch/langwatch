@@ -186,3 +186,44 @@ Feature: Model Registry Sync Task
     When I run the syncModelRegistry task
     Then the output should include models from all providers returned by the API
     # All providers are kept, including unknown ones, for future custom provider matching
+
+  # Embedding Models Sync
+  Scenario: Fetches embedding models from separate API endpoint
+    When I run the syncModelRegistry task
+    Then it should fetch models from the OpenRouter /api/v1/models endpoint
+    And it should fetch embedding models from the OpenRouter /api/v1/embeddings/models endpoint
+
+  Scenario: Merges chat and embedding models in output
+    Given the chat models API returns 300 models
+    And the embeddings API returns 50 models
+    When I run the syncModelRegistry task
+    Then the output should contain 350 total models
+
+  Scenario: Embedding models have mode set to embedding
+    When I run the syncModelRegistry task
+    Then all models from the embeddings endpoint should have mode "embedding"
+
+  Scenario: Embedding models have correct pricing structure
+    Given the embeddings API returns a model with pricing:
+      | prompt     | 0.00001 |
+      | completion | 0       |
+    When I run the syncModelRegistry task
+    Then the embedding model should have:
+      | inputCostPerToken  | 0.00001 |
+      | outputCostPerToken | 0       |
+
+  Scenario: Embedding models are accessible via embedding mode filter
+    When I run the syncModelRegistry task
+    Then the output should contain models with mode "embedding"
+    And those models can be filtered using mode === "embedding"
+
+  Scenario: Handles embeddings API error gracefully
+    Given the embeddings API returns an error response
+    And the chat models API returns models successfully
+    When I run the syncModelRegistry task
+    Then it should still include chat models in output
+    And it should log a warning about embeddings API failure
+
+  Scenario: Logs embedding model count in stats
+    When I run the syncModelRegistry task successfully
+    Then the console output should include embedding model count

@@ -383,9 +383,7 @@ export function FieldsForm({
           return (
             <OptimizationStudioLLMConfigField
               key={field.id}
-              allowDefault={true}
-              defaultLLMConfig={default_llm}
-              llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
+              llmConfig={(node.data.parameters?.[index]?.value as LLMConfig) ?? default_llm}
               onChange={(llmConfig) => {
                 // Update form state instead of directly calling setNode
                 // This ensures form state stays in sync and prevents resets

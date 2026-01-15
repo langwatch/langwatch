@@ -10,6 +10,10 @@ import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { modelProviderIcons } from "../../server/modelProviders/iconsMap";
 import { titleCase } from "../../utils/stringCasing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "../llmPromptConfigs/constants";
 import { InputGroup } from "../ui/input-group";
 import { Select } from "../ui/select";
 
@@ -107,14 +111,23 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
   });
 
   const selectedItem = selectOptions.find((option) => option.value === model);
-  const selectedIcon =
-    selectedItem?.icon ??
-    modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
+  const selectedIcon = selectedItem?.icon ?? modelProviderIcons[model.split("/")[0] as keyof typeof modelProviderIcons];
+  const isUnknown = !selectedItem;
 
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
-      {selectedIcon && <Box minWidth="16px">{selectedIcon}</Box>}
-      <Box fontSize={14} fontFamily="mono" lineClamp={1} wordBreak="break-all">
+      {selectedIcon && (
+        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
+          {selectedIcon}
+        </Box>
+      )}
+      <Box
+        fontSize={size === "sm" ? 12 : 14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+        color={isUnknown ? "gray.500" : undefined}
+      >
         {selectedItem?.label ?? model.split("/").slice(1).join("/")}
       </Box>
     </HStack>
@@ -188,7 +201,7 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
             key={group.provider}
             label={
               <HStack gap={2}>
-                <Box width="14px" minWidth="14px">
+                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
                   {group.icon}
                 </Box>
                 <Text fontWeight="medium">{titleCase(group.provider)}</Text>
@@ -197,9 +210,20 @@ export const ProviderModelSelector = React.memo(function ProviderModelSelector({
           >
             {group.models.map((item) => (
               <Select.Item key={item.value} item={item}>
-                <Box fontSize={14} fontFamily="mono" paddingY="2px">
-                  {item.label}
-                </Box>
+                <HStack gap={2}>
+                  {item.icon && (
+                    <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+                      {item.icon}
+                    </Box>
+                  )}
+                  <Box
+                    fontSize={size === "sm" ? 12 : 14}
+                    fontFamily="mono"
+                    paddingY={size === "sm" ? 0 : "2px"}
+                  >
+                    {item.label}
+                  </Box>
+                </HStack>
               </Select.Item>
             ))}
           </Select.ItemGroup>

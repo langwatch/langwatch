@@ -380,24 +380,13 @@ export function OptimizeModalContent({
                 control={form.control}
                 name="params.llm"
                 render={({ field }) => (
-                  <Box
-                    width="full"
-                    border="1px solid"
-                    borderColor="gray.200"
-                    borderRadius={6}
-                    paddingX={1}
-                    paddingY="3px"
-                  >
-                    <OptimizationStudioLLMConfigField
-                      allowDefault={true}
-                      defaultLLMConfig={default_llm}
+                  <OptimizationStudioLLMConfigField
                       showProviderKeyMessage={false}
-                      llmConfig={llmConfig ?? undefined}
+                      llmConfig={llmConfig ?? default_llm}
                       onChange={(llmConfig) => {
                         field.onChange(llmConfig);
                       }}
                     />
-                  </Box>
                 )}
               />
             </VStack>

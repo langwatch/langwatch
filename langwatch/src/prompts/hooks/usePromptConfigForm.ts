@@ -64,11 +64,29 @@ export const usePromptConfigForm = ({
   // Update schema ref when limits change
   useEffect(() => {
     schemaRef.current = dynamicSchema as typeof formSchema;
+
+    // Clamp max_tokens to model limit when limits change (prevents validation error)
+    if (modelLimits?.maxOutputTokens) {
+      const currentMaxTokens = methods.getValues(
+        "version.configData.llm.maxTokens",
+      );
+      if (
+        currentMaxTokens !== undefined &&
+        currentMaxTokens > modelLimits.maxOutputTokens
+      ) {
+        methods.setValue(
+          "version.configData.llm.maxTokens",
+          modelLimits.maxOutputTokens,
+          { shouldDirty: false },
+        );
+      }
+    }
+
     // Re-validate when schema changes
     if (methods.formState.isDirty) {
       void methods.trigger("version.configData.llm");
     }
-  }, [dynamicSchema, methods]);
+  }, [dynamicSchema, modelLimits, methods]);
   const messages = methods.watch("version.configData.messages");
   // Messages should always be an array, but we're being defensive here.
   const systemMessage = Array.isArray(messages)

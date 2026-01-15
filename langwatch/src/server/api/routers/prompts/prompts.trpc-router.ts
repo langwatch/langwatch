@@ -190,6 +190,19 @@ export const promptsRouter = createTRPCRouter({
           model: z.string().optional(),
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
+          // Traditional sampling parameters
+          topP: z.number().optional(),
+          frequencyPenalty: z.number().optional(),
+          presencePenalty: z.number().optional(),
+          // Other sampling parameters
+          seed: z.number().optional(),
+          topK: z.number().optional(),
+          minP: z.number().optional(),
+          repetitionPenalty: z.number().optional(),
+          // Reasoning model parameters
+          reasoningEffort: z.string().optional(),
+          reasoning: z.string().optional(),
+          verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
@@ -229,6 +242,19 @@ export const promptsRouter = createTRPCRouter({
           model: z.string().optional(),
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
+          // Traditional sampling parameters
+          topP: z.number().optional(),
+          frequencyPenalty: z.number().optional(),
+          presencePenalty: z.number().optional(),
+          // Other sampling parameters
+          seed: z.number().optional(),
+          topK: z.number().optional(),
+          minP: z.number().optional(),
+          repetitionPenalty: z.number().optional(),
+          // Reasoning model parameters
+          reasoningEffort: z.string().optional(),
+          reasoning: z.string().optional(),
+          verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),

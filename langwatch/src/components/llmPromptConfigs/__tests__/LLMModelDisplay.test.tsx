@@ -36,7 +36,7 @@ vi.mock("../../ModelSelector", () => ({
   useModelSelectionOptions: (
     _options: string[],
     model: string,
-    _mode: string
+    _mode: string,
   ) => {
     const knownModels: Record<
       string,
@@ -73,7 +73,7 @@ vi.mock("../../ModelSelector", () => ({
 import { LLMModelDisplay } from "../LLMModelDisplay";
 
 const renderComponent = (
-  props: Partial<Parameters<typeof LLMModelDisplay>[0]> = {}
+  props: Partial<Parameters<typeof LLMModelDisplay>[0]> = {},
 ) => {
   const defaultProps = {
     model: "openai/gpt-4.1",
@@ -82,7 +82,7 @@ const renderComponent = (
   return render(
     <ChakraProvider value={defaultSystem}>
       <LLMModelDisplay {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 

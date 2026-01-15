@@ -2,20 +2,23 @@
  * Unit tests for parameter configuration
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { ReasoningConfig } from "../../../server/modelProviders/llmModels.types";
 import {
-  getParameterConfig,
-  getEffectiveParameterConfig,
+  DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
+  getEffectiveParameterConfig,
+  getParameterConfig,
   getParameterDefault,
   isReasoningParameter,
-  supportsTemperature,
-  supportsReasoning,
-  DEFAULT_SUPPORTED_PARAMETERS,
+  PARAM_NAME_MAPPING,
   PARAMETER_CONFIG,
   PARAMETER_DISPLAY_ORDER,
+  supportsReasoning,
+  supportsTemperature,
+  toFormKey,
+  toInternalKey,
 } from "../parameterConfig";
-import type { ReasoningConfig } from "../../../server/modelProviders/llmModels.types";
 
 describe("Parameter Config", () => {
   describe("PARAMETER_CONFIG", () => {
@@ -102,10 +105,10 @@ describe("Parameter Config", () => {
       ]);
       // reasoning_effort should come before temperature in display order
       expect(params.indexOf("reasoning_effort")).toBeLessThan(
-        params.indexOf("temperature")
+        params.indexOf("temperature"),
       );
       expect(params.indexOf("temperature")).toBeLessThan(
-        params.indexOf("max_tokens")
+        params.indexOf("max_tokens"),
       );
     });
 
@@ -210,13 +213,13 @@ describe("Parameter Config", () => {
   describe("PARAMETER_DISPLAY_ORDER", () => {
     it("has reasoning params first", () => {
       expect(PARAMETER_DISPLAY_ORDER.indexOf("reasoning_effort")).toBeLessThan(
-        PARAMETER_DISPLAY_ORDER.indexOf("temperature")
+        PARAMETER_DISPLAY_ORDER.indexOf("temperature"),
       );
     });
 
     it("has traditional params in logical order", () => {
       expect(PARAMETER_DISPLAY_ORDER.indexOf("temperature")).toBeLessThan(
-        PARAMETER_DISPLAY_ORDER.indexOf("max_tokens")
+        PARAMETER_DISPLAY_ORDER.indexOf("max_tokens"),
       );
     });
   });
@@ -235,7 +238,10 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getEffectiveParameterConfig("temperature", reasoningConfig);
+      const config = getEffectiveParameterConfig(
+        "temperature",
+        reasoningConfig,
+      );
       expect(config?.type).toBe("slider");
     });
 
@@ -247,8 +253,11 @@ describe("Parameter Config", () => {
         defaultValue: "high",
         canDisable: false,
       };
-      const config = getEffectiveParameterConfig("reasoning_effort", reasoningConfig);
-      
+      const config = getEffectiveParameterConfig(
+        "reasoning_effort",
+        reasoningConfig,
+      );
+
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
         expect(config.options).toEqual(["low", "high"]);
@@ -265,23 +274,89 @@ describe("Parameter Config", () => {
         canDisable: true,
       };
       const config = getEffectiveParameterConfig("reasoning", reasoningConfig);
-      
+
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
-        expect(config.options).toEqual(["none", "low", "medium", "high", "xhigh"]);
+        expect(config.options).toEqual([
+          "none",
+          "low",
+          "medium",
+          "high",
+          "xhigh",
+        ]);
         expect(config.default).toBe("none");
       }
     });
 
     it("returns fallback options when no reasoningConfig", () => {
       const config = getEffectiveParameterConfig("reasoning_effort");
-      
+
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
         // Should have fallback options
         expect(config.options).toContain("low");
         expect(config.options).toContain("medium");
         expect(config.options).toContain("high");
+      }
+    });
+  });
+
+  describe("PARAM_NAME_MAPPING", () => {
+    it("maps top_p to topP", () => {
+      expect(PARAM_NAME_MAPPING.top_p).toBe("topP");
+    });
+
+    it("maps frequency_penalty to frequencyPenalty", () => {
+      expect(PARAM_NAME_MAPPING.frequency_penalty).toBe("frequencyPenalty");
+    });
+
+    it("maps reasoning_effort to reasoningEffort", () => {
+      expect(PARAM_NAME_MAPPING.reasoning_effort).toBe("reasoningEffort");
+    });
+  });
+
+  describe("toFormKey", () => {
+    it("converts snake_case to camelCase", () => {
+      expect(toFormKey("top_p")).toBe("topP");
+      expect(toFormKey("frequency_penalty")).toBe("frequencyPenalty");
+      expect(toFormKey("reasoning_effort")).toBe("reasoningEffort");
+    });
+
+    it("returns same key for non-mapped params", () => {
+      expect(toFormKey("temperature")).toBe("temperature");
+      expect(toFormKey("reasoning")).toBe("reasoning");
+      expect(toFormKey("seed")).toBe("seed");
+    });
+  });
+
+  describe("toInternalKey", () => {
+    it("converts camelCase to snake_case", () => {
+      expect(toInternalKey("topP")).toBe("top_p");
+      expect(toInternalKey("frequencyPenalty")).toBe("frequency_penalty");
+      expect(toInternalKey("reasoningEffort")).toBe("reasoning_effort");
+    });
+
+    it("returns same key for non-mapped params", () => {
+      expect(toInternalKey("temperature")).toBe("temperature");
+      expect(toInternalKey("reasoning")).toBe("reasoning");
+      expect(toInternalKey("seed")).toBe("seed");
+    });
+  });
+
+  describe("reasoning options fallback", () => {
+    it("does not include none in reasoning_effort fallback options", () => {
+      const config = PARAMETER_CONFIG.reasoning_effort;
+      expect(config?.type).toBe("select");
+      if (config?.type === "select") {
+        expect(config.options).not.toContain("none");
+      }
+    });
+
+    it("does not include none in reasoning fallback options", () => {
+      const config = PARAMETER_CONFIG.reasoning;
+      expect(config?.type).toBe("select");
+      if (config?.type === "select") {
+        expect(config.options).not.toContain("none");
       }
     });
   });

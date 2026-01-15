@@ -6,15 +6,20 @@ import {
   Input,
   Text,
 } from "@chakra-ui/react";
+import { Settings } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Search } from "react-feather";
-
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { modelProviderIcons } from "../server/modelProviders/iconsMap";
 import { allLitellmModels } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import { titleCase } from "../utils/stringCasing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "./llmPromptConfigs/constants";
 import { InputGroup } from "./ui/input-group";
+import { Link } from "./ui/link";
 import { Select } from "./ui/select";
 
 export type ModelOption = {
@@ -113,12 +118,15 @@ export const ModelSelector = React.memo(function ModelSelector({
   onChange,
   size = "md",
   mode,
+  showConfigureAction = false,
 }: {
   model: string;
   options: string[];
   onChange: (model: string) => void;
   size?: "sm" | "md" | "full";
   mode?: "chat" | "embedding";
+  /** When true, shows a "Configure available models" link at the bottom of the dropdown */
+  showConfigureAction?: boolean;
 }) {
   const { selectOptions, groupedByProvider } = useModelSelectionOptions(
     options,
@@ -155,7 +163,7 @@ export const ModelSelector = React.memo(function ModelSelector({
   const selectValueText = (
     <HStack overflow="hidden" gap={2} align="center">
       {selectedItem?.icon && (
-        <Box minWidth={size === "sm" ? "14px" : "16px"}>
+        <Box minWidth={size === "sm" ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}>
           {selectedItem.icon}
         </Box>
       )}
@@ -239,7 +247,7 @@ export const ModelSelector = React.memo(function ModelSelector({
             key={group.provider}
             label={
               <HStack gap={2}>
-                <Box width="14px" minWidth="14px">
+                <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
                   {group.icon}
                 </Box>
                 <Text fontWeight="medium">{titleCase(group.provider)}</Text>
@@ -250,7 +258,7 @@ export const ModelSelector = React.memo(function ModelSelector({
               <Select.Item key={item.value} item={item}>
                 <HStack gap={2}>
                   {item.icon && (
-                    <Box width="14px" minWidth="14px">
+                    <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
                       {item.icon}
                     </Box>
                   )}
@@ -266,6 +274,43 @@ export const ModelSelector = React.memo(function ModelSelector({
             ))}
           </Select.ItemGroup>
         ))}
+        {showConfigureAction && (
+          <Box
+            padding={2}
+            position="sticky"
+            bottom={"-1"}
+            bg="white"
+            borderTop="1px solid"
+            borderColor="gray.200"
+            zIndex="1"
+            marginTop={1}
+          >
+            <Link
+              href="/settings/model-providers"
+              target="_blank"
+              _hover={{ textDecoration: "none" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <HStack
+                width="full"
+                padding={2}
+                borderRadius="md"
+                border="1px solid"
+                borderColor="gray.200"
+                cursor="pointer"
+                color="gray.600"
+                _hover={{ bg: "gray.50", color: "gray.800" }}
+                transition="all 0.15s"
+                gap={2}
+              >
+                <Settings size={16} />
+                <Text fontSize={size === "sm" ? 12 : 14}>
+                  Configure available models
+                </Text>
+              </HStack>
+            </Link>
+          </Box>
+        )}
       </Select.Content>
     </Select.Root>
   );

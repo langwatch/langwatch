@@ -4,9 +4,62 @@
  * Defines the configuration for rendering LLM parameters dynamically based on
  * what each model supports. Parameters are rendered as sliders or selects
  * depending on their type.
+ *
+ * NOTE: This file re-exports from parameterRegistry for backward compatibility.
+ * New code should use parameterRegistry directly for better type safety and
+ * to benefit from the single-source-of-truth pattern.
+ *
+ * @see parameterRegistry.ts for the canonical parameter definitions
  */
 
+import type { LucideIcon } from "lucide-react";
+import { Settings } from "lucide-react";
 import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
+import { parameterRegistry } from "./parameterRegistry";
+
+// ============================================================================
+// Parameter Name Mapping (snake_case ↔ camelCase)
+// ============================================================================
+
+/**
+ * Maps internal snake_case parameter names to form camelCase names.
+ * This is needed because the form schema uses camelCase while the
+ * parameter display uses snake_case internally.
+ */
+export const PARAM_NAME_MAPPING: Record<string, string> = {
+  top_p: "topP",
+  frequency_penalty: "frequencyPenalty",
+  presence_penalty: "presencePenalty",
+  max_tokens: "maxTokens",
+  top_k: "topK",
+  min_p: "minP",
+  repetition_penalty: "repetitionPenalty",
+  reasoning_effort: "reasoningEffort",
+  // These are the same in both: temperature, reasoning, verbosity, seed, model
+};
+
+/**
+ * Converts a snake_case parameter name to its camelCase form key.
+ * Returns the original key if no mapping exists (e.g., temperature, seed).
+ */
+export function toFormKey(snakeCaseKey: string): string {
+  return PARAM_NAME_MAPPING[snakeCaseKey] ?? snakeCaseKey;
+}
+
+/**
+ * Reverse mapping from camelCase to snake_case
+ */
+const REVERSE_PARAM_MAPPING: Record<string, string> = Object.fromEntries(
+  Object.entries(PARAM_NAME_MAPPING).map(([snake, camel]) => [camel, snake]),
+);
+
+/**
+ * Converts a camelCase form key to its snake_case internal key.
+ * Returns the original key if no mapping exists.
+ */
+export function toInternalKey(camelCaseKey: string): string {
+  return REVERSE_PARAM_MAPPING[camelCaseKey] ?? camelCaseKey;
+}
 
 // ============================================================================
 // Types
@@ -37,129 +90,20 @@ export type SelectParameterConfig = {
 export type ParameterConfig = SliderParameterConfig | SelectParameterConfig;
 
 // ============================================================================
-// Parameter Definitions
+// Parameter Definitions (derived from registry)
 // ============================================================================
 
 /**
  * Configuration for all known LLM parameters
  * The key matches the parameter name from supportedParameters
+ *
+ * @deprecated Use parameterRegistry.getConfig(name) instead
  */
-export const PARAMETER_CONFIG: Record<string, ParameterConfig> = {
-  // Traditional parameters
-  temperature: {
-    type: "slider",
-    min: 0,
-    max: 2,
-    step: 0.1,
-    default: 1,
-    label: "Temperature",
-    helper: "Controls randomness in the output",
-  },
-  top_p: {
-    type: "slider",
-    min: 0,
-    max: 1,
-    step: 0.01,
-    default: 1,
-    label: "Top P",
-    helper: "Nucleus sampling probability mass",
-  },
-  max_tokens: {
-    type: "slider",
-    min: 256,
-    max: 64000, // Will be overridden by model's maxCompletionTokens
-    step: 256,
-    default: 4096,
-    label: "Max Tokens",
-    helper: "Maximum output length",
-    dynamicMax: true,
-  },
-  frequency_penalty: {
-    type: "slider",
-    min: 0,
-    max: 2,
-    step: 0.1,
-    default: 0,
-    label: "Frequency Penalty",
-    helper: "Reduces repetition of frequent tokens",
-  },
-  presence_penalty: {
-    type: "slider",
-    min: 0,
-    max: 2,
-    step: 0.1,
-    default: 0,
-    label: "Presence Penalty",
-    helper: "Encourages topic diversity",
-  },
-
-  // Reasoning model parameters
-  // Note: These use dynamicOptions - actual options come from model's reasoningConfig
-  reasoning_effort: {
-    type: "select",
-    options: ["none", "minimal", "low", "medium", "high", "xhigh"] as const, // Fallback options
-    default: "medium",
-    label: "Reasoning Effort",
-    helper: "Computational effort for reasoning",
-    dynamicOptions: true,
-  },
-  reasoning: {
-    type: "select",
-    options: ["none", "minimal", "low", "medium", "high", "xhigh"] as const, // Fallback options
-    default: "medium",
-    label: "Reasoning",
-    helper: "Internal reasoning mode",
-    dynamicOptions: true,
-  },
-  verbosity: {
-    type: "select",
-    options: ["low", "medium", "high"] as const,
-    default: "medium",
-    label: "Verbosity",
-    helper: "Response detail level",
-  },
-
-  // Other parameters
-  seed: {
-    type: "slider",
-    min: 0,
-    max: 999999999,
-    step: 1,
-    default: 0,
-    label: "Seed",
-    helper: "For deterministic outputs (0 = random)",
-  },
-  top_k: {
-    type: "slider",
-    min: 1,
-    max: 100,
-    step: 1,
-    default: 40,
-    label: "Top K",
-    helper: "Limits token selection to top K",
-  },
-  min_p: {
-    type: "slider",
-    min: 0,
-    max: 1,
-    step: 0.01,
-    default: 0,
-    label: "Min P",
-    helper: "Minimum probability threshold",
-  },
-  repetition_penalty: {
-    type: "slider",
-    min: 1,
-    max: 2,
-    step: 0.1,
-    default: 1,
-    label: "Repetition Penalty",
-    helper: "Penalizes repeated tokens",
-  },
-};
+export const PARAMETER_CONFIG: Record<string, ParameterConfig> =
+  parameterRegistry.buildParameterConfig() as Record<string, ParameterConfig>;
 
 // ============================================================================
-// Default Parameters
+// Default Parameters (derived from registry)
 // ============================================================================
 
 /**
@@ -169,38 +113,46 @@ export const DEFAULT_SUPPORTED_PARAMETERS = ["temperature", "max_tokens"];
 
 /**
  * Parameters that should always be available (user-facing core params)
+ *
+ * @deprecated Use parameterRegistry.getCoreParameters() instead
  */
-export const CORE_PARAMETERS = [
-  "temperature",
-  "max_tokens",
-  "top_p",
-  "frequency_penalty",
-  "presence_penalty",
-  "reasoning_effort",
-  "reasoning",
-  "verbosity",
-];
+export const CORE_PARAMETERS = parameterRegistry.getCoreParameters();
 
 /**
  * Order in which parameters should be displayed
+ *
+ * @deprecated Use parameterRegistry.getDisplayOrder() instead
  */
-export const PARAMETER_DISPLAY_ORDER = [
-  // Reasoning params first (for newer models)
-  "reasoning_effort",
-  "reasoning",
-  "verbosity",
-  // Traditional params
-  "temperature",
-  "max_tokens",
-  "top_p",
-  "frequency_penalty",
-  "presence_penalty",
-  // Less common
-  "top_k",
-  "min_p",
-  "repetition_penalty",
-  "seed",
-];
+export const PARAMETER_DISPLAY_ORDER = parameterRegistry.getDisplayOrder();
+
+// ============================================================================
+// Parameter Icons (for compact mode, derived from registry)
+// ============================================================================
+
+export type ParameterIcon = {
+  icon: LucideIcon;
+  color: string;
+};
+
+/**
+ * Icon mapping for parameters in compact display mode
+ *
+ * @deprecated Use parameterRegistry.getIcon(name) instead
+ */
+export const PARAMETER_ICONS: Record<string, ParameterIcon> =
+  parameterRegistry.buildParameterIcons();
+
+/**
+ * Get the icon config for a parameter
+ */
+export function getParameterIcon(paramName: string): ParameterIcon {
+  return (
+    parameterRegistry.getIcon(paramName) ?? {
+      icon: Settings,
+      color: "gray.500",
+    }
+  );
+}
 
 // ============================================================================
 // Utility Functions
@@ -210,7 +162,7 @@ export const PARAMETER_DISPLAY_ORDER = [
  * Get the config for a parameter, or undefined if not configured
  */
 export function getParameterConfig(
-  paramName: string
+  paramName: string,
 ): ParameterConfig | undefined {
   return PARAMETER_CONFIG[paramName];
 }
@@ -221,7 +173,7 @@ export function getParameterConfig(
  */
 export function getEffectiveParameterConfig(
   paramName: string,
-  reasoningConfig?: ReasoningConfig
+  reasoningConfig?: ReasoningConfig,
 ): ParameterConfig | undefined {
   const baseConfig = PARAMETER_CONFIG[paramName];
   if (!baseConfig) return undefined;
@@ -254,7 +206,7 @@ export function getDisplayParameters(supportedParameters: string[]): string[] {
 
   // Filter to only configured parameters that the model supports
   const configuredParams = supportedParameters.filter(
-    (param) => PARAMETER_CONFIG[param] !== undefined
+    (param) => PARAMETER_CONFIG[param] !== undefined,
   );
 
   // Sort by display order

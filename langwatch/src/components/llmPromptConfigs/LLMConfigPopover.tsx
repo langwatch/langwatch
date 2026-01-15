@@ -1,100 +1,36 @@
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
-import { useState, useEffect, useMemo, useRef } from "react";
-import { Settings, X } from "lucide-react";
-
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
-import { FALLBACK_MAX_TOKENS, MIN_MAX_TOKENS } from "../../utils/constants";
-import { HorizontalFormControl } from "../HorizontalFormControl";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import {
   type Output,
   OutputsSection,
   type OutputType,
 } from "../outputs/OutputsSection";
-import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { Switch } from "../ui/switch";
-import { Tooltip } from "../ui/tooltip";
 
-import { ParameterField } from "./ParameterField";
+import { ParameterRow } from "./ParameterRow";
 import {
+  DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
   getEffectiveParameterConfig,
-  getParameterConfig,
-  DEFAULT_SUPPORTED_PARAMETERS,
+  toFormKey,
 } from "./parameterConfig";
+import type { LLMConfigValues } from "./types";
+import { getParamValue } from "./utils/paramValueUtils";
+import {
+  buildModelChangeValues,
+  getMaxTokenLimit,
+  normalizeMaxTokens,
+} from "./utils/tokenUtils";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-export type LLMConfigValues = {
-  model: string;
-  temperature?: number;
-  max_tokens?: number;
-  reasoning_effort?: string;
-  reasoning?: string;
-  verbosity?: string;
-  top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
-} & (
-  | { max_tokens?: number; maxTokens?: never }
-  | { maxTokens?: number; max_tokens?: never }
-);
+// Re-export types for backward compatibility
+export type { LLMConfigValues } from "./types";
 
 // Default output when structured outputs is disabled
 const DEFAULT_OUTPUT: Output = { identifier: "output", type: "str" };
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Ensures only one of maxTokens or max_tokens is set
- */
-const normalizeMaxTokens = (
-  values: Record<string, unknown>,
-  tokenValue: number
-): LLMConfigValues => {
-  const usesCamelCase = values.maxTokens !== undefined;
-
-  const {
-    maxTokens: _sunkMaxTokens,
-    max_tokens: _sunkMaxTokens2,
-    ...rest
-  } = values;
-
-  if (usesCamelCase) {
-    return { ...rest, maxTokens: tokenValue } as LLMConfigValues;
-  } else {
-    return { ...rest, max_tokens: tokenValue } as LLMConfigValues;
-  }
-};
-
-/**
- * Get the parameter value from the config values
- */
-function getParamValue(
-  values: LLMConfigValues,
-  paramName: string
-): number | string | undefined {
-  if (paramName === "max_tokens") {
-    return values.maxTokens ?? values.max_tokens;
-  }
-  return (values as Record<string, unknown>)[paramName] as
-    | number
-    | string
-    | undefined;
-}
 
 // ============================================================================
 // Component Props
@@ -142,6 +78,9 @@ export function LLMConfigPopover({
   showStructuredOutputs = false,
 }: LLMConfigPopoverProps) {
   const { project } = useOrganizationTeamProject();
+
+  // State for tracking which parameter popover is open
+  const [openParameter, setOpenParameter] = useState<string | null>(null);
   const { modelMetadata } = useModelProvidersSettings({
     projectId: project?.id,
   });
@@ -160,22 +99,20 @@ export function LLMConfigPopover({
 
   // Get max token limit for the model
   const maxTokenLimit = useMemo(() => {
-    return (
-      currentModelMetadata?.maxCompletionTokens ??
-      currentModelMetadata?.contextLength ??
-      FALLBACK_MAX_TOKENS
-    );
+    return getMaxTokenLimit(currentModelMetadata);
   }, [currentModelMetadata]);
 
   // Get reasoning config for the model
   const reasoningConfig = currentModelMetadata?.reasoningConfig;
 
-  // Handle parameter change
+  // Handle parameter change - outputs camelCase keys for form compatibility
   const handleParamChange = (paramName: string, value: number | string) => {
+    const formKey = toFormKey(paramName);
+
     if (paramName === "max_tokens") {
       onChange(normalizeMaxTokens(values, value as number));
     } else {
-      onChange({ ...values, [paramName]: value });
+      onChange({ ...values, [formKey]: value });
     }
   };
 
@@ -216,72 +153,37 @@ export function LLMConfigPopover({
   };
 
   return (
-    <Popover.Content minWidth="420px" maxWidth="480px" zIndex={1401}>
-      {/* Header */}
-      <HStack
-        width="full"
-        paddingX={4}
-        paddingY={2}
-        paddingRight={1}
-        borderBottomWidth="1px"
-        borderColor="gray.200"
-      >
-        <Text fontSize="14px" fontWeight={500}>
-          LLM Config
-        </Text>
-        <Spacer />
-        <Popover.CloseTrigger asChild>
-          <Button size="xs" variant="ghost">
-            <X size={14} />
-          </Button>
-        </Popover.CloseTrigger>
-      </HStack>
-
-      {/* Content */}
+    <Popover.Content minWidth="260px" maxWidth="100%" zIndex={1401}>
       <VStack paddingY={3} paddingX={4} width="full" align="start" gap={3}>
         {/* Model Selector */}
-        <HStack width="full" gap={2}>
-          <Box flex={1}>
-            <Text fontSize="xs" color="gray.600" marginBottom={1}>
-              Model
-            </Text>
-            <ModelSelector
-              model={values?.model ?? ""}
-              options={allModelOptions}
-              onChange={(model) => onChange({ ...values, model })}
-              mode="chat"
-              size="full"
-            />
-          </Box>
-          <Box paddingTop={5}>
-            <Tooltip
-              content="Configure available models"
-              positioning={{ placement: "top" }}
-              showArrow
-            >
-              <Link href="/settings/model-providers" target="_blank" asChild>
-                <Button variant="ghost" size="xs">
-                  <Settings size={14} />
-                </Button>
-              </Link>
-            </Tooltip>
-          </Box>
-        </HStack>
+        <Box width="full">
+          <Text fontSize="sm" fontWeight="medium" color="gray.600" marginBottom={1}>
+            Model
+          </Text>
+          <ModelSelector
+            model={values?.model ?? ""}
+            options={allModelOptions}
+            onChange={(model) => onChange(buildModelChangeValues(model))}
+            mode="chat"
+            size="full"
+            showConfigureAction={true}
+          />
+        </Box>
 
         {/* Dynamic Parameters */}
-        <VStack width="full" gap={3} align="stretch">
+        <VStack width="full" gap={1} align="stretch">
           {displayParameters.map((paramName) => {
             // Get effective config (with dynamic options for reasoning)
             const config = getEffectiveParameterConfig(
               paramName,
-              reasoningConfig ?? undefined
+              reasoningConfig ?? undefined,
             );
             if (!config) return null;
 
             const value = getParamValue(values, paramName);
 
             return (
-              <ParameterField
+              <ParameterRow
                 key={paramName}
                 name={paramName}
                 config={config}
@@ -289,6 +191,10 @@ export function LLMConfigPopover({
                 onChange={(newValue) => handleParamChange(paramName, newValue)}
                 maxOverride={
                   paramName === "max_tokens" ? maxTokenLimit : undefined
+                }
+                isOpen={openParameter === paramName}
+                onOpenChange={(open) =>
+                  setOpenParameter(open ? paramName : null)
                 }
               />
             );
@@ -317,21 +223,24 @@ export function LLMConfigPopover({
         {/* Structured Outputs Section */}
         {showStructuredOutputs && onOutputsChange && (
           <>
-            <HorizontalFormControl
-              label="Structured Outputs"
-              helper="Define custom output fields and types"
-              inputWidth="10%"
-            >
-              <HStack width="full" justify="flex-end">
-                <Switch
-                  data-testid="structured-outputs-switch"
-                  checked={isStructuredOutputsEnabled}
-                  onCheckedChange={({ checked }) =>
-                    handleStructuredOutputsToggle(checked)
-                  }
-                />
-              </HStack>
-            </HorizontalFormControl>
+            <HStack width="full" justify="space-between" paddingTop={2}>
+              <VStack align="start" gap={0}>
+                <Text fontSize="sm" fontWeight="medium" color="gray.600">
+                  Structured Outputs
+                </Text>
+                <Text fontSize="xs" color="gray.500">
+                  Define custom output fields and types
+                </Text>
+              </VStack>
+              <Switch
+                size="sm"
+                data-testid="structured-outputs-switch"
+                checked={isStructuredOutputsEnabled}
+                onCheckedChange={({ checked }) =>
+                  handleStructuredOutputsToggle(checked)
+                }
+              />
+            </HStack>
 
             {isStructuredOutputsEnabled && outputs && (
               <Box width="full">
@@ -344,6 +253,7 @@ export function LLMConfigPopover({
             )}
           </>
         )}
+
       </VStack>
     </Popover.Content>
   );

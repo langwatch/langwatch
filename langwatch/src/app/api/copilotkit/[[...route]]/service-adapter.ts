@@ -331,7 +331,23 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          value: formValues.version.configData.llm,
+          // Convert camelCase form values to snake_case for Python backend
+          value: {
+            model: formValues.version.configData.llm.model,
+            temperature: formValues.version.configData.llm.temperature,
+            max_tokens: formValues.version.configData.llm.maxTokens,
+            top_p: formValues.version.configData.llm.topP,
+            frequency_penalty: formValues.version.configData.llm.frequencyPenalty,
+            presence_penalty: formValues.version.configData.llm.presencePenalty,
+            seed: formValues.version.configData.llm.seed,
+            top_k: formValues.version.configData.llm.topK,
+            min_p: formValues.version.configData.llm.minP,
+            repetition_penalty: formValues.version.configData.llm.repetitionPenalty,
+            reasoning_effort: formValues.version.configData.llm.reasoningEffort,
+            reasoning: formValues.version.configData.llm.reasoning,
+            verbosity: formValues.version.configData.llm.verbosity,
+            litellm_params: formValues.version.configData.llm.litellmParams,
+          },
         },
         {
           identifier: "prompting_technique",

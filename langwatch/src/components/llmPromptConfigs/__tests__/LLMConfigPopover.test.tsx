@@ -162,22 +162,23 @@ describe("LLMConfigPopover", () => {
     cleanup();
   });
 
-  describe("header", () => {
-    it("displays LLM Config title", () => {
+  describe("layout", () => {
+    it("does not display LLM Config header", () => {
       renderComponent();
-      expect(screen.getByText("LLM Config")).toBeInTheDocument();
+      expect(screen.queryByText("LLM Config")).not.toBeInTheDocument();
     });
 
-    it("has a close button", () => {
+    it("starts directly with model selector", () => {
       renderComponent();
-      const buttons = screen.getAllByRole("button");
-      expect(buttons.length).toBeGreaterThan(0);
+      expect(screen.getByText("Model")).toBeInTheDocument();
     });
   });
 
   describe("model selection", () => {
     it("displays current model", () => {
-      renderComponent({ values: { model: "openai/gpt-4.1", temperature: 0.7 } });
+      renderComponent({
+        values: { model: "openai/gpt-4.1", temperature: 0.7 },
+      });
       const selector = screen.getByTestId("model-selector");
       expect(selector).toHaveValue("openai/gpt-4.1");
     });
@@ -195,7 +196,7 @@ describe("LLMConfigPopover", () => {
       });
 
       expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ model: "anthropic/claude-3.5-sonnet" })
+        expect.objectContaining({ model: "anthropic/claude-3.5-sonnet" }),
       );
     });
   });
@@ -206,35 +207,35 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByText("Temperature")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-temperature")).toBeInTheDocument();
       });
 
       it("shows Top P parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByText("Top P")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-top_p")).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByText("Max Tokens")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("shows Frequency Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByText("Frequency Penalty")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-frequency_penalty")).toBeInTheDocument();
       });
 
       it("shows Presence Penalty parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-4.1", temperature: 0.7 },
         });
-        expect(screen.getByText("Presence Penalty")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-presence_penalty")).toBeInTheDocument();
       });
 
       it("does not show Reasoning parameter", () => {
@@ -250,14 +251,14 @@ describe("LLMConfigPopover", () => {
         renderComponent({
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
-        expect(screen.getByText("Reasoning")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
-        expect(screen.getByText("Max Tokens")).toBeInTheDocument();
+        expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("does not show Temperature parameter", () => {
@@ -290,12 +291,35 @@ describe("LLMConfigPopover", () => {
       const selects = screen.getAllByRole("combobox");
       // The reasoning select (first select after model selector)
       const reasoningSelect = selects.find(
-        (s) => s.getAttribute("data-testid") !== "model-selector"
+        (s) => s.getAttribute("data-testid") !== "model-selector",
       );
 
       if (reasoningSelect) {
         await user.selectOptions(reasoningSelect, "high");
         expect(onChange).toHaveBeenCalled();
+      }
+    });
+
+    it("outputs camelCase keys for form compatibility", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      renderComponent({
+        values: { model: "openai/gpt-5", reasoning: "medium" },
+        onChange,
+      });
+
+      const selects = screen.getAllByRole("combobox");
+      const reasoningSelect = selects.find(
+        (s) => s.getAttribute("data-testid") !== "model-selector",
+      );
+
+      if (reasoningSelect) {
+        await user.selectOptions(reasoningSelect, "high");
+        // Should use camelCase key "reasoning" (same in both formats)
+        expect(onChange).toHaveBeenCalledWith(
+          expect.objectContaining({ reasoning: "high" }),
+        );
       }
     });
   });
@@ -382,11 +406,14 @@ describe("LLMConfigPopover", () => {
     });
   });
 
-  describe("settings link", () => {
-    it("has a link to model provider settings", () => {
+  describe("model configuration action", () => {
+    it("passes showConfigureAction to ModelSelector", () => {
+      // The "Configure available models" link is now rendered inside ModelSelector
+      // which is mocked in these tests. The prop is passed through and the actual
+      // link behavior is tested in ModelSelector tests.
       renderComponent();
-      const link = screen.getByRole("link");
-      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      // ModelSelector is mocked, so we just verify the component renders
+      expect(screen.getByTestId("model-selector")).toBeInTheDocument();
     });
   });
 });

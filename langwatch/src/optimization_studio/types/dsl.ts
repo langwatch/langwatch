@@ -93,13 +93,19 @@ export const llmConfigSchema = z.object({
   model: z.string(),
   temperature: z.number().optional(),
   max_tokens: z.number().optional(),
-  // Reasoning parameters (for reasoning models)
-  reasoning_effort: z.string().optional(),
-  reasoning: z.string().optional(),
-  // Other parameters
+  // Traditional sampling parameters
   top_p: z.number().optional(),
   frequency_penalty: z.number().optional(),
   presence_penalty: z.number().optional(),
+  // Other sampling parameters
+  seed: z.number().optional(),
+  top_k: z.number().optional(),
+  min_p: z.number().optional(),
+  repetition_penalty: z.number().optional(),
+  // Reasoning parameters (for reasoning models)
+  reasoning_effort: z.string().optional(),
+  reasoning: z.string().optional(),
+  verbosity: z.string().optional(),
   litellm_params: z.record(z.string()).optional(),
 });
 

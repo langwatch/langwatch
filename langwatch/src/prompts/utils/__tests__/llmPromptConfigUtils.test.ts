@@ -291,7 +291,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     versionCreatedAt: new Date(),
     model: "gpt-4",
     temperature: 0.7,
-    maxTokens: 1000,
+    maxTokens: 4096,
     prompt: "You are a helpful assistant.",
     projectId: "test-project",
     organizationId: "org-1",
@@ -386,7 +386,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     versionCreatedAt: new Date(),
     model: "gpt-4",
     temperature: 0.7,
-    maxTokens: 1000,
+    maxTokens: 4096,
     prompt: "You are a helpful assistant.", // System message stored here
     projectId: "test-project",
     organizationId: "org-1",

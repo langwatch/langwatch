@@ -7,12 +7,18 @@
 
 import {
   HStack,
+  Input,
   NativeSelect,
   Slider,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { ParameterConfig, SliderParameterConfig, SelectParameterConfig } from "./parameterConfig";
+import { useSliderControl } from "./hooks/useSliderControl";
+import type {
+  ParameterConfig,
+  SelectParameterConfig,
+  SliderParameterConfig,
+} from "./parameterConfig";
 
 // ============================================================================
 // Types
@@ -38,7 +44,6 @@ export type ParameterFieldProps = {
 // ============================================================================
 
 type SliderFieldProps = {
-  name: string;
   config: SliderParameterConfig;
   value: number | undefined;
   onChange: (value: number) => void;
@@ -47,18 +52,20 @@ type SliderFieldProps = {
 };
 
 function SliderField({
-  name,
   config,
   value,
   onChange,
   maxOverride,
   disabled,
 }: SliderFieldProps) {
-  const effectiveMax = config.dynamicMax && maxOverride ? maxOverride : config.max;
-  const currentValue = value ?? config.default;
-
-  // Ensure current value is within bounds
-  const boundedValue = Math.min(Math.max(currentValue, config.min), effectiveMax);
+  const {
+    effectiveMax,
+    boundedValue,
+    inputValue,
+    handleInputChange,
+    handleInputBlur,
+    handleKeyDown,
+  } = useSliderControl({ config, value, onChange, maxOverride });
 
   return (
     <VStack gap={1} align="stretch" width="full">
@@ -66,9 +73,20 @@ function SliderField({
         <Text fontSize="xs" color="gray.600">
           {config.label}
         </Text>
-        <Text fontSize="xs" fontWeight="medium">
-          {boundedValue}
-        </Text>
+        <Input
+          size="xs"
+          width="70px"
+          textAlign="right"
+          type="number"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleInputBlur}
+          onKeyDown={handleKeyDown}
+          min={config.min}
+          max={effectiveMax}
+          step={config.step}
+          disabled={disabled}
+        />
       </HStack>
       <Slider.Root
         size="sm"
@@ -76,7 +94,9 @@ function SliderField({
         max={effectiveMax}
         step={config.step}
         value={[boundedValue]}
-        onValueChange={(details) => onChange(details.value[0] ?? config.default)}
+        onValueChange={(details) =>
+          onChange(details.value[0] ?? config.default)
+        }
         disabled={disabled}
       >
         <Slider.Control>
@@ -95,20 +115,13 @@ function SliderField({
 // ============================================================================
 
 type SelectFieldProps = {
-  name: string;
   config: SelectParameterConfig;
   value: string | undefined;
   onChange: (value: string) => void;
   disabled?: boolean;
 };
 
-function SelectField({
-  name,
-  config,
-  value,
-  onChange,
-  disabled,
-}: SelectFieldProps) {
+function SelectField({ config, value, onChange, disabled }: SelectFieldProps) {
   const currentValue = value ?? config.default;
 
   return (
@@ -148,7 +161,6 @@ export function ParameterField({
   if (config.type === "slider") {
     return (
       <SliderField
-        name={name}
         config={config}
         value={typeof value === "number" ? value : undefined}
         onChange={onChange}
@@ -161,7 +173,6 @@ export function ParameterField({
   if (config.type === "select") {
     return (
       <SelectField
-        name={name}
         config={config}
         value={typeof value === "string" ? value : undefined}
         onChange={onChange}

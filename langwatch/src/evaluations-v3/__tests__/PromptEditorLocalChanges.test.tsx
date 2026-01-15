@@ -71,7 +71,7 @@ const mockPromptData = {
   versionCreatedAt: new Date(),
   model: "gpt-4",
   temperature: 0.7,
-  maxTokens: 1000,
+  maxTokens: 4096,
   prompt: "You are a helpful assistant.",
   projectId: "test-project",
   messages: [{ role: "system", content: "You are a helpful assistant." }],
@@ -508,7 +508,7 @@ describe("Prompt Editor Local Changes", () => {
         llm: {
           model: "openai/gpt-4",
           temperature: 0.7,
-          maxTokens: 1000,
+          maxTokens: 4096,
         },
         messages: [{ role: "user", content: "LOCAL UNSAVED CONTENT" }],
         inputs: [{ identifier: "input", type: "str" }],

@@ -1,6 +1,7 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
+import { DEFAULT_MODEL } from "../../utils/constants";
 
 export const entryNode = () => ({
   id: "entry",
@@ -36,8 +37,8 @@ export const blankTemplate: Workflow = {
   description: "Start a new workflow from scratch",
   version: "1.0",
   default_llm: {
-    model: "openai/gpt-5",
-    temperature: 1,
+    model: DEFAULT_MODEL,
+    // Temperature omitted - reasoning models don't support temperature (uses reasoning_effort instead)
     max_tokens: DEFAULT_MAX_TOKENS,
   },
   template_adapter: "default",

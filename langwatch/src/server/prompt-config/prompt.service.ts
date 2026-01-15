@@ -50,6 +50,19 @@ export type VersionedPrompt = {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  // Traditional sampling parameters
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  // Other sampling parameters
+  seed?: number;
+  topK?: number;
+  minP?: number;
+  repetitionPenalty?: number;
+  // Reasoning model parameters
+  reasoningEffort?: string;
+  reasoning?: string;
+  verbosity?: string;
   prompt: string;
   projectId: string;
   organizationId: string;
@@ -764,6 +777,8 @@ export class PromptService {
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
+    const configData = config.latestVersion.configData;
+
     return {
       id: config.id,
       name: config.name,
@@ -772,9 +787,22 @@ export class PromptService {
       version: config.latestVersion.version ?? 0,
       versionId: config.latestVersion.id ?? "",
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-      model: config.latestVersion.configData.model,
-      temperature: config.latestVersion.configData.temperature,
-      maxTokens: config.latestVersion.configData.max_tokens,
+      model: configData.model,
+      temperature: configData.temperature,
+      maxTokens: configData.max_tokens,
+      // Traditional sampling parameters
+      topP: configData.top_p,
+      frequencyPenalty: configData.frequency_penalty,
+      presencePenalty: configData.presence_penalty,
+      // Other sampling parameters
+      seed: configData.seed,
+      topK: configData.top_k,
+      minP: configData.min_p,
+      repetitionPenalty: configData.repetition_penalty,
+      // Reasoning model parameters
+      reasoningEffort: configData.reasoning_effort,
+      reasoning: configData.reasoning,
+      verbosity: configData.verbosity,
       prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,
@@ -782,11 +810,11 @@ export class PromptService {
       // but in the database, we only have the prompt field above
       messages: [
         { role: "system", content: prompt },
-        ...(config.latestVersion.configData.messages ?? []),
+        ...(configData.messages ?? []),
       ],
-      inputs: config.latestVersion.configData.inputs,
-      outputs: config.latestVersion.configData.outputs,
-      responseFormat: config.latestVersion.configData.response_format,
+      inputs: configData.inputs,
+      outputs: configData.outputs,
+      responseFormat: configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
       author: config.latestVersion.author
         ? {
@@ -796,8 +824,8 @@ export class PromptService {
         : null,
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
-      demonstrations: config.latestVersion.configData.demonstrations,
-      promptingTechnique: config.latestVersion.configData.prompting_technique,
+      demonstrations: configData.demonstrations,
+      promptingTechnique: configData.prompting_technique,
       commitMessage: config.latestVersion.commitMessage,
       copiedFromPromptId: config.copiedFromPromptId ?? null,
       _count: config._count ?? undefined,
@@ -831,7 +859,22 @@ export class PromptService {
    * to properly isolate database schema concerns from service business logic.
    */
   private transformToDbFormat(data: any): any {
-    const { maxTokens, promptingTechnique, responseFormat, ...rest } = data;
+    const {
+      maxTokens,
+      promptingTechnique,
+      responseFormat,
+      // Traditional sampling parameters
+      topP,
+      frequencyPenalty,
+      presencePenalty,
+      // Other sampling parameters
+      topK,
+      minP,
+      repetitionPenalty,
+      // Reasoning model parameters
+      reasoningEffort,
+      ...rest
+    } = data;
     return {
       ...rest,
       ...(maxTokens !== undefined && { max_tokens: maxTokens }),
@@ -839,6 +882,25 @@ export class PromptService {
         prompting_technique: promptingTechnique,
       }),
       ...(responseFormat !== undefined && { response_format: responseFormat }),
+      // Traditional sampling parameters
+      ...(topP !== undefined && { top_p: topP }),
+      ...(frequencyPenalty !== undefined && {
+        frequency_penalty: frequencyPenalty,
+      }),
+      ...(presencePenalty !== undefined && {
+        presence_penalty: presencePenalty,
+      }),
+      // Other sampling parameters
+      ...(topK !== undefined && { top_k: topK }),
+      ...(minP !== undefined && { min_p: minP }),
+      ...(repetitionPenalty !== undefined && {
+        repetition_penalty: repetitionPenalty,
+      }),
+      // Reasoning model parameters
+      ...(reasoningEffort !== undefined && {
+        reasoning_effort: reasoningEffort,
+      }),
+      // Note: seed, reasoning, verbosity are already snake_case, passed through in ...rest
     };
   }
 
