@@ -147,7 +147,7 @@ describe("Evaluations V3 Endpoints", () => {
       // Should use the provided slug instead of generating one
       expect(result.slug).toBe(customSlug);
       // ID should still be a ksuid
-      expect(result.id).toMatch(/^evaluation_/);
+      expect(result.id).toMatch(/^experiment_/);
     });
 
     it("saves the workbenchState correctly", async () => {
