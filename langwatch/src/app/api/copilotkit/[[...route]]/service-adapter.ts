@@ -22,6 +22,10 @@ import type { ChatMessage } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import {
+  extractStreamableOutput,
+  type OutputConfig,
+} from "./output-formatter";
 
 const logger = createLogger("PromptStudioAdapter");
 
@@ -68,6 +72,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     let nodeId: string;
     let traceId: string;
     let threadId: string;
+    let outputConfig: OutputConfig | undefined;
 
     try {
       // @ts-expect-error - Total hack
@@ -77,6 +82,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         variables: z.infer<typeof runtimeInputsSchema>;
       };
       threadId = fallbackThreadId;
+      // Capture the first output configuration for dynamic field lookup during streaming
+      outputConfig = formValues.version.configData.outputs?.[0];
       nodeId = "prompt_node";
       traceId = generateOtelTraceId();
       const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
@@ -203,17 +210,20 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
                 });
               }
 
-              // Stream incremental output deltas
-              const current =
-                typeof state.outputs?.output === "string"
-                  ? state.outputs.output
-                  : undefined;
-              if (current && current.length >= lastOutput.length) {
+              // Stream incremental output deltas using dynamic field lookup
+              const current = extractStreamableOutput(
+                state.outputs,
+                outputConfig
+              );
+              if (
+                current !== undefined &&
+                current.length >= lastOutput.length
+              ) {
                 const delta = current.slice(lastOutput.length);
                 if (delta) {
                   eventStream$.sendTextMessageContent({
                     messageId,
-                    content: String(delta),
+                    content: delta,
                     // @ts-expect-error - Total hack
                     traceId,
                   });
