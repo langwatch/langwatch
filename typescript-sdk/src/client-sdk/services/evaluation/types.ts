@@ -70,7 +70,7 @@ export const batchEntrySchema = z.object({
   entry: z.unknown(),
   duration: z.number(),
   error: z.string().nullable().optional(),
-  trace_id: z.string(),
+  trace_id: z.string().nullable(),  // null when no tracer configured (no-op)
   target_id: z.string().nullable().optional(),
   cost: z.number().nullable().optional(),
   predicted: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -129,7 +129,7 @@ export type LogResultsRequest = {
     entry: unknown;
     duration: number;
     error?: string | null;
-    trace_id: string;
+    trace_id: string | null;  // null when no tracer configured (no-op)
     target_id?: string | null;
     cost?: number | null;
     predicted?: Record<string, unknown> | null;
@@ -137,7 +137,7 @@ export type LogResultsRequest = {
   evaluations: Array<{
     name: string;
     evaluator: string;
-    trace_id: string;
+    trace_id: string | null;  // null when no tracer configured (no-op)
     status: EvaluationStatus;
     inputs?: Record<string, unknown> | null;
     score?: number | null;

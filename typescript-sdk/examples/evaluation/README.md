@@ -59,13 +59,33 @@ npm run start:multi-target
 ```
 
 This example:
+- Uses `setupObservability()` to enable trace capture (required for trace links)
 - Uses `withTarget()` for target-scoped tracing
+- Each target gets its own unique trace ID (clickable in evaluation results)
 - Automatically captures latency from span timing
 - Runs all targets in parallel with `Promise.all`
 - Context inference means `log()` calls don't need explicit target
 - Results show comparison charts in the LangWatch UI
 
 ## Key Concepts
+
+### Setting Up Tracing (Required for Trace Links)
+
+To enable trace capture (so you can click through to trace details from evaluation results):
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+// Call this once at startup
+await setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT,
+  },
+});
+```
+
+Without `setupObservability()`, evaluations still work but trace links won't be available.
 
 ### Initializing an Evaluation
 
@@ -86,7 +106,7 @@ await evaluation.run(
   async ({ item, index }) => {
     // Your evaluation logic here
     const response = await myLLM(item.question);
-    
+
     evaluation.log("accuracy", {
       index,
       passed: response === item.expected,
@@ -131,20 +151,20 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const [gpt4, claude] = await Promise.all([
     evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
       const response = await openai.chat(item.question);
-      
+
       // Target and index are auto-inferred inside withTarget()!
       evaluation.log("quality", { score: 0.95 });
-      
+
       return response;
     }),
-    
+
     evaluation.withTarget("claude-3", { model: "anthropic/claude-3" }, async () => {
       const response = await anthropic.messages(item.question);
       evaluation.log("quality", { score: 0.85 });
       return response;
     }),
   ]);
-  
+
   // Latency is automatically captured from span duration
   console.log(`GPT-4: ${gpt4.duration}ms, Claude: ${claude.duration}ms`);
 });

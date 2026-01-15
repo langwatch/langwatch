@@ -10,7 +10,7 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { trace, context, SpanStatusCode } from "@opentelemetry/api";
+import { trace, context, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
 import type { LangWatchSpan } from "@/observability-sdk/span/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
@@ -100,6 +100,10 @@ export class Evaluation {
   // If so, we don't create dataset entries in executeItem()
   // Note: This is now checked via iterationContextStorage to be thread-safe
   private iterationUsedWithTarget = new Map<number, boolean>();
+
+  // Track whether withTarget() has EVER been used in this evaluation
+  // Once set to true, we stop creating iteration-level traces
+  private evaluationUsesTargets = false;
 
   private constructor(
     name: string,
@@ -264,50 +268,79 @@ export class Evaluation {
     // Set up iteration context (thread-safe via AsyncLocalStorage)
     const iterationContext: IterationContext = { index, item };
 
-    await iterationContextStorage.run(iterationContext, async () => {
-      await tracer.startActiveSpan(
-        "evaluation.iteration",
-        {
-          attributes: {
-            "evaluation.run_id": this.runId,
-            "evaluation.index": index,
-          },
-        },
-        async (otelSpan) => {
-          const span = createLangWatchSpan(otelSpan);
-          const spanContext = otelSpan.spanContext();
-          const traceId = spanContext.traceId;
+    // If evaluation uses targets, skip creating iteration-level traces
+    // Each withTarget() call will create its own independent trace
+    if (this.evaluationUsesTargets) {
+      await iterationContextStorage.run(iterationContext, async () => {
+        this.currentIndex = index;
 
-          // Set current context for log/evaluate calls
-          this.currentTraceId = traceId;
-          this.currentIndex = index;
-          capturedTraceId = traceId;
+        try {
+          // Create a minimal span context for the callback
+          const span = {
+            setStatus: () => {},
+            recordException: () => {},
+            end: () => {},
+          } as unknown as LangWatchSpan;
 
-          try {
-            const ctx: RunContext<T> = { item, index, span };
-            const result = callback(ctx);
+          const ctx: RunContext<T> = { item, index, span };
+          const result = callback(ctx);
 
-            if (result && typeof result.then === "function") {
-              await result;
-            }
-
-            span.setStatus({ code: SpanStatusCode.OK });
-          } catch (err) {
-            error = err instanceof Error ? err : new Error(String(err));
-            span.setStatus({
-              code: SpanStatusCode.ERROR,
-              message: error.message,
-            });
-            span.recordException(error);
-            this.logger.error(`Evaluation error at index ${index}:`, error);
-          } finally {
-            span.end();
-            this.currentTraceId = null;
-            this.currentIndex = null;
+          if (result && typeof result.then === "function") {
+            await result;
           }
+        } catch (err) {
+          error = err instanceof Error ? err : new Error(String(err));
+          this.logger.error(`Evaluation error at index ${index}:`, error);
+        } finally {
+          this.currentIndex = null;
         }
-      );
-    });
+      });
+    } else {
+      await iterationContextStorage.run(iterationContext, async () => {
+        await tracer.startActiveSpan(
+          "evaluation.iteration",
+          {
+            attributes: {
+              "evaluation.run_id": this.runId,
+              "evaluation.index": index,
+            },
+          },
+          async (otelSpan) => {
+            const span = createLangWatchSpan(otelSpan);
+            const spanContext = otelSpan.spanContext();
+            const traceId = spanContext.traceId;
+
+            // Set current context for log/evaluate calls
+            this.currentTraceId = traceId;
+            this.currentIndex = index;
+            capturedTraceId = traceId;
+
+            try {
+              const ctx: RunContext<T> = { item, index, span };
+              const result = callback(ctx);
+
+              if (result && typeof result.then === "function") {
+                await result;
+              }
+
+              span.setStatus({ code: SpanStatusCode.OK });
+            } catch (err) {
+              error = err instanceof Error ? err : new Error(String(err));
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error.message,
+              });
+              span.recordException(error);
+              this.logger.error(`Evaluation error at index ${index}:`, error);
+            } finally {
+              span.end();
+              this.currentTraceId = null;
+              this.currentIndex = null;
+            }
+          }
+        );
+      });
+    }
 
     // Only add a dataset entry if withTarget() was NOT used
     // When withTarget() is used, it creates its own dataset entries per target
@@ -584,6 +617,12 @@ export class Evaluation {
     const callback =
       typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
 
+    // On FIRST withTarget() call ever in this evaluation:
+    // - Set flag to skip creating iteration-level traces going forward
+    if (!this.evaluationUsesTargets) {
+      this.evaluationUsesTargets = true;
+    }
+
     // Get iteration context (thread-safe via AsyncLocalStorage)
     const iterationContext = iterationContextStorage.getStore();
     const index = iterationContext?.index ?? this.currentIndex ?? 0;
@@ -602,6 +641,8 @@ export class Evaluation {
     let spanId = "";
     let callbackError: Error | undefined;
 
+    // Create an INDEPENDENT root span using ROOT_CONTEXT
+    // This ensures each target gets a unique trace_id, not shared with iteration
     await tracer.startActiveSpan(
       `evaluation.target.${targetName}`,
       {
@@ -611,11 +652,16 @@ export class Evaluation {
           "evaluation.index": index,
         },
       },
+      ROOT_CONTEXT,
       async (otelSpan) => {
         const span = createLangWatchSpan(otelSpan);
         const spanContext = otelSpan.spanContext();
-        traceId = spanContext.traceId;
+        const rawTraceId = spanContext.traceId;
         spanId = spanContext.spanId;
+
+        // Check if this is a no-op trace (all zeros = no tracer configured)
+        const isNoOpTrace = rawTraceId === "00000000000000000000000000000000";
+        traceId = isNoOpTrace ? "" : rawTraceId;
 
         // Set up the target execution context
         const executionContext: TargetExecutionContext = {
@@ -670,7 +716,7 @@ export class Evaluation {
       entry: this.serializeItem(currentItem),
       duration,
       error: callbackError?.message ?? null,
-      trace_id: traceId,
+      trace_id: traceId || null,  // null if no tracer configured (no-op)
       target_id: targetName,
       predicted,
     };

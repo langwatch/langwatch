@@ -9,7 +9,7 @@ import time
 import traceback
 import httpx
 import pandas as pd
-from opentelemetry import trace
+from opentelemetry import trace, context as otel_context
 from opentelemetry.trace import Span
 from pydantic import BaseModel, Field
 from typing import (
@@ -165,6 +165,13 @@ class Evaluation:
         # If so, we don't create row-level dataset entries
         self._current_iteration_used_with_target = False
 
+        # Track whether target() has EVER been used in this evaluation
+        # Once set to True, we stop creating iteration-level traces
+        self._evaluation_uses_targets: bool = False
+
+        # Store the active iteration trace so target() can close it early
+        self._active_iteration_trace: Optional[LangWatchTrace] = None
+
     def init(self):
         if not langwatch.get_api_key():
             raise ValueError(
@@ -295,11 +302,17 @@ class Evaluation:
         iter_ctx = IterationContext(index=index, item=item)
         iter_token = _iteration_context.set(iter_ctx)
 
-        # Iteration will be None if we find ourselves in a parallel loop, but still
-        # in the phase of collecting the evaluation.submit() processes. When in_thread,
-        # then it's when we actually collect the iteration info.
-        iteration = (
-            IterationInfo(
+        # Determine if we should create an iteration trace:
+        # - Don't create if evaluation uses targets (each target creates its own trace)
+        # - Don't create if we're collecting submit() calls (not in_thread yet)
+        should_create_iteration_trace = (
+            not self._evaluation_uses_targets
+            and (in_thread or len(self._futures) == 0)
+        )
+
+        iteration: Optional[IterationInfo] = None
+        if should_create_iteration_trace:
+            iteration = IterationInfo(
                 trace=langwatch.trace(
                     name="evaluation.loop_iteration",
                     metadata={
@@ -312,12 +325,9 @@ class Evaluation:
                 duration=0,
                 error=None,
             )
-            if in_thread or len(self._futures) == 0
-            else None
-        )
-
-        if iteration is not None:
             iteration["trace"].__enter__()
+            # Store for target() to potentially close early
+            self._active_iteration_trace = iteration["trace"]
 
         start_time = time.time()
         try:
@@ -327,8 +337,13 @@ class Evaluation:
                 iteration["error"] = e
             print(f"\n[Evaluation Error] index={index}")
             traceback.print_exc()
+        finally:
+            # Reset iteration context
+            _iteration_context.reset(iter_token)
 
-        if iteration is not None:
+        # Handle iteration trace cleanup
+        # Note: If target() was used, it may have already closed the trace
+        if iteration is not None and not self._evaluation_uses_targets:
             try:
                 iteration["duration"] = int((time.time() - start_time) * 1000)
 
@@ -347,8 +362,9 @@ class Evaluation:
                 raise e
             finally:
                 iteration["trace"].__exit__(None, None, None)
-                # Reset iteration context
-                _iteration_context.reset(iter_token)
+
+        # Clear active iteration trace reference
+        self._active_iteration_trace = None
 
     def _add_to_batch(self, iteration: IterationInfo):
         entry: Any = (
@@ -537,6 +553,9 @@ class Evaluation:
         duration automatically. This enables proper per-target latency tracking
         when comparing multiple models/configurations.
 
+        Each target() call creates its own independent trace, allowing you to
+        view execution details separately for each model/configuration.
+
         Inside this context, log() calls will automatically use this target
         unless an explicit target is provided.
 
@@ -563,7 +582,17 @@ class Evaluation:
                 evaluation.submit(evaluate, index, row)
             ```
         """
-        # Mark that target() was used in this iteration
+        # On FIRST target() call ever in this evaluation:
+        # - Set flag to skip creating iteration-level traces going forward
+        # - Close the active iteration trace if any (it won't have useful content)
+        if not self._evaluation_uses_targets:
+            self._evaluation_uses_targets = True
+            # Close the active iteration trace early
+            if self._active_iteration_trace is not None:
+                self._active_iteration_trace.__exit__(None, None, None)
+                self._active_iteration_trace = None
+
+        # Mark that target() was used in this iteration (for dataset entry logic)
         self._current_iteration_used_with_target = True
 
         # Register target
@@ -580,16 +609,7 @@ class Evaluation:
             index = self._current_index
             current_item = self._current_item
 
-        # Create trace for this target
-        target_trace = langwatch.trace(
-            name=f"evaluation.target.{name}",
-            metadata={
-                "thread_id": self.run_id,
-                "loop.index": str(index),
-                "target": name,
-            },
-        )
-
+        target_trace: Optional[LangWatchTrace] = None
         start_time = time.time()
         error_occurred: Optional[Exception] = None
         trace_id = ""
@@ -600,17 +620,44 @@ class Evaluation:
             index=index,
             trace_id="",  # Will be set after entering trace
         )
-        token = _target_context.set(ctx)
+        target_context_token = _target_context.set(ctx)
 
         try:
-            target_trace.__enter__()
-            trace_id = target_trace.trace_id or ""
-            ctx.trace_id = trace_id
+            # Create an INDEPENDENT root trace for this target
+            # We use a new tracer without any parent context to get a unique trace_id
+            # The key is using the tracer directly with context=None to prevent
+            # parent context inheritance
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.trace import INVALID_SPAN_CONTEXT
 
-            yield
+            tracer = trace.get_tracer("langwatch-evaluation")
+
+            # Start a new root span with no parent by passing an empty context
+            # This ensures each target gets a unique trace_id
+            root_context = otel_context.Context()
+
+            with tracer.start_as_current_span(
+                f"evaluation.target.{name}",
+                context=root_context,
+                attributes={
+                    "evaluation.run_id": self.run_id,
+                    "evaluation.index": index,
+                    "evaluation.target": name,
+                },
+            ) as span:
+                span_context = span.get_span_context()
+                trace_id = format(span_context.trace_id, "032x")
+                ctx.trace_id = trace_id
+
+                try:
+                    yield
+                except Exception as e:
+                    error_occurred = e
+                    raise
 
         except Exception as e:
-            error_occurred = e
+            if error_occurred is None:
+                error_occurred = e
             raise
         finally:
             duration_ms = int((time.time() - start_time) * 1000)
@@ -657,13 +704,8 @@ class Evaluation:
             with self.lock:
                 self.batch["dataset"].append(batch_entry)
 
-            # Close the trace
-            if error_occurred:
-                target_trace.update(error=error_occurred)
-            target_trace.__exit__(None, None, None)
-
-            # Reset context
-            _target_context.reset(token)
+            # Reset target context
+            _target_context.reset(target_context_token)
 
             # Schedule send
             if time.time() - self.last_sent >= self.debounce_interval:

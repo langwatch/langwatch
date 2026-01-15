@@ -6,7 +6,8 @@
  *
  * Features demonstrated:
  * - withTarget() for target-scoped spans
- * - Automatic latency capture
+ * - Automatic latency capture per target
+ * - Unique trace IDs per target (clickable in UI)
  * - Context inference for log() calls
  * - Parallel target execution with Promise.all
  *
@@ -15,6 +16,7 @@
 
 import "dotenv/config";
 import { LangWatch } from "langwatch";
+import { setupObservability } from "langwatch/observability/node";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
@@ -22,6 +24,15 @@ if (!process.env.LANGWATCH_API_KEY) {
   console.error("   Get your API key from https://app.langwatch.ai");
   process.exit(1);
 }
+
+// Initialize LangWatch observability (required for trace capture)
+// This enables clicking through to trace details from evaluation results
+await setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    endpoint: process.env.LANGWATCH_ENDPOINT,
+  },
+});
 
 // Sample dataset
 const dataset = [
@@ -98,7 +109,8 @@ const main = async () => {
   );
 
   console.log("\n✅ Comparison complete! Check LangWatch to see charts comparing the models.");
-  console.log("   Latency is automatically captured from each withTarget() span.");
+  console.log("   - Each target has its own unique trace (clickable in UI)");
+  console.log("   - Latency is automatically captured per target");
 };
 
 main().catch(console.error);

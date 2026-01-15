@@ -497,7 +497,6 @@ describe("Evaluation Unit", () => {
       }) as typeof fetch;
 
       try {
-        const { LangWatch } = await import("@/client-sdk");
         const langwatch = new LangWatch({
           apiKey: "test-key",
           endpoint: "http://localhost:5560",
