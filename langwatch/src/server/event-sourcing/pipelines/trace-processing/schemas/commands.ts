@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { spanSchema, resourceSchema, instrumentationScopeSchema } from "./otlp";
+import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
 export const recordSpanCommandDataSchema = z.object({
   tenantId: z.string(),
