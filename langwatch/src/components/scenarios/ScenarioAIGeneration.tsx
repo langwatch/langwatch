@@ -10,17 +10,24 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, Check, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
 import { DEFAULT_MODEL } from "../../utils/constants";
+import { createLogger } from "../../utils/logger";
 import {
   allModelOptions,
   useModelSelectionOptions,
 } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
+
+const logger = createLogger("langwatch:scenarios:ai-generation");
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────────────
 
 type ScenarioAIGenerationProps = {
   form: UseFormReturn<ScenarioFormData> | null;
@@ -29,12 +36,101 @@ type ScenarioAIGenerationProps = {
 type GenerationStatus = "idle" | "generating" | "done" | "error";
 type ViewMode = "prompt" | "input";
 
+type GeneratedScenario = {
+  name: string;
+  situation: string;
+  criteria: string[];
+  labels: string[];
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom Hooks
+// ─────────────────────────────────────────────────────────────────────────────
+
+function usePromptHistory() {
+  const [history, setHistory] = useState<string[]>([]);
+
+  const addPrompt = useCallback((prompt: string) => {
+    setHistory((prev) => [...prev, prompt]);
+  }, []);
+
+  const hasHistory = history.length > 0;
+
+  return { history, addPrompt, hasHistory };
+}
+
+function useScenarioGeneration(projectId: string | undefined) {
+  const [status, setStatus] = useState<GenerationStatus>("idle");
+
+  const generate = useCallback(
+    async (
+      prompt: string,
+      currentScenario: GeneratedScenario | null
+    ): Promise<GeneratedScenario> => {
+      setStatus("generating");
+
+      try {
+        const response = await fetch("/api/scenario/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt, currentScenario, projectId }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Failed to generate scenario");
+        }
+
+        const data = await response.json();
+        setStatus("done");
+        return data.scenario;
+      } catch (error) {
+        setStatus("error");
+        throw error;
+      }
+    },
+    [projectId]
+  );
+
+  return { generate, status };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper Functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
+  const name = form.getValues("name").trim();
+  const situation = form.getValues("situation").trim();
+  const criteria = form.getValues("criteria");
+
+  return name.length > 0 || situation.length > 0 || criteria.length > 0;
+}
+
+function extractProviderFromModel(modelId: string): string {
+  const PROVIDER_SEPARATOR = "/";
+  const UNKNOWN_PROVIDER = "unknown";
+  return modelId.split(PROVIDER_SEPARATOR)[0] ?? UNKNOWN_PROVIDER;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PROMPT_INPUT_ROWS = 5;
+const TOAST_DURATION_MS = 5000;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Component
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { project } = useOrganizationTeamProject();
   const [viewMode, setViewMode] = useState<ViewMode>("prompt");
   const [input, setInput] = useState("");
-  const [promptHistory, setPromptHistory] = useState<string[]>([]);
-  const [status, setStatus] = useState<GenerationStatus>("idle");
+
+  const { history, addPrompt, hasHistory } = usePromptHistory();
+  const { generate, status } = useScenarioGeneration(project?.id);
 
   // Check if the default model is enabled
   const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
@@ -44,28 +140,27 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
     "chat"
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
-  const providerName = defaultModel.split("/")[0] ?? "unknown";
+  const providerName = extractProviderFromModel(defaultModel);
 
-  const isFormDirty = form
-    ? form.getValues("name") ||
-      form.getValues("situation") ||
-      form.getValues("criteria").length > 0
-    : false;
+  const hasExistingContent = form !== null && formHasContent(form);
 
-  const hasHistory = promptHistory.length > 0;
+  const canGenerate = Boolean(
+    input.trim() &&
+      status !== "generating" &&
+      !isDefaultModelDisabled &&
+      form
+  );
 
-  const handleGenerate = async () => {
+  const handleGenerate = useCallback(async () => {
     if (!input.trim() || !project?.id || !form) return;
 
     // Warn if form has content and no history (first generation)
-    if (isFormDirty && !hasHistory) {
+    if (hasExistingContent && !hasHistory) {
       const confirmed = window.confirm(
         "This will replace the current scenario content. Continue?"
       );
       if (!confirmed) return;
     }
-
-    setStatus("generating");
 
     try {
       const currentScenario = hasHistory
@@ -77,25 +172,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           }
         : null;
 
-      const response = await fetch("/api/scenario/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: input,
-          currentScenario,
-          projectId: project.id,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to generate scenario");
-      }
-
-      const data = await response.json();
-      const scenario = data.scenario;
+      const scenario = await generate(input, currentScenario);
 
       // Update form with generated data
       form.setValue("name", scenario.name);
@@ -103,22 +180,32 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
       form.setValue("criteria", scenario.criteria);
       form.setValue("labels", scenario.labels);
 
-      setPromptHistory((prev) => [...prev, input]);
+      addPrompt(input);
       setInput("");
-      setStatus("done");
     } catch (error) {
-      console.error("Error generating scenario:", error);
+      logger.error({ error }, "Error generating scenario");
       toaster.create({
         title: "Generation failed",
         description:
           error instanceof Error ? error.message : "An error occurred",
         type: "error",
-        duration: 5000,
+        duration: TOAST_DURATION_MS,
         meta: { closable: true },
       });
-      setStatus("error");
     }
-  };
+  }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      const isSubmitKeyPress = e.key === "Enter" && !e.shiftKey;
+
+      if (isSubmitKeyPress && canGenerate) {
+        e.preventDefault();
+        void handleGenerate();
+      }
+    },
+    [canGenerate, handleGenerate]
+  );
 
   // "Prompt" view - initial state with CTA
   if (viewMode === "prompt") {
@@ -206,7 +293,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
           {/* Prompt History - no truncation */}
           {hasHistory && (
             <VStack align="stretch" gap={1} fontSize="xs" color="gray.500">
-              {promptHistory.map((prompt, index) => (
+              {history.map((prompt, index) => (
                 <HStack key={index} align="start">
                   <Text flexShrink={0}>{">"}</Text>
                   <Text whiteSpace="pre-wrap">{prompt}</Text>
@@ -223,22 +310,9 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             }
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter or Cmd/Ctrl+Enter to generate, Shift+Enter for new line
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                input.trim() &&
-                status !== "generating" &&
-                !isDefaultModelDisabled &&
-                form
-              ) {
-                e.preventDefault();
-                void handleGenerate();
-              }
-            }}
+            onKeyDown={handleKeyDown}
             disabled={status === "generating" || isDefaultModelDisabled}
-            rows={5}
+            rows={PROMPT_INPUT_ROWS}
             fontSize="sm"
           />
 
@@ -246,12 +320,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             colorPalette="blue"
             size="sm"
             onClick={handleGenerate}
-            disabled={
-              !input.trim() ||
-              status === "generating" ||
-              isDefaultModelDisabled ||
-              !form
-            }
+            disabled={!canGenerate}
           >
             {status === "generating" ? (
               <>
