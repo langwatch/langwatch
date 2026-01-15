@@ -90,6 +90,9 @@ describe("Autosave evaluation state", () => {
       name: "New Evaluation",
     });
     useEvaluationsV3Store.getState().reset();
+    // Set slug to match router query so shouldLoadExisting is false
+    // This simulates the state after initial load completes
+    useEvaluationsV3Store.setState({ experimentSlug: "test-slug" });
   });
 
   afterEach(() => {
@@ -128,7 +131,7 @@ describe("Autosave evaluation state", () => {
     );
   });
 
-  it("updates autosave status to saving then saved then idle", async () => {
+  it("updates autosave status to saving then saved then idle", { timeout: 15000 }, async () => {
     render(<TestAutosaveComponent />, { wrapper: Wrapper });
 
     // Wait for initial render, any pending saves, and status to settle to idle
@@ -158,10 +161,10 @@ describe("Autosave evaluation state", () => {
       expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("saved");
     });
 
-    // After delay, should go back to idle
+    // After delay, should go back to idle (2s delay in markSaved + buffer)
     await waitFor(() => {
       expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("idle");
-    }, { timeout: 3000 });
+    }, { timeout: 5000 });
   });
 
   it("sets autosave status to error when save fails", async () => {

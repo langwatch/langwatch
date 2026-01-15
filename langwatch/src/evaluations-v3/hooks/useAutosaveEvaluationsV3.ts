@@ -24,7 +24,9 @@ export const useAutosaveEvaluationsV3 = () => {
   const router = useRouter();
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasLoadedExistingRef = useRef(false);
+  // Track which slug we've successfully loaded in THIS component instance
+  // This prevents re-loading on every render while allowing reload after navigation
+  const loadedSlugRef = useRef<string | null>(null);
 
   const {
     experimentId,
@@ -84,8 +86,23 @@ export const useAutosaveEvaluationsV3 = () => {
 
   const routerSlug = router.query.slug as string | undefined;
 
-  // Only try to load existing experiment if we don't already have an experimentId loaded
-  const shouldLoadExisting = !!project && !!routerSlug && !experimentId && !hasLoadedExistingRef.current;
+  // Detect if the store was reset while component stayed mounted
+  // This happens when user navigates away and back - reset() is called but component might not remount
+  // If we previously loaded this slug but experimentSlug is now different (or undefined), reset the ref
+  if (loadedSlugRef.current === routerSlug && experimentSlug !== routerSlug) {
+    loadedSlugRef.current = null;
+  }
+
+  // Determine if we need to load the experiment from the database.
+  // We should load if:
+  // 1. We have a project and a slug in the URL
+  // 2. The store's experimentSlug doesn't match the URL slug
+  //    (this means either: new page, store was reset, or navigated to different experiment)
+  // 3. We haven't already loaded this slug in this component instance
+  //    (prevents duplicate loads during the same mount)
+  const shouldLoadExisting = !!project && !!routerSlug &&
+    experimentSlug !== routerSlug &&
+    loadedSlugRef.current !== routerSlug;
 
   // Load existing experiment if navigating to one
   const existingExperiment = api.experiments.getEvaluationsV3BySlug.useQuery(
@@ -110,8 +127,9 @@ export const useAutosaveEvaluationsV3 = () => {
 
   // Load existing experiment data into store OR set slug from URL for new experiments
   useEffect(() => {
-    if (existingExperiment.data && !hasLoadedExistingRef.current) {
-      hasLoadedExistingRef.current = true;
+    if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
+      // Mark this slug as loaded BEFORE updating store to prevent race conditions
+      loadedSlugRef.current = routerSlug ?? null;
 
       // Set experiment ID and slug first
       setExperimentId(existingExperiment.data.id);
@@ -125,12 +143,12 @@ export const useAutosaveEvaluationsV3 = () => {
       !existingExperiment.isLoading &&
       !existingExperiment.data &&
       routerSlug &&
-      !hasLoadedExistingRef.current &&
+      loadedSlugRef.current !== routerSlug &&
       !experimentSlug
     ) {
       // No existing experiment found - this is a new one
       // Set the slug from the URL so it's included in the first save
-      hasLoadedExistingRef.current = true;
+      loadedSlugRef.current = routerSlug;
       setExperimentSlug(routerSlug);
     }
   }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
@@ -161,10 +179,11 @@ export const useAutosaveEvaluationsV3 = () => {
   // Autosave effect with debounce
   useEffect(() => {
     if (!project) return;
-    // Only wait if we're actually trying to load an existing experiment
-    if (shouldLoadExisting && existingExperiment.isLoading) return;
     // Don't save while we're loading an existing experiment
     if (existingExperiment.isLoading) return;
+    // CRITICAL: Don't save if we should be loading (store doesn't match URL)
+    // This prevents saving blank/stale data when navigating back
+    if (shouldLoadExisting) return;
     if (!name) return;
 
     // Only save if we have an existing experiment OR there are actual changes from initial state

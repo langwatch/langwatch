@@ -1085,7 +1085,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   reset: () => {
-    set(createInitialState());
+    // IMPORTANT: Explicitly clear experimentId and experimentSlug
+    // createInitialState() doesn't include these optional fields,
+    // and Zustand's set() does a shallow merge, so we need to explicitly set them
+    set({
+      ...createInitialState(),
+      experimentId: undefined,
+      experimentSlug: undefined,
+    });
   },
 
   loadState: (wizardState: unknown) => {
