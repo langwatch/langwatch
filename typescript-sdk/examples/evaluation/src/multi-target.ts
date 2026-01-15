@@ -34,12 +34,31 @@ await setupObservability({
   },
 });
 
-// Sample dataset
-const dataset = [
-  { question: "Explain quantum computing in one sentence." },
-  { question: "What are the benefits of exercise?" },
-  { question: "How does photosynthesis work?" },
-];
+// Initialize LangWatch client
+const langwatch = new LangWatch({
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT,
+});
+
+// Fetch dataset from LangWatch or use fallback
+type DatasetEntry = { question: string };
+let dataset: DatasetEntry[];
+
+const DATASET_SLUG = process.env.TEST_DATASET_SLUG; // Set this to your dataset slug
+
+if (DATASET_SLUG) {
+  console.log(`📦 Fetching dataset: ${DATASET_SLUG}`);
+  const remoteDataset = await langwatch.datasets.get<DatasetEntry>(DATASET_SLUG);
+  dataset = remoteDataset.entries.map((e) => e.entry);
+  console.log(`   Found ${dataset.length} entries`);
+} else {
+  console.log("📦 Using sample dataset (set TEST_DATASET_SLUG to fetch from LangWatch)");
+  dataset = [
+    { question: "Explain quantum computing in one sentence." },
+    { question: "What are the benefits of exercise?" },
+    { question: "How does photosynthesis work?" },
+  ];
+}
 
 // Simulated LLM calls - replace with your actual LLM calls
 const simulateGPT4 = async (question: string): Promise<string> => {
@@ -59,11 +78,6 @@ const simulateClaude = async (question: string): Promise<string> => {
 
 const main = async () => {
   console.log("🚀 Starting multi-target comparison...\n");
-
-  const langwatch = new LangWatch({
-    apiKey: process.env.LANGWATCH_API_KEY,
-    endpoint: process.env.LANGWATCH_ENDPOINT,
-  });
 
   const evaluation = await langwatch.evaluation.init("typescript-model-comparison");
 
