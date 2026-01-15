@@ -14,6 +14,7 @@ import {
   LuChevronDown,
   LuCircleAlert,
   LuCode,
+  LuCopy,
   LuFileText,
   LuPencil,
   LuPlay,
@@ -44,6 +45,7 @@ const pulseAnimation = keyframes`
 type TargetHeaderProps = {
   target: TargetConfig;
   onEdit?: (target: TargetConfig) => void;
+  onDuplicate?: (target: TargetConfig) => void;
   onRemove?: (targetId: string) => void;
   onRun?: (target: TargetConfig) => void;
   onStop?: () => void;
@@ -67,6 +69,7 @@ type TargetHeaderProps = {
 export const TargetHeader = memo(function TargetHeader({
   target,
   onEdit,
+  onDuplicate,
   onRemove,
   onRun,
   onStop,
@@ -285,6 +288,12 @@ export const TargetHeader = memo(function TargetHeader({
             <HStack gap={2}>
               <LuPencil size={14} />
               <Text>{editLabel}</Text>
+            </HStack>
+          </Menu.Item>
+          <Menu.Item value="duplicate" onClick={() => onDuplicate?.(target)}>
+            <HStack gap={2}>
+              <LuCopy size={14} />
+              <Text>Duplicate</Text>
             </HStack>
           </Menu.Item>
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />

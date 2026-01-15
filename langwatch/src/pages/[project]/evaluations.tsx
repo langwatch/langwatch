@@ -261,7 +261,7 @@ function EvaluationsV2() {
                               </Table.Row>
                             ))
                           : experiments.data
-                          ? experiments.data?.map((experiment, i) => (
+                          ? experiments.data.experiments.map((experiment, i) => (
                               <Table.Row
                                 cursor="pointer"
                                 onClick={() => {
@@ -326,9 +326,12 @@ function EvaluationsV2() {
                                           experiment.runsSummary.primaryMetric,
                                           true,
                                         )}
-                                      </>
-                                    )}
-                                  </Table.Cell>
+                                      </Text>
+                                    </>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </Table.Cell>
                                   <Table.Cell whiteSpace="nowrap">
                                     {new Date(
                                       experiment.updatedAt,

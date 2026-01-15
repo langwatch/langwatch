@@ -31,7 +31,7 @@ export const studioBackendPostEvent = async ({
       (error as any)?.cause?.code === "ECONNREFUSED" ||
       (error as any)?.cause?.code === "ETIMEDOUTA"
     ) {
-      throw new Error("Python runtime is unreachable");
+      throw new Error("LangWatch NLP is unreachable");
     }
     if (
       (error as any)?.message === "fetch failed" &&

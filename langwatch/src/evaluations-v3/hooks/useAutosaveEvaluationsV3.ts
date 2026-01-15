@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { toaster } from "../../components/ui/toaster";
 import { captureException } from "../../utils/posthogErrorCapture";
+import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
 import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
@@ -246,9 +247,15 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
 
+  // Determine if experiment was not found
+  const isNotFound = isTrpcNotFound(existingExperiment.error);
+
   return {
     isLoading: existingExperiment.isLoading,
     isSaving: saveExperiment.isPending,
     existingExperiment: existingExperiment.data,
+    isNotFound,
+    isError: existingExperiment.isError && !isNotFound,
+    error: existingExperiment.error,
   };
 };

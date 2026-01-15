@@ -1,9 +1,7 @@
-import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import ErrorPage from "next/error";
+import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 
-import { CurrentDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -39,7 +37,12 @@ export default function EvaluationsV3Page() {
     }));
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
-  const { isLoading: isLoadingExperiment } = useAutosaveEvaluationsV3();
+  const {
+    isLoading: isLoadingExperiment,
+    isNotFound,
+    isError,
+    error,
+  } = useAutosaveEvaluationsV3();
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
@@ -56,8 +59,37 @@ export default function EvaluationsV3Page() {
     return <LoadingScreen />;
   }
 
-  if (!slug) {
-    return <ErrorPage statusCode={404} />;
+  // Show error states inside DashboardLayout so user can navigate away
+  if (!slug || isNotFound) {
+    return (
+      <DashboardLayout backgroundColor="white" compactMenu={true}>
+        <Box padding={6}>
+          <Alert.Root status="warning">
+            <Alert.Indicator />
+            <Alert.Title>Evaluation not found</Alert.Title>
+            <Alert.Description>
+              The evaluation you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+            </Alert.Description>
+          </Alert.Root>
+        </Box>
+      </DashboardLayout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <DashboardLayout backgroundColor="white" compactMenu={true}>
+        <Box padding={6}>
+          <Alert.Root status="error">
+            <Alert.Indicator />
+            <Alert.Title>Failed to load evaluation</Alert.Title>
+            <Alert.Description>
+              {error?.message ?? "An unexpected error occurred while loading the evaluation."}
+            </Alert.Description>
+          </Alert.Root>
+        </Box>
+      </DashboardLayout>
+    );
   }
 
   return (

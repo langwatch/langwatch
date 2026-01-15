@@ -199,13 +199,14 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
             <Tabs.Content
               value="results"
               width="full"
-              height="fit-content"
-              minHeight="calc(100vh - 150px)"
+              height="calc(100vh - 150px)"
+              maxHeight="calc(100vh - 150px)"
               position="sticky"
               top="58px"
+              overflow="hidden"
             >
-              <Card.Root width="full" height="full" position="sticky" top={6}>
-                <Card.Body width="full" height="full" padding={0}>
+              <Card.Root width="full" height="full" position="sticky" top={6} overflow="hidden">
+                <Card.Body width="full" height="full" padding={0} overflow="hidden">
                   <EvaluationResults
                     workflowId={workflowId}
                     experimentId={experimentId}

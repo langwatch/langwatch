@@ -511,6 +511,7 @@ export type TableMeta = {
   targetsMap: Map<string, TargetConfig>;
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
+  handleDuplicateTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
   // Execution handlers
