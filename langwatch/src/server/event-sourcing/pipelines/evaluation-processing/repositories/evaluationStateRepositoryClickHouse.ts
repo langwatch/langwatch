@@ -170,7 +170,7 @@ export class EvaluationStateRepositoryClickHouse<
             toString(StartedAt) AS StartedAt,
             toString(CompletedAt) AS CompletedAt,
             LastProcessedEventId
-          FROM ${TABLE_NAME}
+          FROM ${TABLE_NAME} FINAL
           WHERE TenantId = {tenantId:String}
             AND EvaluationId = {evaluationId:String}
           ORDER BY Version DESC
