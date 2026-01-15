@@ -20,10 +20,7 @@ const logger = createLogger("langwatch:clickhouse:migrations");
  * @see https://github.com/pressly/goose
  */
 
-const MIGRATIONS_DIR = path.join(
-  process.cwd(),
-  "src/server/clickhouse/migrations",
-);
+const MIGRATIONS_DIR = path.join(__dirname, "migrations");
 
 interface GooseOptions {
   database?: string;
