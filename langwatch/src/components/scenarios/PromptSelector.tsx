@@ -1,10 +1,13 @@
 import {
+  Box,
   Button,
   createListCollection,
+  HStack,
   Portal,
+  Text,
   useListbox,
 } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { Listbox } from "../ui/listbox";
 import { Popover } from "../ui/popover";
@@ -13,13 +16,18 @@ import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForPro
 interface PromptSelectorProps {
   value: string | null;
   onChange: (value: string | null) => void;
+  onCreatePrompt?: () => void;
 }
 
 /**
  * Dropdown selector for prompts from the library.
  * Uses Listbox with Popover pattern per Chakra recommendations.
  */
-export function PromptSelector({ value, onChange }: PromptSelectorProps) {
+export function PromptSelector({
+  value,
+  onChange,
+  onCreatePrompt,
+}: PromptSelectorProps) {
   const { data: prompts } = useAllPromptsForProject();
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
@@ -52,6 +60,12 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
   });
 
   const selectedItem = listbox.selectedItems[0];
+
+  const handleCreatePrompt = () => {
+    setOpen(false);
+    setInputValue("");
+    onCreatePrompt?.();
+  };
 
   return (
     <Popover.Root
@@ -92,6 +106,20 @@ export function PromptSelector({ value, onChange }: PromptSelectorProps) {
               ))}
             </Listbox.Content>
           </Listbox.RootProvider>
+          {/* Add New Prompt */}
+          <Box borderTopWidth="1px" borderColor="gray.200">
+            <HStack
+              paddingX={3}
+              paddingY={2}
+              cursor="pointer"
+              _hover={{ bg: "gray.100" }}
+              color="blue.500"
+              onClick={handleCreatePrompt}
+            >
+              <Plus size={14} />
+              <Text fontSize="sm">Add New Prompt</Text>
+            </HStack>
+          </Box>
         </Popover.Content>
       </Portal>
     </Popover.Root>

@@ -8,6 +8,7 @@ interface QuickTestBarProps {
   onTargetTypeChange: (type: TargetType) => void;
   selectedTargetId: string | null;
   onTargetIdChange: (value: string | null) => void;
+  onCreatePrompt?: () => void;
 }
 
 /**
@@ -19,6 +20,7 @@ export function QuickTestBar({
   onTargetTypeChange,
   selectedTargetId,
   onTargetIdChange,
+  onCreatePrompt,
 }: QuickTestBarProps) {
   return (
     <HStack gap={4}>
@@ -33,7 +35,11 @@ export function QuickTestBar({
       <HStack gap={2}>
         <TargetTypeSelector value={targetType} onChange={onTargetTypeChange} />
         {targetType === "prompt" ? (
-          <PromptSelector value={selectedTargetId} onChange={onTargetIdChange} />
+          <PromptSelector
+            value={selectedTargetId}
+            onChange={onTargetIdChange}
+            onCreatePrompt={onCreatePrompt}
+          />
         ) : (
           <HttpAgentSelector
             value={selectedTargetId}

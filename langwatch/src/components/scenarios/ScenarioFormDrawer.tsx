@@ -13,6 +13,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
 import { api } from "../../utils/api";
+import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
 import { pollForScenarioRun } from "../../utils/pollForScenarioRun";
@@ -40,6 +41,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const formRef = useRef<UseFormReturn<ScenarioFormData> | null>(null);
   const [targetType, setTargetType] = useState<TargetType>("prompt");
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
   const runMutation = api.scenarios.run.useMutation();
   const scenarioId = params.scenarioId;
   const isOpen = props.open !== false && props.open !== undefined;
@@ -209,6 +211,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
             }}
             selectedTargetId={selectedTargetId}
             onTargetIdChange={setSelectedTargetId}
+            onCreatePrompt={() => setPromptDrawerOpen(true)}
           />
           <HStack gap={2}>
             <Button
@@ -231,6 +234,17 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Prompt Creation Drawer */}
+      <PromptEditorDrawer
+        open={promptDrawerOpen}
+        onClose={() => setPromptDrawerOpen(false)}
+        onSave={(prompt) => {
+          // Auto-select the newly created prompt
+          setSelectedTargetId(prompt.id);
+          setPromptDrawerOpen(false);
+        }}
+      />
     </Drawer.Root>
   );
 }
