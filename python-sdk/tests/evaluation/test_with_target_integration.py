@@ -255,23 +255,23 @@ class TestRaceConditionPrevention:
 
     def test_parallel_targets_capture_correct_item_data(self, evaluation):
         """Each target() captures its own item data, not the last one processed.
-        
+
         This test reproduces the bug where all dataset entries end up with the
         same entry data (the last item) because _current_item is a shared
         instance variable that gets overwritten by other threads.
         """
         items_processed: list[dict] = []
-        
+
         def run_for_item(item_data: dict, index: int):
             # Simulate what happens in evaluation.submit()
             evaluation._current_index = index
             evaluation._current_item = item_data
-            
+
             with evaluation.target(f"target-{index}"):
                 # Sleep to create opportunity for race condition
                 time.sleep(0.05)
                 items_processed.append({"index": index, "item": item_data})
-        
+
         # Run multiple items in parallel - this is where the bug manifests
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
@@ -281,13 +281,13 @@ class TestRaceConditionPrevention:
             ]
             for f in as_completed(futures):
                 f.result()
-        
+
         # All 3 entries should exist
         assert len(evaluation.batch["dataset"]) == 3
-        
+
         # Each entry should have its OWN item data, not all the same
         entries_by_target = {e.target_id: e for e in evaluation.batch["dataset"]}
-        
+
         # This is the critical assertion that catches the bug:
         # Without the fix, all entries would have "Question C" (the last one)
         assert "Question A" in str(entries_by_target["target-0"].entry), \
@@ -299,14 +299,14 @@ class TestRaceConditionPrevention:
 
     def test_parallel_targets_capture_correct_index(self, evaluation):
         """Each target() captures its own index, not the last one set."""
-        
+
         def run_for_item(item_data: dict, index: int):
             evaluation._current_index = index
             evaluation._current_item = item_data
-            
+
             with evaluation.target(f"model-{index}"):
                 time.sleep(0.03)  # Create race condition opportunity
-        
+
         with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [
                 executor.submit(run_for_item, {"q": "A"}, 0),
@@ -315,21 +315,21 @@ class TestRaceConditionPrevention:
             ]
             for f in as_completed(futures):
                 f.result()
-        
+
         # Each entry should have correct index matching its target
         entries_by_target = {e.target_id: e for e in evaluation.batch["dataset"]}
-        
+
         assert entries_by_target["model-0"].index == 0
         assert entries_by_target["model-1"].index == 1
         assert entries_by_target["model-2"].index == 2
 
     def test_multiple_targets_per_item_with_real_loop_and_submit(self):
         """Multiple target() calls using real evaluation.loop() and submit() pattern.
-        
+
         This test reproduces the ACTUAL bug from the notebook where when running
         multiple targets per dataset item using evaluation.loop() + submit(),
         only the first target's dataset entries are created, not all targets.
-        
+
         The bug: evaluation.submit() calls _execute_item_iteration which sets
         iteration context, but multiple target() calls within the same submitted
         function should all use that same iteration context.
@@ -338,10 +338,10 @@ class TestRaceConditionPrevention:
         import json
         from unittest.mock import patch, MagicMock
         import langwatch
-        
+
         # Mock HTTP to capture what gets sent
         captured_bodies = []
-        
+
         def mock_post(*args, **kwargs):
             body = json.loads(kwargs.get("data", "{}"))
             captured_bodies.append(body)
@@ -349,22 +349,22 @@ class TestRaceConditionPrevention:
             response.status_code = 200
             response.raise_for_status = MagicMock()
             return response
-        
+
         # Setup langwatch
         langwatch._api_key = "test-key"
         langwatch._endpoint = "http://localhost:5560"
-        
+
         # Create evaluation
         evaluation = Evaluation("test-multi-target")
         evaluation.initialized = True
-        
+
         # Create test dataset
         df = pd.DataFrame([
             {"question": "Question A"},
             {"question": "Question B"},
             {"question": "Question C"},
         ])
-        
+
         with patch("httpx.post", side_effect=mock_post):
             for index, row in evaluation.loop(df.iterrows(), threads=3):
                 def evaluate(index, row):
@@ -372,43 +372,43 @@ class TestRaceConditionPrevention:
                     with evaluation.target("gpt-4"):
                         evaluation.log_response(f"GPT-4 response for {row['question']}")
                         time.sleep(0.02)
-                    
+
                     # Second target - this is where the bug manifests
                     with evaluation.target("claude"):
                         evaluation.log_response(f"Claude response for {row['question']}")
                         time.sleep(0.02)
-                
+
                 evaluation.submit(evaluate, index, row)
-        
+
         # Collect all dataset entries from captured HTTP calls
         all_dataset_entries = []
         for body in captured_bodies:
             all_dataset_entries.extend(body.get("dataset", []))
-        
+
         # Should have 6 dataset entries (3 items × 2 targets)
         assert len(all_dataset_entries) == 6, \
             f"Expected 6 dataset entries, got {len(all_dataset_entries)}"
-        
+
         # Group by target
         gpt4_entries = [e for e in all_dataset_entries if e.get("target_id") == "gpt-4"]
         claude_entries = [e for e in all_dataset_entries if e.get("target_id") == "claude"]
-        
+
         assert len(gpt4_entries) == 3, f"Expected 3 GPT-4 entries, got {len(gpt4_entries)}"
         assert len(claude_entries) == 3, f"Expected 3 Claude entries, got {len(claude_entries)}"
-        
+
         # Each target should have entries for all 3 indices
         gpt4_indices = {e["index"] for e in gpt4_entries}
         claude_indices = {e["index"] for e in claude_entries}
-        
+
         assert gpt4_indices == {0, 1, 2}, f"GPT-4 indices: {gpt4_indices}"
         assert claude_indices == {0, 1, 2}, f"Claude indices: {claude_indices}"
-        
+
         # Check predicted values match the correct question
         for entry in gpt4_entries:
             expected_question = df.iloc[entry["index"]]["question"]
             assert expected_question in str(entry.get("predicted")), \
                 f"GPT-4 entry at index {entry['index']} has wrong predicted: {entry.get('predicted')}"
-        
+
         for entry in claude_entries:
             expected_question = df.iloc[entry["index"]]["question"]
             assert expected_question in str(entry.get("predicted")), \

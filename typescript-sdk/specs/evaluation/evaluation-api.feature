@@ -53,7 +53,7 @@ Feature: Evaluation API
         const response = await myLLM(item.question);
         evaluation.log("quality", { index, score: 0.95 });
       });
-      
+
       await evaluation.withTarget("claude-3", { model: "anthropic/claude-3" }, async (span) => {
         const response = await myLLM(item.question);
         evaluation.log("quality", { index, score: 0.85 });
