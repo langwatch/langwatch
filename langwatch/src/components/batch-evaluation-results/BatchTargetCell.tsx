@@ -4,7 +4,7 @@
  * This is a read-only version for displaying historical evaluation results.
  * For the interactive workbench version, see evaluations-v3/components/TargetSection/TargetCell.tsx
  */
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { LuListTree, LuCircleAlert, LuCopy, LuCheck } from "react-icons/lu";
 
@@ -19,6 +19,9 @@ const MAX_DISPLAY_CHARS = 10000;
 
 // Max height for collapsed output
 const OUTPUT_MAX_HEIGHT = 120;
+
+// Approximate chars that fit before overflow (rough heuristic to avoid useEffect flicker)
+const OVERFLOW_CHAR_THRESHOLD = 200;
 
 /**
  * Unwrap output if it's an object with only a single "output" key
@@ -54,24 +57,13 @@ export function BatchTargetCell({
 
   // State for expanded output view
   const [isOutputExpanded, setIsOutputExpanded] = useState(false);
-  const [isOverflowing, setIsOverflowing] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
-  const outputRef = useRef<HTMLDivElement>(null);
   const cellRef = useRef<HTMLDivElement>(null);
   const [expandedPosition, setExpandedPosition] = useState({
     top: 0,
     left: 0,
     width: 0,
   });
-
-  // Check if content overflows
-  useEffect(() => {
-    if (outputRef.current) {
-      const isContentOverflowing =
-        outputRef.current.scrollHeight > OUTPUT_MAX_HEIGHT;
-      setIsOverflowing(isContentOverflowing);
-    }
-  }, [targetOutput.output]);
 
   // Handler to open trace drawer
   const handleViewTrace = useCallback(() => {
@@ -139,6 +131,11 @@ export function BatchTargetCell({
     ? rawOutput.slice(0, MAX_DISPLAY_CHARS)
     : rawOutput;
 
+  // Use a simple heuristic to determine if content likely overflows
+  // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
+  const hasNewlines = rawOutput.includes("\n");
+  const isLikelyOverflowing = rawOutput.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
+
   // Render output content
   const renderOutput = (expanded: boolean) => {
     // Error state
@@ -177,15 +174,19 @@ export function BatchTargetCell({
         );
       }
 
-      // Collapsed view with fade
+      // Collapsed view - fills available row height, clips with fade if overflowing
       return (
-        <Box position="relative">
+        <Box
+          position="relative"
+          flex={1}
+          minHeight={0}
+          cursor={isLikelyOverflowing ? "pointer" : undefined}
+          onClick={isLikelyOverflowing ? handleExpandOutput : undefined}
+        >
           <Box
-            ref={outputRef}
+            height="100%"
             maxHeight={`${OUTPUT_MAX_HEIGHT}px`}
             overflow="hidden"
-            cursor={isOverflowing ? "pointer" : undefined}
-            onClick={isOverflowing ? handleExpandOutput : undefined}
           >
             <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
               {displayOutput}
@@ -197,8 +198,8 @@ export function BatchTargetCell({
             </Text>
           </Box>
 
-          {/* Fade overlay for overflowing content */}
-          {isOverflowing && (
+          {/* Fade overlay for overflowing content - shown based on heuristic to avoid flicker */}
+          {isLikelyOverflowing && (
             <Box
               position="absolute"
               bottom={0}
@@ -336,17 +337,18 @@ export function BatchTargetCell({
   return (
     <>
       {/* Normal collapsed cell view */}
-      <Box
+      <VStack
         ref={cellRef}
         position="relative"
+        align="stretch"
+        gap={2}
+        height="100%"
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
-        <VStack align="stretch" gap={2}>
-          {renderActionButtons(false)}
-          {renderOutput(false)}
-          {renderEvaluatorChips()}
-        </VStack>
-      </Box>
+        {renderActionButtons(false)}
+        {renderOutput(false)}
+        {renderEvaluatorChips()}
+      </VStack>
 
       {/* Expanded cell overlay */}
       {isOutputExpanded && (

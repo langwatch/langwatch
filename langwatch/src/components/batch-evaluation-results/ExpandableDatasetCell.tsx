@@ -4,7 +4,7 @@
  * Used for dataset columns in the batch results table.
  * Simpler version of BatchTargetCell without evaluator chips and trace buttons.
  */
-import { useCallback, useState, useRef, useEffect } from "react";
+import { useCallback, useState, useRef } from "react";
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
 import { LuCopy, LuCheck } from "react-icons/lu";
 
@@ -13,8 +13,12 @@ import { Tooltip } from "~/components/ui/tooltip";
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
 
-// Max height for collapsed output
-const CELL_MAX_HEIGHT = 100;
+// Max height for collapsed output - used in CSS
+const CELL_MAX_HEIGHT = 180;
+
+// Approximate chars that fit in the cell before overflow (rough heuristic)
+// This avoids needing useEffect for overflow detection which causes flicker
+const OVERFLOW_CHAR_THRESHOLD = 150;
 
 type ExpandableDatasetCellProps = {
   /** The value to display */
@@ -38,9 +42,7 @@ export function ExpandableDatasetCell({
 }: ExpandableDatasetCellProps) {
   // State for expanded view
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isOverflowing, setIsOverflowing] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
   const cellRef = useRef<HTMLDivElement>(null);
   const [expandedPosition, setExpandedPosition] = useState({
     top: 0,
@@ -50,13 +52,10 @@ export function ExpandableDatasetCell({
 
   const rawContent = stringify(value);
 
-  // Check if content overflows
-  useEffect(() => {
-    if (contentRef.current) {
-      const isContentOverflowing = contentRef.current.scrollHeight > CELL_MAX_HEIGHT;
-      setIsOverflowing(isContentOverflowing);
-    }
-  }, [rawContent]);
+  // Use a simple heuristic to determine if content likely overflows
+  // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
+  const hasNewlines = rawContent.includes("\n");
+  const isLikelyOverflowing = rawContent.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
 
   // Handler to expand
   const handleExpand = useCallback(() => {
@@ -67,17 +66,17 @@ export function ExpandableDatasetCell({
       // Also get the td width to use as min width
       const td = cellRef.current.closest("td");
       const tdWidth = td?.getBoundingClientRect().width ?? rect.width;
-      
+
       const expandedWidth = Math.max(rect.width, tdWidth) + 24;
       const safetyMargin = 32;
       const viewportWidth = window.innerWidth;
-      
+
       // Adjust left position if it would overflow the viewport
       let left = rect.left - 12;
       if (left + expandedWidth > viewportWidth - safetyMargin) {
         left = viewportWidth - expandedWidth - safetyMargin;
       }
-      
+
       setExpandedPosition({
         top: rect.top,
         left,
@@ -131,15 +130,20 @@ export function ExpandableDatasetCell({
       );
     }
 
-    // Collapsed view with fade
+    // Collapsed view - fills available row height, clips with fade if overflowing
+    // Using height: 100% lets it stretch to match taller cells in the same row
     return (
-      <Box position="relative">
+      <Box
+        position="relative"
+        height="100%"
+        minHeight={0}
+        cursor={isLikelyOverflowing ? "pointer" : undefined}
+        onClick={isLikelyOverflowing ? handleExpand : undefined}
+      >
         <Box
-          ref={contentRef}
+          height="100%"
           maxHeight={`${CELL_MAX_HEIGHT}px`}
           overflow="hidden"
-          cursor={isOverflowing ? "pointer" : undefined}
-          onClick={isOverflowing ? handleExpand : undefined}
         >
           <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
             {displayContent}
@@ -151,8 +155,8 @@ export function ExpandableDatasetCell({
           </Text>
         </Box>
 
-        {/* Fade overlay for overflowing content */}
-        {isOverflowing && (
+        {/* Fade overlay for overflowing content - shown based on heuristic to avoid flicker */}
+        {isLikelyOverflowing && (
           <Box
             position="absolute"
             bottom={0}
@@ -220,7 +224,7 @@ export function ExpandableDatasetCell({
         position="relative"
         css={{ "&:hover .cell-action-btn": { opacity: 1 } }}
       >
-        <VStack align="stretch" gap={0}>
+        <VStack align="stretch" height="100%" gap={0}>
           {renderCopyButton(false)}
           {renderContent(false)}
         </VStack>

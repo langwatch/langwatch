@@ -13,12 +13,22 @@ export {
   DEFAULT_HIDDEN_COLUMNS,
   type ColumnVisibilityButtonProps,
 } from "./BatchEvaluationResultsTable";
+export { SingleRunTable } from "./SingleRunTable";
+export { ComparisonTable } from "./ComparisonTable";
 export { BatchTargetCell } from "./BatchTargetCell";
 export { BatchTargetHeader } from "./BatchTargetHeader";
 export { ExpandableDatasetCell } from "./ExpandableDatasetCell";
 export { BatchRunsSidebar, type BatchRunSummary } from "./BatchRunsSidebar";
 // BatchSummaryFooter is still used by ResultsPanel for stop button functionality
 export { BatchSummaryFooter } from "./BatchSummaryFooter";
+
+// Table utilities
+export {
+  ROW_HEIGHT,
+  calculateMinTableWidth,
+  getTableStyles,
+  inferColumnType,
+} from "./tableUtils";
 
 // Aggregate computation
 export {
