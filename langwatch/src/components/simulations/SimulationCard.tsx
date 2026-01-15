@@ -2,7 +2,6 @@ import { Badge, Box, Card, HStack, Text, VStack } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
 
-// Card props: title, status, messages
 export interface SimulationCardMessage {
   role: "agent" | "user";
   content: string;
@@ -14,7 +13,6 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
-// Component for the card header with status and expand button
 function SimulationCardHeader({
   title,
   status,
@@ -22,95 +20,63 @@ function SimulationCardHeader({
   title: string;
   status?: ScenarioRunStatus;
 }) {
-  const colorPallete = {
+  const isComplete =
+    status === ScenarioRunStatus.SUCCESS ||
+    status === ScenarioRunStatus.FAILED ||
+    status === ScenarioRunStatus.ERROR ||
+    status === ScenarioRunStatus.CANCELLED;
+
+  const colorPalette = {
     [ScenarioRunStatus.SUCCESS]: "green",
-    [ScenarioRunStatus.IN_PROGRESS]: "gray",
+    [ScenarioRunStatus.IN_PROGRESS]: "blue",
     [ScenarioRunStatus.ERROR]: "red",
     [ScenarioRunStatus.CANCELLED]: "gray",
     [ScenarioRunStatus.PENDING]: "gray",
     [ScenarioRunStatus.FAILED]: "red",
   }[status ?? ScenarioRunStatus.IN_PROGRESS];
 
-  const bgColor = `${colorPallete}.100`;
-
   return (
-    <Card.Header
-      py={4}
-      px={6}
-      borderBottom="1px solid"
-      borderColor="gray.200"
+    <Box
+      py={3}
+      px={4}
       w="100%"
-      bgColor={bgColor}
+      position="relative"
+      zIndex={25}
     >
-      <HStack justify="space-between" align="flex-start" w="100%" gap={6}>
-        <Text fontSize="md" fontWeight="bold" color="gray.900">
+      <HStack justify="space-between" align="center" w="100%" gap={4}>
+        <Text
+          fontSize="sm"
+          fontWeight="semibold"
+          color={isComplete ? "white" : "gray.800"}
+          lineClamp={2}
+          textShadow={isComplete ? "0 1px 2px rgba(0,0,0,0.3)" : "none"}
+        >
           {title}
         </Text>
         {status && (
-          <HStack align="center" gap={2}>
-            <Badge
-              colorPalette={
-                status === ScenarioRunStatus.IN_PROGRESS ? "blue" : colorPallete
-              }
-              size="sm"
-            >
-              {status}
-            </Badge>
-          </HStack>
+          <Badge
+            colorPalette={colorPalette}
+            size="sm"
+            variant={isComplete ? "solid" : "subtle"}
+          >
+            {status}
+          </Badge>
         )}
       </HStack>
-    </Card.Header>
+    </Box>
   );
 }
 
-// Component for the chat content area
-function SimulationCardContent({
-  children,
-  status,
-}: {
-  children: React.ReactNode;
-  status?: ScenarioRunStatus;
-}) {
+function SimulationCardContent({ children }: { children: React.ReactNode }) {
   return (
-    <Card.Body
-      p={0}
-      height="100%"
-      overflow="hidden"
-      position="relative"
-      w="100%"
-    >
+    <Card.Body p={0} height="100%" overflow="hidden" position="relative" w="100%">
       <Box height="100%" width="100%" position="relative">
         {children}
-
-        {/* Top fade overlay */}
-        <Box
-          position="absolute"
-          top={0}
-          left={0}
-          right={0}
-          height="30px"
-          background="linear-gradient(to bottom, white, transparent)"
-          pointerEvents="none"
-          zIndex={10}
-        />
-
-        {/* Bottom fade overlay */}
-        <Box
-          position="absolute"
-          bottom={0}
-          left={0}
-          right={0}
-          height="60px"
-          background="linear-gradient(to top, white, transparent)"
-          pointerEvents="none"
-          zIndex={10}
-        />
       </Box>
     </Card.Body>
   );
 }
 
-// Main simulation card component
 export function SimulationCard({
   title,
   status,
@@ -120,17 +86,31 @@ export function SimulationCard({
     <Card.Root
       height="100%"
       borderWidth={1}
-      borderColor="gray.200"
-      borderRadius="lg"
+      borderColor="whiteAlpha.600"
+      borderRadius="xl"
       overflow="hidden"
+      position="relative"
+      boxShadow="0 4px 24px -1px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.5) inset"
+      _before={{
+        content: '""',
+        position: "absolute",
+        inset: 0,
+        borderRadius: "xl",
+        padding: "1px",
+        background: "linear-gradient(135deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.3) 100%)",
+        WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+        WebkitMaskComposite: "xor",
+        maskComposite: "exclude",
+        pointerEvents: "none",
+      }}
     >
       <VStack height="100%" gap={0}>
         <SimulationCardHeader title={title} status={status} />
-        <SimulationCardContent status={status}>
+        <SimulationCardContent>
           {children}
-          {status && <SimulationStatusOverlay status={status} />}
         </SimulationCardContent>
       </VStack>
+      {status && <SimulationStatusOverlay status={status} />}
     </Card.Root>
   );
 }
