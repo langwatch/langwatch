@@ -6,13 +6,7 @@
  * Supports different X-axis groupings (by run, target, model, prompt, custom metadata).
  */
 import { useMemo, useState, useEffect, useRef } from "react";
-import {
-  Box,
-  Button,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import {
   BarChart,
   Bar,
@@ -64,14 +58,12 @@ const calculateYAxisWidth = (
   values: number[],
   formatter: (value: number) => string,
   minWidth = 35,
-  maxWidth = 80
+  maxWidth = 80,
 ): number => {
   if (values.length === 0) return minWidth;
 
   // Get the max formatted string length
-  const maxLength = Math.max(
-    ...values.map((v) => formatter(v).length)
-  );
+  const maxLength = Math.max(...values.map((v) => formatter(v).length));
 
   // Approximate width: ~7px per character + some padding
   const calculatedWidth = maxLength * 7 + 12;
@@ -147,7 +139,7 @@ type TargetMetricsResult = {
  */
 export const computeTargetMetrics = (
   rows: BatchEvaluationData["rows"],
-  targetId: string
+  targetId: string,
 ): TargetMetricsResult => {
   let totalCost = 0;
   let totalDuration = 0;
@@ -220,7 +212,9 @@ export const computeTargetMetrics = (
 /**
  * Compute aggregate metrics for a single run (global averages)
  */
-export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult => {
+export const computeRunMetrics = (
+  data: BatchEvaluationData,
+): RunMetricsResult => {
   let totalCost = 0;
   let totalDuration = 0;
   let targetCount = 0;
@@ -270,7 +264,8 @@ export const computeRunMetrics = (data: BatchEvaluationData): RunMetricsResult =
     evaluatorNames[evalId] = metrics.name;
 
     if (metrics.scores.length > 0) {
-      avgScores[evalId] = metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
+      avgScores[evalId] =
+        metrics.scores.reduce((a, b) => a + b, 0) / metrics.scores.length;
     }
 
     // Only compute pass rate if there are pass/fail results
@@ -326,7 +321,8 @@ export const ComparisonCharts = ({
     return "runs";
   }, [comparisonData]);
 
-  const [internalXAxisOption, setInternalXAxisOption] = useState<XAxisOption>(defaultXAxis);
+  const [internalXAxisOption, setInternalXAxisOption] =
+    useState<XAxisOption>(defaultXAxis);
   const xAxisOption = controlledXAxisOption ?? internalXAxisOption;
   const setXAxisOption = (option: XAxisOption) => {
     if (onXAxisOptionChange) {
@@ -342,9 +338,9 @@ export const ComparisonCharts = ({
   }, [defaultXAxis]);
 
   // Metrics selector state
-  const [internalVisibleMetrics, setInternalVisibleMetrics] = useState<Set<MetricType>>(
-    () => new Set(["cost", "latency"] as MetricType[])
-  );
+  const [internalVisibleMetrics, setInternalVisibleMetrics] = useState<
+    Set<MetricType>
+  >(() => new Set(["cost", "latency"] as MetricType[]));
   const [metricsDropdownOpen, setMetricsDropdownOpen] = useState(false);
   const [groupByDropdownOpen, setGroupByDropdownOpen] = useState(false);
 
@@ -431,10 +427,16 @@ export const ComparisonCharts = ({
         cost: run.metrics.totalCost,
         latency: run.metrics.avgLatency,
         ...Object.fromEntries(
-          Object.entries(run.metrics.avgScores).map(([k, v]) => [`score_${k}`, v])
+          Object.entries(run.metrics.avgScores).map(([k, v]) => [
+            `score_${k}`,
+            v,
+          ]),
         ),
         ...Object.fromEntries(
-          Object.entries(run.metrics.passRates).map(([k, v]) => [`pass_${k}`, v])
+          Object.entries(run.metrics.passRates).map(([k, v]) => [
+            `pass_${k}`,
+            v,
+          ]),
         ),
       }));
     }
@@ -475,13 +477,13 @@ export const ComparisonCharts = ({
 
           // Aggregate per-target evaluator metrics (NOT global run.metrics!)
           for (const [evalId, score] of Object.entries(
-            targetMetrics.avgScores
+            targetMetrics.avgScores,
           )) {
             if (!existing.scores[evalId]) existing.scores[evalId] = [];
             existing.scores[evalId]!.push(score);
           }
           for (const [evalId, rate] of Object.entries(
-            targetMetrics.passRates
+            targetMetrics.passRates,
           )) {
             if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
             existing.passRates[evalId]!.push(rate);
@@ -495,8 +497,7 @@ export const ComparisonCharts = ({
       return Array.from(targetGroups.entries()).map(([id, data]) => ({
         name: data.name,
         color: targetColors[id],
-        cost:
-          data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
+        cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency:
           data.latencies.reduce((a, b) => a + b, 0) /
           (data.latencies.length || 1),
@@ -504,13 +505,13 @@ export const ComparisonCharts = ({
           Object.entries(data.scores).map(([k, v]) => [
             `score_${k}`,
             v.reduce((a, b) => a + b, 0) / v.length,
-          ])
+          ]),
         ),
         ...Object.fromEntries(
           Object.entries(data.passRates).map(([k, v]) => [
             `pass_${k}`,
             v.reduce((a, b) => a + b, 0) / v.length,
-          ])
+          ]),
         ),
       }));
     }
@@ -531,9 +532,10 @@ export const ComparisonCharts = ({
         // For prompt, combine promptId and version to create unique key
         if (xAxisOption === "prompt" && targetCol.promptId) {
           const version = targetCol.promptVersion;
-          value = version !== undefined && version !== null
-            ? `${targetCol.promptId}::v${version}`
-            : targetCol.promptId;
+          value =
+            version !== undefined && version !== null
+              ? `${targetCol.promptId}::v${version}`
+              : targetCol.promptId;
           break;
         }
         // Check metadata
@@ -551,30 +553,38 @@ export const ComparisonCharts = ({
 
     // Average metrics within each group
     return Array.from(groups.entries()).map(([key, runs]) => {
-      const avgCost = runs.reduce((a, r) => a + r.metrics.totalCost, 0) / runs.length;
-      const avgLatency = runs.reduce((a, r) => a + r.metrics.avgLatency, 0) / runs.length;
+      const avgCost =
+        runs.reduce((a, r) => a + r.metrics.totalCost, 0) / runs.length;
+      const avgLatency =
+        runs.reduce((a, r) => a + r.metrics.avgLatency, 0) / runs.length;
 
       // Average each evaluator score
-      const allScoreIds = new Set(runs.flatMap((r) => Object.keys(r.metrics.avgScores)));
+      const allScoreIds = new Set(
+        runs.flatMap((r) => Object.keys(r.metrics.avgScores)),
+      );
       const avgScores: Record<string, number> = {};
       for (const evalId of allScoreIds) {
         const scores = runs
           .map((r) => r.metrics.avgScores[evalId])
           .filter((s): s is number => s !== undefined);
         if (scores.length > 0) {
-          avgScores[`score_${evalId}`] = scores.reduce((a, b) => a + b, 0) / scores.length;
+          avgScores[`score_${evalId}`] =
+            scores.reduce((a, b) => a + b, 0) / scores.length;
         }
       }
 
       // Average each evaluator pass rate
-      const allPassIds = new Set(runs.flatMap((r) => Object.keys(r.metrics.passRates)));
+      const allPassIds = new Set(
+        runs.flatMap((r) => Object.keys(r.metrics.passRates)),
+      );
       const avgPassRates: Record<string, number> = {};
       for (const evalId of allPassIds) {
         const rates = runs
           .map((r) => r.metrics.passRates[evalId])
           .filter((s): s is number => s !== undefined);
         if (rates.length > 0) {
-          avgPassRates[`pass_${evalId}`] = rates.reduce((a, b) => a + b, 0) / rates.length;
+          avgPassRates[`pass_${evalId}`] =
+            rates.reduce((a, b) => a + b, 0) / rates.length;
         }
       }
 
@@ -585,7 +595,8 @@ export const ComparisonCharts = ({
         const [promptId, versionPart] = key.split("::");
 
         // Build prompt name from targetColumns - find target with matching promptId
-        let resolvedPromptName: string = promptNames[promptId ?? ""] ?? promptId ?? key;
+        let resolvedPromptName: string =
+          promptNames[promptId ?? ""] ?? promptId ?? key;
         for (const run of runs) {
           for (const targetCol of run.targetColumns) {
             if (targetCol.promptId === promptId && targetCol.name) {
@@ -624,7 +635,9 @@ export const ComparisonCharts = ({
 
   // Determine if X-axis labels should be rotated (3+ items)
   const shouldRotateLabels = chartData.length >= ROTATE_LABELS_THRESHOLD;
-  const chartHeight = shouldRotateLabels ? CHART_HEIGHT_ROTATED : CHART_HEIGHT_NORMAL;
+  const chartHeight = shouldRotateLabels
+    ? CHART_HEIGHT_ROTATED
+    : CHART_HEIGHT_NORMAL;
 
   // Get all evaluators with scores (for score chart)
   const scoreEvaluators = useMemo(() => {
@@ -714,7 +727,7 @@ export const ComparisonCharts = ({
 
     // Track which properties/metadata keys exist across all targets
     let hasModel = false;
-    let hasPrompt = false;  // Prompt option combines promptId + version
+    let hasPrompt = false; // Prompt option combines promptId + version
     const metadataKeys = new Set<string>();
 
     for (const run of runMetrics) {
@@ -762,8 +775,8 @@ export const ComparisonCharts = ({
   }
 
   return (
-    <VStack width="100%" align="stretch" gap={4} marginBottom={4}>
-      {isVisible && (
+    isVisible && (
+      <VStack width="100%" align="stretch" gap={4} marginBottom={4}>
         <VStack width="100%" align="stretch" gap={2}>
           {/* Controls row: Group by selector + Metrics selector */}
           <HStack wrap="wrap" gap={2}>
@@ -776,7 +789,9 @@ export const ComparisonCharts = ({
                   onClick={() => setGroupByDropdownOpen(!groupByDropdownOpen)}
                   data-testid="group-by-button"
                 >
-                  Group by: {xAxisOptions.find((o) => o.value === xAxisOption)?.label ?? "Runs"}
+                  Group by:{" "}
+                  {xAxisOptions.find((o) => o.value === xAxisOption)?.label ??
+                    "Runs"}
                 </Button>
                 {groupByDropdownOpen && (
                   <Box
@@ -801,8 +816,17 @@ export const ComparisonCharts = ({
                           padding={1}
                           borderRadius="sm"
                           cursor="pointer"
-                          bg={xAxisOption === opt.value ? "blue.50" : "transparent"}
-                          _hover={{ bg: xAxisOption === opt.value ? "blue.100" : "gray.50" }}
+                          bg={
+                            xAxisOption === opt.value
+                              ? "blue.50"
+                              : "transparent"
+                          }
+                          _hover={{
+                            bg:
+                              xAxisOption === opt.value
+                                ? "blue.100"
+                                : "gray.50",
+                          }}
                           onClick={() => {
                             setXAxisOption(opt.value);
                             setGroupByDropdownOpen(false);
@@ -811,8 +835,12 @@ export const ComparisonCharts = ({
                         >
                           <Text
                             fontSize="sm"
-                            fontWeight={xAxisOption === opt.value ? "medium" : "normal"}
-                            color={xAxisOption === opt.value ? "blue.600" : "inherit"}
+                            fontWeight={
+                              xAxisOption === opt.value ? "medium" : "normal"
+                            }
+                            color={
+                              xAxisOption === opt.value ? "blue.600" : "inherit"
+                            }
                           >
                             {opt.label}
                           </Text>
@@ -869,16 +897,24 @@ export const ComparisonCharts = ({
                           border="1px solid"
                           borderColor="gray.300"
                           borderRadius="sm"
-                          bg={visibleMetrics.has(metric.id) ? "blue.500" : "transparent"}
+                          bg={
+                            visibleMetrics.has(metric.id)
+                              ? "blue.500"
+                              : "transparent"
+                          }
                           display="flex"
                           alignItems="center"
                           justifyContent="center"
                         >
                           {visibleMetrics.has(metric.id) && (
-                            <Text color="white" fontSize="xs" fontWeight="bold">✓</Text>
+                            <Text color="white" fontSize="xs" fontWeight="bold">
+                              ✓
+                            </Text>
                           )}
                         </Box>
-                        <Text fontSize="sm" whiteSpace="nowrap">{metric.name}</Text>
+                        <Text fontSize="sm" whiteSpace="nowrap">
+                          {metric.name}
+                        </Text>
                       </HStack>
                     ))}
                   </VStack>
@@ -917,7 +953,12 @@ export const ComparisonCharts = ({
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
                   <BarChart data={chartData}>
-                    <CartesianGrid horizontal={true} vertical={false} stroke="#EDF2F7" strokeDasharray="0" />
+                    <CartesianGrid
+                      horizontal={true}
+                      vertical={false}
+                      stroke="#EDF2F7"
+                      strokeDasharray="0"
+                    />
                     <XAxis
                       dataKey="name"
                       style={{ fontSize: "11px" }}
@@ -934,12 +975,17 @@ export const ComparisonCharts = ({
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip formatter={(value) => formatCost(value as number)} />
+                    <Tooltip
+                      formatter={(value) => formatCost(value as number)}
+                    />
                     <Bar dataKey="cost" name="Cost">
                       {chartData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={(entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]}
+                          fill={
+                            (entry as any).color ??
+                            RUN_COLORS[index % RUN_COLORS.length]
+                          }
                         />
                       ))}
                     </Bar>
@@ -971,7 +1017,12 @@ export const ComparisonCharts = ({
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
                   <BarChart data={chartData}>
-                    <CartesianGrid horizontal={true} vertical={false} stroke="#EDF2F7" strokeDasharray="0" />
+                    <CartesianGrid
+                      horizontal={true}
+                      vertical={false}
+                      stroke="#EDF2F7"
+                      strokeDasharray="0"
+                    />
                     <XAxis
                       dataKey="name"
                       style={{ fontSize: "11px" }}
@@ -988,12 +1039,17 @@ export const ComparisonCharts = ({
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip formatter={(value) => formatLatency(value as number)} />
+                    <Tooltip
+                      formatter={(value) => formatLatency(value as number)}
+                    />
                     <Bar dataKey="latency" name="Latency">
                       {chartData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={(entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]}
+                          fill={
+                            (entry as any).color ??
+                            RUN_COLORS[index % RUN_COLORS.length]
+                          }
                         />
                       ))}
                     </Bar>
@@ -1003,124 +1059,148 @@ export const ComparisonCharts = ({
             )}
 
             {/* Per-evaluator score charts */}
-            {scoreEvaluators.map((ev) => (
-              visibleMetrics.has(`score_${ev.id}` as MetricType) && (
-                <Box
-                  key={`score-${ev.id}`}
-                  minWidth="280px"
-                  width="280px"
-                  flexShrink={0}
-                  bg="gray.50"
-                  borderRadius="md"
-                  padding={3}
-                  paddingBottom={1}
-                  data-testid={`chart-score-${ev.id}`}
-                >
-                  <Text
-                    fontSize="xs"
-                    fontWeight="medium"
-                    marginBottom={2}
-                    lineClamp={1}
-                    title={`${ev.name} (Score)`}
+            {scoreEvaluators.map(
+              (ev) =>
+                visibleMetrics.has(`score_${ev.id}` as MetricType) && (
+                  <Box
+                    key={`score-${ev.id}`}
+                    minWidth="280px"
+                    width="280px"
+                    flexShrink={0}
+                    bg="gray.50"
+                    borderRadius="md"
+                    padding={3}
+                    paddingBottom={1}
+                    data-testid={`chart-score-${ev.id}`}
                   >
-                    {ev.name} (Score)
-                  </Text>
-                  <ResponsiveContainer width="100%" height={chartHeight}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid horizontal={true} vertical={false} stroke="#EDF2F7" strokeDasharray="0" />
-                      <XAxis
-                        dataKey="name"
-                        style={{ fontSize: "11px" }}
-                        axisLine={false}
-                        tickLine={false}
-                        angle={shouldRotateLabels ? -45 : 0}
-                        textAnchor={shouldRotateLabels ? "end" : "middle"}
-                        height={shouldRotateLabels ? 60 : 25}
-                      />
-                      <YAxis
-                        style={{ fontSize: "11px" }}
-                        width={40}
-                        domain={[0, 1]}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip formatter={(value) => (value as number).toFixed(2)} />
-                      <Bar dataKey={`score_${ev.id}`}>
-                        {chartData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={(entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              )
-            ))}
+                    <Text
+                      fontSize="xs"
+                      fontWeight="medium"
+                      marginBottom={2}
+                      lineClamp={1}
+                      title={`${ev.name} (Score)`}
+                    >
+                      {ev.name} (Score)
+                    </Text>
+                    <ResponsiveContainer width="100%" height={chartHeight}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid
+                          horizontal={true}
+                          vertical={false}
+                          stroke="#EDF2F7"
+                          strokeDasharray="0"
+                        />
+                        <XAxis
+                          dataKey="name"
+                          style={{ fontSize: "11px" }}
+                          axisLine={false}
+                          tickLine={false}
+                          angle={shouldRotateLabels ? -45 : 0}
+                          textAnchor={shouldRotateLabels ? "end" : "middle"}
+                          height={shouldRotateLabels ? 60 : 25}
+                        />
+                        <YAxis
+                          style={{ fontSize: "11px" }}
+                          width={40}
+                          domain={[0, 1]}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          formatter={(value) => (value as number).toFixed(2)}
+                        />
+                        <Bar dataKey={`score_${ev.id}`}>
+                          {chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                (entry as any).color ??
+                                RUN_COLORS[index % RUN_COLORS.length]
+                              }
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                ),
+            )}
 
             {/* Per-evaluator pass rate charts */}
-            {passRateEvaluators.map((ev) => (
-              visibleMetrics.has(`pass_${ev.id}` as MetricType) && (
-                <Box
-                  key={`pass-${ev.id}`}
-                  minWidth="280px"
-                  width="280px"
-                  flexShrink={0}
-                  bg="gray.50"
-                  borderRadius="md"
-                  padding={3}
-                  paddingBottom={1}
-                  data-testid={`chart-pass-${ev.id}`}
-                >
-                  <Text
-                    fontSize="xs"
-                    fontWeight="medium"
-                    marginBottom={2}
-                    lineClamp={1}
-                    title={`${ev.name} (Pass Rate)`}
+            {passRateEvaluators.map(
+              (ev) =>
+                visibleMetrics.has(`pass_${ev.id}` as MetricType) && (
+                  <Box
+                    key={`pass-${ev.id}`}
+                    minWidth="280px"
+                    width="280px"
+                    flexShrink={0}
+                    bg="gray.50"
+                    borderRadius="md"
+                    padding={3}
+                    paddingBottom={1}
+                    data-testid={`chart-pass-${ev.id}`}
                   >
-                    {ev.name} (Pass Rate)
-                  </Text>
-                  <ResponsiveContainer width="100%" height={chartHeight}>
-                    <BarChart data={chartData}>
-                      <CartesianGrid horizontal={true} vertical={false} stroke="#EDF2F7" strokeDasharray="0" />
-                      <XAxis
-                        dataKey="name"
-                        style={{ fontSize: "11px" }}
-                        axisLine={false}
-                        tickLine={false}
-                        angle={shouldRotateLabels ? -45 : 0}
-                        textAnchor={shouldRotateLabels ? "end" : "middle"}
-                        height={shouldRotateLabels ? 60 : 25}
-                      />
-                      <YAxis
-                        style={{ fontSize: "11px" }}
-                        width={40}
-                        domain={[0, 1]}
-                        tickFormatter={(value) => `${Math.round((value as number) * 100)}%`}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <Tooltip
-                        formatter={(value) => `${Math.round((value as number) * 100)}%`}
-                      />
-                      <Bar dataKey={`pass_${ev.id}`}>
-                        {chartData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={(entry as any).color ?? RUN_COLORS[index % RUN_COLORS.length]}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </Box>
-              )
-            ))}
+                    <Text
+                      fontSize="xs"
+                      fontWeight="medium"
+                      marginBottom={2}
+                      lineClamp={1}
+                      title={`${ev.name} (Pass Rate)`}
+                    >
+                      {ev.name} (Pass Rate)
+                    </Text>
+                    <ResponsiveContainer width="100%" height={chartHeight}>
+                      <BarChart data={chartData}>
+                        <CartesianGrid
+                          horizontal={true}
+                          vertical={false}
+                          stroke="#EDF2F7"
+                          strokeDasharray="0"
+                        />
+                        <XAxis
+                          dataKey="name"
+                          style={{ fontSize: "11px" }}
+                          axisLine={false}
+                          tickLine={false}
+                          angle={shouldRotateLabels ? -45 : 0}
+                          textAnchor={shouldRotateLabels ? "end" : "middle"}
+                          height={shouldRotateLabels ? 60 : 25}
+                        />
+                        <YAxis
+                          style={{ fontSize: "11px" }}
+                          width={40}
+                          domain={[0, 1]}
+                          tickFormatter={(value) =>
+                            `${Math.round((value as number) * 100)}%`
+                          }
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          formatter={(value) =>
+                            `${Math.round((value as number) * 100)}%`
+                          }
+                        />
+                        <Bar dataKey={`pass_${ev.id}`}>
+                          {chartData.map((entry, index) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={
+                                (entry as any).color ??
+                                RUN_COLORS[index % RUN_COLORS.length]
+                              }
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </Box>
+                ),
+            )}
           </HStack>
         </VStack>
-      )}
-    </VStack>
+      </VStack>
+    )
   );
 };

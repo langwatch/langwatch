@@ -16,7 +16,6 @@ import {
   Box,
   Button,
   HStack,
-  Skeleton,
   Text,
 } from "@chakra-ui/react";
 import { Columns3 } from "lucide-react";
@@ -46,6 +45,7 @@ import type {
   ComparisonRunData,
 } from "./types";
 import { DiffCell, type DiffValue } from "./DiffCell";
+import { TableSkeleton } from "./TableSkeleton";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */
@@ -234,6 +234,7 @@ const buildColumns = (
                   minHeight="24px"
                   maxHeight="80px"
                   maxWidth="100%"
+                  expandable
                 />
               );
             }
@@ -518,44 +519,7 @@ export function BatchEvaluationResultsTable({
 
   // Loading state - render a skeleton that looks like the actual table
   if (isLoading) {
-    return (
-      <Box
-        overflowX="auto"
-        css={{
-          "& table": { width: "100%", borderCollapse: "collapse" },
-          "& th": {
-            borderBottom: "1px solid var(--chakra-colors-gray-200)",
-            padding: "8px 12px",
-            textAlign: "left",
-          },
-          "& td": {
-            borderBottom: "1px solid var(--chakra-colors-gray-100)",
-            padding: "12px",
-          },
-        }}
-      >
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: 32 }} />
-              <th style={{ width: 150 }}><Skeleton height="16px" width="80px" /></th>
-              <th style={{ width: 150 }}><Skeleton height="16px" width="100px" /></th>
-              <th style={{ width: 280 }}><Skeleton height="16px" width="120px" /></th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 5 }).map((_, rowIdx) => (
-              <tr key={rowIdx}>
-                <td style={{ width: 32 }}><Skeleton height="14px" width="16px" /></td>
-                <td style={{ width: 150 }}><Skeleton height="40px" /></td>
-                <td style={{ width: 150 }}><Skeleton height="40px" /></td>
-                <td style={{ width: 280 }}><Skeleton height="60px" /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Box>
-    );
+    return <TableSkeleton />;
   }
 
   // Empty state
@@ -606,7 +570,7 @@ export function BatchEvaluationResultsTable({
       <Box
         overflowX="auto"
         overflowY="auto"
-        maxHeight="calc(100vh - 300px)"
+        height="100%"
         css={tableStyles}
       >
         <table>
@@ -647,7 +611,7 @@ export function BatchEvaluationResultsTable({
     <Box
       overflowX="auto"
       overflowY="auto"
-      maxHeight="calc(100vh - 300px)"
+      height="100%"
       css={tableStyles}
     >
       <table>

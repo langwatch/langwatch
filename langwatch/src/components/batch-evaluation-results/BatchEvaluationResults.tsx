@@ -12,13 +12,13 @@ import {
   Card,
   Heading,
   HStack,
-  Skeleton,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { Experiment, Project } from "@prisma/client";
 import { Download, ExternalLink, BarChart2 } from "react-feather";
+import { useRouter } from "next/router";
 
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
@@ -33,7 +33,7 @@ import {
   transformBatchEvaluationData,
   type BatchEvaluationData,
 } from "./types";
-import { useBatchEvaluationDownloadCSV } from "../experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
+import { downloadCsv } from "./csvExport";
 import { useComparisonMode } from "./useComparisonMode";
 import {
   useMultiRunData,
@@ -41,66 +41,8 @@ import {
   RUN_COLORS,
 } from "./useMultiRunData";
 import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
+import { TableSkeleton } from "./TableSkeleton";
 import { PageLayout } from "../ui/layouts/PageLayout";
-
-/**
- * Skeleton loading state that looks like a table
- */
-const TableSkeleton = () => (
-  <Card.Root width="100%" overflow="hidden">
-    <Card.Body padding={0}>
-      <Box
-        css={{
-          "& table": { width: "100%", borderCollapse: "collapse" },
-          "& th": {
-            borderBottom: "1px solid var(--chakra-colors-gray-200)",
-            padding: "8px 12px",
-            textAlign: "left",
-          },
-          "& td": {
-            borderBottom: "1px solid var(--chakra-colors-gray-100)",
-            padding: "12px",
-          },
-        }}
-      >
-        <table>
-          <thead>
-            <tr>
-              <th style={{ width: 32 }} />
-              <th style={{ width: 150 }}>
-                <Skeleton height="16px" width="80px" />
-              </th>
-              <th style={{ width: 150 }}>
-                <Skeleton height="16px" width="100px" />
-              </th>
-              <th style={{ width: 280 }}>
-                <Skeleton height="16px" width="120px" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {Array.from({ length: 5 }).map((_, rowIdx) => (
-              <tr key={rowIdx}>
-                <td style={{ width: 32 }}>
-                  <Skeleton height="14px" width="16px" />
-                </td>
-                <td style={{ width: 150 }}>
-                  <Skeleton height="40px" />
-                </td>
-                <td style={{ width: 150 }}>
-                  <Skeleton height="40px" />
-                </td>
-                <td style={{ width: 280 }}>
-                  <Skeleton height="60px" />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </Box>
-    </Card.Body>
-  </Card.Root>
-);
 
 type BatchEvaluationResultsProps = {
   project: Project;
@@ -113,15 +55,33 @@ type BatchEvaluationResultsProps = {
   onSelectRunId?: (runId: string) => void;
 };
 
+/** Time in milliseconds after which a run without updates is considered interrupted */
+const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
  * Check if a run is finished based on timestamps
+ * A run is considered finished if it has finished_at, stopped_at,
+ * or hasn't been updated in 5 minutes (interrupted)
  */
 const isRunFinished = (timestamps: {
   finished_at?: number | null;
   stopped_at?: number | null;
   updated_at?: number;
 }): boolean => {
-  return !!(timestamps.finished_at ?? timestamps.stopped_at);
+  // Explicitly finished or stopped
+  if (timestamps.finished_at ?? timestamps.stopped_at) {
+    return true;
+  }
+
+  // Consider interrupted if no updates for 5 minutes
+  if (timestamps.updated_at) {
+    const timeSinceUpdate = Date.now() - timestamps.updated_at;
+    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
 export function BatchEvaluationResults({
@@ -163,27 +123,35 @@ export function BatchEvaluationResults({
     },
   );
 
-  // Internal state for run selection (used when not controlled)
-  const [internalSelectedRunId, setInternalSelectedRunId] = useState<
-    string | undefined
-  >();
+  // Router for URL query params
+  const router = useRouter();
 
-  // Determine which run ID to use
+  // Get runId from URL query params
+  const queryRunId =
+    typeof router.query.runId === "string" ? router.query.runId : undefined;
+
+  // Determine which run ID to use (priority: external prop > URL query > first run)
   const selectedRunId =
-    externalSelectedRunId ??
-    internalSelectedRunId ??
-    runsQuery.data?.runs[0]?.run_id;
+    externalSelectedRunId ?? queryRunId ?? runsQuery.data?.runs[0]?.run_id;
 
-  // Handle run selection
+  // Handle run selection - updates URL query param
   const handleSelectRun = useCallback(
     (runId: string) => {
       if (onSelectRunId) {
         onSelectRunId(runId);
       } else {
-        setInternalSelectedRunId(runId);
+        // Update URL query param without full navigation
+        void router.replace(
+          {
+            pathname: router.pathname,
+            query: { ...router.query, runId },
+          },
+          undefined,
+          { shallow: true },
+        );
       }
     },
-    [onSelectRunId],
+    [onSelectRunId, router],
   );
 
   // Find selected run
@@ -254,6 +222,48 @@ export function BatchEvaluationResults({
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
+  // Get compare run IDs from URL query params
+  const queryCompareRunIds = useMemo(() => {
+    const compareParam = router.query.compare;
+    if (typeof compareParam === "string") {
+      return compareParam.split(",").filter(Boolean);
+    }
+    if (Array.isArray(compareParam)) {
+      return compareParam.filter((id): id is string => typeof id === "string");
+    }
+    return undefined;
+  }, [router.query.compare]);
+
+  // Handle comparison mode URL sync
+  const handleComparisonChange = useCallback(
+    (isComparing: boolean, comparedRunIds: string[]) => {
+      if (onSelectRunId) return; // Don't sync URL in controlled mode
+
+      const newQuery = { ...router.query };
+
+      if (isComparing && comparedRunIds.length >= 2) {
+        // In compare mode: set compare param, remove runId
+        newQuery.compare = comparedRunIds.join(",");
+        delete newQuery.runId;
+      } else if (!isComparing && comparedRunIds.length === 0) {
+        // Not in compare mode: remove compare param
+        delete newQuery.compare;
+      }
+
+      // Only update if query actually changed
+      const currentCompare = router.query.compare;
+      const newCompare = newQuery.compare;
+      if (currentCompare !== newCompare) {
+        void router.replace(
+          { pathname: router.pathname, query: newQuery },
+          undefined,
+          { shallow: true },
+        );
+      }
+    },
+    [onSelectRunId, router],
+  );
+
   // Stable color map for ALL runs - colors are assigned based on position in the full list
   // This ensures colors stay the same regardless of which runs are selected for comparison
   const stableRunColorMap = useMemo(() => {
@@ -273,6 +283,8 @@ export function BatchEvaluationResults({
   } = useComparisonMode({
     runIds,
     currentRunId: selectedRunId,
+    initialCompareRunIds: queryCompareRunIds,
+    onSelectionChange: handleComparisonChange,
   });
 
   // Fetch multiple runs when in compare mode
@@ -340,13 +352,14 @@ export function BatchEvaluationResults({
   // Find sidebar run for selected
   const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId);
 
-  // CSV download
-  const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV({
-    project,
-    experiment,
-    runId: selectedRunId,
-    isFinished,
-  });
+  // CSV download - using the new V3 export that properly handles multi-target data
+  const handleDownloadCSV = useCallback(() => {
+    if (!transformedData) return;
+    downloadCsv(transformedData, experiment.name ?? experiment.slug);
+  }, [transformedData, experiment.name, experiment.slug]);
+
+  const isDownloadCSVEnabled =
+    !!transformedData && transformedData.rows.length > 0;
 
   // Error state
   if (runsQuery.error) {
@@ -359,7 +372,7 @@ export function BatchEvaluationResults({
   }
 
   return (
-    <HStack align="start" width="full" height="full" gap={0}>
+    <HStack align="stretch" width="full" height="full" gap={0}>
       {/* Sidebar */}
       <BatchRunsSidebar
         runs={sidebarRuns}
@@ -375,93 +388,98 @@ export function BatchEvaluationResults({
         runColors={runColors}
       />
 
-      {/* Main content */}
+      {/* Main content - flex column that fills available space */}
       <VStack
-        width="full"
-        height="fit-content"
-        minHeight="100%"
-        position="relative"
+        flex={1}
+        minWidth={0}
+        height="full"
         gap={0}
-        justify="space-between"
-        minWidth="0"
+        align="stretch"
+        overflow="hidden"
       >
-        <VStack align="start" width="full" height="full" gap={0} padding={0}>
-          {/* Header */}
-          <PageLayout.Header paddingX={2} withBorder={false}>
-            <Heading>{experiment.name ?? experiment.slug}</Heading>
-            <Spacer />
-            {/* Charts toggle - show when charts are available */}
-            {canShowCharts && (
-              <Button
-                size="sm"
-                variant={chartsVisible ? "solid" : "outline"}
-                onClick={() => setChartsVisible(!chartsVisible)}
-                data-testid="toggle-charts-button"
-              >
-                <BarChart2 size={16} />
-                Charts
-              </Button>
-            )}
-            {transformedData && transformedData.datasetColumns.length > 0 && (
-              <ColumnVisibilityButton
-                datasetColumns={transformedData.datasetColumns}
-                hiddenColumns={hiddenColumns}
-                onToggle={toggleColumn}
-              />
-            )}
+        {/* Header - fixed height */}
+        <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
+          <Heading>{experiment.name ?? experiment.slug}</Heading>
+          <Spacer />
+          {/* Charts toggle - show when charts are available */}
+          {canShowCharts && (
             <Button
               size="sm"
-              variant="outline"
-              onClick={() => void downloadCSV()}
-              disabled={!isDownloadCSVEnabled}
+              variant={chartsVisible ? "solid" : "outline"}
+              onClick={() => setChartsVisible(!chartsVisible)}
+              data-testid="toggle-charts-button"
             >
-              <Download size={16} /> Export to CSV
+              <BarChart2 size={16} />
+              Charts
             </Button>
-            {experiment.workflowId && (
-              <Link
-                target="_blank"
-                href={`/${project.slug}/studio/${experiment.workflowId}`}
-                asChild
-              >
-                <Button size="sm" variant="outline" textDecoration="none">
-                  <ExternalLink size={16} /> Open Workflow
-                </Button>
-              </Link>
-            )}
-          </PageLayout.Header>
-
-          {/* Charts (comparison or single-run with multiple targets) */}
-          {canShowCharts && chartDisplayData && chartDisplayData.length > 0 && (
-            <ComparisonCharts
-              comparisonData={chartDisplayData}
-              isVisible={chartsVisible}
-              onVisibilityChange={setChartsVisible}
-              onTargetColorsChange={setTargetColors}
+          )}
+          {transformedData && transformedData.datasetColumns.length > 0 && (
+            <ColumnVisibilityButton
+              datasetColumns={transformedData.datasetColumns}
+              hiddenColumns={hiddenColumns}
+              onToggle={toggleColumn}
             />
           )}
-
-          {/* Loading state */}
-          {runsQuery.isLoading ? (
-            <TableSkeleton />
-          ) : sidebarRuns.length === 0 ? (
-            <Text>Waiting for results...</Text>
-          ) : (
-            <Box width="full" paddingRight={2}>
-              <Card.Root width="100%" overflow="hidden">
-                <Card.Body padding={0}>
-                  <BatchEvaluationResultsTable
-                    data={transformedData}
-                    isLoading={runDataQuery.isLoading && !compareMode}
-                    hiddenColumns={hiddenColumns}
-                    onToggleColumn={toggleColumn}
-                    comparisonData={comparisonData}
-                    targetColors={targetColors}
-                  />
-                </Card.Body>
-              </Card.Root>
-            </Box>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleDownloadCSV}
+            disabled={!isDownloadCSVEnabled}
+          >
+            <Download size={16} /> Export to CSV
+          </Button>
+          {experiment.workflowId && (
+            <Link
+              target="_blank"
+              href={`/${project.slug}/studio/${experiment.workflowId}`}
+              asChild
+            >
+              <Button size="sm" variant="outline" textDecoration="none">
+                <ExternalLink size={16} /> Open Workflow
+              </Button>
+            </Link>
           )}
-        </VStack>
+        </PageLayout.Header>
+
+        {/* Charts (comparison or single-run with multiple targets) - auto height */}
+        {canShowCharts && chartDisplayData && chartDisplayData.length > 0 && (
+          <ComparisonCharts
+            comparisonData={chartDisplayData}
+            isVisible={chartsVisible}
+            onVisibilityChange={setChartsVisible}
+            onTargetColorsChange={setTargetColors}
+          />
+        )}
+
+        {/* Table container - fills remaining space */}
+        {runsQuery.isLoading ? (
+          <Box
+            flex={1}
+            minHeight={0}
+            overflow="auto"
+            paddingRight={2}
+            paddingBottom={2}
+          >
+            <TableSkeleton withCard />
+          </Box>
+        ) : sidebarRuns.length === 0 ? (
+          <Text padding={4}>Waiting for results...</Text>
+        ) : (
+          <Box flex={1} minHeight={0} paddingRight={2} paddingBottom={2}>
+            <Card.Root width="100%" height="100%" overflow="hidden">
+              <Card.Body padding={0} height="100%">
+                <BatchEvaluationResultsTable
+                  data={transformedData}
+                  isLoading={runDataQuery.isLoading && !compareMode}
+                  hiddenColumns={hiddenColumns}
+                  onToggleColumn={toggleColumn}
+                  comparisonData={comparisonData}
+                  targetColors={targetColors}
+                />
+              </Card.Body>
+            </Card.Root>
+          </Box>
+        )}
       </VStack>
     </HStack>
   );
