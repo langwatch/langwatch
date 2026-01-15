@@ -525,6 +525,11 @@ export async function* runOrchestrator(
   let completedCells = 0;
   let aborted = false;
 
+  logger.info(
+    { runId, totalCells, concurrency: DEFAULT_CONCURRENCY, experimentId },
+    "Starting evaluation execution"
+  );
+
   // Event queue for collecting results from parallel executions
   // Uses a resolver pattern to allow yielding events as they arrive
   type EventResolver = (event: EvaluationV3Event | null) => void;
@@ -675,6 +680,10 @@ export async function* runOrchestrator(
 
     // Emit stopped event if aborted
     if (aborted) {
+      logger.info(
+        { runId, completedCells, totalCells },
+        "Emitting stopped event"
+      );
       yield {
         type: "stopped",
         reason: "user",
@@ -712,6 +721,12 @@ export async function* runOrchestrator(
   // Only emit done if not aborted
   if (!aborted) {
     const finishedAt = Date.now();
+    const duration = finishedAt - startTime;
+
+    logger.info(
+      { runId, completedCells, failedCells, totalCells, duration, totalCost },
+      "Evaluation execution completed successfully"
+    );
 
     // Emit done with summary
     const summary: ExecutionSummary = {
@@ -719,7 +734,7 @@ export async function* runOrchestrator(
       totalCells,
       completedCells,
       failedCells,
-      duration: finishedAt - startTime,
+      duration,
       timestamps: {
         startedAt: startTime,
         finishedAt,
@@ -730,6 +745,12 @@ export async function* runOrchestrator(
       type: "done",
       summary,
     };
+  } else {
+    const duration = Date.now() - startTime;
+    logger.info(
+      { runId, completedCells, failedCells, totalCells, duration },
+      "Evaluation execution stopped by user"
+    );
   }
 }
 

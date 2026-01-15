@@ -1,4 +1,4 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { Play, Square, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
@@ -20,6 +20,8 @@ export type SelectionToolbarProps = {
   onClear: () => void;
   /** Whether these specific rows are currently being executed */
   isRunning?: boolean;
+  /** Whether an abort request is in progress */
+  isAborting?: boolean;
 };
 
 export function SelectionToolbar({
@@ -29,6 +31,7 @@ export function SelectionToolbar({
   onDelete,
   onClear,
   isRunning = false,
+  isAborting = false,
 }: SelectionToolbarProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -73,9 +76,14 @@ export function SelectionToolbar({
           size="sm"
           variant="ghost"
           onClick={handleRunClick}
+          disabled={isAborting}
           data-testid="selection-run-btn"
         >
-          {isRunning ? (
+          {isAborting ? (
+            <>
+              <Spinner size="xs" /> Stopping...
+            </>
+          ) : isRunning ? (
             <>
               <Square size={16} /> Stop
             </>

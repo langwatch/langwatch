@@ -167,7 +167,7 @@ export function EvaluationsV3Table({
   });
 
   // Execution hook for running evaluations
-  const { execute, abort, status, progress } = useExecuteEvaluation();
+  const { execute, abort, status, progress, isAborting } = useExecuteEvaluation();
 
   // Execution handlers for partial execution
   const handleRunTarget = useCallback(
@@ -1093,6 +1093,7 @@ export function EvaluationsV3Table({
         onDelete={() => deleteSelectedRows(activeDatasetId)}
         onClear={clearRowSelection}
         isRunning={isExecutionRunning}
+        isAborting={isAborting}
       />
 
       {/* Save as dataset drawer */}

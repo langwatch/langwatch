@@ -26,6 +26,8 @@ export type UseExecuteEvaluationReturn = {
   totalCost: number;
   /** Error message if execution failed */
   error: string | null;
+  /** Whether an abort request is in progress */
+  isAborting: boolean;
   /** Start execution with given scope */
   execute: (scope?: ExecutionScope) => Promise<void>;
   /** Request abort of current execution */
@@ -49,6 +51,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [totalCost, setTotalCost] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isAborting, setIsAborting] = useState(false);
 
   // Get store state and actions
   const {
@@ -291,12 +294,16 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
         case "stopped":
           setStatus("stopped");
-          // Note: executingCells will be cleared by the execute function's cleanup
+          setIsAborting(false); // Clear aborting state when stop is confirmed
+          // Update store status and clear executing cells
+          setResults({ status: "stopped", executingCells: undefined });
           break;
 
         case "done":
           setStatus("completed");
-          // Note: executingCells will be cleared by the execute function's cleanup
+          setIsAborting(false); // Clear aborting state on completion too
+          // Update store status and clear executing cells
+          setResults({ status: "success", executingCells: undefined });
           break;
       }
     },
@@ -331,7 +338,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       const datasetRows = activeDataset.inline?.records
         ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
         : activeDataset.savedRecords ?? [];
-      
+
       const executionCells = computeExecutionCells({
         scope,
         targetIds: targets.map((t) => t.id),
@@ -458,6 +465,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           onError: (err) => {
             setStatus("error");
             setError(err.message);
+            setIsAborting(false); // Clear aborting state on error
             cleanupExecutingCells();
             toaster.create({
               title: "Execution Failed",
@@ -473,6 +481,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         const message = err instanceof Error ? err.message : "Unknown error";
         setStatus("error");
         setError(message);
+        setIsAborting(false); // Clear aborting state on error
         cleanupExecutingCells();
       }
     },
@@ -491,9 +500,15 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
   /**
    * Request abort
+   * Sets isAborting=true which remains true until the `stopped` SSE event is received.
    */
   const abort = useCallback(async () => {
-    if (!project?.id || !runId) return;
+    if (!project?.id || !runId) {
+      return;
+    }
+
+    // Set aborting state - this stays true until we receive the `stopped` event
+    setIsAborting(true);
 
     try {
       const response = await fetch("/api/evaluations/v3/abort", {
@@ -504,8 +519,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
 
       if (!response.ok) {
         throw new Error("Failed to abort execution");
+        // Note: we don't setIsAborting(false) here - we wait for the `stopped` event
       }
     } catch (err) {
+      // On error, reset aborting state since abort failed
+      setIsAborting(false);
       const message = err instanceof Error ? err.message : "Failed to abort";
       toaster.create({
         title: "Abort Failed",
@@ -513,6 +531,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         type: "error",
       });
     }
+    // Note: No finally block - isAborting stays true until `stopped` event
   }, [project?.id, runId]);
 
   /**
@@ -524,6 +543,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     setProgress({ completed: 0, total: 0 });
     setTotalCost(0);
     setError(null);
+    setIsAborting(false);
     clearResults();
   }, [clearResults]);
 
@@ -533,6 +553,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     progress,
     totalCost,
     error,
+    isAborting,
     execute,
     abort,
     reset,

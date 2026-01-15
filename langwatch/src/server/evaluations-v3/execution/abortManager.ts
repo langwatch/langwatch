@@ -23,13 +23,13 @@ export const abortManager = {
    */
   async requestAbort(runId: string): Promise<void> {
     if (!connection) {
-      logger.warn("Redis not available, abort request ignored");
+      logger.warn({ runId }, "Redis not available, abort request ignored");
       return;
     }
 
     const key = `${ABORT_KEY_PREFIX}${runId}`;
     await connection.set(key, "1", "EX", ABORT_TTL_SECONDS);
-    logger.info({ runId }, "Abort requested");
+    logger.info({ runId }, "Abort flag set");
   },
 
   /**
@@ -38,13 +38,19 @@ export const abortManager = {
    */
   async isAborted(runId: string): Promise<boolean> {
     if (!connection) {
-      // If Redis is not available, don't block execution
       return false;
     }
 
     const key = `${ABORT_KEY_PREFIX}${runId}`;
     const value = await connection.get(key);
-    return value === "1";
+    const isAborted = value === "1";
+    
+    // Only log when abort is detected to avoid spam
+    if (isAborted) {
+      logger.info({ runId }, "Abort flag detected");
+    }
+    
+    return isAborted;
   },
 
   /**
@@ -57,7 +63,7 @@ export const abortManager = {
 
     const key = `${ABORT_KEY_PREFIX}${runId}`;
     await connection.del(key);
-    logger.info({ runId }, "Abort flag cleared");
+    logger.debug({ runId }, "Abort flag cleared");
   },
 
   /**

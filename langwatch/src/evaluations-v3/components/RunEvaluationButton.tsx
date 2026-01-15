@@ -11,7 +11,7 @@
  * - Displays progress indicator
  */
 
-import { Button } from "@chakra-ui/react";
+import { Button, Spinner } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
@@ -34,7 +34,7 @@ export const RunEvaluationButton = ({
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
-  const { status, progress, execute, abort } = useExecuteEvaluation();
+  const { status, progress, execute, abort, isAborting } = useExecuteEvaluation();
 
   const {
     targets,
@@ -151,6 +151,9 @@ export const RunEvaluationButton = ({
 
   // Determine button state and tooltip
   const getTooltipContent = () => {
+    if (isAborting) {
+      return "Stopping evaluation...";
+    }
     if (isRunning) {
       return "Stop evaluation";
     }
@@ -179,10 +182,15 @@ export const RunEvaluationButton = ({
         size="sm"
         variant="outline"
         onClick={handleClick}
-        disabled={disabled}
+        disabled={disabled || isAborting}
         data-testid="run-evaluation-button"
       >
-        {isRunning ? (
+        {isAborting ? (
+          <>
+            <Spinner size="xs" />
+            Stopping...
+          </>
+        ) : isRunning ? (
           <>
             <LuSquare size={14} />
             Stop

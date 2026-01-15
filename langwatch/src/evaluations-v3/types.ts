@@ -216,7 +216,7 @@ export type TargetConfig = Omit<
 // Execution Results Types
 // ============================================================================
 
-export type EvaluationResultStatus = "idle" | "running" | "success" | "error";
+export type EvaluationResultStatus = "idle" | "running" | "success" | "error" | "stopped";
 
 /**
  * Schema for per-row metadata for a target execution.
