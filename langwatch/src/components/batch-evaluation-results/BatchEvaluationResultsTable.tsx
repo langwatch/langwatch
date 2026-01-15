@@ -5,13 +5,14 @@
  * Displays dataset columns followed by target columns with inline evaluator chips.
  * Target headers include summary statistics similar to V3.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useCallback } from "react";
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
   useReactTable,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   Box,
   Button,
@@ -159,7 +160,14 @@ const inferColumnType = (value: unknown): string => {
   if (typeof value === "number") return "number";
   if (typeof value === "object") {
     // Check for chat messages format
-    if (Array.isArray(value) && value.length > 0 && "role" in (value[0] as object)) {
+    // Must verify first element is actually an object before using 'in' operator
+    if (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      typeof value[0] === "object" &&
+      value[0] !== null &&
+      "role" in value[0]
+    ) {
       return "chat_messages";
     }
     return "json";
@@ -219,7 +227,8 @@ const buildColumns = (
             </Text>
           </HStack>
         ),
-        size: 150,
+        size: 210,
+        minSize: 150,
         cell: ({ getValue }) => {
           const value = getValue();
 
@@ -262,7 +271,8 @@ const buildColumns = (
             colorIndicator={targetColor}
           />
         ),
-        size: 280,
+        size: 300,
+        minSize: 200,
         cell: ({ getValue }) => {
           const targetOutput = getValue();
           if (!targetOutput) {
@@ -339,7 +349,8 @@ const buildComparisonColumns = (
               </Text>
             </HStack>
           ),
-          size: 150,
+          size: 210,
+          minSize: 150,
           cell: ({ row }) => {
             const values: DiffValue[] = comparisonData
               .filter((run) => run.data !== null)
@@ -384,7 +395,8 @@ const buildComparisonColumns = (
               {targetCol.name}
             </Text>
           ),
-          size: 280,
+          size: 300,
+          minSize: 200,
           cell: ({ row }) => {
             const values: DiffValue[] = comparisonData
               .filter((run) => run.data !== null)
@@ -503,18 +515,55 @@ export function BatchEvaluationResultsTable({
     return buildComparisonRows(comparisonData);
   }, [comparisonData, isComparisonMode]);
 
+  // Memoize getCoreRowModel to prevent infinite re-renders
+  // TanStack Table can cause React scheduling loops if options change on every render
+  const coreRowModel = useMemo(() => getCoreRowModel(), []);
+
   // Create table instance for single run mode
   const singleRunTable = useReactTable({
     data: data?.rows ?? [],
     columns: singleRunColumns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: coreRowModel,
   });
 
   // Create table instance for comparison mode
   const comparisonTable = useReactTable({
     data: comparisonRows,
     columns: comparisonColumns,
-    getCoreRowModel: getCoreRowModel(),
+    getCoreRowModel: coreRowModel,
+  });
+
+  // State for scroll container - using state instead of ref triggers re-render when mounted
+  // This is important because useVirtualizer needs to know when the scroll element is available
+  const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(null);
+
+  // Callback ref to set the scroll container
+  const scrollContainerRef = useCallback((node: HTMLDivElement | null) => {
+    setScrollContainer(node);
+  }, []);
+
+  // Estimated row height for virtualization
+  const ROW_HEIGHT = 80;
+
+  // Get row count based on mode
+  // Note: We use the source data length directly instead of getRowModel().rows.length
+  // because calling getRowModel() during render can cause React scheduling loops
+  // in certain contexts (optimization studio, wizard) due to TanStack Table internals
+  const rowCount = isComparisonMode
+    ? comparisonRows.length
+    : (data?.rows?.length ?? 0);
+
+  // Stable callbacks for virtualizer to prevent unnecessary recalculations
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
+  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+
+  // Set up row virtualization
+  const rowVirtualizer = useVirtualizer({
+    count: rowCount,
+    getScrollElement,
+    estimateSize,
+    overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
+    enabled: !!scrollContainer, // Only enable when scroll container is mounted
   });
 
   // Loading state - render a skeleton that looks like the actual table
@@ -531,10 +580,17 @@ export function BatchEvaluationResultsTable({
     );
   }
 
+  // Calculate minimum table width based on columns
+  // Row number (40) + dataset cols (210 each) + target cols (300 each)
+  const datasetColCount = data.datasetColumns.filter(c => !hiddenColumns.has(c.name)).length;
+  const targetColCount = data.targetColumns.length;
+  const minTableWidth = 40 + (datasetColCount * 210) + (targetColCount * 300);
+
   // Table styling shared between modes
   const tableStyles = {
     "& table": {
       width: "100%",
+      minWidth: `${minTableWidth}px`,
       borderCollapse: "collapse",
     },
     "& th": {
@@ -556,6 +612,11 @@ export function BatchEvaluationResultsTable({
       verticalAlign: "top",
       fontSize: "13px",
     },
+    // First column (row number) should stay small
+    "& td:first-of-type": {
+      minWidth: "40px",
+      width: "40px",
+    },
     "& tr:hover td": {
       background: "var(--chakra-colors-gray-50)",
     },
@@ -564,12 +625,27 @@ export function BatchEvaluationResultsTable({
     },
   } as const;
 
+  const virtualRows = rowVirtualizer.getVirtualItems();
+  const totalSize = rowVirtualizer.getTotalSize();
+
+  // Calculate padding to maintain scroll position
+  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+  const paddingBottom =
+    virtualRows.length > 0
+      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      : 0;
+
   // Render comparison mode table
   if (isComparisonMode) {
+    const rows = comparisonTable.getRowModel().rows;
+    const columnCount = comparisonTable.getAllColumns().length;
+
     return (
       <Box
+        ref={scrollContainerRef}
         overflowX="auto"
         overflowY="auto"
+        width="100%"
         height="100%"
         css={tableStyles}
       >
@@ -591,15 +667,32 @@ export function BatchEvaluationResultsTable({
             ))}
           </thead>
           <tbody>
-            {comparisonTable.getRowModel().rows.map((row) => (
-              <tr key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+            {/* Top padding row to maintain scroll position */}
+            {paddingTop > 0 && (
+              <tr>
+                <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
               </tr>
-            ))}
+            )}
+            {/* Render only visible rows */}
+            {virtualRows.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
+              return (
+                <tr key={row.id} data-index={virtualRow.index}>
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+            {/* Bottom padding row to maintain scroll position */}
+            {paddingBottom > 0 && (
+              <tr>
+                <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+              </tr>
+            )}
           </tbody>
         </table>
       </Box>
@@ -607,10 +700,15 @@ export function BatchEvaluationResultsTable({
   }
 
   // Render single run mode table
+  const rows = singleRunTable.getRowModel().rows;
+  const columnCount = singleRunTable.getAllColumns().length;
+
   return (
     <Box
+      ref={scrollContainerRef}
       overflowX="auto"
       overflowY="auto"
+      width="100%"
       height="100%"
       css={tableStyles}
     >
@@ -619,7 +717,7 @@ export function BatchEvaluationResultsTable({
           {singleRunTable.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <th key={header.id} style={{ width: header.getSize() }}>
+                <th key={header.id} style={{ width: `${header.getSize()}px` }}>
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -632,15 +730,32 @@ export function BatchEvaluationResultsTable({
           ))}
         </thead>
         <tbody>
-          {singleRunTable.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
-              {row.getVisibleCells().map((cell) => (
-                <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
+          {/* Top padding row to maintain scroll position */}
+          {paddingTop > 0 && (
+            <tr>
+              <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
             </tr>
-          ))}
+          )}
+          {/* Render only visible rows */}
+          {virtualRows.map((virtualRow) => {
+            const row = rows[virtualRow.index];
+            if (!row) return null;
+            return (
+              <tr key={row.id} data-index={virtualRow.index}>
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+          {/* Bottom padding row to maintain scroll position */}
+          {paddingBottom > 0 && (
+            <tr>
+              <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+            </tr>
+          )}
         </tbody>
       </table>
     </Box>

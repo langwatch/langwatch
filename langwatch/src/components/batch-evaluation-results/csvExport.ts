@@ -43,6 +43,9 @@ const formatBoolean = (value: boolean | null | undefined): string => {
 export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
   const headers: string[] = [];
 
+  // Row index first - useful for debugging and cross-referencing
+  headers.push("index");
+
   // Dataset columns
   for (const col of data.datasetColumns) {
     headers.push(col.name);
@@ -50,6 +53,21 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
   // Target columns with their outputs, cost, duration, and evaluator results
   for (const target of data.targetColumns) {
+    // Target metadata columns (model, prompt info, custom metadata)
+    if (target.model) {
+      headers.push(`${target.name}_model`);
+    }
+    if (target.promptId) {
+      headers.push(`${target.name}_prompt_id`);
+      headers.push(`${target.name}_prompt_version`);
+    }
+    // Custom metadata keys
+    if (target.metadata) {
+      for (const key of Object.keys(target.metadata)) {
+        headers.push(`${target.name}_${key}`);
+      }
+    }
+
     // Target output (may have multiple fields)
     for (const field of target.outputFields) {
       headers.push(`${target.name}_${field}`);
@@ -61,7 +79,10 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
 
     // Cost and duration for this target
     headers.push(`${target.name}_cost`);
-    headers.push(`${target.name}_duration`);
+    headers.push(`${target.name}_duration_ms`);
+
+    // Error column
+    headers.push(`${target.name}_error`);
 
     // Trace ID
     headers.push(`${target.name}_trace_id`);
@@ -84,6 +105,8 @@ export const buildCsvHeaders = (data: BatchEvaluationData): string[] => {
       headers.push(`${target.name}_${evalName}_passed`);
       headers.push(`${target.name}_${evalName}_label`);
       headers.push(`${target.name}_${evalName}_details`);
+      headers.push(`${target.name}_${evalName}_cost`);
+      headers.push(`${target.name}_${evalName}_duration_ms`);
     }
   }
 
@@ -100,6 +123,9 @@ const buildCsvRow = (
 ): string[] => {
   const values: string[] = [];
 
+  // Row index first
+  values.push(String(row.index));
+
   // Dataset columns
   for (const col of data.datasetColumns) {
     values.push(stringify(row.datasetEntry[col.name]));
@@ -108,6 +134,21 @@ const buildCsvRow = (
   // Target columns
   for (const target of data.targetColumns) {
     const targetOutput = row.targets[target.id];
+
+    // Target metadata values (must match header order)
+    if (target.model) {
+      values.push(target.model);
+    }
+    if (target.promptId) {
+      values.push(target.promptId);
+      values.push(target.promptVersion != null ? String(target.promptVersion) : "");
+    }
+    // Custom metadata values
+    if (target.metadata) {
+      for (const key of Object.keys(target.metadata)) {
+        values.push(stringify(target.metadata[key]));
+      }
+    }
 
     // Target output fields
     if (target.outputFields.length > 0) {
@@ -123,6 +164,9 @@ const buildCsvRow = (
     // Cost and duration
     values.push(formatNumber(targetOutput?.cost));
     values.push(formatNumber(targetOutput?.duration));
+
+    // Error
+    values.push(targetOutput?.error ?? "");
 
     // Trace ID
     values.push(targetOutput?.traceId ?? "");
@@ -144,17 +188,18 @@ const buildCsvRow = (
       );
 
       if (!evalResult) {
-        values.push("", "", "", "");
+        // Empty values for: score, passed, label, details, cost, duration
+        values.push("", "", "", "", "", "");
         continue;
       }
 
       if (evalResult.status === "error") {
-        values.push("Error", "", "", evalResult.details ?? "");
+        values.push("Error", "", "", evalResult.details ?? "", "", "");
         continue;
       }
 
       if (evalResult.status === "skipped") {
-        values.push("Skipped", "", "", evalResult.details ?? "");
+        values.push("Skipped", "", "", evalResult.details ?? "", "", "");
         continue;
       }
 
@@ -162,6 +207,8 @@ const buildCsvRow = (
       values.push(formatBoolean(evalResult.passed));
       values.push(evalResult.label ?? "");
       values.push(evalResult.details ?? "");
+      values.push(formatNumber(evalResult.cost));
+      values.push(formatNumber(evalResult.duration));
     }
   }
 

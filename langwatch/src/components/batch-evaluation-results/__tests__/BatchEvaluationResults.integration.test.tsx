@@ -632,6 +632,60 @@ describe("BatchEvaluationResults Integration", () => {
       expect(screen.getByText("calm-eager-owl")).toBeInTheDocument();
     });
 
+    it("shows interrupted status for runs without updates for 5+ minutes", async () => {
+      // Create a run that hasn't been updated in 10 minutes (no finished_at or stopped_at)
+      const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+      const interruptedRunData = {
+        runs: [
+          {
+            run_id: "interrupted-run",
+            workflow_version: null,
+            timestamps: {
+              created_at: tenMinutesAgo - 60000,
+              updated_at: tenMinutesAgo, // Last update was 10 minutes ago
+              // No finished_at or stopped_at
+            },
+            progress: 5,
+            total: 10,
+            summary: {
+              dataset_cost: 0.02,
+              evaluations_cost: 0.01,
+              evaluations: {},
+            },
+          },
+        ],
+      };
+
+      vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+        data: interruptedRunData,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn(),
+      } as any);
+
+      vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+        data: createMockRunData("interrupted-run"),
+        isLoading: false,
+        error: null,
+      } as any);
+
+      render(
+        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
+        { wrapper: Wrapper }
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("run-item-interrupted-run")).toBeInTheDocument();
+      });
+
+      // Should show "interrupted" text in the run item
+      const runItem = screen.getByTestId("run-item-interrupted-run");
+      expect(runItem.textContent).toContain("interrupted");
+
+      // Should NOT show a spinner (since it's considered finished)
+      expect(runItem.querySelector('[data-part="spinner"]')).not.toBeInTheDocument();
+    });
+
     it("enters compare mode when using Compare button", async () => {
       const user = userEvent.setup();
       setupWithMultipleRuns();

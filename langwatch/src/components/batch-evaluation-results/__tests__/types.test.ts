@@ -692,22 +692,22 @@ describe("transformBatchEvaluationData", () => {
 
       // Row 0: Each target should have its OWN evaluator results
       const row0 = result.rows[0]!;
-      
+
       // GPT-4 should have score 0.95
       expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(1);
       expect(row0.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.95);
-      
+
       // GPT-3.5 should have score 0.70
       expect(row0.targets["gpt-3.5"]?.evaluatorResults).toHaveLength(1);
       expect(row0.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.70);
-      
+
       // Claude-3 should have score 0.50
       expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(1);
       expect(row0.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.50);
 
       // Row 1: Same structure, different scores
       const row1 = result.rows[1]!;
-      
+
       expect(row1.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.90);
       expect(row1.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.60);
       expect(row1.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.40);
@@ -739,12 +739,12 @@ describe("transformBatchEvaluationData", () => {
       const result = transformBatchEvaluationData(data);
 
       const row0 = result.rows[0]!;
-      
+
       // GPT-4 should have 2 evaluator results
       expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(2);
       expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(100);
       expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "quality")?.score).toBe(0.9);
-      
+
       // Claude-3 should have 2 evaluator results
       expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(2);
       expect(row0.targets["claude-3"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(200);

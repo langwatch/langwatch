@@ -83,15 +83,28 @@ export function BatchTargetCell({
   // Handler to expand output
   const handleExpandOutput = useCallback(() => {
     if (cellRef.current) {
+      // Use the cell ref's own position (works correctly in diff mode where multiple
+      // values share the same td, each value should expand from its own position)
+      const rect = cellRef.current.getBoundingClientRect();
+      // Also get the td width to use as min width
       const td = cellRef.current.closest("td");
-      if (td) {
-        const rect = td.getBoundingClientRect();
-        setExpandedPosition({
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-        });
+      const tdWidth = td?.getBoundingClientRect().width ?? rect.width;
+      
+      const expandedWidth = Math.max(rect.width, tdWidth) + 24;
+      const safetyMargin = 32;
+      const viewportWidth = window.innerWidth;
+      
+      // Adjust left position if it would overflow the viewport
+      let left = rect.left - 12;
+      if (left + expandedWidth > viewportWidth - safetyMargin) {
+        left = viewportWidth - expandedWidth - safetyMargin;
       }
+      
+      setExpandedPosition({
+        top: rect.top,
+        left,
+        width: expandedWidth,
+      });
     }
     setIsOutputExpanded(true);
   }, []);
@@ -349,10 +362,10 @@ export function BatchTargetCell({
           {/* Expanded cell */}
           <Box
             position="fixed"
-            top={`${expandedPosition.top - 8}px`}
-            left={`${expandedPosition.left - 8}px`}
-            width={`${Math.max(expandedPosition.width + 16, 250)}px`}
-            maxHeight={`calc(100vh - ${expandedPosition.top - 8}px - 32px)`}
+            top={`${expandedPosition.top - 12}px`}
+            left={`${expandedPosition.left}px`}
+            width={`${Math.max(expandedPosition.width, 250)}px`}
+            maxHeight={`calc(100vh - ${expandedPosition.top - 12}px - 32px)`}
             overflowY="auto"
             bg="white/75"
             backdropFilter="blur(8px)"

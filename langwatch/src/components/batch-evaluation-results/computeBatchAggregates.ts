@@ -101,7 +101,7 @@ export const computeBatchTargetAggregates = (
   rows: BatchResultRow[]
 ): BatchTargetAggregate => {
   const targetId = targetColumn.id;
-  
+
   let completedRows = 0;
   let errorRows = 0;
   const costValues: number[] = [];

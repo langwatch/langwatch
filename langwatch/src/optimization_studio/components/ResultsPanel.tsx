@@ -280,7 +280,7 @@ export function EvaluationResults({
   const evaluationStateRunId = evaluationState?.run_id;
 
   return (
-    <HStack align="start" width="full" height="full" gap={0}>
+    <HStack align="stretch" width="full" height="full" gap={0}>
       <BatchRunsSidebar
         runs={sidebarRuns}
         selectedRunId={selectedRunId_}
@@ -289,12 +289,14 @@ export function EvaluationResults({
         size="sm"
         {...sidebarProps}
       />
-      <VStack gap={0} width="full" height="full" minWidth="0">
-        <BatchEvaluationResultsTable
-          data={transformedData}
-          isLoading={runDataQuery.isLoading}
-        />
-        <Spacer />
+      <VStack gap={0} width="full" height="full" minWidth="0" minHeight="0">
+        {/* Table container with constrained height for virtualization */}
+        <Box flex={1} width="full" minHeight="0" overflow="hidden">
+          <BatchEvaluationResultsTable
+            data={transformedData}
+            isLoading={runDataQuery.isLoading}
+          />
+        </Box>
         {sidebarSelectedRun && (
           <BatchSummaryFooter
             run={sidebarSelectedRun}

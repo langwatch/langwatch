@@ -16,7 +16,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import type { Experiment, Project } from "@prisma/client";
+import { ExperimentType, type Experiment, type Project } from "@prisma/client";
 import { Download, ExternalLink, BarChart2 } from "react-feather";
 import { useRouter } from "next/router";
 
@@ -372,21 +372,23 @@ export function BatchEvaluationResults({
   }
 
   return (
-    <HStack align="stretch" width="full" height="full" gap={0}>
-      {/* Sidebar */}
-      <BatchRunsSidebar
-        runs={sidebarRuns}
-        selectedRunId={selectedRunId}
-        onSelectRun={handleSelectRun}
-        isLoading={runsQuery.isLoading}
-        size={size}
-        compareMode={compareMode}
-        onToggleCompareMode={toggleCompareMode}
-        selectedRunIds={selectedRunIds}
-        onToggleRunSelection={toggleRunSelection}
-        onEnterCompareWithRuns={enterCompareWithRuns}
-        runColors={runColors}
-      />
+    <HStack align="stretch" width="full" height="full" gap={0} overflow="hidden">
+      {/* Sidebar - fixed width, doesn't shrink */}
+      <Box flexShrink={0}>
+        <BatchRunsSidebar
+          runs={sidebarRuns}
+          selectedRunId={selectedRunId}
+          onSelectRun={handleSelectRun}
+          isLoading={runsQuery.isLoading}
+          size={size}
+          compareMode={compareMode}
+          onToggleCompareMode={toggleCompareMode}
+          selectedRunIds={selectedRunIds}
+          onToggleRunSelection={toggleRunSelection}
+          onEnterCompareWithRuns={enterCompareWithRuns}
+          runColors={runColors}
+        />
+      </Box>
 
       {/* Main content - flex column that fills available space */}
       <VStack
@@ -395,7 +397,6 @@ export function BatchEvaluationResults({
         height="full"
         gap={0}
         align="stretch"
-        overflow="hidden"
       >
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
@@ -436,6 +437,16 @@ export function BatchEvaluationResults({
             >
               <Button size="sm" variant="outline" textDecoration="none">
                 <ExternalLink size={16} /> Open Workflow
+              </Button>
+            </Link>
+          )}
+          {experiment.type === ExperimentType.EVALUATIONS_V3 && (
+            <Link
+              href={`/${project.slug}/evaluations/v3/${experiment.slug}`}
+              asChild
+            >
+              <Button size="sm" variant="outline" textDecoration="none">
+                <ExternalLink size={16} /> Open Evaluation
               </Button>
             </Link>
           )}

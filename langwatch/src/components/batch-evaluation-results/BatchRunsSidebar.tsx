@@ -37,6 +37,7 @@ export type BatchRunSummary = {
   > | null;
   timestamps: {
     created_at: number;
+    updated_at?: number | null;
     finished_at?: number | null;
     stopped_at?: number | null;
   };
@@ -83,11 +84,45 @@ type BatchRunsSidebarProps = {
   runColors?: Record<string, string>;
 };
 
+/** Time in milliseconds after which a run without updates is considered interrupted */
+const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
+
 /**
- * Check if a run is finished
+ * Check if a run is finished (completed, stopped, or interrupted)
  */
 const isRunFinished = (timestamps: BatchRunSummary["timestamps"]): boolean => {
-  return !!(timestamps.finished_at ?? timestamps.stopped_at);
+  // Explicitly finished or stopped
+  if (timestamps.finished_at ?? timestamps.stopped_at) {
+    return true;
+  }
+
+  // Consider interrupted if no updates for 5 minutes
+  if (timestamps.updated_at) {
+    const timeSinceUpdate = Date.now() - timestamps.updated_at;
+    if (timeSinceUpdate > INTERRUPTED_THRESHOLD_MS) {
+      return true;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Check if a run was interrupted (no explicit finish/stop but stale)
+ */
+const isRunInterrupted = (timestamps: BatchRunSummary["timestamps"]): boolean => {
+  // Has explicit finish or stop - not interrupted
+  if (timestamps.finished_at ?? timestamps.stopped_at) {
+    return false;
+  }
+
+  // No updates for 5 minutes - considered interrupted
+  if (timestamps.updated_at) {
+    const timeSinceUpdate = Date.now() - timestamps.updated_at;
+    return timeSinceUpdate > INTERRUPTED_THRESHOLD_MS;
+  }
+
+  return false;
 };
 
 /**
@@ -217,14 +252,24 @@ export function BatchRunsSidebar({
 
       {/* Loading state */}
       {isLoading && (
-        <VStack gap={1} paddingX={2}>
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton
+        <VStack gap={0.5} align="stretch" paddingX={2}>
+          {Array.from({ length: 6 }).map((_, index) => (
+            <HStack
               key={index}
-              width="100%"
-              height="52px"
-              borderRadius="md"
-            />
+              paddingX={2}
+              paddingY={2}
+              gap={2}
+            >
+              <VStack align="start" gap={1} flex={1} minWidth={0}>
+                {/* Line 1: Color square + name + version */}
+                <HStack gap={1} width="100%">
+                  <Skeleton width="10px" height="10px" borderRadius="sm" />
+                  <Skeleton height="13px" width="calc(100% - 14px)" />
+                </HStack>
+                {/* Line 2: Time ago */}
+                <Skeleton height="12px" width="full" />
+              </VStack>
+            </HStack>
           ))}
         </VStack>
       )}
@@ -274,10 +319,14 @@ export function BatchRunsSidebar({
               });
 
             const isSelectedForComparison = selectedRunIds.includes(run.runId);
+            const interrupted = isRunInterrupted(run.timestamps);
+
             // Use stable color from parent (based on position in full runs list)
-            // Override with red for stopped runs
+            // Override with red for stopped runs, orange for interrupted
             const runColor = run.timestamps.stopped_at
               ? "red.400"
+              : interrupted
+              ? "orange.400"
               : runColors[run.runId] ?? getColorForString("colors", run.runId).color;
 
             return (
@@ -371,12 +420,13 @@ export function BatchRunsSidebar({
                     )}
                   </HStack>
 
-                  {/* Line 2: Time ago */}
+                  {/* Line 2: Time ago + status */}
                   <Text color="gray.500" fontSize="12px">
                     {run.timestamps.created_at
                       ? formatTimeAgo(run.timestamps.created_at)
                       : "..."}
                     {run.timestamps.stopped_at && " · stopped"}
+                    {interrupted && " · interrupted"}
                   </Text>
                 </VStack>
               </HStack>

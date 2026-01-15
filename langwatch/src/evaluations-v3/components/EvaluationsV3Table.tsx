@@ -7,6 +7,8 @@ import {
   type ColumnDef,
   type ColumnSizingState,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -403,6 +405,22 @@ export function EvaluationsV3Table({
     [removeTarget],
   );
 
+  // Handler for duplicating a target
+  const handleDuplicateTarget = useCallback(
+    (target: TargetConfig) => {
+      const newTarget: TargetConfig = {
+        ...target,
+        id: `target-${nanoid(8)}`,
+        name: `${target.name} (copy)`,
+        // Clear version-specific fields so the copy isn't pinned
+        promptVersionId: undefined,
+        promptVersionNumber: undefined,
+      };
+      addTarget(newTarget);
+    },
+    [addTarget],
+  );
+
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
     () => ({
@@ -472,6 +490,22 @@ export function EvaluationsV3Table({
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
+
+  // Find the scroll container (parent with overflow: auto)
+  useEffect(() => {
+    if (!tableRef.current) return;
+
+    let parent = tableRef.current.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      if (style.overflow === "auto" || style.overflowY === "auto") {
+        setScrollContainer(parent);
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }, []);
 
   // Clear cell selection when clicking outside the table rows
   useEffect(() => {
@@ -493,6 +527,23 @@ export function EvaluationsV3Table({
   const rowCount = getRowCount(activeDatasetId);
   // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);
+
+  // Estimated row height for virtualization
+  const ROW_HEIGHT = 60;
+
+  // Stable callbacks for virtualizer to prevent infinite re-renders
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
+  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+
+  // Set up row virtualization
+  const rowVirtualizer = useVirtualizer({
+    count: displayRowCount,
+    getScrollElement,
+    estimateSize,
+    overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
+    enabled: !!scrollContainer, // Only enable when scroll container is available
+  });
+
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
@@ -638,6 +689,7 @@ export function EvaluationsV3Table({
       targetsMap,
       evaluatorsMap,
       openTargetEditor,
+      handleDuplicateTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       // Execution handlers
@@ -662,6 +714,7 @@ export function EvaluationsV3Table({
       targetsMap,
       evaluatorsMap,
       openTargetEditor,
+      handleDuplicateTarget,
       handleRemoveTarget,
       handleAddEvaluator,
       handleRunTarget,
@@ -1078,24 +1131,61 @@ export function EvaluationsV3Table({
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              data-selected={selectedRows.has(row.index) ? "true" : undefined}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  cell={cell}
-                  rowIndex={row.index}
-                  activeDatasetId={activeDatasetId}
-                  isLoading={isLoadingExperiment || isLoadingDatasets}
-                />
-              ))}
-              {/* Spacer column to match drawer width */}
-              <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
-            </tr>
-          ))}
+          {/* Virtualized rows for performance */}
+          {(() => {
+            const virtualRows = rowVirtualizer.getVirtualItems();
+            const totalSize = rowVirtualizer.getTotalSize();
+            const rows = table.getRowModel().rows;
+            const columnCount = table.getAllColumns().length + 1; // +1 for spacer
+
+            // Calculate padding to maintain scroll position
+            const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+            const paddingBottom =
+              virtualRows.length > 0
+                ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+                : 0;
+
+            return (
+              <>
+                {/* Top padding row */}
+                {paddingTop > 0 && (
+                  <tr>
+                    <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
+                  </tr>
+                )}
+                {/* Render only visible rows */}
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+                  if (!row) return null;
+                  return (
+                    <tr
+                      key={row.id}
+                      data-index={virtualRow.index}
+                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          cell={cell}
+                          rowIndex={row.index}
+                          activeDatasetId={activeDatasetId}
+                          isLoading={isLoadingExperiment || isLoadingDatasets}
+                        />
+                      ))}
+                      {/* Spacer column to match drawer width */}
+                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                    </tr>
+                  );
+                })}
+                {/* Bottom padding row */}
+                {paddingBottom > 0 && (
+                  <tr>
+                    <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+                  </tr>
+                )}
+              </>
+            );
+          })()}
         </tbody>
       </table>
 

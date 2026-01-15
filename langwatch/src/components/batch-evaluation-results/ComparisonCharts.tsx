@@ -776,10 +776,10 @@ export const ComparisonCharts = ({
 
   return (
     isVisible && (
-      <VStack width="100%" align="stretch" gap={4} marginBottom={4}>
+      <VStack width="100%" align="stretch" gap={4} marginBottom={4} flexShrink={0}>
         <VStack width="100%" align="stretch" gap={2}>
           {/* Controls row: Group by selector + Metrics selector */}
-          <HStack wrap="wrap" gap={2}>
+          <HStack wrap="wrap" gap={2} paddingX={2}>
             {/* Group by dropdown */}
             {xAxisOptions.length > 0 && (
               <Box position="relative" data-testid="xaxis-selector">
@@ -804,7 +804,7 @@ export const ComparisonCharts = ({
                     borderColor="gray.200"
                     borderRadius="md"
                     boxShadow="md"
-                    zIndex={10}
+                    zIndex={1000}
                     minWidth="150px"
                     padding={2}
                     data-testid="group-by-dropdown"
@@ -873,7 +873,7 @@ export const ComparisonCharts = ({
                   borderColor="gray.200"
                   borderRadius="md"
                   boxShadow="md"
-                  zIndex={10}
+                  zIndex={1000}
                   minWidth="200px"
                   padding={2}
                   data-testid="metrics-dropdown"
@@ -926,8 +926,10 @@ export const ComparisonCharts = ({
           {/* Charts in horizontal scroll container */}
           <HStack
             overflowX="auto"
-            gap={6}
+            gap={4}
             align="stretch"
+            paddingX={2}
+            paddingBottom={2}
             data-testid="charts-container"
           >
             {/* Cost chart */}

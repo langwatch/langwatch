@@ -6,14 +6,19 @@
  * - Selecting/deselecting runs for comparison
  * - Auto-selecting runs when entering compare mode
  * - Enforcing minimum selection (at least 2 runs)
+ * - URL query param sync (when onSelectionChange provided)
  */
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 type UseComparisonModeOptions = {
   /** All available run IDs */
   runIds: string[];
   /** Currently viewed run ID (for auto-selection) */
   currentRunId?: string;
+  /** Initial compare run IDs from URL */
+  initialCompareRunIds?: string[];
+  /** Callback when selection changes (for URL sync) */
+  onSelectionChange?: (compareMode: boolean, selectedRunIds: string[]) => void;
 };
 
 type UseComparisonModeReturn = {
@@ -36,11 +41,23 @@ type UseComparisonModeReturn = {
 export const useComparisonMode = ({
   runIds,
   currentRunId,
+  initialCompareRunIds,
+  onSelectionChange,
 }: UseComparisonModeOptions): UseComparisonModeReturn => {
-  const [compareMode, setCompareMode] = useState(false);
-  const [selectedRunIds, setSelectedRunIds] = useState<string[]>([]);
+  // Initialize from URL params if provided
+  const [compareMode, setCompareMode] = useState(
+    () => (initialCompareRunIds?.length ?? 0) >= 2
+  );
+  const [selectedRunIds, setSelectedRunIds] = useState<string[]>(
+    () => initialCompareRunIds ?? []
+  );
 
   const canCompare = runIds.length >= 2;
+
+  // Notify parent of selection changes (for URL sync)
+  useEffect(() => {
+    onSelectionChange?.(compareMode, selectedRunIds);
+  }, [compareMode, selectedRunIds, onSelectionChange]);
 
   const toggleCompareMode = useCallback(() => {
     setCompareMode((prev) => {
