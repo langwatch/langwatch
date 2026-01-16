@@ -12,7 +12,7 @@ import path from "path";
  *   pnpm exec playwright test --ui
  */
 
-const BASE_URL = process.env.BASE_URL ?? "http://localhost:5561";
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:5560";
 const AUTH_FILE = path.join(__dirname, "agentic-e2e-tests", ".auth", "user.json");
 const IS_CI = !!process.env.CI;
 
@@ -52,15 +52,11 @@ export default defineConfig({
     navigationTimeout: 30000,
   },
 
-  /* Start test environment via Docker Compose (local only, CI uses services) */
-  webServer: IS_CI
-    ? undefined
-    : {
-        command: "docker compose -f compose.test.yml up --wait",
-        url: BASE_URL,
-        reuseExistingServer: true,
-        timeout: 120000,
-      },
+  /* Start test environment via Docker Compose (local only, CI uses services)
+   * Note: Run `docker compose -f compose.test.yml up -d` manually before tests
+   * The webServer is disabled to avoid complexity with container lifecycle
+   */
+  webServer: undefined,
 
   /* Project configurations */
   projects: [
