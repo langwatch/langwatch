@@ -1,6 +1,10 @@
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
+export type { Dataset, DatasetEntry, GetDatasetOptions } from "./services/datasets";
+export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./services/datasets";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
+import { EvaluationFacade } from "./services/evaluation";
+import { DatasetsFacade } from "./services/datasets";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -16,10 +20,12 @@ export interface LangWatchConstructorOptions {
 }
 
 export class LangWatch {
-  private readonly config: InternalConfig;
+  private readonly config: InternalConfig & { endpoint: string; apiKey: string };
 
   readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;
+  readonly evaluation: EvaluationFacade;
+  readonly datasets: DatasetsFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -37,6 +43,16 @@ export class LangWatch {
       ...this.config,
     });
     this.traces = new TracesFacade(this.config);
+    this.evaluation = new EvaluationFacade({
+      langwatchApiClient: this.config.langwatchApiClient,
+      endpoint: this.config.endpoint,
+      apiKey: this.config.apiKey,
+      logger: this.config.logger,
+    });
+    this.datasets = new DatasetsFacade({
+      langwatchApiClient: this.config.langwatchApiClient,
+      logger: this.config.logger,
+    });
   }
 
   get apiClient(): LangwatchApiClient {
@@ -51,10 +67,12 @@ export class LangWatch {
     apiKey: string;
     endpoint: string;
     options?: LangWatchConstructorOptions["options"];
-  }): InternalConfig {
+  }): InternalConfig & { endpoint: string; apiKey: string } {
     return {
       logger: options?.logger ?? new NoOpLogger(),
       langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),
+      endpoint,
+      apiKey,
     };
   }
 }

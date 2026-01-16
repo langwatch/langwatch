@@ -222,7 +222,11 @@ def start_component_event(
 
 
 def end_component_event(
-    node: Node, trace_id: str, result: Any, cost: Optional[Union[float, Money]] = None
+    node: Node,
+    trace_id: str,
+    result: Any,
+    cost: Optional[Union[float, Money]] = None,
+    started_at: Optional[int] = None,
 ):
     try:
         outputs = dict(result)
@@ -239,7 +243,10 @@ def end_component_event(
             execution_state=ExecutionState(
                 status=ExecutionStatus.success,
                 trace_id=trace_id,
-                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+                timestamps=Timestamps(
+                    started_at=started_at,
+                    finished_at=int(time.time() * 1000),
+                ),
                 outputs=outputs,
                 cost=cost.amount if isinstance(cost, Money) else cost,
             ),
@@ -247,14 +254,19 @@ def end_component_event(
     )
 
 
-def component_error_event(trace_id: str, node_id: str, error: str):
+def component_error_event(
+    trace_id: str, node_id: str, error: str, started_at: Optional[int] = None
+):
     return ComponentStateChange(
         payload=ComponentStateChangePayload(
             component_id=node_id,
             execution_state=ExecutionState(
                 status=ExecutionStatus.error,
                 error=error,
-                timestamps=Timestamps(finished_at=int(time.time() * 1000)),
+                timestamps=Timestamps(
+                    started_at=started_at,
+                    finished_at=int(time.time() * 1000),
+                ),
             ),
         )
     )

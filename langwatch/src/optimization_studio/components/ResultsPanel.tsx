@@ -19,13 +19,14 @@ import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import { LuSquareCheckBig } from "react-icons/lu";
+import { useBatchEvaluationState } from "../../components/experiments/BatchEvaluationV2";
 import {
-  BatchEvaluationV2RunList,
-  useBatchEvaluationState,
-} from "../../components/experiments/BatchEvaluationV2";
-import { BatchEvaluationV2EvaluationSummary } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationSummary";
-import { BatchEvaluationV2EvaluationResults } from "../../components/experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults";
-import { EvaluationProgressBar } from "../../components/experiments/BatchEvaluationV2/EvaluationProgressBar";
+  BatchEvaluationResultsTable,
+  BatchRunsSidebar,
+  BatchSummaryFooter,
+  transformBatchEvaluationData,
+  type BatchRunSummary,
+} from "../../components/batch-evaluation-results";
 import {
   DSPyExperimentRunList,
   DSPyExperimentSummary,
@@ -198,6 +199,49 @@ export function EvaluationResults({
     setSelectedRunId,
   });
 
+  // Fetch selected run data for new table
+  const runDataQuery = api.experiments.getExperimentBatchEvaluationRun.useQuery(
+    {
+      projectId: project?.id ?? "",
+      experimentId: experiment.data?.id ?? "",
+      runId: selectedRunId_ ?? "",
+    },
+    {
+      enabled: !!project && !!experiment.data && !!selectedRunId_,
+      refetchInterval: !isFinished ? 1000 : false,
+    }
+  );
+
+  // Transform run data for new table
+  const transformedData = runDataQuery.data
+    ? transformBatchEvaluationData(runDataQuery.data)
+    : null;
+
+  // Transform runs for new sidebar
+  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map((run) => ({
+    runId: run.run_id,
+    workflowVersion: run.workflow_version,
+    timestamps: run.timestamps,
+    progress: run.progress,
+    total: run.total,
+    summary: {
+      datasetCost: run.summary.dataset_cost,
+      evaluationsCost: run.summary.evaluations_cost,
+      evaluations: Object.fromEntries(
+        Object.entries(run.summary.evaluations).map(([id, ev]) => [
+          id,
+          {
+            name: ev.name,
+            averageScore: ev.average_score,
+            averagePassed: ev.average_passed,
+          },
+        ])
+      ),
+    },
+  }));
+
+  const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId_);
+
   if (
     (experiment.isError && experiment.error.data?.httpStatus === 404) ||
     batchEvaluationRuns.data?.runs.length === 0 ||
@@ -236,27 +280,26 @@ export function EvaluationResults({
   const evaluationStateRunId = evaluationState?.run_id;
 
   return (
-    <HStack align="start" width="full" height="full" gap={0}>
-      <BatchEvaluationV2RunList
-        batchEvaluationRuns={batchEvaluationRuns}
-        selectedRun={selectedRun}
+    <HStack align="stretch" width="full" height="full" gap={0}>
+      <BatchRunsSidebar
+        runs={sidebarRuns}
         selectedRunId={selectedRunId_}
-        setSelectedRunId={setSelectedRunId}
+        onSelectRun={setSelectedRunId}
+        isLoading={batchEvaluationRuns.isLoading}
         size="sm"
         {...sidebarProps}
       />
-      <VStack gap={0} width="full" height="full" minWidth="0">
-        <BatchEvaluationV2EvaluationResults
-          project={project}
-          experiment={experiment.data}
-          runId={selectedRunId_}
-          isFinished={isFinished}
-          size="sm"
-        />
-        <Spacer />
-        {selectedRun && (
-          <BatchEvaluationV2EvaluationSummary
-            run={selectedRun}
+      <VStack gap={0} width="full" height="full" minWidth="0" minHeight="0">
+        {/* Table container with constrained height for virtualization */}
+        <Box flex={1} width="full" minHeight="0" overflow="hidden">
+          <BatchEvaluationResultsTable
+            data={transformedData}
+            isLoading={runDataQuery.isLoading}
+          />
+        </Box>
+        {sidebarSelectedRun && (
+          <BatchSummaryFooter
+            run={sidebarSelectedRun}
             showProgress={
               (!selectedRun || selectedRun.run_id === evaluationStateRunId) &&
               !!evaluationStateRunId &&

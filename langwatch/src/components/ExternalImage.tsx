@@ -1,5 +1,5 @@
-import { Box, Image, Text } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { Box, Image, Portal, Text } from "@chakra-ui/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Tooltip } from "../components/ui/tooltip";
 
 export const getImageUrl = (str: unknown): string | null => {
@@ -85,19 +85,95 @@ export const ExternalImage = ({
   alt,
   src,
   dontLinkify = false,
+  expandable = false,
   ...props
 }: {
   alt?: string;
   src: string;
   dontLinkify?: boolean;
+  /** When true, clicking expands the image in place instead of opening new tab */
+  expandable?: boolean;
   [key: string]: any;
 }) => {
   const [error, setError] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  // Store center point of original image
+  const [expandedPosition, setExpandedPosition] = useState({ centerX: 0, centerY: 0 });
+  // Offset to apply after clamping to viewport (0,0 means perfectly centered)
+  const [clampOffset, setClampOffset] = useState({ top: 0, left: 0 });
+  const [isPositioned, setIsPositioned] = useState(false);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const expandedRef = useRef<HTMLDivElement>(null);
   const proxiedSrc = getProxiedImageUrl(src);
+
+  const VIEWPORT_MARGIN = 32;
 
   useEffect(() => {
     setError(false);
   }, [src]);
+
+  // Calculate clamp offset after expanded container renders
+  useEffect(() => {
+    if (isExpanded && expandedRef.current) {
+      // Use requestAnimationFrame to ensure the image has loaded and sized
+      requestAnimationFrame(() => {
+        if (!expandedRef.current) return;
+
+        const rect = expandedRef.current.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+
+        // Current position (centered via CSS transform)
+        // The element is at centerX, centerY with transform: translate(-50%, -50%)
+        // So its edges are:
+        const currentLeft = expandedPosition.centerX - rect.width / 2;
+        const currentTop = expandedPosition.centerY - rect.height / 2;
+        const currentRight = currentLeft + rect.width;
+        const currentBottom = currentTop + rect.height;
+
+        let offsetLeft = 0;
+        let offsetTop = 0;
+
+        // Push left if overflowing right
+        if (currentRight > viewportWidth - VIEWPORT_MARGIN) {
+          offsetLeft = (viewportWidth - VIEWPORT_MARGIN) - currentRight;
+        }
+        // Push right if overflowing left
+        if (currentLeft + offsetLeft < VIEWPORT_MARGIN) {
+          offsetLeft = VIEWPORT_MARGIN - currentLeft;
+        }
+        // Push up if overflowing bottom
+        if (currentBottom > viewportHeight - VIEWPORT_MARGIN) {
+          offsetTop = (viewportHeight - VIEWPORT_MARGIN) - currentBottom;
+        }
+        // Push down if overflowing top
+        if (currentTop + offsetTop < VIEWPORT_MARGIN) {
+          offsetTop = VIEWPORT_MARGIN - currentTop;
+        }
+
+        setClampOffset({ top: offsetTop, left: offsetLeft });
+        setIsPositioned(true);
+      });
+    }
+  }, [isExpanded, expandedPosition]);
+
+  const handleExpand = useCallback(() => {
+    if (imageRef.current) {
+      const rect = imageRef.current.getBoundingClientRect();
+      // Calculate center of original image
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      setExpandedPosition({ centerX, centerY });
+      setClampOffset({ top: 0, left: 0 });
+      setIsPositioned(false);
+    }
+    setIsExpanded(true);
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setIsExpanded(false);
+    setIsPositioned(false);
+  }, []);
 
   if (error) {
     return (
@@ -138,6 +214,67 @@ export const ExternalImage = ({
     );
   }
 
+  // Expandable mode - click to expand in place (centered on original image, clamped to viewport)
+  if (expandable) {
+    return (
+      <>
+        <Image
+          ref={imageRef}
+          alt={alt}
+          onError={() => setError(true)}
+          src={proxiedSrc}
+          cursor="pointer"
+          onClick={handleExpand}
+          {...props}
+        />
+        {isExpanded && (
+          <Portal>
+            {/* Invisible backdrop to catch clicks outside */}
+            <Box
+              position="fixed"
+              inset={0}
+              zIndex={1000}
+              onClick={handleClose}
+              data-testid="expanded-image-backdrop"
+            />
+            {/* Expanded image - centered on cell via CSS, with JS offset for viewport clamping */}
+            <Box
+              ref={expandedRef}
+              position="fixed"
+              top={`${expandedPosition.centerY + clampOffset.top}px`}
+              left={`${expandedPosition.centerX + clampOffset.left}px`}
+              transform="translate(-50%, -50%)"
+              maxWidth={`calc(100vw - ${VIEWPORT_MARGIN * 2}px)`}
+              maxHeight={`calc(100vh - ${VIEWPORT_MARGIN * 2}px)`}
+              bg="white/75"
+              backdropFilter="blur(8px)"
+              borderRadius="md"
+              boxShadow="0 0 0 2px var(--chakra-colors-gray-300), 0 4px 12px rgba(0,0,0,0.15)"
+              zIndex={1001}
+              padding={2}
+              overflow="auto"
+              opacity={isPositioned ? 1 : 0}
+              css={{
+                animation: isPositioned ? "scale-in 0.15s ease-out" : "none",
+              }}
+            >
+              <Image
+                alt={alt}
+                src={proxiedSrc}
+                maxWidth="min(90vw, 900px)"
+                maxHeight={`calc(100vh - ${VIEWPORT_MARGIN * 2 + 16}px)`}
+                objectFit="contain"
+                cursor="pointer"
+                onClick={handleClose}
+              />
+            </Box>
+          </Portal>
+        )}
+      </>
+    );
+  }
+
+  // Default: open in new tab
   return (
     <a href={src} target="_blank" rel="noopener noreferrer">
       <Image

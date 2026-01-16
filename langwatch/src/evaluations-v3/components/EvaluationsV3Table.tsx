@@ -7,6 +7,8 @@ import {
   type ColumnDef,
   type ColumnSizingState,
 } from "@tanstack/react-table";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { nanoid } from "nanoid";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -32,10 +34,13 @@ type EvaluatorDbConfig = {
 };
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
+import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
+import { useOpenTargetEditor, scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
+import { isRowEmpty } from "../utils/emptyRowDetection";
+import { isCellInExecution } from "../utils/executionScope";
 import {
   convertToUIMapping,
   convertFromUIMapping,
@@ -77,11 +82,14 @@ import {
 type EvaluationsV3TableProps = {
   isLoadingExperiment?: boolean;
   isLoadingDatasets?: boolean;
+  /** Disable virtualization (for tests) */
+  disableVirtualization?: boolean;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
+  disableVirtualization = false,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -163,6 +171,39 @@ export function EvaluationsV3Table({
     setActiveDataset,
   });
 
+  // Execution hook for running evaluations
+  const { execute, abort, status, progress, isAborting } = useExecuteEvaluation();
+
+  // Execution handlers for partial execution
+  const handleRunTarget = useCallback(
+    (targetId: string) => {
+      void execute({ type: "target", targetId });
+    },
+    [execute]
+  );
+
+  const handleRunRow = useCallback(
+    (rowIndex: number) => {
+      void execute({ type: "rows", rowIndices: [rowIndex] });
+    },
+    [execute]
+  );
+
+  const handleRunCell = useCallback(
+    (rowIndex: number, targetId: string) => {
+      void execute({ type: "cell", rowIndex, targetId });
+    },
+    [execute]
+  );
+
+  // Handler for stopping execution
+  const handleStopExecution = useCallback(() => {
+    void abort();
+  }, [abort]);
+
+  // Check if execution is running
+  const isExecutionRunning = status === "running" || results.status === "running";
+
   // Get the active dataset
   const activeDataset = useMemo(
     () => datasets.find((d) => d.id === activeDatasetId),
@@ -175,7 +216,7 @@ export function EvaluationsV3Table({
     | {
         name: string;
         columnTypes: { name: string; type: DatasetColumnType }[];
-        datasetRecords: Array<{ id: string } & Record<string, string>>;
+        datasetRecords: Array<{ id?: string } & Record<string, string>>;
       }
     | undefined
   >(undefined);
@@ -273,63 +314,96 @@ export function EvaluationsV3Table({
         },
         { resetStack: true },
       );
+
+      // Scroll to position the target column next to the drawer
+      // Use requestAnimationFrame to ensure the drawer has started opening
+      requestAnimationFrame(() => {
+        scrollToTargetColumn(targetId);
+      });
     },
     [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
+  );
+
+  /**
+   * Helper to add an evaluator to the workbench from a Prisma Evaluator.
+   * Used by both onSelect (existing evaluator) and onSave (newly created evaluator).
+   */
+  const addEvaluatorToWorkbench = useCallback(
+    (evaluator: Evaluator) => {
+      // Extract evaluator config from the Prisma evaluator
+      const config = evaluator.config as EvaluatorDbConfig | null;
+
+      // Check if this evaluator is already added globally
+      const existingEvaluator = evaluators.find(
+        (e) => e.dbEvaluatorId === evaluator.id
+      );
+
+      // If already exists, no need to add again (it applies to all targets)
+      if (existingEvaluator) {
+        return;
+      }
+
+      // Get the evaluator definition to derive inputs from requiredFields/optionalFields
+      const evaluatorType = config?.evaluatorType;
+      const evaluatorDef = evaluatorType
+        ? AVAILABLE_EVALUATORS[evaluatorType]
+        : undefined;
+
+      // Derive inputs from evaluator definition's required and optional fields
+      const inputFields = [
+        ...(evaluatorDef?.requiredFields ?? []),
+        ...(evaluatorDef?.optionalFields ?? []),
+      ];
+
+      // Create a new EvaluatorConfig from the Prisma evaluator
+      const evaluatorConfig: EvaluatorConfig = {
+        id: `evaluator_${Date.now()}`,
+        evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
+        name: evaluator.name,
+        settings: config?.settings ?? {},
+        inputs: inputFields.map((field) => ({
+          identifier: field,
+          type: "str" as const, // Default all evaluator inputs to string
+        })),
+        mappings: {},
+        dbEvaluatorId: evaluator.id,
+      };
+
+      // Add the evaluator globally (applies to all targets automatically)
+      addEvaluator(evaluatorConfig);
+    },
+    [evaluators, addEvaluator]
   );
 
   // Handler for opening the evaluator selector (evaluators apply to ALL targets)
   const handleAddEvaluator = useCallback(
     () => {
-      // Set up flow callback to handle evaluator selection
+      // Set up flow callback to handle evaluator selection (existing evaluator)
       setFlowCallbacks("evaluatorList", {
-        onSelect: (evaluator: Evaluator) => {
-          // Extract evaluator config from the Prisma evaluator
-          const config = evaluator.config as EvaluatorDbConfig | null;
+        onSelect: addEvaluatorToWorkbench,
+      });
 
-          // Check if this evaluator is already added globally
-          const existingEvaluator = evaluators.find(
-            (e) => e.dbEvaluatorId === evaluator.id
-          );
+      // Set up flow callback to handle newly created evaluator
+      // When user creates a new evaluator via the editor drawer, we need to:
+      // 1. Fetch the newly created evaluator from DB
+      // 2. Add it to the workbench
+      setFlowCallbacks("evaluatorEditor", {
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-          // If already exists, no need to add again (it applies to all targets)
-          if (existingEvaluator) {
-            return;
+          if (evaluator) {
+            addEvaluatorToWorkbench(evaluator);
           }
-
-          // Get the evaluator definition to derive inputs from requiredFields/optionalFields
-          const evaluatorType = config?.evaluatorType;
-          const evaluatorDef = evaluatorType
-            ? AVAILABLE_EVALUATORS[evaluatorType]
-            : undefined;
-
-          // Derive inputs from evaluator definition's required and optional fields
-          const inputFields = [
-            ...(evaluatorDef?.requiredFields ?? []),
-            ...(evaluatorDef?.optionalFields ?? []),
-          ];
-
-          // Create a new EvaluatorConfig from the Prisma evaluator
-          const evaluatorConfig: EvaluatorConfig = {
-            id: `evaluator_${Date.now()}`,
-            evaluatorType: (config?.evaluatorType ?? "custom/unknown") as EvaluatorConfig["evaluatorType"],
-            name: evaluator.name,
-            settings: config?.settings ?? {},
-            inputs: inputFields.map((field) => ({
-              identifier: field,
-              type: "str" as const, // Default all evaluator inputs to string
-            })),
-            mappings: {},
-            dbEvaluatorId: evaluator.id,
-          };
-
-          // Add the evaluator globally (applies to all targets automatically)
-          addEvaluator(evaluatorConfig);
         },
       });
 
       openDrawer("evaluatorList");
     },
-    [openDrawer, evaluators, addEvaluator],
+    [openDrawer, addEvaluatorToWorkbench, trpcUtils.evaluators.getById, project?.id],
   );
 
   // Handler for removing a target from the workbench
@@ -338,6 +412,18 @@ export function EvaluationsV3Table({
       removeTarget(targetId);
     },
     [removeTarget],
+  );
+
+  // Handler for duplicating a target
+  const handleDuplicateTarget = useCallback(
+    (target: TargetConfig) => {
+      const newTarget: TargetConfig = {
+        ...target,
+        id: `target-${nanoid(8)}`,
+      };
+      addTarget(newTarget);
+    },
+    [addTarget],
   );
 
   // Dataset handlers for drawer integration
@@ -378,8 +464,9 @@ export function EvaluationsV3Table({
       onEditDataset: () => {
         setEditDatasetDrawerOpen(true);
       },
-      onSaveAsDataset: (dataset: DatasetReference) => {
+      onSaveAsDataset: async (dataset: DatasetReference) => {
         if (dataset.type !== "inline" || !dataset.inline) return;
+        if (!project?.id) return;
 
         // Convert inline dataset to row-based format, filtering empty rows
         const columns = dataset.inline.columns;
@@ -388,8 +475,21 @@ export function EvaluationsV3Table({
           dataset.inline.records,
         );
 
+        // Find next available name to avoid conflicts
+        // E.g., if "Test Data" exists, suggest "Test Data (2)"
+        let suggestedName = dataset.name;
+        try {
+          suggestedName = await trpcUtils.dataset.findNextName.fetch({
+            projectId: project.id,
+            proposedName: dataset.name,
+          });
+        } catch (error) {
+          // If fetch fails, use original name - validation will catch conflicts
+          console.warn("Failed to fetch next available name:", error);
+        }
+
         setDatasetToSave({
-          name: dataset.name,
+          name: suggestedName,
           columnTypes: columns.map((col) => ({
             name: col.name,
             type: col.type as DatasetColumnType,
@@ -399,7 +499,7 @@ export function EvaluationsV3Table({
         setSaveAsDatasetDrawerOpen(true);
       },
     }),
-    [openDrawer, loadSavedDataset],
+    [openDrawer, loadSavedDataset, project?.id, trpcUtils],
   );
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
@@ -409,6 +509,22 @@ export function EvaluationsV3Table({
   );
 
   const tableRef = useRef<HTMLTableElement>(null);
+  const [scrollContainer, setScrollContainer] = useState<HTMLElement | null>(null);
+
+  // Find the scroll container (parent with overflow: auto)
+  useEffect(() => {
+    if (!tableRef.current) return;
+
+    let parent = tableRef.current.parentElement;
+    while (parent) {
+      const style = window.getComputedStyle(parent);
+      if (style.overflow === "auto" || style.overflowY === "auto") {
+        setScrollContainer(parent);
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  }, []);
 
   // Clear cell selection when clicking outside the table rows
   useEffect(() => {
@@ -430,9 +546,34 @@ export function EvaluationsV3Table({
   const rowCount = getRowCount(activeDatasetId);
   // Always show at least 3 rows, and always include 1 extra empty row at the end (Excel-like behavior)
   const displayRowCount = Math.max(rowCount + 1, 3);
+
+  // Estimated row height for virtualization
+  const ROW_HEIGHT = 60;
+
+  // Stable callbacks for virtualizer to prevent infinite re-renders
+  const getScrollElement = useCallback(() => scrollContainer, [scrollContainer]);
+  const estimateSize = useCallback(() => ROW_HEIGHT, []);
+
+  // Set up row virtualization
+  const rowVirtualizer = useVirtualizer({
+    count: displayRowCount,
+    getScrollElement,
+    estimateSize,
+    overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
+    enabled: !!scrollContainer, // Only enable when scroll container is available
+  });
+
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
   const someSelected = selectedRows.size > 0 && selectedRows.size < rowCount;
+
+  // Handler for running selected rows
+  const handleRunSelectedRows = useCallback(() => {
+    const rowIndices = Array.from(selectedRows);
+    if (rowIndices.length > 0) {
+      void execute({ type: "rows", rowIndices });
+    }
+  }, [execute, selectedRows]);
 
   // Get columns from active dataset, filtering out hidden columns
   const allDatasetColumns = activeDataset?.columns ?? [];
@@ -461,31 +602,50 @@ export function EvaluationsV3Table({
   // Build row data from active dataset records (works for both inline and saved)
   // Note: We include activeDataset in dependencies to ensure re-render when cell values change
   const rowData = useMemo((): TableRowData[] => {
-    return Array.from({ length: displayRowCount }, (_, index) => ({
-      rowIndex: index,
-      dataset: Object.fromEntries(
+    return Array.from({ length: displayRowCount }, (_, index) => {
+      // Build dataset values for this row
+      const datasetValues = Object.fromEntries(
         datasetColumns.map((col) => [
           col.id,
           getCellValue(activeDatasetId, index, col.id),
         ]),
-      ),
-      targets: Object.fromEntries(
-        targets.map((target) => [
-          target.id,
-          {
-            output: results.targetOutputs[target.id]?.[index] ?? null,
-            // All evaluators apply to all targets
-            evaluators: Object.fromEntries(
-              evaluators.map((evaluator) => [
-                evaluator.id,
-                results.evaluatorResults[target.id]?.[evaluator.id]?.[index] ??
-                  null,
-              ]),
-            ),
-          },
-        ]),
-      ),
-    }));
+      );
+
+      // Check if this row is empty - empty rows don't get executed
+      const rowIsEmpty = isRowEmpty(datasetValues);
+
+      return {
+        rowIndex: index,
+        dataset: datasetValues,
+        targets: Object.fromEntries(
+          targets.map((target) => [
+            target.id,
+            {
+              output: results.targetOutputs[target.id]?.[index] ?? null,
+              // All evaluators apply to all targets
+              evaluators: Object.fromEntries(
+                evaluators.map((evaluator) => [
+                  evaluator.id,
+                  results.evaluatorResults[target.id]?.[evaluator.id]?.[index] ??
+                    null,
+                ]),
+              ),
+              // Error for this target/row
+              error: results.errors[target.id]?.[index] ?? null,
+              // Loading if this specific cell is in the executing set
+              // Uses the executingCells set as single source of truth
+              isLoading:
+                results.executingCells !== undefined &&
+                isCellInExecution(results.executingCells, index, target.id),
+              // Trace ID for viewing the execution trace
+              traceId: results.targetMetadata?.[target.id]?.[index]?.traceId ?? null,
+              // Duration/latency for this cell execution
+              duration: results.targetMetadata?.[target.id]?.[index]?.duration ?? null,
+            },
+          ]),
+        ),
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeDataset triggers re-render when data changes
   }, [
     activeDatasetId,
@@ -517,6 +677,30 @@ export function EvaluationsV3Table({
     [targets]
   );
 
+  // Helper to check if a specific target has cells being executed
+  const isTargetExecuting = useCallback(
+    (targetId: string): boolean => {
+      if (!results.executingCells) return false;
+      // Check if any cell for this target is in the executing set
+      for (let i = 0; i < rowCount; i++) {
+        if (isCellInExecution(results.executingCells, i, targetId)) {
+          return true;
+        }
+      }
+      return false;
+    },
+    [results.executingCells, rowCount]
+  );
+
+  // Helper to check if a specific cell is being executed
+  const isCellExecuting = useCallback(
+    (rowIndex: number, targetId: string): boolean => {
+      if (!results.executingCells) return false;
+      return isCellInExecution(results.executingCells, rowIndex, targetId);
+    },
+    [results.executingCells]
+  );
+
   const tableMeta: TableMeta = useMemo(
     () => ({
       // Target data
@@ -524,8 +708,17 @@ export function EvaluationsV3Table({
       targetsMap,
       evaluatorsMap,
       openTargetEditor,
+      handleDuplicateTarget,
       handleRemoveTarget,
       handleAddEvaluator,
+      // Execution handlers
+      handleRunTarget,
+      handleRunRow,
+      handleRunCell,
+      handleStopExecution,
+      isExecutionRunning,
+      isTargetExecuting,
+      isCellExecuting,
       // Selection data
       selectedRows,
       allSelected,
@@ -540,8 +733,16 @@ export function EvaluationsV3Table({
       targetsMap,
       evaluatorsMap,
       openTargetEditor,
+      handleDuplicateTarget,
       handleRemoveTarget,
       handleAddEvaluator,
+      handleRunTarget,
+      handleRunRow,
+      handleRunCell,
+      handleStopExecution,
+      isExecutionRunning,
+      isTargetExecuting,
+      isCellExecuting,
       selectedRows,
       allSelected,
       someSelected,
@@ -894,26 +1095,39 @@ export function EvaluationsV3Table({
           </tr>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id}>
-              {headerGroup.headers.map((header) => (
-                <th key={header.id} style={{ width: header.getSize() }}>
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext(),
-                      )}
-                  {/* Resize handle */}
-                  {header.column.getCanResize() && (
-                    <div
-                      onMouseDown={header.getResizeHandler()}
-                      onTouchStart={header.getResizeHandler()}
-                      className={`resizer ${
-                        header.column.getIsResizing() ? "isResizing" : ""
-                      }`}
-                    />
-                  )}
-                </th>
-              ))}
+              {headerGroup.headers.map((header) => {
+                // Extract target ID if this is a target column
+                const isTargetColumn = header.id.startsWith("target.");
+                const targetId = isTargetColumn
+                  ? header.id.replace("target.", "")
+                  : undefined;
+
+                return (
+                  <th
+                    key={header.id}
+                    style={{ width: header.getSize() }}
+                    // Add data attribute for target columns to enable scroll-to behavior
+                    {...(targetId && { "data-target-column": targetId })}
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                    {/* Resize handle */}
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={`resizer ${
+                          header.column.getIsResizing() ? "isResizing" : ""
+                        }`}
+                      />
+                    )}
+                  </th>
+                );
+              })}
               {targets.length === 0 ? (
                 // Spacer column to match drawer width + default target column width
                 <th
@@ -936,32 +1150,100 @@ export function EvaluationsV3Table({
           ))}
         </thead>
         <tbody>
-          {table.getRowModel().rows.map((row) => (
-            <tr
-              key={row.id}
-              data-selected={selectedRows.has(row.index) ? "true" : undefined}
-            >
-              {row.getVisibleCells().map((cell) => (
-                <TableCell
-                  key={cell.id}
-                  cell={cell}
-                  rowIndex={row.index}
-                  activeDatasetId={activeDatasetId}
-                  isLoading={isLoadingExperiment || isLoadingDatasets}
-                />
-              ))}
-              {/* Spacer column to match drawer width */}
-              <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
-            </tr>
-          ))}
+          {/* Virtualized rows for performance */}
+          {(() => {
+            const virtualRows = rowVirtualizer.getVirtualItems();
+            const totalSize = rowVirtualizer.getTotalSize();
+            const rows = table.getRowModel().rows;
+            const columnCount = table.getAllColumns().length + 1; // +1 for spacer
+
+            // Calculate padding to maintain scroll position (only when virtualizing)
+            const paddingTop =
+              virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+            const paddingBottom =
+              virtualRows.length > 0
+                ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+                : 0;
+
+            // Test mode: render all rows without virtualization
+            if (disableVirtualization) {
+              return (
+                <>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      data-index={row.index}
+                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          cell={cell}
+                          rowIndex={row.index}
+                          activeDatasetId={activeDatasetId}
+                          isLoading={isLoadingExperiment || isLoadingDatasets}
+                        />
+                      ))}
+                      {/* Spacer column to match drawer width */}
+                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                    </tr>
+                  ))}
+                </>
+              );
+            }
+
+            return (
+              <>
+                {/* Top padding row */}
+                {paddingTop > 0 && (
+                  <tr>
+                    <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
+                  </tr>
+                )}
+                {/* Render only virtualized rows - empty until container is measured */}
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+                  if (!row) return null;
+                  return (
+                    <tr
+                      key={row.id}
+                      data-index={virtualRow.index}
+                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          cell={cell}
+                          rowIndex={row.index}
+                          activeDatasetId={activeDatasetId}
+                          isLoading={isLoadingExperiment || isLoadingDatasets}
+                        />
+                      ))}
+                      {/* Spacer column to match drawer width */}
+                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                    </tr>
+                  );
+                })}
+                {/* Bottom padding row */}
+                {paddingBottom > 0 && (
+                  <tr>
+                    <td style={{ height: `${paddingBottom}px`, padding: 0 }} colSpan={columnCount} />
+                  </tr>
+                )}
+              </>
+            );
+          })()}
         </tbody>
       </table>
 
       <SelectionToolbar
         selectedCount={selectedRows.size}
-        onRun={() => console.log("Run selected:", Array.from(selectedRows))}
+        onRun={handleRunSelectedRows}
+        onStop={handleStopExecution}
         onDelete={() => deleteSelectedRows(activeDatasetId)}
         onClear={clearRowSelection}
+        isRunning={isExecutionRunning}
+        isAborting={isAborting}
       />
 
       {/* Save as dataset drawer */}
@@ -984,18 +1266,16 @@ export function EvaluationsV3Table({
                 type: col.type as DatasetColumnType,
               }),
             );
-            // Update the dataset to be a saved reference
-            const updatedDataset: DatasetReference = {
-              ...currentDataset,
+            // Use updateDataset to transform inline to saved in-place
+            // This avoids the removeDataset + addDataset race condition
+            // that caused duplicate datasets when removeDataset was blocked
+            updateDataset(currentDataset.id, {
               type: "saved",
+              name: savedDataset.name,
               datasetId: savedDataset.datasetId,
               inline: undefined,
               columns,
-            };
-            // Remove the old dataset and add the new one
-            removeDataset(currentDataset.id);
-            addDataset(updatedDataset);
-            setActiveDataset(updatedDataset.id);
+            });
           }
           setSaveAsDatasetDrawerOpen(false);
           setDatasetToSave(undefined);

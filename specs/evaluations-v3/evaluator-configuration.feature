@@ -100,3 +100,14 @@ Feature: Evaluator configuration
     When the workflow DSL is generated
     Then evaluator nodes are named "GPT-4o.Exact Match" and "Claude Opus.Exact Match"
     And results can be mapped back to the correct agent
+
+  Scenario: Newly created evaluator is automatically added to workbench
+    When I click "+ Add evaluator" inside the "GPT-4o" agent cell
+    And I click "New Evaluator"
+    And I select category "Expected Answer"
+    And I select evaluator type "Exact Match"
+    And I configure the evaluator name as "My Custom Evaluator"
+    And I click "Create Evaluator"
+    Then the drawer closes
+    And the evaluator "My Custom Evaluator" is added to the workbench
+    And the evaluator chip appears inside the agent cell

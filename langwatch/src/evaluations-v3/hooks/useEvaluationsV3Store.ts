@@ -7,6 +7,7 @@ import type { DatasetColumnType } from "~/server/datasets/types";
 
 import {
   createInitialState,
+  createInitialResults,
   type TargetConfig,
   type CellPosition,
   type DatasetColumn,
@@ -781,6 +782,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
       results: {
         status: "idle",
         targetOutputs: {},
+        targetMetadata: {},
         evaluatorResults: {},
         errors: {},
       },
@@ -1083,7 +1085,14 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
   // -------------------------------------------------------------------------
 
   reset: () => {
-    set(createInitialState());
+    // IMPORTANT: Explicitly clear experimentId and experimentSlug
+    // createInitialState() doesn't include these optional fields,
+    // and Zustand's set() does a shallow merge, so we need to explicitly set them
+    set({
+      ...createInitialState(),
+      experimentId: undefined,
+      experimentSlug: undefined,
+    });
   },
 
   loadState: (wizardState: unknown) => {
@@ -1091,17 +1100,45 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     const state = wizardState as Record<string, unknown>;
 
-    set((current) => ({
-      ...current,
-      experimentId: (state.experimentId as string) ?? current.experimentId,
-      experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
-      name: (state.name as string) ?? current.name,
-      datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
-      activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
-      evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-      // Support loading old state format (agents) and new format (targets)
-      targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
-    }));
+    // Load persisted results if available
+    const persistedResults = state.results as Record<string, unknown> | undefined;
+    const loadedResults = persistedResults
+      ? {
+          ...createInitialResults(),
+          runId: persistedResults.runId as string | undefined,
+          versionId: persistedResults.versionId as string | undefined,
+          targetOutputs: (persistedResults.targetOutputs as Record<string, unknown[]>) ?? {},
+          targetMetadata: (persistedResults.targetMetadata as Record<string, Array<{ cost?: number; duration?: number; traceId?: string }>>) ?? {},
+          evaluatorResults: (persistedResults.evaluatorResults as Record<string, Record<string, unknown[]>>) ?? {},
+          errors: (persistedResults.errors as Record<string, string[]>) ?? {},
+        }
+      : undefined;
+
+    set((current) => {
+      // Load hidden columns from persisted state (convert array to Set)
+      const hiddenColumns = Array.isArray(state.hiddenColumns)
+        ? new Set(state.hiddenColumns as string[])
+        : current.ui.hiddenColumns;
+
+      return {
+        ...current,
+        experimentId: (state.experimentId as string) ?? current.experimentId,
+        experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
+        name: (state.name as string) ?? current.name,
+        datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
+        activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
+        evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+        // Support loading old state format (agents) and new format (targets)
+        targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
+        // Load persisted results if available
+        results: loadedResults ?? current.results,
+        // Load hidden columns into UI state
+        ui: {
+          ...current.ui,
+          hiddenColumns,
+        },
+      };
+    });
   },
 
   setSavedDatasetRecords: (datasetId: string, records) => {

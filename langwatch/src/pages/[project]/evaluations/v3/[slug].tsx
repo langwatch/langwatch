@@ -1,15 +1,14 @@
-import { Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import ErrorPage from "next/error";
+import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 
-import { CurrentDrawer } from "~/components/CurrentDrawer";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
 import { EvaluationsV3Table } from "~/evaluations-v3/components/EvaluationsV3Table";
+import { HistoryButton } from "~/evaluations-v3/components/HistoryButton";
 import { RowHeightToggle } from "~/evaluations-v3/components/RowHeightToggle";
 import { RunEvaluationButton } from "~/evaluations-v3/components/RunEvaluationButton";
 import { SavedDatasetLoaders } from "~/evaluations-v3/components/SavedDatasetLoaders";
@@ -38,7 +37,12 @@ export default function EvaluationsV3Page() {
     }));
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
-  const { isLoading: isLoadingExperiment } = useAutosaveEvaluationsV3();
+  const {
+    isLoading: isLoadingExperiment,
+    isNotFound,
+    isError,
+    error,
+  } = useAutosaveEvaluationsV3();
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
@@ -55,8 +59,45 @@ export default function EvaluationsV3Page() {
     return <LoadingScreen />;
   }
 
-  if (!slug) {
-    return <ErrorPage statusCode={404} />;
+  // Show loading while fetching
+  if (isLoadingExperiment) {
+    return <LoadingScreen />;
+  }
+
+  // Show 404 if experiment doesn't exist
+  if (!slug || isNotFound) {
+    return (
+      <DashboardLayout backgroundColor="white" compactMenu={true}>
+        <Box padding={6}>
+          <Alert.Root status="warning">
+            <Alert.Indicator />
+            <Alert.Title>Evaluation not found</Alert.Title>
+            <Alert.Description>
+              The evaluation you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have access to it.
+            </Alert.Description>
+          </Alert.Root>
+        </Box>
+      </DashboardLayout>
+    );
+  }
+
+  // Show error for other failures (permissions, network, etc.)
+  if (isError) {
+    return (
+      <DashboardLayout backgroundColor="white" compactMenu={true}>
+        <Box padding={6}>
+          <Alert.Root status="error">
+            <Alert.Indicator />
+            <Alert.Title>Failed to load evaluation</Alert.Title>
+            <Alert.Description>
+              {error?.message ??
+                "An unexpected error occurred while loading the evaluation."}
+            </Alert.Description>
+          </Alert.Root>
+        </Box>
+      </DashboardLayout>
+    );
   }
 
   return (
@@ -85,7 +126,10 @@ export default function EvaluationsV3Page() {
             />
             <UndoRedo />
             <RowHeightToggle />
-            <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
+            <HistoryButton disabled={isLoadingExperiment} />
+            <RunEvaluationButton
+              disabled={isLoadingExperiment || isLoadingDatasets}
+            />
           </HStack>
         </HStack>
 

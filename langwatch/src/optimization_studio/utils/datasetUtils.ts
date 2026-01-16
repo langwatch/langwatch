@@ -5,6 +5,7 @@ import type {
   DatasetColumns,
   DatasetColumnType,
   DatasetRecordEntry,
+  DatasetRecordInput,
 } from "../../server/datasets/types";
 import type { Field, NodeDataset } from "../types/dsl";
 
@@ -168,11 +169,13 @@ export const trainTestSplit = (
   };
 };
 
+// Accepts input records (optional id) and returns input records
+// Used when mapping columns before saving to DB
 export const tryToMapPreviousColumnsToNewColumns = (
-  datasetRecords: DatasetRecordEntry[],
+  datasetRecords: DatasetRecordInput[],
   previousColumns: DatasetColumns,
   newColumns: DatasetColumns,
-): DatasetRecordEntry[] => {
+): DatasetRecordInput[] => {
   const columnNameMap: Record<string, string | undefined> = {};
 
   // First pass: exact name matches
@@ -208,12 +211,12 @@ export const tryToMapPreviousColumnsToNewColumns = (
   }
 
   const res = datasetRecords.map((record) => {
-    const convertedRecord: DatasetRecordEntry = {
-      id: record.id,
+    const convertedRecord: DatasetRecordInput = {
+      ...(record.id ? { id: record.id } : {}),
     };
 
     for (const [key, value] of Object.entries(record)) {
-      if (key === "id") continue; // Skip id as it's already added
+      if (key === "id") continue; // Skip id as it's already handled
 
       if (key in columnNameMap) {
         const newColumnName = columnNameMap[key];

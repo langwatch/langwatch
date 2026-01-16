@@ -68,6 +68,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {
@@ -268,7 +273,7 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
       // Wait for the table to render (multiple instances, one per row)
       await waitFor(() => {
@@ -310,7 +315,7 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
       // Wait for the table to render
       await waitFor(() => {
@@ -364,7 +369,7 @@ describe("Evaluator Mappings", () => {
         ],
       });
 
-      render(<EvaluationsV3Table />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
       // Wait for the table to render
       await waitFor(() => {
@@ -389,7 +394,7 @@ describe("Evaluator Mappings", () => {
         evaluators: [createTestEvaluator()],
       });
 
-      render(<EvaluationsV3Table />, { wrapper: Wrapper });
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
       // Wait for the evaluator chips to render (multiple, one per row)
       await waitFor(() => {

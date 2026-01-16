@@ -253,20 +253,19 @@ function DatasetTab({
             </HStack>
           </Menu.Item>
         )}
-        {canRemove && dataset.type === "inline" && (
+        {dataset.type === "inline" && (
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
         )}
-        {canRemove && (
-          <Menu.Item
-            value="remove"
-            onClick={onRemove}
-          >
-            <HStack gap={2}>
-              <Trash2 size={14} />
-              <Text>Remove from workbench</Text>
-            </HStack>
-          </Menu.Item>
-        )}
+        <Menu.Item
+          value="remove"
+          onClick={onRemove}
+          disabled={!canRemove}
+        >
+          <HStack gap={2}>
+            <Trash2 size={14} />
+            <Text>Remove from workbench</Text>
+          </HStack>
+        </Menu.Item>
       </Menu.Content>
     </Menu.Root>
   );

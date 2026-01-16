@@ -5,15 +5,20 @@
  * 1. Validates all targets have their required mappings
  * 2. Validates all evaluators have their required mappings
  * 3. If any mapping is missing, opens the first drawer with missing mappings
+ *
+ * When running:
+ * - Shows "Stop" button to abort
+ * - Displays progress indicator
  */
 
-import { Button } from "@chakra-ui/react";
-import { LuPlay } from "react-icons/lu";
+import { Button, Spinner } from "@chakra-ui/react";
+import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
 import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
 import { validateWorkbench } from "../utils/mappingValidation";
 import { convertToUIMapping, convertFromUIMapping } from "../utils/fieldMappingConverters";
@@ -29,12 +34,14 @@ export const RunEvaluationButton = ({
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
+  const { status, progress, execute, abort, isAborting } = useExecuteEvaluation();
 
   const {
     targets,
     evaluators,
     activeDatasetId,
     datasets,
+    results,
     setEvaluatorMapping,
     removeEvaluatorMapping,
   } = useEvaluationsV3Store(
@@ -43,14 +50,23 @@ export const RunEvaluationButton = ({
       evaluators: state.evaluators,
       activeDatasetId: state.activeDatasetId,
       datasets: state.datasets,
+      results: state.results,
       setEvaluatorMapping: state.setEvaluatorMapping,
       removeEvaluatorMapping: state.removeEvaluatorMapping,
     }))
   );
 
   const hasTargets = targets.length > 0;
+  const isRunning = status === "running" || results.status === "running";
+  const hasProgress = progress.total > 0;
 
-  const handleClick = () => {
+  const handleClick = async () => {
+    // If running, stop execution
+    if (isRunning) {
+      await abort();
+      return;
+    }
+
     if (!hasTargets) {
       // Open the target type selector to add a target
       openDrawer("targetTypeSelector", {});
@@ -129,13 +145,18 @@ export const RunEvaluationButton = ({
       return;
     }
 
-    // All validations passed - run the evaluation
-    // TODO: Actually trigger the evaluation
-    console.log("All validations passed - ready to run evaluation!");
+    // All validations passed - run the full evaluation
+    await execute({ type: "full" });
   };
 
   // Determine button state and tooltip
   const getTooltipContent = () => {
+    if (isAborting) {
+      return "Stopping evaluation...";
+    }
+    if (isRunning) {
+      return "Stop evaluation";
+    }
     if (!hasTargets) {
       return "Click to add a target";
     }
@@ -161,11 +182,25 @@ export const RunEvaluationButton = ({
         size="sm"
         variant="outline"
         onClick={handleClick}
-        disabled={disabled}
+        disabled={disabled || isAborting}
         data-testid="run-evaluation-button"
       >
-        <LuPlay size={14} />
-        Run
+        {isAborting ? (
+          <>
+            <Spinner size="xs" />
+            Stopping...
+          </>
+        ) : isRunning ? (
+          <>
+            <LuSquare size={14} />
+            Stop
+          </>
+        ) : (
+          <>
+            <LuPlay size={14} />
+            Run
+          </>
+        )}
       </Button>
     </Tooltip>
   );

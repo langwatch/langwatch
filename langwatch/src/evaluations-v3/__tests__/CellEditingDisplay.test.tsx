@@ -75,6 +75,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {
@@ -149,17 +154,18 @@ describe("Cell editing display - inline dataset", () => {
 
   it("shows updated value immediately after editing inline cell", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Find the first input cell (row 0, column 'input')
     const cell = screen.getByTestId("cell-0-input");
-    expect(cell).toHaveTextContent("");
+    // Cell has initial sample data from createInitialInlineDataset
 
     // Double-click to enter edit mode
     await user.dblClick(cell);
 
-    // Find the textarea and type
+    // Find the textarea and clear it, then type new value
     const textarea = await screen.findByRole("textbox");
+    await user.clear(textarea);
     await user.type(textarea, "test value");
 
     // Press Enter to save
@@ -174,7 +180,7 @@ describe("Cell editing display - inline dataset", () => {
 
   it("shows updated value after editing multiple cells", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Edit first cell
     const cell1 = screen.getByTestId("cell-0-input");
@@ -233,7 +239,7 @@ describe("Cell editing display - saved dataset", () => {
   });
 
   it("shows saved dataset values in cells", async () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getByTestId("cell-0-question_0")).toHaveTextContent("What is 2+2?");
@@ -244,7 +250,7 @@ describe("Cell editing display - saved dataset", () => {
 
   it("shows updated value immediately after editing saved cell", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(() => {
@@ -281,7 +287,7 @@ describe("Auto-add empty row at end", () => {
   });
 
   it("always shows at least one empty row at the end", async () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Should have 3 rows by default (all empty)
     expect(screen.getByTestId("cell-0-input")).toBeInTheDocument();
@@ -291,7 +297,7 @@ describe("Auto-add empty row at end", () => {
 
   it("adds new row when typing in the last row", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Fill all 3 default rows
     for (let i = 0; i < 3; i++) {
@@ -340,7 +346,7 @@ describe("Saved dataset - adding new rows", () => {
   });
 
   it("shows empty row after saved records", async () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       // Should show 2 saved records + at least 1 empty row
@@ -352,7 +358,7 @@ describe("Saved dataset - adding new rows", () => {
 
   it("creates new record when typing in empty row of saved dataset", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(
@@ -418,7 +424,7 @@ describe("Saved dataset - DB sync sends full record", () => {
 
   it("sends full record to backend when editing one column (not just the changed field)", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(() => {
@@ -462,7 +468,7 @@ describe("Saved dataset - DB sync sends full record", () => {
 
   it("preserves all column values when editing different columns sequentially", async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(() => {

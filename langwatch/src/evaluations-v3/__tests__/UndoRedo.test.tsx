@@ -358,6 +358,9 @@ describe("Undo/Redo store actions (unit)", () => {
   it("does NOT restore editingCell on undo (prevents getting stuck in edit mode)", async () => {
     const store = useEvaluationsV3Store.getState();
 
+    // Get the initial value for row 1 (from the sample customer support data)
+    const initialRow1Value = getRecords()?.["input"]?.[1];
+
     // Simulate: user double-clicks cell to edit
     store.setSelectedCell({ row: 0, columnId: "input" });
     store.setEditingCell({ row: 0, columnId: "input" });
@@ -381,8 +384,8 @@ describe("Undo/Redo store actions (unit)", () => {
     // Undo using performUndo (which clears editingCell)
     performUndo();
 
-    // Content should be undone
-    expect(getRecords()?.["input"]?.[1]).toBe("");
+    // Content should be undone to the initial value
+    expect(getRecords()?.["input"]?.[1]).toBe(initialRow1Value);
 
     // CRITICAL: editingCell should NOT be restored - user should not be in edit mode
     expect(useEvaluationsV3Store.getState().ui.editingCell).toBeUndefined();
@@ -436,6 +439,10 @@ describe("Undo/Redo store actions (unit)", () => {
   it("DOES restore selectedCell on undo (shows which cell was edited)", async () => {
     const store = useEvaluationsV3Store.getState();
 
+    // Get the initial values (from the sample customer support data)
+    const initialRow0Value = getRecords()?.["input"]?.[0];
+    const initialRow1Value = getRecords()?.["input"]?.[1];
+
     // Edit cell at row 0
     store.setSelectedCell({ row: 0, columnId: "input" });
     store.setCellValue("test-data", 0, "input", "first");
@@ -455,8 +462,8 @@ describe("Undo/Redo store actions (unit)", () => {
     // Undo the "second" edit
     performUndo();
 
-    // Content should be undone
-    expect(getRecords()?.["input"]?.[1]).toBe("");
+    // Content should be undone to initial values
+    expect(getRecords()?.["input"]?.[1]).toBe(initialRow1Value);
     expect(getRecords()?.["input"]?.[0]).toBe("first");
 
     // selectedCell stays at row 1 (where the undone edit was made)
@@ -474,7 +481,8 @@ describe("Undo/Redo store actions (unit)", () => {
       row: 0,
       columnId: "input",
     });
-    expect(getRecords()?.["input"]?.[0]).toBe("");
+    // Content should be undone to initial value
+    expect(getRecords()?.["input"]?.[0]).toBe(initialRow0Value);
   });
 
   it("does NOT create history entries for navigation-only changes", async () => {
