@@ -1,4 +1,4 @@
-import { Alert, Box, Center, Spinner, Text, VStack } from "@chakra-ui/react";
+import { Alert, Box, Center, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useRef } from "react";
 
@@ -43,7 +43,7 @@ export default function NewEvaluationV3() {
 
         // Redirect to the new experiment
         void router.replace(
-          `/${project.slug}/evaluations/v3/${experiment.slug}`
+          `/${project.slug}/evaluations/v3/${experiment.slug}`,
         );
       } catch (error) {
         console.error("Failed to create new evaluation:", error);
@@ -69,12 +69,7 @@ export default function NewEvaluationV3() {
               </VStack>
             </Alert.Root>
           </Box>
-        ) : (
-          <VStack gap={4}>
-            <Spinner size="lg" color="blue.500" />
-            <Text color="gray.500">Creating new evaluation...</Text>
-          </VStack>
-        )}
+        ) : null}
       </Center>
     </DashboardLayout>
   );

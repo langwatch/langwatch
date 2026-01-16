@@ -90,9 +90,12 @@ describe("Autosave evaluation state", () => {
       name: "New Evaluation",
     });
     useEvaluationsV3Store.getState().reset();
-    // Set slug to match router query so shouldLoadExisting is false
-    // This simulates the state after initial load completes
-    useEvaluationsV3Store.setState({ experimentSlug: "test-slug" });
+    // Set slug AND experimentId to match router query so shouldLoadExisting is false
+    // This simulates the state after initial load completes (experiment already exists)
+    useEvaluationsV3Store.setState({
+      experimentSlug: "test-slug",
+      experimentId: "test-experiment-id",
+    });
   });
 
   afterEach(() => {
