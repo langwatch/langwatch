@@ -20,6 +20,7 @@ import path from "path";
  * - Redis: 6380 (dev uses 6379)
  * - Elasticsearch: 9201 (dev uses 9200)
  */
+// In CI, app runs directly on 5560. In Docker (compose.test.yml), app maps 5561:5560
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5561";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
 
