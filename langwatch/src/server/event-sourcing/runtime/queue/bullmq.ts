@@ -190,18 +190,14 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     this.worker.on("failed", (job, error) => {
       // Don't log ordering/lock/replication-lag errors at ERROR level - they're expected behavior
-      if (isSequentialOrderingError(error) || isLockError(error) || isNoEventsFoundError(error)) {
+      if (this.isExpectedError(error)) {
         this.logger.debug(
           {
             queueName: this.queueName,
             jobId: job?.id,
             error: error instanceof Error ? error.message : String(error),
           },
-          isSequentialOrderingError(error)
-            ? "Job delayed due to ordering (previous event not yet processed)"
-            : isLockError(error)
-              ? "Job failed due to lock contention, will retry"
-              : "Job delayed due to events not yet visible in ClickHouse",
+          this.getExpectedErrorMessage(error),
         );
         return;
       }
@@ -346,6 +342,31 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
       throw error;
     }
+  }
+
+  /**
+   * Checks if an error is an expected error type that should be logged at DEBUG level.
+   * Expected errors include ordering errors, lock contention, and ClickHouse replication lag.
+   */
+  private isExpectedError(error: unknown): boolean {
+    return (
+      isSequentialOrderingError(error) ||
+      isLockError(error) ||
+      isNoEventsFoundError(error)
+    );
+  }
+
+  /**
+   * Returns the appropriate log message for an expected error type.
+   */
+  private getExpectedErrorMessage(error: unknown): string {
+    if (isSequentialOrderingError(error)) {
+      return "Job delayed due to ordering (previous event not yet processed)";
+    }
+    if (isLockError(error)) {
+      return "Job failed due to lock contention, will retry";
+    }
+    return "Job delayed due to events not yet visible in ClickHouse";
   }
 
   /**

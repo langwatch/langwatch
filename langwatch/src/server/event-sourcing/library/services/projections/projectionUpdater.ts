@@ -25,7 +25,7 @@ import {
   handleError,
   isSequentialOrderingError,
   LockError,
-  ValidationError,
+  NoEventsFoundError,
 } from "../errorHandling";
 import type { UpdateProjectionOptions } from "../eventSourcingService.types";
 import type { QueueProcessorManager } from "../queues/queueProcessorManager";
@@ -761,15 +761,10 @@ export class ProjectionUpdater<
           }
 
           if (events.length === 0) {
-            throw new ValidationError(
-              `No events found for aggregate ${String(aggregateId)}`,
-              "events",
-              void 0,
-              {
-                aggregateId: String(aggregateId),
-                tenantId: context.tenantId,
-                projectionName,
-              },
+            throw new NoEventsFoundError(
+              String(aggregateId),
+              context.tenantId,
+              { projectionName },
             );
           }
 
