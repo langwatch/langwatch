@@ -18,42 +18,47 @@ import {
 } from "lucide-react";
 
 /**
+ * Card prompting user to generate scenarios with AI.
+ * Currently hidden until AI generation is implemented.
+ */
+function GenerateWithAICard() {
+  return (
+    <Card.Root>
+      <Card.Body>
+        <VStack align="stretch" gap={3}>
+          <HStack gap={3}>
+            <Box p={2} bg="blue.50" borderRadius="md" color="blue.500">
+              <Icon as={Sparkles} boxSize={5} />
+            </Box>
+            <VStack align="start" gap={0}>
+              <Text fontWeight="semibold" fontSize="sm">
+                Need Help?
+              </Text>
+              <Text fontSize="xs" color="gray.600">
+                Our AI can help you write better scenarios based on your
+                agent&apos;s purpose and common user patterns.
+              </Text>
+            </VStack>
+          </HStack>
+          <Button variant="outline" width="full" size="sm">
+            <Sparkles size={14} />
+            Generate with AI
+          </Button>
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+/**
  * Help sidebar for the scenario editor.
  * Provides tips and best practices for writing scenarios.
  */
 export function ScenarioEditorSidebar() {
   return (
     <VStack align="stretch" gap={4}>
-      {/* Need Help Card */}
-      <Card.Root>
-        <Card.Body>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <Box
-                p={2}
-                bg="blue.50"
-                borderRadius="md"
-                color="blue.500"
-              >
-                <Icon as={Sparkles} boxSize={5} />
-              </Box>
-              <VStack align="start" gap={0}>
-                <Text fontWeight="semibold" fontSize="sm">
-                  Need Help?
-                </Text>
-                <Text fontSize="xs" color="gray.600">
-                  Our AI can help you write better scenarios based on your
-                  agent&apos;s purpose and common user patterns.
-                </Text>
-              </VStack>
-            </HStack>
-            <Button variant="outline" width="full" size="sm">
-              <Sparkles size={14} />
-              Generate with AI
-            </Button>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+      {/* TODO: Uncomment when AI generation is implemented */}
+      {/* <GenerateWithAICard /> */}
 
       {/* Writing Great Scenarios */}
       <Card.Root>

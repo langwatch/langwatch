@@ -68,7 +68,7 @@ function ScenarioLibraryPage() {
           </VStack>
         )}
 
-        {error && (
+        {error && !scenarios?.length && (
           <VStack gap={4} align="center" py={8}>
             <Text color="red.500">Error loading scenarios</Text>
             <Text fontSize="sm" color="gray.600">

@@ -1,7 +1,11 @@
+import { createLogger } from "./logger";
+
+const logger = createLogger("pollForScenarioRun");
+
 const POLLING_INTERVAL_MS = 500;
 const POLLING_MAX_DURATION_MS = 30_000;
 const MAX_POLLING_ATTEMPTS = Math.ceil(
-  POLLING_MAX_DURATION_MS / POLLING_INTERVAL_MS
+  POLLING_MAX_DURATION_MS / POLLING_INTERVAL_MS,
 );
 
 interface PollForRunParams {
@@ -12,32 +16,102 @@ interface PollForRunParams {
 
 interface ScenarioRun {
   scenarioRunId: string;
+  status?: string;
+  messages?: unknown[];
 }
 
 type FetchBatchRunData = (params: PollForRunParams) => Promise<ScenarioRun[]>;
 
+export type PollResult =
+  | { success: true; scenarioRunId: string }
+  | { success: false; error: "timeout" | "run_error"; scenarioRunId?: string };
+
 /**
- * Polls for a scenario run to appear after execution starts.
- * Returns the scenarioRunId when found, or null if max attempts exceeded.
+ * Polls for a scenario run to have content or reach terminal state.
+ * Returns when: has messages (something to show), or ERROR/FAILED/SUCCESS.
+ * Returns success with scenarioRunId, or error with reason.
  */
 export async function pollForScenarioRun(
   fetchBatchRunData: FetchBatchRunData,
-  params: PollForRunParams
-): Promise<string | null> {
+  params: PollForRunParams,
+): Promise<PollResult> {
+  logger.info(
+    {
+      projectId: params.projectId,
+      scenarioSetId: params.scenarioSetId,
+      batchRunId: params.batchRunId,
+    },
+    "Starting poll",
+  );
+
   for (let attempt = 0; attempt < MAX_POLLING_ATTEMPTS; attempt++) {
     try {
+      logger.info({ attempt }, "Fetching batch run data");
       const runs = await fetchBatchRunData(params);
+      logger.info({ attempt, runsCount: runs.length }, "Fetch completed");
+
+      if (attempt % 10 === 0) {
+        logger.info(
+          {
+            attempt,
+            runsCount: runs.length,
+            firstRun: runs[0]
+              ? {
+                  scenarioRunId: runs[0].scenarioRunId,
+                  status: runs[0].status,
+                  messagesCount: runs[0].messages?.length ?? 0,
+                }
+              : null,
+          },
+          "Polling attempt",
+        );
+      }
 
       if (runs.length > 0 && runs[0]?.scenarioRunId) {
-        return runs[0].scenarioRunId;
+        const run = runs[0];
+
+        // Check for error/cancelled states first
+        if (
+          run.status === "ERROR" ||
+          run.status === "FAILED" ||
+          run.status === "CANCELLED"
+        ) {
+          logger.info(
+            { status: run.status, scenarioRunId: run.scenarioRunId },
+            "Run terminated with error or cancelled",
+          );
+          return {
+            success: false,
+            error: "run_error",
+            scenarioRunId: run.scenarioRunId,
+          };
+        }
+
+        // Return success if we have messages to show or run is complete
+        const hasMessages = run.messages && run.messages.length > 0;
+        if (hasMessages || run.status === "SUCCESS") {
+          logger.info(
+            {
+              status: run.status,
+              hasMessages,
+              scenarioRunId: run.scenarioRunId,
+            },
+            "Run ready",
+          );
+          return { success: true, scenarioRunId: run.scenarioRunId };
+        }
+
+        // Run exists but no messages yet and not terminal - keep polling
       }
     } catch (error) {
-      console.error("Failed to fetch batch run data:", error);
+      logger.error({ error }, "Fetch error");
       // Continue polling on error
     }
 
     await new Promise((resolve) => setTimeout(resolve, POLLING_INTERVAL_MS));
   }
 
-  return null;
+  logger.warn({ maxAttempts: MAX_POLLING_ATTEMPTS }, "Timed out");
+
+  return { success: false, error: "timeout" };
 }
