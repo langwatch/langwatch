@@ -1114,19 +1114,31 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
         }
       : undefined;
 
-    set((current) => ({
-      ...current,
-      experimentId: (state.experimentId as string) ?? current.experimentId,
-      experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
-      name: (state.name as string) ?? current.name,
-      datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
-      activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
-      evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
-      // Support loading old state format (agents) and new format (targets)
-      targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
-      // Load persisted results if available
-      results: loadedResults ?? current.results,
-    }));
+    set((current) => {
+      // Load hidden columns from persisted state (convert array to Set)
+      const hiddenColumns = Array.isArray(state.hiddenColumns)
+        ? new Set(state.hiddenColumns as string[])
+        : current.ui.hiddenColumns;
+
+      return {
+        ...current,
+        experimentId: (state.experimentId as string) ?? current.experimentId,
+        experimentSlug: (state.experimentSlug as string) ?? current.experimentSlug,
+        name: (state.name as string) ?? current.name,
+        datasets: (state.datasets as typeof current.datasets) ?? current.datasets,
+        activeDatasetId: (state.activeDatasetId as string) ?? current.activeDatasetId,
+        evaluators: (state.evaluators as typeof current.evaluators) ?? current.evaluators,
+        // Support loading old state format (agents) and new format (targets)
+        targets: (state.targets as typeof current.targets) ?? (state.agents as typeof current.targets) ?? current.targets,
+        // Load persisted results if available
+        results: loadedResults ?? current.results,
+        // Load hidden columns into UI state
+        ui: {
+          ...current.ui,
+          hiddenColumns,
+        },
+      };
+    });
   },
 
   setSavedDatasetRecords: (datasetId: string, records) => {

@@ -38,6 +38,8 @@ export const persistedEvaluationsV3StateSchema = z.object({
   evaluators: z.array(evaluatorConfigSchema),
   targets: z.array(targetConfigSchema),
   results: persistedResultsSchema.optional(),
+  // Hidden columns - stored as array for JSON serialization, converted to Set on load
+  hiddenColumns: z.array(z.string()).optional(),
 });
 
 // ============================================================================
@@ -60,6 +62,8 @@ export type PersistedEvaluationsV3State = Omit<
   "ui" | "results"
 > & {
   results?: PersistedResults;
+  // Hidden columns - stored as array for JSON serialization
+  hiddenColumns?: string[];
 };
 
 /**
@@ -99,15 +103,31 @@ const extractPersistedResults = (results: EvaluationResults): PersistedResults |
 
 /**
  * Extracts the persistable state from the full store state.
+ * Strips savedRecords from datasets - they're loaded on demand from DB,
+ * not stored in the experiment's wizardState.
  */
 export const extractPersistedState = (
   state: EvaluationsV3State
 ): PersistedEvaluationsV3State => {
-  const { ui: _ui, results, ...restState } = state;
+  const { ui, results, datasets, ...restState } = state;
   const persistedResults = extractPersistedResults(results);
+
+  // Strip savedRecords from datasets - they're fetched from DB on load
+  // Only the dataset reference (datasetId, columns) needs to be persisted
+  const datasetsWithoutRecords = datasets.map((dataset) => {
+    if (dataset.type === "saved") {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { savedRecords: _savedRecords, ...datasetWithoutRecords } = dataset;
+      return datasetWithoutRecords;
+    }
+    return dataset;
+  });
 
   return {
     ...restState,
+    datasets: datasetsWithoutRecords,
     results: persistedResults,
+    // Convert Set to array for JSON serialization
+    hiddenColumns: Array.from(ui.hiddenColumns),
   };
 };

@@ -8,15 +8,95 @@ describe("Persistence", () => {
     useEvaluationsV3Store.setState(createInitialState());
   });
 
+  describe("extractPersistedState from actual store state", () => {
+    it("persists hiddenColumns from actual store UI state", () => {
+      // This test ensures that when extractPersistedState is called with the 
+      // actual store state (as done in useAutosaveEvaluationsV3), hiddenColumns
+      // are correctly extracted from ui.hiddenColumns
+      const store = useEvaluationsV3Store.getState();
+      
+      // Hide some columns via the store action
+      store.toggleColumnVisibility("input");
+      store.toggleColumnVisibility("expected_output");
+      
+      // Get the full store state (simulating what useAutosaveEvaluationsV3 does)
+      const fullState = useEvaluationsV3Store.getState();
+      
+      // Extract persisted state from the FULL store state
+      const persisted = extractPersistedState(fullState);
+      
+      // hiddenColumns should be extracted from ui.hiddenColumns
+      expect(persisted.hiddenColumns).toContain("input");
+      expect(persisted.hiddenColumns).toContain("expected_output");
+      expect(persisted.hiddenColumns?.length).toBe(2);
+    });
+
+    it("persists empty hiddenColumns when none are hidden in store", () => {
+      // Get the full store state with no hidden columns
+      const fullState = useEvaluationsV3Store.getState();
+      
+      // Verify no columns are hidden initially
+      expect(fullState.ui.hiddenColumns.size).toBe(0);
+      
+      const persisted = extractPersistedState(fullState);
+      
+      expect(persisted.hiddenColumns).toEqual([]);
+    });
+
+    it("round-trips hiddenColumns through extract and load", () => {
+      // Hide columns
+      useEvaluationsV3Store.getState().toggleColumnVisibility("input");
+      useEvaluationsV3Store.getState().toggleColumnVisibility("some_column");
+      
+      // Extract persisted state
+      const persisted = extractPersistedState(useEvaluationsV3Store.getState());
+      
+      // Reset store to initial state
+      useEvaluationsV3Store.setState(createInitialState());
+      expect(useEvaluationsV3Store.getState().ui.hiddenColumns.size).toBe(0);
+      
+      // Load the persisted state back
+      useEvaluationsV3Store.getState().loadState(persisted);
+      
+      // Verify hidden columns are restored
+      const restoredState = useEvaluationsV3Store.getState();
+      expect(restoredState.ui.hiddenColumns.has("input")).toBe(true);
+      expect(restoredState.ui.hiddenColumns.has("some_column")).toBe(true);
+      expect(restoredState.ui.hiddenColumns.size).toBe(2);
+    });
+  });
+
   describe("extractPersistedState", () => {
-    it("excludes UI state from persisted state", () => {
+    it("excludes transient UI state from persisted state", () => {
       const state = createInitialState();
       state.ui.selectedRows = new Set([0, 1, 2]);
       state.ui.rowHeightMode = "expanded";
 
       const persisted = extractPersistedState(state);
 
+      // Transient UI state should not be persisted
       expect(persisted).not.toHaveProperty("ui");
+      expect(persisted).not.toHaveProperty("selectedRows");
+      expect(persisted).not.toHaveProperty("rowHeightMode");
+    });
+
+    it("persists hiddenColumns as array for JSON serialization", () => {
+      const state = createInitialState();
+      state.ui.hiddenColumns = new Set(["input", "expected_output"]);
+
+      const persisted = extractPersistedState(state);
+
+      // hiddenColumns should be persisted (converted to array for JSON)
+      expect(persisted.hiddenColumns).toEqual(["input", "expected_output"]);
+    });
+
+    it("persists empty hiddenColumns as empty array", () => {
+      const state = createInitialState();
+      state.ui.hiddenColumns = new Set();
+
+      const persisted = extractPersistedState(state);
+
+      expect(persisted.hiddenColumns).toEqual([]);
     });
 
     it("excludes transient result fields (status, progress, executingCells)", () => {
@@ -130,6 +210,61 @@ describe("Persistence", () => {
       expect(persisted.results?.versionId).toBe("version-456");
     });
 
+    it("strips savedRecords from saved datasets", () => {
+      const state = createInitialState();
+      state.datasets = [
+        {
+          id: "saved-dataset-1",
+          name: "My Saved Dataset",
+          type: "saved",
+          datasetId: "db-dataset-id",
+          columns: [{ id: "col1", name: "input", type: "string" }],
+          savedRecords: [
+            { id: "rec1", input: "row 1 data" },
+            { id: "rec2", input: "row 2 data" },
+            { id: "rec3", input: "row 3 data" },
+          ],
+        },
+      ];
+
+      const persisted = extractPersistedState(state);
+
+      // savedRecords should be stripped - they're loaded from DB on demand
+      expect(persisted.datasets[0]).not.toHaveProperty("savedRecords");
+      // But other properties should be preserved
+      expect(persisted.datasets[0]).toEqual({
+        id: "saved-dataset-1",
+        name: "My Saved Dataset",
+        type: "saved",
+        datasetId: "db-dataset-id",
+        columns: [{ id: "col1", name: "input", type: "string" }],
+      });
+    });
+
+    it("preserves inline dataset records (they are part of the experiment)", () => {
+      const state = createInitialState();
+      state.datasets = [
+        {
+          id: "inline-dataset-1",
+          name: "Test Data",
+          type: "inline",
+          columns: [{ id: "col1", name: "input", type: "string" }],
+          inline: {
+            columns: [{ id: "col1", name: "input", type: "string" }],
+            records: { col1: ["value 1", "value 2"] },
+          },
+        },
+      ];
+
+      const persisted = extractPersistedState(state);
+
+      // Inline dataset records SHOULD be preserved
+      expect(persisted.datasets[0]).toHaveProperty("inline");
+      expect((persisted.datasets[0] as any).inline.records).toEqual({
+        col1: ["value 1", "value 2"],
+      });
+    });
+
     it("handles sparse arrays with null/undefined values", () => {
       const state = createInitialState();
       // Simulate running only row 1, leaving row 0 empty
@@ -174,6 +309,42 @@ describe("Persistence", () => {
   });
 
   describe("loadState", () => {
+    it("loads hiddenColumns from persisted state into UI", () => {
+      const persistedState = {
+        name: "Test Evaluation",
+        datasets: [],
+        activeDatasetId: "test-dataset",
+        evaluators: [],
+        targets: [],
+        hiddenColumns: ["input", "expected_output"],
+      };
+
+      useEvaluationsV3Store.getState().loadState(persistedState);
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.hiddenColumns).toBeInstanceOf(Set);
+      expect(state.ui.hiddenColumns.has("input")).toBe(true);
+      expect(state.ui.hiddenColumns.has("expected_output")).toBe(true);
+      expect(state.ui.hiddenColumns.size).toBe(2);
+    });
+
+    it("handles missing hiddenColumns in persisted state", () => {
+      const persistedState = {
+        name: "Test Evaluation",
+        datasets: [],
+        activeDatasetId: "test-dataset",
+        evaluators: [],
+        targets: [],
+        // No hiddenColumns field
+      };
+
+      useEvaluationsV3Store.getState().loadState(persistedState);
+
+      const state = useEvaluationsV3Store.getState();
+      expect(state.ui.hiddenColumns).toBeInstanceOf(Set);
+      expect(state.ui.hiddenColumns.size).toBe(0);
+    });
+
     it("loads persisted results into the store", () => {
       const persistedState = {
         name: "Test Evaluation",
