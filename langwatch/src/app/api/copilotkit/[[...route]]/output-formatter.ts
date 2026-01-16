@@ -26,8 +26,10 @@ function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean
       return typeof value === "boolean";
     case "json_schema":
       return typeof value === "object";
-    default:
-      return false;
+    default: {
+      const _exhaustive: never = type;
+      throw new Error(`Unhandled output type: ${_exhaustive}`);
+    }
   }
 }
 

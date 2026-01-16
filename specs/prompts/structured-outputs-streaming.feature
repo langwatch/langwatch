@@ -1,4 +1,4 @@
-@unit
+@integration
 Feature: Structured Outputs Streaming in Prompt Playground
   As a user executing prompts in the playground
   I want my custom output fields to stream correctly

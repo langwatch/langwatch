@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
+import type { ReactElement } from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -47,7 +48,7 @@ describe("tryParseJson", () => {
 });
 
 describe("StructuredOutputDisplay", () => {
-  const renderWithChakra = (ui: React.ReactElement) =>
+  const renderWithChakra = (ui: ReactElement) =>
     render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
 
   const fallback = <div data-testid="fallback">Fallback</div>;
