@@ -17,7 +17,9 @@ import { getTestProject } from "~/utils/testUtils";
  * - OPENAI_API_KEY in environment
  * - Database available for test project
  */
-describe("WorkflowExecution Integration", () => {
+// Skip for now as those tests depend on the NLP service, which is not available in the CI environment.
+
+describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
   let project: Project;
 
   beforeAll(async () => {
@@ -177,7 +179,7 @@ describe("WorkflowExecution Integration", () => {
 
       expect(targetCompletedEvent).toBeDefined();
       expect(targetCompletedEvent?.payload.execution_state?.outputs?.output).toBeDefined();
-      
+
       // The output should be a string (the LLM response)
       const output = targetCompletedEvent?.payload.execution_state?.outputs?.output;
       expect(typeof output).toBe("string");
@@ -223,7 +225,7 @@ describe("WorkflowExecution Integration", () => {
     }, 60000);
   });
 
-  // Note: evaluator and execute_flow tests are skipped due to a "coroutine raised StopIteration" 
+  // Note: evaluator and execute_flow tests are skipped due to a "coroutine raised StopIteration"
   // Python async bug in the NLP service. This is being tracked separately.
   // The key functionality (prompt execution via execute_component) works correctly.
   describe.skip("execute_component for evaluator - NLP service bug", () => {
@@ -262,7 +264,7 @@ describe("WorkflowExecution Integration", () => {
       );
 
       expect(targetEvent).toBeDefined();
-      
+
       const executionState = targetEvent?.payload.execution_state;
       expect(executionState?.outputs).toBeDefined();
       expect(executionState?.timestamps).toBeDefined();
