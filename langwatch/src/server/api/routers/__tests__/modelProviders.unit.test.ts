@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
-import { getModelMetadataForFrontend, type ModelMetadataForFrontend } from "../modelProviders";
+import { getModelMetadataForFrontend, type ModelMetadataForFrontend, prepareLitellmParams } from "../modelProviders";
+import type { MaybeStoredModelProvider } from "../../../modelProviders/registry";
 
 /**
  * Unit tests for modelProviders router helper functions
@@ -212,5 +213,113 @@ describe("getModelMetadataForFrontend", () => {
 
     // GPT-4o doesn't have reasoning config
     expect(gpt4?.reasoningConfig).toBeUndefined();
+  });
+});
+
+describe("prepareLitellmParams", () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const createMockProvider = (
+    provider: string,
+    customKeys: Record<string, string> | null = null
+  ): MaybeStoredModelProvider => ({
+    provider,
+    enabled: true,
+    customKeys,
+    models: null,
+    embeddingsModels: null,
+    deploymentMapping: null,
+    extraHeaders: null,
+  });
+
+  describe("Anthropic URL normalization", () => {
+    it("strips /v1 suffix from Anthropic api_base", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
+    });
+
+    it("strips /v1/ suffix (with trailing slash) from Anthropic api_base", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1/");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
+    });
+
+    it("preserves custom Anthropic base URL without /v1", async () => {
+      vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+      vi.stubEnv("ANTHROPIC_BASE_URL", "https://custom-anthropic.example.com");
+
+      const modelProvider = createMockProvider("anthropic");
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://custom-anthropic.example.com");
+    });
+
+    it("uses custom keys api_base for Anthropic with /v1 stripped", async () => {
+      const modelProvider = createMockProvider("anthropic", {
+        ANTHROPIC_API_KEY: "custom-key",
+        ANTHROPIC_BASE_URL: "https://api.anthropic.com/v1",
+      });
+
+      const result = await prepareLitellmParams({
+        model: "anthropic/claude-opus-4.5",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.anthropic.com");
+    });
+  });
+
+  describe("non-Anthropic providers", () => {
+    it("preserves /v1 suffix for OpenAI", async () => {
+      vi.stubEnv("OPENAI_API_KEY", "test-key");
+      vi.stubEnv("OPENAI_BASE_URL", "https://api.openai.com/v1");
+
+      const modelProvider = createMockProvider("openai");
+      const result = await prepareLitellmParams({
+        model: "openai/gpt-4o",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://api.openai.com/v1");
+    });
+
+    it("preserves /v1 suffix for custom provider", async () => {
+      vi.stubEnv("CUSTOM_API_KEY", "test-key");
+      vi.stubEnv("CUSTOM_BASE_URL", "https://custom-llm.example.com/v1");
+
+      const modelProvider = createMockProvider("custom");
+      const result = await prepareLitellmParams({
+        model: "custom/my-model",
+        modelProvider,
+        projectId: "test-project",
+      });
+
+      expect(result.api_base).toBe("https://custom-llm.example.com/v1");
+    });
   });
 });

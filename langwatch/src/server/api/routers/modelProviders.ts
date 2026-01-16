@@ -424,7 +424,12 @@ export const prepareLitellmParams = async ({
   }
   const endpoint = getModelOrDefaultEndpointKey(modelProvider);
   if (endpoint) {
-    params.api_base = endpoint;
+    // Strip trailing /v1 for Anthropic - LiteLLM adds it internally
+    if (modelProvider.provider === "anthropic") {
+      params.api_base = endpoint.replace(/\/v1\/?$/, "");
+    } else {
+      params.api_base = endpoint;
+    }
   }
 
   if (modelProvider.provider === "vertex_ai") {
