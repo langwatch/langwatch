@@ -1,7 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test.describe('Test group', () => {
-  test('seed', async ({ page }) => {
-    // generate code here.
-  });
+/**
+ * Default seed for Playwright MCP test planning.
+ * This file is used by planner_setup_page when no seed is specified.
+ */
+test('seed', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
 });

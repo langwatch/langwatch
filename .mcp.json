@@ -1,11 +1,15 @@
 {
   "mcpServers": {
     "playwright-test": {
-      "command": "npx",
+      "command": "pnpm",
       "args": [
+        "exec",
         "playwright",
-        "run-test-mcp-server"
-      ]
+        "run-test-mcp-server",
+        "--config",
+        "langwatch/playwright.config.ts"
+      ],
+      "cwd": "/Users/hope/workspace/langwatch/langwatch-saas"
     }
   }
 }
