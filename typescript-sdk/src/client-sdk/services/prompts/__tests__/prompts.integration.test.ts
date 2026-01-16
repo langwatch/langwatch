@@ -10,7 +10,6 @@ import {
   beforeEach,
   afterAll,
   afterEach,
-  vi,
 } from "vitest";
 import { setupServer } from "msw/node";
 import { createOpenApiHttp } from "openapi-msw";

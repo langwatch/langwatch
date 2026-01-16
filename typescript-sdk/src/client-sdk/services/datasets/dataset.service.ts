@@ -29,7 +29,7 @@ export class DatasetService {
    */
   async getDataset<T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
-    options?: GetDatasetOptions
+    _options?: GetDatasetOptions
   ): Promise<Dataset<T>> {
     this.#config.logger.debug(`Fetching dataset: ${slugOrId}`);
 

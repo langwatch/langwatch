@@ -64,7 +64,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       const processed: number[] = [];
 
-      await evaluation.run(dataset, async ({ item, index }) => {
+      await evaluation.run(dataset, async ({ index }) => {
         processed.push(index);
         // Simulate some work
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -82,7 +82,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       await evaluation.run(
         dataset,
-        async ({ index }) => {
+        async () => {
           currentConcurrent++;
           maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
 
@@ -103,7 +103,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       const processed: number[] = [];
 
-      await evaluation.run(dataset, async ({ item, index }) => {
+      await evaluation.run(dataset, async ({ index }) => {
         processed.push(index);
         if (index === 1) {
           throw new Error("Simulated error");
@@ -209,11 +209,11 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       const results: Array<{ target: string; duration: number; spanId: string }> = [];
 
-      await evaluation.run(dataset, async ({ item, index }) => {
+      await evaluation.run(dataset, async () => {
         const gpt4Result = await evaluation.withTarget(
           "gpt-4",
           { model: "openai/gpt-4" },
-          async ({ spanId }) => {
+          async () => {
             await new Promise((resolve) => setTimeout(resolve, 50));
             return { response: "GPT-4 response" };
           }
@@ -228,7 +228,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
         const claudeResult = await evaluation.withTarget(
           "claude-3",
           { model: "anthropic/claude-3" },
-          async ({ spanId }) => {
+          async () => {
             await new Promise((resolve) => setTimeout(resolve, 30));
             return { response: "Claude response" };
           }
@@ -260,7 +260,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       let loggedInGpt4 = false;
       let loggedInClaude = false;
 
-      await evaluation.run(dataset, async ({ index }) => {
+      await evaluation.run(dataset, async () => {
         await evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
           // Log WITHOUT specifying target - should be inferred as "gpt-4"
           evaluation.log("quality", { score: 0.95 });
@@ -283,7 +283,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       const evaluation = await langwatch.evaluation.init(`test-withTarget-latency-${Date.now()}`);
       const dataset = [{ question: "Test" }];
 
-      await evaluation.run(dataset, async ({ index }) => {
+      await evaluation.run(dataset, async () => {
         const result = await evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
           await new Promise((resolve) => setTimeout(resolve, 100));
           return "done";
@@ -307,7 +307,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       let parallelStartTime = 0;
       let parallelEndTime = 0;
 
-      await evaluation.run(dataset, async ({ index }) => {
+      await evaluation.run(dataset, async () => {
         parallelStartTime = Date.now();
 
         // Run both targets in parallel
@@ -343,7 +343,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
       // Track that both withTarget blocks executed successfully
       const executedTargets: string[] = [];
 
-      await evaluation.run(dataset, async ({ index }) => {
+      await evaluation.run(dataset, async () => {
         await Promise.all([
           evaluation.withTarget("target-a", null, async () => {
             // Delay to ensure overlap with target-b
@@ -484,8 +484,8 @@ describe("Evaluation Unit", () => {
 
       // Mock fetch to capture API calls
       const originalFetch = globalThis.fetch;
-      globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
-        const urlStr = typeof url === "string" ? url : url.toString();
+      globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         if (urlStr.includes("experiment/init")) {
           return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
         }
@@ -512,7 +512,7 @@ describe("Evaluation Unit", () => {
 
         await evaluation.run(
           dataset,
-          async ({ item, index }) => {
+          async ({ item }) => {
             // Run targets in parallel - this is where the race condition would occur
             await Promise.all([
               evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {

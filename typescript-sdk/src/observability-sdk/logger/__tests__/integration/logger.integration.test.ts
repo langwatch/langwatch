@@ -19,8 +19,6 @@ import { resetObservabilitySdkConfig } from "../../../config";
 
 // Test data constants for consistency
 const TEST_LOG_MESSAGE = "This is a test log message";
-const TEST_ERROR_MESSAGE = "This is a test error message";
-const TEST_WARNING_MESSAGE = "This is a test warning message";
 
 const TEST_COMPLEX_ATTRIBUTES = {
   "langwatch.service": "test-service",

@@ -10,7 +10,7 @@
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
-import { trace, context, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import { trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
 import type { LangWatchSpan } from "@/observability-sdk/span/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
@@ -18,7 +18,6 @@ import type { Logger } from "@/logger";
 import { generateHumanReadableId } from "./humanReadableId";
 import {
   EvaluationInitError,
-  EvaluationApiError,
   TargetMetadataConflictError,
   EvaluatorError,
 } from "./errors";
@@ -90,7 +89,7 @@ export class Evaluation {
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Target registry
-  private targets: Map<string, TargetInfo> = new Map();
+  private targets = new Map<string, TargetInfo>();
 
   // Current iteration context (for log/evaluate calls)
   private currentTraceId: string | null = null;
@@ -234,7 +233,7 @@ export class Evaluation {
       const itemPromise = this.executeItem(tracer, item, index, callback);
 
       executing.add(itemPromise);
-      itemPromise.finally(() => executing.delete(itemPromise));
+      void itemPromise.finally(() => executing.delete(itemPromise));
 
       // Wait if we've hit concurrency limit
       if (executing.size >= concurrency) {
@@ -277,9 +276,9 @@ export class Evaluation {
         try {
           // Create a minimal span context for the callback
           const span = {
-            setStatus: () => {},
-            recordException: () => {},
-            end: () => {},
+            setStatus: () => { /* no-op */ },
+            recordException: () => { /* no-op */ },
+            end: () => { /* no-op */ },
           } as unknown as LangWatchSpan;
 
           const ctx: RunContext<T> = { item, index, span };
@@ -495,8 +494,8 @@ export class Evaluation {
             "X-Auth-Token": this.apiKey,
           },
           body: JSON.stringify({
-            trace_id: traceId || null,
-            span_id: spanId || null,
+            trace_id: traceId ?? null,
+            span_id: spanId ?? null,
             name: name ?? evaluatorSlug,
             data,
             settings,
@@ -771,8 +770,8 @@ export class Evaluation {
 
     if (now - this.lastSentMs >= DEBOUNCE_INTERVAL_MS) {
       this.sendBatch();
-    } else if (!this.flushTimeout) {
-      this.flushTimeout = setTimeout(() => {
+    } else {
+      this.flushTimeout ??= setTimeout(() => {
         this.flushTimeout = null;
         this.sendBatch();
       }, DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs));

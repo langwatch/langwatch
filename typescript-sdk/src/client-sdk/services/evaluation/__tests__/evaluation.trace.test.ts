@@ -49,15 +49,15 @@ describe("Target Trace Isolation", () => {
 
   it("creates unique trace_id per target within the SAME row (with real tracer)", async () => {
     // Set up a real tracer provider so we get actual trace IDs
-    const { provider, exporter } = setupTestTracer();
+    const { provider } = setupTestTracer();
     tracerProvider = provider;
 
     const capturedBodies: Array<{
       dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
     }> = [];
 
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
-      const urlStr = typeof url === "string" ? url : url.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
         return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
       }
@@ -114,28 +114,28 @@ describe("Target Trace Isolation", () => {
 
     // CRITICAL: Each target should have a DIFFERENT trace_id
     const traceIds = allEntries.map((e) => e.trace_id);
-    
+
     // With a real tracer, we should have non-null trace IDs
     expect(traceIds[0]).not.toBeNull();
     expect(traceIds[1]).not.toBeNull();
     expect(traceIds[0]).not.toBe("");
     expect(traceIds[1]).not.toBe("");
-    
+
     // They must be DIFFERENT
     expect(traceIds[0]).not.toBe(traceIds[1]);
   });
 
   it("creates unique trace_id across ALL targets in multi-row evaluation (with real tracer)", async () => {
     // Set up a real tracer provider
-    const { provider, exporter } = setupTestTracer();
+    const { provider } = setupTestTracer();
     tracerProvider = provider;
 
     const capturedBodies: Array<{
       dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
     }> = [];
 
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
-      const urlStr = typeof url === "string" ? url : url.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
         return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
       }
@@ -181,7 +181,7 @@ describe("Target Trace Isolation", () => {
 
     // ALL trace_ids should be unique
     const traceIds = allEntries.map((e) => e.trace_id).filter((t): t is string => t !== null && t !== "");
-    
+
     expect(traceIds.length).toBe(6); // All should have valid trace IDs
     expect(new Set(traceIds).size).toBe(6); // All should be unique
   });
@@ -191,8 +191,8 @@ describe("Target Trace Isolation", () => {
       dataset: Array<{ trace_id: string | null }>;
     }> = [];
 
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
-      const urlStr = typeof url === "string" ? url : url.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
         return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
       }
@@ -234,8 +234,8 @@ describe("Target Trace Isolation", () => {
   });
 
   it("sets evaluationUsesTargets flag on first withTarget call", async () => {
-    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
-      const urlStr = typeof url === "string" ? url : url.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
         return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
       }
@@ -280,8 +280,8 @@ describe("Target Trace Isolation", () => {
       dataset: Array<{ target_id?: string }>;
     }> = [];
 
-    globalThis.fetch = vi.fn(async (url: string | URL | Request, options?: RequestInit) => {
-      const urlStr = typeof url === "string" ? url : url.toString();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
         return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
       }

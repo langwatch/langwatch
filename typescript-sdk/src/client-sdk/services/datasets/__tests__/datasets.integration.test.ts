@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { LangWatch } from "@/client-sdk";
-import { DatasetNotFoundError } from "../errors";
 
 // Skip if no API key (CI environments without backend)
 const SKIP_INTEGRATION = !process.env.LANGWATCH_API_KEY;

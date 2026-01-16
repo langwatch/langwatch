@@ -304,7 +304,7 @@ export type IterationInfo = {
  */
 export type TargetContext = {
   /** The LangWatch span for this target execution */
-  span: import("@/observability-sdk/span/types").LangWatchSpan;
+  span: LangWatchSpan;
   /** The trace ID for this target execution */
   traceId: string;
   /** The span ID for this target execution */
