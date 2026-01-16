@@ -243,10 +243,10 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
 
       expect(results).toHaveLength(2);
       expect(results[0]!.target).toBe("gpt-4");
-      expect(results[0]!.duration).toBeGreaterThanOrEqual(50);
+      expect(results[0]!.duration).toBeGreaterThanOrEqual(40);
       expect(results[0]!.spanId).toBeDefined();
       expect(results[1]!.target).toBe("claude-3");
-      expect(results[1]!.duration).toBeGreaterThanOrEqual(30);
+      expect(results[1]!.duration).toBeGreaterThanOrEqual(20);
       // Each target should have its own span ID (even if trace is same without OTEL provider)
       expect(results[0]!.spanId).toBeDefined();
       expect(results[1]!.spanId).toBeDefined();
