@@ -4,25 +4,18 @@ import path from "path";
 /**
  * Agentic E2E Tests Configuration
  *
- * This config is used by:
- * - Playwright Test Planner agent (exploration)
- * - Playwright Test Generator agent (test creation)
- * - Playwright Test Healer agent (debugging/fixing)
- * - CI pipeline (regression testing)
+ * Self-contained test environment using Docker Compose.
+ * Playwright starts the containers automatically before tests run.
+ *
+ * Usage:
+ *   pnpm test          # Starts containers, runs tests, stops containers
+ *   pnpm test:ui       # Interactive mode with Playwright UI
+ *   pnpm test:debug    # Debug mode
  */
 
-/**
- * Test Environment Configuration
- *
- * Uses separate ports to avoid interfering with local development:
- * - App: 5561 (dev uses 5560)
- * - Postgres: 5433 (dev uses 5432)
- * - Redis: 6380 (dev uses 6379)
- * - Elasticsearch: 9201 (dev uses 9200)
- */
-// In CI, app runs directly on 5560. In Docker (compose.test.yml), app maps 5561:5560
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5561";
 const AUTH_FILE = path.join(__dirname, ".auth", "user.json");
+const IS_CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: "./tests",
@@ -32,16 +25,13 @@ export default defineConfig({
   workers: 1,
 
   /* Fail the build on CI if you accidentally left test.only in the source code */
-  forbidOnly: !!process.env.CI,
+  forbidOnly: IS_CI,
 
   /* Retry on CI only */
-  retries: process.env.CI ? 2 : 0,
+  retries: IS_CI ? 2 : 0,
 
   /* Reporter configuration */
-  reporter: [
-    ["html", { outputFolder: "playwright-report" }],
-    ["list"],
-  ],
+  reporter: [["html", { outputFolder: "playwright-report" }], ["list"]],
 
   /* Shared settings for all projects */
   use: {
@@ -56,6 +46,16 @@ export default defineConfig({
     actionTimeout: 15000,
     navigationTimeout: 30000,
   },
+
+  /* Start test environment via Docker Compose (local only, CI uses services) */
+  webServer: IS_CI
+    ? undefined
+    : {
+        command: "docker compose -f ../compose.test.yml up --wait",
+        url: BASE_URL,
+        reuseExistingServer: true,
+        timeout: 120000,
+      },
 
   /* Project configurations */
   projects: [
@@ -76,7 +76,7 @@ export default defineConfig({
     },
 
     /* Firefox for cross-browser coverage (CI only) */
-    ...(process.env.CI
+    ...(IS_CI
       ? [
           {
             name: "firefox",
