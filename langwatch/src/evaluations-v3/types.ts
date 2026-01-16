@@ -216,7 +216,23 @@ export type TargetConfig = Omit<
 // Execution Results Types
 // ============================================================================
 
-export type EvaluationResultStatus = "idle" | "running" | "success" | "error";
+export type EvaluationResultStatus = "idle" | "running" | "success" | "error" | "stopped";
+
+/**
+ * Schema for per-row metadata for a target execution.
+ * This is the source of truth - TypeScript type is derived from this.
+ */
+export const targetRowMetadataSchema = z.object({
+  cost: z.number().optional(),
+  duration: z.number().optional(),
+  traceId: z.string().optional(),
+});
+
+/**
+ * Per-row metadata for a target execution (cost, duration, trace info).
+ * Derived from targetRowMetadataSchema - keeps types in sync automatically.
+ */
+export type TargetRowMetadata = z.infer<typeof targetRowMetadataSchema>;
 
 export type EvaluationResults = {
   runId?: string;
@@ -224,11 +240,20 @@ export type EvaluationResults = {
   status: EvaluationResultStatus;
   progress?: number;
   total?: number;
-  // Per-row results
-  targetOutputs: Record<string, unknown[]>; // targetId -> array of outputs per row
-  // Evaluator results nested by target
-  evaluatorResults: Record<string, Record<string, unknown[]>>; // targetId -> evaluatorId -> array of results per row
-  errors: Record<string, string[]>; // targetId -> array of errors per row
+  /**
+   * Set of cells currently being executed.
+   * Key format: "rowIndex:targetId"
+   * This is the single source of truth for determining which cells show loading state.
+   */
+  executingCells?: Set<string>;
+  // Per-row results - arrays can have holes (undefined) for rows not yet executed
+  targetOutputs: Record<string, Array<unknown>>;
+  // Per-row metadata - arrays can have holes (undefined/null) for rows not yet executed
+  targetMetadata: Record<string, Array<TargetRowMetadata | null | undefined>>;
+  // Evaluator results nested by target - arrays can have holes
+  evaluatorResults: Record<string, Record<string, Array<unknown>>>;
+  // Per-row errors - arrays can have holes (undefined) for rows without errors
+  errors: Record<string, Array<string | null | undefined>>;
 };
 
 // ============================================================================
@@ -464,7 +489,12 @@ export type TableRowData = {
   dataset: Record<string, string>;
   targets: Record<
     string,
-    { output: unknown; evaluators: Record<string, unknown> }
+    {
+      output: unknown;
+      evaluators: Record<string, unknown>;
+      error?: string | null;
+      isLoading?: boolean;
+    }
   >;
 };
 
@@ -481,8 +511,20 @@ export type TableMeta = {
   targetsMap: Map<string, TargetConfig>;
   evaluatorsMap: Map<string, EvaluatorConfig>;
   openTargetEditor: (target: TargetConfig) => void;
+  handleDuplicateTarget: (target: TargetConfig) => void;
   handleRemoveTarget: (targetId: string) => void;
   handleAddEvaluator: () => void;
+  // Execution handlers
+  handleRunTarget?: (targetId: string) => void;
+  handleRunRow?: (rowIndex: number) => void;
+  handleRunCell?: (rowIndex: number, targetId: string) => void;
+  handleStopExecution?: () => void;
+  /** Whether any execution is currently running */
+  isExecutionRunning?: boolean;
+  /** Check if a specific target has cells being executed */
+  isTargetExecuting?: (targetId: string) => boolean;
+  /** Check if a specific cell is being executed */
+  isCellExecuting?: (rowIndex: number, targetId: string) => boolean;
   // Selection data (for checkbox column)
   selectedRows: Set<number>;
   allSelected: boolean;
@@ -505,8 +547,16 @@ export const createInitialInlineDataset = (): InlineDataset => ({
     { id: "expected_output", name: "expected_output", type: "string" },
   ],
   records: {
-    input: ["", "", ""],
-    expected_output: ["", "", ""],
+    input: [
+      "How do I update my billing information?",
+      "I'm having trouble logging into my account",
+      "What are your business hours?",
+    ],
+    expected_output: [
+      "You can update your billing information by going to Settings > Billing in your account dashboard. From there, click 'Edit Payment Method' to make changes. Let me know if you need any help!",
+      "I'm sorry to hear you're having trouble logging in. Let's get this sorted out. Could you try resetting your password using the 'Forgot Password' link on the login page? If that doesn't work, let me know and I can help further.",
+      "We're available Monday through Friday, 9 AM to 6 PM in your local timezone. You can also reach us anytime through this chat or by email at support@company.com.",
+    ],
   },
 });
 
@@ -524,6 +574,7 @@ export const createInitialDataset = (): DatasetReference => ({
 export const createInitialResults = (): EvaluationResults => ({
   status: "idle",
   targetOutputs: {},
+  targetMetadata: {},
   evaluatorResults: {},
   errors: {},
 });

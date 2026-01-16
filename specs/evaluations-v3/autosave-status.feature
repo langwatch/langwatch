@@ -137,3 +137,49 @@ Feature: Autosave Status Indicator
     When I click the undo button
     Then the status indicator shows "Saving..."
     And the original value is synced to the database
+
+  # ============================================================================
+  # Results Persistence
+  # ============================================================================
+
+  Scenario: Evaluation results are persisted on autosave
+    Given I run an evaluation and get results
+    When the autosave is triggered
+    Then the results are included in the persisted state
+    And targetOutputs are saved
+    And targetMetadata (cost, duration, traceId) are saved
+    And evaluatorResults are saved
+    And errors are saved
+
+  Scenario: Transient execution state is NOT persisted
+    Given an evaluation is currently running
+    When the autosave is triggered
+    Then the persisted state does NOT include:
+      | field          |
+      | status         |
+      | progress       |
+      | total          |
+      | executingCells |
+
+  Scenario: Results are restored on page reload
+    Given I run an evaluation and get results for all cells
+    And the autosave completes
+    When I refresh the page
+    Then the previous results are displayed in the cells
+    And target outputs show the saved values
+    And evaluator chips show their saved results
+    And the status is "idle" (not running)
+
+  Scenario: Partial results are restored correctly
+    Given I ran only Target 1 and got results
+    And I did NOT run Target 2
+    And the autosave completes
+    When I refresh the page
+    Then Target 1 cells show their results
+    And Target 2 cells show "No output"
+
+  Scenario: Empty results are not persisted
+    Given I have not run any evaluations
+    When the autosave is triggered
+    Then the persisted state has no results field
+    And storage is not wasted on empty objects

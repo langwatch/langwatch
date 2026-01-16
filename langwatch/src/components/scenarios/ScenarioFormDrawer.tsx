@@ -1,26 +1,20 @@
-import {
-  Button,
-  Grid,
-  GridItem,
-  Heading,
-  HStack,
-} from "@chakra-ui/react";
+import { Grid, GridItem, Heading } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
-import { Play } from "lucide-react";
-import { useRouter } from "next/router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useDrawer, useDrawerParams } from "../../hooks/useDrawer";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRunScenario } from "../../hooks/useRunScenario";
+import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
+import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
+import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
-import { pollForScenarioRun } from "../../utils/pollForScenarioRun";
-import { buildRoutePath } from "../../utils/routes";
-import { QuickTestBar } from "./QuickTestBar";
-import type { TargetType } from "./TargetTypeSelector";
+import { SaveAndRunMenu } from "./SaveAndRunMenu";
 import { ScenarioEditorSidebar } from "./ScenarioEditorSidebar";
 import { ScenarioForm, type ScenarioFormData } from "./ScenarioForm";
+import type { TargetValue } from "./TargetSelector";
 export type ScenarioFormDrawerProps = {
   open?: boolean;
   onClose?: () => void;
@@ -32,21 +26,46 @@ export type ScenarioFormDrawerProps = {
  * Bottom bar with Quick Test and Save and Run.
  */
 export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
-  const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const params = useDrawerParams();
   const utils = api.useContext();
   const [formInstance, setFormInstance] = useState<UseFormReturn<ScenarioFormData> | null>(null);
-  const [targetType, setTargetType] = useState<TargetType>("prompt");
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
-  const runMutation = api.scenarios.run.useMutation();
+  const { runScenario, isRunning } = useRunScenario({
+    projectId: project?.id,
+    projectSlug: project?.slug,
+  });
   const scenarioId = params.scenarioId;
+
+  // Target selection with localStorage persistence
+  const { target: persistedTarget, setTarget: persistTarget } =
+    useScenarioTarget(scenarioId);
+  const [selectedTarget, setSelectedTarget] = useState<TargetValue>(null);
+  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
+  const [promptDrawerOpen, setPromptDrawerOpen] = useState(false);
+
+  // Initialize from persisted target when scenario loads
+  useEffect(() => {
+    if (persistedTarget && !selectedTarget) {
+      setSelectedTarget(persistedTarget);
+    }
+  }, [persistedTarget, selectedTarget]);
+
+  // Update persistence when target changes
+  const handleTargetChange = useCallback(
+    (target: TargetValue) => {
+      setSelectedTarget(target);
+      if (target && scenarioId) {
+        persistTarget(target);
+      }
+    },
+    [persistTarget, scenarioId],
+  );
   const isOpen = props.open !== false && props.open !== undefined;
   const onClose = props.onClose ?? closeDrawer;
   const { data: scenario } = api.scenarios.getById.useQuery(
     { projectId: project?.id ?? "", id: scenarioId ?? "" },
-    { enabled: !!project && !!scenarioId }
+    { enabled: !!project && !!scenarioId },
   );
   const createMutation = api.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
@@ -96,56 +115,44 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [project?.id, scenario, createMutation, updateMutation]
+    [project?.id, scenario, createMutation, updateMutation],
   );
-  const handleSaveAndRun = useCallback(async () => {
-    const form = formInstance;
-    if (!form || !project?.id) return;
-    if (!selectedTargetId) {
-      toaster.create({
-        title: targetType === "prompt" ? "Select a prompt" : "Select an HTTP agent",
-        description: `Please select a ${targetType === "prompt" ? "prompt" : "HTTP agent"} to run the scenario against.`,
-        type: "warning",
-        meta: { closable: true },
-      });
-      return;
-    }
-    await form.handleSubmit(async (data) => {
-      const savedScenario = await handleSave(data);
-      if (!savedScenario) return;
-      const { setId, batchRunId } = await runMutation.mutateAsync({
-        projectId: project.id,
-        scenarioId: savedScenario.id,
-        target: { type: targetType, referenceId: selectedTargetId },
-      });
-
-      // Poll for the run to appear, then redirect to the specific run
-      const scenarioRunId = await pollForScenarioRun(
-        utils.scenarios.getBatchRunData.fetch,
-        { projectId: project.id, scenarioSetId: setId, batchRunId }
-      );
-
-      if (scenarioRunId) {
-        void router.push(
-          buildRoutePath("simulations_run", {
-            project: project.slug,
-            scenarioSetId: setId,
-            batchRunId,
-            scenarioRunId,
-          })
-        );
-      } else {
-        // Fallback to batch page if polling times out
-        void router.push(
-          buildRoutePath("simulations_batch", {
-            project: project.slug,
-            scenarioSetId: setId,
-            batchRunId,
-          })
-        );
+  const handleSaveAndRun = useCallback(
+    async (target: TargetValue) => {
+      const form = formInstance;
+      if (!form || !project?.id) return;
+      if (!target) {
+        toaster.create({
+          title: "Select a target",
+          description:
+            "Please select a prompt or agent to run the scenario against.",
+          type: "warning",
+          meta: { closable: true },
+        });
+        return;
       }
-    })();
-  }, [handleSave, project, selectedTargetId, targetType, runMutation, router, utils, formInstance]);
+      try {
+        await form.handleSubmit(async (data) => {
+          const savedScenario = await handleSave(data);
+          if (!savedScenario) return;
+
+          // Persist the target selection for this scenario
+          persistTarget(target);
+
+          await runScenario(savedScenario.id, target);
+        })();
+      } catch (error) {
+        toaster.create({
+          title: "Failed to run scenario",
+          description:
+            error instanceof Error ? error.message : "An error occurred",
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+    },
+    [handleSave, project?.id, persistTarget, runScenario, formInstance],
+  );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
     if (!form) return;
@@ -163,8 +170,12 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
   const setFormRef = useCallback((form: UseFormReturn<ScenarioFormData>) => {
     setFormInstance(form);
   }, []);
-  const isSubmitting = createMutation.isPending || updateMutation.isPending || runMutation.isPending;
-  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(() => scenario ?? undefined, [scenario]);
+  const isSubmitting =
+    createMutation.isPending || updateMutation.isPending || isRunning;
+  const defaultValues: Partial<ScenarioFormData> | undefined = useMemo(
+    () => scenario ?? undefined,
+    [scenario],
+  );
   return (
     <Drawer.Root
       closeOnInteractOutside={false}
@@ -176,7 +187,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header borderBottomWidth="1px">
-          <Heading size="md">{scenario ? "Edit Scenario" : "Create Scenario"}</Heading>
+          <Heading size="md">
+            {scenario ? "Edit Scenario" : "Create Scenario"}
+          </Heading>
         </Drawer.Header>
         <Drawer.Body padding={0} overflow="hidden">
           <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
@@ -200,37 +213,52 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           </Grid>
         </Drawer.Body>
         {/* Bottom Bar */}
-        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          <QuickTestBar
-            targetType={targetType}
-            onTargetTypeChange={(type) => {
-              setTargetType(type);
-              setSelectedTargetId(null);
-            }}
-            selectedTargetId={selectedTargetId}
-            onTargetIdChange={setSelectedTargetId}
+        <Drawer.Footer borderTopWidth="1px" justifyContent="flex-end">
+          <SaveAndRunMenu
+            selectedTarget={selectedTarget}
+            onTargetChange={handleTargetChange}
+            onSaveAndRun={handleSaveAndRun}
+            onSaveWithoutRunning={handleSaveWithoutRunning}
+            onCreateAgent={() => setAgentDrawerOpen(true)}
+            onCreatePrompt={() => setPromptDrawerOpen(true)}
+            isLoading={isSubmitting}
           />
-          <HStack gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSaveWithoutRunning}
-              loading={isSubmitting}
-            >
-              Save
-            </Button>
-            <Button
-              colorPalette="blue"
-              size="sm"
-              onClick={handleSaveAndRun}
-              loading={isSubmitting}
-            >
-              <Play size={14} />
-              Save and Run
-            </Button>
-          </HStack>
         </Drawer.Footer>
       </Drawer.Content>
+
+      {/* Agent Creation Drawer */}
+      <AgentHttpEditorDrawer
+        open={agentDrawerOpen}
+        onClose={() => setAgentDrawerOpen(false)}
+        onSave={(agent) => {
+          // Auto-select the newly created agent
+          handleTargetChange({ type: "http", id: agent.id });
+          setAgentDrawerOpen(false);
+          toaster.create({
+            title: "Agent created",
+            description: `"${agent.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
+        }}
+      />
+
+      {/* Prompt Creation Drawer */}
+      <PromptEditorDrawer
+        open={promptDrawerOpen}
+        onClose={() => setPromptDrawerOpen(false)}
+        onSave={(prompt) => {
+          // Auto-select the newly created prompt
+          handleTargetChange({ type: "prompt", id: prompt.id });
+          setPromptDrawerOpen(false);
+          toaster.create({
+            title: "Prompt created",
+            description: `"${prompt.name}" is now selected as the target.`,
+            type: "success",
+            meta: { closable: true },
+          });
+        }}
+      />
     </Drawer.Root>
   );
 }

@@ -219,7 +219,7 @@ describe("LangWatchExporter", () => {
 
   describe("inheritance from OTLPTraceExporter", () => {
     it("should extend OTLPTraceExporter", () => {
-      const exporter = new LangWatchTraceExporter();
+      new LangWatchTraceExporter();
 
       // Since we're mocking OTLPTraceExporter, we check that the constructor was called
       expect(vi.mocked(OTLPTraceExporter)).toHaveBeenCalledWith(

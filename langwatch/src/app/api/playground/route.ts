@@ -3,7 +3,7 @@ import { streamText } from "ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { env } from "../../../env.mjs";
-import { backendHasTeamProjectPermission } from "../../../server/api/permission";
+import { hasProjectPermission } from "../../../server/api/rbac";
 import {
   getProjectModelProviders,
   prepareLitellmParams,
@@ -32,10 +32,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const hasPermission = await backendHasTeamProjectPermission(
+  const hasPermission = await hasProjectPermission(
     { prisma, session },
-    { projectId },
-    "PLAYGROUND",
+    projectId,
+    "playground:manage",
   );
   if (!hasPermission) {
     return NextResponse.json(

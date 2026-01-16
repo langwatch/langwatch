@@ -72,6 +72,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {
@@ -308,7 +313,7 @@ describe("JSON formatting display", () => {
       },
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // The JSON should be displayed (we can check the cell exists)
     await waitFor(() => {
@@ -337,7 +342,7 @@ describe("JSON formatting display", () => {
       },
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getByTestId("cell-0-items")).toBeInTheDocument();
@@ -362,7 +367,7 @@ describe("Value truncation", () => {
     const longValue = "a".repeat(6000);
     store.setCellValue("test-data", 0, "input", longValue);
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       const cell = screen.getByTestId("cell-0-input");
@@ -383,14 +388,14 @@ describe("Sticky headers", () => {
   });
 
   it("table has thead element for headers", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const thead = document.querySelector("thead");
     expect(thead).toBeInTheDocument();
   });
 
   it("table has multiple header rows (super header and column headers)", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const headerRows = document.querySelectorAll("thead tr");
     expect(headerRows.length).toBeGreaterThanOrEqual(2);
@@ -408,10 +413,112 @@ describe("Column resize handles", () => {
   });
 
   it("resizer elements exist in column headers", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const resizers = document.querySelectorAll(".resizer");
     expect(resizers.length).toBeGreaterThan(0);
+  });
+});
+
+describe("Target duplication", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("duplicates a target when clicking Duplicate in menu", async () => {
+    const user = userEvent.setup();
+
+    // Add a prompt target with version pinned
+    useEvaluationsV3Store.getState().addTarget({
+      id: "original-target",
+      type: "prompt",
+      name: "My Prompt",
+      promptId: "prompt-123",
+      promptVersionId: "version-456",
+      promptVersionNumber: 13,
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+    });
+
+    expect(useEvaluationsV3Store.getState().targets.length).toBe(1);
+
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    // Wait for target to render
+    await waitFor(() => {
+      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+    });
+
+    // Click on the target header to open menu
+    await user.click(screen.getByTestId("target-header-button"));
+
+    // Wait for menu to open and click Duplicate
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Duplicate"));
+
+    // Check that a new target was added
+    await waitFor(() => {
+      expect(useEvaluationsV3Store.getState().targets.length).toBe(2);
+    });
+
+    const targets = useEvaluationsV3Store.getState().targets;
+    // The duplicate should have the same properties but a different ID
+    const duplicate = targets[1];
+    expect(duplicate).toBeDefined();
+    expect(duplicate!.id).not.toBe("original-target");
+    expect(duplicate!.name).toBe("My Prompt"); // Same name
+    expect(duplicate!.type).toBe("prompt");
+
+    // Version should be preserved (not cleared)
+    if (duplicate!.type === "prompt") {
+      expect(duplicate!.promptId).toBe("prompt-123");
+      expect(duplicate!.promptVersionId).toBe("version-456");
+      expect(duplicate!.promptVersionNumber).toBe(13);
+    }
+  });
+
+  it("duplicate target renders as a new column in the table", async () => {
+    const store = useEvaluationsV3Store.getState();
+    const user = userEvent.setup();
+
+    // Add a prompt target
+    store.addTarget({
+      id: "original-target",
+      type: "prompt",
+      name: "My Prompt",
+      promptId: "prompt-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+    // Wait for target to render
+    await waitFor(() => {
+      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+    });
+
+    // Open menu and duplicate
+    await user.click(screen.getByTestId("target-header-button"));
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Duplicate"));
+
+    // Both targets should be visible (same name appears twice)
+    await waitFor(() => {
+      const targetNames = screen.getAllByText("My Prompt");
+      expect(targetNames.length).toBe(2);
+    });
   });
 });
 
@@ -449,7 +556,7 @@ describe("TargetHeader stability", () => {
       originalLog(...args);
     };
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(() => {
@@ -495,7 +602,7 @@ describe("TargetHeader stability", () => {
       originalLog(...args);
     };
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Test Prompt 2")).toBeInTheDocument();

@@ -4,7 +4,6 @@ import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { createTracingProxy } from "../../create-tracing-proxy";
 import { getLangWatchTracer } from "../../../../observability-sdk";
 import { NoOpLogger } from "../../../../logger";
-import * as semconv from "../../../../observability-sdk/semconv";
 import { setupObservability } from "../../../../observability-sdk/setup/node";
 
 /**

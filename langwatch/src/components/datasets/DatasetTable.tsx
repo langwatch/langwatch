@@ -35,6 +35,7 @@ import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_stud
 import type {
   DatasetColumns,
   DatasetRecordEntry,
+  DatasetRecordInput,
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import {
@@ -58,6 +59,14 @@ export type InMemoryDataset = {
   datasetId?: string;
   name?: string;
   datasetRecords: DatasetRecordEntry[];
+  columnTypes: DatasetColumns;
+};
+
+// Input type for saving datasets - ID is optional (backend generates with nanoid)
+export type InMemoryDatasetInput = {
+  datasetId?: string;
+  name?: string;
+  datasetRecords: DatasetRecordInput[];
   columnTypes: DatasetColumns;
 };
 

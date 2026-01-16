@@ -204,7 +204,7 @@ describe("LangWatchLogsExporter", () => {
 
   describe("inheritance from OTLPLogExporter", () => {
     it("should extend OTLPLogExporter", () => {
-      const exporter = new LangWatchLogsExporter();
+      new LangWatchLogsExporter();
 
       // Since we're mocking OTLPLogExporter, we check that the constructor was called
       expect(vi.mocked(OTLPLogExporter)).toHaveBeenCalledWith(

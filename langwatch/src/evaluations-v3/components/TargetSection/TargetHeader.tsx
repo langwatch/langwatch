@@ -9,14 +9,16 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import {
   LuChevronDown,
   LuCircleAlert,
   LuCode,
+  LuCopy,
   LuFileText,
   LuPencil,
   LuPlay,
+  LuSquare,
   LuTrash2,
 } from "react-icons/lu";
 
@@ -28,6 +30,11 @@ import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import type { TargetConfig } from "../../types";
 import { targetHasMissingMappings } from "../../utils/mappingValidation";
+import { computeTargetAggregates } from "../../utils/computeAggregates";
+import { isRowEmpty } from "../../utils/emptyRowDetection";
+import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import { TargetSummary } from "./TargetSummary";
+import { countCellsForTarget } from "../../utils/executionScope";
 
 // Pulsing animation for missing mapping alert
 const pulseAnimation = keyframes`
@@ -38,8 +45,12 @@ const pulseAnimation = keyframes`
 type TargetHeaderProps = {
   target: TargetConfig;
   onEdit?: (target: TargetConfig) => void;
+  onDuplicate?: (target: TargetConfig) => void;
   onRemove?: (targetId: string) => void;
   onRun?: (target: TargetConfig) => void;
+  onStop?: () => void;
+  /** Whether this target is currently being executed */
+  isRunning?: boolean;
 };
 
 /**
@@ -58,8 +69,11 @@ type TargetHeaderProps = {
 export const TargetHeader = memo(function TargetHeader({
   target,
   onEdit,
+  onDuplicate,
   onRemove,
   onRun,
+  onStop,
+  isRunning = false,
 }: TargetHeaderProps) {
   // First check if prop has localPromptConfig (for direct prop usage)
   const propHasUnpublished =
@@ -80,13 +94,74 @@ export const TargetHeader = memo(function TargetHeader({
   const hasUnpublishedChanges = propHasUnpublished || storeHasUnpublished;
 
   // Check if there are missing mappings for the active dataset
-  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+  const activeDatasetId = useEvaluationsV3Store(
+    (state) => state.activeDatasetId,
+  );
   const hasMissingMappings = targetHasMissingMappings(target, activeDatasetId);
+
+  // Get results, evaluators, and dataset for computing aggregates
+  const { results, evaluators, activeDataset } = useEvaluationsV3Store(
+    (state) => ({
+      results: state.results,
+      evaluators: state.evaluators,
+      activeDataset: state.datasets.find((d) => d.id === state.activeDatasetId),
+    }),
+  );
+
+  // Count non-empty rows (empty rows are skipped during execution)
+  const nonEmptyRowCount = useMemo(() => {
+    if (!activeDataset?.inline?.records) return 0;
+    const rows = transposeColumnsFirstToRowsFirstWithId(
+      activeDataset.inline.records,
+    );
+    return rows.filter((row: Record<string, unknown>) => !isRowEmpty(row))
+      .length;
+  }, [activeDataset?.inline?.records]);
+
+  // When THIS target is executing, use the count from executingCells
+  // This ensures partial executions show correct progress (e.g., 0/1 for single cell)
+  const effectiveRowCount = useMemo(() => {
+    if (results.executingCells && isRunning) {
+      // Count cells being executed for this specific target
+      const maxRowIndex = nonEmptyRowCount; // Max possible row index
+      const cellCount = countCellsForTarget(
+        results.executingCells,
+        target.id,
+        maxRowIndex,
+      );
+      // Only use cell count if this target actually has cells executing
+      if (cellCount > 0) {
+        return cellCount;
+      }
+    }
+    // When not running or no cells for this target, use the full non-empty row count
+    return nonEmptyRowCount;
+  }, [results.executingCells, isRunning, target.id, nonEmptyRowCount]);
+
+  // Compute aggregate statistics using effective row count
+  const aggregates = useMemo(
+    () =>
+      computeTargetAggregates(
+        target.id,
+        results,
+        evaluators,
+        effectiveRowCount,
+      ),
+    [target.id, results, evaluators, effectiveRowCount],
+  );
+
+  // Show aggregates only when we have results or errors or running
+  const hasAggregates =
+    aggregates.completedRows > 0 ||
+    aggregates.errorRows > 0 ||
+    aggregates.totalCost !== null ||
+    results.status === "running";
 
   // Get the latest version for this prompt (to determine if target is at "latest")
   const { latestVersion } = useLatestPromptVersion({
     configId: target.type === "prompt" ? target.promptId : undefined,
-    currentVersion: target.type === "prompt" ? target.promptVersionNumber : undefined,
+    currentVersion:
+      target.type === "prompt" ? target.promptVersionNumber : undefined,
   });
 
   // Check if this target is effectively at "latest" version
@@ -154,9 +229,7 @@ export const TargetHeader = memo(function TargetHeader({
             </Text>
             {showVersionBadge && target.promptVersionNumber !== undefined && (
               <Box flexShrink={0}>
-                <VersionBadge
-                  version={target.promptVersionNumber}
-                />
+                <VersionBadge version={target.promptVersionNumber} />
               </Box>
             )}
             {hasMissingMappings && (
@@ -217,6 +290,12 @@ export const TargetHeader = memo(function TargetHeader({
               <Text>{editLabel}</Text>
             </HStack>
           </Menu.Item>
+          <Menu.Item value="duplicate" onClick={() => onDuplicate?.(target)}>
+            <HStack gap={2}>
+              <LuCopy size={14} />
+              <Text>Duplicate</Text>
+            </HStack>
+          </Menu.Item>
           <Box borderTopWidth="1px" borderColor="gray.200" my={1} />
           <Menu.Item value="remove" onClick={() => onRemove?.(target.id)}>
             <HStack gap={2} color="red.600">
@@ -229,20 +308,37 @@ export const TargetHeader = memo(function TargetHeader({
 
       <Spacer />
 
-      {/* Play button on far right */}
+      {/* Summary statistics (positioned on the right before play button) */}
+      {hasAggregates && (
+        <TargetSummary
+          aggregates={aggregates}
+          isRunning={isRunning}
+        />
+      )}
+
+      {/* Play/Stop button on far right */}
       <Tooltip
-        content={hasMissingMappings ? "Configure missing mappings first" : "Run evaluation"}
+        content={
+          isRunning
+            ? "Stop evaluation"
+            : hasMissingMappings
+            ? "Configure missing mappings first"
+            : "Run evaluation"
+        }
         positioning={{ placement: "top" }}
         openDelay={200}
       >
         <IconButton
-          aria-label="Run evaluation for this target"
+          aria-label={
+            isRunning ? "Stop evaluation" : "Run evaluation for this target"
+          }
           size="xs"
-          variant="ghost"
+          variant="outline"
           onClick={(e) => {
             e.stopPropagation();
-            // If there are missing mappings, open the drawer instead of running
-            if (hasMissingMappings) {
+            if (isRunning) {
+              onStop?.();
+            } else if (hasMissingMappings) {
               onEdit?.(target);
             } else {
               onRun?.(target);
@@ -253,7 +349,7 @@ export const TargetHeader = memo(function TargetHeader({
           height="auto"
           padding={1}
         >
-          <LuPlay size={14} />
+          {isRunning ? <LuSquare size={14} /> : <LuPlay size={14} />}
         </IconButton>
       </Tooltip>
     </HStack>

@@ -1,3 +1,4 @@
+import time
 from typing import Any, Optional, TypeVar
 import dspy
 
@@ -49,6 +50,7 @@ class ReportingModule(dspy.Module):
                 else None
             )
 
+            started_at = int(time.time() * 1000)
             if self.context and node:
                 self.context.queue.put_nowait(
                     start_component_event(node, self.context.trace_id, kwargs)
@@ -61,13 +63,17 @@ class ReportingModule(dspy.Module):
                 traceback.print_exc()
                 if self.context and node:
                     self.context.queue.put_nowait(
-                        component_error_event(node.id, self.context.trace_id, repr(e))
+                        component_error_event(
+                            self.context.trace_id, node.id, repr(e), started_at=started_at
+                        )
                     )
                 raise e
             if self.context and node:
                 cost = result.cost if hasattr(result, "cost") else None
                 self.context.queue.put_nowait(
-                    end_component_event(node, self.context.trace_id, result, cost)
+                    end_component_event(
+                        node, self.context.trace_id, result, cost, started_at=started_at
+                    )
                 )
             return result
 

@@ -79,19 +79,35 @@ export class SimulationRunnerService {
       // 4. Resolve target to adapter
       logger.debug(
         { targetType: target.type, referenceId: target.referenceId, projectId },
-        "Resolving target to adapter"
+        "Resolving target to adapter",
       );
       const adapter = this.resolveAdapter(target, projectId);
       logger.debug(
         { adapterName: adapter.name, adapterRole: adapter.role },
-        "Adapter resolved"
+        "Adapter resolved",
       );
 
       // 5. Run scenario with SDK
+      // Validate batchRunId is defined before passing to SDK
+      if (!batchRunId || typeof batchRunId !== "string") {
+        logger.error({ batchRunId, type: typeof batchRunId }, "Invalid batchRunId");
+        throw new Error(`Invalid batchRunId: ${batchRunId}`);
+      }
+
       logger.info(
-        { scenarioId, setId, targetType: target.type, model: defaultModel },
-        "Starting scenario execution"
+        {
+          scenarioId,
+          setId,
+          batchRunId,
+          batchRunIdLength: batchRunId.length,
+          targetType: target.type,
+          model: defaultModel,
+        },
+        "Starting scenario execution with batchRunId",
       );
+
+      // Run in headless mode on server (don't open browser tabs)
+      process.env.SCENARIO_HEADLESS = "true";
 
       const result = await ScenarioRunner.run(
         {
@@ -102,7 +118,10 @@ export class SimulationRunnerService {
           agents: [
             adapter,
             ScenarioRunner.userSimulatorAgent({ model: simulatorModel }),
-            ScenarioRunner.judgeAgent({ model: judgeModel, criteria: scenario.criteria }),
+            ScenarioRunner.judgeAgent({
+              model: judgeModel,
+              criteria: scenario.criteria,
+            }),
           ],
           verbose: true,
         },
@@ -112,7 +131,7 @@ export class SimulationRunnerService {
             endpoint: this.getLangWatchEndpoint(),
             apiKey: project.apiKey,
           },
-        }
+        },
       );
 
       logger.info(
@@ -123,12 +142,12 @@ export class SimulationRunnerService {
           success: result.success,
           reasoning: result.reasoning,
         },
-        "Scenario execution completed"
+        "Scenario execution completed",
       );
     } catch (error) {
       logger.error(
         { error, scenarioId, projectId, setId },
-        "Scenario execution failed"
+        "Scenario execution failed",
       );
     }
   }
@@ -140,14 +159,14 @@ export class SimulationRunnerService {
 
   private resolveAdapter(
     target: SimulationTarget,
-    projectId: string
+    projectId: string,
   ): AgentAdapter {
     switch (target.type) {
       case "prompt":
         return new PromptConfigAdapter(
           target.referenceId,
           this.promptService,
-          projectId
+          projectId,
         );
       case "http":
         return HttpAgentAdapter.create({

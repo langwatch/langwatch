@@ -1,9 +1,9 @@
-import { useDisclosure } from "@chakra-ui/react";
-import ErrorPage from "next/error";
+import { Alert, Box, useDisclosure } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { CurrentDrawer } from "../../../components/CurrentDrawer";
+import { DashboardLayout } from "../../../components/DashboardLayout";
 import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
 import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
@@ -46,7 +46,19 @@ export default function EvaluationWizard() {
   }, []);
 
   if (isNotFound(initialLoadExperiment.error)) {
-    return <ErrorPage statusCode={404} />;
+    return (
+      <DashboardLayout>
+        <Box padding={6}>
+          <Alert.Root status="warning">
+            <Alert.Indicator />
+            <Alert.Title>Evaluation not found</Alert.Title>
+            <Alert.Description>
+              The evaluation you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+            </Alert.Description>
+          </Alert.Root>
+        </Box>
+      </DashboardLayout>
+    );
   }
 
   if (!project) {

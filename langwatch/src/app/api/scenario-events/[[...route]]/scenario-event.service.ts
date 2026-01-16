@@ -387,7 +387,7 @@ export class ScenarioEventService {
         status: runFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
         results: runFinishedEvent?.results ?? null,
         messages: messageEvent?.messages ?? [],
-        timestamp: messageEvent?.timestamp ?? 0,
+        timestamp: messageEvent?.timestamp ?? runStartedEvent.timestamp,
         name: runStartedEvent?.metadata?.name ?? null,
         description: runStartedEvent?.metadata?.description ?? null,
         durationInMs:

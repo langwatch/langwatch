@@ -62,6 +62,11 @@ vi.mock("~/utils/api", () => ({
           fetch: vi.fn().mockResolvedValue(null),
         },
       },
+      evaluators: {
+        getById: {
+          fetch: vi.fn().mockResolvedValue(null),
+        },
+      },
     }),
     datasetRecord: {
       getAll: {
@@ -184,7 +189,7 @@ describe("Add Evaluator Button", () => {
   });
 
   it("renders Add evaluator button for each target", async () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       // There should be at least one add evaluator button
@@ -194,7 +199,7 @@ describe("Add Evaluator Button", () => {
 
   it("calls openDrawer with evaluatorList when Add evaluator is clicked", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getAllByTestId("add-evaluator-button-target-1").length).toBeGreaterThan(0);

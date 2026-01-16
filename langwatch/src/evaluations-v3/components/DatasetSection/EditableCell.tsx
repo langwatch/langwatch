@@ -367,7 +367,11 @@ export function EditableCell({ value, row, columnId, datasetId, dataType }: Edit
             onClick={handleExpandClick}
             className="cell-fade-overlay"
             css={{
-              background: "linear-gradient(to bottom, transparent, var(--cell-bg, white))",
+              background: "linear-gradient(to bottom, transparent, white)",
+              "tr:hover &": {
+                background:
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
+              },
             }}
           />
         )}

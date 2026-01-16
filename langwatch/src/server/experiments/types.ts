@@ -94,6 +94,35 @@ export type DSPyRunsSummary = {
   created_at: number;
 };
 
+/**
+ * Valid target types for batch evaluations.
+ * - prompt: LLM prompt target from Evaluations V3
+ * - agent: Agent target from Evaluations V3
+ * - custom: External target from API (Python SDK, etc.)
+ */
+export type ESBatchEvaluationTargetType = "prompt" | "agent" | "custom";
+
+/**
+ * Target metadata stored in batch evaluation for Evaluations V3.
+ * Captures the state of targets at execution time so we can display
+ * results even after targets are modified or deleted.
+ */
+export type ESBatchEvaluationTarget = {
+  id: string;
+  name: string;
+  type: ESBatchEvaluationTargetType;
+  /** For prompt targets: the prompt config ID */
+  prompt_id?: string | null;
+  /** For prompt targets: the specific version used */
+  prompt_version?: number | null;
+  /** For agent targets: the agent ID */
+  agent_id?: string | null;
+  /** Model used (for prompt targets) */
+  model?: string | null;
+  /** Flexible metadata for comparison and analysis (model name, temperature, etc.) */
+  metadata?: Record<string, string | number | boolean> | null;
+};
+
 export type ESBatchEvaluation = {
   project_id: string;
   experiment_id: string;
@@ -101,8 +130,12 @@ export type ESBatchEvaluation = {
   workflow_version_id?: string | null;
   progress?: number | null;
   total?: number | null;
+  /** For Evaluations V3: stores target configurations at execution time */
+  targets?: ESBatchEvaluationTarget[] | null;
   dataset: {
     index: number;
+    /** For Evaluations V3: identifies which target produced this result */
+    target_id?: string | null;
     entry: Record<string, any>;
     predicted?: Record<string, any>;
     cost?: number | null;
@@ -113,6 +146,8 @@ export type ESBatchEvaluation = {
   evaluations: {
     evaluator: string;
     name?: string | null;
+    /** For Evaluations V3: identifies which target this evaluation is for */
+    target_id?: string | null;
     status: "processed" | "skipped" | "error";
     index: number;
     duration?: number | null;
@@ -132,15 +167,24 @@ export type ESBatchEvaluation = {
   };
 };
 
+/**
+ * Target in REST API params - type is optional as it can be
+ * extracted from metadata or defaulted to "custom"
+ */
+export type ESBatchEvaluationTargetREST = Omit<ESBatchEvaluationTarget, "type"> & {
+  type?: ESBatchEvaluationTargetType;
+};
+
 export type ESBatchEvaluationRESTParams = Omit<
   Partial<ESBatchEvaluation>,
-  "project_id" | "experiment_id" | "timestamps"
+  "project_id" | "experiment_id" | "timestamps" | "targets"
 > & {
   experiment_id?: string | null;
   experiment_slug?: string | null;
   run_id: string | null;
   workflow_id?: string | null;
   name?: string | null;
+  targets?: ESBatchEvaluationTargetREST[] | null;
   timestamps?: {
     created_at?: number | null;
     finished_at?: number | null;

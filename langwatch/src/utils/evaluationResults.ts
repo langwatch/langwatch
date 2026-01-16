@@ -3,7 +3,7 @@
  * Used for rendering evaluation results in UI components.
  */
 export type ParsedEvaluationResult = {
-  status: "pending" | "passed" | "failed" | "error" | "skipped";
+  status: "pending" | "running" | "passed" | "failed" | "error" | "skipped";
   score?: number;
   label?: string;
   details?: string;
@@ -20,6 +20,11 @@ export type ParsedEvaluationResult = {
 export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult => {
   if (result === null || result === undefined) {
     return { status: "pending" };
+  }
+
+  // Check for explicit running status (from execution)
+  if (result === "running" || (typeof result === "object" && (result as Record<string, unknown>).status === "running")) {
+    return { status: "running" };
   }
 
   if (typeof result === "boolean") {
@@ -44,6 +49,11 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
         parsed.details = obj.details;
       }
       return parsed;
+    }
+
+    // Check for running status
+    if ("status" in obj && obj.status === "running") {
+      return { status: "running" };
     }
 
     // Extract score
@@ -80,6 +90,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
  */
 export const EVALUATION_STATUS_COLORS = {
   pending: "gray.400",
+  running: "blue.400",
   passed: "green.500",
   failed: "red.500",
   error: "orange.500",
@@ -91,6 +102,8 @@ export const EVALUATION_STATUS_COLORS = {
  */
 export const getStatusLabel = (status: ParsedEvaluationResult["status"]): string => {
   switch (status) {
+    case "running":
+      return "Running";
     case "passed":
       return "Passed";
     case "failed":

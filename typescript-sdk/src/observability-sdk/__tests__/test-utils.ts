@@ -218,7 +218,7 @@ export class MockSpan implements Span {
 export class MockTracer implements Tracer {
   private _spans: MockSpan[] = [];
 
-  public readonly startSpan = vi.fn((name: string, options?: SpanOptions, context?: Context): MockSpan => {
+  public readonly startSpan = vi.fn((name: string, _options?: SpanOptions, _context?: Context): MockSpan => {
     const span = new MockSpan(name);
     this._spans.push(span);
     return span;

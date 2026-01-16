@@ -141,7 +141,3 @@ export function ScenarioEditorSidebar({ form }: ScenarioEditorSidebarProps) {
     </VStack>
   );
 }
-
-
-
-

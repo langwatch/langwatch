@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
 import { logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
-import { type LangWatchLogger, type LangWatchLogRecord } from "../types";
+import { type LangWatchLogRecord } from "../types";
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 
 vi.mock("@opentelemetry/api-logs", () => ({
@@ -95,8 +95,7 @@ describe("LangWatch Logger", () => {
 
     it("should use NoOp logger when no provider is set", () => {
       // Reset to use NoOp logger
-      const noopProvider = new NoopLoggerProvider();
-      const noopLogger = noopProvider.getLogger("test");
+      new NoopLoggerProvider();
 
       const logger = getLangWatchLogger("test-logger");
 
