@@ -46,6 +46,8 @@ type SingleRunTableProps = {
   hiddenColumns?: Set<string>;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Disable virtualization (for tests) */
+  disableVirtualization?: boolean;
 };
 
 // Column helper for type-safe column definitions
@@ -172,6 +174,7 @@ export function SingleRunTable({
   isLoading,
   hiddenColumns = new Set(),
   targetColors = {},
+  disableVirtualization = false,
 }: SingleRunTableProps) {
   // Check if target colors should be shown (non-empty means X-axis is "target")
   const showTargetColors = Object.keys(targetColors).length > 0;
@@ -258,17 +261,11 @@ export function SingleRunTable({
   const rows = table.getRowModel().rows;
   const columnCount = table.getAllColumns().length;
 
-  // Fallback to rendering all rows when virtualization returns no items
-  // (e.g., in jsdom tests where container has no dimensions)
-  const shouldRenderAllRows = virtualRows.length === 0 && rows.length > 0;
-
   // Calculate padding to maintain scroll position (only when virtualizing)
   const paddingTop =
-    !shouldRenderAllRows && virtualRows.length > 0
-      ? virtualRows[0]?.start ?? 0
-      : 0;
+    virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
   const paddingBottom =
-    !shouldRenderAllRows && virtualRows.length > 0
+    virtualRows.length > 0
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
       : 0;
 
@@ -299,27 +296,30 @@ export function SingleRunTable({
           ))}
         </thead>
         <tbody>
-          {/* Top padding row to maintain scroll position */}
-          {paddingTop > 0 && (
-            <tr>
-              <td
-                style={{ height: `${paddingTop}px`, padding: 0 }}
-                colSpan={columnCount}
-              />
-            </tr>
-          )}
-          {/* Render visible rows (or all rows if virtualization not working) */}
-          {shouldRenderAllRows
-            ? rows.map((row) => (
-                <tr key={row.id} data-index={row.index}>
-                  {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </td>
-                  ))}
+          {disableVirtualization ? (
+            // Test mode: render all rows without virtualization
+            rows.map((row) => (
+              <tr key={row.id} data-index={row.index}>
+                {row.getVisibleCells().map((cell) => (
+                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
+              </tr>
+            ))
+          ) : (
+            <>
+              {/* Top padding row to maintain scroll position */}
+              {paddingTop > 0 && (
+                <tr>
+                  <td
+                    style={{ height: `${paddingTop}px`, padding: 0 }}
+                    colSpan={columnCount}
+                  />
                 </tr>
-              ))
-            : virtualRows.map((virtualRow) => {
+              )}
+              {/* Render only virtualized rows - empty until container is measured */}
+              {virtualRows.map((virtualRow) => {
                 const row = rows[virtualRow.index];
                 if (!row) return null;
                 return (
@@ -332,14 +332,16 @@ export function SingleRunTable({
                   </tr>
                 );
               })}
-          {/* Bottom padding row to maintain scroll position */}
-          {paddingBottom > 0 && (
-            <tr>
-              <td
-                style={{ height: `${paddingBottom}px`, padding: 0 }}
-                colSpan={columnCount}
-              />
-            </tr>
+              {/* Bottom padding row to maintain scroll position */}
+              {paddingBottom > 0 && (
+                <tr>
+                  <td
+                    style={{ height: `${paddingBottom}px`, padding: 0 }}
+                    colSpan={columnCount}
+                  />
+                </tr>
+              )}
+            </>
           )}
         </tbody>
       </table>

@@ -21,7 +21,7 @@ import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject"
 import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
 import type {
   DatasetColumns,
-  DatasetRecordEntry,
+  DatasetRecordInput,
   DatasetRecordForm,
 } from "../server/datasets/types";
 import { datasetRecordFormSchema } from "../server/datasets/types.generated";
@@ -35,7 +35,8 @@ import { HorizontalFormControl } from "./HorizontalFormControl";
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
     datasetId?: string;
-    datasetRecords?: InMemoryDataset["datasetRecords"];
+    // IDs are optional for new records - backend generates them with nanoid()
+    datasetRecords?: Array<{ id?: string } & Record<string, unknown>>;
   };
   open?: boolean;
   onClose?: () => void;
@@ -397,9 +398,9 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
 }
 
 export const tryToConvertRowsToAppropriateType = (
-  datasetRecords: DatasetRecordEntry[],
+  datasetRecords: DatasetRecordInput[],
   columnTypes: DatasetColumns,
-) => {
+): DatasetRecordInput[] => {
   const typeForColumn = Object.fromEntries(
     columnTypes.map((col) => [col.name, col.type]),
   );

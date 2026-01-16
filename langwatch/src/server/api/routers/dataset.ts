@@ -5,7 +5,7 @@ import { slugify } from "~/utils/slugify";
 import { DatasetService } from "../../datasets/dataset.service";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import {
-  datasetRecordEntrySchema,
+  datasetRecordInputSchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
@@ -35,7 +35,7 @@ export const datasetRouter = createTRPCRouter({
       z.intersection(
         z.object({
           projectId: z.string(),
-          datasetRecords: z.array(datasetRecordEntrySchema).optional(),
+          datasetRecords: z.array(datasetRecordInputSchema).optional(),
         }),
         z.union([
           datasetRecordFormSchema.extend({

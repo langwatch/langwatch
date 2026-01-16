@@ -82,11 +82,14 @@ import {
 type EvaluationsV3TableProps = {
   isLoadingExperiment?: boolean;
   isLoadingDatasets?: boolean;
+  /** Disable virtualization (for tests) */
+  disableVirtualization?: boolean;
 };
 
 export function EvaluationsV3Table({
   isLoadingExperiment = false,
   isLoadingDatasets = false,
+  disableVirtualization = false,
 }: EvaluationsV3TableProps) {
   const { openDrawer, closeDrawer } = useDrawer();
   const { project } = useOrganizationTeamProject();
@@ -213,7 +216,7 @@ export function EvaluationsV3Table({
     | {
         name: string;
         columnTypes: { name: string; type: DatasetColumnType }[];
-        datasetRecords: Array<{ id: string } & Record<string, string>>;
+        datasetRecords: Array<{ id?: string } & Record<string, string>>;
       }
     | undefined
   >(undefined);
@@ -461,8 +464,9 @@ export function EvaluationsV3Table({
       onEditDataset: () => {
         setEditDatasetDrawerOpen(true);
       },
-      onSaveAsDataset: (dataset: DatasetReference) => {
+      onSaveAsDataset: async (dataset: DatasetReference) => {
         if (dataset.type !== "inline" || !dataset.inline) return;
+        if (!project?.id) return;
 
         // Convert inline dataset to row-based format, filtering empty rows
         const columns = dataset.inline.columns;
@@ -471,8 +475,21 @@ export function EvaluationsV3Table({
           dataset.inline.records,
         );
 
+        // Find next available name to avoid conflicts
+        // E.g., if "Test Data" exists, suggest "Test Data (2)"
+        let suggestedName = dataset.name;
+        try {
+          suggestedName = await trpcUtils.dataset.findNextName.fetch({
+            projectId: project.id,
+            proposedName: dataset.name,
+          });
+        } catch (error) {
+          // If fetch fails, use original name - validation will catch conflicts
+          console.warn("Failed to fetch next available name:", error);
+        }
+
         setDatasetToSave({
-          name: dataset.name,
+          name: suggestedName,
           columnTypes: columns.map((col) => ({
             name: col.name,
             type: col.type as DatasetColumnType,
@@ -482,7 +499,7 @@ export function EvaluationsV3Table({
         setSaveAsDatasetDrawerOpen(true);
       },
     }),
-    [openDrawer, loadSavedDataset],
+    [openDrawer, loadSavedDataset, project?.id, trpcUtils],
   );
 
   // Create a map of evaluator IDs to evaluator configs for quick lookup
@@ -1140,19 +1157,40 @@ export function EvaluationsV3Table({
             const rows = table.getRowModel().rows;
             const columnCount = table.getAllColumns().length + 1; // +1 for spacer
 
-            // Fallback to rendering all rows when virtualization returns no items
-            // (e.g., in jsdom tests where container has no dimensions)
-            const shouldRenderAllRows = virtualRows.length === 0 && rows.length > 0;
-
             // Calculate padding to maintain scroll position (only when virtualizing)
             const paddingTop =
-              !shouldRenderAllRows && virtualRows.length > 0
-                ? virtualRows[0]?.start ?? 0
-                : 0;
+              virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
             const paddingBottom =
-              !shouldRenderAllRows && virtualRows.length > 0
+              virtualRows.length > 0
                 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
                 : 0;
+
+            // Test mode: render all rows without virtualization
+            if (disableVirtualization) {
+              return (
+                <>
+                  {rows.map((row) => (
+                    <tr
+                      key={row.id}
+                      data-index={row.index}
+                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          cell={cell}
+                          rowIndex={row.index}
+                          activeDatasetId={activeDatasetId}
+                          isLoading={isLoadingExperiment || isLoadingDatasets}
+                        />
+                      ))}
+                      {/* Spacer column to match drawer width */}
+                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                    </tr>
+                  ))}
+                </>
+              );
+            }
 
             return (
               <>
@@ -1162,50 +1200,30 @@ export function EvaluationsV3Table({
                     <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
                   </tr>
                 )}
-                {/* Render visible rows (or all rows if virtualization not working) */}
-                {shouldRenderAllRows
-                  ? rows.map((row) => (
-                      <tr
-                        key={row.id}
-                        data-index={row.index}
-                        data-selected={selectedRows.has(row.index) ? "true" : undefined}
-                      >
-                        {row.getVisibleCells().map((cell) => (
-                          <TableCell
-                            key={cell.id}
-                            cell={cell}
-                            rowIndex={row.index}
-                            activeDatasetId={activeDatasetId}
-                            isLoading={isLoadingExperiment || isLoadingDatasets}
-                          />
-                        ))}
-                        {/* Spacer column to match drawer width */}
-                        <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
-                      </tr>
-                    ))
-                  : virtualRows.map((virtualRow) => {
-                      const row = rows[virtualRow.index];
-                      if (!row) return null;
-                      return (
-                        <tr
-                          key={row.id}
-                          data-index={virtualRow.index}
-                          data-selected={selectedRows.has(row.index) ? "true" : undefined}
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell
-                              key={cell.id}
-                              cell={cell}
-                              rowIndex={row.index}
-                              activeDatasetId={activeDatasetId}
-                              isLoading={isLoadingExperiment || isLoadingDatasets}
-                            />
-                          ))}
-                          {/* Spacer column to match drawer width */}
-                          <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
-                        </tr>
-                      );
-                    })}
+                {/* Render only virtualized rows - empty until container is measured */}
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+                  if (!row) return null;
+                  return (
+                    <tr
+                      key={row.id}
+                      data-index={virtualRow.index}
+                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell
+                          key={cell.id}
+                          cell={cell}
+                          rowIndex={row.index}
+                          activeDatasetId={activeDatasetId}
+                          isLoading={isLoadingExperiment || isLoadingDatasets}
+                        />
+                      ))}
+                      {/* Spacer column to match drawer width */}
+                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                    </tr>
+                  );
+                })}
                 {/* Bottom padding row */}
                 {paddingBottom > 0 && (
                   <tr>
@@ -1248,18 +1266,16 @@ export function EvaluationsV3Table({
                 type: col.type as DatasetColumnType,
               }),
             );
-            // Update the dataset to be a saved reference
-            const updatedDataset: DatasetReference = {
-              ...currentDataset,
+            // Use updateDataset to transform inline to saved in-place
+            // This avoids the removeDataset + addDataset race condition
+            // that caused duplicate datasets when removeDataset was blocked
+            updateDataset(currentDataset.id, {
               type: "saved",
+              name: savedDataset.name,
               datasetId: savedDataset.datasetId,
               inline: undefined,
               columns,
-            };
-            // Remove the old dataset and add the new one
-            removeDataset(currentDataset.id);
-            addDataset(updatedDataset);
-            setActiveDataset(updatedDataset.id);
+            });
           }
           setSaveAsDatasetDrawerOpen(false);
           setDatasetToSave(undefined);

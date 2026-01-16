@@ -85,7 +85,7 @@ describe("BatchEvaluationResultsTable", () => {
 
   describe("Loading State", () => {
     it("shows skeleton when loading", () => {
-      render(<BatchEvaluationResultsTable data={null} isLoading />, {
+      render(<BatchEvaluationResultsTable data={null} isLoading disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -97,7 +97,7 @@ describe("BatchEvaluationResultsTable", () => {
 
   describe("Empty State", () => {
     it("shows empty message when no data", () => {
-      render(<BatchEvaluationResultsTable data={null} isLoading={false} />, {
+      render(<BatchEvaluationResultsTable data={null} isLoading={false} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -107,7 +107,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("shows empty message when rows is empty", () => {
       const data = createTestData({ rows: [] });
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -119,7 +119,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number column (empty header, shows row numbers in cells)", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -130,7 +130,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset column headers", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -143,7 +143,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target column headers", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -155,7 +155,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -165,7 +165,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset values", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -177,7 +177,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target output", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -188,7 +188,7 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders evaluator chips", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -233,7 +233,7 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -279,7 +279,7 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(<BatchEvaluationResultsTable data={data} />, {
+      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
         wrapper: Wrapper,
       });
 
@@ -320,7 +320,7 @@ describe("BatchEvaluationResultsTable", () => {
       const hiddenColumns = new Set(["id"]);
 
       render(
-        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} />,
+        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} disableVirtualization />,
         { wrapper: Wrapper }
       );
 
@@ -359,7 +359,7 @@ describe("BatchEvaluationResultsTable", () => {
       const hiddenColumns = new Set<string>();
 
       render(
-        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} />,
+        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} disableVirtualization />,
         { wrapper: Wrapper }
       );
 

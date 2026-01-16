@@ -271,7 +271,7 @@ describe("New Evaluator Added to Workbench", () => {
 
   it("sets up onSave callback for evaluatorEditor when clicking Add evaluator", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for the table to render with the target
     await waitFor(() => {
@@ -303,7 +303,7 @@ describe("New Evaluator Added to Workbench", () => {
 
   it("adds newly created evaluator to workbench when onSave is called", async () => {
     const user = userEvent.setup();
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for the table to render
     await waitFor(() => {
@@ -355,7 +355,7 @@ describe("New Evaluator Added to Workbench", () => {
       ],
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // The evaluator chip should appear in the table (one per row)
     await waitFor(() => {

@@ -369,7 +369,7 @@ describe("Selected row visual indication", () => {
     store.setCellValue("test-data", 1, "input", "row 1");
     store.toggleRowSelection(0);
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       const rows = document.querySelectorAll("tbody tr");

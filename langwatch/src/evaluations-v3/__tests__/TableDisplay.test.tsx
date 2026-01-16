@@ -313,7 +313,7 @@ describe("JSON formatting display", () => {
       },
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // The JSON should be displayed (we can check the cell exists)
     await waitFor(() => {
@@ -342,7 +342,7 @@ describe("JSON formatting display", () => {
       },
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getByTestId("cell-0-items")).toBeInTheDocument();
@@ -367,7 +367,7 @@ describe("Value truncation", () => {
     const longValue = "a".repeat(6000);
     store.setCellValue("test-data", 0, "input", longValue);
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       const cell = screen.getByTestId("cell-0-input");
@@ -388,14 +388,14 @@ describe("Sticky headers", () => {
   });
 
   it("table has thead element for headers", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const thead = document.querySelector("thead");
     expect(thead).toBeInTheDocument();
   });
 
   it("table has multiple header rows (super header and column headers)", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const headerRows = document.querySelectorAll("thead tr");
     expect(headerRows.length).toBeGreaterThanOrEqual(2);
@@ -413,7 +413,7 @@ describe("Column resize handles", () => {
   });
 
   it("resizer elements exist in column headers", () => {
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     const resizers = document.querySelectorAll(".resizer");
     expect(resizers.length).toBeGreaterThan(0);
@@ -443,12 +443,12 @@ describe("Target duplication", () => {
       promptVersionNumber: 13,
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
-      mappings: { input: { source: "dataset", columnId: "input" } },
+      mappings: {},
     });
 
     expect(useEvaluationsV3Store.getState().targets.length).toBe(1);
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for target to render
     await waitFor(() => {
@@ -500,7 +500,7 @@ describe("Target duplication", () => {
       mappings: {},
     });
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for target to render
     await waitFor(() => {
@@ -556,7 +556,7 @@ describe("TargetHeader stability", () => {
       originalLog(...args);
     };
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     // Wait for initial render
     await waitFor(() => {
@@ -602,7 +602,7 @@ describe("TargetHeader stability", () => {
       originalLog(...args);
     };
 
-    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+    render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
 
     await waitFor(() => {
       expect(screen.getByText("Test Prompt 2")).toBeInTheDocument();

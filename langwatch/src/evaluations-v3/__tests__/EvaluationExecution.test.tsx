@@ -269,7 +269,7 @@ const simulateSSEEvents = (events: EvaluationV3Event[]) => {
 const renderTable = () => {
   return render(
     <ChakraProvider value={defaultSystem}>
-      <EvaluationsV3Table />
+      <EvaluationsV3Table disableVirtualization />
     </ChakraProvider>
   );
 };

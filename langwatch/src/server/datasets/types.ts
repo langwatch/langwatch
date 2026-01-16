@@ -7,7 +7,11 @@ import {
   rAGSpanSchema,
 } from "../tracer/types.generated";
 
+// Strict type for records from database - ID is always present
 export type DatasetRecordEntry = { id: string } & Record<string, any>;
+
+// Input type for creating new records - ID is optional (backend generates with nanoid)
+export type DatasetRecordInput = { id?: string } & Record<string, any>;
 
 // TODO: fix this list being repeated 3 times
 export const datasetColumnTypeSchema = z.union([

@@ -39,6 +39,8 @@ type BatchEvaluationResultsTableProps = {
   comparisonData?: ComparisonRunData[] | null;
   /** Target colors for when X-axis is "target" in charts */
   targetColors?: Record<string, string>;
+  /** Disable virtualization (for tests) */
+  disableVirtualization?: boolean;
 };
 
 /**
@@ -102,6 +104,7 @@ export function BatchEvaluationResultsTable({
   hiddenColumns = new Set(),
   comparisonData,
   targetColors = {},
+  disableVirtualization = false,
 }: BatchEvaluationResultsTableProps) {
   // Determine if we're in comparison mode
   const isComparisonMode = !!comparisonData && comparisonData.length > 1;
@@ -112,6 +115,7 @@ export function BatchEvaluationResultsTable({
         comparisonData={comparisonData}
         isLoading={isLoading}
         hiddenColumns={hiddenColumns}
+        disableVirtualization={disableVirtualization}
       />
     );
   }
@@ -122,6 +126,7 @@ export function BatchEvaluationResultsTable({
       isLoading={isLoading}
       hiddenColumns={hiddenColumns}
       targetColors={targetColors}
+      disableVirtualization={disableVirtualization}
     />
   );
 }
