@@ -35,7 +35,7 @@ type EvaluatorDbConfig = {
 import { useDatasetSync } from "../hooks/useDatasetSync";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
-import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
+import { useOpenTargetEditor, scrollToTargetColumn } from "../hooks/useOpenTargetEditor";
 import { useDatasetSelectionLoader } from "../hooks/useSavedDatasetLoader";
 import { useTableKeyboardNavigation } from "../hooks/useTableKeyboardNavigation";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
@@ -311,6 +311,12 @@ export function EvaluationsV3Table({
         },
         { resetStack: true },
       );
+
+      // Scroll to position the target column next to the drawer
+      // Use requestAnimationFrame to ensure the drawer has started opening
+      requestAnimationFrame(() => {
+        scrollToTargetColumn(targetId);
+      });
     },
     [addTarget, openDrawer, updateTarget, setTargetMapping, removeTargetMapping],
   );
@@ -411,10 +417,6 @@ export function EvaluationsV3Table({
       const newTarget: TargetConfig = {
         ...target,
         id: `target-${nanoid(8)}`,
-        name: `${target.name} (copy)`,
-        // Clear version-specific fields so the copy isn't pinned
-        promptVersionId: undefined,
-        promptVersionNumber: undefined,
       };
       addTarget(newTarget);
     },

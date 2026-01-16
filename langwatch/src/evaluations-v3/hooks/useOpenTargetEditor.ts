@@ -37,7 +37,7 @@ const DRAWER_WIDTH = 456;
  * Scroll the table container to position the target column right next to the drawer edge.
  * Uses smooth scrolling animation for a polished UX.
  */
-const scrollToTargetColumn = (targetId: string) => {
+export const scrollToTargetColumn = (targetId: string) => {
   // Find the target column header by data attribute
   const targetHeader = document.querySelector(
     `[data-target-column="${targetId}"]`

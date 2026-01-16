@@ -35,6 +35,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 
 describe("TargetHeader", () => {
   const mockOnEdit = vi.fn();
+  const mockOnDuplicate = vi.fn();
   const mockOnRemove = vi.fn();
 
   beforeEach(() => {
@@ -87,6 +88,7 @@ describe("TargetHeader", () => {
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
         />
       );
@@ -95,6 +97,7 @@ describe("TargetHeader", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Edit Prompt")).toBeInTheDocument();
+        expect(screen.getByText("Duplicate")).toBeInTheDocument();
         expect(screen.getByText("Remove from Workbench")).toBeInTheDocument();
       });
     });
@@ -105,6 +108,7 @@ describe("TargetHeader", () => {
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
         />
       );
@@ -118,12 +122,33 @@ describe("TargetHeader", () => {
       expect(mockOnEdit).toHaveBeenCalledWith(promptTarget);
     });
 
+    it("calls onDuplicate when clicking Duplicate", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <TargetHeader
+          target={promptTarget}
+          onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
+          onRemove={mockOnRemove}
+        />
+      );
+
+      await user.click(screen.getByTestId("target-header-button"));
+      await waitFor(() => {
+        expect(screen.getByText("Duplicate")).toBeInTheDocument();
+      });
+      await user.click(screen.getByText("Duplicate"));
+
+      expect(mockOnDuplicate).toHaveBeenCalledWith(promptTarget);
+    });
+
     it("calls onRemove when clicking Remove from Workbench", async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <TargetHeader
           target={promptTarget}
           onEdit={mockOnEdit}
+          onDuplicate={mockOnDuplicate}
           onRemove={mockOnRemove}
         />
       );

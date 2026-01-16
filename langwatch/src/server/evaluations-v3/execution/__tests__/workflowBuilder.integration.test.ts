@@ -327,7 +327,8 @@ describe("WorkflowBuilder", () => {
 
       const node = buildEvaluatorNode(evaluator, "target-1.eval-1", "target-1", cell, 0);
 
-      expect(node.data.evaluator).toBe("exact_match");
+      // Full evaluator type including namespace
+      expect(node.data.evaluator).toBe("langevals/exact_match");
     });
 
     it("sets evaluator inputs", () => {

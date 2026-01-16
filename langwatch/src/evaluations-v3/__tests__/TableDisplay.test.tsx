@@ -420,6 +420,108 @@ describe("Column resize handles", () => {
   });
 });
 
+describe("Target duplication", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  it("duplicates a target when clicking Duplicate in menu", async () => {
+    const user = userEvent.setup();
+
+    // Add a prompt target with version pinned
+    useEvaluationsV3Store.getState().addTarget({
+      id: "original-target",
+      type: "prompt",
+      name: "My Prompt",
+      promptId: "prompt-123",
+      promptVersionId: "version-456",
+      promptVersionNumber: 13,
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: { input: { source: "dataset", columnId: "input" } },
+    });
+
+    expect(useEvaluationsV3Store.getState().targets.length).toBe(1);
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    // Wait for target to render
+    await waitFor(() => {
+      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+    });
+
+    // Click on the target header to open menu
+    await user.click(screen.getByTestId("target-header-button"));
+
+    // Wait for menu to open and click Duplicate
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Duplicate"));
+
+    // Check that a new target was added
+    await waitFor(() => {
+      expect(useEvaluationsV3Store.getState().targets.length).toBe(2);
+    });
+
+    const targets = useEvaluationsV3Store.getState().targets;
+    // The duplicate should have the same properties but a different ID
+    const duplicate = targets[1];
+    expect(duplicate).toBeDefined();
+    expect(duplicate!.id).not.toBe("original-target");
+    expect(duplicate!.name).toBe("My Prompt"); // Same name
+    expect(duplicate!.type).toBe("prompt");
+
+    // Version should be preserved (not cleared)
+    if (duplicate!.type === "prompt") {
+      expect(duplicate!.promptId).toBe("prompt-123");
+      expect(duplicate!.promptVersionId).toBe("version-456");
+      expect(duplicate!.promptVersionNumber).toBe(13);
+    }
+  });
+
+  it("duplicate target renders as a new column in the table", async () => {
+    const store = useEvaluationsV3Store.getState();
+    const user = userEvent.setup();
+
+    // Add a prompt target
+    store.addTarget({
+      id: "original-target",
+      type: "prompt",
+      name: "My Prompt",
+      promptId: "prompt-123",
+      inputs: [],
+      outputs: [],
+      mappings: {},
+    });
+
+    render(<EvaluationsV3Table />, { wrapper: Wrapper });
+
+    // Wait for target to render
+    await waitFor(() => {
+      expect(screen.getByText("My Prompt")).toBeInTheDocument();
+    });
+
+    // Open menu and duplicate
+    await user.click(screen.getByTestId("target-header-button"));
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate")).toBeInTheDocument();
+    });
+    await user.click(screen.getByText("Duplicate"));
+
+    // Both targets should be visible (same name appears twice)
+    await waitFor(() => {
+      const targetNames = screen.getAllByText("My Prompt");
+      expect(targetNames.length).toBe(2);
+    });
+  });
+});
+
 describe("TargetHeader stability", () => {
   beforeEach(() => {
     useEvaluationsV3Store.getState().reset();

@@ -683,7 +683,8 @@ describe("Orchestrator Integration", () => {
 
       if (doneEvent?.type === "done") {
         const { summary } = doneEvent;
-        expect(summary.runId).toMatch(/^run_/);
+        // Human-readable run IDs like "quick-agile-lynx" (adjective-adjective-noun pattern)
+        expect(summary.runId).toMatch(/^[a-z]+-[a-z]+-[a-z]+$/);
         expect(summary.duration).toBeGreaterThan(0);
         expect(summary.duration).toBeLessThanOrEqual(endTime - startTime + 1000);
         expect(summary.timestamps.startedAt).toBeGreaterThanOrEqual(startTime);
