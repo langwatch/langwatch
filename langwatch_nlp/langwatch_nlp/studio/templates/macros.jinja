@@ -7,6 +7,18 @@
 dspy.LM(
             max_tokens={{ corrected_params["max_tokens"] }},
             temperature={{ corrected_params["temperature"] }},
+            {% if llm_config.reasoning_effort %}
+            reasoning_effort={{ llm_config.reasoning_effort.__repr__() }},
+            {% elif llm_config.reasoning %}
+            {# FALLBACK: Handle legacy 'reasoning' field (deprecated) #}
+            reasoning_effort={{ llm_config.reasoning.__repr__() }},
+            {% endif %}
+            {% if llm_config.thinkingLevel %}
+            thinkingLevel={{ llm_config.thinkingLevel.__repr__() }},
+            {% endif %}
+            {% if llm_config.effort %}
+            effort={{ llm_config.effort.__repr__() }},
+            {% endif %}
             {% for key, value in llm_params.items() %}
             {{ key }}={{ value.__repr__() }},
             {% endfor %}

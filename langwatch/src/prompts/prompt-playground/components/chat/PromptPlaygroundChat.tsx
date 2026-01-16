@@ -17,6 +17,7 @@ import type { ChatMessage } from "~/server/tracer/types";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { DeletableMessage } from "./DeletableMessage";
+import { ErrorMessage } from "./ErrorMessage";
 import { StructuredOutputDisplay } from "./StructuredOutputDisplay";
 import { SyncedChatInput } from "./SyncedChatInput";
 
@@ -149,7 +150,18 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         Input={SyncedChatInput}
         AssistantMessage={(props) => {
           const isStreaming = props.isLoading || props.isGenerating;
-          const content = props.rawData?.content?.toString();
+          const content = props.rawData?.content?.toString() ?? "";
+
+          // Check if response is an error
+          const isError = content.startsWith("[ERROR]");
+          let parsedError = null;
+          if (isError) {
+            try {
+              parsedError = JSON.parse(content.replace("[ERROR]", ""));
+            } catch {
+              parsedError = { type: "unknown", message: content };
+            }
+          }
 
           return (
             <>
@@ -157,12 +169,16 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
                 messageId={props.rawData.id}
                 onDelete={deleteMessage}
               >
-                <StructuredOutputDisplay
-                  content={content}
-                  isStreaming={isStreaming}
-                >
-                  <AssistantMessage {...props} />
-                </StructuredOutputDisplay>
+                {isError && parsedError ? (
+                  <ErrorMessage error={parsedError} />
+                ) : (
+                  <StructuredOutputDisplay
+                    content={content}
+                    isStreaming={isStreaming}
+                  >
+                    <AssistantMessage {...props} />
+                  </StructuredOutputDisplay>
+                )}
               </DeletableMessage>
               {!isStreaming && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />

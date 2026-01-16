@@ -78,7 +78,7 @@ export interface ParameterRegistration {
 // Registry Class
 // ============================================================================
 
-class ParameterRegistry {
+export class ParameterRegistry {
   private parameters: Map<string, ParameterRegistration> = new Map();
 
   /**
@@ -158,11 +158,13 @@ class ParameterRegistry {
     const baseConfig = reg.config;
 
     // Apply dynamic options for reasoning parameters
+    // All reasoning params (reasoning, reasoning_effort, thinkingLevel, effort) use dynamic options
+    const isReasoningParam = ["reasoning_effort", "thinkingLevel", "effort"].includes(name);
     if (
       baseConfig.type === "select" &&
       baseConfig.dynamicOptions &&
       reasoningConfig &&
-      (name === "reasoning_effort" || name === "reasoning")
+      isReasoningParam
     ) {
       return {
         ...baseConfig,
@@ -273,18 +275,35 @@ parameterRegistry.register({
 });
 
 parameterRegistry.register({
-  name: "reasoning",
+  name: "thinkingLevel",
   config: {
     type: "select",
     options: ["low", "medium", "high"] as const,
     default: "medium",
-    label: "Reasoning",
-    helper: "How deeply the model reasons through problems.",
+    label: "Thinking Level",
+    helper: "How deeply the model thinks through problems. (Gemini)",
     dynamicOptions: true,
   },
   icon: Brain,
   iconColor: "cyan.500",
-  displayOrder: 1,
+  displayOrder: 2,
+  isCore: true,
+  isReasoning: true,
+});
+
+parameterRegistry.register({
+  name: "effort",
+  config: {
+    type: "select",
+    options: ["low", "medium", "high"] as const,
+    default: "medium",
+    label: "Effort",
+    helper: "How much effort the model puts into reasoning. (Anthropic)",
+    dynamicOptions: true,
+  },
+  icon: Brain,
+  iconColor: "cyan.500",
+  displayOrder: 3,
   isCore: true,
   isReasoning: true,
 });
@@ -300,12 +319,12 @@ parameterRegistry.register({
   },
   icon: MessageSquare,
   iconColor: "teal.500",
-  displayOrder: 2,
+  displayOrder: 4,
   isCore: true,
   isReasoning: true,
 });
 
-// Traditional parameters (display order 3-7)
+// Traditional parameters (display order 5-9)
 parameterRegistry.register({
   name: "temperature",
   config: {
@@ -320,7 +339,7 @@ parameterRegistry.register({
   },
   icon: Thermometer,
   iconColor: "orange.500",
-  displayOrder: 3,
+  displayOrder: 5,
   isCore: true,
 });
 
@@ -339,7 +358,7 @@ parameterRegistry.register({
   },
   icon: Hash,
   iconColor: "green.500",
-  displayOrder: 4,
+  displayOrder: 6,
   isCore: true,
 });
 
@@ -357,7 +376,7 @@ parameterRegistry.register({
   },
   icon: Gauge,
   iconColor: "blue.500",
-  displayOrder: 5,
+  displayOrder: 7,
   isCore: true,
 });
 
@@ -375,7 +394,7 @@ parameterRegistry.register({
   },
   icon: Repeat,
   iconColor: "purple.500",
-  displayOrder: 6,
+  displayOrder: 8,
   isCore: true,
 });
 
@@ -393,11 +412,11 @@ parameterRegistry.register({
   },
   icon: Target,
   iconColor: "pink.500",
-  displayOrder: 7,
+  displayOrder: 9,
   isCore: true,
 });
 
-// Less common parameters (display order 8-11)
+// Less common parameters (display order 10-13)
 parameterRegistry.register({
   name: "top_k",
   formKey: "topK",
@@ -412,7 +431,7 @@ parameterRegistry.register({
   },
   icon: Layers,
   iconColor: "indigo.500",
-  displayOrder: 8,
+  displayOrder: 10,
 });
 
 parameterRegistry.register({
@@ -429,7 +448,7 @@ parameterRegistry.register({
   },
   icon: ArrowUpDown,
   iconColor: "red.500",
-  displayOrder: 9,
+  displayOrder: 11,
 });
 
 parameterRegistry.register({
@@ -446,7 +465,7 @@ parameterRegistry.register({
   },
   icon: Repeat,
   iconColor: "yellow.600",
-  displayOrder: 10,
+  displayOrder: 12,
 });
 
 parameterRegistry.register({
@@ -462,5 +481,5 @@ parameterRegistry.register({
   },
   icon: Dices,
   iconColor: "gray.500",
-  displayOrder: 11,
+  displayOrder: 13,
 });

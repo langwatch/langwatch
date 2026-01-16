@@ -20,6 +20,7 @@ import {
 } from "./parameterConfig";
 import type { LLMConfigValues } from "./types";
 import { getParamValue } from "./utils/paramValueUtils";
+import { resolveDisplayParameters } from "./utils/resolveDisplayParameters";
 import {
   buildModelChangeValues,
   getMaxTokenLimit,
@@ -90,20 +91,21 @@ export function LLMConfigPopover({
     ? modelMetadata?.[values.model]
     : undefined;
 
+  // Get reasoning config for the model
+  const reasoningConfig = currentModelMetadata?.reasoningConfig;
+
   // Determine which parameters to display
   const displayParameters = useMemo(() => {
     const supportedParams =
       currentModelMetadata?.supportedParameters ?? DEFAULT_SUPPORTED_PARAMETERS;
-    return getDisplayParameters(supportedParams);
-  }, [currentModelMetadata?.supportedParameters]);
+    const resolvedParams = resolveDisplayParameters(supportedParams, reasoningConfig);
+    return getDisplayParameters(resolvedParams);
+  }, [currentModelMetadata?.supportedParameters, reasoningConfig]);
 
   // Get max token limit for the model
   const maxTokenLimit = useMemo(() => {
     return getMaxTokenLimit(currentModelMetadata);
   }, [currentModelMetadata]);
-
-  // Get reasoning config for the model
-  const reasoningConfig = currentModelMetadata?.reasoningConfig;
 
   // Handle parameter change - outputs camelCase keys for form compatibility
   const handleParamChange = (paramName: string, value: number | string) => {
@@ -112,7 +114,14 @@ export function LLMConfigPopover({
     if (paramName === "max_tokens") {
       onChange(normalizeMaxTokens(values, value as number));
     } else {
-      onChange({ ...values, [formKey]: value });
+      // Remove BOTH potential keys (snake_case and camelCase) to avoid duplicates
+      // This ensures the new value replaces the old regardless of key format
+      const {
+        [paramName]: _snake,
+        [formKey]: _camel,
+        ...rest
+      } = values as Record<string, unknown>;
+      onChange({ ...rest, [formKey]: value } as LLMConfigValues);
     }
   };
 

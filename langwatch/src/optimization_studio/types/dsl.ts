@@ -102,9 +102,10 @@ export const llmConfigSchema = z.object({
   top_k: z.number().optional(),
   min_p: z.number().optional(),
   repetition_penalty: z.number().optional(),
-  // Reasoning parameters (for reasoning models)
-  reasoning_effort: z.string().optional(),
-  reasoning: z.string().optional(),
+  // Reasoning parameters (provider-specific API keys)
+  reasoning_effort: z.string().optional(), // OpenAI
+  thinkingLevel: z.string().optional(), // Gemini
+  effort: z.string().optional(), // Anthropic
   verbosity: z.string().optional(),
   litellm_params: z.record(z.string()).optional(),
 });

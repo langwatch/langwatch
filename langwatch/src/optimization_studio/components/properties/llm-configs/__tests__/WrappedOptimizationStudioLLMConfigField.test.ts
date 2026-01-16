@@ -84,12 +84,6 @@ describe("formToDslFormat", () => {
       expect(result.reasoning_effort).toBe("medium");
     });
 
-    it("preserves reasoning field", () => {
-      const formConfig = { model: "test", reasoning: "enabled" };
-      const result = LLMConfigFormatUtils.formToDslFormat(formConfig);
-      expect(result.reasoning).toBe("enabled");
-    });
-
     it("preserves verbosity field", () => {
       const formConfig = { model: "test", verbosity: "verbose" };
       const result = LLMConfigFormatUtils.formToDslFormat(formConfig);
@@ -178,12 +172,6 @@ describe("dslToFormFormat", () => {
       expect(result.reasoningEffort).toBe("medium");
     });
 
-    it("preserves reasoning field", () => {
-      const dslConfig: LLMConfig = { model: "test", reasoning: "enabled" };
-      const result = LLMConfigFormatUtils.dslToFormFormat(dslConfig);
-      expect(result.reasoning).toBe("enabled");
-    });
-
     it("preserves verbosity field", () => {
       const dslConfig: LLMConfig = { model: "test", verbosity: "verbose" };
       const result = LLMConfigFormatUtils.dslToFormFormat(dslConfig);
@@ -206,7 +194,6 @@ describe("round-trip conversion", () => {
       minP: 0.05,
       repetitionPenalty: 1.1,
       reasoningEffort: "medium",
-      reasoning: "enabled",
       verbosity: "verbose",
       litellmParams: { key: "value" },
     };
@@ -230,7 +217,6 @@ describe("round-trip conversion", () => {
       min_p: 0.05,
       repetition_penalty: 1.1,
       reasoning_effort: "medium",
-      reasoning: "enabled",
       verbosity: "verbose",
       litellm_params: { key: "value" },
     };

@@ -237,11 +237,27 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
 
     corrected = get_corrected_llm_params(llm_config)
 
-    return dspy.LM(
-        max_tokens=corrected["max_tokens"],
-        temperature=corrected["temperature"],
+    # Build kwargs with reasoning params if present
+    dspy_kwargs: dict[str, Any] = {
+        "max_tokens": corrected["max_tokens"],
+        "temperature": corrected["temperature"],
         **llm_params,
-    )
+    }
+
+    # Pass provider-specific reasoning parameters
+    if llm_config.reasoning_effort is not None:
+        dspy_kwargs["reasoning_effort"] = llm_config.reasoning_effort
+    if llm_config.thinkingLevel is not None:
+        dspy_kwargs["thinkingLevel"] = llm_config.thinkingLevel
+    if llm_config.effort is not None:
+        dspy_kwargs["effort"] = llm_config.effort
+
+    # FALLBACK: Handle legacy 'reasoning' field (deprecated)
+    # Map to reasoning_effort for backward compatibility with old stored configs
+    if llm_config.reasoning is not None and llm_config.reasoning_effort is None:
+        dspy_kwargs["reasoning_effort"] = llm_config.reasoning
+
+    return dspy.LM(**dspy_kwargs)
 
 
 def shutdown_handler(sig, frame):

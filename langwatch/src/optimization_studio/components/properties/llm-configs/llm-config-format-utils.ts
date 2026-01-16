@@ -17,9 +17,10 @@ export type FormLLMConfig = {
   topK?: number;
   minP?: number;
   repetitionPenalty?: number;
-  // Reasoning model parameters
-  reasoningEffort?: string;
-  reasoning?: string;
+  // Reasoning model parameters (provider-specific)
+  reasoningEffort?: string; // OpenAI
+  thinkingLevel?: string; // Gemini
+  effort?: string; // Anthropic
   verbosity?: string;
   litellmParams?: Record<string, string>;
 };
@@ -45,9 +46,10 @@ export const LLMConfigFormatUtils = {
       top_k: formLlm.topK,
       min_p: formLlm.minP,
       repetition_penalty: formLlm.repetitionPenalty,
-      // Reasoning model parameters
+      // Reasoning model parameters (provider-specific)
       reasoning_effort: formLlm.reasoningEffort,
-      reasoning: formLlm.reasoning,
+      thinkingLevel: formLlm.thinkingLevel,
+      effort: formLlm.effort,
       verbosity: formLlm.verbosity,
       litellm_params: formLlm.litellmParams,
     };
@@ -70,9 +72,10 @@ export const LLMConfigFormatUtils = {
       topK: dslLlm.top_k,
       minP: dslLlm.min_p,
       repetitionPenalty: dslLlm.repetition_penalty,
-      // Reasoning model parameters
+      // Reasoning model parameters (provider-specific)
       reasoningEffort: dslLlm.reasoning_effort,
-      reasoning: dslLlm.reasoning,
+      thinkingLevel: dslLlm.thinkingLevel,
+      effort: dslLlm.effort,
       verbosity: dslLlm.verbosity,
       litellmParams: dslLlm.litellm_params,
     };

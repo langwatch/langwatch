@@ -106,6 +106,12 @@ class LLMConfig(BaseModel):
     model: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
+    # Reasoning model parameters (provider-specific API keys)
+    reasoning_effort: Optional[str] = None  # OpenAI
+    thinkingLevel: Optional[str] = None  # Gemini
+    effort: Optional[str] = None  # Anthropic
+    # Legacy field for backward compatibility (deprecated)
+    reasoning: Optional[str] = None
     litellm_params: Optional[Dict[str, str]] = None
 
 

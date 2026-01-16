@@ -5,14 +5,9 @@
  * Shows slider/input or select control with the parameter description.
  */
 
-import {
-  HStack,
-  Input,
-  NativeSelect,
-  Slider,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { HStack, Input, NativeSelect, Text, VStack } from "@chakra-ui/react";
+
+import { Slider } from "../ui/slider";
 
 import { Popover } from "../ui/popover";
 import { useSliderControl } from "./hooks/useSliderControl";
@@ -100,7 +95,9 @@ function SliderControl({
           <Slider.Track>
             <Slider.Range />
           </Slider.Track>
-          <Slider.Thumbs />
+          <Slider.Thumb index={0}>
+            <Slider.HiddenInput />
+          </Slider.Thumb>
         </Slider.Control>
       </Slider.Root>
     </HStack>

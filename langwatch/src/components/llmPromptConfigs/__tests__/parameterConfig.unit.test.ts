@@ -128,12 +128,12 @@ describe("Parameter Config", () => {
 
     it("handles GPT-5 style parameters", () => {
       const params = getDisplayParameters([
-        "reasoning",
+        "reasoning_effort",
         "max_tokens",
         "seed",
         "tool_choice",
       ]);
-      expect(params).toContain("reasoning");
+      expect(params).toContain("reasoning_effort");
       expect(params).toContain("max_tokens");
       expect(params).toContain("seed");
       expect(params).not.toContain("tool_choice"); // Not in our config
@@ -163,8 +163,12 @@ describe("Parameter Config", () => {
       expect(isReasoningParameter("reasoning_effort")).toBe(true);
     });
 
-    it("returns true for reasoning", () => {
-      expect(isReasoningParameter("reasoning")).toBe(true);
+    it("returns true for thinkingLevel", () => {
+      expect(isReasoningParameter("thinkingLevel")).toBe(true);
+    });
+
+    it("returns true for effort", () => {
+      expect(isReasoningParameter("effort")).toBe(true);
     });
 
     it("returns true for verbosity", () => {
@@ -182,17 +186,21 @@ describe("Parameter Config", () => {
     });
 
     it("returns false when temperature is not in supported params", () => {
-      expect(supportsTemperature(["reasoning", "max_tokens"])).toBe(false);
+      expect(supportsTemperature(["reasoning_effort", "max_tokens"])).toBe(false);
     });
   });
 
   describe("supportsReasoning", () => {
-    it("returns true when reasoning is supported", () => {
-      expect(supportsReasoning(["reasoning", "max_tokens"])).toBe(true);
-    });
-
     it("returns true when reasoning_effort is supported", () => {
       expect(supportsReasoning(["reasoning_effort", "max_tokens"])).toBe(true);
+    });
+
+    it("returns true when thinkingLevel is supported", () => {
+      expect(supportsReasoning(["thinkingLevel", "max_tokens"])).toBe(true);
+    });
+
+    it("returns true when effort is supported", () => {
+      expect(supportsReasoning(["effort", "max_tokens"])).toBe(true);
     });
 
     it("returns false when no reasoning params supported", () => {
@@ -265,15 +273,15 @@ describe("Parameter Config", () => {
       }
     });
 
-    it("uses model reasoningConfig for reasoning options", () => {
+    it("uses model reasoningConfig for reasoning_effort options", () => {
       const reasoningConfig: ReasoningConfig = {
         supported: true,
-        parameterName: "reasoning",
+        parameterName: "reasoning_effort",
         allowedValues: ["none", "low", "medium", "high", "xhigh"],
         defaultValue: "none",
         canDisable: true,
       };
-      const config = getEffectiveParameterConfig("reasoning", reasoningConfig);
+      const config = getEffectiveParameterConfig("reasoning_effort", reasoningConfig);
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
@@ -324,7 +332,7 @@ describe("Parameter Config", () => {
 
     it("returns same key for non-mapped params", () => {
       expect(toFormKey("temperature")).toBe("temperature");
-      expect(toFormKey("reasoning")).toBe("reasoning");
+      expect(toFormKey("thinkingLevel")).toBe("thinkingLevel");
       expect(toFormKey("seed")).toBe("seed");
     });
   });
@@ -338,7 +346,7 @@ describe("Parameter Config", () => {
 
     it("returns same key for non-mapped params", () => {
       expect(toInternalKey("temperature")).toBe("temperature");
-      expect(toInternalKey("reasoning")).toBe("reasoning");
+      expect(toInternalKey("thinkingLevel")).toBe("thinkingLevel");
       expect(toInternalKey("seed")).toBe("seed");
     });
   });
@@ -352,8 +360,16 @@ describe("Parameter Config", () => {
       }
     });
 
-    it("does not include none in reasoning fallback options", () => {
-      const config = PARAMETER_CONFIG.reasoning;
+    it("does not include none in thinkingLevel fallback options", () => {
+      const config = PARAMETER_CONFIG.thinkingLevel;
+      expect(config?.type).toBe("select");
+      if (config?.type === "select") {
+        expect(config.options).not.toContain("none");
+      }
+    });
+
+    it("does not include none in effort fallback options", () => {
+      const config = PARAMETER_CONFIG.effort;
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
         expect(config.options).not.toContain("none");

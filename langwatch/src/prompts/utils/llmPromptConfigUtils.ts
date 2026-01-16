@@ -415,7 +415,6 @@ export function formValuesToTriggerSaveVersionParams(
     repetitionPenalty: llm.repetitionPenalty,
     // Reasoning model parameters
     reasoningEffort: llm.reasoningEffort,
-    reasoning: llm.reasoning,
     verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,

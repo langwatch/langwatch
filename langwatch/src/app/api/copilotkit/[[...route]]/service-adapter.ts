@@ -19,6 +19,7 @@ import type {
 import type { runtimeInputsSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { ChatMessage } from "~/server/tracer/types";
+import { parseLLMError } from "~/utils/formatLLMError";
 import { createLogger } from "~/utils/logger";
 import { generateOtelTraceId } from "~/utils/trace";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
@@ -174,16 +175,19 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
       /**
        * Sends an error message to the client and finishes the stream.
-       * @param message - Error message to display (without ❌ prefix)
+       * @param message - Error message to display
        */
       const sendError = (message: string) => {
         if (!started) {
           started = true;
           eventStream$.sendTextMessageStart({ messageId });
         }
+        const parsed = parseLLMError(message);
+        // Escape backticks to prevent code blocks in chat
+        parsed.message = parsed.message.replace(/`/g, "'");
         eventStream$.sendTextMessageContent({
           messageId,
-          content: `❌ ${message.replace(/`/g, "'")}`, // Otherwise we'll get code blocks in the message
+          content: `[ERROR]${JSON.stringify(parsed)}`,
         });
         finishIfNeeded();
       };
@@ -344,7 +348,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
             min_p: formValues.version.configData.llm.minP,
             repetition_penalty: formValues.version.configData.llm.repetitionPenalty,
             reasoning_effort: formValues.version.configData.llm.reasoningEffort,
-            reasoning: formValues.version.configData.llm.reasoning,
+            thinkingLevel: formValues.version.configData.llm.thinkingLevel,
+            effort: formValues.version.configData.llm.effort,
             verbosity: formValues.version.configData.llm.verbosity,
             litellm_params: formValues.version.configData.llm.litellmParams,
           },

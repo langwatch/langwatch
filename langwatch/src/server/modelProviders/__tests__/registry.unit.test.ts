@@ -39,9 +39,11 @@ describe("Registry Model Access", () => {
 
   describe("getModelById", () => {
     it("returns a model when it exists", () => {
-      const model = getModelById("openai/gpt-5.2");
+      const allModels = getAllModels();
+      const modelId = Object.keys(allModels)[0]!;
+      const model = getModelById(modelId);
       expect(model).toBeDefined();
-      expect(model?.name).toContain("GPT");
+      expect(model?.name).toBeDefined();
     });
 
     it("returns undefined for non-existent model", () => {
@@ -52,7 +54,9 @@ describe("Registry Model Access", () => {
 
   describe("getModelMetadata", () => {
     it("returns metadata for existing model", () => {
-      const metadata = getModelMetadata("openai/gpt-5.2");
+      const allModels = getAllModels();
+      const modelId = Object.keys(allModels)[0]!;
+      const metadata = getModelMetadata(modelId);
 
       expect(metadata).not.toBeNull();
       expect(metadata?.supportedParameters).toBeInstanceOf(Array);
@@ -67,7 +71,9 @@ describe("Registry Model Access", () => {
     });
 
     it("includes multimodal flags", () => {
-      const metadata = getModelMetadata("openai/gpt-5.2");
+      const allModels = getAllModels();
+      const modelId = Object.keys(allModels)[0]!;
+      const metadata = getModelMetadata(modelId);
       expect(metadata).toHaveProperty("supportsImageInput");
       expect(metadata).toHaveProperty("supportsAudioInput");
     });

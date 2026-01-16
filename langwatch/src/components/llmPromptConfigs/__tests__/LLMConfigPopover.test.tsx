@@ -61,7 +61,7 @@ const mockModelMetadata = {
     id: "openai/gpt-5",
     name: "GPT-5",
     provider: "openai",
-    supportedParameters: ["reasoning", "max_tokens"],
+    supportedParameters: ["reasoning", "max_tokens"], // Generic! Maps to reasoning_effort via reasoningConfig
     contextLength: 256000,
     maxCompletionTokens: 131072,
     defaultParameters: null,
@@ -247,30 +247,44 @@ describe("LLMConfigPopover", () => {
     });
 
     describe("for reasoning models (GPT-5)", () => {
-      it("shows Reasoning parameter", () => {
+      it("displays 'Reasoning Effort' label when model uses reasoning_effort parameter", () => {
+        // Mock has supportedParameters: ["reasoning", ...] (generic)
+        // but reasoningConfig.parameterName: "reasoning_effort" (specific API key)
+        // UI should show "Reasoning Effort", NOT "Reasoning"
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning: "medium" },
+          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         });
-        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
+
+        // Should find "Reasoning Effort" (may appear multiple times in UI)
+        expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(0);
+        // Should NOT find standalone "Reasoning" (only as part of "Reasoning Effort")
+        expect(screen.queryByText(/^Reasoning$/)).not.toBeInTheDocument();
+      });
+
+      it("shows Reasoning Effort parameter", () => {
+        renderComponent({
+          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+        });
+        expect(screen.getByTestId("parameter-row-reasoning_effort")).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning: "medium" },
+          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         });
         expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("does not show Temperature parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning: "medium" },
+          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         });
         expect(screen.queryByText("Temperature")).not.toBeInTheDocument();
       });
 
       it("does not show Top P parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning: "medium" },
+          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         });
         expect(screen.queryByText("Top P")).not.toBeInTheDocument();
       });
@@ -278,16 +292,16 @@ describe("LLMConfigPopover", () => {
   });
 
   describe("parameter value changes", () => {
-    it("calls onChange when reasoning is changed", async () => {
+    it("calls onChange when reasoning_effort is changed", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
       renderComponent({
-        values: { model: "openai/gpt-5", reasoning: "medium" },
+        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         onChange,
       });
 
-      // Find the select for reasoning
+      // Find the select for reasoning_effort
       const selects = screen.getAllByRole("combobox");
       // The reasoning select (first select after model selector)
       const reasoningSelect = selects.find(
@@ -300,12 +314,12 @@ describe("LLMConfigPopover", () => {
       }
     });
 
-    it("outputs camelCase keys for form compatibility", async () => {
+    it("outputs model-specific API key (reasoning_effort)", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
       renderComponent({
-        values: { model: "openai/gpt-5", reasoning: "medium" },
+        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
         onChange,
       });
 
@@ -316,9 +330,9 @@ describe("LLMConfigPopover", () => {
 
       if (reasoningSelect) {
         await user.selectOptions(reasoningSelect, "high");
-        // Should use camelCase key "reasoning" (same in both formats)
+        // Should use model-specific API key "reasoning_effort"
         expect(onChange).toHaveBeenCalledWith(
-          expect.objectContaining({ reasoning: "high" }),
+          expect.objectContaining({ reasoning_effort: "high" }),
         );
       }
     });
@@ -414,6 +428,37 @@ describe("LLMConfigPopover", () => {
       renderComponent();
       // ModelSelector is mocked, so we just verify the component renders
       expect(screen.getByTestId("model-selector")).toBeInTheDocument();
+    });
+  });
+
+  describe("duplicate key prevention", () => {
+    it("removes snake_case key when updating with camelCase output", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      // Input has snake_case key (from DSL/Optimization Studio)
+      renderComponent({
+        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+        onChange,
+      });
+
+      const selects = screen.getAllByRole("combobox");
+      const reasoningSelect = selects.find(
+        (s) => s.getAttribute("data-testid") !== "model-selector",
+      );
+
+      if (reasoningSelect) {
+        await user.selectOptions(reasoningSelect, "high");
+
+        // Should NOT have both snake_case and camelCase keys
+        const calledWith = onChange.mock.calls[0]?.[0] as Record<string, unknown>;
+        
+        // The output should have the camelCase key (form format)
+        expect(calledWith.reasoningEffort).toBe("high");
+        
+        // The snake_case key should be removed to prevent duplicates
+        expect(calledWith.reasoning_effort).toBeUndefined();
+      }
     });
   });
 });

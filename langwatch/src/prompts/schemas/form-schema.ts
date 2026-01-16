@@ -31,10 +31,11 @@ const llmSchema = z.object({
   minP: latestConfigVersionSchema.shape.configData.shape.min_p,
   repetitionPenalty:
     latestConfigVersionSchema.shape.configData.shape.repetition_penalty,
-  // Reasoning model parameters
+  // Reasoning model parameters (provider-specific API keys)
   reasoningEffort:
     latestConfigVersionSchema.shape.configData.shape.reasoning_effort,
-  reasoning: latestConfigVersionSchema.shape.configData.shape.reasoning,
+  thinkingLevel: latestConfigVersionSchema.shape.configData.shape.thinkingLevel,
+  effort: latestConfigVersionSchema.shape.configData.shape.effort,
   verbosity: latestConfigVersionSchema.shape.configData.shape.verbosity,
   litellmParams: z.record(z.string()).optional(),
 });
@@ -114,9 +115,10 @@ export function refinedFormSchemaWithModelLimits(
           topK: llmSchema.shape.topK,
           minP: llmSchema.shape.minP,
           repetitionPenalty: llmSchema.shape.repetitionPenalty,
-          // Reasoning model parameters
+          // Reasoning model parameters (provider-specific API keys)
           reasoningEffort: llmSchema.shape.reasoningEffort,
-          reasoning: llmSchema.shape.reasoning,
+          thinkingLevel: llmSchema.shape.thinkingLevel,
+          effort: llmSchema.shape.effort,
           verbosity: llmSchema.shape.verbosity,
           // Additional params attached to the LLM config
           litellmParams: llmSchema.shape.litellmParams,

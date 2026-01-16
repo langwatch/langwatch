@@ -13,6 +13,7 @@ import type {
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
+import { transformCamelToSnake } from "./transformToDbFormat";
 import { PromptVersionService } from "./prompt-version.service";
 import {
   type CreateLlmConfigParams,
@@ -232,6 +233,19 @@ export class PromptService {
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    // Traditional sampling parameters
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
+    // Other sampling parameters
+    seed?: number;
+    topK?: number;
+    minP?: number;
+    repetitionPenalty?: number;
+    // Reasoning model parameters
+    reasoningEffort?: string;
+    reasoning?: string;
+    verbosity?: string;
     promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
     demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
     responseFormat?: LatestConfigVersionSchema["configData"]["response_format"];
@@ -303,6 +317,19 @@ export class PromptService {
               model: params.model,
               temperature: params.temperature,
               maxTokens: params.maxTokens,
+              // Traditional sampling parameters
+              topP: params.topP,
+              frequencyPenalty: params.frequencyPenalty,
+              presencePenalty: params.presencePenalty,
+              // Other sampling parameters
+              seed: params.seed,
+              topK: params.topK,
+              minP: params.minP,
+              repetitionPenalty: params.repetitionPenalty,
+              // Reasoning model parameters
+              reasoningEffort: params.reasoningEffort,
+              reasoning: params.reasoning,
+              verbosity: params.verbosity,
               promptingTechnique: params.promptingTechnique,
               demonstrations: params.demonstrations,
               responseFormat: params.responseFormat,
@@ -801,7 +828,6 @@ export class PromptService {
       repetitionPenalty: configData.repetition_penalty,
       // Reasoning model parameters
       reasoningEffort: configData.reasoning_effort,
-      reasoning: configData.reasoning,
       verbosity: configData.verbosity,
       prompt,
       projectId: config.projectId,
@@ -855,53 +881,14 @@ export class PromptService {
    * Transforms camelCase service params to snake_case for repository/database
    * Single Responsibility: Handle naming convention conversion at data boundary
    *
+   * Uses transformCamelToSnake utility which derives mappings from PARAM_NAME_MAPPING
+   * (single source of truth) plus prompt-specific mappings.
+   *
    * TODO: Move to repository layer - the repository should handle this transformation
    * to properly isolate database schema concerns from service business logic.
    */
   private transformToDbFormat(data: any): any {
-    const {
-      maxTokens,
-      promptingTechnique,
-      responseFormat,
-      // Traditional sampling parameters
-      topP,
-      frequencyPenalty,
-      presencePenalty,
-      // Other sampling parameters
-      topK,
-      minP,
-      repetitionPenalty,
-      // Reasoning model parameters
-      reasoningEffort,
-      ...rest
-    } = data;
-    return {
-      ...rest,
-      ...(maxTokens !== undefined && { max_tokens: maxTokens }),
-      ...(promptingTechnique !== undefined && {
-        prompting_technique: promptingTechnique,
-      }),
-      ...(responseFormat !== undefined && { response_format: responseFormat }),
-      // Traditional sampling parameters
-      ...(topP !== undefined && { top_p: topP }),
-      ...(frequencyPenalty !== undefined && {
-        frequency_penalty: frequencyPenalty,
-      }),
-      ...(presencePenalty !== undefined && {
-        presence_penalty: presencePenalty,
-      }),
-      // Other sampling parameters
-      ...(topK !== undefined && { top_k: topK }),
-      ...(minP !== undefined && { min_p: minP }),
-      ...(repetitionPenalty !== undefined && {
-        repetition_penalty: repetitionPenalty,
-      }),
-      // Reasoning model parameters
-      ...(reasoningEffort !== undefined && {
-        reasoning_effort: reasoningEffort,
-      }),
-      // Note: seed, reasoning, verbosity are already snake_case, passed through in ...rest
-    };
+    return transformCamelToSnake(data);
   }
 
   /**

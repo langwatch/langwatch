@@ -380,10 +380,12 @@ export function FieldsForm({
     <VStack as="form" align="start" gap={3} width="full">
       {fields.map((field, index) => {
         if (field.type === "llm") {
+          // Use form state value (field.value) instead of node.data to ensure
+          // immediate UI updates when setValue is called
           return (
             <OptimizationStudioLLMConfigField
               key={field.id}
-              llmConfig={(node.data.parameters?.[index]?.value as LLMConfig) ?? default_llm}
+              llmConfig={(field.value as LLMConfig) ?? default_llm}
               onChange={(llmConfig) => {
                 // Update form state instead of directly calling setNode
                 // This ensures form state stays in sync and prevents resets

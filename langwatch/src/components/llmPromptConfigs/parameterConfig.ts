@@ -13,7 +13,6 @@
  */
 
 import type { LucideIcon } from "lucide-react";
-import { Settings } from "lucide-react";
 import type { ReasoningConfig } from "../../server/modelProviders/llmModels.types";
 import { parameterRegistry } from "./parameterRegistry";
 
@@ -146,12 +145,7 @@ export const PARAMETER_ICONS: Record<string, ParameterIcon> =
  * Get the icon config for a parameter
  */
 export function getParameterIcon(paramName: string): ParameterIcon {
-  return (
-    parameterRegistry.getIcon(paramName) ?? {
-      icon: Settings,
-      color: "gray.500",
-    }
-  );
+  return parameterRegistry.getIcon(paramName);
 }
 
 // ============================================================================
@@ -179,11 +173,13 @@ export function getEffectiveParameterConfig(
   if (!baseConfig) return undefined;
 
   // For reasoning parameters with dynamicOptions, use model's reasoningConfig
+  // All reasoning params (reasoning, reasoning_effort, thinkingLevel, effort) use dynamic options
+  const isReasoningParam = ["reasoning_effort", "thinkingLevel", "effort"].includes(paramName);
   if (
     baseConfig.type === "select" &&
     baseConfig.dynamicOptions &&
     reasoningConfig &&
-    (paramName === "reasoning_effort" || paramName === "reasoning")
+    isReasoningParam
   ) {
     return {
       ...baseConfig,
@@ -232,7 +228,7 @@ export function getParameterDefault(paramName: string): unknown {
  * Check if a parameter is a reasoning-type parameter
  */
 export function isReasoningParameter(paramName: string): boolean {
-  return ["reasoning_effort", "reasoning", "verbosity"].includes(paramName);
+  return ["reasoning_effort", "thinkingLevel", "effort", "verbosity"].includes(paramName);
 }
 
 /**
@@ -247,7 +243,8 @@ export function supportsTemperature(supportedParameters: string[]): boolean {
  */
 export function supportsReasoning(supportedParameters: string[]): boolean {
   return (
-    supportedParameters.includes("reasoning") ||
-    supportedParameters.includes("reasoning_effort")
+    supportedParameters.includes("reasoning_effort") ||
+    supportedParameters.includes("thinkingLevel") ||
+    supportedParameters.includes("effort")
   );
 }

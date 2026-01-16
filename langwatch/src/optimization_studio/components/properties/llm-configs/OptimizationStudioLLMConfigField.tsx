@@ -7,33 +7,7 @@ import {
 import { useOrganizationTeamProject } from "../../../../hooks/useOrganizationTeamProject";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type { LLMConfig } from "../../../types/dsl";
-
-/**
- * Normalizes LLM config to snake_case format required by optimization studio DSL
- */
-function normalizeToSnakeCase(
-  llmConfig: LLMConfig & { maxTokens?: number },
-): LLMConfig {
-  const normalized: LLMConfig = {
-    model: llmConfig.model,
-  };
-
-  if (llmConfig.temperature !== undefined) {
-    normalized.temperature = llmConfig.temperature;
-  }
-
-  // Prefer maxTokens if present, otherwise use max_tokens
-  const maxTokens = (llmConfig as any).maxTokens ?? llmConfig.max_tokens;
-  if (maxTokens !== undefined) {
-    normalized.max_tokens = maxTokens;
-  }
-
-  if (llmConfig.litellm_params !== undefined) {
-    normalized.litellm_params = llmConfig.litellm_params;
-  }
-
-  return normalized;
-}
+import { normalizeToSnakeCase } from "./normalizeToSnakeCase";
 
 type OptimizationStudioLLMConfigFieldProps = {
   llmConfig: LLMConfig;

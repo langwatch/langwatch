@@ -91,7 +91,7 @@ Feature: Model Parameter Display
     Then the Max Tokens slider should show a sensible default value
     And the default should be approximately 25% of 128000
 
-  @visual
+  @integration
   Scenario: Max tokens slider has minimum of 256
     When I open the LLM Config popover
     Then the Max Tokens slider should have min value of 256

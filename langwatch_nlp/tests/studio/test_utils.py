@@ -152,3 +152,80 @@ class TestReasoningModelConfig:
         mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
         assert call_kwargs.get("temperature") == 1.0
+
+    # Reasoning parameters passthrough
+
+    def test_reasoning_effort_passed_to_dspy_lm(self, mock_dspy_lm):
+        """Given reasoning_effort='high', it should be passed to dspy.LM."""
+        config = LLMConfig(
+            model="openai/gpt-5",
+            reasoning_effort="high",
+            max_tokens=16000,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("reasoning_effort") == "high"
+
+    def test_thinkingLevel_passed_to_dspy_lm(self, mock_dspy_lm):
+        """Given thinkingLevel='high' (Gemini), it should be passed to dspy.LM."""
+        config = LLMConfig(
+            model="google/gemini-pro",
+            thinkingLevel="high",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("thinkingLevel") == "high"
+
+    def test_effort_passed_to_dspy_lm(self, mock_dspy_lm):
+        """Given effort='high' (Anthropic), it should be passed to dspy.LM."""
+        config = LLMConfig(
+            model="anthropic/claude-3",
+            effort="high",
+            max_tokens=4096,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        assert call_kwargs.get("effort") == "high"
+
+    def test_legacy_reasoning_fallback_to_reasoning_effort(self, mock_dspy_lm):
+        """Given legacy 'reasoning' field (deprecated), it should map to reasoning_effort."""
+        config = LLMConfig(
+            model="openai/gpt-5",
+            reasoning="medium",  # Legacy field
+            max_tokens=16000,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        # Should be mapped to reasoning_effort
+        assert call_kwargs.get("reasoning_effort") == "medium"
+        # Should NOT have 'reasoning' key
+        assert "reasoning" not in call_kwargs
+
+    def test_reasoning_effort_takes_precedence_over_legacy_reasoning(self, mock_dspy_lm):
+        """Given both reasoning_effort and legacy reasoning, reasoning_effort takes precedence."""
+        config = LLMConfig(
+            model="openai/gpt-5",
+            reasoning_effort="high",
+            reasoning="low",  # Legacy field - should be ignored
+            max_tokens=16000,
+        )
+
+        node_llm_config_to_dspy_lm(config)
+
+        mock_dspy_lm.assert_called_once()
+        call_kwargs = mock_dspy_lm.call_args.kwargs
+        # reasoning_effort should take precedence
+        assert call_kwargs.get("reasoning_effort") == "high"

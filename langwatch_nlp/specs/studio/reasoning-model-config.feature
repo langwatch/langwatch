@@ -63,3 +63,37 @@ Feature: Reasoning Model LLM Configuration
     When creating a DSPy LM instance
     Then temperature should be 0
     And max_tokens should be 2048
+
+  # Integration: Reasoning parameters passthrough
+
+  @integration
+  Scenario: reasoning_effort is passed to dspy.LM (OpenAI)
+    Given an LLM config with model "openai/gpt-5" and reasoning_effort "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="high"
+
+  @integration
+  Scenario: thinkingLevel is passed to dspy.LM (Gemini)
+    Given an LLM config with model "google/gemini-pro" and thinkingLevel "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include thinkingLevel="high"
+
+  @integration
+  Scenario: effort is passed to dspy.LM (Anthropic)
+    Given an LLM config with model "anthropic/claude-3" and effort "high"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include effort="high"
+
+  @integration
+  Scenario: Legacy reasoning field maps to reasoning_effort
+    Given an LLM config with model "openai/gpt-5" and reasoning "medium"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="medium"
+    # Note: The legacy 'reasoning' field is mapped to 'reasoning_effort' for backward compatibility
+
+  @integration
+  Scenario: reasoning_effort takes precedence over legacy reasoning
+    Given an LLM config with model "openai/gpt-5" and reasoning_effort "high" and reasoning "low"
+    When parsing a workflow with this config
+    Then the generated dspy.LM should include reasoning_effort="high"
+    # Note: When both are present, reasoning_effort takes precedence
