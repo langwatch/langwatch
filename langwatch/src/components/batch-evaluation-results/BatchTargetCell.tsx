@@ -81,17 +81,17 @@ export function BatchTargetCell({
       // Also get the td width to use as min width
       const td = cellRef.current.closest("td");
       const tdWidth = td?.getBoundingClientRect().width ?? rect.width;
-      
+
       const expandedWidth = Math.max(rect.width, tdWidth) + 24;
       const safetyMargin = 32;
       const viewportWidth = window.innerWidth;
-      
+
       // Adjust left position if it would overflow the viewport
       let left = rect.left - 12;
       if (left + expandedWidth > viewportWidth - safetyMargin) {
         left = viewportWidth - expandedWidth - safetyMargin;
       }
-      
+
       setExpandedPosition({
         top: rect.top,
         left,

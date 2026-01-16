@@ -247,15 +247,37 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
 
-  // Determine if experiment was not found
-  const isNotFound = isTrpcNotFound(existingExperiment.error);
+  // Determine if experiment was truly not found
+  //
+  // IMPORTANT: NOT_FOUND from the API is expected when creating a new experiment!
+  // The flow for new experiments is:
+  // 1. Index page generates slug and redirects to /v3/[newSlug]
+  // 2. Query runs for that slug → returns NOT_FOUND (expected!)
+  // 3. Effect handles this by setting experimentSlug in store
+  // 4. Autosave detects the change, waits for debounce, then saves
+  // 5. Save completes → experimentId is set
+  //
+  // For the v3 evaluation page, going to ANY slug will create a new experiment
+  // via autosave if it doesn't exist. So "not found" is not really applicable -
+  // every slug becomes a valid new experiment.
+  //
+  // We disable isNotFound for this hook since autosave handles experiment creation.
+  // If there are real errors (permissions, network, etc.), they'll be caught by
+  // the autosave error handling which shows a toast and sets autosaveStatus to "error".
+  const isNotFound = false;
+
+  // Check if the error is a NOT_FOUND error (using multiple checks for robustness)
+  const isNotFoundError = isTrpcNotFound(existingExperiment.error) ||
+    existingExperiment.error?.data?.code === "NOT_FOUND" ||
+    existingExperiment.error?.data?.httpStatus === 404;
 
   return {
     isLoading: existingExperiment.isLoading,
     isSaving: saveExperiment.isPending,
     existingExperiment: existingExperiment.data,
     isNotFound,
-    isError: existingExperiment.isError && !isNotFound,
+    // Only show isError for non-NOT_FOUND errors (e.g., permission denied)
+    isError: existingExperiment.isError && !isNotFoundError,
     error: existingExperiment.error,
   };
 };
