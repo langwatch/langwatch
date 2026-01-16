@@ -108,7 +108,11 @@ export function extractStreamableOutput(
     }
 
     // Custom identifier: wrap in JSON object with the identifier as key
-    return JSON.stringify({ [config.identifier]: rawValue }, null, 2);
+    // Coerce str types to ensure consistent string representation
+    const valueToWrap = config.type === "str"
+      ? formatOutputForStreaming(rawValue, "str")
+      : rawValue;
+    return JSON.stringify({ [config.identifier]: valueToWrap }, null, 2);
   }
 
   // Multiple outputs case: combine all valid outputs into a single JSON object
@@ -118,7 +122,10 @@ export function extractStreamableOutput(
   for (const config of configs) {
     const rawValue = outputs[config.identifier];
     if (isValidValueForType(rawValue, config.type)) {
-      combinedOutputs[config.identifier] = rawValue;
+      // Coerce str types to ensure consistent string representation
+      combinedOutputs[config.identifier] = config.type === "str"
+        ? formatOutputForStreaming(rawValue, "str")
+        : rawValue;
       hasAnyOutput = true;
     }
   }

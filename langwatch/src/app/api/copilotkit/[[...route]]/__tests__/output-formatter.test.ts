@@ -82,8 +82,7 @@ describe("formatOutputForStreaming", () => {
         { outer: { inner: "value" } },
         "json_schema"
       );
-      expect(result).toContain('"outer"');
-      expect(result).toContain('"inner"');
+      expect(result).toBe('{\n  "outer": {\n    "inner": "value"\n  }\n}');
     });
 
     it("handles arrays", () => {
@@ -187,11 +186,7 @@ describe("extractStreamableOutput", () => {
       const outputs = { analysis: { sentiment: "positive", confidence: 0.9 } };
 
       const result = extractStreamableOutput(outputs, configs);
-      expect(result).toContain('"analysis"');
-      expect(result).toContain('"sentiment"');
-      expect(result).toContain('"positive"');
-      expect(result).toContain('"confidence"');
-      expect(result).toContain("0.9");
+      expect(result).toBe('{\n  "analysis": {\n    "sentiment": "positive",\n    "confidence": 0.9\n  }\n}');
     });
   });
 
