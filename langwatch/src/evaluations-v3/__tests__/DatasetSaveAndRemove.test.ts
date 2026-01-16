@@ -121,7 +121,7 @@ describe("Dataset save and remove edge cases", () => {
       // Add the saved reference first (so we have 2)
       store.addDataset(savedDataset);
       store.setActiveDataset("workbench_saved_ref");
-      
+
       // Remove the old inline dataset (now we have 1)
       store.removeDataset(DEFAULT_TEST_DATA_ID);
 
@@ -131,7 +131,7 @@ describe("Dataset save and remove edge cases", () => {
 
       // Step 4: BUG - User tries to remove this dataset
       // This should NOT crash with "can't access property 'id', newDatasets[0] is undefined"
-      
+
       // The guard should prevent removal of the last dataset
       store.removeDataset("workbench_saved_ref");
 
@@ -155,9 +155,9 @@ describe("Dataset save and remove edge cases", () => {
       // Get the inline records
       const state = useEvaluationsV3Store.getState();
       const dataset = state.datasets.find((d) => d.id === DEFAULT_TEST_DATA_ID);
-      
+
       expect(dataset?.inline?.records).toBeDefined();
-      
+
       // The records should be in column-first format
       const records = dataset?.inline?.records;
       expect(records?.input).toBeDefined();
@@ -170,7 +170,7 @@ describe("Dataset save and remove edge cases", () => {
       // FIX: convertInlineToRowRecords should NOT include IDs
       // The backend's createDatasetRecords generates unique IDs with nanoid()
       // This prevents "Unique constraint failed on the fields: (`id`)" errors
-      
+
       const columns: DatasetColumn[] = [
         { id: "input", name: "input", type: "string" },
         { id: "expected_output", name: "expected_output", type: "string" },
@@ -198,7 +198,7 @@ describe("Dataset save and remove edge cases", () => {
     it("allows saving the same data multiple times without ID conflicts", () => {
       // When user saves the same dataset multiple times (e.g., saves, then saves again with different name)
       // There should be no ID conflicts because IDs are not included
-      
+
       const columns: DatasetColumn[] = [
         { id: "input", name: "input", type: "string" },
       ];
@@ -242,7 +242,7 @@ describe("Dataset save and remove edge cases", () => {
 
       // BUG: We now have 2 datasets with the same ID!
       const state = useEvaluationsV3Store.getState();
-      
+
       // This DOCUMENTS the bug - we get 2 datasets when we should have 1
       expect(state.datasets.length).toBe(2); // Bug: should be 1
     });
@@ -262,10 +262,10 @@ describe("Dataset save and remove edge cases", () => {
       });
 
       const state = useEvaluationsV3Store.getState();
-      
+
       // Should still be 1 dataset
       expect(state.datasets.length).toBe(1);
-      
+
       // The dataset should now be saved type
       expect(state.datasets[0]!.type).toBe("saved");
       expect(state.datasets[0]!.datasetId).toBe("persisted_id_123");

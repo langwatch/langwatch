@@ -27,7 +27,7 @@ export const filterEmptyRows = (
 /**
  * Converts column-based inline records to row-based records for saving.
  * Filters out completely empty rows.
- * 
+ *
  * NOTE: IDs are NOT included - the backend's createDatasetRecords will generate
  * unique IDs using nanoid(). This prevents unique constraint violations when
  * saving datasets with names that produce the same record IDs.

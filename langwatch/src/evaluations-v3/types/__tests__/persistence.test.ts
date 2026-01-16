@@ -10,21 +10,21 @@ describe("Persistence", () => {
 
   describe("extractPersistedState from actual store state", () => {
     it("persists hiddenColumns from actual store UI state", () => {
-      // This test ensures that when extractPersistedState is called with the 
+      // This test ensures that when extractPersistedState is called with the
       // actual store state (as done in useAutosaveEvaluationsV3), hiddenColumns
       // are correctly extracted from ui.hiddenColumns
       const store = useEvaluationsV3Store.getState();
-      
+
       // Hide some columns via the store action
       store.toggleColumnVisibility("input");
       store.toggleColumnVisibility("expected_output");
-      
+
       // Get the full store state (simulating what useAutosaveEvaluationsV3 does)
       const fullState = useEvaluationsV3Store.getState();
-      
+
       // Extract persisted state from the FULL store state
       const persisted = extractPersistedState(fullState);
-      
+
       // hiddenColumns should be extracted from ui.hiddenColumns
       expect(persisted.hiddenColumns).toContain("input");
       expect(persisted.hiddenColumns).toContain("expected_output");
@@ -34,12 +34,12 @@ describe("Persistence", () => {
     it("persists empty hiddenColumns when none are hidden in store", () => {
       // Get the full store state with no hidden columns
       const fullState = useEvaluationsV3Store.getState();
-      
+
       // Verify no columns are hidden initially
       expect(fullState.ui.hiddenColumns.size).toBe(0);
-      
+
       const persisted = extractPersistedState(fullState);
-      
+
       expect(persisted.hiddenColumns).toEqual([]);
     });
 
@@ -47,17 +47,17 @@ describe("Persistence", () => {
       // Hide columns
       useEvaluationsV3Store.getState().toggleColumnVisibility("input");
       useEvaluationsV3Store.getState().toggleColumnVisibility("some_column");
-      
+
       // Extract persisted state
       const persisted = extractPersistedState(useEvaluationsV3Store.getState());
-      
+
       // Reset store to initial state
       useEvaluationsV3Store.setState(createInitialState());
       expect(useEvaluationsV3Store.getState().ui.hiddenColumns.size).toBe(0);
-      
+
       // Load the persisted state back
       useEvaluationsV3Store.getState().loadState(persisted);
-      
+
       // Verify hidden columns are restored
       const restoredState = useEvaluationsV3Store.getState();
       expect(restoredState.ui.hiddenColumns.has("input")).toBe(true);
@@ -189,7 +189,7 @@ describe("Persistence", () => {
     it("returns undefined results when no actual results exist", () => {
       const state = createInitialState();
       // Initial state has empty results
-      
+
       const persisted = extractPersistedState(state);
 
       expect(persisted.results).toBeUndefined();
