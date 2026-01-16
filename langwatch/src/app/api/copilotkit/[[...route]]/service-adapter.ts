@@ -80,7 +80,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       };
       threadId = fallbackThreadId;
       // Capture all output configurations for dynamic field lookup during streaming
-      outputConfigs = formValues.version.configData.outputs;
+      outputConfigs = formValues.version.configData.outputs ?? [
+        { identifier: "output", type: "str" },
+      ];
       nodeId = "prompt_node";
       traceId = generateOtelTraceId();
       const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
