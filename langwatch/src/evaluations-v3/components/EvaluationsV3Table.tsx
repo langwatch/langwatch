@@ -1138,10 +1138,17 @@ export function EvaluationsV3Table({
             const rows = table.getRowModel().rows;
             const columnCount = table.getAllColumns().length + 1; // +1 for spacer
 
-            // Calculate padding to maintain scroll position
-            const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+            // Fallback to rendering all rows when virtualization returns no items
+            // (e.g., in jsdom tests where container has no dimensions)
+            const shouldRenderAllRows = virtualRows.length === 0 && rows.length > 0;
+
+            // Calculate padding to maintain scroll position (only when virtualizing)
+            const paddingTop =
+              !shouldRenderAllRows && virtualRows.length > 0
+                ? virtualRows[0]?.start ?? 0
+                : 0;
             const paddingBottom =
-              virtualRows.length > 0
+              !shouldRenderAllRows && virtualRows.length > 0
                 ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
                 : 0;
 
@@ -1153,30 +1160,50 @@ export function EvaluationsV3Table({
                     <td style={{ height: `${paddingTop}px`, padding: 0 }} colSpan={columnCount} />
                   </tr>
                 )}
-                {/* Render only visible rows */}
-                {virtualRows.map((virtualRow) => {
-                  const row = rows[virtualRow.index];
-                  if (!row) return null;
-                  return (
-                    <tr
-                      key={row.id}
-                      data-index={virtualRow.index}
-                      data-selected={selectedRows.has(row.index) ? "true" : undefined}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          cell={cell}
-                          rowIndex={row.index}
-                          activeDatasetId={activeDatasetId}
-                          isLoading={isLoadingExperiment || isLoadingDatasets}
-                        />
-                      ))}
-                      {/* Spacer column to match drawer width */}
-                      <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
-                    </tr>
-                  );
-                })}
+                {/* Render visible rows (or all rows if virtualization not working) */}
+                {shouldRenderAllRows
+                  ? rows.map((row) => (
+                      <tr
+                        key={row.id}
+                        data-index={row.index}
+                        data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell
+                            key={cell.id}
+                            cell={cell}
+                            rowIndex={row.index}
+                            activeDatasetId={activeDatasetId}
+                            isLoading={isLoadingExperiment || isLoadingDatasets}
+                          />
+                        ))}
+                        {/* Spacer column to match drawer width */}
+                        <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                      </tr>
+                    ))
+                  : virtualRows.map((virtualRow) => {
+                      const row = rows[virtualRow.index];
+                      if (!row) return null;
+                      return (
+                        <tr
+                          key={row.id}
+                          data-index={virtualRow.index}
+                          data-selected={selectedRows.has(row.index) ? "true" : undefined}
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell
+                              key={cell.id}
+                              cell={cell}
+                              rowIndex={row.index}
+                              activeDatasetId={activeDatasetId}
+                              isLoading={isLoadingExperiment || isLoadingDatasets}
+                            />
+                          ))}
+                          {/* Spacer column to match drawer width */}
+                          <td style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }} />
+                        </tr>
+                      );
+                    })}
                 {/* Bottom padding row */}
                 {paddingBottom > 0 && (
                   <tr>

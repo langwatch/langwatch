@@ -19,6 +19,9 @@ const stringifiedInitialState = JSON.stringify(
 /**
  * Manages syncing the evaluations v3 state with the database.
  * Uses wizardState field in the Experiment model for persistence.
+ *
+ * This hook expects the experiment to already exist - it only loads and saves.
+ * New experiments are created by the index page before redirecting here.
  */
 export const useAutosaveEvaluationsV3 = () => {
   const { project } = useOrganizationTeamProject();
@@ -101,7 +104,9 @@ export const useAutosaveEvaluationsV3 = () => {
   //    (this means either: new page, store was reset, or navigated to different experiment)
   // 3. We haven't already loaded this slug in this component instance
   //    (prevents duplicate loads during the same mount)
-  const shouldLoadExisting = !!project && !!routerSlug &&
+  const shouldLoadExisting =
+    !!project &&
+    !!routerSlug &&
     experimentSlug !== routerSlug &&
     loadedSlugRef.current !== routerSlug;
 
@@ -114,7 +119,7 @@ export const useAutosaveEvaluationsV3 = () => {
     { enabled: shouldLoadExisting }
   );
 
-  // Update URL when experiment slug changes
+  // Update URL when experiment slug changes (for URL sync after save)
   useEffect(() => {
     if (project && experimentSlug && routerSlug !== experimentSlug) {
       void router.replace(
@@ -126,7 +131,7 @@ export const useAutosaveEvaluationsV3 = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [experimentSlug, project?.slug]);
 
-  // Load existing experiment data into store OR set slug from URL for new experiments
+  // Load existing experiment data into store
   useEffect(() => {
     if (existingExperiment.data && loadedSlugRef.current !== routerSlug) {
       // Mark this slug as loaded BEFORE updating store to prevent race conditions
@@ -140,19 +145,14 @@ export const useAutosaveEvaluationsV3 = () => {
       if (existingExperiment.data.wizardState && loadState) {
         loadState(existingExperiment.data.wizardState);
       }
-    } else if (
-      !existingExperiment.isLoading &&
-      !existingExperiment.data &&
-      routerSlug &&
-      loadedSlugRef.current !== routerSlug &&
-      !experimentSlug
-    ) {
-      // No existing experiment found - this is a new one
-      // Set the slug from the URL so it's included in the first save
-      loadedSlugRef.current = routerSlug;
-      setExperimentSlug(routerSlug);
     }
-  }, [existingExperiment.data, existingExperiment.isLoading, routerSlug, experimentSlug, setExperimentId, setExperimentSlug, loadState]);
+  }, [
+    existingExperiment.data,
+    routerSlug,
+    setExperimentId,
+    setExperimentSlug,
+    loadState,
+  ]);
 
   // Clear timeouts on unmount
   useEffect(() => {
@@ -185,10 +185,12 @@ export const useAutosaveEvaluationsV3 = () => {
     // CRITICAL: Don't save if we should be loading (store doesn't match URL)
     // This prevents saving blank/stale data when navigating back
     if (shouldLoadExisting) return;
+    // Don't save if we don't have an experiment ID yet (experiment must exist first)
+    if (!experimentId) return;
     if (!name) return;
 
-    // Only save if we have an existing experiment OR there are actual changes from initial state
-    if (!experimentId && stringifiedState === stringifiedInitialState) {
+    // Only save if there are actual changes from initial state
+    if (stringifiedState === stringifiedInitialState) {
       return;
     }
 
@@ -208,7 +210,9 @@ export const useAutosaveEvaluationsV3 = () => {
             experimentId: experimentId,
             // Cast to any since the actual types are more complex than the schema
             // The schema is designed to be lenient for storage
-            state: persistedState as Parameters<typeof saveExperiment.mutateAsync>[0]["state"],
+            state: persistedState as Parameters<
+              typeof saveExperiment.mutateAsync
+            >[0]["state"],
           });
 
           setExperimentId(updatedExperiment.id);
@@ -219,7 +223,11 @@ export const useAutosaveEvaluationsV3 = () => {
           markSaved();
         } catch (error) {
           console.error("Failed to autosave evaluations v3:", error);
-          setAutosaveStatus("evaluation", "error", error instanceof Error ? error.message : "Unknown error");
+          setAutosaveStatus(
+            "evaluation",
+            "error",
+            error instanceof Error ? error.message : "Unknown error"
+          );
           toaster.create({
             title: "Failed to autosave evaluation",
             type: "error",
@@ -245,31 +253,23 @@ export const useAutosaveEvaluationsV3 = () => {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stringifiedState, project?.id, shouldLoadExisting, experimentId, existingExperiment.isLoading]);
+  }, [
+    stringifiedState,
+    project?.id,
+    shouldLoadExisting,
+    experimentId,
+    existingExperiment.isLoading,
+  ]);
 
   // Determine if experiment was truly not found
-  //
-  // IMPORTANT: NOT_FOUND from the API is expected when creating a new experiment!
-  // The flow for new experiments is:
-  // 1. Index page generates slug and redirects to /v3/[newSlug]
-  // 2. Query runs for that slug → returns NOT_FOUND (expected!)
-  // 3. Effect handles this by setting experimentSlug in store
-  // 4. Autosave detects the change, waits for debounce, then saves
-  // 5. Save completes → experimentId is set
-  //
-  // For the v3 evaluation page, going to ANY slug will create a new experiment
-  // via autosave if it doesn't exist. So "not found" is not really applicable -
-  // every slug becomes a valid new experiment.
-  //
-  // We disable isNotFound for this hook since autosave handles experiment creation.
-  // If there are real errors (permissions, network, etc.), they'll be caught by
-  // the autosave error handling which shows a toast and sets autosaveStatus to "error".
-  const isNotFound = false;
-
   // Check if the error is a NOT_FOUND error (using multiple checks for robustness)
-  const isNotFoundError = isTrpcNotFound(existingExperiment.error) ||
+  const isNotFoundError =
+    isTrpcNotFound(existingExperiment.error) ||
     existingExperiment.error?.data?.code === "NOT_FOUND" ||
     existingExperiment.error?.data?.httpStatus === 404;
+
+  // isNotFound: query completed with error AND that error is NOT_FOUND
+  const isNotFound = existingExperiment.isError && isNotFoundError;
 
   return {
     isLoading: existingExperiment.isLoading,

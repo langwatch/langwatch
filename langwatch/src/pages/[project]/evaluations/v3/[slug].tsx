@@ -59,7 +59,12 @@ export default function EvaluationsV3Page() {
     return <LoadingScreen />;
   }
 
-  // Show error states inside DashboardLayout so user can navigate away
+  // Show loading while fetching
+  if (isLoadingExperiment) {
+    return <LoadingScreen />;
+  }
+
+  // Show 404 if experiment doesn't exist
   if (!slug || isNotFound) {
     return (
       <DashboardLayout backgroundColor="white" compactMenu={true}>
@@ -68,7 +73,8 @@ export default function EvaluationsV3Page() {
             <Alert.Indicator />
             <Alert.Title>Evaluation not found</Alert.Title>
             <Alert.Description>
-              The evaluation you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              The evaluation you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -76,6 +82,7 @@ export default function EvaluationsV3Page() {
     );
   }
 
+  // Show error for other failures (permissions, network, etc.)
   if (isError) {
     return (
       <DashboardLayout backgroundColor="white" compactMenu={true}>
@@ -84,7 +91,8 @@ export default function EvaluationsV3Page() {
             <Alert.Indicator />
             <Alert.Title>Failed to load evaluation</Alert.Title>
             <Alert.Description>
-              {error?.message ?? "An unexpected error occurred while loading the evaluation."}
+              {error?.message ??
+                "An unexpected error occurred while loading the evaluation."}
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -119,7 +127,9 @@ export default function EvaluationsV3Page() {
             <UndoRedo />
             <RowHeightToggle />
             <HistoryButton disabled={isLoadingExperiment} />
-            <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
+            <RunEvaluationButton
+              disabled={isLoadingExperiment || isLoadingDatasets}
+            />
           </HStack>
         </HStack>
 

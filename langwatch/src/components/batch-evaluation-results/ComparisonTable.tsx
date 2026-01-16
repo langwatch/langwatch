@@ -308,15 +308,22 @@ export function ComparisonTable({
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
 
-  // Calculate padding to maintain scroll position
-  const paddingTop = virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
-  const paddingBottom =
-    virtualRows.length > 0
-      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
-      : 0;
-
   const rows = table.getRowModel().rows;
   const columnCount = table.getAllColumns().length;
+
+  // Fallback to rendering all rows when virtualization returns no items
+  // (e.g., in jsdom tests where container has no dimensions)
+  const shouldRenderAllRows = virtualRows.length === 0 && rows.length > 0;
+
+  // Calculate padding to maintain scroll position (only when virtualizing)
+  const paddingTop =
+    !shouldRenderAllRows && virtualRows.length > 0
+      ? virtualRows[0]?.start ?? 0
+      : 0;
+  const paddingBottom =
+    !shouldRenderAllRows && virtualRows.length > 0
+      ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
+      : 0;
 
   return (
     <Box
@@ -354,20 +361,30 @@ export function ComparisonTable({
               />
             </tr>
           )}
-          {/* Render only visible rows */}
-          {virtualRows.map((virtualRow) => {
-            const row = rows[virtualRow.index];
-            if (!row) return null;
-            return (
-              <tr key={row.id} data-index={virtualRow.index}>
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
+          {/* Render visible rows (or all rows if virtualization not working) */}
+          {shouldRenderAllRows
+            ? rows.map((row) => (
+                <tr key={row.id} data-index={row.index}>
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            : virtualRows.map((virtualRow) => {
+                const row = rows[virtualRow.index];
+                if (!row) return null;
+                return (
+                  <tr key={row.id} data-index={virtualRow.index}>
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
           {/* Bottom padding row to maintain scroll position */}
           {paddingBottom > 0 && (
             <tr>
