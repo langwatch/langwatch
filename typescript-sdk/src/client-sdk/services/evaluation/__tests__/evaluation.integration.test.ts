@@ -1,8 +1,8 @@
 /**
  * Integration tests for Evaluation API
  *
- * These tests run against a real LangWatch backend at localhost:5560
- * Set LANGWATCH_API_KEY and LANGWATCH_ENDPOINT environment variables
+ * These tests run against a real LangWatch backend.
+ * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { LangWatch } from "@/client-sdk";
@@ -18,7 +18,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
   beforeAll(() => {
     langwatch = new LangWatch({
       apiKey: process.env.LANGWATCH_API_KEY,
-      endpoint: process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560",
+      endpoint: process.env.LANGWATCH_ENDPOINT,
     });
   });
 
@@ -45,7 +45,7 @@ describe.skipIf(SKIP_INTEGRATION)("Evaluation Integration", () => {
     it("throws EvaluationInitError with invalid API key", async () => {
       const badLangwatch = new LangWatch({
         apiKey: "invalid-key",
-        endpoint: process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560",
+        endpoint: process.env.LANGWATCH_ENDPOINT,
       });
 
       await expect(
