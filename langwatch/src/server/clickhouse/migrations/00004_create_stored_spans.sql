@@ -3,14 +3,13 @@
 -- +goose StatementBegin
 
 -- ============================================================================
--- LangWatch ClickHouse Schema - Initial Migration
--- ============================================================================
--- ============================================================================
-
--- ============================================================================
 -- Table: stored_spans
 -- ============================================================================
 -- OpenTelemetry span storage for distributed tracing.
+--
+-- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_REPLICATED)
+-- - DDL replication handled by Replicated database engine
+-- - Data replication handled by ReplicatedReplacingMergeTree when enabled
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_spans

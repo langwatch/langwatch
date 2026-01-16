@@ -3,14 +3,13 @@
 -- +goose StatementBegin
 
 -- ============================================================================
--- LangWatch ClickHouse Schema - Initial Migration
--- ============================================================================
--- ============================================================================
-
--- ============================================================================
 -- Table: event_log
 -- ============================================================================
 -- Stores immutable events with tenant isolation and aggregate grouping.
+--
+-- Engine: MergeTree / ReplicatedMergeTree (based on CLICKHOUSE_REPLICATED)
+-- - DDL replication handled by Replicated database engine
+-- - Data replication handled by ReplicatedMergeTree when enabled
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log

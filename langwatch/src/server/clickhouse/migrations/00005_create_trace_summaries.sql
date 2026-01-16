@@ -3,14 +3,13 @@
 -- +goose StatementBegin
 
 -- ============================================================================
--- LangWatch ClickHouse Schema - Create Trace Overviews
--- ============================================================================
--- ============================================================================
-
--- ============================================================================
 -- Table: trace_summaries
 -- ============================================================================
 -- Aggregated trace-level overviews for dashboards and analytics.
+--
+-- Engine: ReplacingMergeTree / ReplicatedReplacingMergeTree (based on CLICKHOUSE_REPLICATED)
+-- - DDL replication handled by Replicated database engine
+-- - Data replication handled by ReplicatedReplacingMergeTree when enabled
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries
