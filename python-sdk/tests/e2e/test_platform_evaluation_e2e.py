@@ -1,44 +1,44 @@
 """
-Integration tests for platform evaluations (Evaluations V3) runner.
+End-to-End tests for platform evaluations (Evaluations V3) runner.
 
 These tests require:
-- LANGWATCH_ENDPOINT=http://localhost:5560 (or your backend URL)
+- LANGWATCH_ENDPOINT set (or defaults to production)
 - LANGWATCH_API_KEY set with a valid API key
-- A saved evaluation with slug "test-evaluation" (or TEST_EVALUATION_SLUG env var)
+- A saved evaluation with slug (set via TEST_EVALUATION_SLUG env var)
 """
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import pytest
+
 import langwatch
-from langwatch.evaluation import run, EvaluationRunResult
+from langwatch.evaluation import evaluate, EvaluationRunResult
 from langwatch.evaluation.platform_run import (
     EvaluationNotFoundError,
     EvaluationsApiError,
 )
 
 
-# Skip if not configured for integration testing
-pytestmark = pytest.mark.skipif(
-    not (os.environ.get("LANGWATCH_ENDPOINT") and os.environ.get("LANGWATCH_API_KEY")),
-    reason="Integration test requires LANGWATCH_ENDPOINT and LANGWATCH_API_KEY",
-)
-
-
+@pytest.mark.e2e
 class TestErrorHandling:
     def test_raises_evaluation_not_found_for_non_existent_slug(self):
         with pytest.raises(EvaluationNotFoundError) as exc_info:
-            run("non-existent-evaluation-slug-12345")
+            evaluate("non-existent-evaluation-slug-12345")
         assert "non-existent-evaluation-slug-12345" in str(exc_info.value)
 
     def test_raises_api_error_with_invalid_api_key(self):
         with pytest.raises(EvaluationsApiError) as exc_info:
-            run(
+            evaluate(
                 os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation"),
                 api_key="invalid-api-key",
             )
         assert exc_info.value.status_code == 401
 
 
+@pytest.mark.e2e
 class TestRunEvaluation:
     @pytest.mark.skipif(
         not os.environ.get("TEST_EVALUATION_SLUG"),
@@ -46,7 +46,7 @@ class TestRunEvaluation:
     )
     def test_runs_evaluation_and_returns_results(self):
         slug = os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation")
-        result = run(
+        result = evaluate(
             slug,
             timeout=300,  # 5 minutes
             on_progress=lambda completed, total: print(f"Progress: {completed}/{total}"),
@@ -72,7 +72,7 @@ class TestRunEvaluation:
         slug = os.environ.get("TEST_EVALUATION_SLUG", "test-evaluation")
         progress_updates: list[tuple[int, int]] = []
 
-        result = run(
+        result = evaluate(
             slug,
             timeout=300,
             on_progress=lambda completed, total: progress_updates.append(
