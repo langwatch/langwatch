@@ -2,6 +2,14 @@ import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 export type { Dataset, DatasetEntry, GetDatasetOptions } from "./services/datasets";
 export { DatasetError, DatasetNotFoundError, DatasetApiError } from "./services/datasets";
+export type { EvaluationRunResult, RunEvaluationOptions } from "./services/evaluation";
+export {
+  EvaluationsError,
+  EvaluationNotFoundError,
+  EvaluationTimeoutError,
+  EvaluationRunFailedError,
+  EvaluationsApiError,
+} from "./services/evaluation";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { EvaluationFacade } from "./services/evaluation";
 import { DatasetsFacade } from "./services/datasets";

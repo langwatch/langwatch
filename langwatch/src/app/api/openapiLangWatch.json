@@ -6057,6 +6057,212 @@
 					}
 				}
 			}
+		},
+		"/api/evaluations/v3/{slug}/run": {
+			"post": {
+				"description": "Start execution of a saved Evaluations V3 experiment by slug. Returns immediately with a runId for polling, or streams SSE events if Accept: text/event-stream header is provided.",
+				"operationId": "postEvaluationsV3Run",
+				"tags": ["Evaluations V3"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"in": "path",
+						"name": "slug",
+						"required": true,
+						"description": "The slug of the evaluation to run"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Run started successfully",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"runId": {
+											"type": "string",
+											"description": "Unique identifier for this run"
+										},
+										"status": {
+											"type": "string",
+											"enum": ["running"],
+											"description": "Initial status of the run"
+										},
+										"total": {
+											"type": "integer",
+											"description": "Total number of cells to execute"
+										},
+										"runUrl": {
+											"type": "string",
+											"description": "URL to view the run in LangWatch"
+										}
+									},
+									"required": ["runId", "status", "total"]
+								}
+							},
+							"text/event-stream": {
+								"schema": {
+									"type": "string",
+									"description": "Server-sent events stream with execution progress"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized - Missing or invalid API key",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string"
+										}
+									},
+									"required": ["error"]
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Evaluation not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string"
+										}
+									},
+									"required": ["error"]
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/evaluations/v3/runs/{runId}": {
+			"get": {
+				"description": "Get the current status of an evaluation run for polling. Returns progress while running, and summary when completed.",
+				"operationId": "getEvaluationsV3RunStatus",
+				"tags": ["Evaluations V3"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string"
+						},
+						"in": "path",
+						"name": "runId",
+						"required": true,
+						"description": "The run ID returned from POST /api/evaluations/v3/{slug}/run"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Run status",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"runId": {
+											"type": "string"
+										},
+										"status": {
+											"type": "string",
+											"enum": ["pending", "running", "completed", "failed", "stopped"]
+										},
+										"progress": {
+											"type": "integer",
+											"description": "Number of cells completed"
+										},
+										"total": {
+											"type": "integer",
+											"description": "Total number of cells"
+										},
+										"startedAt": {
+											"type": "integer",
+											"description": "Unix timestamp when run started"
+										},
+										"finishedAt": {
+											"type": "integer",
+											"description": "Unix timestamp when run finished (only present when completed/failed/stopped)"
+										},
+										"summary": {
+											"type": "object",
+											"description": "Execution summary (only present when completed)",
+											"properties": {
+												"runId": {
+													"type": "string"
+												},
+												"totalCells": {
+													"type": "integer"
+												},
+												"completedCells": {
+													"type": "integer"
+												},
+												"failedCells": {
+													"type": "integer"
+												},
+												"duration": {
+													"type": "integer",
+													"description": "Total execution time in milliseconds"
+												},
+												"runUrl": {
+													"type": "string",
+													"description": "URL to view the run in LangWatch"
+												}
+											}
+										},
+										"error": {
+											"type": "string",
+											"description": "Error message (only present when failed)"
+										}
+									},
+									"required": ["runId", "status", "progress", "total"]
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Unauthorized - Missing or invalid API key",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string"
+										}
+									},
+									"required": ["error"]
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Run not found",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"error": {
+											"type": "string"
+										}
+									},
+									"required": ["error"]
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	},
 	"components": {
