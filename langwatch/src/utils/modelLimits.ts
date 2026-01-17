@@ -3,6 +3,18 @@ import { createLogger } from "./logger";
 
 const logger = createLogger("modelLimits");
 
+/**
+ * Model token limits for context window and output generation.
+ *
+ * Semantic differences:
+ * - maxInputTokens: Maximum tokens in input context (prompt + conversation history)
+ * - maxOutputTokens: Maximum tokens the model can generate in response
+ * - maxTokens: General context length reference (same as maxInputTokens for most models)
+ *
+ * Note: Currently maxInputTokens and maxTokens are both set from contextLength.
+ * maxInputTokens is retained for semantic clarity in contexts that specifically
+ * need to reference input limits vs output limits.
+ */
 export interface ModelLimits {
   maxInputTokens?: number;
   maxOutputTokens?: number;

@@ -62,6 +62,8 @@ export type VersionedPrompt = {
   repetitionPenalty?: number;
   // Reasoning model parameters
   reasoningEffort?: string;
+  thinkingLevel?: string;
+  effort?: string;
   reasoning?: string;
   verbosity?: string;
   prompt: string;
@@ -828,6 +830,9 @@ export class PromptService {
       repetitionPenalty: configData.repetition_penalty,
       // Reasoning model parameters
       reasoningEffort: configData.reasoning_effort,
+      thinkingLevel: configData.thinkingLevel,
+      effort: configData.effort,
+      reasoning: configData.reasoning,
       verbosity: configData.verbosity,
       prompt,
       projectId: config.projectId,
@@ -884,11 +889,18 @@ export class PromptService {
    * Uses transformCamelToSnake utility which derives mappings from PARAM_NAME_MAPPING
    * (single source of truth) plus prompt-specific mappings.
    *
+   * Also handles legacy 'reasoning' field by mapping it to the appropriate
+   * provider-specific parameter based on the model in the data.
+   *
    * TODO: Move to repository layer - the repository should handle this transformation
    * to properly isolate database schema concerns from service business logic.
    */
-  private transformToDbFormat(data: any): any {
-    return transformCamelToSnake(data);
+  private transformToDbFormat(
+    data: Record<string, unknown>,
+  ): Record<string, unknown> {
+    // Extract model from data for intelligent reasoning fallback
+    const model = typeof data.model === "string" ? data.model : undefined;
+    return transformCamelToSnake(data, model);
   }
 
   /**

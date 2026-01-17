@@ -157,7 +157,18 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
           let parsedError = null;
           if (isError) {
             try {
-              parsedError = JSON.parse(content.replace("[ERROR]", ""));
+              const parsed = JSON.parse(content.replace("[ERROR]", ""));
+              // Validate parsed error has expected shape
+              if (
+                typeof parsed === "object" &&
+                parsed !== null &&
+                typeof parsed.type === "string" &&
+                typeof parsed.message === "string"
+              ) {
+                parsedError = parsed;
+              } else {
+                parsedError = { type: "unknown", message: content };
+              }
             } catch {
               parsedError = { type: "unknown", message: content };
             }

@@ -238,10 +238,11 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     corrected = get_corrected_llm_params(llm_config)
 
     # Build kwargs with reasoning params if present
+    # Note: corrected values are applied AFTER llm_params to ensure they always win
     dspy_kwargs: dict[str, Any] = {
+        **llm_params,
         "max_tokens": corrected["max_tokens"],
         "temperature": corrected["temperature"],
-        **llm_params,
     }
 
     # Pass provider-specific reasoning parameters

@@ -40,7 +40,7 @@ export function normalizeMaxTokens(
   tokenValue: number,
 ): LLMConfigValues {
   const usesCamelCase = Object.hasOwn(values, "maxTokens");
-  const model = values.model as string;
+  const model = (values.model ?? "") as string;
 
   const {
     maxTokens: _sunkMaxTokens,

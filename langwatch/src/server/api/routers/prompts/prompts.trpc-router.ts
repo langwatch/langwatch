@@ -201,6 +201,8 @@ export const promptsRouter = createTRPCRouter({
           repetitionPenalty: z.number().optional(),
           // Reasoning model parameters
           reasoningEffort: z.string().optional(),
+          thinkingLevel: z.string().optional(),
+          effort: z.string().optional(),
           reasoning: z.string().optional(),
           verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
@@ -253,6 +255,8 @@ export const promptsRouter = createTRPCRouter({
           repetitionPenalty: z.number().optional(),
           // Reasoning model parameters
           reasoningEffort: z.string().optional(),
+          thinkingLevel: z.string().optional(),
+          effort: z.string().optional(),
           reasoning: z.string().optional(),
           verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
@@ -627,39 +631,45 @@ export const promptsRouter = createTRPCRouter({
           outputs: sourcePrompt.outputs,
           model: sourcePrompt.model,
           temperature: sourcePrompt.temperature,
-          ...(sourcePrompt.maxTokens !== undefined && {
+          ...(sourcePrompt.maxTokens != null && {
             maxTokens: sourcePrompt.maxTokens,
           }),
           // Traditional sampling parameters
-          ...(sourcePrompt.topP !== undefined && { topP: sourcePrompt.topP }),
-          ...(sourcePrompt.frequencyPenalty !== undefined && {
+          ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
+          ...(sourcePrompt.frequencyPenalty != null && {
             frequencyPenalty: sourcePrompt.frequencyPenalty,
           }),
-          ...(sourcePrompt.presencePenalty !== undefined && {
+          ...(sourcePrompt.presencePenalty != null && {
             presencePenalty: sourcePrompt.presencePenalty,
           }),
           // Other sampling parameters
-          ...(sourcePrompt.seed !== undefined && { seed: sourcePrompt.seed }),
-          ...(sourcePrompt.topK !== undefined && { topK: sourcePrompt.topK }),
-          ...(sourcePrompt.minP !== undefined && { minP: sourcePrompt.minP }),
-          ...(sourcePrompt.repetitionPenalty !== undefined && {
+          ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
+          ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
+          ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
+          ...(sourcePrompt.repetitionPenalty != null && {
             repetitionPenalty: sourcePrompt.repetitionPenalty,
           }),
           // Reasoning model parameters
-          ...(sourcePrompt.reasoningEffort !== undefined && {
+          ...(sourcePrompt.reasoningEffort != null && {
             reasoningEffort: sourcePrompt.reasoningEffort,
           }),
-          ...(sourcePrompt.reasoning !== undefined && {
+          ...(sourcePrompt.thinkingLevel != null && {
+            thinkingLevel: sourcePrompt.thinkingLevel,
+          }),
+          ...(sourcePrompt.effort != null && {
+            effort: sourcePrompt.effort,
+          }),
+          ...(sourcePrompt.reasoning != null && {
             reasoning: sourcePrompt.reasoning,
           }),
-          ...(sourcePrompt.verbosity !== undefined && {
+          ...(sourcePrompt.verbosity != null && {
             verbosity: sourcePrompt.verbosity,
           }),
-          ...(sourcePrompt.promptingTechnique !== undefined && {
+          ...(sourcePrompt.promptingTechnique != null && {
             promptingTechnique: sourcePrompt.promptingTechnique,
           }),
           demonstrations: sourcePrompt.demonstrations,
-          ...(sourcePrompt.responseFormat !== undefined && {
+          ...(sourcePrompt.responseFormat != null && {
             responseFormat: sourcePrompt.responseFormat,
           }),
           authorId,
@@ -773,39 +783,45 @@ export const promptsRouter = createTRPCRouter({
             outputs: sourcePrompt.outputs,
             model: sourcePrompt.model,
             temperature: sourcePrompt.temperature,
-            ...(sourcePrompt.maxTokens !== undefined && {
+            ...(sourcePrompt.maxTokens != null && {
               maxTokens: sourcePrompt.maxTokens,
             }),
             // Traditional sampling parameters
-            ...(sourcePrompt.topP !== undefined && { topP: sourcePrompt.topP }),
-            ...(sourcePrompt.frequencyPenalty !== undefined && {
+            ...(sourcePrompt.topP != null && { topP: sourcePrompt.topP }),
+            ...(sourcePrompt.frequencyPenalty != null && {
               frequencyPenalty: sourcePrompt.frequencyPenalty,
             }),
-            ...(sourcePrompt.presencePenalty !== undefined && {
+            ...(sourcePrompt.presencePenalty != null && {
               presencePenalty: sourcePrompt.presencePenalty,
             }),
             // Other sampling parameters
-            ...(sourcePrompt.seed !== undefined && { seed: sourcePrompt.seed }),
-            ...(sourcePrompt.topK !== undefined && { topK: sourcePrompt.topK }),
-            ...(sourcePrompt.minP !== undefined && { minP: sourcePrompt.minP }),
-            ...(sourcePrompt.repetitionPenalty !== undefined && {
+            ...(sourcePrompt.seed != null && { seed: sourcePrompt.seed }),
+            ...(sourcePrompt.topK != null && { topK: sourcePrompt.topK }),
+            ...(sourcePrompt.minP != null && { minP: sourcePrompt.minP }),
+            ...(sourcePrompt.repetitionPenalty != null && {
               repetitionPenalty: sourcePrompt.repetitionPenalty,
             }),
             // Reasoning model parameters
-            ...(sourcePrompt.reasoningEffort !== undefined && {
+            ...(sourcePrompt.reasoningEffort != null && {
               reasoningEffort: sourcePrompt.reasoningEffort,
             }),
-            ...(sourcePrompt.reasoning !== undefined && {
+            ...(sourcePrompt.thinkingLevel != null && {
+              thinkingLevel: sourcePrompt.thinkingLevel,
+            }),
+            ...(sourcePrompt.effort != null && {
+              effort: sourcePrompt.effort,
+            }),
+            ...(sourcePrompt.reasoning != null && {
               reasoning: sourcePrompt.reasoning,
             }),
-            ...(sourcePrompt.verbosity !== undefined && {
+            ...(sourcePrompt.verbosity != null && {
               verbosity: sourcePrompt.verbosity,
             }),
-            ...(sourcePrompt.promptingTechnique !== undefined && {
+            ...(sourcePrompt.promptingTechnique != null && {
               promptingTechnique: sourcePrompt.promptingTechnique,
             }),
             demonstrations: sourcePrompt.demonstrations,
-            ...(sourcePrompt.responseFormat !== undefined && {
+            ...(sourcePrompt.responseFormat != null && {
               responseFormat: sourcePrompt.responseFormat,
             }),
             authorId,

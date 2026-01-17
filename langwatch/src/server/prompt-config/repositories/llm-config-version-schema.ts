@@ -62,6 +62,7 @@ const configSchemaV1_0 = z.object({
     reasoning_effort: z.string().optional(), // OpenAI
     thinkingLevel: z.string().optional(), // Gemini
     effort: z.string().optional(), // Anthropic
+    reasoning: z.string().optional(), // Legacy field (deprecated)
     verbosity: z.string().optional(),
     demonstrations: nodeDatasetSchema.optional(),
     prompting_technique: promptingTechniqueSchema.optional(),
