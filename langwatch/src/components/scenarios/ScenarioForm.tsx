@@ -11,7 +11,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef } from "react";
-import { Controller, useForm, type UseFormReturn } from "react-hook-form";
+import { Controller, type UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { CriteriaInput } from "./ui/CriteriaInput";
 import { InlineTagsInput } from "./ui/InlineTagsInput";
@@ -68,7 +68,12 @@ export function ScenarioForm({ defaultValues, formRef }: ScenarioFormProps) {
   const prevDefaultsRef = useRef<string | null>(null);
   useEffect(() => {
     const currentDefaults = defaultValues
-      ? JSON.stringify([defaultValues.name, defaultValues.situation, defaultValues.criteria, defaultValues.labels])
+      ? JSON.stringify([
+          defaultValues.name,
+          defaultValues.situation,
+          defaultValues.criteria,
+          defaultValues.labels,
+        ])
       : null;
     if (currentDefaults !== prevDefaultsRef.current) {
       prevDefaultsRef.current = currentDefaults;

@@ -15,10 +15,13 @@ import {
 } from "../../../../../server/modelProviders/registry";
 import { createLogger } from "../../../../../utils/logger";
 import {
+  hasUserEnteredNewApiKey,
+  hasUserModifiedNonApiKeyFields,
+} from "../../../../../utils/modelProviderHelpers";
+import {
   parseZodFieldErrors,
   type ZodErrorStructure,
 } from "../../../../../utils/zod";
-import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../../../../utils/modelProviderHelpers";
 import {
   getModelProvider,
   modelProviderRegistry,
@@ -267,11 +270,14 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     // Check if user modified non-API-key fields (like URLs)
     const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
       state.customKeys,
-      state.initialKeys
+      state.initialKeys,
     );
 
     // Validate keys according to schema before submitting
-    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
+    if (
+      providerDefinition?.keysSchema &&
+      (!isUsingEnvVars || hasNonApiKeyChanges)
+    ) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),

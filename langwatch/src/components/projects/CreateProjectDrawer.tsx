@@ -1,5 +1,5 @@
-import React from "react";
 import { HStack, Text } from "@chakra-ui/react";
+import type React from "react";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";

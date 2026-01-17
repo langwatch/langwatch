@@ -5,9 +5,9 @@ import {
   Button,
   HStack,
   Separator,
+  Spacer,
   Tag,
   Text,
-  Spacer,
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";

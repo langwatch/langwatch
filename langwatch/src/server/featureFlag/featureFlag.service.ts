@@ -1,9 +1,9 @@
-import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
-import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
-import type { FeatureFlagServiceInterface } from "./types";
+import { getLangWatchTracer } from "langwatch";
 import { env } from "~/env.mjs";
 import { createLogger } from "~/utils/logger";
-import { getLangWatchTracer } from "langwatch";
+import { FeatureFlagServiceMemory } from "./featureFlagService.memory";
+import { FeatureFlagServicePostHog } from "./featureFlagService.posthog";
+import type { FeatureFlagServiceInterface } from "./types";
 
 /**
  * Feature flag service that automatically chooses between PostHog and memory
@@ -13,7 +13,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   private readonly service: FeatureFlagServiceInterface;
   private readonly logger = createLogger("langwatch:feature-flag-service");
   private readonly _tracer = getLangWatchTracer(
-    "langwatch.feature-flag-service"
+    "langwatch.feature-flag-service",
   );
 
   constructor() {
@@ -33,7 +33,7 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
   async isEnabled(
     flagKey: string,
     distinctId: string,
-    defaultValue: boolean = true
+    defaultValue = true,
   ): Promise<boolean> {
     return this.service.isEnabled(flagKey, distinctId, defaultValue);
   }

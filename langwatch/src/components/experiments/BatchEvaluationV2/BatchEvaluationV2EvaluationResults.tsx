@@ -131,9 +131,7 @@ export const useBatchEvaluationResults = ({
   );
 
   // Get target metadata for display names
-  const targetsMap = new Map(
-    (run.data?.targets ?? []).map((t) => [t.id, t])
-  );
+  const targetsMap = new Map((run.data?.targets ?? []).map((t) => [t.id, t]));
 
   resultsByEvaluator = Object.fromEntries(
     Object.entries(resultsByEvaluator ?? {}).sort((a, b) =>
@@ -365,7 +363,10 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
     });
 
     // Helper to format tab label for V3 (target + evaluator)
-    const getTabLabel = (key: string, results: ESBatchEvaluation["evaluations"]) => {
+    const getTabLabel = (
+      key: string,
+      results: ESBatchEvaluation["evaluations"],
+    ) => {
       // Check if this is a V3 target:evaluator key
       if (key.includes(":")) {
         const [targetId, evaluator] = key.split(":");

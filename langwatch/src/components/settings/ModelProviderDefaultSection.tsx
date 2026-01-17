@@ -1,13 +1,8 @@
-import {
-  VStack,
-  Text,
-  Box,
-  Field,
-} from "@chakra-ui/react";
+import { Box, Field, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type {
-  UseModelProviderFormState,
   UseModelProviderFormActions,
+  UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { modelProviders } from "../../server/modelProviders/registry";
@@ -16,11 +11,11 @@ import {
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
 } from "../../utils/constants";
+import { isProviderDefaultModel } from "../../utils/modelProviderHelpers";
+import { modelSelectorOptions } from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import { Switch } from "../ui/switch";
-import { modelSelectorOptions } from "../ModelSelector";
 import { Tooltip } from "../ui/tooltip";
-import { isProviderDefaultModel } from "../../utils/modelProviderHelpers";
 import { ProviderModelSelector } from "./ProviderModelSelector";
 
 /**
@@ -45,11 +40,14 @@ export const DefaultProviderSection = ({
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
   enabledProvidersCount: number;
-  project: {
-    defaultModel?: string | null;
-    topicClusteringModel?: string | null;
-    embeddingsModel?: string | null;
-  } | null | undefined;
+  project:
+    | {
+        defaultModel?: string | null;
+        topicClusteringModel?: string | null;
+        embeddingsModel?: string | null;
+      }
+    | null
+    | undefined;
   providers: Record<string, MaybeStoredModelProvider> | undefined;
 }) => {
   // Determine if toggle should be disabled
@@ -69,7 +67,9 @@ export const DefaultProviderSection = ({
   }
 
   // Get provider name for display
-  const providerName = modelProviders[provider.provider as keyof typeof modelProviders]?.name || provider.provider;
+  const providerName =
+    modelProviders[provider.provider as keyof typeof modelProviders]?.name ||
+    provider.provider;
 
   // Get all models from modelSelectorOptions for this specific provider only
   // Include custom models from state.customModels, formatted as provider/model-name
@@ -78,13 +78,13 @@ export const DefaultProviderSection = ({
       .filter(
         (option) =>
           option.mode === "chat" &&
-          option.value.startsWith(`${provider.provider}/`)
+          option.value.startsWith(`${provider.provider}/`),
       )
       .map((option) => option.value);
 
     // Add custom models from state, formatted with provider prefix
     const customModels = state.customModels.map(
-      (model) => `${provider.provider}/${model.value}`
+      (model) => `${provider.provider}/${model.value}`,
     );
 
     // Combine and deduplicate
@@ -134,21 +134,49 @@ export const DefaultProviderSection = ({
           <Switch
             onCheckedChange={(details) => {
               actions.setUseAsDefaultProvider(details.checked);
-              
+
               // When toggling ON, sync the model states to this provider's models
               // if the current state values don't belong to this provider
               // Only set if there are options available, otherwise allow custom input
               if (details.checked) {
-                if (!state.projectDefaultModel?.startsWith(`${provider.provider}/`) && chatOptions.length > 0) {
-                  const defaultModel = DEFAULT_MODEL.startsWith(`${provider.provider}/`) ? DEFAULT_MODEL : chatOptions[0];
+                if (
+                  !state.projectDefaultModel?.startsWith(
+                    `${provider.provider}/`,
+                  ) &&
+                  chatOptions.length > 0
+                ) {
+                  const defaultModel = DEFAULT_MODEL.startsWith(
+                    `${provider.provider}/`,
+                  )
+                    ? DEFAULT_MODEL
+                    : chatOptions[0];
                   actions.setProjectDefaultModel(defaultModel ?? null);
                 }
-                if (!state.projectTopicClusteringModel?.startsWith(`${provider.provider}/`) && chatOptions.length > 0) {
-                  const defaultModel = DEFAULT_TOPIC_CLUSTERING_MODEL.startsWith(`${provider.provider}/`) ? DEFAULT_TOPIC_CLUSTERING_MODEL : chatOptions[0];
+                if (
+                  !state.projectTopicClusteringModel?.startsWith(
+                    `${provider.provider}/`,
+                  ) &&
+                  chatOptions.length > 0
+                ) {
+                  const defaultModel =
+                    DEFAULT_TOPIC_CLUSTERING_MODEL.startsWith(
+                      `${provider.provider}/`,
+                    )
+                      ? DEFAULT_TOPIC_CLUSTERING_MODEL
+                      : chatOptions[0];
                   actions.setProjectTopicClusteringModel(defaultModel ?? null);
                 }
-                if (!embeddingOptions.includes(state.projectEmbeddingsModel ?? "") && embeddingOptions.length > 0) {
-                  const defaultModel = embeddingOptions.includes(DEFAULT_EMBEDDINGS_MODEL) ? DEFAULT_EMBEDDINGS_MODEL : embeddingOptions[0];
+                if (
+                  !embeddingOptions.includes(
+                    state.projectEmbeddingsModel ?? "",
+                  ) &&
+                  embeddingOptions.length > 0
+                ) {
+                  const defaultModel = embeddingOptions.includes(
+                    DEFAULT_EMBEDDINGS_MODEL,
+                  )
+                    ? DEFAULT_EMBEDDINGS_MODEL
+                    : embeddingOptions[0];
                   actions.setProjectEmbeddingsModel(defaultModel ?? null);
                 }
               }
@@ -169,11 +197,7 @@ export const DefaultProviderSection = ({
 
       {/* Default Models Selection - Only visible when toggle is enabled */}
       {state.useAsDefaultProvider && (
-        <VStack
-          width="full"
-          align="start"
-          gap={4}
-        >
+        <VStack width="full" align="start" gap={4}>
           <Field.Root width="full">
             <SmallLabel>Default Model</SmallLabel>
             <Text fontSize="xs" color="gray.500" marginBottom={2}>
@@ -197,7 +221,9 @@ export const DefaultProviderSection = ({
             </Text>
             <ProviderModelSelector
               model={
-                state.projectTopicClusteringModel?.startsWith(`${provider.provider}/`)
+                state.projectTopicClusteringModel?.startsWith(
+                  `${provider.provider}/`,
+                )
                   ? state.projectTopicClusteringModel
                   : (chatOptions[0] ?? "")
               }

@@ -14,8 +14,8 @@
  */
 
 import type { NormalizedEvent } from "../../schemas/spans";
-import type { ExtractorContext } from "./_types";
 import { ATTR_KEYS } from "./_constants";
+import type { ExtractorContext } from "./_types";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Type Guards & Basic Utilities

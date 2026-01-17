@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { nanoid } from "nanoid";
-import { createMocks } from "node-mocks-http";
-import type { NextApiRequest, NextApiResponse } from "next";
-import handler from "../log_results";
-import { getTestProject } from "~/utils/testUtils";
 import type { Project } from "@prisma/client";
+import { nanoid } from "nanoid";
+import type { NextApiRequest, NextApiResponse } from "next";
+import { createMocks } from "node-mocks-http";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { esClient, BATCH_EVALUATION_INDEX, batchEvaluationId } from "~/server/elasticsearch";
+import {
+  BATCH_EVALUATION_INDEX,
+  batchEvaluationId,
+  esClient,
+} from "~/server/elasticsearch";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import { slugify } from "~/utils/slugify";
+import { getTestProject } from "~/utils/testUtils";
+import handler from "../log_results";
 
 /**
  * Integration tests for log_results API with targets and metadata.
@@ -51,7 +55,9 @@ describe("log_results API Integration", () => {
     // Clean up experiments
     for (const expId of createdExperimentIds) {
       try {
-        await prisma.experiment.delete({ where: { id: expId, projectId: project.id } });
+        await prisma.experiment.delete({
+          where: { id: expId, projectId: project.id },
+        });
       } catch {
         // Ignore cleanup errors
       }
@@ -85,9 +91,16 @@ describe("log_results API Integration", () => {
     return experiment;
   };
 
-  const getFromEs = async (experimentId: string, runId: string): Promise<ESBatchEvaluation | null> => {
+  const getFromEs = async (
+    experimentId: string,
+    runId: string,
+  ): Promise<ESBatchEvaluation | null> => {
     const client = await esClient({ projectId: project.id });
-    const id = batchEvaluationId({ projectId: project.id, experimentId, runId });
+    const id = batchEvaluationId({
+      projectId: project.id,
+      experimentId,
+      runId,
+    });
     try {
       const result = await client.get<ESBatchEvaluation>({
         index: BATCH_EVALUATION_INDEX.alias,
@@ -95,7 +108,10 @@ describe("log_results API Integration", () => {
       });
       return result._source ?? null;
     } catch (error: unknown) {
-      const err = error as { statusCode?: number; meta?: { statusCode?: number } };
+      const err = error as {
+        statusCode?: number;
+        meta?: { statusCode?: number };
+      };
       if (err?.statusCode === 404 || err?.meta?.statusCode === 404) {
         return null;
       }
@@ -176,7 +192,9 @@ describe("log_results API Integration", () => {
         max_tokens: 1000,
       });
 
-      const target2 = stored?.targets?.find((t) => t.id === "claude-experiment");
+      const target2 = stored?.targets?.find(
+        (t) => t.id === "claude-experiment",
+      );
       expect(target2?.name).toBe("Claude Experiment");
       expect(target2?.metadata?.model).toBe("anthropic/claude-3-opus");
     });
@@ -435,19 +453,62 @@ describe("log_results API Integration", () => {
         run_id: runId,
         experiment_slug: experimentSlug,
         targets: [
-          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
-          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
-          { id: "claude-3", name: "Claude-3", type: "custom", metadata: { model: "anthropic/claude-3" } },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "custom",
+            metadata: { model: "openai/gpt-4" },
+          },
+          {
+            id: "gpt-3.5",
+            name: "GPT-3.5",
+            type: "custom",
+            metadata: { model: "openai/gpt-3.5-turbo" },
+          },
+          {
+            id: "claude-3",
+            name: "Claude-3",
+            type: "custom",
+            metadata: { model: "anthropic/claude-3" },
+          },
         ],
         dataset: [
           { index: 0, entry: { question: "Question 1" } },
           { index: 1, entry: { question: "Question 2" } },
         ],
         evaluations: [
-          { evaluator: "latency", name: "latency", target_id: "gpt-4", index: 0, status: "processed", score: 100 },
-          { evaluator: "quality", name: "quality", target_id: "gpt-4", index: 0, status: "processed", score: 0.9 },
-          { evaluator: "latency", name: "latency", target_id: "gpt-4", index: 1, status: "processed", score: 150 },
-          { evaluator: "quality", name: "quality", target_id: "gpt-4", index: 1, status: "processed", score: 0.85 },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "gpt-4",
+            index: 0,
+            status: "processed",
+            score: 100,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "gpt-4",
+            index: 0,
+            status: "processed",
+            score: 0.9,
+          },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "gpt-4",
+            index: 1,
+            status: "processed",
+            score: 150,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "gpt-4",
+            index: 1,
+            status: "processed",
+            score: 0.85,
+          },
         ],
         progress: 2,
         total: 6,
@@ -467,10 +528,38 @@ describe("log_results API Integration", () => {
         targets: [],
         dataset: [],
         evaluations: [
-          { evaluator: "latency", name: "latency", target_id: "gpt-3.5", index: 0, status: "processed", score: 80 },
-          { evaluator: "quality", name: "quality", target_id: "gpt-3.5", index: 0, status: "processed", score: 0.8 },
-          { evaluator: "latency", name: "latency", target_id: "gpt-3.5", index: 1, status: "processed", score: 90 },
-          { evaluator: "quality", name: "quality", target_id: "gpt-3.5", index: 1, status: "processed", score: 0.75 },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "gpt-3.5",
+            index: 0,
+            status: "processed",
+            score: 80,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "gpt-3.5",
+            index: 0,
+            status: "processed",
+            score: 0.8,
+          },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "gpt-3.5",
+            index: 1,
+            status: "processed",
+            score: 90,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "gpt-3.5",
+            index: 1,
+            status: "processed",
+            score: 0.75,
+          },
         ],
         progress: 4,
         total: 6,
@@ -487,10 +576,38 @@ describe("log_results API Integration", () => {
         targets: [],
         dataset: [],
         evaluations: [
-          { evaluator: "latency", name: "latency", target_id: "claude-3", index: 0, status: "processed", score: 120 },
-          { evaluator: "quality", name: "quality", target_id: "claude-3", index: 0, status: "processed", score: 0.95 },
-          { evaluator: "latency", name: "latency", target_id: "claude-3", index: 1, status: "processed", score: 130 },
-          { evaluator: "quality", name: "quality", target_id: "claude-3", index: 1, status: "processed", score: 0.92 },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "claude-3",
+            index: 0,
+            status: "processed",
+            score: 120,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "claude-3",
+            index: 0,
+            status: "processed",
+            score: 0.95,
+          },
+          {
+            evaluator: "latency",
+            name: "latency",
+            target_id: "claude-3",
+            index: 1,
+            status: "processed",
+            score: 130,
+          },
+          {
+            evaluator: "quality",
+            name: "quality",
+            target_id: "claude-3",
+            index: 1,
+            status: "processed",
+            score: 0.92,
+          },
         ],
         progress: 6,
         total: 6,
@@ -512,18 +629,30 @@ describe("log_results API Integration", () => {
       expect(stored?.evaluations).toHaveLength(12);
 
       // Verify evaluations for each target
-      const gpt4Evals = stored?.evaluations?.filter((e) => e.target_id === "gpt-4");
-      const gpt35Evals = stored?.evaluations?.filter((e) => e.target_id === "gpt-3.5");
-      const claude3Evals = stored?.evaluations?.filter((e) => e.target_id === "claude-3");
+      const gpt4Evals = stored?.evaluations?.filter(
+        (e) => e.target_id === "gpt-4",
+      );
+      const gpt35Evals = stored?.evaluations?.filter(
+        (e) => e.target_id === "gpt-3.5",
+      );
+      const claude3Evals = stored?.evaluations?.filter(
+        (e) => e.target_id === "claude-3",
+      );
 
       expect(gpt4Evals).toHaveLength(4);
       expect(gpt35Evals).toHaveLength(4);
       expect(claude3Evals).toHaveLength(4);
 
       // Verify each target has correct latency scores
-      const gpt4Latency0 = gpt4Evals?.find((e) => e.evaluator === "latency" && e.index === 0);
-      const gpt35Latency0 = gpt35Evals?.find((e) => e.evaluator === "latency" && e.index === 0);
-      const claude3Latency0 = claude3Evals?.find((e) => e.evaluator === "latency" && e.index === 0);
+      const gpt4Latency0 = gpt4Evals?.find(
+        (e) => e.evaluator === "latency" && e.index === 0,
+      );
+      const gpt35Latency0 = gpt35Evals?.find(
+        (e) => e.evaluator === "latency" && e.index === 0,
+      );
+      const claude3Latency0 = claude3Evals?.find(
+        (e) => e.evaluator === "latency" && e.index === 0,
+      );
 
       expect(gpt4Latency0?.score).toBe(100);
       expect(gpt35Latency0?.score).toBe(80);
@@ -540,15 +669,42 @@ describe("log_results API Integration", () => {
         run_id: runId,
         experiment_slug: experimentSlug,
         targets: [
-          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
-          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
-          { id: "claude", name: "Claude", type: "custom", metadata: { model: "anthropic/claude-3" } },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "custom",
+            metadata: { model: "openai/gpt-4" },
+          },
+          {
+            id: "gpt-3.5",
+            name: "GPT-3.5",
+            type: "custom",
+            metadata: { model: "openai/gpt-3.5-turbo" },
+          },
+          {
+            id: "claude",
+            name: "Claude",
+            type: "custom",
+            metadata: { model: "anthropic/claude-3" },
+          },
         ],
         dataset: [
-          { index: 0, target_id: "gpt-4", entry: { question: "Q1" }, predicted: { output: "GPT-4 answer" }, duration: 500 },
+          {
+            index: 0,
+            target_id: "gpt-4",
+            entry: { question: "Q1" },
+            predicted: { output: "GPT-4 answer" },
+            duration: 500,
+          },
         ],
         evaluations: [
-          { evaluator: "quality", target_id: "gpt-4", index: 0, status: "processed", score: 0.9 },
+          {
+            evaluator: "quality",
+            target_id: "gpt-4",
+            index: 0,
+            status: "processed",
+            score: 0.9,
+          },
         ],
         progress: 1,
         total: 3,
@@ -567,10 +723,22 @@ describe("log_results API Integration", () => {
         experiment_slug: experimentSlug,
         targets: [],
         dataset: [
-          { index: 0, target_id: "gpt-3.5", entry: { question: "Q1" }, predicted: { output: "GPT-3.5 answer" }, duration: 200 },
+          {
+            index: 0,
+            target_id: "gpt-3.5",
+            entry: { question: "Q1" },
+            predicted: { output: "GPT-3.5 answer" },
+            duration: 200,
+          },
         ],
         evaluations: [
-          { evaluator: "quality", target_id: "gpt-3.5", index: 0, status: "processed", score: 0.8 },
+          {
+            evaluator: "quality",
+            target_id: "gpt-3.5",
+            index: 0,
+            status: "processed",
+            score: 0.8,
+          },
         ],
         progress: 2,
         total: 3,
@@ -586,10 +754,22 @@ describe("log_results API Integration", () => {
         experiment_slug: experimentSlug,
         targets: [],
         dataset: [
-          { index: 0, target_id: "claude", entry: { question: "Q1" }, predicted: { output: "Claude answer" }, duration: 300 },
+          {
+            index: 0,
+            target_id: "claude",
+            entry: { question: "Q1" },
+            predicted: { output: "Claude answer" },
+            duration: 300,
+          },
         ],
         evaluations: [
-          { evaluator: "quality", target_id: "claude", index: 0, status: "processed", score: 0.85 },
+          {
+            evaluator: "quality",
+            target_id: "claude",
+            index: 0,
+            status: "processed",
+            score: 0.85,
+          },
         ],
         progress: 3,
         total: 3,
@@ -609,8 +789,12 @@ describe("log_results API Integration", () => {
 
       // Verify each target has its own dataset entry
       const gpt4Entry = stored?.dataset?.find((d) => d.target_id === "gpt-4");
-      const gpt35Entry = stored?.dataset?.find((d) => d.target_id === "gpt-3.5");
-      const claudeEntry = stored?.dataset?.find((d) => d.target_id === "claude");
+      const gpt35Entry = stored?.dataset?.find(
+        (d) => d.target_id === "gpt-3.5",
+      );
+      const claudeEntry = stored?.dataset?.find(
+        (d) => d.target_id === "claude",
+      );
 
       expect(gpt4Entry).toBeDefined();
       expect(gpt35Entry).toBeDefined();
@@ -636,9 +820,7 @@ describe("log_results API Integration", () => {
       await callApi({
         run_id: runId,
         experiment_slug: experimentSlug,
-        dataset: [
-          { index: 0, entry: { question: "Q1" } },
-        ],
+        dataset: [{ index: 0, entry: { question: "Q1" } }],
         evaluations: [
           { evaluator: "accuracy", index: 0, status: "processed", score: 0.9 },
         ],

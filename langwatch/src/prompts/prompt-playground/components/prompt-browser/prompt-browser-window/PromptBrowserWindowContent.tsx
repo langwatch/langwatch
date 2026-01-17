@@ -233,8 +233,8 @@ function PromptBrowserWindowInner(props: {
   const messagesMaxHeight = isCollapsed
     ? 0
     : userMaxHeight !== null
-    ? userMaxHeight
-    : getMaxAllowedHeight();
+      ? userMaxHeight
+      : getMaxAllowedHeight();
 
   // Horizontal layout: side-by-side (single window mode)
   if (props.layoutMode === "horizontal") {
@@ -296,8 +296,11 @@ function PromptBrowserWindowInner(props: {
               <PromptTabbedSection
                 layoutMode="horizontal"
                 isPromptExpanded={true}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onPositionChange={() => {}}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onDragEnd={() => {}}
+                // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-ops for read-only display
                 onToggle={() => {}}
               />
             </Box>
@@ -333,8 +336,8 @@ function PromptBrowserWindowInner(props: {
               isCollapsed
                 ? 0
                 : messagesMaxHeight
-                ? `${messagesMaxHeight}px`
-                : undefined
+                  ? `${messagesMaxHeight}px`
+                  : undefined
             }
             overflow="hidden"
             position="relative"

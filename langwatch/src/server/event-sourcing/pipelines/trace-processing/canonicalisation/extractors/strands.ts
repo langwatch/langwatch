@@ -16,15 +16,15 @@
  * - gen_ai.output.messages (from gen_ai.choice events)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import { createLogger } from "../../../../../../utils/logger";
+import type { NormalizedEvent } from "../../schemas/spans";
+import { ATTR_KEYS } from "./_constants";
 import {
-  safeJsonParse,
   extractOutputMessages,
   inferSpanTypeIfAbsent,
+  safeJsonParse,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
-import type { NormalizedEvent } from "../../schemas/spans";
-import { createLogger } from "../../../../../../utils/logger";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 const logger = createLogger("langwatch:trace-processing:strands-extractor");
 

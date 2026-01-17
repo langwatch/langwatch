@@ -63,7 +63,7 @@ export const sendSlackWebhook = async ({
 
   const traceLinks = traceIds.map((trace) => {
     const isCustomGraph = !!trace.graphId;
-    
+
     return `\n<${getLink(trace)}|${getDisplayText(trace)}>
     ${
       !triggerMessage && !isCustomGraph
@@ -71,9 +71,11 @@ export const sendSlackWebhook = async ({
     \n*Output:* ${trace.output}'\n`
         : ""
     }
-      ${!isCustomGraph && (trace.events ?? [])
-        .map((event: any) => {
-          return `\n*Event Type:* ${event.event_type}
+      ${
+        !isCustomGraph &&
+        (trace.events ?? [])
+          .map((event: any) => {
+            return `\n*Event Type:* ${event.event_type}
           ${Object.entries(event.metrics || {})
             .map(([key, value]) => `\n*${key}:* ${value as string}`)
             .join("")}
@@ -81,8 +83,9 @@ export const sendSlackWebhook = async ({
             .map(([key, value]) => `\n*${key}:* ${value as string}`)
             .join("")}
           \n-------------------`;
-        })
-        .join("")}
+          })
+          .join("")
+      }
      `;
   });
 

@@ -109,7 +109,9 @@ export function GripHandles({
             justifyContent="center"
             pointerEvents="auto"
             cursor={draggedParagraph === idx ? "grabbing" : "grab"}
-            opacity={hoveredParagraph === idx || draggedParagraph === idx ? 1 : 0}
+            opacity={
+              hoveredParagraph === idx || draggedParagraph === idx ? 1 : 0
+            }
             transition="opacity 0.1s"
             draggable
             onMouseEnter={() => onGripHover(idx)}

@@ -8,7 +8,7 @@
  * - Enforcing minimum selection (at least 2 runs)
  * - URL query param sync (when onSelectionChange provided)
  */
-import { useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type UseComparisonModeOptions = {
   /** All available run IDs */
@@ -46,10 +46,10 @@ export const useComparisonMode = ({
 }: UseComparisonModeOptions): UseComparisonModeReturn => {
   // Initialize from URL params if provided
   const [compareMode, setCompareMode] = useState(
-    () => (initialCompareRunIds?.length ?? 0) >= 2
+    () => (initialCompareRunIds?.length ?? 0) >= 2,
   );
   const [selectedRunIds, setSelectedRunIds] = useState<string[]>(
-    () => initialCompareRunIds ?? []
+    () => initialCompareRunIds ?? [],
   );
 
   const canCompare = runIds.length >= 2;
@@ -63,20 +63,20 @@ export const useComparisonMode = ({
     setCompareMode((prev) => {
       if (!prev) {
         // Entering compare mode - auto-select current run + next one
-        const currentIndex = currentRunId
-          ? runIds.indexOf(currentRunId)
-          : 0;
+        const currentIndex = currentRunId ? runIds.indexOf(currentRunId) : 0;
         const firstRunId = runIds[currentIndex] ?? runIds[0];
         const secondRunId =
           runIds[currentIndex + 1] ?? runIds[currentIndex - 1] ?? runIds[1];
 
         const initialSelection = [firstRunId, secondRunId].filter(
-          (id): id is string => !!id
+          (id): id is string => !!id,
         );
 
         // Ensure we have at least 2 unique runs
         const uniqueSelection = [...new Set(initialSelection)];
-        setSelectedRunIds(uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2));
+        setSelectedRunIds(
+          uniqueSelection.length >= 2 ? uniqueSelection : runIds.slice(0, 2),
+        );
 
         return true;
       } else {
@@ -109,7 +109,7 @@ export const useComparisonMode = ({
       if (!selectedRunIds.includes(runId)) return false;
       return selectedRunIds.length > 1;
     },
-    [selectedRunIds]
+    [selectedRunIds],
   );
 
   const enterCompareWithRuns = useCallback((runId1: string, runId2: string) => {

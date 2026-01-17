@@ -23,7 +23,11 @@ describe("computeMessageEdgeUpdate", () => {
 
   // Node data: system message is in "instructions", non-system in "messages"
   const nodeParameters = [
-    { identifier: "instructions", type: "str", value: "You are a helpful assistant." },
+    {
+      identifier: "instructions",
+      type: "str",
+      value: "You are a helpful assistant.",
+    },
     {
       identifier: "messages",
       type: "chat_messages",
@@ -67,7 +71,9 @@ describe("computeMessageEdgeUpdate", () => {
       // Should update messages[0] (adjusted index)
       expect(result.parameterToUpdate).toBe("messages");
       expect(result.messagesIndex).toBe(0);
-      expect(result.newValue).toEqual([{ role: "user", content: "Hello! {{question}}" }]);
+      expect(result.newValue).toEqual([
+        { role: "user", content: "Hello! {{question}}" },
+      ]);
     });
   });
 
@@ -104,7 +110,10 @@ describe("computeMessageEdgeUpdate", () => {
       expect(result.parameterToUpdate).toBe("messages");
       expect(result.messagesIndex).toBe(2);
 
-      const newMessages = result.newValue as Array<{ role: string; content: string }>;
+      const newMessages = result.newValue as Array<{
+        role: string;
+        content: string;
+      }>;
       expect(newMessages[0]?.content).toBe("First user");
       expect(newMessages[1]?.content).toBe("First assistant");
       expect(newMessages[2]?.content).toBe("Second user {{var}}");
@@ -143,4 +152,3 @@ describe("computeMessageEdgeUpdate", () => {
     });
   });
 });
-

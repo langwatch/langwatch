@@ -3,7 +3,8 @@
  *
  * Displays stacked values from different runs with colored indicators.
  */
-import { useMemo, useState, useCallback } from "react";
+
+import { Box, HStack, Text } from "@chakra-ui/react";
 import {
   createColumnHelper,
   flexRender,
@@ -11,20 +12,23 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Box, HStack, Text } from "@chakra-ui/react";
-
-import { BatchTargetCell } from "./BatchTargetCell";
-import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
+import { useCallback, useMemo, useState } from "react";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
+import { BatchTargetCell } from "./BatchTargetCell";
+import { DiffCell, type DiffValue } from "./DiffCell";
+import { ExpandableDatasetCell } from "./ExpandableDatasetCell";
+import { TableSkeleton } from "./TableSkeleton";
+import {
+  calculateMinTableWidth,
+  getTableStyles,
+  ROW_HEIGHT,
+} from "./tableUtils";
 import type {
-  BatchResultRow,
   BatchDatasetColumn,
+  BatchResultRow,
   BatchTargetColumn,
   ComparisonRunData,
 } from "./types";
-import { DiffCell, type DiffValue } from "./DiffCell";
-import { TableSkeleton } from "./TableSkeleton";
-import { ROW_HEIGHT, calculateMinTableWidth, getTableStyles } from "./tableUtils";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */
@@ -43,7 +47,10 @@ type ComparisonTableProps = {
 type ComparisonRow = {
   index: number;
   datasetEntries: Record<string, Record<string, unknown>>;
-  targetsByRun: Record<string, Record<string, BatchResultRow["targets"][string]>>;
+  targetsByRun: Record<
+    string,
+    Record<string, BatchResultRow["targets"][string]>
+  >;
   runColors: Record<string, string>;
 };
 
@@ -55,7 +62,7 @@ const comparisonColumnHelper = createColumnHelper<ComparisonRow>();
  */
 const buildComparisonColumns = (
   comparisonData: ComparisonRunData[],
-  hiddenColumns: Set<string>
+  hiddenColumns: Set<string>,
 ) => {
   const columns = [];
 
@@ -84,15 +91,20 @@ const buildComparisonColumns = (
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="gray.500" textAlign="right" paddingRight={1}>
+        <Text
+          fontSize="12px"
+          color="gray.500"
+          textAlign="right"
+          paddingRight={1}
+        >
           {row.original.index + 1}
         </Text>
       ),
-    })
+    }),
   );
 
   // Dataset columns with diff values
-  for (const [colName, col] of allDatasetColumns) {
+  for (const [colName, _col] of allDatasetColumns) {
     if (hiddenColumns.has(colName)) continue;
 
     columns.push(
@@ -128,7 +140,7 @@ const buildComparisonColumns = (
             values.map((v) => {
               const entry = row.original.datasetEntries[v.runId];
               return JSON.stringify(entry?.[colName]);
-            })
+            }),
           );
 
           if (uniqueValues.size === 1 && values[0]) {
@@ -137,7 +149,7 @@ const buildComparisonColumns = (
 
           return <DiffCell values={values} />;
         },
-      })
+      }),
     );
   }
 
@@ -176,7 +188,7 @@ const buildComparisonColumns = (
 
           return <DiffCell values={values} />;
         },
-      })
+      }),
     );
   }
 
@@ -187,14 +199,14 @@ const buildComparisonColumns = (
  * Transform comparison data into row format
  */
 const buildComparisonRows = (
-  comparisonData: ComparisonRunData[]
+  comparisonData: ComparisonRunData[],
 ): ComparisonRow[] => {
   // Find the max row count across all runs
   const maxRows = Math.max(
     0,
     ...comparisonData
       .filter((run) => run.data !== null)
-      .map((run) => run.data!.rows.length)
+      .map((run) => run.data!.rows.length),
   );
 
   const rows: ComparisonRow[] = [];
@@ -257,7 +269,7 @@ export function ComparisonTable({
 
   // State for scroll container - using state triggers re-render when mounted
   const [scrollContainer, setScrollContainer] = useState<HTMLDivElement | null>(
-    null
+    null,
   );
 
   // Callback ref to set the scroll container
@@ -271,7 +283,7 @@ export function ComparisonTable({
   // Stable callbacks for virtualizer
   const getScrollElement = useCallback(
     () => scrollContainer,
-    [scrollContainer]
+    [scrollContainer],
   );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
@@ -302,7 +314,7 @@ export function ComparisonTable({
   const firstRunWithData = comparisonData.find((run) => run.data !== null);
   const datasetColCount =
     firstRunWithData?.data?.datasetColumns.filter(
-      (c) => !hiddenColumns.has(c.name)
+      (c) => !hiddenColumns.has(c.name),
     ).length ?? 0;
   const targetColCount = firstRunWithData?.data?.targetColumns.length ?? 0;
   const minTableWidth = calculateMinTableWidth(datasetColCount, targetColCount);
@@ -315,8 +327,7 @@ export function ComparisonTable({
   const columnCount = table.getAllColumns().length;
 
   // Calculate padding to maintain scroll position (only when virtualizing)
-  const paddingTop =
-    virtualRows.length > 0 ? virtualRows[0]?.start ?? 0 : 0;
+  const paddingTop = virtualRows.length > 0 ? (virtualRows[0]?.start ?? 0) : 0;
   const paddingBottom =
     virtualRows.length > 0
       ? totalSize - (virtualRows[virtualRows.length - 1]?.end ?? 0)
@@ -341,7 +352,7 @@ export function ComparisonTable({
                     ? null
                     : flexRender(
                         header.column.columnDef.header,
-                        header.getContext()
+                        header.getContext(),
                       )}
                 </th>
               ))}
@@ -378,8 +389,14 @@ export function ComparisonTable({
                 return (
                   <tr key={row.id} data-index={virtualRow.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      <td
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
                       </td>
                     ))}
                   </tr>

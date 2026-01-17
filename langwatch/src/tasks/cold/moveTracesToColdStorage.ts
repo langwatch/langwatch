@@ -100,20 +100,21 @@ const pollReindexTask = async (
           hasChildTasks = true;
 
           // Aggregate progress from all child tasks
-          for (const nodeId in allTasksResponse.nodes) {
-            const nodeTasks = allTasksResponse.nodes[nodeId]!.tasks;
-            for (const childTaskId in nodeTasks) {
-              const childTask = nodeTasks[childTaskId]!;
-              if (childTask.status) {
-                totalCreated += childTask.status.created || 0;
-                totalUpdated += childTask.status.updated || 0;
+          for (const [_nodeId, nodeData] of Object.entries(
+            allTasksResponse.nodes,
+          )) {
+            const nodeTasks = nodeData!.tasks;
+            for (const [_childTaskId, childTask] of Object.entries(nodeTasks)) {
+              if (childTask!.status) {
+                totalCreated += childTask!.status.created || 0;
+                totalUpdated += childTask!.status.updated || 0;
                 totalProcessed +=
-                  (childTask.status.created || 0) +
-                  (childTask.status.updated || 0);
+                  (childTask!.status.created || 0) +
+                  (childTask!.status.updated || 0);
                 // Check for failures in child tasks
                 if (
-                  childTask.status.failures &&
-                  childTask.status.failures.length > 0
+                  childTask!.status.failures &&
+                  childTask!.status.failures.length > 0
                 ) {
                   hasFailures = true;
                 }

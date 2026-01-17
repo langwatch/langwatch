@@ -74,7 +74,7 @@ export const studioBackendPostEvent = async ({
     let events = 0;
     while (true) {
       // Check abort before each read
-      if (isAborted && await isAborted()) {
+      if (isAborted && (await isAborted())) {
         logger.info("Execution aborted, cancelling stream reader");
         await reader.cancel();
         break;
@@ -94,7 +94,7 @@ export const studioBackendPostEvent = async ({
         chunksBuffer = chunks[chunks.length - 1] ?? "";
       }
     }
-    if (events === 0 && !(isAborted && await isAborted())) {
+    if (events === 0 && !(isAborted && (await isAborted()))) {
       throw new Error(`Studio invalid response: ${chunksBuffer}`);
     }
   } catch (error) {

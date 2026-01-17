@@ -1,4 +1,4 @@
-import React from "react";
+import type React from "react";
 import { Anthropic } from "../../components/icons/Anthropic";
 import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";

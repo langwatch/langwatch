@@ -10,52 +10,48 @@ export { BatchEvaluationResults } from "./BatchEvaluationResults";
 export {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
-  DEFAULT_HIDDEN_COLUMNS,
   type ColumnVisibilityButtonProps,
+  DEFAULT_HIDDEN_COLUMNS,
 } from "./BatchEvaluationResultsTable";
-export { SingleRunTable } from "./SingleRunTable";
-export { ComparisonTable } from "./ComparisonTable";
-export { BatchTargetCell } from "./BatchTargetCell";
-export { BatchTargetHeader } from "./BatchTargetHeader";
-export { ExpandableDatasetCell } from "./ExpandableDatasetCell";
-export { BatchRunsSidebar, type BatchRunSummary } from "./BatchRunsSidebar";
+export { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
 // BatchSummaryFooter is still used by ResultsPanel for stop button functionality
 export { BatchSummaryFooter } from "./BatchSummaryFooter";
-
+export { BatchTargetCell } from "./BatchTargetCell";
+export { BatchTargetHeader } from "./BatchTargetHeader";
+export { ComparisonTable } from "./ComparisonTable";
+// Aggregate computation
+export {
+  type BatchEvaluatorAggregate,
+  type BatchTargetAggregate,
+  computeAllBatchAggregates,
+  computeBatchTargetAggregates,
+} from "./computeBatchAggregates";
+// CSV Export
+export {
+  buildCsvData,
+  buildCsvHeaders,
+  type CsvDownloadOptions,
+  createCsvDownloader,
+  downloadCsv,
+  generateCsvContent,
+} from "./csvExport";
+export { ExpandableDatasetCell } from "./ExpandableDatasetCell";
+export { SingleRunTable } from "./SingleRunTable";
 // Table utilities
 export {
-  ROW_HEIGHT,
   calculateMinTableWidth,
   getTableStyles,
   inferColumnType,
+  ROW_HEIGHT,
 } from "./tableUtils";
-
-// Aggregate computation
-export {
-  computeBatchTargetAggregates,
-  computeAllBatchAggregates,
-  type BatchTargetAggregate,
-  type BatchEvaluatorAggregate,
-} from "./computeBatchAggregates";
-
 // Types
 export {
-  transformBatchEvaluationData,
-  isImageUrlHeuristic,
-  type BatchEvaluationData,
-  type BatchResultRow,
-  type BatchTargetOutput,
-  type BatchEvaluatorResult,
-  type BatchTargetColumn,
   type BatchDatasetColumn,
+  type BatchEvaluationData,
+  type BatchEvaluatorResult,
+  type BatchResultRow,
+  type BatchTargetColumn,
+  type BatchTargetOutput,
+  isImageUrlHeuristic,
+  transformBatchEvaluationData,
 } from "./types";
-
-// CSV Export
-export {
-  buildCsvHeaders,
-  buildCsvData,
-  generateCsvContent,
-  downloadCsv,
-  createCsvDownloader,
-  type CsvDownloadOptions,
-} from "./csvExport";

@@ -1,13 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import {
-  parseNodeId,
   isEvaluatorNode,
-  mapTargetResult,
+  mapErrorEvent,
   mapEvaluatorResult,
   mapNlpEvent,
-  mapErrorEvent,
+  mapTargetResult,
+  parseNodeId,
 } from "../resultMapper";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
 
 describe("resultMapper", () => {
   describe("parseNodeId", () => {
@@ -172,7 +172,7 @@ describe("resultMapper", () => {
 
     it("throws for non-evaluator node ID", () => {
       expect(() =>
-        mapEvaluatorResult("target-1", 0, { status: "success" })
+        mapEvaluatorResult("target-1", 0, { status: "success" }),
       ).toThrow("Expected evaluator node ID");
     });
 
@@ -184,7 +184,7 @@ describe("resultMapper", () => {
           status: "success",
           outputs: { passed: true, score: 1.0, label: "exact" },
         },
-        { stripScore: true }
+        { stripScore: true },
       );
 
       expect(result.type).toBe("evaluator_result");
@@ -206,7 +206,7 @@ describe("resultMapper", () => {
           status: "success",
           outputs: { passed: true, score: 0.85 },
         },
-        { stripScore: false }
+        { stripScore: false },
       );
 
       expect(result.type).toBe("evaluator_result");
@@ -242,7 +242,7 @@ describe("resultMapper", () => {
           status: "error",
           error: "Failed",
         },
-        { stripScore: true }
+        { stripScore: true },
       );
 
       expect(result.type).toBe("evaluator_result");
@@ -494,7 +494,12 @@ describe("resultMapper", () => {
     });
 
     it("creates error event with context", () => {
-      const result = mapErrorEvent("Failed to execute", 2, "target-1", "eval-1");
+      const result = mapErrorEvent(
+        "Failed to execute",
+        2,
+        "target-1",
+        "eval-1",
+      );
 
       expect(result).toEqual({
         type: "error",

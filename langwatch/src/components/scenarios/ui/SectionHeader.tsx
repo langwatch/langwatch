@@ -22,7 +22,3 @@ export function SectionHeader({ children, ...props }: SectionHeaderProps) {
     </Text>
   );
 }
-
-
-
-

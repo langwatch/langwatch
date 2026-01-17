@@ -38,15 +38,19 @@ const renderControls = (props = {}) => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <ExecutionControls {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
-const renderMiniButton = (props: { onClick: () => void; isRunning?: boolean; disabled?: boolean }) => {
+const renderMiniButton = (props: {
+  onClick: () => void;
+  isRunning?: boolean;
+  disabled?: boolean;
+}) => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <MiniRunButton {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -66,7 +70,7 @@ describe("ExecutionControls", () => {
   describe("Idle State", () => {
     it("renders Evaluate button when idle", () => {
       renderControls();
-      
+
       const button = screen.getByTestId("execution-control-button");
       expect(button).toBeInTheDocument();
       expect(screen.getByText("Evaluate")).toBeInTheDocument();
@@ -74,7 +78,7 @@ describe("ExecutionControls", () => {
 
     it("disables button when isReady is false", () => {
       renderControls({ isReady: false });
-      
+
       const button = screen.getByTestId("execution-control-button");
       expect(button).toBeDisabled();
     });
@@ -82,10 +86,10 @@ describe("ExecutionControls", () => {
     it("calls execute when clicked", async () => {
       const user = userEvent.setup();
       renderControls();
-      
+
       const button = screen.getByTestId("execution-control-button");
       await user.click(button);
-      
+
       expect(mockExecute).toHaveBeenCalled();
     });
   });
@@ -99,23 +103,23 @@ describe("ExecutionControls", () => {
 
     it("renders Stop button when running", () => {
       renderControls();
-      
+
       expect(screen.getByText("Stop")).toBeInTheDocument();
     });
 
     it("shows progress indicator", () => {
       renderControls();
-      
+
       expect(screen.getByText("2/5")).toBeInTheDocument();
     });
 
     it("calls abort when clicked", async () => {
       const user = userEvent.setup();
       renderControls();
-      
+
       const button = screen.getByTestId("execution-control-button");
       await user.click(button);
-      
+
       expect(mockAbort).toHaveBeenCalled();
     });
   });
@@ -128,13 +132,13 @@ describe("ExecutionControls", () => {
 
     it("shows completion message", () => {
       renderControls();
-      
+
       expect(screen.getByText(/5\/5 completed/)).toBeInTheDocument();
     });
 
     it("shows Evaluate button again", () => {
       renderControls();
-      
+
       expect(screen.getByText("Evaluate")).toBeInTheDocument();
     });
   });
@@ -147,7 +151,7 @@ describe("ExecutionControls", () => {
 
     it("shows error message", () => {
       renderControls();
-      
+
       expect(screen.getByText(/Execution failed/)).toBeInTheDocument();
     });
   });
@@ -160,7 +164,7 @@ describe("ExecutionControls", () => {
 
     it("shows stopped message with progress", () => {
       renderControls();
-      
+
       expect(screen.getByText(/Stopped at 3\/5/)).toBeInTheDocument();
     });
   });
@@ -168,7 +172,7 @@ describe("ExecutionControls", () => {
   describe("Compact Mode", () => {
     it("renders smaller button in compact mode", () => {
       renderControls({ compact: true });
-      
+
       const button = screen.getByTestId("execution-control-button");
       expect(button).toBeInTheDocument();
     });
@@ -183,7 +187,7 @@ describe("MiniRunButton", () => {
   it("renders play icon when not running", () => {
     const onClick = vi.fn();
     renderMiniButton({ onClick });
-    
+
     // Should have an SVG element (play icon)
     expect(document.querySelector("svg")).toBeInTheDocument();
   });
@@ -191,7 +195,7 @@ describe("MiniRunButton", () => {
   it("renders spinner when running", () => {
     const onClick = vi.fn();
     renderMiniButton({ onClick, isRunning: true });
-    
+
     // Should have a button (spinner renders inside)
     expect(screen.getByRole("button")).toBeInTheDocument();
   });
@@ -200,10 +204,10 @@ describe("MiniRunButton", () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     renderMiniButton({ onClick });
-    
+
     const button = screen.getByRole("button");
     await user.click(button);
-    
+
     expect(onClick).toHaveBeenCalled();
   });
 
@@ -211,18 +215,18 @@ describe("MiniRunButton", () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     const parentClick = vi.fn();
-    
+
     render(
       <ChakraProvider value={defaultSystem}>
         <div onClick={parentClick}>
           <MiniRunButton onClick={onClick} />
         </div>
-      </ChakraProvider>
+      </ChakraProvider>,
     );
-    
+
     const button = screen.getByRole("button");
     await user.click(button);
-    
+
     expect(onClick).toHaveBeenCalled();
     expect(parentClick).not.toHaveBeenCalled();
   });
@@ -230,7 +234,7 @@ describe("MiniRunButton", () => {
   it("disables when disabled prop is true", () => {
     const onClick = vi.fn();
     renderMiniButton({ onClick, disabled: true });
-    
+
     const button = screen.getByRole("button");
     expect(button).toBeDisabled();
   });

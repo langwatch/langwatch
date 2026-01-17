@@ -1,8 +1,7 @@
-import { Button, HStack, Text, Box, Spinner } from "@chakra-ui/react";
+import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
-
-import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import type { ExecutionScope } from "~/server/evaluations-v3/execution/types";
+import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 
 type ExecutionControlsProps = {
   /** Whether the evaluation is ready to run (all mappings configured) */
@@ -17,7 +16,7 @@ type ExecutionControlsProps = {
 
 /**
  * ExecutionControls - Run/Stop button with progress indicator.
- * 
+ *
  * Displays:
  * - "Evaluate" button when idle
  * - "Stop" button with progress when running
@@ -29,17 +28,14 @@ export function ExecutionControls({
   compact = false,
   onComplete,
 }: ExecutionControlsProps) {
-  const {
-    status,
-    progress,
-    execute,
-    abort,
-  } = useExecuteEvaluation();
+  const { status, progress, execute, abort } = useExecuteEvaluation();
 
   const isRunning = status === "running";
   const isIdle = status === "idle";
   const hasProgress = progress.total > 0;
-  const progressPercent = hasProgress ? (progress.completed / progress.total) * 100 : 0;
+  const progressPercent = hasProgress
+    ? (progress.completed / progress.total) * 100
+    : 0;
 
   const handleClick = async () => {
     if (isRunning) {
@@ -155,11 +151,7 @@ export function MiniRunButton({
       height="auto"
       data-testid={testId}
     >
-      {isRunning ? (
-        <Spinner size="xs" />
-      ) : (
-        <LuPlay size={14} />
-      )}
+      {isRunning ? <Spinner size="xs" /> : <LuPlay size={14} />}
     </Button>
   );
 }

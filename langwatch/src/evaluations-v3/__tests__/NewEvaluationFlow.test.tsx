@@ -11,9 +11,10 @@
  * - /v3/ (index) creates experiment on server, then redirects to /v3/[slug]
  * - /v3/[slug] ONLY loads existing experiments, shows 404 if not found
  */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
@@ -101,9 +102,7 @@ const TestSlugPage = () => {
       {isError && <div data-testid="error">Error: {error?.message}</div>}
       {!isLoading && !isNotFound && !isError && (
         <div data-testid="content">
-          <div data-testid="experiment-id">
-            {store.experimentId ?? "no-id"}
-          </div>
+          <div data-testid="experiment-id">{store.experimentId ?? "no-id"}</div>
           <div data-testid="experiment-slug">
             {store.experimentSlug ?? "no-slug"}
           </div>

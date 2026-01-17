@@ -212,7 +212,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
               // Stream incremental output deltas using dynamic field lookup
               const current = extractStreamableOutput(
                 state.outputs,
-                outputConfigs
+                outputConfigs,
               );
               if (
                 current !== undefined &&

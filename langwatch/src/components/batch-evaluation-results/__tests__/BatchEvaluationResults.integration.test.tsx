@@ -8,14 +8,20 @@
  * Following the test trophy approach - testing the full component integration
  * without mocking child components.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor, within, cleanup } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 
-import { BatchEvaluationResults } from "../BatchEvaluationResults";
-import type { Project, Experiment } from "@prisma/client";
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Experiment, Project } from "@prisma/client";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
+import { BatchEvaluationResults } from "../BatchEvaluationResults";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -36,12 +42,15 @@ vi.mock("~/utils/api", () => ({
 }));
 
 // Mock CSV download hook
-vi.mock("../../../experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults", () => ({
-  useBatchEvaluationDownloadCSV: vi.fn().mockReturnValue({
-    downloadCSV: vi.fn(),
-    isDownloadCSVEnabled: true,
+vi.mock(
+  "../../../experiments/BatchEvaluationV2/BatchEvaluationV2EvaluationResults",
+  () => ({
+    useBatchEvaluationDownloadCSV: vi.fn().mockReturnValue({
+      downloadCSV: vi.fn(),
+      isDownloadCSVEnabled: true,
+    }),
   }),
-}));
+);
 
 // Mock Next.js router
 vi.mock("next/router", () => ({
@@ -87,7 +96,11 @@ const mockRunsData = {
         dataset_cost: 0.05,
         evaluations_cost: 0.02,
         evaluations: {
-          accuracy: { name: "accuracy", average_score: 0.85, average_passed: null },
+          accuracy: {
+            name: "accuracy",
+            average_score: 0.85,
+            average_passed: null,
+          },
         },
       },
     },
@@ -104,7 +117,11 @@ const mockRunsData = {
         dataset_cost: 0.04,
         evaluations_cost: 0.01,
         evaluations: {
-          accuracy: { name: "accuracy", average_score: 0.90, average_passed: null },
+          accuracy: {
+            name: "accuracy",
+            average_score: 0.9,
+            average_passed: null,
+          },
         },
       },
     },
@@ -203,21 +220,32 @@ describe("BatchEvaluationResults Integration", () => {
 
   it("shows loading state while fetching runs", () => {
     // Mock loading state
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRun.useQuery,
+    ).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRun.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRun.useQuery
+    >);
 
     render(
-      <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-      { wrapper: Wrapper }
+      <BatchEvaluationResults
+        project={mockProject}
+        experiment={mockExperiment}
+      />,
+      { wrapper: Wrapper },
     );
 
     // Should show experiment name
@@ -226,21 +254,32 @@ describe("BatchEvaluationResults Integration", () => {
 
   it("shows empty state when no runs exist", async () => {
     // Mock empty runs
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: { runs: [] },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRun.useQuery,
+    ).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRun.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRun.useQuery
+    >);
 
     render(
-      <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-      { wrapper: Wrapper }
+      <BatchEvaluationResults
+        project={mockProject}
+        experiment={mockExperiment}
+      />,
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
@@ -250,57 +289,85 @@ describe("BatchEvaluationResults Integration", () => {
 
   it("shows error state when fetch fails", async () => {
     // Mock error
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: undefined,
       isLoading: false,
       error: new Error("Failed to fetch"),
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(
-      <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-      { wrapper: Wrapper }
+      <BatchEvaluationResults
+        project={mockProject}
+        experiment={mockExperiment}
+      />,
+      { wrapper: Wrapper },
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/Error loading experiment runs/i)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Error loading experiment runs/i),
+      ).toBeInTheDocument();
     });
   });
 
   describe("Comparison Mode", () => {
     const setupWithMultipleRuns = () => {
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+      ).mockReturnValue({
         data: mockRunsData,
         isLoading: false,
         error: null,
-      } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+      } as unknown as ReturnType<
+        typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+      >);
 
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRun.useQuery,
+      ).mockReturnValue({
         data: createMockRunData("swift-bright-fox"),
         isLoading: false,
         error: null,
-      } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRun.useQuery>);
+      } as unknown as ReturnType<
+        typeof api.experiments.getExperimentBatchEvaluationRun.useQuery
+      >);
     };
 
     const setupWithSingleRun = () => {
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+      ).mockReturnValue({
         data: mockSingleRunData,
         isLoading: false,
         error: null,
-      } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+      } as unknown as ReturnType<
+        typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+      >);
 
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRun.useQuery,
+      ).mockReturnValue({
         data: createMockRunData("swift-bright-fox"),
         isLoading: false,
         error: null,
-      } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRun.useQuery>);
+      } as unknown as ReturnType<
+        typeof api.experiments.getExperimentBatchEvaluationRun.useQuery
+      >);
     };
 
     it("shows Compare button when multiple runs available", async () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -312,8 +379,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithSingleRun();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -327,13 +397,18 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       // Wait for runs to load
       await waitFor(() => {
-        expect(screen.getByTestId("run-item-swift-bright-fox")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-swift-bright-fox"),
+        ).toBeInTheDocument();
       });
 
       // Click Compare button
@@ -346,8 +421,12 @@ describe("BatchEvaluationResults Integration", () => {
       });
 
       // Checkboxes should appear
-      expect(screen.getByTestId("run-checkbox-swift-bright-fox")).toBeInTheDocument();
-      expect(screen.getByTestId("run-checkbox-calm-eager-owl")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("run-checkbox-swift-bright-fox"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("run-checkbox-calm-eager-owl"),
+      ).toBeInTheDocument();
     });
 
     it("auto-selects current run and next run when entering compare mode", async () => {
@@ -355,12 +434,17 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("run-item-swift-bright-fox")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-swift-bright-fox"),
+        ).toBeInTheDocument();
       });
 
       // Enter compare mode
@@ -381,8 +465,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -405,7 +492,9 @@ describe("BatchEvaluationResults Integration", () => {
       });
 
       // Checkboxes should be gone
-      expect(screen.queryByTestId("run-checkbox-swift-bright-fox")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("run-checkbox-swift-bright-fox"),
+      ).not.toBeInTheDocument();
     });
 
     it("toggles run selection when clicking checkbox in compare mode", async () => {
@@ -413,8 +502,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -425,12 +517,16 @@ describe("BatchEvaluationResults Integration", () => {
       await user.click(screen.getByTestId("compare-button"));
 
       await waitFor(() => {
-        expect(screen.getByTestId("run-checkbox-noble-vivid-storm")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-checkbox-noble-vivid-storm"),
+        ).toBeInTheDocument();
       });
 
       // Third run should not be selected initially
       const checkbox3 = screen.getByTestId("run-checkbox-noble-vivid-storm");
-      expect(checkbox3.querySelector('input[type="checkbox"]')).not.toBeChecked();
+      expect(
+        checkbox3.querySelector('input[type="checkbox"]'),
+      ).not.toBeChecked();
 
       // Click to select it
       await user.click(checkbox3);
@@ -445,14 +541,23 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("run-item-swift-bright-fox")).toBeInTheDocument();
-        expect(screen.getByTestId("run-item-calm-eager-owl")).toBeInTheDocument();
-        expect(screen.getByTestId("run-item-noble-vivid-storm")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-swift-bright-fox"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-calm-eager-owl"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-noble-vivid-storm"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -460,8 +565,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       // Wait for table to render - look for table structure
@@ -477,8 +585,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       // Wait for runs to load
@@ -491,8 +602,12 @@ describe("BatchEvaluationResults Integration", () => {
 
       // Wait for checkboxes to appear
       await waitFor(() => {
-        expect(screen.getByTestId("run-checkbox-swift-bright-fox")).toBeInTheDocument();
-        expect(screen.getByTestId("run-checkbox-calm-eager-owl")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-checkbox-swift-bright-fox"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-checkbox-calm-eager-owl"),
+        ).toBeInTheDocument();
       });
 
       // First two runs should be auto-selected (checked)
@@ -503,7 +618,9 @@ describe("BatchEvaluationResults Integration", () => {
 
       // Third run should not be selected initially
       const checkbox3 = screen.getByTestId("run-checkbox-noble-vivid-storm");
-      expect(checkbox3.querySelector('input[type="checkbox"]')).not.toBeChecked();
+      expect(
+        checkbox3.querySelector('input[type="checkbox"]'),
+      ).not.toBeChecked();
     });
 
     it("switches between normal and comparison mode correctly", async () => {
@@ -511,8 +628,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -544,8 +664,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -566,8 +689,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -581,8 +707,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
@@ -594,7 +723,9 @@ describe("BatchEvaluationResults Integration", () => {
 
       // Wait for checkboxes
       await waitFor(() => {
-        expect(screen.getByTestId("run-checkbox-swift-bright-fox")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-checkbox-swift-bright-fox"),
+        ).toBeInTheDocument();
       });
 
       // Both runs should be checked initially
@@ -609,7 +740,9 @@ describe("BatchEvaluationResults Integration", () => {
       // Now only one should be checked
       await waitFor(() => {
         expect(checkbox1.querySelector('input[type="checkbox"]')).toBeChecked();
-        expect(checkbox2.querySelector('input[type="checkbox"]')).not.toBeChecked();
+        expect(
+          checkbox2.querySelector('input[type="checkbox"]'),
+        ).not.toBeChecked();
       });
     });
 
@@ -617,14 +750,23 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("run-item-swift-bright-fox")).toBeInTheDocument();
-        expect(screen.getByTestId("run-item-calm-eager-owl")).toBeInTheDocument();
-        expect(screen.getByTestId("run-item-noble-vivid-storm")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-swift-bright-fox"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-calm-eager-owl"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-noble-vivid-storm"),
+        ).toBeInTheDocument();
       });
 
       // Should show run names (IDs since no commit message)
@@ -656,26 +798,35 @@ describe("BatchEvaluationResults Integration", () => {
         ],
       };
 
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+      ).mockReturnValue({
         data: interruptedRunData,
         isLoading: false,
         error: null,
         refetch: vi.fn(),
       } as any);
 
-      vi.mocked(api.experiments.getExperimentBatchEvaluationRun.useQuery).mockReturnValue({
+      vi.mocked(
+        api.experiments.getExperimentBatchEvaluationRun.useQuery,
+      ).mockReturnValue({
         data: createMockRunData("interrupted-run"),
         isLoading: false,
         error: null,
       } as any);
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {
-        expect(screen.getByTestId("run-item-interrupted-run")).toBeInTheDocument();
+        expect(
+          screen.getByTestId("run-item-interrupted-run"),
+        ).toBeInTheDocument();
       });
 
       // Should show "interrupted" text in the run item
@@ -683,7 +834,9 @@ describe("BatchEvaluationResults Integration", () => {
       expect(runItem.textContent).toContain("interrupted");
 
       // Should NOT show a spinner (since it's considered finished)
-      expect(runItem.querySelector('[data-part="spinner"]')).not.toBeInTheDocument();
+      expect(
+        runItem.querySelector('[data-part="spinner"]'),
+      ).not.toBeInTheDocument();
     });
 
     it("enters compare mode when using Compare button", async () => {
@@ -691,8 +844,11 @@ describe("BatchEvaluationResults Integration", () => {
       setupWithMultipleRuns();
 
       render(
-        <BatchEvaluationResults project={mockProject} experiment={mockExperiment} />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResults
+          project={mockProject}
+          experiment={mockExperiment}
+        />,
+        { wrapper: Wrapper },
       );
 
       await waitFor(() => {

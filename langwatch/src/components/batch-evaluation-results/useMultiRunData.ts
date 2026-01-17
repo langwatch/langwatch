@@ -5,8 +5,8 @@
  * Includes run color assignments for visual differentiation.
  */
 import { useMemo } from "react";
-import { api } from "~/utils/api";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
+import { api } from "~/utils/api";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [
@@ -64,35 +64,35 @@ export const useMultiRunData = ({
   // and enable/disable based on whether we have that many runs
   const run0 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[0] ?? "" },
-    { enabled: enabled && !!runIds[0], refetchInterval }
+    { enabled: enabled && !!runIds[0], refetchInterval },
   );
   const run1 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[1] ?? "" },
-    { enabled: enabled && !!runIds[1], refetchInterval }
+    { enabled: enabled && !!runIds[1], refetchInterval },
   );
   const run2 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[2] ?? "" },
-    { enabled: enabled && !!runIds[2], refetchInterval }
+    { enabled: enabled && !!runIds[2], refetchInterval },
   );
   const run3 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[3] ?? "" },
-    { enabled: enabled && !!runIds[3], refetchInterval }
+    { enabled: enabled && !!runIds[3], refetchInterval },
   );
   const run4 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[4] ?? "" },
-    { enabled: enabled && !!runIds[4], refetchInterval }
+    { enabled: enabled && !!runIds[4], refetchInterval },
   );
   const run5 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[5] ?? "" },
-    { enabled: enabled && !!runIds[5], refetchInterval }
+    { enabled: enabled && !!runIds[5], refetchInterval },
   );
   const run6 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[6] ?? "" },
-    { enabled: enabled && !!runIds[6], refetchInterval }
+    { enabled: enabled && !!runIds[6], refetchInterval },
   );
   const run7 = api.experiments.getExperimentBatchEvaluationRun.useQuery(
     { projectId, experimentId, runId: runIds[7] ?? "" },
-    { enabled: enabled && !!runIds[7], refetchInterval }
+    { enabled: enabled && !!runIds[7], refetchInterval },
   );
 
   const queries = [run0, run1, run2, run3, run4, run5, run6, run7];

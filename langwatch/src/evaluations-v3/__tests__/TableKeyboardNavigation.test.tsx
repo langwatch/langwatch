@@ -1,9 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -83,9 +90,7 @@ const KeyboardNavigationTestComponent = () => {
       <div data-testid="selected-rows">
         {Array.from(ui.selectedRows).join(",")}
       </div>
-      <div data-testid="columns">
-        {allColumns.map((c) => c.id).join(",")}
-      </div>
+      <div data-testid="columns">{allColumns.map((c) => c.id).join(",")}</div>
     </div>
   );
 };
@@ -104,17 +109,23 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Set initial selection
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       // Press ArrowDown
       fireEvent.keyDown(document, { key: "ArrowDown" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:input",
+        );
       });
     });
 
@@ -122,17 +133,23 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Set initial selection at row 1
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 1, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 1, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:input",
+        );
       });
 
       // Press ArrowUp
       fireEvent.keyDown(document, { key: "ArrowUp" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
 
@@ -140,17 +157,23 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Set initial selection on checkbox column
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "__checkbox__" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
 
       // Press ArrowRight
       fireEvent.keyDown(document, { key: "ArrowRight" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
 
@@ -158,27 +181,37 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Set initial selection on input column
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       // Press ArrowLeft
       fireEvent.keyDown(document, { key: "ArrowLeft" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
     });
 
     it("does not navigate up past row 0", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       // Press ArrowUp at row 0
@@ -186,17 +219,23 @@ describe("Table keyboard navigation", () => {
 
       // Should stay at row 0
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
 
     it("does not navigate left past first column", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "__checkbox__" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
 
       // Press ArrowLeft at first column
@@ -204,7 +243,9 @@ describe("Table keyboard navigation", () => {
 
       // Should stay at first column
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
     });
   });
@@ -213,32 +254,44 @@ describe("Table keyboard navigation", () => {
     it("moves to next column with Tab", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "__checkbox__" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
 
       fireEvent.keyDown(document, { key: "Tab" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
 
     it("moves to previous column with Shift+Tab", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
     });
 
@@ -246,17 +299,23 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Navigate to the last column (expected_output for default store)
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "expected_output" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "expected_output" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:expected_output");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:expected_output",
+        );
       });
 
       fireEvent.keyDown(document, { key: "Tab" });
 
       // Should wrap to first column of next row
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:__checkbox__",
+        );
       });
     });
 
@@ -264,17 +323,23 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Start at first column of row 1
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 1, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 1, columnId: "__checkbox__" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:__checkbox__",
+        );
       });
 
       fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
 
       // Should wrap to last column of previous row
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:expected_output");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:expected_output",
+        );
       });
     });
   });
@@ -283,7 +348,9 @@ describe("Table keyboard navigation", () => {
     it("toggles row selection when Enter pressed on checkbox column", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "__checkbox__" });
 
       await waitFor(() => {
         expect(screen.getByTestId("selected-rows")).toHaveTextContent("");
@@ -299,11 +366,15 @@ describe("Table keyboard navigation", () => {
     it("toggles row selection when Space pressed on checkbox column", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 1, columnId: "__checkbox__" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 1, columnId: "__checkbox__" });
 
       // Wait for state to propagate
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:__checkbox__",
+        );
       });
 
       fireEvent.keyDown(document, { key: " ", code: "Space" });
@@ -316,7 +387,9 @@ describe("Table keyboard navigation", () => {
     it("enters edit mode when Enter pressed on dataset column", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
         expect(screen.getByTestId("editing-cell")).toHaveTextContent("none");
@@ -332,17 +405,23 @@ describe("Table keyboard navigation", () => {
     it("enters edit mode when Space pressed on dataset column", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "expected_output" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "expected_output" });
 
       // Wait for state to propagate
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:expected_output");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:expected_output",
+        );
       });
 
       fireEvent.keyDown(document, { key: " ", code: "Space" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("editing-cell")).toHaveTextContent("0:expected_output");
+        expect(screen.getByTestId("editing-cell")).toHaveTextContent(
+          "0:expected_output",
+        );
       });
     });
   });
@@ -351,10 +430,14 @@ describe("Table keyboard navigation", () => {
     it("clears selection when Escape pressed", async () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       fireEvent.keyDown(document, { key: "Escape" });
@@ -390,8 +473,12 @@ describe("Table keyboard navigation", () => {
       render(<KeyboardNavigationTestComponent />, { wrapper: Wrapper });
 
       // Set selection and enter edit mode
-      useEvaluationsV3Store.getState().setSelectedCell({ row: 0, columnId: "input" });
-      useEvaluationsV3Store.getState().setEditingCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setSelectedCell({ row: 0, columnId: "input" });
+      useEvaluationsV3Store
+        .getState()
+        .setEditingCell({ row: 0, columnId: "input" });
 
       await waitFor(() => {
         expect(screen.getByTestId("editing-cell")).toHaveTextContent("0:input");
@@ -402,7 +489,9 @@ describe("Table keyboard navigation", () => {
 
       // Should still be at same cell
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
   });

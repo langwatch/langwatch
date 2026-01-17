@@ -1,6 +1,6 @@
 import { Box, Center } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LuGripHorizontal, LuChevronUp, LuChevronDown } from "react-icons/lu";
+import { LuChevronDown, LuChevronUp, LuGripHorizontal } from "react-icons/lu";
 
 export type ResizableDividerProps = {
   /** Whether the top panel is expanded */
@@ -128,4 +128,3 @@ export function ResizableDivider({
     </Box>
   );
 }
-

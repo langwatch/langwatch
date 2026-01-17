@@ -28,7 +28,7 @@ export function validateProjectName(name: string | undefined): string | true {
  */
 export function validateNewTeamName(
   teamId: string | undefined,
-  newTeamName: string | undefined
+  newTeamName: string | undefined,
 ): string | true {
   if (teamId !== NEW_TEAM_VALUE) return true;
   if (!newTeamName || newTeamName.trim() === "") {

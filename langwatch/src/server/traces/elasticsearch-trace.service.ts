@@ -5,7 +5,9 @@ import type {
 } from "@elastic/elasticsearch/lib/api/types";
 import type { PrismaClient } from "@prisma/client";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
-
+import { generateTracesPivotQueryConditions } from "~/server/api/routers/analytics/common";
+import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
+import type { Protections } from "~/server/elasticsearch/protections";
 import {
   aggregateTraces,
   getTraceById as esGetTraceById,
@@ -13,10 +15,12 @@ import {
   searchTraces,
 } from "~/server/elasticsearch/traces";
 import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/transformers";
-import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import type { Protections } from "~/server/elasticsearch/protections";
-import type { ElasticSearchTrace, Evaluation, LLMSpan, Trace } from "~/server/tracer/types";
-import { generateTracesPivotQueryConditions } from "~/server/api/routers/analytics/common";
+import type {
+  ElasticSearchTrace,
+  Evaluation,
+  LLMSpan,
+  Trace,
+} from "~/server/tracer/types";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -62,7 +66,7 @@ export class ElasticsearchTraceService {
   async getById(
     projectId: string,
     traceId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace | undefined> {
     return esGetTraceById({
       connConfig: { projectId },
@@ -84,7 +88,7 @@ export class ElasticsearchTraceService {
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     const traces = await searchTraces({
       connConfig: { projectId },
@@ -134,7 +138,7 @@ export class ElasticsearchTraceService {
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     return esGetTracesGroupedByThreadId({
       connConfig: { projectId },
@@ -158,7 +162,7 @@ export class ElasticsearchTraceService {
       downloadMode?: boolean;
       includeSpans?: boolean;
       scrollId?: string | null;
-    } = {}
+    } = {},
   ): Promise<TracesForProjectResult> {
     const { downloadMode = false, includeSpans = false, scrollId } = options;
 
@@ -209,7 +213,11 @@ export class ElasticsearchTraceService {
 
     // Handle thread_id grouping
     if (input.groupBy === "thread_id") {
-      await this.enrichTracesWithThreadGroup(traces, input.projectId, protections);
+      await this.enrichTracesWithThreadGroup(
+        traces,
+        input.projectId,
+        protections,
+      );
 
       if (!input.sortBy) {
         this.sortTracesByTimestampDesc(traces);
@@ -219,7 +227,7 @@ export class ElasticsearchTraceService {
     const totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
     const evaluations = Object.fromEntries(
-      traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+      traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
     );
 
     const tracesWithGuardrails = this.transformTracesWithGuardrails(traces);
@@ -244,7 +252,7 @@ export class ElasticsearchTraceService {
   async getEvaluationsMultiple(
     projectId: string,
     traceIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Record<string, Evaluation[]>> {
     const traces = await searchTraces({
       connConfig: { projectId },
@@ -267,7 +275,7 @@ export class ElasticsearchTraceService {
     });
 
     return Object.fromEntries(
-      traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+      traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
     );
   }
 
@@ -282,7 +290,7 @@ export class ElasticsearchTraceService {
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[]> {
     const traces = await searchTraces({
       connConfig: { projectId },
@@ -327,7 +335,9 @@ export class ElasticsearchTraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns TopicCountsResult with topic and subtopic aggregations
    */
-  async getTopicCounts(input: AggregationFiltersInput): Promise<TopicCountsResult> {
+  async getTopicCounts(
+    input: AggregationFiltersInput,
+  ): Promise<TopicCountsResult> {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 
     const result = await aggregateTraces({
@@ -377,7 +387,9 @@ export class ElasticsearchTraceService {
    * @param input - Filter parameters including projectId and date range
    * @returns CustomersAndLabelsResult with unique customer IDs and labels
    */
-  async getCustomersAndLabels(input: AggregationFiltersInput): Promise<CustomersAndLabelsResult> {
+  async getCustomersAndLabels(
+    input: AggregationFiltersInput,
+  ): Promise<CustomersAndLabelsResult> {
     const result = await aggregateTraces({
       connConfig: { projectId: input.projectId },
       search: {
@@ -422,7 +434,7 @@ export class ElasticsearchTraceService {
   async getSpanForPromptStudio(
     projectId: string,
     spanId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<PromptStudioSpanResult | null> {
     // Find the trace containing this span using nested query
     const traces = await searchTraces({
@@ -473,7 +485,7 @@ export class ElasticsearchTraceService {
    */
   private extractPromptStudioData(
     trace: Trace,
-    span: LLMSpan
+    span: LLMSpan,
   ): PromptStudioSpanResult {
     const messages: PromptStudioSpanResult["messages"] = [];
 
@@ -544,8 +556,8 @@ export class ElasticsearchTraceService {
         model: span.model ?? null,
         systemPrompt,
         temperature: (params.temperature as number) ?? null,
-        maxTokens: (params.max_tokens ?? params.maxTokens) as number ?? null,
-        topP: (params.top_p ?? params.topP) as number ?? null,
+        maxTokens: ((params.max_tokens ?? params.maxTokens) as number) ?? null,
+        topP: ((params.top_p ?? params.topP) as number) ?? null,
         litellmParams,
       },
       vendor: span.vendor ?? null,
@@ -561,7 +573,7 @@ export class ElasticsearchTraceService {
    */
   private buildSortClause(
     sortBy?: string,
-    sortDirection?: string
+    sortDirection?: string,
   ): { sort: Sort } {
     if (!sortBy) {
       return {
@@ -621,7 +633,7 @@ export class ElasticsearchTraceService {
   private async enrichTracesWithThreadGroup(
     traces: Trace[],
     projectId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<void> {
     const threadIds = traces.map((t) => t.metadata.thread_id).filter(Boolean);
     const existingTraceIds = new Set(traces.map((t) => t.trace_id));
@@ -647,7 +659,7 @@ export class ElasticsearchTraceService {
       });
 
       const filteredTracesByThreadId = tracesFromThreadId.filter(
-        (trace) => !existingTraceIds.has(trace.trace_id)
+        (trace) => !existingTraceIds.has(trace.trace_id),
       );
 
       traces.unshift(...filteredTracesByThreadId);
@@ -695,7 +707,7 @@ export class ElasticsearchTraceService {
    */
   private groupTraces<T extends Trace>(
     groupBy: string | undefined,
-    traces: T[]
+    traces: T[],
   ): T[][] {
     const groups: T[][] = [];
 
@@ -746,4 +758,3 @@ export class ElasticsearchTraceService {
     return groups;
   }
 }
-

@@ -8,8 +8,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import React from "react";
 import { Archive, MoreVertical, Plus } from "lucide-react";
+import React from "react";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { ProjectAvatar } from "../../components/ProjectAvatar";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
@@ -26,7 +27,6 @@ import type {
 import { api } from "../../utils/api";
 import { canAddProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -109,7 +109,9 @@ function ProjectsList({
             <React.Fragment key={team.id}>
               <Table.Header key={team.id}>
                 <Table.Row>
-                  <Table.ColumnHeader colSpan={2}>{team.name}</Table.ColumnHeader>
+                  <Table.ColumnHeader colSpan={2}>
+                    {team.name}
+                  </Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <TeamProjectsList team={team} />
@@ -164,9 +166,7 @@ export function TeamProjectsList({
             <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={teamProject.id}>
                 <ProjectAvatar name={teamProject.name} />
-                <Link href={`/${teamProject.slug}`}>
-                  {teamProject.name}
-                </Link>
+                <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
               </HStack>
             </Box>
           </Table.Cell>

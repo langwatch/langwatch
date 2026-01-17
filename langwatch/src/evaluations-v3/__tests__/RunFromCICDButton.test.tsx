@@ -7,9 +7,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { RunFromCICDButton } from "../components/RunFromCICDButton";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock the useOrganizationTeamProject hook
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -108,7 +107,7 @@ describe("RunFromCICDButton", () => {
         // Should show Python-specific content - look for the keyword token
         const codeTokens = document.querySelectorAll(".token.keyword");
         const hasImport = Array.from(codeTokens).some(
-          (el) => el.textContent === "import"
+          (el) => el.textContent === "import",
         );
         expect(hasImport).toBe(true);
       });

@@ -12,7 +12,10 @@ export interface OutputConfig {
  * Checks if a value is valid for the given type.
  * Returns true if the value can be formatted for streaming.
  */
-function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean {
+function isValidValueForType(
+  value: unknown,
+  type: LlmConfigOutputType,
+): boolean {
   if (value === undefined || value === null) {
     return false;
   }
@@ -43,7 +46,7 @@ function isValidValueForType(value: unknown, type: LlmConfigOutputType): boolean
  */
 export function formatOutputForStreaming(
   value: unknown,
-  type: LlmConfigOutputType
+  type: LlmConfigOutputType,
 ): string | undefined {
   if (value === undefined || value === null) {
     return undefined;
@@ -86,7 +89,7 @@ const DEFAULT_OUTPUT_IDENTIFIER = "output";
  */
 export function extractStreamableOutput(
   outputs: Record<string, unknown> | undefined,
-  configs: OutputConfig[] | undefined
+  configs: OutputConfig[] | undefined,
 ): string | undefined {
   if (!outputs || !configs || configs.length === 0) {
     return undefined;
@@ -109,9 +112,10 @@ export function extractStreamableOutput(
 
     // Custom identifier: wrap in JSON object with the identifier as key
     // Coerce str types to ensure consistent string representation
-    const valueToWrap = config.type === "str"
-      ? formatOutputForStreaming(rawValue, "str")
-      : rawValue;
+    const valueToWrap =
+      config.type === "str"
+        ? formatOutputForStreaming(rawValue, "str")
+        : rawValue;
     return JSON.stringify({ [config.identifier]: valueToWrap }, null, 2);
   }
 
@@ -123,9 +127,10 @@ export function extractStreamableOutput(
     const rawValue = outputs[config.identifier];
     if (isValidValueForType(rawValue, config.type)) {
       // Coerce str types to ensure consistent string representation
-      combinedOutputs[config.identifier] = config.type === "str"
-        ? formatOutputForStreaming(rawValue, "str")
-        : rawValue;
+      combinedOutputs[config.identifier] =
+        config.type === "str"
+          ? formatOutputForStreaming(rawValue, "str")
+          : rawValue;
       hasAnyOutput = true;
     }
   }

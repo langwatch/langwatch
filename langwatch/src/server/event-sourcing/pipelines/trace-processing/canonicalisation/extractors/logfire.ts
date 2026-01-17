@@ -15,15 +15,15 @@
  * - gen_ai.output.messages (from gen_ai.choice events)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import type { NormalizedEvent } from "../../schemas/spans";
+import { ATTR_KEYS } from "./_constants";
 import {
-  safeJsonParse,
   extractInputMessages,
   extractOutputMessages,
   inferSpanTypeIfAbsent,
+  safeJsonParse,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
-import type { NormalizedEvent } from "../../schemas/spans";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class LogfireExtractor implements CanonicalAttributesExtractor {
   readonly id = "logfire";

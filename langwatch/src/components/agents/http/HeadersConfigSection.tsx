@@ -8,8 +8,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Plus, X } from "lucide-react";
-import type { HttpHeader } from "~/optimization_studio/types/dsl";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { HttpHeader } from "~/optimization_studio/types/dsl";
 
 export type HeadersConfigSectionProps = {
   value: HttpHeader[];
@@ -37,7 +37,7 @@ export function HeadersConfigSection({
   const handleUpdateHeader = (
     index: number,
     field: "key" | "value",
-    newValue: string
+    newValue: string,
   ) => {
     const newHeaders = [...value];
     const header = newHeaders[index];
@@ -84,7 +84,9 @@ export function HeadersConfigSection({
             <HStack key={index} gap={2}>
               <Input
                 value={header.key}
-                onChange={(e) => handleUpdateHeader(index, "key", e.target.value)}
+                onChange={(e) =>
+                  handleUpdateHeader(index, "key", e.target.value)
+                }
                 placeholder="Header name"
                 size="sm"
                 flex={1}
@@ -93,7 +95,9 @@ export function HeadersConfigSection({
               />
               <Input
                 value={header.value}
-                onChange={(e) => handleUpdateHeader(index, "value", e.target.value)}
+                onChange={(e) =>
+                  handleUpdateHeader(index, "value", e.target.value)
+                }
                 placeholder="Header value"
                 size="sm"
                 flex={2}
@@ -101,7 +105,10 @@ export function HeadersConfigSection({
                 data-testid={`header-value-${index}`}
               />
               {!disabled && (
-                <Tooltip content="Remove header" positioning={{ placement: "top" }}>
+                <Tooltip
+                  content="Remove header"
+                  positioning={{ placement: "top" }}
+                >
                   <Button
                     size="xs"
                     variant="ghost"

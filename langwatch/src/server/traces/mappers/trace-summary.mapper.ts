@@ -1,5 +1,12 @@
 import type { TraceSummaryData } from "~/server/event-sourcing/pipelines/trace-processing/projections/traceSummaryProjection";
-import type { Span, Trace, TraceMetadata, ErrorCapture, TraceInput, TraceOutput } from "~/server/tracer/types";
+import type {
+  ErrorCapture,
+  Span,
+  Trace,
+  TraceInput,
+  TraceMetadata,
+  TraceOutput,
+} from "~/server/tracer/types";
 
 /**
  * Known attribute keys that map to reserved TraceMetadata fields.
@@ -30,12 +37,14 @@ const RESERVED_ATTRIBUTE_MAPPINGS: Record<string, keyof TraceMetadata> = {
 export function mapAttributesToMetadata(
   attributes: Record<string, string>,
   topicId: string | null,
-  subTopicId: string | null
+  subTopicId: string | null,
 ): TraceMetadata {
   const metadata: TraceMetadata = {};
 
   // Map known attributes to reserved fields
-  for (const [attrKey, metadataKey] of Object.entries(RESERVED_ATTRIBUTE_MAPPINGS)) {
+  for (const [attrKey, metadataKey] of Object.entries(
+    RESERVED_ATTRIBUTE_MAPPINGS,
+  )) {
     const value = attributes[attrKey];
     if (value !== void 0) {
       metadata[metadataKey] = value;
@@ -51,7 +60,7 @@ export function mapAttributesToMetadata(
   }
 
   // Extract labels if present
-  const labelsStr = attributes["langwatch.labels"] ?? attributes["labels"];
+  const labelsStr = attributes["langwatch.labels"] ?? attributes.labels;
   if (labelsStr) {
     try {
       const labels = JSON.parse(labelsStr);
@@ -80,8 +89,10 @@ export function mapAttributesToMetadata(
   // Add remaining attributes as custom metadata
   const knownKeys = new Set([
     ...Object.keys(RESERVED_ATTRIBUTE_MAPPINGS),
-    "langwatch.labels", "labels",
-    "langwatch.prompt_ids", "langwatch.prompt_version_ids",
+    "langwatch.labels",
+    "labels",
+    "langwatch.prompt_ids",
+    "langwatch.prompt_version_ids",
   ]);
 
   for (const [key, value] of Object.entries(attributes)) {
@@ -132,7 +143,7 @@ const OUTPUT_FIELD_NAMES = [
  */
 function extractTextFromStateObject(
   obj: Record<string, unknown>,
-  fieldNames: readonly string[]
+  fieldNames: readonly string[],
 ): string | null {
   for (const field of fieldNames) {
     const value = obj[field];
@@ -163,8 +174,9 @@ function extractMessageContent(msg: unknown): string | null {
   // Handle content array (multimodal messages)
   if (Array.isArray(obj.content)) {
     const texts = obj.content
-      .filter((p: unknown): p is Record<string, unknown> =>
-        typeof p === "object" && p !== null
+      .filter(
+        (p: unknown): p is Record<string, unknown> =>
+          typeof p === "object" && p !== null,
       )
       .map((p) => {
         if (typeof p.text === "string") return p.text;
@@ -183,7 +195,7 @@ function extractMessageContent(msg: unknown): string | null {
  * Used by DSPy, LangGraph, and other frameworks.
  */
 function isStructuredValue(
-  data: unknown
+  data: unknown,
 ): data is { type: string; value: unknown } {
   return (
     typeof data === "object" &&
@@ -204,7 +216,7 @@ function isStructuredValue(
  */
 function extractTextFromMessages(
   data: unknown,
-  mode: "input" | "output" = "input"
+  mode: "input" | "output" = "input",
 ): string | null {
   // Handle LangWatch structured value wrapper: {type: "json"|"chat_messages", value: ...}
   if (isStructuredValue(data)) {
@@ -220,8 +232,12 @@ function extractTextFromMessages(
 
     if (type === "json" && typeof value === "object" && value !== null) {
       // Extract text from state object using common field names
-      const fieldNames = mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
-      return extractTextFromStateObject(value as Record<string, unknown>, fieldNames);
+      const fieldNames =
+        mode === "input" ? INPUT_FIELD_NAMES : OUTPUT_FIELD_NAMES;
+      return extractTextFromStateObject(
+        value as Record<string, unknown>,
+        fieldNames,
+      );
     }
 
     // For other types, try to extract from the value
@@ -253,7 +269,9 @@ function extractTextFromMessages(
  * @param computedInput - The computed input string from ClickHouse
  * @returns TraceInput with extracted text value
  */
-function parseComputedInput(computedInput: string | null): TraceInput | undefined {
+function parseComputedInput(
+  computedInput: string | null,
+): TraceInput | undefined {
   if (!computedInput) {
     return void 0;
   }
@@ -281,7 +299,9 @@ function parseComputedInput(computedInput: string | null): TraceInput | undefine
  * @param computedOutput - The computed output string from ClickHouse
  * @returns TraceOutput with extracted text value
  */
-function parseComputedOutput(computedOutput: string | null): TraceOutput | undefined {
+function parseComputedOutput(
+  computedOutput: string | null,
+): TraceOutput | undefined {
   if (!computedOutput) {
     return void 0;
   }
@@ -307,7 +327,7 @@ function parseComputedOutput(computedOutput: string | null): TraceOutput | undef
  */
 function createError(
   containsErrorStatus: boolean,
-  errorMessage: string | null
+  errorMessage: string | null,
 ): ErrorCapture | null {
   if (!containsErrorStatus) {
     return null;
@@ -327,12 +347,12 @@ function createError(
 export function mapTraceSummaryToTrace(
   summary: TraceSummaryData,
   spans: Span[],
-  projectId: string
+  projectId: string,
 ): Trace {
   const metadata = mapAttributesToMetadata(
     summary.Attributes,
     summary.TopicId,
-    summary.SubTopicId
+    summary.SubTopicId,
   );
 
   const trace: Trace = {

@@ -47,7 +47,8 @@ export const computeMessageEdgeUpdate = ({
   // Calculate the adjusted index for non-system messages
   // The form has [system, user, assistant, ...] but node messages has [user, assistant, ...]
   const systemIndex = formMessages.findIndex((m) => m.role === "system");
-  const adjustedIndex = systemIndex >= 0 && formIndex > systemIndex ? formIndex - 1 : formIndex;
+  const adjustedIndex =
+    systemIndex >= 0 && formIndex > systemIndex ? formIndex - 1 : formIndex;
 
   const messagesParam = nodeParameters.find(
     (param) => param.identifier === "messages",
@@ -69,4 +70,3 @@ export const computeMessageEdgeUpdate = ({
     ),
   };
 };
-

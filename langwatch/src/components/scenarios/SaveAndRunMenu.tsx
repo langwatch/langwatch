@@ -47,7 +47,7 @@ export function SaveAndRunMenu({
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
       (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
     if (!searchValue) return sorted;
     return sorted.filter((p) =>
@@ -152,12 +152,7 @@ export function SaveAndRunMenu({
                 Run against HTTP Agent
               </Text>
               {filteredAgents.length === 0 ? (
-                <Text
-                  fontSize="sm"
-                  color="gray.400"
-                  paddingX={3}
-                  paddingY={2}
-                >
+                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
                   {searchValue ? "No agents found" : "No agents available"}
                 </Text>
               ) : (
@@ -219,12 +214,7 @@ export function SaveAndRunMenu({
                 Run against Prompt
               </Text>
               {filteredPrompts.length === 0 ? (
-                <Text
-                  fontSize="sm"
-                  color="gray.400"
-                  paddingX={3}
-                  paddingY={2}
-                >
+                <Text fontSize="sm" color="gray.400" paddingX={3} paddingY={2}>
                   {searchValue ? "No prompts found" : "No prompts available"}
                 </Text>
               ) : (
@@ -245,10 +235,7 @@ export function SaveAndRunMenu({
                       handleSelectAndRun({ type: "prompt", id: prompt.id })
                     }
                   >
-                    <BookText
-                      size={14}
-                      color="var(--chakra-colors-gray-500)"
-                    />
+                    <BookText size={14} color="var(--chakra-colors-gray-500)" />
                     <Text fontSize="sm" flex={1}>
                       {prompt.handle ?? prompt.id}
                     </Text>

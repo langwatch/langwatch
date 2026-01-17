@@ -2,18 +2,19 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, afterEach } from "vitest";
-
-import { EvaluatorChip } from "../EvaluatorChip";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EvaluatorConfig } from "../../../types";
+import { EvaluatorChip } from "../EvaluatorChip";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-const createEvaluator = (overrides: Partial<EvaluatorConfig> = {}): EvaluatorConfig => ({
+const createEvaluator = (
+  overrides: Partial<EvaluatorConfig> = {},
+): EvaluatorConfig => ({
   id: "eval-1",
   name: "Exact Match",
   evaluatorType: "langevals/exact_match",
@@ -39,7 +40,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show the evaluator name
@@ -59,7 +60,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show spinner (running state)
@@ -77,7 +78,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should NOT show spinner - execution has stopped
@@ -93,7 +94,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show spinner
@@ -109,7 +110,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show score, no spinner
@@ -126,7 +127,7 @@ describe("EvaluatorChip", () => {
           onEdit={vi.fn()}
           onRemove={vi.fn()}
         />,
-        { wrapper: Wrapper }
+        { wrapper: Wrapper },
       );
 
       // Should show the evaluator name and no spinner

@@ -30,12 +30,12 @@ import { TeamProjectsList } from "../../pages/settings/projects";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
+import { PageLayout } from "../ui/layouts/PageLayout";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,
   teamRolesOptions,
 } from "./TeamUserRoleField";
-import { PageLayout } from "../ui/layouts/PageLayout";
 
 export type TeamFormData = {
   name: string;
@@ -113,7 +113,9 @@ export const TeamForm = ({
           <Spacer />
           {team && (
             <Link href={`/settings/members`} asChild>
-              <Button variant="outline" size="sm">Manage organization members</Button>
+              <Button variant="outline" size="sm">
+                Manage organization members
+              </Button>
             </Link>
           )}
         </HStack>
@@ -281,7 +283,11 @@ function TeamFormProjects({
     <HStack width="full" marginTop={2}>
       <Heading>Projects</Heading>
       <Spacer />
-      <Button variant="outline" size="sm" onClick={() => openDrawer("createProject", { defaultTeamId: team.id })}>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => openDrawer("createProject", { defaultTeamId: team.id })}
+      >
         <Plus size={20} />
         Add new project
       </Button>

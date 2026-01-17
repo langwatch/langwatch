@@ -1,9 +1,4 @@
 import type { NormalizedAttributes, NormalizedEvent } from "../schemas/spans";
-import { SpanDataBag } from "./spanDataBag";
-import type {
-  CanonicalAttributesExtractor,
-  ExtractorContext,
-} from "./extractors/_types";
 import {
   FallbackExtractor,
   GenAIExtractor,
@@ -17,6 +12,11 @@ import {
   TraceloopExtractor,
   VercelExtractor,
 } from "./extractors";
+import type {
+  CanonicalAttributesExtractor,
+  ExtractorContext,
+} from "./extractors/_types";
+import { SpanDataBag } from "./spanDataBag";
 import { toAttrValue } from "./utils";
 
 export type CanonicalizeResult = {

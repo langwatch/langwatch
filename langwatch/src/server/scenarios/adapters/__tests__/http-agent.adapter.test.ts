@@ -1,9 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { HttpAgentAdapter } from "../http-agent.adapter";
-import type { AgentRepository, TypedAgent } from "../../../agents/agent.repository";
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
-import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
 import { Response } from "undici";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { HttpComponentConfig } from "~/optimization_studio/types/dsl";
+import type {
+  AgentRepository,
+  TypedAgent,
+} from "../../../agents/agent.repository";
+import { HttpAgentAdapter } from "../http-agent.adapter";
 
 const createAgentInput = (
   messages: Array<{ role: string; content: string }>,
@@ -20,9 +23,7 @@ const createAgentInput = (
     ...overrides,
   }) as AgentInput;
 
-const createMockAgentRepository = (
-  agent: TypedAgent | null = null,
-) =>
+const createMockAgentRepository = (agent: TypedAgent | null = null) =>
   ({
     findById: vi.fn().mockResolvedValue(agent),
   }) as unknown as AgentRepository;
@@ -56,7 +57,11 @@ describe("HttpAgentAdapter", () => {
   describe("when agent is not found", () => {
     it("throws an error", async () => {
       const repository = createMockAgentRepository(null);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await expect(adapter.call(createAgentInput([]))).rejects.toThrow(
         "HTTP agent agent-123 not found",
@@ -71,7 +76,11 @@ describe("HttpAgentAdapter", () => {
         type: "signature",
       } as TypedAgent;
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await expect(adapter.call(createAgentInput([]))).rejects.toThrow(
         "Agent agent-123 is not an HTTP agent (type: signature)",
@@ -93,13 +102,19 @@ describe("HttpAgentAdapter", () => {
         auth: { type: "bearer", token: "my-secret-token" },
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
-      expect(headers?.["Authorization"]).toBe("Bearer my-secret-token");
+      expect(headers?.Authorization).toBe("Bearer my-secret-token");
     });
 
     it("adds custom header when auth type is api_key", async () => {
@@ -115,9 +130,15 @@ describe("HttpAgentAdapter", () => {
         auth: { type: "api_key", header: "X-API-Key", value: "my-api-key" },
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -137,14 +158,20 @@ describe("HttpAgentAdapter", () => {
         auth: { type: "basic", username: "user", password: "pass" },
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
       const expectedAuth = `Basic ${Buffer.from("user:pass").toString("base64")}`;
-      expect(headers?.["Authorization"]).toBe(expectedAuth);
+      expect(headers?.Authorization).toBe(expectedAuth);
     });
 
     it("adds no auth header when auth type is none", async () => {
@@ -160,13 +187,19 @@ describe("HttpAgentAdapter", () => {
         auth: { type: "none" },
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
-      expect(headers?.["Authorization"]).toBeUndefined();
+      expect(headers?.Authorization).toBeUndefined();
     });
   });
 
@@ -184,7 +217,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"messages": {{messages}}}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const messages = [{ role: "user", content: "Hello" }];
       await adapter.call(createAgentInput(messages));
@@ -207,7 +244,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"thread": "{{threadId}}"}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }], {
@@ -233,7 +274,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"input": "{{input}}"}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await adapter.call(
         createAgentInput([
@@ -261,12 +306,19 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"input": "{{input}}"}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await adapter.call(
         createAgentInput([
           { role: "user", content: "User question" },
-          { role: "assistant", content: "This is the last message but not user" },
+          {
+            role: "assistant",
+            content: "This is the last message but not user",
+          },
         ]),
       );
 
@@ -288,7 +340,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"input": "{{input}}"}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await adapter.call(createAgentInput([]));
 
@@ -310,7 +366,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"input": "{{input}}"}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await adapter.call(
         createAgentInput([
@@ -337,7 +397,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: '{"input": {{input}}}',
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const structuredContent = [{ type: "text", text: "Hello world" }];
       await adapter.call(
@@ -364,7 +428,11 @@ describe("HttpAgentAdapter", () => {
         bodyTemplate: undefined,
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const messages = [{ role: "user", content: "Hello" }];
       await adapter.call(createAgentInput(messages));
@@ -392,7 +460,11 @@ describe("HttpAgentAdapter", () => {
         outputPath: "$.choices[0].message.content",
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const result = await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
@@ -415,7 +487,11 @@ describe("HttpAgentAdapter", () => {
         outputPath: "$.nonexistent.path",
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const result = await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
@@ -438,7 +514,11 @@ describe("HttpAgentAdapter", () => {
         outputPath: "",
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const result = await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
@@ -458,7 +538,11 @@ describe("HttpAgentAdapter", () => {
 
       const agent = createHttpAgent();
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       const result = await adapter.call(
         createAgentInput([{ role: "user", content: "Hello" }]),
@@ -481,7 +565,11 @@ describe("HttpAgentAdapter", () => {
 
       const agent = createHttpAgent();
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
       await expect(
         adapter.call(createAgentInput([{ role: "user", content: "Hello" }])),
@@ -506,9 +594,15 @@ describe("HttpAgentAdapter", () => {
         ],
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;
@@ -529,9 +623,15 @@ describe("HttpAgentAdapter", () => {
         headers: [{ key: "  X-Trimmed  ", value: "value" }],
       });
       const repository = createMockAgentRepository(agent);
-      const adapter = new HttpAgentAdapter({ agentId: "agent-123", projectId: "project-123", agentRepository: repository });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: repository,
+      });
 
-      await adapter.call(createAgentInput([{ role: "user", content: "Hello" }]));
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }]),
+      );
 
       const callArgs = mockFetch.mock.calls[0];
       const headers = callArgs?.[1]?.headers as Record<string, string>;

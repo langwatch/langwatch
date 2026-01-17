@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { ScenarioService } from "~/server/scenarios/scenario.service";
 import { checkProjectPermission } from "../../rbac";
 import { projectSchema } from "./schemas";
 
@@ -50,7 +50,10 @@ export const scenarioCrudRouter = createTRPCRouter({
       const service = ScenarioService.create(ctx.prisma);
       const scenario = await service.getById(input);
       if (!scenario) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Scenario not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Scenario not found",
+        });
       }
       return scenario;
     }),
@@ -67,6 +70,3 @@ export const scenarioCrudRouter = createTRPCRouter({
       });
     }),
 });
-
-
-

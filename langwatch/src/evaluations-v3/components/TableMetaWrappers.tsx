@@ -5,9 +5,9 @@
 import { Checkbox } from "@chakra-ui/react";
 import type { HeaderContext } from "@tanstack/react-table";
 
-import type { TableRowData, TableMeta } from "../types";
-import { TargetHeader } from "./TargetSection/TargetHeader";
+import type { TableMeta, TableRowData } from "../types";
 import { TargetCellContent } from "./TargetSection/TargetCell";
+import { TargetHeader } from "./TargetSection/TargetHeader";
 
 /**
  * Checkbox header that reads selection state from table meta.
@@ -82,7 +82,8 @@ export const TargetHeaderFromMeta = ({
 
   // Check if THIS specific target has any cells being executed
   // Only show running state if there are cells for this target in executingCells
-  const isThisTargetRunning = meta?.isExecutionRunning && meta?.isTargetExecuting?.(targetId);
+  const isThisTargetRunning =
+    meta?.isExecutionRunning && meta?.isTargetExecuting?.(targetId);
 
   return (
     <TargetHeader
@@ -90,7 +91,11 @@ export const TargetHeaderFromMeta = ({
       onEdit={meta?.openTargetEditor}
       onDuplicate={meta?.handleDuplicateTarget}
       onRemove={meta?.handleRemoveTarget}
-      onRun={meta?.handleRunTarget ? () => meta.handleRunTarget?.(targetId) : undefined}
+      onRun={
+        meta?.handleRunTarget
+          ? () => meta.handleRunTarget?.(targetId)
+          : undefined
+      }
       onStop={meta?.handleStopExecution}
       isRunning={isThisTargetRunning}
     />
@@ -107,14 +112,16 @@ export const TargetCellFromMeta = ({
   tableMeta,
 }: {
   targetId: string;
-  data: {
-    output: unknown;
-    evaluators: Record<string, unknown>;
-    error?: string | null;
-    isLoading?: boolean;
-    traceId?: string | null;
-    duration?: number | null;
-  } | undefined;
+  data:
+    | {
+        output: unknown;
+        evaluators: Record<string, unknown>;
+        error?: string | null;
+        isLoading?: boolean;
+        traceId?: string | null;
+        duration?: number | null;
+      }
+    | undefined;
   rowIndex: number;
   tableMeta: TableMeta | undefined;
 }) => {
@@ -134,7 +141,11 @@ export const TargetCellFromMeta = ({
       isExecutionRunning={tableMeta?.isExecutionRunning}
       row={rowIndex}
       onAddEvaluator={tableMeta?.handleAddEvaluator}
-      onRunCell={tableMeta?.handleRunCell ? () => tableMeta.handleRunCell?.(rowIndex, targetId) : undefined}
+      onRunCell={
+        tableMeta?.handleRunCell
+          ? () => tableMeta.handleRunCell?.(rowIndex, targetId)
+          : undefined
+      }
       onStopCell={tableMeta?.handleStopExecution}
     />
   );

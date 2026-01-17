@@ -123,7 +123,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
   const drawerParams = useDrawerParams();
-  const flowCallbacks = getFlowCallbacks("agentHttpEditor");
+  const _flowCallbacks = getFlowCallbacks("agentHttpEditor");
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
@@ -137,7 +137,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const isOpen = props.open !== false && props.open !== undefined;
 
   // Props from drawer params or direct props (for Evaluations V3)
-  const availableSources =
+  const _availableSources =
     props.availableSources ??
     (complexProps.availableSources as AvailableSource[] | undefined);
 

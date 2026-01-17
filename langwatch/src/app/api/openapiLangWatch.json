@@ -6175,7 +6175,13 @@
 										},
 										"status": {
 											"type": "string",
-											"enum": ["pending", "running", "completed", "failed", "stopped"]
+											"enum": [
+												"pending",
+												"running",
+												"completed",
+												"failed",
+												"stopped"
+											]
 										},
 										"progress": {
 											"type": "integer",

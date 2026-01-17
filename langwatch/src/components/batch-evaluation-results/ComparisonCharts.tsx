@@ -5,20 +5,21 @@
  * Each evaluator gets its own chart (score or pass rate).
  * Supports different X-axis groupings (by run, target, model, prompt, custom metadata).
  */
-import { useMemo, useState, useEffect, useRef } from "react";
+
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  BarChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
 } from "recharts";
 
-import type { ComparisonRunData, BatchEvaluationData } from "./types";
+import type { BatchEvaluationData, ComparisonRunData } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
 /** Metric types that can be displayed */
@@ -101,11 +102,6 @@ type ComparisonChartsProps = {
   onXAxisOptionChange?: (option: XAxisOption) => void;
   /** Callback to provide target color map when X-axis is "target" */
   onTargetColorsChange?: (colors: Record<string, string>) => void;
-};
-
-type ChartDataPoint = {
-  name: string;
-  [key: string]: string | number | undefined;
 };
 
 type EvaluatorMetrics = {
@@ -305,7 +301,7 @@ export const ComparisonCharts = ({
 
   const [internalVisible, setInternalVisible] = useState(shouldShowByDefault);
   const isVisible = controlledVisible ?? internalVisible;
-  const setIsVisible = (visible: boolean) => {
+  const _setIsVisible = (visible: boolean) => {
     if (onVisibilityChange) {
       onVisibilityChange(visible);
     } else {
@@ -531,20 +527,23 @@ export const ComparisonCharts = ({
     >();
 
     // Helper to get the grouping key from a target
-    const getGroupKey = (targetCol: (typeof runMetrics)[0]["targetColumns"][0]): string | undefined => {
+    const getGroupKey = (
+      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
+    ): string | undefined => {
       // Check top-level model property first
       if (xAxisOption === "model") {
         if (targetCol.model) return targetCol.model;
         if (targetCol.metadata?.model) return String(targetCol.metadata.model);
         return undefined;
       }
-      
+
       // For prompt, combine promptId and version
       if (xAxisOption === "prompt") {
         if (!targetCol.promptId) {
           // Check metadata for prompt_id
           if (targetCol.metadata?.prompt_id) {
-            const version = targetCol.promptVersion ?? targetCol.metadata?.version;
+            const version =
+              targetCol.promptVersion ?? targetCol.metadata?.version;
             return version !== undefined && version !== null
               ? `${targetCol.metadata.prompt_id}::v${version}`
               : String(targetCol.metadata.prompt_id);
@@ -556,22 +555,28 @@ export const ComparisonCharts = ({
           ? `${targetCol.promptId}::v${version}`
           : targetCol.promptId;
       }
-      
+
       // For custom metadata keys
       if (targetCol.metadata?.[xAxisOption] !== undefined) {
         return String(targetCol.metadata[xAxisOption]);
       }
-      
+
       return undefined;
     };
 
     // Helper to get display name for a group key
-    const getDisplayName = (key: string, targetCol: (typeof runMetrics)[0]["targetColumns"][0]): string => {
+    const getDisplayName = (
+      key: string,
+      targetCol: (typeof runMetrics)[0]["targetColumns"][0],
+    ): string => {
       if (xAxisOption === "prompt") {
         // Key is in format "promptId::vN" or just "promptId"
         const [promptId, versionPart] = key.split("::");
-        const resolvedPromptName = promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
-        return versionPart ? `${resolvedPromptName} (${versionPart})` : resolvedPromptName;
+        const resolvedPromptName =
+          promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
+        return versionPart
+          ? `${resolvedPromptName} (${versionPart})`
+          : resolvedPromptName;
       }
       return key;
     };
@@ -615,7 +620,9 @@ export const ComparisonCharts = ({
     return Array.from(propertyGroups.entries()).map(([_key, data]) => ({
       name: data.displayName,
       cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
-      latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
+      latency:
+        data.latencies.reduce((a, b) => a + b, 0) /
+        (data.latencies.length || 1),
       ...Object.fromEntries(
         Object.entries(data.scores).map(([k, v]) => [
           `score_${k}`,
@@ -785,7 +792,13 @@ export const ComparisonCharts = ({
 
   return (
     isVisible && (
-      <VStack width="100%" align="stretch" gap={4} marginBottom={4} flexShrink={0}>
+      <VStack
+        width="100%"
+        align="stretch"
+        gap={4}
+        marginBottom={4}
+        flexShrink={0}
+      >
         <VStack width="100%" align="stretch" gap={2}>
           {/* Controls row: Group by selector + Metrics selector */}
           <HStack wrap="wrap" gap={2} paddingX={2}>

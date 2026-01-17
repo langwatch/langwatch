@@ -16,15 +16,15 @@ import {
   it,
   vi,
 } from "vitest";
-import { prisma } from "~/server/db";
-import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
-import { getTestProject } from "~/utils/testUtils";
 import {
   ScenarioEventType,
   ScenarioRunStatus,
   Verdict,
 } from "~/app/api/scenario-events/[[...route]]/enums";
 import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
+import { prisma } from "~/server/db";
+import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
+import { getTestProject } from "~/utils/testUtils";
 
 // Mock the logger to avoid console noise in tests
 vi.mock("~/utils/logger", () => ({
@@ -317,13 +317,17 @@ describe("ScenarioEventService Integration Tests", () => {
       expect(runs).toHaveLength(2);
 
       // Find run with messages
-      const runWithMessages = runs.find((r) => r.scenarioRunId === ids1.scenarioRunId);
+      const runWithMessages = runs.find(
+        (r) => r.scenarioRunId === ids1.scenarioRunId,
+      );
       expect(runWithMessages).toBeDefined();
       expect(runWithMessages!.timestamp).toBe(timestamp1Message);
       expect(runWithMessages!.messages).toHaveLength(1);
 
       // Find run without messages
-      const runWithoutMessages = runs.find((r) => r.scenarioRunId === ids2.scenarioRunId);
+      const runWithoutMessages = runs.find(
+        (r) => r.scenarioRunId === ids2.scenarioRunId,
+      );
       expect(runWithoutMessages).toBeDefined();
       expect(runWithoutMessages!.timestamp).toBe(timestamp2Start);
       expect(runWithoutMessages!.messages).toEqual([]);
@@ -485,13 +489,15 @@ describe("ScenarioEventService Integration Tests", () => {
       expect(result.runs).toHaveLength(3);
 
       // All three runs should be present and have proper timestamps for sorting
-      const runTimestamps = result.runs.map((r) => ({
+      const _runTimestamps = result.runs.map((r) => ({
         name: r.name,
         timestamp: r.timestamp,
       }));
 
       // Verify Run 2 (no messages) has timestamp from RUN_STARTED, not 0
-      const run2Data = result.runs.find((r) => r.scenarioRunId === run2.scenarioRunId);
+      const run2Data = result.runs.find(
+        (r) => r.scenarioRunId === run2.scenarioRunId,
+      );
       expect(run2Data).toBeDefined();
       expect(run2Data!.timestamp).toBe(timestamp2);
       expect(run2Data!.timestamp).not.toBe(0);

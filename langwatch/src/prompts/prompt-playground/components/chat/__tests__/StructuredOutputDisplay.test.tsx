@@ -1,9 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import type { ReactElement } from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock the RenderInputOutput component which uses dynamic imports
@@ -25,7 +26,10 @@ afterEach(() => {
 describe("tryParseJson", () => {
   it.each([
     ['{"score": 10}', { score: 10 }],
-    ['{"complete_name": "Sergio", "score": 10}', { complete_name: "Sergio", score: 10 }],
+    [
+      '{"complete_name": "Sergio", "score": 10}',
+      { complete_name: "Sergio", score: 10 },
+    ],
     ['{"data": {"inner": "value"}}', { data: { inner: "value" } }],
     ['{"passed": true}', { passed: true }],
     ['{"value": null}', { value: null }],
@@ -57,7 +61,7 @@ describe("StructuredOutputDisplay", () => {
     renderWithChakra(
       <StructuredOutputDisplay content='{"score": 10}' isStreaming={true}>
         {fallback}
-      </StructuredOutputDisplay>
+      </StructuredOutputDisplay>,
     );
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
   });
@@ -66,7 +70,7 @@ describe("StructuredOutputDisplay", () => {
     renderWithChakra(
       <StructuredOutputDisplay content='{"score": 10}' isStreaming={false}>
         {fallback}
-      </StructuredOutputDisplay>
+      </StructuredOutputDisplay>,
     );
     expect(screen.getByTestId("json-tree-view")).toBeInTheDocument();
   });
@@ -75,7 +79,7 @@ describe("StructuredOutputDisplay", () => {
     renderWithChakra(
       <StructuredOutputDisplay content="plain text" isStreaming={false}>
         {fallback}
-      </StructuredOutputDisplay>
+      </StructuredOutputDisplay>,
     );
     expect(screen.getByTestId("fallback")).toBeInTheDocument();
   });

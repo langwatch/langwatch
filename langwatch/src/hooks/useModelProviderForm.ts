@@ -9,13 +9,13 @@ import {
 } from "../server/modelProviders/registry";
 import { api } from "../utils/api";
 import {
-  getEffectiveDefaults,
-  isProviderDefaultModel,
-  getSchemaShape,
-  getDisplayKeysForProvider,
   buildCustomKeyState,
   filterMaskedApiKeys,
+  getDisplayKeysForProvider,
+  getEffectiveDefaults,
+  getSchemaShape,
   hasUserModifiedNonApiKeyFields,
+  isProviderDefaultModel,
 } from "../utils/modelProviderHelpers";
 
 type SelectOption = { value: string; label: string };
@@ -25,11 +25,14 @@ export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
-  project: {
-    defaultModel?: string | null;
-    topicClusteringModel?: string | null;
-    embeddingsModel?: string | null;
-  } | null | undefined;
+  project:
+    | {
+        defaultModel?: string | null;
+        topicClusteringModel?: string | null;
+        embeddingsModel?: string | null;
+      }
+    | null
+    | undefined;
   isUsingEnvVars?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
@@ -77,18 +80,19 @@ export type UseModelProviderFormActions = {
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const {
-    provider,
-    projectId,
-    project,
-    isUsingEnvVars,
-    onSuccess,
-    onError,
-  } = params;
+  const { provider, projectId, project, isUsingEnvVars, onSuccess, onError } =
+    params;
 
   // Compute effective defaults using unified helper
-  const effectiveDefaults = useMemo(() => getEffectiveDefaults(project), [project]);
-  const { defaultModel: initialProjectDefaultModel, topicClusteringModel: initialProjectTopicClusteringModel, embeddingsModel: initialProjectEmbeddingsModel } = effectiveDefaults;
+  const effectiveDefaults = useMemo(
+    () => getEffectiveDefaults(project),
+    [project],
+  );
+  const {
+    defaultModel: initialProjectDefaultModel,
+    topicClusteringModel: initialProjectTopicClusteringModel,
+    embeddingsModel: initialProjectEmbeddingsModel,
+  } = effectiveDefaults;
 
   const utils = api.useContext();
   const updateMutation = api.modelProvider.update.useMutation();
@@ -130,9 +134,14 @@ export function useModelProviderForm(
   }, [provider.provider, useApiGateway, originalSchemaShape]);
 
   const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
-    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}, undefined, {
-      providerEnabledWithEnvVars: provider.enabled,
-    }),
+    buildCustomKeyState(
+      displayKeys,
+      originalStoredKeysRef.current ?? {},
+      undefined,
+      {
+        providerEnabledWithEnvVars: provider.enabled,
+      },
+    ),
   );
 
   const [extraHeaders, setExtraHeaders] = useState<ExtraHeader[]>(
@@ -172,15 +181,17 @@ export function useModelProviderForm(
   );
 
   // Auto-enable toggle if this provider is used for the Default Model (matching badge logic)
-  const [useAsDefaultProvider, setUseAsDefaultProvider] =
-    useState<boolean>(() => isProviderDefaultModel(provider.provider, project));
+  const [useAsDefaultProvider, setUseAsDefaultProvider] = useState<boolean>(
+    () => isProviderDefaultModel(provider.provider, project),
+  );
   const [projectDefaultModel, setProjectDefaultModel] = useState<string | null>(
     initialProjectDefaultModel,
   );
   const [projectTopicClusteringModel, setProjectTopicClusteringModel] =
     useState<string | null>(initialProjectTopicClusteringModel);
-  const [projectEmbeddingsModel, setProjectEmbeddingsModel] =
-    useState<string | null>(initialProjectEmbeddingsModel);
+  const [projectEmbeddingsModel, setProjectEmbeddingsModel] = useState<
+    string | null
+  >(initialProjectEmbeddingsModel);
 
   const [isSaving, setIsSaving] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
@@ -210,9 +221,11 @@ export function useModelProviderForm(
       originalSchemaShape,
     );
 
-    setCustomKeys(() => buildCustomKeyState(nextDisplayKeys, storedKeys, undefined, {
-      providerEnabledWithEnvVars: provider.enabled,
-    }));
+    setCustomKeys(() =>
+      buildCustomKeyState(nextDisplayKeys, storedKeys, undefined, {
+        providerEnabledWithEnvVars: provider.enabled,
+      }),
+    );
 
     let nextExtraHeaders = (provider.extraHeaders ?? []).map((header) => ({
       key: header.key,
@@ -247,9 +260,12 @@ export function useModelProviderForm(
     );
 
     // Auto-enable the toggle if this provider is used for the Default Model (matching badge logic)
-    const isUsedForDefaultModel = isProviderDefaultModel(provider.provider, project);
+    const isUsedForDefaultModel = isProviderDefaultModel(
+      provider.provider,
+      project,
+    );
     setUseAsDefaultProvider(isUsedForDefaultModel);
-    
+
     setProjectDefaultModel(initialProjectDefaultModel);
     setProjectTopicClusteringModel(initialProjectTopicClusteringModel);
     setProjectEmbeddingsModel(initialProjectEmbeddingsModel);
@@ -281,16 +297,16 @@ export function useModelProviderForm(
           customEmbeddingsModels: provider.embeddingsModels ?? [],
         });
         onSuccess?.();
-    } catch (err) {
-      onError?.(err);
-      toaster.create({
-        title: "Failed to update provider",
-        description: err instanceof Error ? err.message : String(err),
-        type: "error",
-        duration: 4000,
-        meta: { closable: true },
-      });
-    }
+      } catch (err) {
+        onError?.(err);
+        toaster.create({
+          title: "Failed to update provider",
+          description: err instanceof Error ? err.message : String(err),
+          type: "error",
+          duration: 4000,
+          meta: { closable: true },
+        });
+      }
     },
     [
       onSuccess,
@@ -398,10 +414,12 @@ export function useModelProviderForm(
     setErrors({});
     try {
       // Check if user modified non-API-key fields (like URLs) when using env vars
-      const hasNonApiKeyChanges = isUsingEnvVars && hasUserModifiedNonApiKeyFields(
-        customKeys,
-        originalStoredKeysRef.current
-      );
+      const hasNonApiKeyChanges =
+        isUsingEnvVars &&
+        hasUserModifiedNonApiKeyFields(
+          customKeys,
+          originalStoredKeysRef.current,
+        );
 
       // Validate if not using env vars, OR if using env vars but has non-API-key changes
       if (!isUsingEnvVars || hasNonApiKeyChanges) {

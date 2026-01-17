@@ -8,20 +8,20 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
 import {
-  LuCircleAlert,
   LuChevronDown,
+  LuCircleAlert,
+  LuCircleX,
   LuPencil,
   LuTrash2,
-  LuCircleX,
 } from "react-icons/lu";
-import { keyframes } from "@emotion/react";
 
 import { Menu } from "~/components/ui/menu";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import type { EvaluatorConfig } from "../../types";
 
@@ -76,9 +76,7 @@ export function EvaluatorChip({
 
     // Show error icon for error status
     if (status === "error") {
-      return (
-        <Icon as={LuCircleX} color={statusColor} boxSize="12px" />
-      );
+      return <Icon as={LuCircleX} color={statusColor} boxSize="12px" />;
     }
 
     if (score !== undefined) {
@@ -90,12 +88,7 @@ export function EvaluatorChip({
     }
     if (label) {
       return (
-        <Text
-          fontSize="10px"
-          fontWeight="medium"
-          maxWidth="60px"
-          truncate
-        >
+        <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
           {label}
         </Text>
       );
@@ -172,10 +165,7 @@ export function EvaluatorChip({
                     <Text fontSize="12px" color="gray.600">
                       Score:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {score.toFixed(2)}
                     </Text>
                   </HStack>
@@ -185,10 +175,7 @@ export function EvaluatorChip({
                     <Text fontSize="12px" color="gray.600">
                       Label:
                     </Text>
-                    <Text
-                      fontSize="12px"
-                      fontWeight="semibold"
-                    >
+                    <Text fontSize="12px" fontWeight="semibold">
                       {label}
                     </Text>
                   </HStack>

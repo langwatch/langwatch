@@ -1,6 +1,6 @@
 import type { ZodSchema, z } from "zod";
-import type { CommandType } from "../domain/commandType";
 import { createLogger } from "~/utils/logger";
+import type { CommandType } from "../domain/commandType";
 
 const logger = createLogger("langwatch:event-sourcing:command-schema");
 

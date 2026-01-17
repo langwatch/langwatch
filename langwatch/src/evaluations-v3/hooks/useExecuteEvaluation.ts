@@ -1,19 +1,31 @@
-import { useState, useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "~/components/ui/toaster";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
-import type { EvaluationV3Event, ExecutionScope, ExecutionRequest } from "~/server/evaluations-v3/execution/types";
-import type { EvaluationResults } from "../types";
-import { computeExecutionCells, createExecutionCellSet } from "../utils/executionScope";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import type {
+  EvaluationV3Event,
+  ExecutionRequest,
+  ExecutionScope,
+} from "~/server/evaluations-v3/execution/types";
+import { fetchSSE } from "~/utils/sse/fetchSSE";
+import type { EvaluationResults } from "../types";
+import {
+  computeExecutionCells,
+  createExecutionCellSet,
+} from "../utils/executionScope";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type ExecutionStatus = "idle" | "running" | "stopped" | "completed" | "error";
+export type ExecutionStatus =
+  | "idle"
+  | "running"
+  | "stopped"
+  | "completed"
+  | "error";
 
 export type UseExecuteEvaluationReturn = {
   /** Current execution status */
@@ -62,7 +74,6 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     activeDatasetId,
     targets,
     evaluators,
-    results,
     setResults,
     clearResults,
   } = useEvaluationsV3Store(
@@ -74,14 +85,14 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       activeDatasetId: state.activeDatasetId,
       targets: state.targets,
       evaluators: state.evaluators,
-      results: state.results,
       setResults: state.setResults,
       clearResults: state.clearResults,
-    }))
+    })),
   );
 
   // Find active dataset
-  const activeDataset = datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
+  const activeDataset =
+    datasets.find((d) => d.id === activeDatasetId) ?? datasets[0];
 
   /**
    * Helper to update target output in the store.
@@ -92,7 +103,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       rowIndex: number,
       targetId: string,
       output: unknown,
-      metadata?: { cost?: number; duration?: number; traceId?: string }
+      metadata?: { cost?: number; duration?: number; traceId?: string },
     ) => {
       // Use the store's setState directly for atomic updates
       useEvaluationsV3Store.setState((state) => {
@@ -142,7 +153,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         };
       });
     },
-    []
+    [],
   );
 
   /**
@@ -182,16 +193,22 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         };
       });
     },
-    []
+    [],
   );
 
   /**
    * Helper to update evaluator result in the store.
    */
   const updateEvaluatorResult = useCallback(
-    (rowIndex: number, targetId: string, evaluatorId: string, result: unknown) => {
+    (
+      rowIndex: number,
+      targetId: string,
+      evaluatorId: string,
+      result: unknown,
+    ) => {
       useEvaluationsV3Store.setState((state) => {
-        const existingTargetResults = state.results.evaluatorResults[targetId] ?? {};
+        const existingTargetResults =
+          state.results.evaluatorResults[targetId] ?? {};
         const existingEvalResults = existingTargetResults[evaluatorId] ?? [];
         const newEvalResults = [...existingEvalResults];
         newEvalResults[rowIndex] = result;
@@ -210,7 +227,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         };
       });
     },
-    []
+    [],
   );
 
   /**
@@ -254,7 +271,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             event.rowIndex,
             event.targetId,
             event.evaluatorId,
-            event.result
+            event.result,
           );
           break;
 
@@ -270,12 +287,17 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           if (event.rowIndex !== undefined && event.targetId) {
             if (event.evaluatorId) {
               // Evaluator error
-              updateEvaluatorResult(event.rowIndex, event.targetId, event.evaluatorId, {
-                status: "error",
-                error_type: "EvaluatorError",
-                details: event.message,
-                traceback: [],
-              });
+              updateEvaluatorResult(
+                event.rowIndex,
+                event.targetId,
+                event.evaluatorId,
+                {
+                  status: "error",
+                  error_type: "EvaluatorError",
+                  details: event.message,
+                  traceback: [],
+                },
+              );
             } else {
               // Target error
               updateTargetError(event.rowIndex, event.targetId, event.message);
@@ -307,12 +329,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           break;
       }
     },
-    [
-      setResults,
-      updateTargetOutput,
-      updateTargetError,
-      updateEvaluatorResult,
-    ]
+    [setResults, updateTargetOutput, updateTargetError, updateEvaluatorResult],
   );
 
   /**
@@ -337,7 +354,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       // Compute which cells will be executed (single source of truth)
       const datasetRows = activeDataset.inline?.records
         ? transposeColumnsFirstToRowsFirstWithId(activeDataset.inline.records)
-        : activeDataset.savedRecords ?? [];
+        : (activeDataset.savedRecords ?? []);
 
       const executionCells = computeExecutionCells({
         scope,
@@ -436,8 +453,8 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           // Remove only the cells from THIS execution
           const remainingCells = new Set(
             [...state.results.executingCells].filter(
-              (cellKey) => !executingCellsSet.has(cellKey)
-            )
+              (cellKey) => !executingCellsSet.has(cellKey),
+            ),
           );
 
           // If no cells remain, set to undefined and status to idle/success
@@ -495,7 +512,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       evaluators,
       handleEvent,
       setResults,
-    ]
+    ],
   );
 
   /**

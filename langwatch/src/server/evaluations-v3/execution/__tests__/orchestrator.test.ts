@@ -1,15 +1,23 @@
-import { describe, it, expect } from "vitest";
-import { generateCells } from "../orchestrator";
+import { describe, expect, it } from "vitest";
 import type { EvaluationsV3State } from "~/evaluations-v3/types";
+import { generateCells } from "../orchestrator";
 import type { ExecutionScope } from "../types";
 
 describe("orchestrator", () => {
   // Helper to create test state (partial state with just what generateCells needs)
   const createTestState = (
     targetCount = 2,
-    evaluatorCount = 1
-  ): Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators"> => ({
-    datasets: [{ id: "dataset-1", name: "Test Dataset" } as EvaluationsV3State["datasets"][0]],
+    evaluatorCount = 1,
+  ): Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  > => ({
+    datasets: [
+      {
+        id: "dataset-1",
+        name: "Test Dataset",
+      } as EvaluationsV3State["datasets"][0],
+    ],
     activeDatasetId: "dataset-1",
     targets: Array.from({ length: targetCount }, (_, i) => ({
       id: `target-${i + 1}`,
@@ -19,7 +27,12 @@ describe("orchestrator", () => {
       outputs: [{ identifier: "output", type: "str" as const }],
       mappings: {
         "dataset-1": {
-          input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+          input: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "question",
+          },
         },
       },
       localPromptConfig: {
@@ -41,12 +54,32 @@ describe("orchestrator", () => {
       mappings: {
         "dataset-1": {
           "target-1": {
-            output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-            expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: "target-1",
+              sourceField: "output",
+            },
+            expected_output: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "expected",
+            },
           },
           "target-2": {
-            output: { type: "source", source: "target", sourceId: "target-2", sourceField: "output" },
-            expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+            output: {
+              type: "source",
+              source: "target",
+              sourceId: "target-2",
+              sourceField: "output",
+            },
+            expected_output: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "expected",
+            },
           },
         },
       },
@@ -68,7 +101,7 @@ describe("orchestrator", () => {
       const cells = generateCells(state, datasetRows, scope);
 
       expect(cells).toHaveLength(6); // 3 rows × 2 targets
-      
+
       // Check each cell has correct structure
       for (const cell of cells) {
         expect(cell.rowIndex).toBeGreaterThanOrEqual(0);
@@ -117,7 +150,11 @@ describe("orchestrator", () => {
     it("generates single cell for cell scope", () => {
       const state = createTestState(2, 1);
       const datasetRows = createTestDataset(3);
-      const scope: ExecutionScope = { type: "cell", rowIndex: 2, targetId: "target-2" };
+      const scope: ExecutionScope = {
+        type: "cell",
+        rowIndex: 2,
+        targetId: "target-2",
+      };
 
       const cells = generateCells(state, datasetRows, scope);
 
@@ -129,7 +166,10 @@ describe("orchestrator", () => {
     it("returns empty array for non-existent target", () => {
       const state = createTestState(2, 1);
       const datasetRows = createTestDataset(3);
-      const scope: ExecutionScope = { type: "target", targetId: "non-existent" };
+      const scope: ExecutionScope = {
+        type: "target",
+        targetId: "non-existent",
+      };
 
       const cells = generateCells(state, datasetRows, scope);
 

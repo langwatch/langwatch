@@ -8,10 +8,11 @@
  * 3. It enables and shows correct tooltip when runs exist
  * 4. It navigates to the correct experiment page
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HistoryButton } from "../HistoryButton";
 
@@ -38,8 +39,11 @@ let mockStoreValues = {
 };
 vi.mock("~/evaluations-v3/hooks/useEvaluationsV3Store", () => ({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  useEvaluationsV3Store: vi.fn((selector: (state: any) => unknown) => selector(mockStoreValues)),
+  useEvaluationsV3Store: vi.fn((selector: (state: any) => unknown) =>
+    selector(mockStoreValues),
+  ),
 }));
+
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
 
 // Mock next/router
@@ -51,9 +55,9 @@ vi.mock("next/router", () => ({
   }),
 }));
 
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 // Import the mocked modules
 import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -64,7 +68,7 @@ describe("HistoryButton", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Reset store values
     mockStoreValues = {
       experimentId: null,
@@ -75,10 +79,12 @@ describe("HistoryButton", () => {
     vi.mocked(useOrganizationTeamProject).mockReturnValue({
       project: { id: "project-123", slug: "test-project" },
     } as ReturnType<typeof useOrganizationTeamProject>);
-    
+
     // Update useEvaluationsV3Store mock to use fresh values
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(useEvaluationsV3Store).mockImplementation((selector: (state: any) => unknown) => selector(mockStoreValues));
+    vi.mocked(useEvaluationsV3Store).mockImplementation(
+      (selector: (state: any) => unknown) => selector(mockStoreValues),
+    );
   });
 
   afterEach(() => {
@@ -91,23 +97,29 @@ describe("HistoryButton", () => {
     mockStoreValues.experimentSlug = "test-slug";
 
     // Mock empty runs
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: { runs: [] },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
     // Verify the query was called with experimentId, NOT the slug
-    expect(api.experiments.getExperimentBatchEvaluationRuns.useQuery).toHaveBeenCalledWith(
+    expect(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).toHaveBeenCalledWith(
       {
         projectId: "project-123",
-        experimentId: "exp-actual-id-123",  // Should use actual ID
+        experimentId: "exp-actual-id-123", // Should use actual ID
       },
       expect.objectContaining({
         enabled: true,
-      })
+      }),
     );
   });
 
@@ -115,17 +127,23 @@ describe("HistoryButton", () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: { runs: [] },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
     // Find buttons and get the one that's actually a button element
     const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) => btn.textContent?.includes("History"));
+    const historyButton = buttons.find((btn) =>
+      btn.textContent?.includes("History"),
+    );
     expect(historyButton).toBeDisabled();
   });
 
@@ -133,7 +151,9 @@ describe("HistoryButton", () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: {
         runs: [
           {
@@ -145,13 +165,17 @@ describe("HistoryButton", () => {
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
     // The button should exist and not be disabled
     const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) => btn.textContent?.includes("History"));
+    const historyButton = buttons.find((btn) =>
+      btn.textContent?.includes("History"),
+    );
     expect(historyButton).toBeDefined();
     expect(historyButton).not.toHaveAttribute("disabled");
   });
@@ -159,30 +183,46 @@ describe("HistoryButton", () => {
   it("navigates to experiment page using experimentSlug from store when clicked", async () => {
     // Update the mock to return specific values for this test
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(useEvaluationsV3Store).mockImplementation((selector: (state: any) => unknown) =>
-      selector({
-        experimentId: "exp-123",
-        experimentSlug: "my-custom-slug",
-      })
+    vi.mocked(useEvaluationsV3Store).mockImplementation(
+      (selector: (state: any) => unknown) =>
+        selector({
+          experimentId: "exp-123",
+          experimentSlug: "my-custom-slug",
+        }),
     );
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: {
-        runs: [{ run_id: "run-1", timestamps: { created_at: Date.now() }, summary: { evaluations: {} } }],
+        runs: [
+          {
+            run_id: "run-1",
+            timestamps: { created_at: Date.now() },
+            summary: { evaluations: {} },
+          },
+        ],
       },
       isLoading: false,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
     const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) => btn.textContent?.includes("History") && !btn.hasAttribute("disabled"))!;
+    const historyButton = buttons.find(
+      (btn) =>
+        btn.textContent?.includes("History") && !btn.hasAttribute("disabled"),
+    )!;
     expect(historyButton).toBeDefined();
     await user.click(historyButton);
 
     // Should use experimentSlug from store, not router query
-    expect(mockPush).toHaveBeenCalledWith("/test-project/experiments/my-custom-slug");
+    expect(mockPush).toHaveBeenCalledWith(
+      "/test-project/experiments/my-custom-slug",
+    );
   });
 
   it("does not render when experimentId is not set", () => {
@@ -197,16 +237,22 @@ describe("HistoryButton", () => {
     mockStoreValues.experimentId = "exp-123";
     mockStoreValues.experimentSlug = "test-slug";
 
-    vi.mocked(api.experiments.getExperimentBatchEvaluationRuns.useQuery).mockReturnValue({
+    vi.mocked(
+      api.experiments.getExperimentBatchEvaluationRuns.useQuery,
+    ).mockReturnValue({
       data: undefined,
       isLoading: true,
       error: null,
-    } as unknown as ReturnType<typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery>);
+    } as unknown as ReturnType<
+      typeof api.experiments.getExperimentBatchEvaluationRuns.useQuery
+    >);
 
     render(<HistoryButton />, { wrapper: Wrapper });
 
     const buttons = screen.getAllByRole("button");
-    const historyButton = buttons.find((btn) => btn.textContent?.includes("History"));
+    const historyButton = buttons.find((btn) =>
+      btn.textContent?.includes("History"),
+    );
     expect(historyButton).toBeDisabled();
   });
 });

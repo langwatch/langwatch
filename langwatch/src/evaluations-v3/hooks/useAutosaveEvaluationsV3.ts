@@ -1,19 +1,19 @@
 import { useRouter } from "next/router";
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import { toaster } from "../../components/ui/toaster";
 import { captureException } from "../../utils/posthogErrorCapture";
 import { isNotFound as isTrpcNotFound } from "../../utils/trpcError";
-import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 import { createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
+import { useEvaluationsV3Store } from "./useEvaluationsV3Store";
 
 const AUTOSAVE_DEBOUNCE_MS = 1500; // Wait 1.5s after last change before saving
 
 const stringifiedInitialState = JSON.stringify(
-  extractPersistedState(createInitialState())
+  extractPersistedState(createInitialState()),
 );
 
 /**
@@ -63,7 +63,7 @@ export const useAutosaveEvaluationsV3 = () => {
       setName: state.setName,
       setAutosaveStatus: state.setAutosaveStatus,
       loadState: state.loadState,
-    }))
+    })),
   );
 
   const persistedState = extractPersistedState({
@@ -118,7 +118,7 @@ export const useAutosaveEvaluationsV3 = () => {
       projectId: project?.id ?? "",
       experimentSlug: routerSlug ?? "",
     },
-    { enabled: shouldLoadExisting }
+    { enabled: shouldLoadExisting },
   );
 
   // Update URL when experiment slug changes (for URL sync after save)
@@ -127,7 +127,7 @@ export const useAutosaveEvaluationsV3 = () => {
       void router.replace(
         `/${project.slug}/evaluations/v3/${experimentSlug}`,
         undefined,
-        { shallow: true }
+        { shallow: true },
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -228,7 +228,7 @@ export const useAutosaveEvaluationsV3 = () => {
           setAutosaveStatus(
             "evaluation",
             "error",
-            error instanceof Error ? error.message : "Unknown error"
+            error instanceof Error ? error.message : "Unknown error",
           );
           toaster.create({
             title: "Failed to autosave evaluation",

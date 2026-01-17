@@ -1,18 +1,19 @@
-import React, { useMemo, useState, useEffect } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import type { Event } from "../lib/types";
-import type { DiscoveredProjection } from "../discovery/projections.types";
+import type React from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
 import type { AggregateLinkInfo } from "../discovery/links";
-import type { ResolvedChildAggregate } from "./Root";
-import { buildProjectionTimelines } from "../runner/projectionTimeline";
+import type { DiscoveredProjection } from "../discovery/projections.types";
+import type { Event } from "../lib/types";
 import { buildEventHandlerTimelines } from "../runner/eventHandlerTimeline";
-import { FullscreenLayout, useTerminalDimensions } from "./FullscreenLayout";
-import { ProjectionRow } from "./ProjectionRow";
+import { buildProjectionTimelines } from "../runner/projectionTimeline";
+import { EventDetail } from "./EventDetail";
 import { EventHandlerRow } from "./EventHandlerRow";
 import { EventTimeline } from "./EventTimeline";
-import { EventDetail } from "./EventDetail";
+import { FullscreenLayout, useTerminalDimensions } from "./FullscreenLayout";
+import { ProjectionRow } from "./ProjectionRow";
+import type { ResolvedChildAggregate } from "./Root";
 
 interface RelatedAggregate {
   id: string;
@@ -35,7 +36,9 @@ interface AppProps {
 /**
  * Extracts unique aggregates from events for selection.
  */
-function getUniqueAggregates(events: Event[]): { id: string; type: string; eventCount: number }[] {
+function getUniqueAggregates(
+  events: Event[],
+): { id: string; type: string; eventCount: number }[] {
   const aggregateMap = new Map<string, { type: string; count: number }>();
 
   for (const event of events) {
@@ -43,7 +46,10 @@ function getUniqueAggregates(events: Event[]): { id: string; type: string; event
     if (existing) {
       existing.count++;
     } else {
-      aggregateMap.set(event.aggregateId, { type: event.aggregateType, count: 1 });
+      aggregateMap.set(event.aggregateId, {
+        type: event.aggregateType,
+        count: 1,
+      });
     }
   }
 
@@ -65,13 +71,27 @@ const HEADER_HEIGHT = 3; // Border + content + border
 const TIMELINE_HEIGHT = 5; // Border + 3 lines (events + type + legend) + border
 const FOOTER_HEIGHT = 1; // Help text
 
-const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipelineAggregateTypes, mode, env, linkInfo, resolvedChildren, onNavigateToAggregate }) => {
+const App: React.FC<AppProps> = ({
+  events,
+  projections,
+  eventHandlers = [],
+  pipelineAggregateTypes,
+  mode,
+  env,
+  linkInfo,
+  resolvedChildren,
+  onNavigateToAggregate,
+}) => {
   const { exit } = useApp();
   const { height: terminalHeight } = useTerminalDimensions();
-  const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(null);
+  const [selectedAggregateId, setSelectedAggregateId] = useState<string | null>(
+    null,
+  );
   const [eventCursor, setEventCursor] = useState(0);
   const [projectionCursor, setProjectionCursor] = useState(0);
-  const [expandedProjections, setExpandedProjections] = useState<Set<string>>(new Set());
+  const [expandedProjections, setExpandedProjections] = useState<Set<string>>(
+    new Set(),
+  );
   const [showEventDetail, setShowEventDetail] = useState(false);
   const [projectionScrollOffset, setProjectionScrollOffset] = useState(0);
   const [showRelatedMenu, setShowRelatedMenu] = useState(false);
@@ -79,7 +99,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
   const uniqueAggregates = useMemo(() => getUniqueAggregates(events), [events]);
 
   // Check if we're in merged timeline mode (loaded from links)
-  const isMergedTimeline = resolvedChildren && resolvedChildren.some((c) => c.aggregateIds.length > 0);
+  const isMergedTimeline = resolvedChildren?.some(
+    (c) => c.aggregateIds.length > 0,
+  );
 
   // Auto-select aggregate if there's only one, or use "all" for merged timelines
   useEffect(() => {
@@ -129,8 +151,14 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
   // Combine projections and handlers into a single list for display
   const allTimelines = useMemo(() => {
     return [
-      ...projectionTimelines.map((t) => ({ type: "projection" as const, timeline: t })),
-      ...handlerTimelines.map((t) => ({ type: "handler" as const, timeline: t })),
+      ...projectionTimelines.map((t) => ({
+        type: "projection" as const,
+        timeline: t,
+      })),
+      ...handlerTimelines.map((t) => ({
+        type: "handler" as const,
+        timeline: t,
+      })),
     ];
   }, [projectionTimelines, handlerTimelines]);
 
@@ -139,7 +167,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
   const currentAggregateType = currentEvent?.aggregateType;
 
   // Check if a projection is compatible with the current event's aggregate type
-  const isProjectionCompatible = (projection: DiscoveredProjection): boolean => {
+  const isProjectionCompatible = (
+    projection: DiscoveredProjection,
+  ): boolean => {
     const expectedType = pipelineAggregateTypes[projection.pipelineName];
     return !expectedType || expectedType === currentAggregateType;
   };
@@ -187,27 +217,47 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
 
   // Calculate available height for expanded projections
   // Fixed UI: header (3) + timeline (5) + footer (1) + optional panels
-  const fixedUIHeight = HEADER_HEIGHT + TIMELINE_HEIGHT + FOOTER_HEIGHT + (showRelatedMenu ? 4 : 0) + (showEventDetail ? 10 : 0);
+  const fixedUIHeight =
+    HEADER_HEIGHT +
+    TIMELINE_HEIGHT +
+    FOOTER_HEIGHT +
+    (showRelatedMenu ? 4 : 0) +
+    (showEventDetail ? 10 : 0);
 
   // Count expanded items that have actual data (need full box)
   const expandedWithData = allTimelines.filter((item) => {
-    const step = item.timeline.steps[eventCursor] ?? item.timeline.steps[item.timeline.steps.length - 1];
+    const step =
+      item.timeline.steps[eventCursor] ??
+      item.timeline.steps[item.timeline.steps.length - 1];
     if (item.type === "projection") {
-      const projectionStep = step as { projectionStateByAggregate?: Array<{ version?: number }> };
+      const projectionStep = step as {
+        projectionStateByAggregate?: Array<{ version?: number }>;
+      };
       const snapshot = projectionStep?.projectionStateByAggregate?.[0];
-      return expandedProjections.has(item.timeline.projection.id) && (snapshot?.version ?? 0) > 0;
+      return (
+        expandedProjections.has(item.timeline.projection.id) &&
+        (snapshot?.version ?? 0) > 0
+      );
     } else {
       const handlerStep = step as { processed?: boolean };
-      return expandedProjections.has(item.timeline.handler.id) && handlerStep?.processed;
+      return (
+        expandedProjections.has(item.timeline.handler.id) &&
+        handlerStep?.processed
+      );
     }
   }).length;
 
   // Simple calculation: total available minus fixed UI, divided among expanded items
   // Each item header = 1 line, each expanded v0 = 2 lines (header + message)
-  const collapsedAndV0Lines = allTimelines.length + expandedProjections.size - expandedWithData;
-  const availableForExpandedBoxes = terminalHeight - fixedUIHeight - collapsedAndV0Lines;
+  const collapsedAndV0Lines =
+    allTimelines.length + expandedProjections.size - expandedWithData;
+  const availableForExpandedBoxes =
+    terminalHeight - fixedUIHeight - collapsedAndV0Lines;
   const expandedSlots = Math.max(1, expandedWithData);
-  const maxLinesPerExpanded = Math.max(10, Math.floor(availableForExpandedBoxes / expandedSlots));
+  const maxLinesPerExpanded = Math.max(
+    10,
+    Math.floor(availableForExpandedBoxes / expandedSlots),
+  );
 
   const toggleProjection = (projectionId: string) => {
     setExpandedProjections((prev) => {
@@ -246,7 +296,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
       setProjectionCursor((prev) => Math.max(0, prev - 1));
       setProjectionScrollOffset(0); // Reset scroll when changing projection
     } else if (key.downArrow || input === "j") {
-      setProjectionCursor((prev) => Math.min(allTimelines.length - 1, prev + 1));
+      setProjectionCursor((prev) =>
+        Math.min(allTimelines.length - 1, prev + 1),
+      );
       setProjectionScrollOffset(0); // Reset scroll when changing item
     }
 
@@ -261,9 +313,10 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
     if (key.return || input === " ") {
       const currentItem = allTimelines[projectionCursor];
       if (currentItem) {
-        const id = currentItem.type === "projection"
-          ? currentItem.timeline.projection.id
-          : currentItem.timeline.handler.id;
+        const id =
+          currentItem.type === "projection"
+            ? currentItem.timeline.projection.id
+            : currentItem.timeline.handler.id;
         toggleProjection(id);
       }
     }
@@ -294,7 +347,8 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
         <Box flexDirection="column">
           <Text bold>Select an aggregate to track:</Text>
           <Text dimColor>
-            Found {uniqueAggregates.length} unique aggregate(s) in {events.length} events
+            Found {uniqueAggregates.length} unique aggregate(s) in{" "}
+            {events.length} events
           </Text>
           <Box marginTop={1}>
             <SelectInput
@@ -316,7 +370,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
   if (projections.length === 0) {
     return (
       <FullscreenLayout>
-        <Text color="red">No projections discovered under event-sourcing pipelines directory.</Text>
+        <Text color="red">
+          No projections discovered under event-sourcing pipelines directory.
+        </Text>
       </FullscreenLayout>
     );
   }
@@ -330,8 +386,12 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
   }
 
   // Count parent and child links
-  const parentCount = relatedAggregates.filter((r) => r.relationship === "parent").length;
-  const childCount = relatedAggregates.filter((r) => r.relationship === "child").length;
+  const parentCount = relatedAggregates.filter(
+    (r) => r.relationship === "parent",
+  ).length;
+  const childCount = relatedAggregates.filter(
+    (r) => r.relationship === "child",
+  ).length;
 
   return (
     <FullscreenLayout>
@@ -356,15 +416,13 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
               </>
             )}
           </Text>
-          {mode === "database" && env && (
-            <Text dimColor> ({env})</Text>
-          )}
+          {mode === "database" && env && <Text dimColor> ({env})</Text>}
           {!isMergedTimeline && relatedAggregates.length > 0 && (
             <Text dimColor>
-              {" "}| {parentCount > 0 && <Text color="yellow">{parentCount}↑</Text>}
+              {" "}
+              | {parentCount > 0 && <Text color="yellow">{parentCount}↑</Text>}
               {parentCount > 0 && childCount > 0 && " "}
-              {childCount > 0 && <Text color="green">{childCount}↓</Text>}
-              {" "}(r)
+              {childCount > 0 && <Text color="green">{childCount}↓</Text>} (r)
             </Text>
           )}
         </Box>
@@ -384,12 +442,15 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
           flexDirection="column"
           flexShrink={0}
         >
-          <Text bold color="yellow">Related Aggregates (press r to close)</Text>
+          <Text bold color="yellow">
+            Related Aggregates (press r to close)
+          </Text>
           <SelectInput
             items={relatedAggregates.map((r) => ({
-              label: r.relationship === "parent"
-                ? `↑ ${r.type}: ${r.id}`
-                : `↓ ${r.type}: ${r.id}`,
+              label:
+                r.relationship === "parent"
+                  ? `↑ ${r.type}: ${r.id}`
+                  : `↓ ${r.type}: ${r.id}`,
               value: r,
             }))}
             onSelect={(item) => {
@@ -403,7 +464,13 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
       )}
 
       {/* Main content fills remaining space to keep footer pinned */}
-      <Box flexDirection="column" flexGrow={1} flexShrink={1} minHeight={0} overflow="hidden">
+      <Box
+        flexDirection="column"
+        flexGrow={1}
+        flexShrink={1}
+        minHeight={0}
+        overflow="hidden"
+      >
         {/* Projections list */}
         <Box
           flexDirection="column"
@@ -414,17 +481,24 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
         >
           {allTimelines.map((item, index) => {
             const step =
-              item.timeline.steps[eventCursor] ?? item.timeline.steps[item.timeline.steps.length - 1];
+              item.timeline.steps[eventCursor] ??
+              item.timeline.steps[item.timeline.steps.length - 1];
             const isFocused = index === projectionCursor;
-            const id = item.type === "projection"
-              ? item.timeline.projection.id
-              : item.timeline.handler.id;
+            const id =
+              item.type === "projection"
+                ? item.timeline.projection.id
+                : item.timeline.handler.id;
             const isExpanded = expandedProjections.has(id);
 
             if (item.type === "projection") {
-              const compatible = isProjectionCompatible(item.timeline.projection);
-              const expectedType = pipelineAggregateTypes[item.timeline.projection.pipelineName];
-              const projectionStep = step as { stale?: boolean; projectionStateByAggregate?: unknown[] } | undefined;
+              const compatible = isProjectionCompatible(
+                item.timeline.projection,
+              );
+              const expectedType =
+                pipelineAggregateTypes[item.timeline.projection.pipelineName];
+              const projectionStep = step as
+                | { stale?: boolean; projectionStateByAggregate?: unknown[] }
+                | undefined;
               const isStale = projectionStep?.stale ?? false;
               return (
                 <ProjectionRow
@@ -434,7 +508,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
                   isExpanded={isExpanded}
                   isFocused={isFocused}
                   maxLines={maxLinesPerExpanded}
-                  scrollOffset={isFocused && isExpanded ? projectionScrollOffset : 0}
+                  scrollOffset={
+                    isFocused && isExpanded ? projectionScrollOffset : 0
+                  }
                   isCompatible={compatible}
                   expectedAggregateType={expectedType}
                   stale={isStale}
@@ -450,7 +526,9 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
                   isExpanded={isExpanded}
                   isFocused={isFocused}
                   maxLines={maxLinesPerExpanded}
-                  scrollOffset={isFocused && isExpanded ? projectionScrollOffset : 0}
+                  scrollOffset={
+                    isFocused && isExpanded ? projectionScrollOffset : 0
+                  }
                 />
               );
             }
@@ -469,7 +547,12 @@ const App: React.FC<AppProps> = ({ events, projections, eventHandlers = [], pipe
       {/* Help footer */}
       <Box paddingX={1} flexShrink={0}>
         <Text dimColor>
-          ↑↓/jk: projection | ←→/hl: events | Enter: expand | []: scroll | e: event{!isMergedTimeline && relatedAggregates.length > 0 ? " | r: related" : ""} | q: quit
+          ↑↓/jk: projection | ←→/hl: events | Enter: expand | []: scroll | e:
+          event
+          {!isMergedTimeline && relatedAggregates.length > 0
+            ? " | r: related"
+            : ""}{" "}
+          | q: quit
         </Text>
       </Box>
     </FullscreenLayout>

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createSemaphore } from "../semaphore";
 
 describe("semaphore", () => {
@@ -70,7 +70,7 @@ describe("semaphore", () => {
         const idx = active.indexOf(i);
         if (idx !== -1) active.splice(idx, 1);
         semaphore.release();
-      })()
+      })(),
     );
 
     await Promise.all(tasks);

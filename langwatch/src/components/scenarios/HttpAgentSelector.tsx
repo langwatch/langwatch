@@ -6,10 +6,10 @@ import {
 } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { Listbox } from "../ui/listbox";
-import { Popover } from "../ui/popover";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { Listbox } from "../ui/listbox";
+import { Popover } from "../ui/popover";
 
 interface HttpAgentSelectorProps {
   value: string | null;

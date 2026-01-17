@@ -38,7 +38,7 @@ export type DeleteModelProviderInput = {
 export class ModelProviderService {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly repository: ModelProviderRepository
+    private readonly repository: ModelProviderRepository,
   ) {}
 
   /**
@@ -59,7 +59,7 @@ export class ModelProviderService {
    */
   async getProjectModelProviders(
     projectId: string,
-    includeKeys = true
+    includeKeys = true,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -73,7 +73,7 @@ export class ModelProviderService {
     const savedModelProviders = await this.buildSavedProviders(
       projectId,
       defaultModelProviders,
-      includeKeys
+      includeKeys,
     );
 
     return {
@@ -91,9 +91,12 @@ export class ModelProviderService {
    */
   async getProjectModelProvidersForFrontend(
     projectId: string,
-    includeKeys = true
+    includeKeys = true,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    const providers = await this.getProjectModelProviders(projectId, includeKeys);
+    const providers = await this.getProjectModelProviders(
+      projectId,
+      includeKeys,
+    );
 
     if (!includeKeys) {
       return providers;
@@ -132,11 +135,15 @@ export class ModelProviderService {
     // Validate and clean custom keys
     const { validatedKeys, customKeysProvided } = this.validateAndCleanKeys(
       provider,
-      customKeys
+      customKeys,
     );
 
     // Find existing provider
-    const existingProvider = await this.findExistingProvider(id, provider, projectId);
+    const existingProvider = await this.findExistingProvider(
+      id,
+      provider,
+      projectId,
+    );
 
     return await this.prisma.$transaction(async (tx) => {
       let result;
@@ -154,7 +161,7 @@ export class ModelProviderService {
           },
           validatedKeys,
           customKeysProvided,
-          tx
+          tx,
         );
       } else {
         result = await this.createNew(
@@ -168,7 +175,7 @@ export class ModelProviderService {
           },
           validatedKeys,
           customKeysProvided,
-          tx
+          tx,
         );
       }
 
@@ -202,7 +209,7 @@ export class ModelProviderService {
   // ─────────────────────────────────────────────────────────────────
 
   private buildDefaultProviders(
-    project: Project
+    project: Project,
   ): Record<string, MaybeStoredModelProvider> {
     return Object.fromEntries(
       Object.entries(modelProviders)
@@ -218,42 +225,50 @@ export class ModelProviderService {
             enabled,
             disabledByDefault: !enabled,
             customKeys: null,
-            models: getProviderModelOptions(providerKey, "chat").map((m) => m.value),
-            embeddingsModels: getProviderModelOptions(providerKey, "embedding").map(
-              (m) => m.value
+            models: getProviderModelOptions(providerKey, "chat").map(
+              (m) => m.value,
             ),
+            embeddingsModels: getProviderModelOptions(
+              providerKey,
+              "embedding",
+            ).map((m) => m.value),
             deploymentMapping: null,
             extraHeaders: [],
           };
           return [providerKey, provider_];
-        })
+        }),
     );
   }
 
   private async buildSavedProviders(
     projectId: string,
     defaultProviders: Record<string, MaybeStoredModelProvider>,
-    includeKeys: boolean
+    includeKeys: boolean,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
     const savedProviders = await this.repository.findAll(projectId);
 
     return savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
-      .reduce((acc, mp) => {
-        const provider_: MaybeStoredModelProvider = {
-          id: mp.id,
-          provider: mp.provider,
-          enabled: mp.enabled,
-          customKeys: includeKeys ? mp.customKeys : null,
-          models: mp.customModels as string[] | null,
-          embeddingsModels: mp.customEmbeddingsModels as string[] | null,
-          deploymentMapping: mp.deploymentMapping,
-          disabledByDefault: defaultProviders[mp.provider]?.disabledByDefault,
-          extraHeaders: mp.extraHeaders as { key: string; value: string }[] | null,
-        };
+      .reduce(
+        (acc, mp) => {
+          const provider_: MaybeStoredModelProvider = {
+            id: mp.id,
+            provider: mp.provider,
+            enabled: mp.enabled,
+            customKeys: includeKeys ? mp.customKeys : null,
+            models: mp.customModels as string[] | null,
+            embeddingsModels: mp.customEmbeddingsModels as string[] | null,
+            deploymentMapping: mp.deploymentMapping,
+            disabledByDefault: defaultProviders[mp.provider]?.disabledByDefault,
+            extraHeaders: mp.extraHeaders as
+              | { key: string; value: string }[]
+              | null,
+          };
 
-        return { ...acc, [mp.provider]: provider_ };
-      }, {} as Record<string, MaybeStoredModelProvider>);
+          return { ...acc, [mp.provider]: provider_ };
+        },
+        {} as Record<string, MaybeStoredModelProvider>,
+      );
   }
 
   /**
@@ -261,8 +276,14 @@ export class ModelProviderService {
    * Filters out providers that don't have meaningful customizations.
    */
   private shouldKeepModelProvider(
-    mp: { customKeys: unknown; provider: string; enabled: boolean; customModels: unknown; customEmbeddingsModels: unknown },
-    defaultProviders: Record<string, MaybeStoredModelProvider>
+    mp: {
+      customKeys: unknown;
+      provider: string;
+      enabled: boolean;
+      customModels: unknown;
+      customEmbeddingsModels: unknown;
+    },
+    defaultProviders: Record<string, MaybeStoredModelProvider>,
   ): boolean {
     // Keep if has custom keys
     if (mp.customKeys) return true;
@@ -282,7 +303,7 @@ export class ModelProviderService {
   }
 
   private maskApiKeys(
-    providers: Record<string, MaybeStoredModelProvider>
+    providers: Record<string, MaybeStoredModelProvider>,
   ): Record<string, MaybeStoredModelProvider> {
     const masked = { ...providers };
 
@@ -296,7 +317,7 @@ export class ModelProviderService {
               KEY_CHECK.some((k) => key.includes(k))
                 ? MASKED_KEY_PLACEHOLDER
                 : value,
-            ])
+            ]),
           ),
         };
       }
@@ -307,8 +328,11 @@ export class ModelProviderService {
 
   private validateAndCleanKeys(
     provider: string,
-    customKeys: Record<string, unknown> | null | undefined
-  ): { validatedKeys: Record<string, unknown> | null; customKeysProvided: boolean } {
+    customKeys: Record<string, unknown> | null | undefined,
+  ): {
+    validatedKeys: Record<string, unknown> | null;
+    customKeysProvided: boolean;
+  } {
     const customKeysProvided = customKeys !== undefined;
 
     if (!customKeys) {
@@ -317,19 +341,24 @@ export class ModelProviderService {
 
     const providerSchema =
       modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
-    const validator = z.union([providerSchema, z.object({ MANAGED: z.string() })]);
+    const validator = z.union([
+      providerSchema,
+      z.object({ MANAGED: z.string() }),
+    ]);
 
     let validatedKeys: Record<string, unknown>;
     try {
       validatedKeys = validator.parse(customKeys);
     } catch {
-      throw new Error(`Invalid API key configuration for ${provider}. Please verify your credentials.`);
+      throw new Error(
+        `Invalid API key configuration for ${provider}. Please verify your credentials.`,
+      );
     }
 
     // Filter out null values for Azure provider
     if (provider === "azure" && validatedKeys) {
       validatedKeys = Object.fromEntries(
-        Object.entries(validatedKeys).filter(([_, value]) => value !== null)
+        Object.entries(validatedKeys).filter(([_, value]) => value !== null),
       );
       if (Object.keys(validatedKeys).length === 0) {
         return { validatedKeys: null, customKeysProvided };
@@ -342,7 +371,7 @@ export class ModelProviderService {
   private async findExistingProvider(
     id: string | undefined,
     provider: string,
-    projectId: string
+    projectId: string,
   ) {
     if (id) {
       return await this.repository.findById(id, projectId);
@@ -362,14 +391,14 @@ export class ModelProviderService {
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
     let customKeysToSave: Record<string, unknown> | undefined;
 
     if (customKeysProvided) {
       customKeysToSave = this.mergeCustomKeys(
         validatedKeys,
-        existingProvider.customKeys as Record<string, unknown> | null
+        existingProvider.customKeys as Record<string, unknown> | null,
       );
     }
 
@@ -398,12 +427,13 @@ export class ModelProviderService {
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
-    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]
+    tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0],
   ) {
     return await tx.modelProvider.create({
       data: {
         ...data,
-        ...(customKeysProvided && validatedKeys && { customKeys: validatedKeys }),
+        ...(customKeysProvided &&
+          validatedKeys && { customKeys: validatedKeys }),
       } as Parameters<typeof tx.modelProvider.create>[0]["data"],
     });
   }
@@ -417,7 +447,7 @@ export class ModelProviderService {
    */
   private mergeCustomKeys(
     validatedKeys: Record<string, unknown> | null,
-    existingKeys: Record<string, unknown> | null
+    existingKeys: Record<string, unknown> | null,
   ): Record<string, unknown> {
     if (!validatedKeys) return {};
 
@@ -428,7 +458,7 @@ export class ModelProviderService {
       ...Object.fromEntries(
         Object.entries(existingKeys)
           .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-          .map(([key, value]) => [key, value])
+          .map(([key, value]) => [key, value]),
       ),
     };
   }

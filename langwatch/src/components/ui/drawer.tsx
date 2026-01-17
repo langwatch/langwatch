@@ -52,12 +52,7 @@ export const DrawerCloseTrigger = React.forwardRef<
 });
 
 export const DrawerRoot = function DrawerRoot(props: ChakraDrawer.RootProps) {
-  return (
-    <ChakraDrawer.Root
-      {...props}
-      preventScroll={false}
-    />
-  );
+  return <ChakraDrawer.Root {...props} preventScroll={false} />;
 };
 
 export const DrawerTrigger = ChakraDrawer.Trigger;

@@ -8,16 +8,16 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Search, Workflow } from "lucide-react";
-import { LuArrowLeft } from "react-icons/lu";
-import { useState, useMemo, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { Search, Workflow } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { TypedAgent } from "~/server/agents/agent.repository";
+import { api } from "~/utils/api";
 
 export type WorkflowSelectorDrawerProps = {
   open?: boolean;
@@ -41,16 +41,20 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
   const utils = api.useContext();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSave = props.onSave ?? (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
+  const onSave =
+    props.onSave ??
+    (complexProps.onSave as WorkflowSelectorDrawerProps["onSave"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
+    null,
+  );
   const [agentName, setAgentName] = useState(props.agentName ?? "");
 
   const workflowsQuery = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen }
+    { enabled: !!project?.id && isOpen },
   );
 
   const filteredWorkflows = useMemo(() => {
@@ -60,7 +64,7 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
     if (!query) return workflowsQuery.data;
 
     return workflowsQuery.data.filter((workflow) =>
-      workflow.name.toLowerCase().includes(query)
+      workflow.name.toLowerCase().includes(query),
     );
   }, [workflowsQuery.data, searchQuery]);
 
@@ -74,12 +78,15 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
 
   const isSaving = createMutation.isPending;
 
-  const handleSelectWorkflow = useCallback((workflowId: string, workflowName: string) => {
-    setSelectedWorkflowId(workflowId);
-    if (!agentName) {
-      setAgentName(workflowName);
-    }
-  }, [agentName]);
+  const handleSelectWorkflow = useCallback(
+    (workflowId: string, workflowName: string) => {
+      setSelectedWorkflowId(workflowId);
+      if (!agentName) {
+        setAgentName(workflowName);
+      }
+    },
+    [agentName],
+  );
 
   const handleSave = useCallback(() => {
     if (!project?.id || !selectedWorkflowId || !agentName.trim()) return;
@@ -127,7 +134,12 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
             <Heading>Select Workflow</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an existing workflow to use as the agent implementation.
@@ -193,7 +205,9 @@ export function WorkflowSelectorDrawer(props: WorkflowSelectorDrawerProps) {
                     name={workflow.name}
                     updatedAt={workflow.updatedAt}
                     isSelected={selectedWorkflowId === workflow.id}
-                    onClick={() => handleSelectWorkflow(workflow.id, workflow.name)}
+                    onClick={() =>
+                      handleSelectWorkflow(workflow.id, workflow.name)
+                    }
                   />
                 ))
               )}
@@ -232,7 +246,12 @@ type WorkflowCardProps = {
   onClick: () => void;
 };
 
-function WorkflowCard({ name, updatedAt, isSelected, onClick }: WorkflowCardProps) {
+function WorkflowCard({
+  name,
+  updatedAt,
+  isSelected,
+  onClick,
+}: WorkflowCardProps) {
   return (
     <Box
       as="button"
@@ -257,7 +276,8 @@ function WorkflowCard({ name, updatedAt, isSelected, onClick }: WorkflowCardProp
             {name}
           </Text>
           <Text fontSize="xs" color="gray.500">
-            Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+            Updated{" "}
+            {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
           </Text>
         </VStack>
       </HStack>

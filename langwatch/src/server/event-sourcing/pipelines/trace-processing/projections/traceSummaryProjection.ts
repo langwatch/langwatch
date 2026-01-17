@@ -7,16 +7,16 @@ import type {
   ProjectionHandler,
 } from "../../../library";
 import { traceSummaryRepository } from "../repositories";
+import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
 import type {
   SpanReceivedEvent,
   TraceProcessingEvent,
 } from "../schemas/events";
 import { isSpanReceivedEvent } from "../schemas/events";
-import { traceAggregationService } from "../services/traceAggregationService";
-import { SpanNormalizationPipelineService } from "../services";
-import { IdUtils } from "../utils/id.utils";
 import type { NormalizedSpan } from "../schemas/spans";
-import { TRACE_SUMMARY_PROJECTION_VERSION_LATEST } from "../schemas/constants";
+import { SpanNormalizationPipelineService } from "../services";
+import { traceAggregationService } from "../services/traceAggregationService";
+import { IdUtils } from "../utils/id.utils";
 
 /**
  * Summary data for trace metrics.

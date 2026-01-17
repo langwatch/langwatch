@@ -109,7 +109,8 @@ export class ScenarioEventRepository {
             _script: {
               type: "number",
               script: {
-                source: "params._source.messages != null ? params._source.messages.length : 0",
+                source:
+                  "params._source.messages != null ? params._source.messages.length : 0",
               },
               order: "desc",
             },
@@ -118,7 +119,6 @@ export class ScenarioEventRepository {
         size: 1,
       },
     });
-
 
     const rawResult = response.hits.hits[0]?._source as
       | Record<string, unknown>
@@ -881,7 +881,8 @@ export class ScenarioEventRepository {
                       _script: {
                         type: "number",
                         script: {
-                          source: "params._source.messages != null ? params._source.messages.length : 0",
+                          source:
+                            "params._source.messages != null ? params._source.messages.length : 0",
                         },
                         order: "desc",
                       },

@@ -5,8 +5,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { DatasetReference, TargetConfig } from "../../../types";
 import { TargetVariablesPanel } from "../../TargetSection/TargetVariablesPanel";
-import type { TargetConfig, DatasetReference } from "../../../types";
 
 // Mock components with complex dependencies
 vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
@@ -55,7 +55,10 @@ const mockTarget: TargetConfig = {
   localPromptConfig: {
     llm: { model: "gpt-4" },
     messages: [
-      { role: "user", content: "Answer this: {{question}} with context: {{context}}" },
+      {
+        role: "user",
+        content: "Answer this: {{question}} with context: {{context}}",
+      },
     ],
     inputs: [
       { identifier: "question", type: "str" },
@@ -75,7 +78,7 @@ const mockOtherTarget: TargetConfig = {
 };
 
 const renderComponent = (
-  props: Partial<Parameters<typeof TargetVariablesPanel>[0]> = {}
+  props: Partial<Parameters<typeof TargetVariablesPanel>[0]> = {},
 ) => {
   const defaultProps = {
     target: mockTarget,
@@ -89,7 +92,7 @@ const renderComponent = (
   return render(
     <ChakraProvider value={defaultSystem}>
       <TargetVariablesPanel {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -120,7 +123,7 @@ describe("TargetVariablesPanel", () => {
     it("shows helper text", () => {
       renderComponent();
       expect(
-        screen.getByText(/Connect each input variable to a data source/i)
+        screen.getByText(/Connect each input variable to a data source/i),
       ).toBeInTheDocument();
     });
   });
@@ -176,7 +179,7 @@ describe("TargetVariablesPanel", () => {
       const inputs = screen.getAllByRole("textbox");
       // Click on an empty mapping input to open dropdown
       const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value
+        (input) => !(input as HTMLInputElement).value,
       );
       if (emptyInput) {
         await user.click(emptyInput);
@@ -194,7 +197,7 @@ describe("TargetVariablesPanel", () => {
       // Click on an empty mapping input
       const inputs = screen.getAllByRole("textbox");
       const emptyInput = inputs.find(
-        (input) => !(input as HTMLInputElement).value
+        (input) => !(input as HTMLInputElement).value,
       );
       if (emptyInput) {
         await user.click(emptyInput);
@@ -238,7 +241,7 @@ describe("TargetVariablesPanel", () => {
           type: "source",
           sourceId: "dataset-1",
           sourceField: "expected_output",
-        })
+        }),
       );
     });
   });
@@ -247,7 +250,7 @@ describe("TargetVariablesPanel", () => {
     it("hides helper text in readOnly mode", () => {
       renderComponent({ readOnly: true });
       expect(
-        screen.queryByText(/Connect each input variable to a data source/i)
+        screen.queryByText(/Connect each input variable to a data source/i),
       ).not.toBeInTheDocument();
     });
   });

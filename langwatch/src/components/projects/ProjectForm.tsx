@@ -1,4 +1,3 @@
-import React, { useEffect } from "react";
 import {
   Alert,
   Button,
@@ -10,6 +9,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type React from "react";
+import { useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -17,9 +18,9 @@ import { isAtMaxProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../ui/link";
 import {
-  validateProjectName,
-  validateNewTeamName,
   NEW_TEAM_VALUE,
+  validateNewTeamName,
+  validateProjectName,
 } from "./projectFormValidation";
 
 export interface ProjectFormData {
@@ -29,14 +30,21 @@ export interface ProjectFormData {
 }
 
 export interface ProjectFormProps {
-  onSubmit: (data: ProjectFormData & { language: string; framework: string }) => void;
+  onSubmit: (
+    data: ProjectFormData & { language: string; framework: string },
+  ) => void;
   isLoading?: boolean;
   error?: string | null;
   defaultTeamId?: string;
 }
 
 export function ProjectForm(props: ProjectFormProps): React.ReactElement {
-  const { onSubmit: onSubmitProp, isLoading = false, error, defaultTeamId } = props;
+  const {
+    onSubmit: onSubmitProp,
+    isLoading = false,
+    error,
+    defaultTeamId,
+  } = props;
   const { organization, project } = useOrganizationTeamProject();
 
   const {
@@ -73,9 +81,10 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
     if (teams.data && teams.data.length > 0 && !teamId) {
       // Use defaultTeamId if provided and valid, otherwise use first team
       const teamIdToUse =
-        defaultTeamId && teams.data.some((t: { id: string }) => t.id === defaultTeamId)
+        defaultTeamId &&
+        teams.data.some((t: { id: string }) => t.id === defaultTeamId)
           ? defaultTeamId
-          : teams.data[0]?.id ?? "";
+          : (teams.data[0]?.id ?? "");
 
       reset((prev) => ({
         ...prev,
@@ -91,7 +100,9 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   const atMaxProjects = isAtMaxProjects(usage.data);
 
   const showTeamSelector =
-    teams.data?.some((team: { projects: unknown[] }) => team.projects.length > 0) ?? false;
+    teams.data?.some(
+      (team: { projects: unknown[] }) => team.projects.length > 0,
+    ) ?? false;
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -102,8 +113,8 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
             <Alert.Indicator />
             <Alert.Content>
               <Text>
-                You have reached the maximum number of projects allowed by
-                your plan. Please{" "}
+                You have reached the maximum number of projects allowed by your
+                plan. Please{" "}
                 <Link
                   href="/settings/subscription"
                   textDecoration="underline"
@@ -124,9 +135,9 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
         )}
 
         <Text fontSize="sm" color="fg.muted">
-          You can set up separate projects for each service or LLM feature
-          of your application (for example, one for your ChatBot, another
-          for that Content Generation feature).
+          You can set up separate projects for each service or LLM feature of
+          your application (for example, one for your ChatBot, another for that
+          Content Generation feature).
         </Text>
 
         <Field.Root invalid={!!errors.name}>
@@ -172,16 +183,16 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
                   placeholder="Engineering Team"
                 />
                 {errors.newTeamName && (
-                  <Field.ErrorText>{errors.newTeamName.message}</Field.ErrorText>
+                  <Field.ErrorText>
+                    {errors.newTeamName.message}
+                  </Field.ErrorText>
                 )}
               </Field.Root>
             )}
           </>
         )}
 
-        {error && (
-          <Text color="red.500">{error}</Text>
-        )}
+        {error && <Text color="red.500">{error}</Text>}
 
         <HStack width="full">
           <Spacer />

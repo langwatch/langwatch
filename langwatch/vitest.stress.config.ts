@@ -14,11 +14,11 @@ export default defineConfig({
       "~/": join(__dirname, "./src/"),
       "@injected-dependencies.client": join(
         __dirname,
-        "./src/injection/injection.client.ts"
+        "./src/injection/injection.client.ts",
       ),
       "@injected-dependencies.server": join(
         __dirname,
-        "./src/injection/injection.server.ts"
+        "./src/injection/injection.server.ts",
       ),
     },
   },

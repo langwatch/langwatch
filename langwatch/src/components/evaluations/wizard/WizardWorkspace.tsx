@@ -205,8 +205,19 @@ export const WizardWorkspace = memo(function WizardWorkspace() {
               top="58px"
               overflow="hidden"
             >
-              <Card.Root width="full" height="full" position="sticky" top={6} overflow="hidden">
-                <Card.Body width="full" height="full" padding={0} overflow="hidden">
+              <Card.Root
+                width="full"
+                height="full"
+                position="sticky"
+                top={6}
+                overflow="hidden"
+              >
+                <Card.Body
+                  width="full"
+                  height="full"
+                  padding={0}
+                  overflow="hidden"
+                >
                   <EvaluationResults
                     workflowId={workflowId}
                     experimentId={experimentId}

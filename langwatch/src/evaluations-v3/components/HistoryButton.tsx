@@ -5,13 +5,12 @@
  * history page showing all past runs stored in Elasticsearch.
  */
 import { Button } from "@chakra-ui/react";
-import { Clock } from "react-feather";
 import { useRouter } from "next/router";
-
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
-import { api } from "~/utils/api";
+import { Clock } from "react-feather";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 type HistoryButtonProps = {
   disabled?: boolean;
@@ -36,7 +35,7 @@ export function HistoryButton({ disabled = false }: HistoryButtonProps) {
     },
     {
       enabled: !!project && !!experimentId,
-    }
+    },
   );
 
   const hasRuns = (runsQuery.data?.runs.length ?? 0) > 0;

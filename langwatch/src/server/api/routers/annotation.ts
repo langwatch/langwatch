@@ -13,6 +13,7 @@ import {
   TRACE_INDEX,
   traceIndexId,
 } from "~/server/elasticsearch";
+import { TraceService } from "~/server/traces/trace.service";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger";
 import type { Protections } from "../../elasticsearch/protections";
@@ -20,7 +21,6 @@ import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { getUserProtectionsForProject } from "../utils";
-import { TraceService } from "~/server/traces/trace.service";
 
 const scoreOptionSchema = z.object({
   value: z
@@ -62,7 +62,11 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
 
   // Get traces for queue items
   const traceService = TraceService.create(ctx.prisma);
-  const traces = await traceService.getTracesWithSpans(projectId, traceIds, protections);
+  const traces = await traceService.getTracesWithSpans(
+    projectId,
+    traceIds,
+    protections,
+  );
 
   // Create lookup maps for O(1) access
   const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));

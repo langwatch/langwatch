@@ -1,20 +1,20 @@
-import {
-  type NormalizedAttributes,
-  type NormalizedEvent,
-  type NormalizedSpan,
-} from "../schemas/spans";
-import {
-  type OtlpInstrumentationScope,
-  type OtlpResource,
-  type OtlpSpan,
-} from "../schemas/otlp";
-import { TraceRequestUtils } from "../utils/traceRequest.utils";
-import { IdUtils } from "../utils/id.utils";
-import { CanonicalizeSpanAttributesService } from "../canonicalisation";
-import { createLogger } from "~/utils/logger";
-import { getLangWatchTracer } from "langwatch";
 import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 import { EventUtils } from "~/server/event-sourcing/library";
+import { createLogger } from "~/utils/logger";
+import { CanonicalizeSpanAttributesService } from "../canonicalisation";
+import type {
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "../schemas/otlp";
+import type {
+  NormalizedAttributes,
+  NormalizedEvent,
+  NormalizedSpan,
+} from "../schemas/spans";
+import { IdUtils } from "../utils/id.utils";
+import { TraceRequestUtils } from "../utils/traceRequest.utils";
 
 export class SpanNormalizationPipelineService {
   private readonly canonicalizeSpanAttributesService =
@@ -26,6 +26,7 @@ export class SpanNormalizationPipelineService {
     "langwatch.trace-processing.span-normalization-pipeline-service",
   );
 
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - class uses dependency injection via private fields
   constructor() {}
 
   normalizeSpanReceived(

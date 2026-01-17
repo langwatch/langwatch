@@ -31,7 +31,7 @@ const mockSources: AvailableSource[] = [
 ];
 
 const renderComponent = (
-  props: Partial<Parameters<typeof VariableInsertMenu>[0]> = {}
+  props: Partial<Parameters<typeof VariableInsertMenu>[0]> = {},
 ) => {
   const defaultProps = {
     isOpen: true,
@@ -47,7 +47,7 @@ const renderComponent = (
   return render(
     <ChakraProvider value={defaultSystem}>
       <VariableInsertMenu {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -182,7 +182,7 @@ describe("VariableInsertMenu", () => {
 
       // Should show with {{ }} syntax
       expect(
-        screen.getByText(/Create variable "{{my_custom}}"/)
+        screen.getByText(/Create variable "{{my_custom}}"/),
       ).toBeInTheDocument();
     });
 
@@ -192,7 +192,7 @@ describe("VariableInsertMenu", () => {
 
       // Should normalize to my_custom_var
       expect(
-        screen.getByText(/Create variable "{{my_custom_var}}"/)
+        screen.getByText(/Create variable "{{my_custom_var}}"/),
       ).toBeInTheDocument();
     });
 
@@ -209,12 +209,10 @@ describe("VariableInsertMenu", () => {
 
       // Should show "input" field AND create option
       expect(screen.getByText("input")).toBeInTheDocument();
-      expect(
-        screen.getByText(/Create variable "{{in}}"/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Create variable "{{in}}"/)).toBeInTheDocument();
 
       // Verify order: find all clickable items and check create is last
-      const items = container.querySelectorAll('[cursor="pointer"]');
+      const _items = container.querySelectorAll('[cursor="pointer"]');
       // The create option should have a border-top (visual separator)
       const createOption = screen.getByText(/Create variable "{{in}}"/);
       const parentHStack = createOption.closest('[class*="chakra"]');
@@ -249,7 +247,7 @@ describe("VariableInsertMenu", () => {
       // No fields match "nonexistent", but create option should show
       expect(screen.queryByText("input")).not.toBeInTheDocument();
       expect(
-        screen.getByText(/Create variable "{{nonexistent}}"/)
+        screen.getByText(/Create variable "{{nonexistent}}"/),
       ).toBeInTheDocument();
     });
 
@@ -270,7 +268,7 @@ describe("VariableInsertMenu", () => {
 
       // Should call onSelect with the field, not onCreateVariable
       expect(onSelect).toHaveBeenCalledWith(
-        expect.objectContaining({ fieldName: "input" })
+        expect.objectContaining({ fieldName: "input" }),
       );
       expect(onCreateVariable).not.toHaveBeenCalled();
     });
@@ -293,7 +291,7 @@ describe("VariableInsertMenu", () => {
 
       expect(screen.getByText("No matching fields found")).toBeInTheDocument();
       expect(
-        screen.getByText("Type a name to create a new variable")
+        screen.getByText("Type a name to create a new variable"),
       ).toBeInTheDocument();
     });
   });

@@ -11,7 +11,10 @@
  * 3. Evaluator is "langevals/llm_answer_match" (always 0 or 1)
  */
 
-import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
+import {
+  AVAILABLE_EVALUATORS,
+  type EvaluatorTypes,
+} from "~/server/evaluations/evaluators.generated";
 
 /**
  * Evaluator types that should always have their scores stripped,
@@ -54,7 +57,7 @@ export const shouldStripScore = (evaluatorType: string): boolean => {
  * @returns Set of evaluator IDs that should have scores stripped
  */
 export const buildStripScoreEvaluatorIds = (
-  evaluators: Array<{ id: string; evaluatorType: string }>
+  evaluators: Array<{ id: string; evaluatorType: string }>,
 ): Set<string> => {
   const stripScoreIds = new Set<string>();
 

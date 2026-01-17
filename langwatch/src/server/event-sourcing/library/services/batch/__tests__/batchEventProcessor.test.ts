@@ -3,7 +3,6 @@ import type { Event, ProcessorCheckpoint } from "../../../domain/types";
 import type { ProcessorCheckpointStore } from "../../../stores/eventHandlerCheckpointStore.types";
 import type { EventStore } from "../../../stores/eventStore.types";
 import type { DistributedLock } from "../../../utils/distributedLock";
-import { LockError } from "../../errorHandling";
 import {
   createMockDistributedLock,
   createMockEventStore,
@@ -12,6 +11,7 @@ import {
   createTestEvent,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
+import { LockError } from "../../errorHandling";
 import { BatchEventProcessor } from "../batchEventProcessor";
 
 describe("BatchEventProcessor", () => {
@@ -514,12 +514,13 @@ describe("BatchEventProcessor", () => {
 
         const processEvent = vi.fn().mockResolvedValue(void 0);
 
-        const result = await batchProcessorNoCheckpoint.processUnprocessedEvents(
-          triggerEvent,
-          processorName,
-          "handler",
-          processEvent,
-        );
+        const result =
+          await batchProcessorNoCheckpoint.processUnprocessedEvents(
+            triggerEvent,
+            processorName,
+            "handler",
+            processEvent,
+          );
 
         expect(result.success).toBe(true);
         expect(result.processedCount).toBe(2);
@@ -636,4 +637,3 @@ describe("BatchEventProcessor", () => {
     });
   });
 });
-

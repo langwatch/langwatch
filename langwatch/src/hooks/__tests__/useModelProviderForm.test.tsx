@@ -1,8 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, act, cleanup } from "@testing-library/react";
+
+import { act, cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
@@ -57,7 +58,7 @@ describe("useModelProviderForm", () => {
   });
 
   const createOpenAIProvider = (
-    overrides: Partial<MaybeStoredModelProvider> = {}
+    overrides: Partial<MaybeStoredModelProvider> = {},
   ): MaybeStoredModelProvider => ({
     provider: "openai",
     enabled: false,
@@ -83,7 +84,7 @@ describe("useModelProviderForm", () => {
             projectId: "test-project-id",
             project,
           }),
-        { initialProps: { project: stableProject } }
+        { initialProps: { project: stableProject } },
       );
 
       // User types in an API key
@@ -91,13 +92,17 @@ describe("useModelProviderForm", () => {
         result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
       });
 
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-user-typing");
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
+        "sk-user-typing",
+      );
 
       // Re-render with SAME reference (simulating memoized project)
       rerender({ project: stableProject });
 
       // Key should be preserved because project reference is stable
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-user-typing");
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
+        "sk-user-typing",
+      );
     });
 
     it("resets form when project object reference changes (unmemoized)", () => {
@@ -112,7 +117,7 @@ describe("useModelProviderForm", () => {
             projectId: "test-project-id",
             project,
           }),
-        { initialProps: { project: project1 } }
+        { initialProps: { project: project1 } },
       );
 
       // User types in an API key
@@ -120,7 +125,9 @@ describe("useModelProviderForm", () => {
         result.current[1].setCustomKey("OPENAI_API_KEY", "sk-user-typing");
       });
 
-      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-user-typing");
+      expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
+        "sk-user-typing",
+      );
 
       // Re-render with NEW reference (unmemoized project - the bug scenario)
       rerender({ project: project2 });
@@ -150,7 +157,7 @@ describe("useModelProviderForm", () => {
             projectId: "test-project-id",
             project: null,
           }),
-        { initialProps: { provider: openaiProvider } }
+        { initialProps: { provider: openaiProvider } },
       );
 
       // User types in an OpenAI API key
@@ -178,7 +185,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("");
@@ -199,15 +206,15 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       // Keys should be masked
       expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        MASKED_KEY_PLACEHOLDER
+        MASKED_KEY_PLACEHOLDER,
       );
       expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe(
-        "https://api.openai.com/v1"
+        "https://api.openai.com/v1",
       );
     });
 
@@ -222,12 +229,12 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       // API key should be masked since provider is enabled
       expect(result.current[0].customKeys.OPENAI_API_KEY).toBe(
-        MASKED_KEY_PLACEHOLDER
+        MASKED_KEY_PLACEHOLDER,
       );
       // URL fields are not masked
       expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe("");
@@ -243,7 +250,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {
@@ -263,20 +270,20 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {
         result.current[1].setCustomKey("OPENAI_API_KEY", "sk-key");
         result.current[1].setCustomKey(
           "OPENAI_BASE_URL",
-          "https://custom.example.com"
+          "https://custom.example.com",
         );
       });
 
       expect(result.current[0].customKeys.OPENAI_API_KEY).toBe("sk-key");
       expect(result.current[0].customKeys.OPENAI_BASE_URL).toBe(
-        "https://custom.example.com"
+        "https://custom.example.com",
       );
     });
   });
@@ -291,7 +298,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
-        })
+        }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(true);
@@ -306,7 +313,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
-        })
+        }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(false);
@@ -321,7 +328,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project,
-        })
+        }),
       );
 
       expect(result.current[0].useAsDefaultProvider).toBe(false);
@@ -345,7 +352,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].extraHeaders).toHaveLength(1);
@@ -361,7 +368,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].extraHeaders).toHaveLength(0);
@@ -388,7 +395,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].extraHeaders).toHaveLength(2);
@@ -411,7 +418,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {
@@ -432,7 +439,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {
@@ -441,7 +448,7 @@ describe("useModelProviderForm", () => {
       });
 
       const model1Count = result.current[0].customModels.filter(
-        (m) => m.value === "model-1"
+        (m) => m.value === "model-1",
       ).length;
       expect(model1Count).toBe(1);
     });
@@ -468,7 +475,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].useApiGateway).toBe(true);
@@ -491,12 +498,12 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].useApiGateway).toBe(false);
       expect(result.current[0].displayKeys).toHaveProperty(
-        "AZURE_OPENAI_API_KEY"
+        "AZURE_OPENAI_API_KEY",
       );
 
       act(() => {
@@ -505,10 +512,10 @@ describe("useModelProviderForm", () => {
 
       expect(result.current[0].useApiGateway).toBe(true);
       expect(result.current[0].displayKeys).toHaveProperty(
-        "AZURE_API_GATEWAY_BASE_URL"
+        "AZURE_API_GATEWAY_BASE_URL",
       );
       expect(result.current[0].displayKeys).not.toHaveProperty(
-        "AZURE_OPENAI_API_KEY"
+        "AZURE_OPENAI_API_KEY",
       );
     });
 
@@ -529,7 +536,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       expect(result.current[0].extraHeaders).toHaveLength(0);
@@ -552,7 +559,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {
@@ -570,7 +577,7 @@ describe("useModelProviderForm", () => {
           provider,
           projectId: "test-project-id",
           project: null,
-        })
+        }),
       );
 
       act(() => {

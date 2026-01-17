@@ -1,6 +1,6 @@
-import { z } from "zod";
-import { nanoid } from "nanoid";
 import type { Prisma } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { z } from "zod";
 import { EvaluatorService } from "../../evaluators/evaluator.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -92,8 +92,12 @@ export const evaluatorsRouter = createTRPCRouter({
         data: {
           ...(input.name && { name: input.name }),
           ...(input.type && { type: input.type }),
-          ...(input.config && { config: input.config as Prisma.InputJsonValue }),
-          ...(input.workflowId !== undefined && { workflowId: input.workflowId }),
+          ...(input.config && {
+            config: input.config as Prisma.InputJsonValue,
+          }),
+          ...(input.workflowId !== undefined && {
+            workflowId: input.workflowId,
+          }),
         },
       });
     }),

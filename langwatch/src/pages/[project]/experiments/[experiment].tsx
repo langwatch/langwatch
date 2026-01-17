@@ -1,13 +1,13 @@
-import { ExperimentType } from "@prisma/client";
 import { Alert, Box } from "@chakra-ui/react";
+import { ExperimentType } from "@prisma/client";
 
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../../../components/DashboardLayout";
-import { LoadingScreen } from "../../../components/LoadingScreen";
-import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
 import { BatchEvaluationResults } from "../../../components/batch-evaluation-results";
+import { DashboardLayout } from "../../../components/DashboardLayout";
+import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
 // Note: BatchEvaluationV2 is kept for reference but no longer used - can be deleted after verification
 import { DSPyExperiment } from "../../../components/experiments/DSPyExperiment";
+import { LoadingScreen } from "../../../components/LoadingScreen";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { api } from "../../../utils/api";
 import { isNotFound } from "../../../utils/trpcError";
@@ -47,7 +47,8 @@ export default function ExperimentPage() {
             <Alert.Indicator />
             <Alert.Title>Experiment not found</Alert.Title>
             <Alert.Description>
-              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              The experiment you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -63,7 +64,8 @@ export default function ExperimentPage() {
             <Alert.Indicator />
             <Alert.Title>Failed to load experiment</Alert.Title>
             <Alert.Description>
-              {experiment.error?.message ?? "An unexpected error occurred while loading the experiment."}
+              {experiment.error?.message ??
+                "An unexpected error occurred while loading the experiment."}
             </Alert.Description>
           </Alert.Root>
         </Box>
@@ -79,7 +81,10 @@ export default function ExperimentPage() {
         <BatchEvaluation project={project} experiment={experiment.data} />
       ) : experiment.data.type === ExperimentType.BATCH_EVALUATION_V2 ||
         experiment.data.type === ExperimentType.EVALUATIONS_V3 ? (
-        <BatchEvaluationResults project={project} experiment={experiment.data} />
+        <BatchEvaluationResults
+          project={project}
+          experiment={experiment.data}
+        />
       ) : (
         <Box padding={6}>
           <Alert.Root status="warning">

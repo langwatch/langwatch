@@ -44,12 +44,12 @@ export const abortManager = {
     const key = `${ABORT_KEY_PREFIX}${runId}`;
     const value = await connection.get(key);
     const isAborted = value === "1";
-    
+
     // Only log when abort is detected to avoid spam
     if (isAborted) {
       logger.info({ runId }, "Abort flag detected");
     }
-    
+
     return isAborted;
   },
 

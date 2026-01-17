@@ -1,11 +1,9 @@
 import { definePipeline } from "../../library";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
-import {
-  SpanStorageEventHandler,
-} from "./handlers";
+import { SpanStorageEventHandler } from "./handlers";
 import { TraceSummaryProjectionHandler } from "./projections";
-import type { TraceProcessingEvent } from "./schemas/events";
 import { SPAN_RECEIVED_EVENT_TYPE } from "./schemas/constants";
+import type { TraceProcessingEvent } from "./schemas/events";
 
 /**
  * Trace processing pipeline definition (static, no runtime dependencies).

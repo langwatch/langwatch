@@ -10,7 +10,7 @@
 
 import { connection } from "~/server/redis";
 import { createLogger } from "~/utils/logger";
-import type { ExecutionSummary, EvaluationV3Event } from "./types";
+import type { EvaluationV3Event, ExecutionSummary } from "./types";
 
 const logger = createLogger("evaluations-v3:run-state-manager");
 
@@ -81,7 +81,10 @@ export const runStateManager = {
     total: number;
   }): Promise<void> {
     if (!connection) {
-      logger.warn({ runId: params.runId }, "Redis not available, run state not stored");
+      logger.warn(
+        { runId: params.runId },
+        "Redis not available, run state not stored",
+      );
       return;
     }
 
@@ -98,7 +101,12 @@ export const runStateManager = {
     };
 
     const key = `${RUN_STATE_KEY_PREFIX}${params.runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
     logger.info({ runId: params.runId }, "Run state created");
   },
 
@@ -114,7 +122,12 @@ export const runStateManager = {
     state.progress = progress;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
   },
 
   /**
@@ -139,7 +152,12 @@ export const runStateManager = {
     }
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
   },
 
   /**
@@ -147,7 +165,7 @@ export const runStateManager = {
    */
   async completeRun(
     runId: string,
-    summary: RunState["summary"]
+    summary: RunState["summary"],
   ): Promise<void> {
     if (!connection) return;
 
@@ -160,7 +178,12 @@ export const runStateManager = {
     state.progress = state.total;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
     logger.info({ runId }, "Run completed");
   },
 
@@ -178,7 +201,12 @@ export const runStateManager = {
     state.error = error;
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
     logger.error({ runId, error }, "Run failed");
   },
 
@@ -195,7 +223,12 @@ export const runStateManager = {
     state.finishedAt = Date.now();
 
     const key = `${RUN_STATE_KEY_PREFIX}${runId}`;
-    await connection.set(key, JSON.stringify(state), "EX", RUN_STATE_TTL_SECONDS);
+    await connection.set(
+      key,
+      JSON.stringify(state),
+      "EX",
+      RUN_STATE_TTL_SECONDS,
+    );
     logger.info({ runId }, "Run stopped");
   },
 

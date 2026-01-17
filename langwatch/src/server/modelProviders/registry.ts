@@ -35,10 +35,15 @@ export type MaybeStoredModelProvider = Omit<
 
 /** Validates URL format when value is present, allows empty/null/undefined */
 const optionalUrlField = () =>
-  z.string().nullable().optional().refine(
-    (val) => !val || val.trim() === "" || z.string().url().safeParse(val).success,
-    { message: "Must be a valid URL (e.g., https://api.openai.com/v1)" }
-  );
+  z
+    .string()
+    .nullable()
+    .optional()
+    .refine(
+      (val) =>
+        !val || val.trim() === "" || z.string().url().safeParse(val).success,
+      { message: "Must be a valid URL (e.g., https://api.openai.com/v1)" },
+    );
 
 export const getProviderModelOptions = (
   provider: string,

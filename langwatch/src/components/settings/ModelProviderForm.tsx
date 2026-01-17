@@ -1,27 +1,25 @@
-import {
-  VStack,
-  HStack,
-  Button,
-  Field,
-} from "@chakra-ui/react";
+import { Button, Field, HStack, VStack } from "@chakra-ui/react";
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
-import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
-import { useModelProviderForm } from "../../hooks/useModelProviderForm";
-import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
 import { useDrawer } from "../../hooks/useDrawer";
+import { useModelProviderApiKeyValidation } from "../../hooks/useModelProviderApiKeyValidation";
+import { useModelProviderForm } from "../../hooks/useModelProviderForm";
+import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import {
   type MaybeStoredModelProvider,
   modelProviders as modelProvidersRegistry,
 } from "../../server/modelProviders/registry";
+import {
+  hasUserEnteredNewApiKey,
+  hasUserModifiedNonApiKeyFields,
+} from "../../utils/modelProviderHelpers";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../utils/zod";
-import { hasUserEnteredNewApiKey, hasUserModifiedNonApiKeyFields } from "../../utils/modelProviderHelpers";
 import { Switch } from "../ui/switch";
 import { CredentialsSection } from "./ModelProviderCredentialsSection";
-import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 import { DefaultProviderSection } from "./ModelProviderDefaultSection";
+import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -46,10 +44,15 @@ export const EditModelProviderForm = ({
   // Include the current provider being edited since it will be enabled when saved
   const enabledProvidersCount = useMemo(() => {
     if (!providers) return 1; // Current provider will be enabled when (if) saved
-    const currentlyEnabledCount = Object.values(providers).filter((p) => p.enabled).length;
+    const currentlyEnabledCount = Object.values(providers).filter(
+      (p) => p.enabled,
+    ).length;
     // If the current provider is not already enabled, add 1 since it will be enabled when saved
-    const isCurrentProviderAlreadyEnabled = providers[providerKey]?.enabled ?? false;
-    return isCurrentProviderAlreadyEnabled ? currentlyEnabledCount : currentlyEnabledCount + 1;
+    const isCurrentProviderAlreadyEnabled =
+      providers[providerKey]?.enabled ?? false;
+    return isCurrentProviderAlreadyEnabled
+      ? currentlyEnabledCount
+      : currentlyEnabledCount + 1;
   }, [providers, providerKey]);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -105,7 +108,13 @@ export const EditModelProviderForm = ({
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
-  const { validate: validateApiKey, validateWithCustomUrl, isValidating: isValidatingApiKey, validationError: apiKeyValidationError, clearError: clearApiKeyError } = useModelProviderApiKeyValidation(
+  const {
+    validate: validateApiKey,
+    validateWithCustomUrl,
+    isValidating: isValidatingApiKey,
+    validationError: apiKeyValidationError,
+    clearError: clearApiKeyError,
+  } = useModelProviderApiKeyValidation(
     provider.provider,
     state.customKeys,
     projectId,
@@ -128,21 +137,26 @@ export const EditModelProviderForm = ({
     // Check if user modified non-API-key fields (like URLs)
     const hasNonApiKeyChanges = hasUserModifiedNonApiKeyFields(
       state.customKeys,
-      state.initialKeys
+      state.initialKeys,
     );
 
     // Validate keys according to schema before submitting
-    if (providerDefinition?.keysSchema && (!isUsingEnvVars || hasNonApiKeyChanges)) {
+    if (
+      providerDefinition?.keysSchema &&
+      (!isUsingEnvVars || hasNonApiKeyChanges)
+    ) {
       const keysSchema = z.union([
         providerDefinition.keysSchema,
         z.object({ MANAGED: z.string() }),
       ]);
-      
+
       const keysToValidate: Record<string, unknown> = { ...state.customKeys };
       const result = keysSchema.safeParse(keysToValidate);
-      
+
       if (!result.success) {
-        const parsedErrors = parseZodFieldErrors(result.error as ZodErrorStructure);
+        const parsedErrors = parseZodFieldErrors(
+          result.error as ZodErrorStructure,
+        );
         setFieldErrors(parsedErrors);
         return;
       }
@@ -162,9 +176,18 @@ export const EditModelProviderForm = ({
       const isValid = await validateWithCustomUrl();
       if (!isValid) return;
     }
-    
+
     void actions.submit();
-  }, [isUsingEnvVars, providerDefinition, state.customKeys, state.initialKeys, actions, validateApiKey, validateWithCustomUrl, clearApiKeyError]);
+  }, [
+    isUsingEnvVars,
+    providerDefinition,
+    state.customKeys,
+    state.initialKeys,
+    actions,
+    validateApiKey,
+    validateWithCustomUrl,
+    clearApiKeyError,
+  ]);
 
   return (
     <VStack gap={4} align="start" width="full">

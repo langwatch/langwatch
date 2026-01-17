@@ -27,8 +27,8 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -156,7 +156,7 @@ describe("Column width persistence", () => {
       store.setColumnWidth("input", 300);
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.columnWidths["input"]).toBe(300);
+      expect(updatedStore.ui.columnWidths.input).toBe(300);
     });
 
     it("setColumnWidths sets widths for multiple columns", () => {
@@ -165,8 +165,8 @@ describe("Column width persistence", () => {
       store.setColumnWidths({ input: 200, expected_output: 400 });
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.columnWidths["input"]).toBe(200);
-      expect(updatedStore.ui.columnWidths["expected_output"]).toBe(400);
+      expect(updatedStore.ui.columnWidths.input).toBe(200);
+      expect(updatedStore.ui.columnWidths.expected_output).toBe(400);
     });
 
     it("setColumnWidths merges with existing widths", () => {
@@ -176,8 +176,8 @@ describe("Column width persistence", () => {
       store.setColumnWidths({ expected_output: 400 });
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.columnWidths["input"]).toBe(300);
-      expect(updatedStore.ui.columnWidths["expected_output"]).toBe(400);
+      expect(updatedStore.ui.columnWidths.input).toBe(300);
+      expect(updatedStore.ui.columnWidths.expected_output).toBe(400);
     });
 
     it("column widths are part of UI state", () => {
@@ -229,7 +229,9 @@ describe("Row height mode", () => {
 
       // Expand a cell
       store.toggleCellExpanded(0, "input");
-      expect(useEvaluationsV3Store.getState().ui.expandedCells.has("0-input")).toBe(true);
+      expect(
+        useEvaluationsV3Store.getState().ui.expandedCells.has("0-input"),
+      ).toBe(true);
 
       // Switch mode
       store.setRowHeightMode("expanded");
@@ -570,7 +572,7 @@ describe("TargetHeader stability", () => {
     store.setSelectedCell({ row: 0, columnId: "input" });
 
     // Wait a bit for any potential re-renders
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // TargetHeader should NOT have been remounted
     expect(unmountCount.current).toBe(initialUnmountCount);
@@ -614,7 +616,7 @@ describe("TargetHeader stability", () => {
     // Toggle row selection
     store.toggleRowSelection(0);
 
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // TargetHeader should NOT have been remounted
     expect(unmountCount.current).toBe(initialUnmountCount);

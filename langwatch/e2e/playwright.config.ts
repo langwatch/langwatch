@@ -1,7 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
-import path from "path";
-
 import fs from "fs";
+import path from "path";
 
 // Check if auth.json exists, if not, throw an error
 const authFilePath = path.join(__dirname, "auth.json");
@@ -13,7 +12,7 @@ if (!fs.existsSync(authFilePath)) {
     If the file exists, please check that you are running the tests from the root of the project.
 
     IMPORTANT: DO NOT COMMIT THE auth.json FILE TO GIT.
-    `
+    `,
   );
 }
 /*

@@ -6,7 +6,10 @@ import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:sse");
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== "GET") {
     res.status(405).json({ message: "Method not allowed" });
     return;
@@ -19,12 +22,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  const inputParam = typeof req.query.input === "string" ? req.query.input : undefined;
+  const inputParam =
+    typeof req.query.input === "string" ? req.query.input : undefined;
   const input = inputParam ? superjson.parse(inputParam) : undefined;
 
   const ctx = await createTRPCContext({ req, res });
   const caller = appRouter.createCaller(ctx);
-  const procedure = path.split(".").reduce<any>((obj, key) => obj?.[key], caller);
+  const procedure = path
+    .split(".")
+    .reduce<any>((obj, key) => obj?.[key], caller);
 
   if (typeof procedure !== "function") {
     res.status(404).json({ message: "Procedure not found" });
@@ -37,7 +43,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
-  if (typeof (res as any).flushHeaders === "function") (res as any).flushHeaders();
+  if (typeof (res as any).flushHeaders === "function")
+    (res as any).flushHeaders();
 
   const writeData = (value: unknown) => {
     if (res.writableEnded || res.destroyed) return;
@@ -60,6 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     clearInterval(ping);
     try {
       unsubscribe?.();
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - ignore cleanup errors
     } catch {}
     unsubscribe = null;
     res.end();
@@ -93,13 +101,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         },
         error: (err: unknown) => {
           logger.error({ err, path }, "SSE observable error");
-          writeData({ type: "error", message: err instanceof Error ? err.message : "Subscription error" });
+          writeData({
+            type: "error",
+            message: err instanceof Error ? err.message : "Subscription error",
+          });
           end();
         },
       });
 
       if (typeof sub === "function") unsubscribe = sub;
-      else if (sub && typeof sub.unsubscribe === "function") unsubscribe = () => sub.unsubscribe();
+      else if (sub && typeof sub.unsubscribe === "function")
+        unsubscribe = () => sub.unsubscribe();
 
       return; // keep connection open
     }
@@ -110,7 +122,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     end();
   } catch (error) {
     logger.error({ error, path, input }, "SSE handler error");
-    writeData({ type: "error", message: error instanceof Error ? error.message : "Internal server error" });
+    writeData({
+      type: "error",
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
     end();
   }
 }

@@ -1,13 +1,11 @@
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import type { Event } from "../lib/types";
+import { type ClickHouseEventRow, clickHouseRowToEvent } from "./loadEvents";
 import {
   type Environment,
-  getClickHousePassword,
   getClickHouseHost,
+  getClickHousePassword,
 } from "./secrets";
-import { clickHouseRowToEvent, type ClickHouseEventRow } from "./loadEvents";
-
-const CLICKHOUSE_DATABASE = "langwatch";
 
 export interface ClickHouseConfig {
   env: Environment;
@@ -90,7 +88,9 @@ export async function listRecentAggregates(config: {
   env: Environment;
   profile?: string;
   limit?: number;
-}): Promise<{ aggregateId: string; aggregateType: string; eventCount: number }[]> {
+}): Promise<
+  { aggregateId: string; aggregateType: string; eventCount: number }[]
+> {
   const { env, profile, limit = 50 } = config;
 
   const client = await createClickHouseClient({ env, profile });
@@ -177,11 +177,3 @@ export async function queryChildAggregates(config: {
     await client.close();
   }
 }
-
-
-
-
-
-
-
-

@@ -11,26 +11,32 @@
  * - SSE: Add "Accept: text/event-stream" header for real-time streaming
  */
 
+import { ExperimentType } from "@prisma/client";
 import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { handle } from "hono/vercel";
-import { ExperimentType } from "@prisma/client";
-import { z } from "zod";
-import { captureException } from "~/utils/posthogErrorCapture";
+import type { z } from "zod";
+import { loggerMiddleware } from "~/app/api/middleware/logger";
+import {
+  createInitialUIState,
+  type EvaluationsV3State,
+} from "~/evaluations-v3/types";
+import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
+import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
+import type { TypedAgent } from "~/server/agents/agent.repository";
+import { AgentService } from "~/server/agents/agent.service";
+import { getFullDataset } from "~/server/api/routers/datasetRecord";
+import { prisma } from "~/server/db";
 import { runOrchestrator } from "~/server/evaluations-v3/execution/orchestrator";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
-import { type EvaluationsV3State, createInitialUIState } from "~/evaluations-v3/types";
-import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
-import { prisma } from "~/server/db";
-import { createLogger } from "~/utils/logger";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
-import { PromptService, type VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import { AgentService } from "~/server/agents/agent.service";
-import type { TypedAgent } from "~/server/agents/agent.repository";
-import { getFullDataset } from "~/server/api/routers/datasetRecord";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
-import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
+import {
+  PromptService,
+  type VersionedPrompt,
+} from "~/server/prompt-config/prompt.service";
+import { generateHumanReadableId } from "~/utils/humanReadableId";
+import { createLogger } from "~/utils/logger";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 const logger = createLogger("langwatch:evaluations-v3:run");
 
@@ -40,7 +46,9 @@ app.use(loggerMiddleware());
 /**
  * Helper to authenticate via API key
  */
-const authenticateApiKey = async (c: { req: { header: (name: string) => string | undefined } }) => {
+const authenticateApiKey = async (c: {
+  req: { header: (name: string) => string | undefined };
+}) => {
   const apiKey =
     c.req.header("X-Auth-Token") ??
     c.req.header("Authorization")?.split(" ")[1];
@@ -77,9 +85,14 @@ const loadExperiment = async (projectId: string, slug: string) => {
   }
 
   // Parse and validate wizardState
-  const parseResult = persistedEvaluationsV3StateSchema.safeParse(experiment.wizardState);
+  const parseResult = persistedEvaluationsV3StateSchema.safeParse(
+    experiment.wizardState,
+  );
   if (!parseResult.success) {
-    logger.error({ slug, errors: parseResult.error.errors }, "Invalid wizardState");
+    logger.error(
+      { slug, errors: parseResult.error.errors },
+      "Invalid wizardState",
+    );
     return { error: "Invalid evaluation configuration", status: 400 as const };
   }
 
@@ -91,7 +104,7 @@ const loadExperiment = async (projectId: string, slug: string) => {
  */
 const loadExecutionData = async (
   projectId: string,
-  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>
+  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>,
 ) => {
   const dataset = wizardState.datasets[0];
   if (!dataset) {
@@ -104,7 +117,9 @@ const loadExecutionData = async (
   // Load dataset
   if (dataset.type === "inline" && dataset.inline) {
     datasetColumns = dataset.inline.columns;
-    datasetRows = transposeColumnsFirstToRowsFirstWithId(dataset.inline.records);
+    datasetRows = transposeColumnsFirstToRowsFirstWithId(
+      dataset.inline.records,
+    );
   } else if (dataset.type === "saved" && dataset.datasetId) {
     const fullDataset = await getFullDataset({
       datasetId: dataset.datasetId,
@@ -115,7 +130,9 @@ const loadExecutionData = async (
       return { error: "Dataset not found", status: 404 as const };
     }
     datasetColumns = dataset.columns;
-    datasetRows = fullDataset.datasetRecords.map((r) => r.entry as Record<string, unknown>);
+    datasetRows = fullDataset.datasetRecords.map(
+      (r) => r.entry as Record<string, unknown>,
+    );
   } else {
     return { error: "Invalid dataset configuration", status: 400 as const };
   }
@@ -138,15 +155,22 @@ const loadExecutionData = async (
           const versionInfo = target.promptVersionNumber
             ? ` version ${target.promptVersionNumber}`
             : "";
-          return { error: `Prompt "${target.name}"${versionInfo} not found`, status: 404 as const };
+          return {
+            error: `Prompt "${target.name}"${versionInfo} not found`,
+            status: 404 as const,
+          };
         }
       } catch (promptError) {
         const versionInfo = target.promptVersionNumber
           ? ` version ${target.promptVersionNumber}`
           : "";
         logger.error(
-          { error: promptError, promptId: target.promptId, version: target.promptVersionNumber },
-          "Failed to load prompt for target"
+          {
+            error: promptError,
+            promptId: target.promptId,
+            version: target.promptVersionNumber,
+          },
+          "Failed to load prompt for target",
         );
         return {
           error: `Failed to load prompt "${target.name}"${versionInfo}: ${(promptError as Error).message}`,
@@ -179,7 +203,7 @@ const loadExecutionData = async (
  * Build state object for orchestrator
  */
 const buildState = (
-  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>
+  wizardState: z.infer<typeof persistedEvaluationsV3StateSchema>,
 ): EvaluationsV3State => {
   const dataset = wizardState.datasets[0]!;
 
@@ -204,8 +228,13 @@ const buildState = (
 /**
  * Generate run URL for the UI
  */
-const getRunUrl = (projectSlug: string, experimentSlug: string, runId: string) => {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.langwatch.ai";
+const getRunUrl = (
+  projectSlug: string,
+  experimentSlug: string,
+  runId: string,
+) => {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL ?? "https://app.langwatch.ai";
   return `${baseUrl}/${projectSlug}/experiments/${experimentSlug}?runId=${runId}`;
 };
 
@@ -234,7 +263,8 @@ app.post("/:slug/run", async (c) => {
   if ("error" in dataResult) {
     return c.json({ error: dataResult.error }, { status: dataResult.status });
   }
-  const { datasetRows, datasetColumns, loadedPrompts, loadedAgents, dataset } = dataResult;
+  const { datasetRows, datasetColumns, loadedPrompts, loadedAgents } =
+    dataResult;
 
   // Build state for orchestrator
   const state = buildState(wizardState);
@@ -245,7 +275,7 @@ app.post("/:slug/run", async (c) => {
 
   logger.info(
     { projectId: project.id, slug, isSSE, rowCount: datasetRows.length },
-    "Starting CI/CD evaluation execution"
+    "Starting CI/CD evaluation execution",
   );
 
   // Calculate total cells
@@ -277,7 +307,10 @@ app.post("/:slug/run", async (c) => {
           }
         }
       } catch (error) {
-        logger.error({ error, projectId: project.id, slug }, "Orchestrator error");
+        logger.error(
+          { error, projectId: project.id, slug },
+          "Orchestrator error",
+        );
         captureException(error, { extra: { projectId: project.id, slug } });
 
         await stream.writeSSE({
@@ -327,8 +360,13 @@ app.post("/:slug/run", async (c) => {
         }
       }
     } catch (error) {
-      logger.error({ error, projectId: project.id, slug, runId }, "Execution error");
-      captureException(error, { extra: { projectId: project.id, slug, runId } });
+      logger.error(
+        { error, projectId: project.id, slug, runId },
+        "Execution error",
+      );
+      captureException(error, {
+        extra: { projectId: project.id, slug, runId },
+      });
       await runStateManager.failRun(runId, (error as Error).message);
     }
   };

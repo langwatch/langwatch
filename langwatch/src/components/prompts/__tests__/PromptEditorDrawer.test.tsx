@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  */
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useForm, FormProvider } from "react-hook-form";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // All mocks need to be set up before any imports
 const mockCloseDrawer = vi.fn();
@@ -68,7 +69,11 @@ const mockDefaultFormValues = {
 };
 
 vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
-  usePromptConfigForm: ({ initialConfigValues }: { initialConfigValues?: unknown }) => {
+  usePromptConfigForm: ({
+    initialConfigValues,
+  }: {
+    initialConfigValues?: unknown;
+  }) => {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const methods = useForm({
       defaultValues: initialConfigValues ?? mockDefaultFormValues,
@@ -80,7 +85,10 @@ vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
 // Mock useLatestPromptVersion to return consistent values for tests
 // This ensures the SavePromptButton knows we're at the "latest" version
 vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
-  useLatestPromptVersion: (options: { configId?: string; currentVersion?: number }) => {
+  useLatestPromptVersion: (options: {
+    configId?: string;
+    currentVersion?: number;
+  }) => {
     // For new prompts (no configId), return undefined versions
     if (!options?.configId) {
       return {
@@ -147,7 +155,10 @@ vi.mock("~/utils/api", () => ({
         }),
       },
       updateHandle: {
-        useMutation: (opts?: { onSuccess?: () => void; onError?: () => void }) => ({
+        useMutation: (opts?: {
+          onSuccess?: () => void;
+          onError?: () => void;
+        }) => ({
           mutate: mockUpdateHandle,
           isPending: false,
         }),
@@ -195,14 +206,14 @@ vi.mock(
         )}
       </div>
     ),
-  })
+  }),
 );
 
 vi.mock(
   "~/prompts/forms/fields/message-history-fields/PromptMessagesField",
   () => ({
     PromptMessagesField: () => <div data-testid="messages-field">Messages</div>,
-  })
+  }),
 );
 
 vi.mock("~/prompts/forms/fields/PromptConfigVersionFieldGroup", () => ({
@@ -229,7 +240,10 @@ vi.mock("~/prompts/utils/llmPromptConfigUtils", () => ({
     version: {
       versionId: prompt.versionId,
       configData: {
-        llm: prompt.configData?.llm ?? { model: "openai/gpt-4o", temperature: 0.7 },
+        llm: prompt.configData?.llm ?? {
+          model: "openai/gpt-4o",
+          temperature: 0.7,
+        },
         messages: [{ role: "system", content: prompt.prompt ?? "" }],
         inputs: prompt.inputs ?? [],
         outputs: prompt.outputs ?? [],
@@ -275,7 +289,9 @@ describe("PromptEditorDrawer", () => {
     it("shows save button with Save text for new prompts", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       // New prompts show "Save" on the button (no version update)
-      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent("Save");
+      expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
+        "Save",
+      );
     });
 
     it("shows model selector in header", () => {
@@ -298,14 +314,14 @@ describe("PromptEditorDrawer", () => {
     it("shows Saved button initially (no changes)", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(screen.getByTestId("save-prompt-button")).toHaveTextContent(
-        "Saved"
+        "Saved",
       );
     });
 
     it("does not show version history button in create mode", () => {
       renderWithProviders(<PromptEditorDrawer open={true} />);
       expect(
-        screen.queryByTestId("version-history-button")
+        screen.queryByTestId("version-history-button"),
       ).not.toBeInTheDocument();
     });
 
@@ -325,7 +341,7 @@ describe("PromptEditorDrawer", () => {
 
     it("renders prompt handle as header when editing", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       // When editing, shows the prompt handle as the title
       expect(screen.getByText("test-prompt")).toBeInTheDocument();
@@ -333,23 +349,23 @@ describe("PromptEditorDrawer", () => {
 
     it("does not show handle input field when editing", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(
-        screen.queryByTestId("prompt-handle-input")
+        screen.queryByTestId("prompt-handle-input"),
       ).not.toBeInTheDocument();
     });
 
     it("shows version history button when editing", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
     it("shows save button when editing existing prompt", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       // Save button should be present (may show "Saved" or "Update to vX" depending on form state)
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
@@ -375,7 +391,7 @@ describe("PromptEditorDrawer", () => {
           open={true}
           promptId="prompt-123"
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // Close drawer - should not call confirm since onLocalConfigChange is provided
@@ -402,7 +418,7 @@ describe("PromptEditorDrawer", () => {
           promptId="prompt-123"
           initialLocalConfig={initialLocalConfig}
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // The drawer should render with the prompt loaded (shows handle as title)
@@ -438,13 +454,13 @@ describe("PromptEditorDrawer", () => {
           promptId="prompt-123"
           initialLocalConfig={initialLocalConfig}
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // Since areFormValuesEqual returns false, hasUnsavedChanges is true
       // the discard button should be visible in version history
       expect(
-        screen.getByTestId("discard-local-changes-button")
+        screen.getByTestId("discard-local-changes-button"),
       ).toBeInTheDocument();
     });
 
@@ -454,34 +470,37 @@ describe("PromptEditorDrawer", () => {
           open={true}
           promptId="prompt-123"
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // No initialLocalConfig means no unsaved changes
       expect(
-        screen.queryByTestId("discard-local-changes-button")
+        screen.queryByTestId("discard-local-changes-button"),
       ).not.toBeInTheDocument();
     });
 
     it("discard button not shown for new prompts", () => {
       // Reset mocks for new prompt scenario
       mockAreFormValuesEqual.mockReturnValue(true);
-      mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
+      mockGetByIdOrHandle.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+      });
 
       renderWithProviders(
         <PromptEditorDrawer
           open={true}
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // New prompts don't have version history, so no version history button at all
       expect(
-        screen.queryByTestId("version-history-button")
+        screen.queryByTestId("version-history-button"),
       ).not.toBeInTheDocument();
       // And no discard button
       expect(
-        screen.queryByTestId("discard-local-changes-button")
+        screen.queryByTestId("discard-local-changes-button"),
       ).not.toBeInTheDocument();
     });
   });
@@ -514,7 +533,7 @@ describe("PromptEditorDrawer", () => {
           open={true}
           promptId="prompt-123"
           availableSources={mockAvailableSources}
-        />
+        />,
       );
 
       // Variables section should be present
@@ -523,10 +542,7 @@ describe("PromptEditorDrawer", () => {
 
     it("shows simple inputs when no availableSources provided", () => {
       renderWithProviders(
-        <PromptEditorDrawer
-          open={true}
-          promptId="prompt-123"
-        />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
 
       // Variables section should be present with simple inputs
@@ -535,7 +551,11 @@ describe("PromptEditorDrawer", () => {
 
     it("accepts inputMappings and onInputMappingsChange props", () => {
       const inputMappings = {
-        question: { type: "source" as const, sourceId: "dataset-1", field: "question" },
+        question: {
+          type: "source" as const,
+          sourceId: "dataset-1",
+          field: "question",
+        },
       };
 
       renderWithProviders(
@@ -545,7 +565,7 @@ describe("PromptEditorDrawer", () => {
           availableSources={mockAvailableSources}
           inputMappings={inputMappings}
           onInputMappingsChange={mockOnInputMappingsChange}
-        />
+        />,
       );
 
       // The drawer should render without errors (shows handle as title)
@@ -561,37 +581,50 @@ describe("PromptEditorDrawer", () => {
           promptId="prompt-123"
           availableSources={mockAvailableSources}
           onInputMappingsChange={mockOnInputMappingsChange}
-        />
+        />,
       );
 
       // Find the prompt textarea and type {{ to trigger variable menu
       const textareas = screen.getAllByRole("textbox");
-      const promptTextarea = textareas.find(t => t.getAttribute("data-testid")?.includes("textarea") || t.closest("[data-testid]")?.getAttribute("data-testid")?.includes("prompt"));
+      const promptTextarea = textareas.find(
+        (t) =>
+          t.getAttribute("data-testid")?.includes("textarea") ||
+          t
+            .closest("[data-testid]")
+            ?.getAttribute("data-testid")
+            ?.includes("prompt"),
+      );
 
       if (promptTextarea) {
         await user.click(promptTextarea);
         await user.type(promptTextarea, "{{");
 
         // Wait for the variable insert menu to appear
-        await waitFor(() => {
-          expect(screen.getByText("Test Dataset")).toBeInTheDocument();
-        }, { timeout: 3000 });
+        await waitFor(
+          () => {
+            expect(screen.getByText("Test Dataset")).toBeInTheDocument();
+          },
+          { timeout: 3000 },
+        );
 
         // Click on the "question" field from the dataset
         const questionOption = screen.getByText("question");
         await user.click(questionOption);
 
         // Verify onInputMappingsChange was called with the correct mapping
-        await waitFor(() => {
-          expect(mockOnInputMappingsChange).toHaveBeenCalledWith(
-            "question",
-            expect.objectContaining({
-              type: "source",
-              sourceId: "dataset-1",
-              field: "question",
-            })
-          );
-        }, { timeout: 3000 });
+        await waitFor(
+          () => {
+            expect(mockOnInputMappingsChange).toHaveBeenCalledWith(
+              "question",
+              expect.objectContaining({
+                type: "source",
+                sourceId: "dataset-1",
+                field: "question",
+              }),
+            );
+          },
+          { timeout: 3000 },
+        );
       }
     });
   });
@@ -606,28 +639,28 @@ describe("PromptEditorDrawer", () => {
 
     it("has model selector in header", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("model-select")).toBeInTheDocument();
     });
 
     it("has version history button in header when editing", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("version-history-button")).toBeInTheDocument();
     });
 
     it("has save button in header", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
 
     it("does not have save button in footer", () => {
       renderWithProviders(
-        <PromptEditorDrawer open={true} promptId="prompt-123" />
+        <PromptEditorDrawer open={true} promptId="prompt-123" />,
       );
       // The drawer should not have a footer with save button
       // Only one save button should exist (in header)
@@ -671,7 +704,7 @@ describe("PromptEditorDrawer", () => {
           promptId="prompt-123"
           initialLocalConfig={localConfigA}
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // Verify first render (shows handle as title)
@@ -690,7 +723,7 @@ describe("PromptEditorDrawer", () => {
             initialLocalConfig={localConfigB}
             onLocalConfigChange={mockOnLocalConfigChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // The drawer should still be showing (form reinitialized with new config)
@@ -710,7 +743,7 @@ describe("PromptEditorDrawer", () => {
           promptVersionId="version-3"
           initialLocalConfig={localConfigA}
           onLocalConfigChange={mockOnLocalConfigChange}
-        />
+        />,
       );
 
       // Shows handle as title
@@ -730,7 +763,7 @@ describe("PromptEditorDrawer", () => {
             initialLocalConfig={localConfigB}
             onLocalConfigChange={mockOnLocalConfigChange}
           />
-        </ChakraProvider>
+        </ChakraProvider>,
       );
 
       // Drawer should re-render with new target's config

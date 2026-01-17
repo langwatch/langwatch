@@ -1,9 +1,16 @@
-import { Box,Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { Bot, Code, Globe, MessageSquare, MoreVertical, Workflow } from "lucide-react";
+import { Box, Card, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import {
+  Bot,
+  Code,
+  Globe,
+  MessageSquare,
+  MoreVertical,
+  Workflow,
+} from "lucide-react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import { Menu } from "../ui/menu";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
+import { Menu } from "../ui/menu";
 
 const agentTypeIcons: Record<string, typeof MessageSquare> = {
   signature: MessageSquare,

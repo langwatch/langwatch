@@ -1,17 +1,17 @@
 import { z } from "zod";
 import { dependencies } from "../../../injection/dependencies.server";
 import { prisma } from "../../db";
+import { ModelProviderService } from "../../modelProviders/modelProvider.service";
 import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "../../modelProviders/registry";
-import { ModelProviderService } from "../../modelProviders/modelProvider.service";
-import {
-  checkProjectPermission,
-  hasProjectPermission,
-} from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { validateProviderApiKey, validateKeyWithCustomUrl } from "./providerValidation";
+import {
+  validateKeyWithCustomUrl,
+  validateProviderApiKey,
+} from "./providerValidation";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -27,7 +27,10 @@ export const modelProviderRouter = createTRPCRouter({
         "project:update",
       );
 
-      return await service.getProjectModelProviders(projectId, hasSetupPermission);
+      return await service.getProjectModelProviders(
+        projectId,
+        hasSetupPermission,
+      );
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -70,7 +73,10 @@ export const modelProviderRouter = createTRPCRouter({
         projectId: input.projectId,
         provider: input.provider,
         enabled: input.enabled,
-        customKeys: input.customKeys as Record<string, unknown> | null | undefined,
+        customKeys: input.customKeys as
+          | Record<string, unknown>
+          | null
+          | undefined,
         customModels: input.customModels,
         customEmbeddingsModels: input.customEmbeddingsModels,
         extraHeaders: input.extraHeaders,
@@ -129,7 +135,12 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .query(async ({ input, ctx }) => {
       const { projectId, provider, customBaseUrl } = input;
-      return validateKeyWithCustomUrl(projectId, provider, customBaseUrl, ctx.prisma);
+      return validateKeyWithCustomUrl(
+        projectId,
+        provider,
+        customBaseUrl,
+        ctx.prisma,
+      );
     }),
 });
 

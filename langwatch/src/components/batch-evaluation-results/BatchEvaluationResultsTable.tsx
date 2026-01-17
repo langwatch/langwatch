@@ -17,14 +17,13 @@ import {
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-
+import { ComparisonTable } from "./ComparisonTable";
+import { SingleRunTable } from "./SingleRunTable";
 import type {
-  BatchEvaluationData,
   BatchDatasetColumn,
+  BatchEvaluationData,
   ComparisonRunData,
 } from "./types";
-import { SingleRunTable } from "./SingleRunTable";
-import { ComparisonTable } from "./ComparisonTable";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */

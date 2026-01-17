@@ -4,7 +4,7 @@
  * This is the main entry point that combines the sidebar and table.
  * It replaces BatchEvaluationV2 with a cleaner, V3-style visualization.
  */
-import { useMemo, useCallback, useState, useEffect } from "react";
+
 import {
   Alert,
   Box,
@@ -16,33 +16,33 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ExperimentType, type Experiment, type Project } from "@prisma/client";
-import { Download, ExternalLink, BarChart2 } from "react-feather";
+import { type Experiment, ExperimentType, type Project } from "@prisma/client";
 import { useRouter } from "next/router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import { Link } from "~/components/ui/link";
 import { api } from "~/utils/api";
-
+import { PageLayout } from "../ui/layouts/PageLayout";
 import {
   BatchEvaluationResultsTable,
   ColumnVisibilityButton,
   DEFAULT_HIDDEN_COLUMNS,
 } from "./BatchEvaluationResultsTable";
-import { BatchRunsSidebar, type BatchRunSummary } from "./BatchRunsSidebar";
-import {
-  transformBatchEvaluationData,
-  type BatchEvaluationData,
-} from "./types";
+import { type BatchRunSummary, BatchRunsSidebar } from "./BatchRunsSidebar";
+import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
 import { downloadCsv } from "./csvExport";
+import { TableSkeleton } from "./TableSkeleton";
+import {
+  type BatchEvaluationData,
+  transformBatchEvaluationData,
+} from "./types";
 import { useComparisonMode } from "./useComparisonMode";
 import {
-  useMultiRunData,
-  type RunWithColor,
   RUN_COLORS,
+  type RunWithColor,
+  useMultiRunData,
 } from "./useMultiRunData";
-import { ComparisonCharts, type XAxisOption } from "./ComparisonCharts";
-import { TableSkeleton } from "./TableSkeleton";
-import { PageLayout } from "../ui/layouts/PageLayout";
 
 type BatchEvaluationResultsProps = {
   project: Project;
@@ -350,7 +350,9 @@ export function BatchEvaluationResults({
   const runColors = stableRunColorMap;
 
   // Find sidebar run for selected
-  const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId);
+  const _sidebarSelectedRun = sidebarRuns.find(
+    (r) => r.runId === selectedRunId,
+  );
 
   // CSV download - using the new V3 export that properly handles multi-target data
   const handleDownloadCSV = useCallback(() => {
@@ -372,7 +374,13 @@ export function BatchEvaluationResults({
   }
 
   return (
-    <HStack align="stretch" width="full" height="full" gap={0} overflow="hidden">
+    <HStack
+      align="stretch"
+      width="full"
+      height="full"
+      gap={0}
+      overflow="hidden"
+    >
       {/* Sidebar - fixed width, doesn't shrink */}
       <Box flexShrink={0}>
         <BatchRunsSidebar
@@ -391,13 +399,7 @@ export function BatchEvaluationResults({
       </Box>
 
       {/* Main content - flex column that fills available space */}
-      <VStack
-        flex={1}
-        minWidth={0}
-        height="full"
-        gap={0}
-        align="stretch"
-      >
+      <VStack flex={1} minWidth={0} height="full" gap={0} align="stretch">
         {/* Header - fixed height */}
         <PageLayout.Header paddingX={2} withBorder={false} flexShrink={0}>
           <Heading>{experiment.name ?? experiment.slug}</Heading>

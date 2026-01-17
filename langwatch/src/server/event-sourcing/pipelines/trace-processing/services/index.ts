@@ -1,12 +1,12 @@
 export { SpanNormalizationPipelineService } from "./spanNormalizationPipelineService";
 export {
+  type TraceAggregationResult,
   TraceAggregationService,
   traceAggregationService,
-  type TraceAggregationResult,
 } from "./traceAggregationService";
 export {
+  type FlattenMode,
+  type SpanTreeNode,
   TraceIOExtractionService,
   traceIOExtractionService,
-  type SpanTreeNode,
-  type FlattenMode,
 } from "./traceIOExtractionService";

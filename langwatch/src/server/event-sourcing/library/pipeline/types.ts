@@ -27,7 +27,7 @@ export interface CommandHandlerOptions<Payload = any> {
   delay?: number;
   concurrency?: number;
   spanAttributes?: (
-    payload: Payload
+    payload: Payload,
   ) => Record<string, string | number | boolean>;
   lockTtlMs?: number;
 }
@@ -64,7 +64,7 @@ export interface StaticPipelineDefinition<
     string,
     Projection
   >,
-  RegisteredCommands extends RegisteredCommand = NoCommands
+  RegisteredCommands extends RegisteredCommand = NoCommands,
 > {
   /** Pipeline metadata for introspection and tooling */
   metadata: PipelineMetadata;

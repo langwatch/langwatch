@@ -1,8 +1,8 @@
-import { z } from "zod";
 import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
+import { z } from "zod";
 
 export const longBitsSchema = z.object({
   low: z.number(),

@@ -1,18 +1,18 @@
 import ScenarioRunner, { type AgentAdapter } from "@langwatch/scenario";
 import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { PromptService } from "../prompt-config/prompt.service";
-import { ScenarioService } from "./scenario.service";
-import type { SimulationTarget } from "../api/routers/scenarios";
-import { createLogger } from "~/utils/logger";
-import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
-import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
 import { env } from "~/env.mjs";
-import { getVercelAIModel } from "../modelProviders/utils";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { createLogger } from "~/utils/logger";
+import type { SimulationTarget } from "../api/routers/scenarios";
+import { getVercelAIModel } from "../modelProviders/utils";
+import { PromptService } from "../prompt-config/prompt.service";
+import { HttpAgentAdapter } from "./adapters/http-agent.adapter";
+import { PromptConfigAdapter } from "./adapters/prompt-config.adapter";
+import { ScenarioService } from "./scenario.service";
 
 /** Default scenario set for local/quick runs */
-const DEFAULT_SIMULATION_SET_ID = "local-scenarios";
+const _DEFAULT_SIMULATION_SET_ID = "local-scenarios";
 
 /** Generates a unique batch run ID for grouping scenario executions */
 export function generateBatchRunId(): string {
@@ -90,7 +90,10 @@ export class SimulationRunnerService {
       // 5. Run scenario with SDK
       // Validate batchRunId is defined before passing to SDK
       if (!batchRunId || typeof batchRunId !== "string") {
-        logger.error({ batchRunId, type: typeof batchRunId }, "Invalid batchRunId");
+        logger.error(
+          { batchRunId, type: typeof batchRunId },
+          "Invalid batchRunId",
+        );
         throw new Error(`Invalid batchRunId: ${batchRunId}`);
       }
 

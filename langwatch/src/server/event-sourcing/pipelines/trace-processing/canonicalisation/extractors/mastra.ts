@@ -21,8 +21,8 @@
  * - generic/processor_run/workflow_step → span
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 import { ATTR_KEYS } from "./_constants";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class MastraExtractor implements CanonicalAttributesExtractor {
   readonly id = "mastra";

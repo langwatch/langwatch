@@ -1,5 +1,5 @@
-import type { DiscoveredProjection } from "../discovery/projections.types";
 import type { Event } from "../../../../src/server/event-sourcing/library/domain/types";
+import type { DiscoveredProjection } from "../discovery/projections.types";
 
 /**
  * Grouped projection timeline types, exported as a single symbol per file.
@@ -30,4 +30,3 @@ export type ProjectionTimelineTypes = {
     projections: DiscoveredProjection[];
   };
 };
-

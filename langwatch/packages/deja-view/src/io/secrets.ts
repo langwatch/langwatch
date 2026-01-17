@@ -1,6 +1,6 @@
 import {
-  SecretsManagerClient,
   GetSecretValueCommand,
+  SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 
 const AWS_REGION = "eu-central-1";
@@ -74,4 +74,3 @@ export async function getClickHousePassword(
 export function getClickHouseHost(env: Environment): string {
   return process.env.CLICKHOUSE_URL_READ_ONLY ?? "";
 }
-

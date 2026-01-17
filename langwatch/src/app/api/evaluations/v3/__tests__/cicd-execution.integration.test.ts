@@ -1,9 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import type { Project, Experiment } from "@prisma/client";
+import type { Experiment, Project } from "@prisma/client";
 import { ExperimentType } from "@prisma/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { getTestProject } from "~/utils/testUtils";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
+import { getTestProject } from "~/utils/testUtils";
 
 /**
  * Integration tests for CI/CD Evaluation Execution endpoints.
@@ -152,7 +152,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           `${getBaseUrl()}/api/evaluations/v3/${testSlug}/run`,
           {
             method: "POST",
-          }
+          },
         );
 
         expect(response.status).toBe(401);
@@ -168,7 +168,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": "invalid-api-key",
             },
-          }
+          },
         );
 
         expect(response.status).toBe(401);
@@ -184,7 +184,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         // Should get past authentication
@@ -199,7 +199,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               Authorization: `Bearer ${project.apiKey}`,
             },
-          }
+          },
         );
 
         // Should get past authentication
@@ -216,7 +216,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         expect(response.status).toBe(404);
@@ -234,7 +234,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         expect(response.status).toBe(200);
@@ -256,12 +256,12 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
               "X-Auth-Token": project.apiKey,
               Accept: "text/event-stream",
             },
-          }
+          },
         );
 
         expect(response.status).toBe(200);
         expect(response.headers.get("content-type")).toContain(
-          "text/event-stream"
+          "text/event-stream",
         );
 
         // Read stream events
@@ -316,7 +316,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
           `${getBaseUrl()}/api/evaluations/v3/runs/some-run-id`,
           {
             method: "GET",
-          }
+          },
         );
 
         expect(response.status).toBe(401);
@@ -332,7 +332,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         expect(response.status).toBe(404);
@@ -347,7 +347,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         expect(startResponse.status).toBe(200);
@@ -361,14 +361,14 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         expect(statusResponse.status).toBe(200);
         const body = await statusResponse.json();
         expect(body.runId).toBe(runId);
         expect(["pending", "running", "completed", "failed"]).toContain(
-          body.status
+          body.status,
         );
         expect(body.total).toBe(2);
       }, 30000);
@@ -382,7 +382,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
             headers: {
               "X-Auth-Token": project.apiKey,
             },
-          }
+          },
         );
 
         const { runId } = await startResponse.json();
@@ -392,10 +392,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
         let summary = null;
         const startTime = Date.now();
 
-        while (
-          status === "running" ||
-          status === "pending"
-        ) {
+        while (status === "running" || status === "pending") {
           if (Date.now() - startTime > 60000) {
             throw new Error("Run did not complete within timeout");
           }
@@ -409,7 +406,7 @@ describe.skipIf(process.env.CI)("CI/CD Evaluation Execution API", () => {
               headers: {
                 "X-Auth-Token": project.apiKey,
               },
-            }
+            },
           );
 
           const body = await statusResponse.json();

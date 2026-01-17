@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { MASKED_KEY_PLACEHOLDER, KEY_CHECK } from "../../../utils/constants";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 
 /**
  * Unit tests for ModelProviderService business logic.
@@ -9,7 +9,7 @@ import { MASKED_KEY_PLACEHOLDER, KEY_CHECK } from "../../../utils/constants";
 // Test the key merging logic (extracted for testing)
 function mergeCustomKeys(
   validatedKeys: Record<string, unknown> | null,
-  existingKeys: Record<string, unknown> | null
+  existingKeys: Record<string, unknown> | null,
 ): Record<string, unknown> {
   if (!validatedKeys) return {};
   if (!existingKeys) return validatedKeys;
@@ -19,20 +19,20 @@ function mergeCustomKeys(
     ...Object.fromEntries(
       Object.entries(existingKeys)
         .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-        .map(([key, value]) => [key, value])
+        .map(([key, value]) => [key, value]),
     ),
   };
 }
 
 // Test the key masking logic (extracted for testing)
 function maskApiKeys(
-  customKeys: Record<string, unknown>
+  customKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
       KEY_CHECK.some((k) => key.includes(k)) ? MASKED_KEY_PLACEHOLDER : value,
-    ])
+    ]),
   );
 }
 
@@ -45,7 +45,7 @@ function shouldKeepModelProvider(
     customModels: unknown;
     customEmbeddingsModels: unknown;
   },
-  defaultProviders: Record<string, { enabled: boolean }>
+  defaultProviders: Record<string, { enabled: boolean }>,
 ): boolean {
   // Keep if has custom keys
   if (mp.customKeys) return true;
@@ -176,7 +176,9 @@ describe("ModelProviderService business logic", () => {
 
       // GOOGLE_APPLICATION_CREDENTIALS contains "CREDENTIALS" not "KEY"
       // so it should be masked based on KEY_CHECK patterns
-      expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBe(MASKED_KEY_PLACEHOLDER);
+      expect(result.GOOGLE_APPLICATION_CREDENTIALS).toBe(
+        MASKED_KEY_PLACEHOLDER,
+      );
     });
 
     it("handles empty object", () => {

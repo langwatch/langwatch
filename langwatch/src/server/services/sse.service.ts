@@ -1,5 +1,5 @@
-import { EventEmitter } from "events";
 import { SpanKind } from "@opentelemetry/api";
+import { EventEmitter } from "events";
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger";
 import { connection } from "../redis";
@@ -44,11 +44,14 @@ export class SseService {
         const { tenantId, event, serverId } = JSON.parse(message);
         this.logger.debug(
           { tenantId, event, serverId },
-          "Received SSE broadcast from other server"
+          "Received SSE broadcast from other server",
         );
         this.broadcastToTenantLocally(tenantId, event);
       } catch (error) {
-        this.logger.error({ error, message }, "Failed to parse SSE broadcast message");
+        this.logger.error(
+          { error, message },
+          "Failed to parse SSE broadcast message",
+        );
       }
     });
 
@@ -87,7 +90,10 @@ export class SseService {
     }
 
     if (cleanedCount > 0) {
-      this.logger.debug({ cleanedCount }, "Cleaned up stale EventEmitters after timeout");
+      this.logger.debug(
+        { cleanedCount },
+        "Cleaned up stale EventEmitters after timeout",
+      );
     }
   }
 
@@ -117,30 +123,31 @@ export class SseService {
                 event,
                 serverId: process.env.SERVER_ID || "unknown",
                 timestamp: Date.now(),
-              })
+              }),
             );
 
             this.logger.debug(
               { tenantId, event, localConnections },
-              "Broadcasted SSE event via Redis"
+              "Broadcasted SSE event via Redis",
             );
           } catch (error) {
             span.addEvent("redis.publish.error", {
-              "error.message": error instanceof Error ? error.message : String(error),
+              "error.message":
+                error instanceof Error ? error.message : String(error),
             });
 
             this.logger.error(
               { error, tenantId, event },
-              "Failed to broadcast SSE event via Redis"
+              "Failed to broadcast SSE event via Redis",
             );
           }
         } else {
           this.logger.warn(
             { tenantId, event },
-            "Redis not available, only local broadcast sent"
+            "Redis not available, only local broadcast sent",
           );
         }
-      }
+      },
     );
   }
 
@@ -151,7 +158,10 @@ export class SseService {
     if (!emitter || listenerCount === 0) return 0;
 
     const data = { event, timestamp: Date.now() };
-    this.logger.debug({ tenantId, event, listenerCount }, "Emitting SSE event locally");
+    this.logger.debug(
+      { tenantId, event, listenerCount },
+      "Emitting SSE event locally",
+    );
     emitter.emit("trace_updated", data);
     return listenerCount;
   }

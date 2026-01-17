@@ -17,9 +17,9 @@
  * 3. LLM/GenAI indicators → llm
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
-import { inferSpanTypeIfAbsent } from "./_helpers";
 import { ATTR_KEYS } from "./_constants";
+import { inferSpanTypeIfAbsent } from "./_helpers";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class FallbackExtractor implements CanonicalAttributesExtractor {
   readonly id = "fallback";

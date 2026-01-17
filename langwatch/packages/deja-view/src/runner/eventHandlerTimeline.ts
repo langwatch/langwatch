@@ -1,5 +1,5 @@
-import type { Event } from "../lib/types";
 import type { DiscoveredEventHandler } from "../discovery/eventHandlers.types";
+import type { Event } from "../lib/types";
 import type { EventHandlerTimelineTypes } from "./eventHandlerTimeline.types";
 
 /**
@@ -22,7 +22,8 @@ export function buildEventHandlerTimelines({
     const steps: EventHandlerTimelineTypes["Step"][] = [];
 
     // Get event types this handler processes
-    const handlerEventTypes = handler.eventTypes ?? handlerInstance.getEventTypes?.();
+    const handlerEventTypes =
+      handler.eventTypes ?? handlerInstance.getEventTypes?.();
 
     for (let index = 0; index < orderedEvents.length; index++) {
       const event = orderedEvents[index];
@@ -48,7 +49,7 @@ export function buildEventHandlerTimelines({
           } else {
             displayData = data;
           }
-        } catch (error) {
+        } catch {
           // If getDisplayData fails, just don't show display data
           displayData = undefined;
         }
@@ -69,4 +70,3 @@ export function buildEventHandlerTimelines({
     };
   });
 }
-

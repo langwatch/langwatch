@@ -1,49 +1,49 @@
 {
-  "name": "@langwatch/deja-view",
-  "version": "0.0.1",
-  "private": true,
-  "description": "Interactive event-sourcing debug CLI for LangWatch projections",
-  "type": "module",
-  "packageManager": "pnpm@10.26.0",
-  "bin": {
-    "deja-view": "dist/cli.js"
-  },
-  "scripts": {
-    "build": "tsup src/cli.tsx --format esm --dts --clean --minify",
-    "dev": "tsx --tsconfig ../../tsconfig.json src/cli.tsx",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "start": "node dist/cli.js"
-  },
-  "keywords": [
-    "langwatch",
-    "event-sourcing",
-    "ink",
-    "cli",
-    "debug"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.955.0",
-    "@clickhouse/client": "^1.15.0",
-    "commander": "^14.0.2",
-    "fast-glob": "^3.3.3",
-    "fs-extra": "^11.3.3",
-    "ink": "^6.5.1",
-    "ink-select-input": "^6.2.0",
-    "ink-text-input": "^6.0.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.1.0",
-    "zod": "^4.2.1",
-    "dotenv": "17.2.3"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.27",
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
-  }
+	"name": "@langwatch/deja-view",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Interactive event-sourcing debug CLI for LangWatch projections",
+	"type": "module",
+	"packageManager": "pnpm@10.26.0",
+	"bin": {
+		"deja-view": "dist/cli.js"
+	},
+	"scripts": {
+		"build": "tsup src/cli.tsx --format esm --dts --clean --minify",
+		"dev": "tsx --tsconfig ../../tsconfig.json src/cli.tsx",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"start": "node dist/cli.js"
+	},
+	"keywords": [
+		"langwatch",
+		"event-sourcing",
+		"ink",
+		"cli",
+		"debug"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"@aws-sdk/client-secrets-manager": "^3.955.0",
+		"@clickhouse/client": "^1.15.0",
+		"commander": "^14.0.2",
+		"fast-glob": "^3.3.3",
+		"fs-extra": "^11.3.3",
+		"ink": "^6.5.1",
+		"ink-select-input": "^6.2.0",
+		"ink-text-input": "^6.0.0",
+		"react": "^19.2.3",
+		"react-dom": "^19.1.0",
+		"zod": "^4.2.1",
+		"dotenv": "17.2.3"
+	},
+	"devDependencies": {
+		"@types/node": "^20.19.27",
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.16"
+	}
 }

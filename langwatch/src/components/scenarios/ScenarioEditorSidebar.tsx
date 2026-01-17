@@ -21,7 +21,7 @@ import {
  * Card prompting user to generate scenarios with AI.
  * Currently hidden until AI generation is implemented.
  */
-function GenerateWithAICard() {
+function _GenerateWithAICard() {
   return (
     <Card.Root>
       <Card.Body>
@@ -170,7 +170,3 @@ export function ScenarioEditorSidebar() {
     </VStack>
   );
 }
-
-
-
-

@@ -19,8 +19,7 @@ export function VersionBadge({
   latestVersion,
   onUpgrade,
 }: VersionBadgeProps) {
-  const isOutdated =
-    latestVersion !== undefined && latestVersion > version;
+  const isOutdated = latestVersion !== undefined && latestVersion > version;
 
   if (isOutdated && onUpgrade) {
     return (
@@ -55,10 +54,7 @@ export function VersionBadge({
   }
 
   return (
-    <Badge
-      colorPalette="gray"
-      data-testid="version-badge"
-    >
+    <Badge colorPalette="gray" data-testid="version-badge">
       v{version}
     </Badge>
   );

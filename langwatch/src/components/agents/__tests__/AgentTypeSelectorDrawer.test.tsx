@@ -57,7 +57,7 @@ describe("AgentTypeSelectorDrawer", () => {
         onSelect={mockOnSelect}
         {...props}
       />,
-      { wrapper: Wrapper }
+      { wrapper: Wrapper },
     );
   };
 
@@ -82,8 +82,16 @@ describe("AgentTypeSelectorDrawer", () => {
     it("shows descriptions for each type", async () => {
       renderDrawer();
       await waitFor(() => {
-        expect(screen.getByText("Write custom Python code to process inputs and generate outputs")).toBeInTheDocument();
-        expect(screen.getByText("Use an existing workflow as the agent implementation")).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            "Write custom Python code to process inputs and generate outputs",
+          ),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText(
+            "Use an existing workflow as the agent implementation",
+          ),
+        ).toBeInTheDocument();
       });
     });
   });

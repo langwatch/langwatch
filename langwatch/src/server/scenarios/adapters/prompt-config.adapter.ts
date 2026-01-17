@@ -1,9 +1,9 @@
-import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import type { AgentInput } from "@langwatch/scenario";
+import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { generateText } from "ai";
-import { PromptService } from "../../prompt-config/prompt.service";
-import { getVercelAIModel } from "../../modelProviders/utils";
 import { createLogger } from "~/utils/logger";
+import { getVercelAIModel } from "../../modelProviders/utils";
+import type { PromptService } from "../../prompt-config/prompt.service";
 
 const logger = createLogger("PromptConfigAdapter");
 
@@ -23,7 +23,10 @@ export class PromptConfigAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
-    logger.debug({ promptId: this.promptId, projectId: this.projectId }, "PromptConfigAdapter.call");
+    logger.debug(
+      { promptId: this.promptId, projectId: this.projectId },
+      "PromptConfigAdapter.call",
+    );
     try {
       // 1. Fetch prompt configuration
       const prompt = await this.promptService.getPromptByIdOrHandle({
@@ -94,4 +97,3 @@ export class PromptConfigAdapter extends AgentAdapter {
     }
   }
 }
-

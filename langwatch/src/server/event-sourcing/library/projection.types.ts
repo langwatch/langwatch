@@ -1,8 +1,8 @@
 import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { Event, Projection } from "./domain/types";
-import type { ProjectionStore } from "./stores/projectionStore.types";
 import type { KillSwitchOptions } from "./pipeline/types";
 import type { DeduplicationConfig } from "./queues";
+import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**
  * Configuration options for projection processing behavior.

@@ -408,8 +408,11 @@ export const codeComponentSchema = baseComponentSchema.extend({
   parameters: z
     .array(z.union([codeParameterSchema, fieldSchema]))
     .refine(
-      (params) => params?.some((p) => p.identifier === "code" && p.type === "code"),
-      { message: "Code component must have a 'code' parameter with type 'code'" },
+      (params) =>
+        params?.some((p) => p.identifier === "code" && p.type === "code"),
+      {
+        message: "Code component must have a 'code' parameter with type 'code'",
+      },
     ),
 });
 
@@ -440,8 +443,16 @@ export const httpHeaderSchema = z.object({
 export const httpAuthSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("none") }),
   z.object({ type: z.literal("bearer"), token: z.string() }),
-  z.object({ type: z.literal("api_key"), header: z.string(), value: z.string() }),
-  z.object({ type: z.literal("basic"), username: z.string(), password: z.string() }),
+  z.object({
+    type: z.literal("api_key"),
+    header: z.string(),
+    value: z.string(),
+  }),
+  z.object({
+    type: z.literal("basic"),
+    username: z.string(),
+    password: z.string(),
+  }),
 ]);
 
 /**

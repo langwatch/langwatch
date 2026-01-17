@@ -9,10 +9,10 @@
 
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
+import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { prisma } from "~/server/db";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
 import { createLogger } from "~/utils/logger";
-import { loggerMiddleware } from "~/app/api/middleware/logger";
 
 const logger = createLogger("langwatch:evaluations-v3:runs");
 
@@ -22,7 +22,9 @@ app.use(loggerMiddleware());
 /**
  * Helper to authenticate via API key
  */
-const authenticateApiKey = async (c: { req: { header: (name: string) => string | undefined } }) => {
+const authenticateApiKey = async (c: {
+  req: { header: (name: string) => string | undefined };
+}) => {
   const apiKey =
     c.req.header("X-Auth-Token") ??
     c.req.header("Authorization")?.split(" ")[1];

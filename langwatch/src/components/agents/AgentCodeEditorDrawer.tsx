@@ -9,32 +9,39 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useCallback, useEffect, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-import { useState, useCallback, useEffect } from "react";
-
-import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps, useDrawerParams, getFlowCallbacks } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import { CodeBlockEditor } from "~/components/blocks/CodeBlockEditor";
-import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import {
-  VariablesSection,
-  type Variable,
-  type AvailableSource,
-  type FieldMapping,
-} from "~/components/variables";
-import {
-  OutputsSection,
   CODE_OUTPUT_TYPES,
   type Output,
+  OutputsSection,
   type OutputType,
 } from "~/components/outputs/OutputsSection";
+import { Drawer } from "~/components/ui/drawer";
+import {
+  type AvailableSource,
+  type FieldMapping,
+  type Variable,
+  VariablesSection,
+} from "~/components/variables";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { CodeEditorModal } from "~/optimization_studio/components/code/CodeEditorModal";
 import type {
-  TypedAgent,
+  CodeComponentConfig,
+  Field as DSLField,
+} from "~/optimization_studio/types/dsl";
+import type {
   AgentComponentConfig,
+  TypedAgent,
 } from "~/server/agents/agent.repository";
-import type { CodeComponentConfig, Field as DSLField } from "~/optimization_studio/types/dsl";
+import { api } from "~/utils/api";
 
 const DEFAULT_CODE = `import dspy
 
@@ -81,7 +88,7 @@ const getOutputsFromConfig = (config: AgentComponentConfig): DSLField[] => {
 const buildCodeConfig = (
   code: string,
   inputs: DSLField[],
-  outputs: DSLField[]
+  outputs: DSLField[],
 ): CodeComponentConfig => ({
   name: "Code",
   description: "Python code block",
@@ -107,7 +114,10 @@ export type AgentCodeEditorDrawerProps = {
   /** Current input mappings (from Evaluations V3) */
   inputMappings?: Record<string, FieldMapping>;
   /** Callback when input mappings change (for Evaluations V3) */
-  onInputMappingsChange?: (identifier: string, mapping: FieldMapping | undefined) => void;
+  onInputMappingsChange?: (
+    identifier: string,
+    mapping: FieldMapping | undefined,
+  ) => void;
 };
 
 /**
@@ -274,7 +284,7 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
     (identifier: string, mapping: FieldMapping | undefined) => {
       onInputMappingsChange?.(identifier, mapping);
     },
-    [onInputMappingsChange]
+    [onInputMappingsChange],
   );
 
   // Convert DSL inputs to Variable[] for VariablesSection

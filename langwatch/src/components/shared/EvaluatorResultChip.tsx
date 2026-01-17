@@ -21,10 +21,10 @@ import { LuCircleX } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  parseEvaluationResult,
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
   type ParsedEvaluationResult,
+  parseEvaluationResult,
 } from "~/utils/evaluationResults";
 
 export type EvaluationStatus = ParsedEvaluationResult["status"];

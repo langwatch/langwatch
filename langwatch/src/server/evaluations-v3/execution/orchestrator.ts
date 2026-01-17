@@ -11,36 +11,47 @@
  */
 
 import { nanoid } from "nanoid";
-import { buildCellWorkflow } from "./workflowBuilder";
-import { mapNlpEvent, mapErrorEvent, type ResultMapperConfig } from "./resultMapper";
-import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
-import { abortManager } from "./abortManager";
-import { createSemaphore } from "./semaphore";
-import { generateHumanReadableId } from "~/utils/humanReadableId";
-import type {
-  ExecutionScope,
-  ExecutionCell,
-  EvaluationV3Event,
-  ExecutionSummary,
-} from "./types";
+import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
 import type { EvaluationsV3State, TargetConfig } from "~/evaluations-v3/types";
 import { isRowEmpty } from "~/evaluations-v3/utils/emptyRowDetection";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
-import { createLogger } from "~/utils/logger";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import type { TypedAgent } from "~/server/agents/agent.repository";
-import type { BatchEvaluationRepository, DatasetEntry, EvaluationEntry } from "../repositories/batchEvaluation.repository";
-import { getDefaultBatchEvaluationRepository } from "../repositories/elasticsearchBatchEvaluation.repository";
-import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
 import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
+import type { ESBatchEvaluationTarget } from "~/server/experiments/types";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { generateHumanReadableId } from "~/utils/humanReadableId";
+import { createLogger } from "~/utils/logger";
+import type {
+  BatchEvaluationRepository,
+  DatasetEntry,
+  EvaluationEntry,
+} from "../repositories/batchEvaluation.repository";
+import { getDefaultBatchEvaluationRepository } from "../repositories/elasticsearchBatchEvaluation.repository";
+import { abortManager } from "./abortManager";
+import { buildStripScoreEvaluatorIds } from "./evaluatorScoreFilter";
+import {
+  mapErrorEvent,
+  mapNlpEvent,
+  type ResultMapperConfig,
+} from "./resultMapper";
+import { createSemaphore } from "./semaphore";
+import type {
+  EvaluationV3Event,
+  ExecutionCell,
+  ExecutionScope,
+  ExecutionSummary,
+} from "./types";
+import { buildCellWorkflow } from "./workflowBuilder";
 
 const logger = createLogger("evaluations-v3:orchestrator");
 
 // Default concurrency limit (can be overridden via environment variable)
-const DEFAULT_CONCURRENCY = parseInt(process.env.EVAL_V3_CONCURRENCY ?? "5", 10);
+const DEFAULT_CONCURRENCY = parseInt(
+  process.env.EVAL_V3_CONCURRENCY ?? "5",
+  10,
+);
 
 /**
  * Input data required to run the orchestrator.
@@ -65,12 +76,16 @@ export type OrchestratorInput = {
  * Generates all cells to execute based on the scope.
  */
 export const generateCells = (
-  state: Pick<EvaluationsV3State, "datasets" | "activeDatasetId" | "targets" | "evaluators">,
+  state: Pick<
+    EvaluationsV3State,
+    "datasets" | "activeDatasetId" | "targets" | "evaluators"
+  >,
   datasetRows: Array<Record<string, unknown>>,
-  scope: ExecutionScope
+  scope: ExecutionScope,
 ): ExecutionCell[] => {
   const cells: ExecutionCell[] = [];
-  const datasetId = state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
+  const datasetId =
+    state.datasets[0]?.id ?? state.activeDatasetId ?? "dataset-1";
 
   // Determine which rows to process
   const rowIndices =
@@ -108,7 +123,9 @@ export const generateCells = (
     }
 
     for (const targetId of targetIds) {
-      const targetConfig = state.targets.find((t: TargetConfig) => t.id === targetId);
+      const targetConfig = state.targets.find(
+        (t: TargetConfig) => t.id === targetId,
+      );
       if (!targetConfig) continue;
 
       cells.push({
@@ -137,7 +154,7 @@ export async function* executeCell(
   datasetColumns: Array<{ id: string; name: string; type: string }>,
   loadedData: { prompt?: VersionedPrompt; agent?: TypedAgent },
   resultMapperConfig?: ResultMapperConfig,
-  isAborted?: () => Promise<boolean>
+  isAborted?: () => Promise<boolean>,
 ): AsyncGenerator<EvaluationV3Event> {
   // Emit cell_started
   yield {
@@ -154,7 +171,7 @@ export async function* executeCell(
         cell,
         datasetColumns,
       },
-      loadedData
+      loadedData,
     );
 
     // Create set of target nodes for the result mapper
@@ -178,7 +195,7 @@ export async function* executeCell(
     // Add environment variables and process datasets
     const enrichedEvent = await loadDatasets(
       await addEnvs(rawEvent, projectId),
-      projectId
+      projectId,
     );
 
     // Execute target and collect events
@@ -212,24 +229,41 @@ export async function* executeCell(
 
     // Map and yield target events
     for (const event of targetEvents) {
-      const mappedEvent = mapNlpEvent(event, cell.rowIndex, targetNodes, resultMapperConfig);
+      const mappedEvent = mapNlpEvent(
+        event,
+        cell.rowIndex,
+        targetNodes,
+        resultMapperConfig,
+      );
       if (mappedEvent) {
         yield mappedEvent;
       }
     }
 
     // Check abort before executing evaluators
-    if (isAborted && await isAborted()) {
-      logger.debug({ cell: cell.rowIndex, targetId: cell.targetId }, "Cell aborted after target execution");
+    if (isAborted && (await isAborted())) {
+      logger.debug(
+        { cell: cell.rowIndex, targetId: cell.targetId },
+        "Cell aborted after target execution",
+      );
       return;
     }
 
     // Execute evaluators if target succeeded and we have evaluators
-    if (!targetFailed && targetOutput && Object.keys(evaluatorNodeIds).length > 0) {
-      for (const [evaluatorId, evaluatorNodeId] of Object.entries(evaluatorNodeIds)) {
+    if (
+      !targetFailed &&
+      targetOutput &&
+      Object.keys(evaluatorNodeIds).length > 0
+    ) {
+      for (const [evaluatorId, evaluatorNodeId] of Object.entries(
+        evaluatorNodeIds,
+      )) {
         // Check abort before each evaluator
-        if (isAborted && await isAborted()) {
-          logger.debug({ cell: cell.rowIndex, evaluatorId }, "Cell aborted before evaluator execution");
+        if (isAborted && (await isAborted())) {
+          logger.debug(
+            { cell: cell.rowIndex, evaluatorId },
+            "Cell aborted before evaluator execution",
+          );
           return;
         }
         try {
@@ -237,7 +271,7 @@ export async function* executeCell(
           const evaluatorInputs = buildEvaluatorInputs(
             cell,
             evaluatorId,
-            targetOutput
+            targetOutput,
           );
 
           // Create execute_component event for evaluator
@@ -255,7 +289,10 @@ export async function* executeCell(
           };
 
           // Add environment variables
-          const enrichedEvaluatorEvent = await addEnvs(evaluatorEvent, projectId);
+          const enrichedEvaluatorEvent = await addEnvs(
+            evaluatorEvent,
+            projectId,
+          );
 
           // Execute evaluator
           const evaluatorEvents: StudioServerEvent[] = [];
@@ -270,7 +307,12 @@ export async function* executeCell(
 
           // Map and yield evaluator events
           for (const event of evaluatorEvents) {
-            const mappedEvent = mapNlpEvent(event, cell.rowIndex, targetNodes, resultMapperConfig);
+            const mappedEvent = mapNlpEvent(
+              event,
+              cell.rowIndex,
+              targetNodes,
+              resultMapperConfig,
+            );
             if (mappedEvent) {
               yield mappedEvent;
             }
@@ -279,7 +321,7 @@ export async function* executeCell(
           // Yield error for this evaluator but continue with others
           logger.warn(
             { error: evalError, evaluatorId, cell },
-            "Evaluator execution failed"
+            "Evaluator execution failed",
           );
           yield {
             type: "evaluator_result",
@@ -298,11 +340,7 @@ export async function* executeCell(
     }
   } catch (error) {
     logger.error({ error, cell }, "Cell execution failed");
-    yield mapErrorEvent(
-      (error as Error).message,
-      cell.rowIndex,
-      cell.targetId
-    );
+    yield mapErrorEvent((error as Error).message, cell.rowIndex, cell.targetId);
   }
 }
 
@@ -312,7 +350,7 @@ export async function* executeCell(
 const buildEvaluatorInputs = (
   cell: ExecutionCell,
   evaluatorId: string,
-  targetOutput: Record<string, unknown>
+  targetOutput: Record<string, unknown>,
 ): Record<string, unknown> => {
   const inputs: Record<string, unknown> = {};
   const datasetId = cell.datasetEntry._datasetId as string | undefined;
@@ -330,7 +368,10 @@ const buildEvaluatorInputs = (
       if (mapping.source === "dataset") {
         // From dataset entry
         inputs[inputField] = cell.datasetEntry[mapping.sourceField];
-      } else if (mapping.source === "target" && mapping.sourceId === cell.targetId) {
+      } else if (
+        mapping.source === "target" &&
+        mapping.sourceId === cell.targetId
+      ) {
         // From target output
         inputs[inputField] = targetOutput[mapping.sourceField];
       }
@@ -340,7 +381,7 @@ const buildEvaluatorInputs = (
   }
 
   return inputs;
-}
+};
 
 /**
  * Builds the input values for a target from the cell's dataset entry.
@@ -367,7 +408,7 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
  * Uses parallel execution with semaphore-based rate limiting.
  */
 export async function* runOrchestrator(
-  input: OrchestratorInput
+  input: OrchestratorInput,
 ): AsyncGenerator<EvaluationV3Event> {
   const {
     projectId,
@@ -396,7 +437,8 @@ export async function* runOrchestrator(
   await abortManager.setRunning(runId);
 
   // Get repository and initialize storage if enabled
-  const repository = saveToEs && experimentId ? getDefaultBatchEvaluationRepository() : null;
+  const repository =
+    saveToEs && experimentId ? getDefaultBatchEvaluationRepository() : null;
 
   // Accumulate results for batch saving
   const pendingDataset: DatasetEntry[] = [];
@@ -421,7 +463,7 @@ export async function* runOrchestrator(
         model = loadedPrompt.model;
       }
     }
-    
+
     return {
       id: t.id,
       name: t.name,
@@ -455,11 +497,15 @@ export async function* runOrchestrator(
     if (!repository || !experimentId) return;
 
     const now = Date.now();
-    const shouldSave = force ||
+    const shouldSave =
+      force ||
       pendingDataset.length + pendingEvaluations.length >= SAVE_THRESHOLD ||
       now - lastSaveTime >= SAVE_INTERVAL;
 
-    if (shouldSave && (pendingDataset.length > 0 || pendingEvaluations.length > 0)) {
+    if (
+      shouldSave &&
+      (pendingDataset.length > 0 || pendingEvaluations.length > 0)
+    ) {
       await repository.upsertResults({
         projectId,
         experimentId,
@@ -481,7 +527,7 @@ export async function* runOrchestrator(
     if (event.type === "target_result") {
       // Get the dataset row entry for this row index
       const datasetEntry = datasetRows[event.rowIndex] ?? {};
-      
+
       pendingDataset.push({
         index: event.rowIndex,
         target_id: event.targetId,
@@ -495,7 +541,9 @@ export async function* runOrchestrator(
     } else if (event.type === "evaluator_result") {
       const result = event.result as SingleEvaluationResult;
       // Find the evaluator config to get the human-readable name
-      const evaluatorConfig = state.evaluators.find((e) => e.id === event.evaluatorId);
+      const evaluatorConfig = state.evaluators.find(
+        (e) => e.id === event.evaluatorId,
+      );
       pendingEvaluations.push({
         evaluator: event.evaluatorId,
         name: evaluatorConfig?.name ?? null,
@@ -505,8 +553,16 @@ export async function* runOrchestrator(
         score: result.status === "processed" ? result.score : null,
         label: result.status === "processed" ? result.label : null,
         passed: result.status === "processed" ? result.passed : null,
-        details: result.status === "error" ? result.details : (result.status === "processed" ? result.details : null),
-        cost: result.status === "processed" && result.cost ? result.cost.amount : null,
+        details:
+          result.status === "error"
+            ? result.details
+            : result.status === "processed"
+              ? result.details
+              : null,
+        cost:
+          result.status === "processed" && result.cost
+            ? result.cost.amount
+            : null,
       });
     } else if (event.type === "progress") {
       pendingProgress = event.completed;
@@ -531,7 +587,7 @@ export async function* runOrchestrator(
 
   logger.info(
     { runId, totalCells, concurrency: DEFAULT_CONCURRENCY, experimentId },
-    "Starting evaluation execution"
+    "Starting evaluation execution",
   );
 
   // Event queue for collecting results from parallel executions
@@ -606,7 +662,11 @@ export async function* runOrchestrator(
             }
 
             // Get loaded data for this target
-            const loadedData = getLoadedDataForTarget(cell.targetConfig, loadedPrompts, loadedAgents);
+            const loadedData = getLoadedDataForTarget(
+              cell.targetConfig,
+              loadedPrompts,
+              loadedAgents,
+            );
 
             // Create abort checker bound to this run
             const checkAbort = () => abortManager.isAborted(runId);
@@ -614,7 +674,14 @@ export async function* runOrchestrator(
             // Execute cell and collect events
             let cellFailed = false;
             let cellAborted = false;
-            for await (const event of executeCell(cell, projectId, datasetColumns, loadedData, resultMapperConfig, checkAbort)) {
+            for await (const event of executeCell(
+              cell,
+              projectId,
+              datasetColumns,
+              loadedData,
+              resultMapperConfig,
+              checkAbort,
+            )) {
               // Check abort during cell processing
               if (await abortManager.isAborted(runId)) {
                 cellAborted = true;
@@ -627,7 +694,10 @@ export async function* runOrchestrator(
               processEventForStorage(event);
 
               // Track failures
-              if (event.type === "error" || (event.type === "target_result" && event.error)) {
+              if (
+                event.type === "error" ||
+                (event.type === "target_result" && event.error)
+              ) {
                 cellFailed = true;
               }
 
@@ -663,7 +733,7 @@ export async function* runOrchestrator(
         })();
 
         activeCells.add(cellPromise);
-        cellPromise.finally(() => activeCells.delete(cellPromise));
+        await cellPromise.finally(() => activeCells.delete(cellPromise));
       }
 
       // Wait for all remaining cells to complete
@@ -686,7 +756,7 @@ export async function* runOrchestrator(
     if (aborted) {
       logger.info(
         { runId, completedCells, totalCells },
-        "Emitting stopped event"
+        "Emitting stopped event",
       );
       yield {
         type: "stopped",
@@ -717,7 +787,10 @@ export async function* runOrchestrator(
           stoppedAt: aborted ? finishedAt : undefined,
         });
       } catch (error) {
-        logger.error({ error, runId }, "Failed to save final results to storage");
+        logger.error(
+          { error, runId },
+          "Failed to save final results to storage",
+        );
       }
     }
   }
@@ -729,7 +802,7 @@ export async function* runOrchestrator(
 
     logger.info(
       { runId, completedCells, failedCells, totalCells, duration, totalCost },
-      "Evaluation execution completed successfully"
+      "Evaluation execution completed successfully",
     );
 
     // Emit done with summary
@@ -753,7 +826,7 @@ export async function* runOrchestrator(
     const duration = Date.now() - startTime;
     logger.info(
       { runId, completedCells, failedCells, totalCells, duration },
-      "Evaluation execution stopped by user"
+      "Evaluation execution stopped by user",
     );
   }
 }
@@ -764,7 +837,7 @@ export async function* runOrchestrator(
 const getLoadedDataForTarget = (
   targetConfig: TargetConfig,
   loadedPrompts: Map<string, VersionedPrompt>,
-  loadedAgents: Map<string, TypedAgent>
+  loadedAgents: Map<string, TypedAgent>,
 ): { prompt?: VersionedPrompt; agent?: TypedAgent } => {
   if (targetConfig.type === "prompt" && targetConfig.promptId) {
     const prompt = loadedPrompts.get(targetConfig.promptId);

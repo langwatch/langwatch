@@ -14,10 +14,9 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { DatasetTabs } from "../components/DatasetSection/DatasetTabs";
-import { DEFAULT_TEST_DATA_ID, type DatasetReference } from "../types";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { type DatasetReference, DEFAULT_TEST_DATA_ID } from "../types";
 
 // Mock callbacks
 const mockOnSelectExisting = vi.fn();

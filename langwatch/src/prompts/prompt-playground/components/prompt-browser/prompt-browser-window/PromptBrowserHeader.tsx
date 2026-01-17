@@ -2,10 +2,10 @@ import { Box } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompts";
 import { PromptEditorHeader } from "~/prompts/components/PromptEditorHeader";
-import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
-import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useHandleSavePrompt } from "~/prompts/prompt-playground/hooks/useHandleSavePrompt";
 import { useHasUnsavedChanges } from "~/prompts/prompt-playground/hooks/useHasUnsavedChanges";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { useTabId } from "../ui/TabContext";
 
 /**

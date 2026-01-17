@@ -17,6 +17,8 @@ import { OrganizationUserRole } from "@prisma/client";
 import { useEffect, useMemo, useState } from "react";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import type { SubmitHandler } from "react-hook-form";
+import { RandomColorAvatar } from "~/components/RandomColorAvatar";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type { MembersForm } from "../../components/AddMembersForm";
 import { AddMembersForm } from "../../components/AddMembersForm";
@@ -37,8 +39,6 @@ import type {
 } from "../../server/api/routers/organization";
 import type { PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 
 const selectOptions = [
   {
@@ -170,15 +170,18 @@ function MembersList({
       },
       {
         onSuccess: (data) => {
-          const newInvites = data.reduce((acc, invite) => {
-            if (invite?.invite && invite.noEmailProvider) {
-              acc.push({
-                inviteCode: invite.invite.inviteCode,
-                email: invite.invite.email,
-              });
-            }
-            return acc;
-          }, [] as { inviteCode: string; email: string }[]);
+          const newInvites = data.reduce(
+            (acc, invite) => {
+              if (invite?.invite && invite.noEmailProvider) {
+                acc.push({
+                  inviteCode: invite.invite.inviteCode,
+                  email: invite.invite.email,
+                });
+              }
+              return acc;
+            },
+            [] as { inviteCode: string; email: string }[],
+          );
 
           setSelectedInvites(newInvites);
 
@@ -406,8 +409,8 @@ function MembersList({
                               !hasOrganizationManagePermission
                                 ? "You need organization:manage permission to remove members"
                                 : organization.members.length === 1
-                                ? "Cannot remove the last member"
-                                : undefined
+                                  ? "Cannot remove the last member"
+                                  : undefined
                             }
                             disabled={
                               hasOrganizationManagePermission &&
@@ -461,10 +464,7 @@ function MembersList({
                 {pendingInvites.data?.map((invite) => (
                   <Table.Row key={invite.id}>
                     <Table.Cell>
-                      <RandomColorAvatar
-                        size="2xs"
-                        name={invite.email}
-                      />
+                      <RandomColorAvatar size="2xs" name={invite.email} />
                     </Table.Cell>
                     <Table.Cell>{invite.email}</Table.Cell>
                     <Table.Cell>

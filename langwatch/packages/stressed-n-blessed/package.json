@@ -1,37 +1,37 @@
 {
-  "name": "@langwatch/stressed-n-blessed",
-  "version": "0.0.1",
-  "private": true,
-  "description": "Stress test the event sourcing pipeline by generating a large number of spans and ingesting them into the database.",
-  "type": "module",
-  "packageManager": "pnpm@10.26.0",
-  "bin": {
-    "stressed-n-blessed": "dist/index.js"
-  },
-  "scripts": {
-    "build": "tsup src/index.ts --format esm --dts --clean --minify",
-    "dev": "tsx --tsconfig ../../tsconfig.json src/index.ts",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "start": "node dist/index.js"
-  },
-  "keywords": [
-    "langwatch",
-    "event-sourcing",
-    "stress-test"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "commander": "^14.0.2",
-    "dotenv": "17.2.3",
-    "@opentelemetry/api": "^1.9.0",
-    "langwatch": "^0.10.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.19.27",
-    "tsup": "^8.5.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.16"
-  }
+	"name": "@langwatch/stressed-n-blessed",
+	"version": "0.0.1",
+	"private": true,
+	"description": "Stress test the event sourcing pipeline by generating a large number of spans and ingesting them into the database.",
+	"type": "module",
+	"packageManager": "pnpm@10.26.0",
+	"bin": {
+		"stressed-n-blessed": "dist/index.js"
+	},
+	"scripts": {
+		"build": "tsup src/index.ts --format esm --dts --clean --minify",
+		"dev": "tsx --tsconfig ../../tsconfig.json src/index.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest",
+		"start": "node dist/index.js"
+	},
+	"keywords": [
+		"langwatch",
+		"event-sourcing",
+		"stress-test"
+	],
+	"license": "MIT",
+	"dependencies": {
+		"commander": "^14.0.2",
+		"dotenv": "17.2.3",
+		"@opentelemetry/api": "^1.9.0",
+		"langwatch": "^0.10.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.19.27",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.0.16"
+	}
 }

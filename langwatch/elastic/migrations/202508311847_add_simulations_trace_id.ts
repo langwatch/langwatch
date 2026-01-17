@@ -1,6 +1,6 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
-import { createIndex } from "../helpers";
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
+import { createIndex } from "../helpers";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await createIndex({

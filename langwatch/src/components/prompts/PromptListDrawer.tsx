@@ -15,7 +15,11 @@ import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps, getFlowCallbacks } from "~/hooks/useDrawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+} from "~/hooks/useDrawer";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
@@ -56,9 +60,15 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   const flowCallbacks = getFlowCallbacks("promptList");
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? flowCallbacks?.onSelect ?? (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
+  const onSelect =
+    props.onSelect ??
+    flowCallbacks?.onSelect ??
+    (complexProps.onSelect as PromptListDrawerProps["onSelect"]);
   // Use flowCallbacks.onCreateNew if available (for evaluations context with availableSources)
-  const onCreateNew = props.onCreateNew ?? flowCallbacks?.onCreateNew ?? (() => openDrawer("promptEditor"));
+  const onCreateNew =
+    props.onCreateNew ??
+    flowCallbacks?.onCreateNew ??
+    (() => openDrawer("promptEditor"));
   const isOpen = props.open !== false && props.open !== undefined;
 
   const { data: prompts, isLoading } = useAllPromptsForProject();
@@ -66,17 +76,18 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
 
   // Filter and group prompts by folder (derived from handle prefix)
   const { groupedPrompts, hasPrompts, filteredCount } = useMemo(() => {
-    const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
+    const publishedPrompts =
+      prompts?.filter((prompt) => prompt.version > 0) ?? [];
 
     // Filter by search query
     const filtered = searchQuery
       ? publishedPrompts.filter((prompt) =>
-          prompt.handle?.toLowerCase().includes(searchQuery.toLowerCase())
+          prompt.handle?.toLowerCase().includes(searchQuery.toLowerCase()),
         )
       : publishedPrompts;
 
     const grouped = groupBy(filtered, (prompt) =>
-      prompt.handle?.includes("/") ? prompt.handle.split("/")[0] : "default"
+      prompt.handle?.includes("/") ? prompt.handle.split("/")[0] : "default",
     );
 
     // Sort folders alphabetically, but put "default" last
@@ -93,7 +104,10 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
     };
   }, [prompts, searchQuery]);
 
-  const handleSelectPrompt = (prompt: { id: string; handle: string | null }) => {
+  const handleSelectPrompt = (prompt: {
+    id: string;
+    handle: string | null;
+  }) => {
     // Find the full prompt data to get inputs/outputs
     const fullPrompt = prompts?.find((p) => p.id === prompt.id);
 
@@ -148,7 +162,12 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
             </Button>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <VStack gap={2} align="stretch" paddingX={6} paddingTop={4}>
               <Text color="gray.600" fontSize="sm">
@@ -238,12 +257,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
   return (
     <VStack paddingY={12} gap={4} textAlign="center">
-      <Box
-        padding={4}
-        borderRadius="full"
-        bg="gray.100"
-        color="gray.500"
-      >
+      <Box padding={4} borderRadius="full" bg="gray.100" color="gray.500">
         <FileText size={32} />
       </Box>
       <VStack gap={1}>
@@ -301,7 +315,10 @@ function PromptFolder({ folder, prompts, onSelect }: PromptFolderProps) {
   }
 
   return (
-    <Collapsible.Root open={isOpen} onOpenChange={({ open }) => setIsOpen(open)}>
+    <Collapsible.Root
+      open={isOpen}
+      onOpenChange={({ open }) => setIsOpen(open)}
+    >
       <Collapsible.Trigger asChild>
         <Button
           variant="ghost"
@@ -388,9 +405,7 @@ function PromptCard({ prompt, onClick }: PromptCardProps) {
       data-testid={`prompt-card-${prompt.id}`}
     >
       <HStack gap={3}>
-        <Box color="green.500">
-          {renderIcon()}
-        </Box>
+        <Box color="green.500">{renderIcon()}</Box>
         <VStack align="start" gap={0} flex={1}>
           <Text fontWeight="medium" fontSize="sm">
             {displayName}

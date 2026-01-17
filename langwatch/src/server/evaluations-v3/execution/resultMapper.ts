@@ -33,7 +33,7 @@ export type ResultMapperConfig = {
  * - "target-1.eval-1" -> { targetId: "target-1", evaluatorId: "eval-1" }
  */
 export const parseNodeId = (
-  nodeId: string
+  nodeId: string,
 ): { targetId: string; evaluatorId?: string } => {
   const dotIndex = nodeId.indexOf(".");
   if (dotIndex === -1) {
@@ -64,14 +64,16 @@ export const mapTargetResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     trace_id?: string;
     error?: string;
-  }
+  },
 ): EvaluationV3Event => {
   const { targetId } = parseNodeId(nodeId);
 
   // Calculate duration if timestamps available
   const duration =
-    executionState.timestamps?.started_at && executionState.timestamps?.finished_at
-      ? executionState.timestamps.finished_at - executionState.timestamps.started_at
+    executionState.timestamps?.started_at &&
+    executionState.timestamps?.finished_at
+      ? executionState.timestamps.finished_at -
+        executionState.timestamps.started_at
       : undefined;
 
   return {
@@ -105,7 +107,7 @@ export const mapEvaluatorResult = (
     timestamps?: { started_at?: number; finished_at?: number };
     error?: string;
   },
-  options?: { stripScore?: boolean }
+  options?: { stripScore?: boolean },
 ): EvaluationV3Event => {
   const { targetId, evaluatorId } = parseNodeId(nodeId);
 
@@ -114,9 +116,11 @@ export const mapEvaluatorResult = (
   }
 
   // Calculate duration if timestamps available
-  const duration =
-    executionState.timestamps?.started_at && executionState.timestamps?.finished_at
-      ? executionState.timestamps.finished_at - executionState.timestamps.started_at
+  const _duration =
+    executionState.timestamps?.started_at &&
+    executionState.timestamps?.finished_at
+      ? executionState.timestamps.finished_at -
+        executionState.timestamps.started_at
       : undefined;
 
   // Build SingleEvaluationResult
@@ -130,11 +134,15 @@ export const mapEvaluatorResult = (
     : {
         status: "processed",
         // Strip score for guardrail-type evaluators where score is just 0 or 1
-        score: options?.stripScore ? undefined : (executionState.outputs?.score as number | undefined),
+        score: options?.stripScore
+          ? undefined
+          : (executionState.outputs?.score as number | undefined),
         passed: executionState.outputs?.passed as boolean | undefined,
         label: executionState.outputs?.label as string | undefined,
         details: executionState.outputs?.details as string | undefined,
-        cost: executionState.cost ? { currency: "USD", amount: executionState.cost } : undefined,
+        cost: executionState.cost
+          ? { currency: "USD", amount: executionState.cost }
+          : undefined,
       };
 
   return {
@@ -159,7 +167,7 @@ export const mapNlpEvent = (
   event: StudioServerEvent,
   rowIndex: number,
   targetNodes: Set<string>,
-  config?: ResultMapperConfig
+  config?: ResultMapperConfig,
 ): EvaluationV3Event | null => {
   if (event.type !== "component_state_change") {
     // Ignore non-component events (debug, done, etc.)
@@ -169,7 +177,10 @@ export const mapNlpEvent = (
   const { component_id, execution_state } = event.payload;
 
   // Skip if not a success or error state
-  if (execution_state?.status !== "success" && execution_state?.status !== "error") {
+  if (
+    execution_state?.status !== "success" &&
+    execution_state?.status !== "error"
+  ) {
     return null;
   }
 
@@ -207,7 +218,7 @@ export const mapNlpEvent = (
         timestamps: execution_state.timestamps,
         error: isError ? execution_state.error : undefined,
       },
-      { stripScore }
+      { stripScore },
     );
   }
 
@@ -222,7 +233,7 @@ export const mapErrorEvent = (
   message: string,
   rowIndex?: number,
   targetId?: string,
-  evaluatorId?: string
+  evaluatorId?: string,
 ): EvaluationV3Event => {
   return {
     type: "error",

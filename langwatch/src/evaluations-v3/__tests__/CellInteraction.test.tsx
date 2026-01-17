@@ -1,9 +1,16 @@
 /**
  * @vitest-environment jsdom
  */
-import React from "react";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, fireEvent } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
@@ -44,18 +51,20 @@ type TableCellProps = {
  * Simplified cell component that replicates the renderCell behavior.
  * This tests the cell selection and interaction logic.
  */
-const TableCell = ({ cellId, rowIndex, meta, value, children }: TableCellProps) => {
-  const {
-    ui,
-    setSelectedCell,
-    setEditingCell,
-    toggleRowSelection,
-  } = useEvaluationsV3Store((state) => ({
-    ui: state.ui,
-    setSelectedCell: state.setSelectedCell,
-    setEditingCell: state.setEditingCell,
-    toggleRowSelection: state.toggleRowSelection,
-  }));
+const TableCell = ({
+  cellId,
+  rowIndex,
+  meta,
+  value,
+  children,
+}: TableCellProps) => {
+  const { ui, setSelectedCell, setEditingCell, toggleRowSelection } =
+    useEvaluationsV3Store((state) => ({
+      ui: state.ui,
+      setSelectedCell: state.setSelectedCell,
+      setEditingCell: state.setEditingCell,
+      toggleRowSelection: state.toggleRowSelection,
+    }));
 
   const isSelected =
     ui.selectedCell?.row === rowIndex &&
@@ -185,7 +194,9 @@ describe("Cell interaction", () => {
       fireEvent.click(cell);
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
     });
 
@@ -196,7 +207,9 @@ describe("Cell interaction", () => {
       fireEvent.click(cell);
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:__checkbox__");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:__checkbox__",
+        );
       });
     });
 
@@ -207,7 +220,9 @@ describe("Cell interaction", () => {
       fireEvent.click(cell);
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:target.target-1");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:target.target-1",
+        );
       });
     });
 
@@ -217,13 +232,17 @@ describe("Cell interaction", () => {
       // Click first cell
       fireEvent.click(screen.getByTestId("input-0"));
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
       });
 
       // Click different cell
       fireEvent.click(screen.getByTestId("output-1"));
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("1:expected_output");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "1:expected_output",
+        );
       });
     });
   });
@@ -315,7 +334,9 @@ describe("Cell interaction", () => {
       fireEvent.doubleClick(cell);
 
       await waitFor(() => {
-        expect(screen.getByTestId("selected-cell")).toHaveTextContent("0:input");
+        expect(screen.getByTestId("selected-cell")).toHaveTextContent(
+          "0:input",
+        );
         expect(screen.getByTestId("editing-cell")).toHaveTextContent("0:input");
       });
     });

@@ -2,26 +2,23 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type {
   Event,
+  EventSourcedQueueProcessor,
   EventStore,
+  EventStoreReadContext,
   Projection,
   StaticPipelineDefinition,
 } from "../library";
 import type { NoCommands, RegisteredCommand } from "../library/pipeline/types";
+import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 import { DisabledPipeline, DisabledPipelineBuilder } from "./disabledPipeline";
 import type { EventSourcingRuntime } from "./eventSourcingRuntime";
 import { getEventSourcingRuntime } from "./eventSourcingRuntime";
 import { PipelineBuilder } from "./index";
 import { EventSourcingPipeline } from "./pipeline";
 import type {
-  EventStoreReadContext,
-  EventSourcedQueueProcessor,
-} from "../library";
-import type {
   PipelineWithCommandHandlers,
   RegisteredPipeline,
 } from "./pipeline/types";
-
-import { traceProcessingPipelineDefinition } from "../pipelines/trace-processing/pipeline";
 
 /**
  * Type helper to convert registered commands union to a record of queue processors.
