@@ -28,6 +28,7 @@ import { PromptService, type VersionedPrompt } from "~/server/prompt-config/prom
 import { AgentService } from "~/server/agents/agent.service";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { getFullDataset } from "~/server/api/routers/datasetRecord";
+import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 
@@ -303,6 +304,7 @@ app.post("/:slug/run", async (c) => {
         loadedPrompts: loadedPrompts as Map<string, VersionedPrompt>,
         loadedAgents: loadedAgents as Map<string, TypedAgent>,
         saveToEs: true,
+        runId, // Pass the run ID we generated
       });
 
       for await (const event of orchestrator) {
@@ -332,7 +334,7 @@ app.post("/:slug/run", async (c) => {
   };
 
   // Create run state and start execution in background
-  const runId = `run_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const runId = generateHumanReadableId();
 
   await runStateManager.createRun({
     runId,

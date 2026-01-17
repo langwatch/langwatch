@@ -57,6 +57,8 @@ export type OrchestratorInput = {
   loadedAgents: Map<string, TypedAgent>;
   /** Enable saving results to Elasticsearch */
   saveToEs?: boolean;
+  /** Optional run ID - if not provided, a human-readable ID will be generated */
+  runId?: string;
 };
 
 /**
@@ -367,8 +369,6 @@ const buildTargetInputs = (cell: ExecutionCell): Record<string, unknown> => {
 export async function* runOrchestrator(
   input: OrchestratorInput
 ): AsyncGenerator<EvaluationV3Event> {
-  // Generate a human-readable run ID like "swift-fox-42"
-  const runId = generateHumanReadableId();
   const {
     projectId,
     experimentId,
@@ -380,7 +380,11 @@ export async function* runOrchestrator(
     loadedPrompts,
     loadedAgents,
     saveToEs = false,
+    runId: providedRunId,
   } = input;
+
+  // Use provided run ID or generate a human-readable one like "swift-fox-42"
+  const runId = providedRunId ?? generateHumanReadableId();
 
   // Generate cells to execute
   const cells = generateCells(state, datasetRows, scope);
