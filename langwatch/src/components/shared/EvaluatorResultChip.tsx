@@ -126,7 +126,7 @@ export function EvaluatorResultChip({
               fontSize="12px"
               color="gray.300"
               whiteSpace="pre-wrap"
-              maxHeight="100px"
+              maxHeight="200px"
               overflow="auto"
             >
               {details}

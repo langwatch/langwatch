@@ -582,13 +582,18 @@ export function EvaluationsV3Table({
   );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
-  // Set up row virtualization
+  // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
     count: displayRowCount,
     getScrollElement,
     estimateSize,
     overscan: 5, // Render 5 extra rows above/below viewport for smooth scrolling
     enabled: !!scrollContainer, // Only enable when scroll container is available
+    // Enable dynamic measurement - measures actual row heights as they render
+    measureElement:
+      typeof window !== "undefined"
+        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        : undefined,
   });
 
   const selectedRows = ui.selectedRows;
@@ -1266,6 +1271,7 @@ export function EvaluationsV3Table({
                     <tr
                       key={row.id}
                       data-index={virtualRow.index}
+                      ref={rowVirtualizer.measureElement}
                       data-selected={
                         selectedRows.has(row.index) ? "true" : undefined
                       }

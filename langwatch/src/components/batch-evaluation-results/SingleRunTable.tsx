@@ -234,13 +234,18 @@ export function SingleRunTable({
   );
   const estimateSize = useCallback(() => ROW_HEIGHT, []);
 
-  // TEMPORARILY DISABLED: Testing if virtualization causes scroll/flicker issues
+  // Set up row virtualization with dynamic measurement
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement,
     estimateSize,
-    overscan: 5,
+    overscan: 10,
     enabled: !!scrollContainer,
+    // Enable dynamic measurement - measures actual row heights as they render
+    measureElement:
+      typeof window !== "undefined"
+        ? (element) => element?.getBoundingClientRect().height ?? ROW_HEIGHT
+        : undefined,
   });
 
   // Loading state
@@ -332,7 +337,11 @@ export function SingleRunTable({
                 const row = rows[virtualRow.index];
                 if (!row) return null;
                 return (
-                  <tr key={row.id} data-index={virtualRow.index}>
+                  <tr
+                    key={row.id}
+                    data-index={virtualRow.index}
+                    ref={rowVirtualizer.measureElement}
+                  >
                     {row.getVisibleCells().map((cell) => (
                       <td
                         key={cell.id}

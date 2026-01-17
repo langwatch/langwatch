@@ -205,7 +205,7 @@ export function EvaluatorChip({
                       fontSize="11px"
                       color="gray.600"
                       whiteSpace="pre-wrap"
-                      maxHeight="100px"
+                      maxHeight="200px"
                       overflow="auto"
                     >
                       {details}
