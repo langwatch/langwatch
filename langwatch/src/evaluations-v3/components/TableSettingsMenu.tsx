@@ -28,16 +28,17 @@ import {
 } from "lucide-react";
 import NextLink from "next/link";
 import React, { useMemo, useState } from "react";
+import { LuGauge } from "react-icons/lu";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Popover } from "~/components/ui/popover";
 import { SimpleSlider } from "~/components/ui/slider";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { RowHeightMode } from "../types";
 import { DEFAULT_CONCURRENCY } from "../types";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { LuGauge } from "react-icons/lu";
 
 type ToggleOption = {
   value: RowHeightMode;
@@ -99,7 +100,11 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
   };
 
   return (
-    <Popover.Root open={open} onOpenChange={(e) => setOpen(e.open)} positioning={{ placement: "bottom-end" }}>
+    <Popover.Root
+      open={open}
+      onOpenChange={(e) => setOpen(e.open)}
+      positioning={{ placement: "bottom-end" }}
+    >
       <Popover.Trigger asChild>
         <Button
           variant="outline"
@@ -167,15 +172,22 @@ type TableSettingsMenuProps = {
 /**
  * Popover menu containing table settings and actions.
  */
-export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) {
-  const { rowHeightMode, setRowHeightMode, concurrency, setConcurrency, experimentSlug } =
-    useEvaluationsV3Store((state) => ({
-      rowHeightMode: state.ui.rowHeightMode,
-      setRowHeightMode: state.setRowHeightMode,
-      concurrency: state.ui.concurrency,
-      setConcurrency: state.setConcurrency,
-      experimentSlug: state.experimentSlug,
-    }));
+export function TableSettingsMenu({
+  disabled = false,
+}: TableSettingsMenuProps) {
+  const {
+    rowHeightMode,
+    setRowHeightMode,
+    concurrency,
+    setConcurrency,
+    experimentSlug,
+  } = useEvaluationsV3Store((state) => ({
+    rowHeightMode: state.ui.rowHeightMode,
+    setRowHeightMode: state.setRowHeightMode,
+    concurrency: state.ui.concurrency,
+    setConcurrency: state.setConcurrency,
+    experimentSlug: state.experimentSlug,
+  }));
 
   const { project } = useOrganizationTeamProject();
   const cicdDialog = useDisclosure();
@@ -191,18 +203,27 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
 
   return (
     <>
-      <Popover.Root open={popoverOpen} onOpenChange={(e) => setPopoverOpen(e.open)}>
+      <Popover.Root
+        open={popoverOpen}
+        onOpenChange={(e) => setPopoverOpen(e.open)}
+      >
         <Popover.Trigger asChild>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            color="gray.500"
-            _hover={{ color: "gray.700", bg: "gray.100" }}
-            disabled={disabled}
-            aria-label="Table settings"
+          <Tooltip
+            content="Workbench settings"
+            positioning={{ placement: "bottom" }}
+            openDelay={100}
           >
-            <SlidersHorizontal size={18} />
-          </IconButton>
+            <IconButton
+              variant="ghost"
+              size="sm"
+              color="gray.500"
+              _hover={{ color: "gray.700", bg: "gray.100" }}
+              disabled={disabled}
+              aria-label="Table settings"
+            >
+              <SlidersHorizontal size={18} />
+            </IconButton>
+          </Tooltip>
         </Popover.Trigger>
         <Popover.Content width="auto" padding={3}>
           <VStack align="stretch" gap={3}>

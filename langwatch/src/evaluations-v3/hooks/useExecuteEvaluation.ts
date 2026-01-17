@@ -403,7 +403,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
             : executingCellsSet;
 
           // Helper to clear a specific cell from an array-based record
-          const clearCellFromArrayRecord = <T,>(
+          const clearCellFromArrayRecord = <T>(
             record: Record<string, (T | undefined | null)[]>,
             targetId: string,
             rowIndex: number,

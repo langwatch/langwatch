@@ -177,7 +177,8 @@ describe("resultMapper", () => {
         status: "success", // Execution succeeded
         outputs: {
           status: "error", // But evaluator itself returned error
-          details: "EvaluatorException('404 Evaluator not found: langevals/invalid')",
+          details:
+            "EvaluatorException('404 Evaluator not found: langevals/invalid')",
         },
       });
 

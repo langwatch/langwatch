@@ -222,11 +222,15 @@ export async function* executeCell(
       );
       // Convert precomputedTargetOutput to the expected format
       // The target output should be a record with the output field identifier as key
-      if (typeof cell.precomputedTargetOutput === "object" && cell.precomputedTargetOutput !== null) {
+      if (
+        typeof cell.precomputedTargetOutput === "object" &&
+        cell.precomputedTargetOutput !== null
+      ) {
         targetOutput = cell.precomputedTargetOutput as Record<string, unknown>;
       } else {
         // If it's a primitive value, wrap it in the expected output field
-        const outputField = cell.targetConfig.outputs?.[0]?.identifier ?? "output";
+        const outputField =
+          cell.targetConfig.outputs?.[0]?.identifier ?? "output";
         targetOutput = { [outputField]: cell.precomputedTargetOutput };
       }
     } else {

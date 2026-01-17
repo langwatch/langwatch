@@ -322,7 +322,9 @@ export const experimentsRouter = createTRPCRouter({
         });
       }
 
-      const workbenchState = experiment.workbenchState as WizardState | undefined;
+      const workbenchState = experiment.workbenchState as
+        | WizardState
+        | undefined;
       const dsl = experiment.workflow?.currentVersion?.dsl as
         | Workflow
         | undefined;
@@ -535,7 +537,9 @@ export const experimentsRouter = createTRPCRouter({
 
           return {
             ...experiment,
-            workbenchState: experiment.workbenchState as WizardState | undefined,
+            workbenchState: experiment.workbenchState as
+              | WizardState
+              | undefined,
             runsSummary: {
               count: runs.length,
               primaryMetric,

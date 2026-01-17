@@ -118,9 +118,7 @@ describe("parseEvaluationResult", () => {
     });
 
     it("returns processed when score and label provided but no passed", () => {
-      expect(
-        parseEvaluationResult({ score: 0.5, label: "Medium" }),
-      ).toEqual({
+      expect(parseEvaluationResult({ score: 0.5, label: "Medium" })).toEqual({
         status: "processed",
         score: 0.5,
         label: "Medium",
@@ -161,7 +159,9 @@ describe("parseEvaluationResult", () => {
 
     it("returns error for object with error object (JSON stringified)", () => {
       expect(
-        parseEvaluationResult({ error: { code: 500, message: "Server error" } }),
+        parseEvaluationResult({
+          error: { code: 500, message: "Server error" },
+        }),
       ).toEqual({
         status: "error",
         details: '{"code":500,"message":"Server error"}',

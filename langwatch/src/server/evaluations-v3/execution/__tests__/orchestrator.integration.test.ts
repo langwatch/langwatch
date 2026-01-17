@@ -1711,9 +1711,7 @@ describe.skipIf(process.env.CI)("Orchestrator Integration", () => {
               temperature: 0,
               maxTokens: 50,
             },
-            messages: [
-              { role: "user", content: "{{input}}" },
-            ],
+            messages: [{ role: "user", content: "{{input}}" }],
             inputs: [{ identifier: "input", type: "str" }],
             outputs: [{ identifier: "output", type: "str" }],
           },

@@ -8,8 +8,8 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { TableSettingsMenu } from "../components/TableSettingsMenu";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock useOrganizationTeamProject
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({

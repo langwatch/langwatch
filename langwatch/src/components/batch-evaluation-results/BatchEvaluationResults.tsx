@@ -192,7 +192,8 @@ export function BatchEvaluationResults({
   useEffect(() => {
     if (finishedAt === null) return;
 
-    const timeUntilGraceExpires = REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
+    const timeUntilGraceExpires =
+      REFETCH_GRACE_PERIOD_MS - (Date.now() - finishedAt);
     if (timeUntilGraceExpires <= 0) return;
 
     const timer = setTimeout(() => {

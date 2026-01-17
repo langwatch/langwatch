@@ -679,10 +679,7 @@ describe("useExecuteEvaluation", () => {
         results: {
           ...state.results,
           targetOutputs: {
-            "target-1": [
-              { output: "Hello" },
-              { output: "World" },
-            ],
+            "target-1": [{ output: "Hello" }, { output: "World" }],
           },
           evaluatorResults: {
             "target-1": {
@@ -716,7 +713,8 @@ describe("useExecuteEvaluation", () => {
       await waitFor(() => {
         const state = useEvaluationsV3Store.getState();
         const targetOutputs = state.results.targetOutputs["target-1"];
-        const evalResults = state.results.evaluatorResults["target-1"]?.["eval-1"];
+        const evalResults =
+          state.results.evaluatorResults["target-1"]?.["eval-1"];
 
         // Row 0 should be cleared (undefined) for both target outputs and evaluator results
         expect(targetOutputs?.[0]).toBeUndefined();
@@ -763,11 +761,7 @@ describe("useExecuteEvaluation", () => {
         results: {
           ...state.results,
           targetOutputs: {
-            "target-1": [
-              { output: "A" },
-              { output: "B" },
-              { output: "C" },
-            ],
+            "target-1": [{ output: "A" }, { output: "B" }, { output: "C" }],
           },
           evaluatorResults: {
             "target-1": {
@@ -800,7 +794,8 @@ describe("useExecuteEvaluation", () => {
       await waitFor(() => {
         const state = useEvaluationsV3Store.getState();
         const targetOutputs = state.results.targetOutputs["target-1"];
-        const evalResults = state.results.evaluatorResults["target-1"]?.["eval-1"];
+        const evalResults =
+          state.results.evaluatorResults["target-1"]?.["eval-1"];
 
         // Rows 0 and 2 should be cleared for both target outputs and evaluator results
         expect(targetOutputs?.[0]).toBeUndefined();
@@ -837,10 +832,7 @@ describe("useExecuteEvaluation", () => {
         results: {
           ...state.results,
           targetOutputs: {
-            "target-1": [
-              { output: "Hello" },
-              { output: "World" },
-            ],
+            "target-1": [{ output: "Hello" }, { output: "World" }],
           },
           evaluatorResults: {
             "target-1": {
@@ -904,10 +896,7 @@ describe("useExecuteEvaluation", () => {
         results: {
           ...state.results,
           targetOutputs: {
-            "target-1": [
-              { output: "Hello" },
-              { output: "World" },
-            ],
+            "target-1": [{ output: "Hello" }, { output: "World" }],
           },
           targetMetadata: {
             "target-1": [
