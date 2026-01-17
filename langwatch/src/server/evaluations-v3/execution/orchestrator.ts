@@ -806,7 +806,9 @@ export async function* runOrchestrator(
         })();
 
         activeCells.add(cellPromise);
-        await cellPromise.finally(() => activeCells.delete(cellPromise));
+        // Don't await here - let cells run in parallel
+        // Clean up when cell completes
+        void cellPromise.finally(() => activeCells.delete(cellPromise));
       }
 
       // Wait for all remaining cells to complete

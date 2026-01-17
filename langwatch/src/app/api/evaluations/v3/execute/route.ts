@@ -206,6 +206,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
         loadedPrompts: loadedPrompts as any,
         loadedAgents: loadedAgents as any,
         saveToEs: shouldSaveToEs,
+        concurrency: request.concurrency,
       });
 
       for await (const event of orchestrator) {

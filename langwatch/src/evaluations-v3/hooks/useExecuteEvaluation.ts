@@ -582,6 +582,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       name,
       targets,
       evaluators,
+      concurrency,
       handleEvent,
       setResults,
     ],
