@@ -788,5 +788,141 @@ describe("useExecuteEvaluation", () => {
         });
       });
     });
+
+    it("clears errors for partial execution", async () => {
+      setupStore();
+
+      // Add an evaluator and pre-populate results with an error
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [
+              { output: "Hello" },
+              { output: "World" },
+            ],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "error", details: "Some error" },
+                { status: "processed", passed: true, score: 1 },
+              ],
+            },
+          },
+          // Pre-existing errors for both rows (array with holes)
+          errors: {
+            "target-1": ["Error in row 0", "Error in row 1"],
+          },
+        },
+      }));
+
+      // Setup SSE mock
+      mockFetchSSE.mockImplementation(async () => {
+        await new Promise(() => {});
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Execute with cell scope (partial execution) for row 0 only
+      act(() => {
+        void result.current.execute({
+          type: "cell",
+          rowIndex: 0,
+          targetId: "target-1",
+        });
+      });
+
+      // Wait for state update
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        const errors = state.results.errors["target-1"];
+
+        // Row 0 error should be cleared
+        expect(errors?.[0]).toBeUndefined();
+        // Row 1 error should still exist
+        expect(errors?.[1]).toBe("Error in row 1");
+      });
+    });
+
+    it("clears target metadata for partial execution", async () => {
+      setupStore();
+
+      // Add target metadata
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        evaluators: [
+          {
+            id: "eval-1",
+            name: "Test Evaluator",
+            evaluatorType: "langevals/exact_match",
+            settings: {},
+            inputs: [],
+            mappings: {},
+          },
+        ],
+        results: {
+          ...state.results,
+          targetOutputs: {
+            "target-1": [
+              { output: "Hello" },
+              { output: "World" },
+            ],
+          },
+          targetMetadata: {
+            "target-1": [
+              { cost: 0.01, latency: 100 },
+              { cost: 0.02, latency: 200 },
+            ],
+          },
+          evaluatorResults: {
+            "target-1": {
+              "eval-1": [
+                { status: "processed", passed: true, score: 1 },
+                { status: "processed", passed: true, score: 1 },
+              ],
+            },
+          },
+        },
+      }));
+
+      // Setup SSE mock
+      mockFetchSSE.mockImplementation(async () => {
+        await new Promise(() => {});
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Execute with cell scope (partial execution) for row 0 only
+      act(() => {
+        void result.current.execute({
+          type: "cell",
+          rowIndex: 0,
+          targetId: "target-1",
+        });
+      });
+
+      // Wait for state update
+      await waitFor(() => {
+        const state = useEvaluationsV3Store.getState();
+        const targetMetadata = state.results.targetMetadata["target-1"];
+
+        // Row 0 metadata should be cleared
+        expect(targetMetadata?.[0]).toBeUndefined();
+        // Row 1 metadata should still exist
+        expect(targetMetadata?.[1]).toEqual({ cost: 0.02, latency: 200 });
+      });
+    });
   });
 });

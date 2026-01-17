@@ -389,55 +389,72 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           errors: {},
         });
       } else {
-        // Partial execution: merge new executingCells with any existing ones
-        // This allows running multiple targets/cells concurrently
-        // Clear both target outputs and evaluator results for cells being executed
+        // Partial execution: clear ALL data for cells being executed
         // This ensures the correct loading sequence:
-        // 1. Gray (pending) - no target output, no evaluator result
-        // 2. Spinner (running) - target output arrives, evaluator still pending
-        // 3. Final result - evaluator result arrives
+        // 1. Gray (pending) - no data at all
+        // 2. Spinner (running) - target output arrives, evaluators pending
+        // 3. Final result - evaluator results arrive
         useEvaluationsV3Store.setState((state) => {
           const existingCells = state.results.executingCells;
           const mergedCells = existingCells
             ? new Set([...existingCells, ...executingCellsSet])
             : executingCellsSet;
 
-          // Clear target outputs for cells being executed
-          const newTargetOutputs = { ...state.results.targetOutputs };
-          for (const cell of executionCells) {
-            const outputs = newTargetOutputs[cell.targetId];
-            if (outputs && outputs[cell.rowIndex] !== undefined) {
-              const newOutputs = [...outputs];
-              newOutputs[cell.rowIndex] = undefined;
-              newTargetOutputs[cell.targetId] = newOutputs;
-            }
-          }
+          // Helper to clear a specific cell from an array-based record
+          const clearCellFromArrayRecord = <T,>(
+            record: Record<string, (T | undefined | null)[]>,
+            targetId: string,
+            rowIndex: number,
+          ): Record<string, (T | undefined | null)[]> => {
+            const arr = record[targetId];
+            if (!arr || arr[rowIndex] === undefined) return record;
+            const newArr = [...arr];
+            newArr[rowIndex] = undefined;
+            return { ...record, [targetId]: newArr };
+          };
 
-          // Clear evaluator results for cells being executed
-          const newEvaluatorResults = { ...state.results.evaluatorResults };
+          let newTargetOutputs = { ...state.results.targetOutputs };
+          let newTargetMetadata = { ...state.results.targetMetadata };
+          let newErrors = { ...state.results.errors };
+          let newEvaluatorResults = { ...state.results.evaluatorResults };
 
-          // Use the evaluators from the store to ensure we clear ALL evaluators
           const evaluatorIds = state.evaluators.map((e) => e.id);
 
           for (const cell of executionCells) {
-            // Ensure target entry exists
+            // Clear target output
+            newTargetOutputs = clearCellFromArrayRecord(
+              newTargetOutputs,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear target metadata
+            newTargetMetadata = clearCellFromArrayRecord(
+              newTargetMetadata,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear errors (also array-based with holes)
+            newErrors = clearCellFromArrayRecord(
+              newErrors,
+              cell.targetId,
+              cell.rowIndex,
+            );
+
+            // Clear evaluator results for ALL evaluators
             if (!newEvaluatorResults[cell.targetId]) {
               newEvaluatorResults[cell.targetId] = {};
             }
             const newTargetResults = { ...newEvaluatorResults[cell.targetId] };
-
-            // Clear results for ALL evaluators for this cell
             for (const evaluatorId of evaluatorIds) {
               const evalResults = newTargetResults[evaluatorId];
-              if (evalResults) {
-                // Clone and clear the specific row
+              if (evalResults && evalResults[cell.rowIndex] !== undefined) {
                 const newEvalResults = [...evalResults];
                 newEvalResults[cell.rowIndex] = undefined;
                 newTargetResults[evaluatorId] = newEvalResults;
               }
-              // If no results array exists yet, that's fine - it will show as pending
             }
-
             newEvaluatorResults[cell.targetId] = newTargetResults;
           }
 
@@ -447,9 +464,9 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
               status: "running",
               executingCells: mergedCells,
               targetOutputs: newTargetOutputs,
+              targetMetadata: newTargetMetadata,
+              errors: newErrors,
               evaluatorResults: newEvaluatorResults,
-              // Note: progress/total are per-execution, not merged
-              // The UI should derive progress from executingCells + actual results
             },
           };
         });
