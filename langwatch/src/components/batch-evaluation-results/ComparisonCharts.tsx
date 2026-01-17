@@ -516,110 +516,119 @@ export const ComparisonCharts = ({
       }));
     }
 
-    // Group by target property or metadata value
-    // For model, prompt - we group by the value across all targets
-    const groups = new Map<string, typeof runMetrics>();
-    for (const run of runMetrics) {
-      // Get the value from targets - check both top-level properties and metadata
-      let value: string | number | boolean | undefined;
-
-      for (const targetCol of run.targetColumns) {
-        // Check top-level properties first
-        if (xAxisOption === "model" && targetCol.model) {
-          value = targetCol.model;
-          break;
-        }
-        // For prompt, combine promptId and version to create unique key
-        if (xAxisOption === "prompt" && targetCol.promptId) {
-          const version = targetCol.promptVersion;
-          value =
-            version !== undefined && version !== null
-              ? `${targetCol.promptId}::v${version}`
-              : targetCol.promptId;
-          break;
-        }
-        // Check metadata
-        if (targetCol.metadata?.[xAxisOption] !== undefined) {
-          value = targetCol.metadata[xAxisOption];
-          break;
-        }
+    // Group by target property or metadata value (model, prompt, custom metadata)
+    // This works per-target (like "target" grouping), grouping by the property value
+    // E.g., for "model": all targets with model="openai/gpt-4" are grouped together
+    const propertyGroups = new Map<
+      string,
+      {
+        displayName: string;
+        costs: number[];
+        latencies: number[];
+        scores: Record<string, number[]>;
+        passRates: Record<string, number[]>;
       }
+    >();
 
-      const key = String(value ?? "unknown");
-      const existing = groups.get(key) ?? [];
-      existing.push(run);
-      groups.set(key, existing);
-    }
-
-    // Average metrics within each group
-    return Array.from(groups.entries()).map(([key, runs]) => {
-      const avgCost =
-        runs.reduce((a, r) => a + r.metrics.totalCost, 0) / runs.length;
-      const avgLatency =
-        runs.reduce((a, r) => a + r.metrics.avgLatency, 0) / runs.length;
-
-      // Average each evaluator score
-      const allScoreIds = new Set(
-        runs.flatMap((r) => Object.keys(r.metrics.avgScores)),
-      );
-      const avgScores: Record<string, number> = {};
-      for (const evalId of allScoreIds) {
-        const scores = runs
-          .map((r) => r.metrics.avgScores[evalId])
-          .filter((s): s is number => s !== undefined);
-        if (scores.length > 0) {
-          avgScores[`score_${evalId}`] =
-            scores.reduce((a, b) => a + b, 0) / scores.length;
-        }
+    // Helper to get the grouping key from a target
+    const getGroupKey = (targetCol: (typeof runMetrics)[0]["targetColumns"][0]): string | undefined => {
+      // Check top-level model property first
+      if (xAxisOption === "model") {
+        if (targetCol.model) return targetCol.model;
+        if (targetCol.metadata?.model) return String(targetCol.metadata.model);
+        return undefined;
       }
-
-      // Average each evaluator pass rate
-      const allPassIds = new Set(
-        runs.flatMap((r) => Object.keys(r.metrics.passRates)),
-      );
-      const avgPassRates: Record<string, number> = {};
-      for (const evalId of allPassIds) {
-        const rates = runs
-          .map((r) => r.metrics.passRates[evalId])
-          .filter((s): s is number => s !== undefined);
-        if (rates.length > 0) {
-          avgPassRates[`pass_${evalId}`] =
-            rates.reduce((a, b) => a + b, 0) / rates.length;
+      
+      // For prompt, combine promptId and version
+      if (xAxisOption === "prompt") {
+        if (!targetCol.promptId) {
+          // Check metadata for prompt_id
+          if (targetCol.metadata?.prompt_id) {
+            const version = targetCol.promptVersion ?? targetCol.metadata?.version;
+            return version !== undefined && version !== null
+              ? `${targetCol.metadata.prompt_id}::v${version}`
+              : String(targetCol.metadata.prompt_id);
+          }
+          return undefined;
         }
+        const version = targetCol.promptVersion;
+        return version !== undefined && version !== null
+          ? `${targetCol.promptId}::v${version}`
+          : targetCol.promptId;
       }
+      
+      // For custom metadata keys
+      if (targetCol.metadata?.[xAxisOption] !== undefined) {
+        return String(targetCol.metadata[xAxisOption]);
+      }
+      
+      return undefined;
+    };
 
-      // Format name for prompt (shows "promptName (v1)" format)
-      let displayName = key;
+    // Helper to get display name for a group key
+    const getDisplayName = (key: string, targetCol: (typeof runMetrics)[0]["targetColumns"][0]): string => {
       if (xAxisOption === "prompt") {
         // Key is in format "promptId::vN" or just "promptId"
         const [promptId, versionPart] = key.split("::");
+        const resolvedPromptName = promptNames[promptId ?? ""] ?? targetCol.name ?? promptId ?? key;
+        return versionPart ? `${resolvedPromptName} (${versionPart})` : resolvedPromptName;
+      }
+      return key;
+    };
 
-        // Build prompt name from targetColumns - find target with matching promptId
-        let resolvedPromptName: string =
-          promptNames[promptId ?? ""] ?? promptId ?? key;
-        for (const run of runs) {
-          for (const targetCol of run.targetColumns) {
-            if (targetCol.promptId === promptId && targetCol.name) {
-              resolvedPromptName = targetCol.name;
-              break;
-            }
-          }
-          if (resolvedPromptName !== promptId) break;
+    for (const run of runMetrics) {
+      for (const targetCol of run.targetColumns) {
+        const key = getGroupKey(targetCol);
+        if (!key) continue;
+
+        // Compute metrics for THIS target only
+        const targetMetrics = computeTargetMetrics(run.rows, targetCol.id);
+
+        const existing = propertyGroups.get(key) ?? {
+          displayName: getDisplayName(key, targetCol),
+          costs: [],
+          latencies: [],
+          scores: {},
+          passRates: {},
+        };
+
+        // Add this target's metrics
+        existing.costs.push(targetMetrics.totalCost);
+        if (targetMetrics.avgLatency > 0) {
+          existing.latencies.push(targetMetrics.avgLatency);
         }
 
-        displayName = versionPart
-          ? `${resolvedPromptName} (${versionPart})`
-          : resolvedPromptName;
-      }
+        // Aggregate evaluator metrics
+        for (const [evalId, score] of Object.entries(targetMetrics.avgScores)) {
+          if (!existing.scores[evalId]) existing.scores[evalId] = [];
+          existing.scores[evalId]!.push(score);
+        }
+        for (const [evalId, rate] of Object.entries(targetMetrics.passRates)) {
+          if (!existing.passRates[evalId]) existing.passRates[evalId] = [];
+          existing.passRates[evalId]!.push(rate);
+        }
 
-      return {
-        name: displayName,
-        cost: avgCost,
-        latency: avgLatency,
-        ...avgScores,
-        ...avgPassRates,
-      };
-    });
+        propertyGroups.set(key, existing);
+      }
+    }
+
+    return Array.from(propertyGroups.entries()).map(([_key, data]) => ({
+      name: data.displayName,
+      cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
+      latency: data.latencies.reduce((a, b) => a + b, 0) / (data.latencies.length || 1),
+      ...Object.fromEntries(
+        Object.entries(data.scores).map(([k, v]) => [
+          `score_${k}`,
+          v.reduce((a, b) => a + b, 0) / v.length,
+        ]),
+      ),
+      ...Object.fromEntries(
+        Object.entries(data.passRates).map(([k, v]) => [
+          `pass_${k}`,
+          v.reduce((a, b) => a + b, 0) / v.length,
+        ]),
+      ),
+    }));
   }, [runMetrics, xAxisOption, promptNames]);
 
   // Calculate dynamic Y-axis widths based on data

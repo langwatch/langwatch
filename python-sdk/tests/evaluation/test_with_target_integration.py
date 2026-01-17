@@ -367,7 +367,7 @@ class TestRaceConditionPrevention:
 
         with patch("httpx.post", side_effect=mock_post):
             for index, row in evaluation.loop(df.iterrows(), threads=3):
-                def evaluate(index, row):
+                def task(index, row):
                     # First target
                     with evaluation.target("gpt-4"):
                         evaluation.log_response(f"GPT-4 response for {row['question']}")
@@ -378,7 +378,7 @@ class TestRaceConditionPrevention:
                         evaluation.log_response(f"Claude response for {row['question']}")
                         time.sleep(0.02)
 
-                evaluation.submit(evaluate, index, row)
+                evaluation.submit(task, index, row)
 
         # Collect all dataset entries from captured HTTP calls
         all_dataset_entries = []

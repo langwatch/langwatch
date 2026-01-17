@@ -56,7 +56,7 @@ export function EvaluationManualIntegration({
   );
 
   const PythonInstructions = ({ async }: { async: boolean }) => {
-    const nameParam = storeSettingsOnCode ? `\n        name="${name}",` : "";
+    const nameParam = `\n        name="${name}",`;
     const contextsParams = evaluatorDefinition.requiredFields.includes(
       "contexts",
     )
@@ -152,7 +152,7 @@ ${
   };
 
   const TypeScriptInstructions = () => {
-    const nameParam = storeSettingsOnCode ? `\n        name: "${name}",` : "";
+    const nameParam = `\n        name: "${name}",`;
     const contextsParams = evaluatorDefinition.requiredFields.includes(
       "contexts",
     )
@@ -341,6 +341,7 @@ curl -X POST "${langwatchEndpoint()}/api/evaluations/${checkSlug}/evaluate" \\
      -d @- <<EOF
 {
   "trace_id": "trace-123",
+  "name": "${name}",
   "data": {
     ${evaluatorDefinition.requiredFields
       .map((field) => `"${field}": "${field} content"`)
