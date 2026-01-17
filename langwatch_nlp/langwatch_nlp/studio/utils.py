@@ -168,6 +168,66 @@ class ClientReadableValueError(ValueError):
 # Minimum max_tokens required by DSPy for reasoning models
 REASONING_MODEL_MIN_MAX_TOKENS = 16000
 
+# Provider-specific reasoning parameter names
+# Used as fallback for mapping the unified 'reasoning' field to provider-specific parameters
+PROVIDER_REASONING_FALLBACKS: Dict[str, str] = {
+    "openai": "reasoning_effort",
+    "google": "thinkingLevel",
+    "anthropic": "effort",
+    "gemini": "thinkingLevel",  # Alias for google
+}
+
+
+def get_provider_from_model(model: str | None) -> str:
+    """Extract provider from model string (e.g., 'openai/gpt-4' -> 'openai')."""
+    if not model:
+        return ""
+    return model.split("/")[0].lower() if "/" in model else ""
+
+
+def map_reasoning_to_provider(model: str | None, reasoning: str | None) -> Dict[str, str]:
+    """
+    Maps the unified 'reasoning' field to the provider-specific parameter.
+
+    This is the boundary layer function that converts the canonical 'reasoning'
+    field to the appropriate provider-specific parameter (reasoning_effort,
+    thinkingLevel, effort) when making API calls.
+
+    Args:
+        model: The model identifier (e.g., "openai/gpt-5", "gemini/gemini-3-flash")
+        reasoning: The unified reasoning value
+
+    Returns:
+        Dict with provider-specific key and value, or empty dict if reasoning is not set
+    """
+    if not reasoning:
+        return {}
+
+    provider = get_provider_from_model(model)
+    param_key = PROVIDER_REASONING_FALLBACKS.get(provider, "reasoning_effort")
+
+    return {param_key: reasoning}
+
+
+def normalize_reasoning_from_provider_fields(llm_config: LLMConfig) -> str | None:
+    """
+    Normalizes provider-specific reasoning fields to the unified 'reasoning' field.
+
+    Priority order: reasoning > reasoning_effort > thinkingLevel > effort
+
+    Args:
+        llm_config: LLMConfig with potentially any combination of reasoning fields
+
+    Returns:
+        The normalized reasoning value, or None if none are set
+    """
+    return (
+        llm_config.reasoning
+        or llm_config.reasoning_effort
+        or llm_config.thinkingLevel
+        or llm_config.effort
+    )
+
 
 def is_reasoning_model(model: str | None) -> bool:
     """
@@ -222,6 +282,11 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     For non-reasoning models:
     - temperature: config value or 0
     - max_tokens: config value or 2048
+
+    Reasoning parameter handling:
+    - The unified 'reasoning' field is the canonical source
+    - Provider-specific fields are checked for backward compatibility
+    - The normalized value is mapped to the provider-specific parameter at runtime
     """
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
@@ -237,26 +302,20 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
 
     corrected = get_corrected_llm_params(llm_config)
 
-    # Build kwargs with reasoning params if present
-    # Note: corrected values are applied AFTER llm_params to ensure they always win
+    # Build kwargs with corrected temperature and max_tokens
     dspy_kwargs: dict[str, Any] = {
         **llm_params,
         "max_tokens": corrected["max_tokens"],
         "temperature": corrected["temperature"],
     }
 
-    # Pass provider-specific reasoning parameters
-    if llm_config.reasoning_effort is not None:
-        dspy_kwargs["reasoning_effort"] = llm_config.reasoning_effort
-    if llm_config.thinkingLevel is not None:
-        dspy_kwargs["thinkingLevel"] = llm_config.thinkingLevel
-    if llm_config.effort is not None:
-        dspy_kwargs["effort"] = llm_config.effort
-
-    # FALLBACK: Handle legacy 'reasoning' field (deprecated)
-    # Map to reasoning_effort for backward compatibility with old stored configs
-    if llm_config.reasoning is not None and llm_config.reasoning_effort is None:
-        dspy_kwargs["reasoning_effort"] = llm_config.reasoning
+    # Normalize reasoning from any provider-specific field (for backward compatibility)
+    # Then map to the appropriate provider-specific parameter at runtime boundary
+    normalized_reasoning = normalize_reasoning_from_provider_fields(llm_config)
+    if normalized_reasoning:
+        # Map unified reasoning to provider-specific parameter
+        reasoning_params = map_reasoning_to_provider(llm_config.model, normalized_reasoning)
+        dspy_kwargs.update(reasoning_params)
 
     return dspy.LM(**dspy_kwargs)
 

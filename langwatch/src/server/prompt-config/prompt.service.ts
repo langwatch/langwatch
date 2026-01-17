@@ -13,6 +13,7 @@ import type {
 } from "~/prompts/schemas/field-schemas";
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
+import { normalizeReasoningFromProviderFields } from "./reasoningBoundary";
 import { transformCamelToSnake } from "./transformToDbFormat";
 import { PromptVersionService } from "./prompt-version.service";
 import {
@@ -60,10 +61,8 @@ export type VersionedPrompt = {
   topK?: number;
   minP?: number;
   repetitionPenalty?: number;
-  // Reasoning model parameters
-  reasoningEffort?: string;
-  thinkingLevel?: string;
-  effort?: string;
+  // Reasoning parameter (canonical/unified field)
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
   reasoning?: string;
   verbosity?: string;
   prompt: string;
@@ -244,8 +243,7 @@ export class PromptService {
     topK?: number;
     minP?: number;
     repetitionPenalty?: number;
-    // Reasoning model parameters
-    reasoningEffort?: string;
+    // Reasoning parameter (canonical/unified field)
     reasoning?: string;
     verbosity?: string;
     promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
@@ -328,8 +326,7 @@ export class PromptService {
               topK: params.topK,
               minP: params.minP,
               repetitionPenalty: params.repetitionPenalty,
-              // Reasoning model parameters
-              reasoningEffort: params.reasoningEffort,
+              // Reasoning parameter (canonical/unified field)
               reasoning: params.reasoning,
               verbosity: params.verbosity,
               promptingTechnique: params.promptingTechnique,
@@ -828,11 +825,13 @@ export class PromptService {
       topK: configData.top_k,
       minP: configData.min_p,
       repetitionPenalty: configData.repetition_penalty,
-      // Reasoning model parameters
-      reasoningEffort: configData.reasoning_effort,
-      thinkingLevel: configData.thinkingLevel,
-      effort: configData.effort,
-      reasoning: configData.reasoning,
+      // Reasoning parameter (normalized from any provider-specific fields for backward compat)
+      reasoning: normalizeReasoningFromProviderFields({
+        reasoning: configData.reasoning,
+        reasoning_effort: configData.reasoning_effort,
+        thinkingLevel: configData.thinkingLevel,
+        effort: configData.effort,
+      }),
       verbosity: configData.verbosity,
       prompt,
       projectId: config.projectId,
@@ -889,8 +888,9 @@ export class PromptService {
    * Uses transformCamelToSnake utility which derives mappings from PARAM_NAME_MAPPING
    * (single source of truth) plus prompt-specific mappings.
    *
-   * Also handles legacy 'reasoning' field by mapping it to the appropriate
-   * provider-specific parameter based on the model in the data.
+   * The 'reasoning' field passes through unchanged as the canonical field.
+   * Provider-specific mapping happens at the boundary layer (reasoningBoundary.ts)
+   * when making actual LLM API calls, not when saving to the database.
    *
    * TODO: Move to repository layer - the repository should handle this transformation
    * to properly isolate database schema concerns from service business logic.
@@ -898,9 +898,7 @@ export class PromptService {
   private transformToDbFormat(
     data: Record<string, unknown>,
   ): Record<string, unknown> {
-    // Extract model from data for intelligent reasoning fallback
-    const model = typeof data.model === "string" ? data.model : undefined;
-    return transformCamelToSnake(data, model);
+    return transformCamelToSnake(data);
   }
 
   /**

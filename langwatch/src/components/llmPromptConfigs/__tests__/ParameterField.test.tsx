@@ -22,11 +22,12 @@ afterEach(() => {
 
 describe("ParameterField", () => {
   describe("Select Parameters", () => {
+    // Uses unified 'reasoning' field with dynamic label
     const reasoningConfig: SelectParameterConfig = {
       type: "select",
       options: ["low", "medium", "high"] as const,
       default: "medium",
-      label: "Reasoning Effort",
+      label: "Reasoning", // Default label (can be overridden by dynamic label)
       helper: "How much the model thinks",
     };
 
@@ -36,7 +37,7 @@ describe("ParameterField", () => {
 
       renderWithChakra(
         <ParameterField
-          name="reasoning_effort"
+          name="reasoning" // Uses unified field name
           config={reasoningConfig}
           value="medium"
           onChange={onChange}

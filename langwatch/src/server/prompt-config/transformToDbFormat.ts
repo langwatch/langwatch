@@ -1,12 +1,17 @@
 /**
  * Transform camelCase parameter keys to snake_case for database storage.
+ *
+ * The 'reasoning' field is the canonical/unified field and is stored as-is.
+ * Provider-specific mapping (to reasoning_effort, thinkingLevel, effort)
+ * happens at the boundary layer when calling LLM APIs, not here.
  */
-
-import { resolveReasoningToProviderParam } from "./resolveReasoningLegacy";
 
 /**
  * Mapping from camelCase to snake_case for LLM and prompt parameters.
  * Defined locally to avoid server code importing from components.
+ *
+ * Note: 'reasoning' is NOT mapped - it stays as 'reasoning' in the database.
+ * Provider-specific parameters are mapped at runtime via reasoningBoundary.ts.
  */
 const CAMEL_TO_SNAKE_MAPPING: Record<string, string> = {
   // LLM parameters
@@ -17,7 +22,6 @@ const CAMEL_TO_SNAKE_MAPPING: Record<string, string> = {
   topK: "top_k",
   minP: "min_p",
   repetitionPenalty: "repetition_penalty",
-  reasoningEffort: "reasoning_effort",
   // Prompt-specific parameters
   promptingTechnique: "prompting_technique",
   responseFormat: "response_format",
@@ -33,16 +37,15 @@ export function buildCamelToSnakeMapping(): Record<string, string> {
 /**
  * Transform an object's camelCase keys to snake_case.
  *
- * Also handles legacy 'reasoning' field by mapping it to the appropriate
- * provider-specific parameter when a model is provided.
+ * The 'reasoning' field passes through unchanged as the canonical field.
+ * Provider-specific mapping happens at the boundary layer (reasoningBoundary.ts)
+ * when making actual LLM API calls.
  *
  * @param data - Object with potentially camelCase keys
- * @param model - Optional model identifier for intelligent reasoning fallback
  * @returns Object with snake_case keys
  */
 export function transformCamelToSnake(
   data: Record<string, unknown>,
-  model?: string,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
   const mapping = buildCamelToSnakeMapping();
@@ -54,24 +57,8 @@ export function transformCamelToSnake(
     }
   }
 
-  // Intelligent fallback for legacy 'reasoning' field
-  // Maps to provider-specific parameter only if that parameter isn't already set
-  if (
-    result.reasoning !== undefined &&
-    result.reasoning !== null &&
-    model
-  ) {
-    const resolved = resolveReasoningToProviderParam(
-      model,
-      result.reasoning as string,
-    );
-    // Only apply fallback if the target parameter isn't already set
-    if (result[resolved.key] === undefined) {
-      result[resolved.key] = resolved.value;
-    }
-    // Remove the legacy field after mapping
-    delete result.reasoning;
-  }
+  // 'reasoning' passes through unchanged - it's the canonical field
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
 
   return result;
 }

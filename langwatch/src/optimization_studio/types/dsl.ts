@@ -102,10 +102,13 @@ export const llmConfigSchema = z.object({
   top_k: z.number().optional(),
   min_p: z.number().optional(),
   repetition_penalty: z.number().optional(),
-  // Reasoning parameters (provider-specific API keys)
-  reasoning_effort: z.string().optional(), // OpenAI
-  thinkingLevel: z.string().optional(), // Gemini
-  effort: z.string().optional(), // Anthropic
+  // Reasoning parameter (canonical/unified field)
+  // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
+  reasoning: z.string().optional(),
+  // Provider-specific fields - kept for backward compatibility
+  reasoning_effort: z.string().optional(), // OpenAI (legacy)
+  thinkingLevel: z.string().optional(), // Gemini (legacy)
+  effort: z.string().optional(), // Anthropic (legacy)
   verbosity: z.string().optional(),
   litellm_params: z.record(z.string()).optional(),
 });

@@ -21,9 +21,8 @@ export type LLMConfigValues = {
   top_k?: number;
   min_p?: number;
   repetition_penalty?: number;
-  reasoning_effort?: string;
-  thinkingLevel?: string;
-  effort?: string;
+  // Unified reasoning parameter (replaces provider-specific fields)
+  reasoning?: string;
   verbosity?: string;
 } & (
   | { max_tokens?: number; maxTokens?: never }

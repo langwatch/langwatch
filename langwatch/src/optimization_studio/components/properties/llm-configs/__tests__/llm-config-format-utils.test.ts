@@ -52,22 +52,10 @@ describe("LLMConfigFormatUtils", () => {
       expect(result.repetition_penalty).toBe(1.1);
     });
 
-    it("converts reasoningEffort to reasoning_effort (OpenAI)", () => {
-      const form: FormLLMConfig = { model: "gpt-5", reasoningEffort: "high" };
+    it("converts unified reasoning field", () => {
+      const form: FormLLMConfig = { model: "gpt-5", reasoning: "high" };
       const result = LLMConfigFormatUtils.formToDslFormat(form);
-      expect(result.reasoning_effort).toBe("high");
-    });
-
-    it("passes through thinkingLevel unchanged (Gemini)", () => {
-      const form: FormLLMConfig = { model: "gemini-2.5-pro", thinkingLevel: "high" };
-      const result = LLMConfigFormatUtils.formToDslFormat(form);
-      expect(result.thinkingLevel).toBe("high");
-    });
-
-    it("passes through effort unchanged (Anthropic)", () => {
-      const form: FormLLMConfig = { model: "claude-opus-4.5", effort: "high" };
-      const result = LLMConfigFormatUtils.formToDslFormat(form);
-      expect(result.effort).toBe("high");
+      expect(result.reasoning).toBe("high");
     });
 
     it("converts all parameters in complete config", () => {
@@ -82,9 +70,7 @@ describe("LLMConfigFormatUtils", () => {
         topK: 40,
         minP: 0.05,
         repetitionPenalty: 1.1,
-        reasoningEffort: "medium",
-        thinkingLevel: "low",
-        effort: "high",
+        reasoning: "medium",
         verbosity: "verbose",
       };
       const result = LLMConfigFormatUtils.formToDslFormat(form);
@@ -99,9 +85,7 @@ describe("LLMConfigFormatUtils", () => {
       expect(result.top_k).toBe(40);
       expect(result.min_p).toBe(0.05);
       expect(result.repetition_penalty).toBe(1.1);
-      expect(result.reasoning_effort).toBe("medium");
-      expect(result.thinkingLevel).toBe("low");
-      expect(result.effort).toBe("high");
+      expect(result.reasoning).toBe("medium");
       expect(result.verbosity).toBe("verbose");
     });
   });
@@ -155,22 +139,39 @@ describe("LLMConfigFormatUtils", () => {
       expect(result.repetitionPenalty).toBe(1.1);
     });
 
-    it("converts reasoning_effort to reasoningEffort (OpenAI)", () => {
+    it("normalizes reasoning field from canonical reasoning", () => {
+      const dsl: LLMConfig = { model: "gpt-5", reasoning: "high" };
+      const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
+      expect(result.reasoning).toBe("high");
+    });
+
+    it("normalizes reasoning from legacy reasoning_effort (OpenAI)", () => {
       const dsl: LLMConfig = { model: "gpt-5", reasoning_effort: "high" };
       const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
-      expect(result.reasoningEffort).toBe("high");
+      expect(result.reasoning).toBe("high");
     });
 
-    it("passes through thinkingLevel unchanged (Gemini)", () => {
+    it("normalizes reasoning from legacy thinkingLevel (Gemini)", () => {
       const dsl: LLMConfig = { model: "gemini-2.5-pro", thinkingLevel: "high" };
       const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
-      expect(result.thinkingLevel).toBe("high");
+      expect(result.reasoning).toBe("high");
     });
 
-    it("passes through effort unchanged (Anthropic)", () => {
+    it("normalizes reasoning from legacy effort (Anthropic)", () => {
       const dsl: LLMConfig = { model: "claude-opus-4.5", effort: "high" };
       const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
-      expect(result.effort).toBe("high");
+      expect(result.reasoning).toBe("high");
+    });
+
+    it("reasoning takes precedence over legacy fields", () => {
+      const dsl: LLMConfig = {
+        model: "gpt-5",
+        reasoning: "high",
+        reasoning_effort: "low",
+        thinkingLevel: "medium",
+      };
+      const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
+      expect(result.reasoning).toBe("high");
     });
 
     it("converts all parameters in complete config", () => {
@@ -185,9 +186,7 @@ describe("LLMConfigFormatUtils", () => {
         top_k: 40,
         min_p: 0.05,
         repetition_penalty: 1.1,
-        reasoning_effort: "medium",
-        thinkingLevel: "low",
-        effort: "high",
+        reasoning: "medium",
         verbosity: "verbose",
       };
       const result = LLMConfigFormatUtils.dslToFormFormat(dsl);
@@ -202,9 +201,7 @@ describe("LLMConfigFormatUtils", () => {
       expect(result.topK).toBe(40);
       expect(result.minP).toBe(0.05);
       expect(result.repetitionPenalty).toBe(1.1);
-      expect(result.reasoningEffort).toBe("medium");
-      expect(result.thinkingLevel).toBe("low");
-      expect(result.effort).toBe("high");
+      expect(result.reasoning).toBe("medium");
       expect(result.verbosity).toBe("verbose");
     });
   });
@@ -216,9 +213,8 @@ describe("LLMConfigFormatUtils", () => {
         temperature: 0.7,
         maxTokens: 4096,
         topP: 0.9,
-        thinkingLevel: "high",
-        effort: "medium",
-        reasoningEffort: "low",
+        reasoning: "high",
+        verbosity: "verbose",
       };
 
       const dsl = LLMConfigFormatUtils.formToDslFormat(original);
@@ -228,9 +224,8 @@ describe("LLMConfigFormatUtils", () => {
       expect(roundTrip.temperature).toBe(original.temperature);
       expect(roundTrip.maxTokens).toBe(original.maxTokens);
       expect(roundTrip.topP).toBe(original.topP);
-      expect(roundTrip.thinkingLevel).toBe(original.thinkingLevel);
-      expect(roundTrip.effort).toBe(original.effort);
-      expect(roundTrip.reasoningEffort).toBe(original.reasoningEffort);
+      expect(roundTrip.reasoning).toBe(original.reasoning);
+      expect(roundTrip.verbosity).toBe(original.verbosity);
     });
 
     it("preserves all values through dsl -> form -> dsl", () => {
@@ -239,9 +234,8 @@ describe("LLMConfigFormatUtils", () => {
         temperature: 1.0,
         max_tokens: 8192,
         top_p: 0.95,
-        thinkingLevel: "low",
-        effort: "high",
-        reasoning_effort: "medium",
+        reasoning: "high",
+        verbosity: "verbose",
       };
 
       const form = LLMConfigFormatUtils.dslToFormFormat(original);
@@ -251,9 +245,8 @@ describe("LLMConfigFormatUtils", () => {
       expect(roundTrip.temperature).toBe(original.temperature);
       expect(roundTrip.max_tokens).toBe(original.max_tokens);
       expect(roundTrip.top_p).toBe(original.top_p);
-      expect(roundTrip.thinkingLevel).toBe(original.thinkingLevel);
-      expect(roundTrip.effort).toBe(original.effort);
-      expect(roundTrip.reasoning_effort).toBe(original.reasoning_effort);
+      expect(roundTrip.reasoning).toBe(original.reasoning);
+      expect(roundTrip.verbosity).toBe(original.verbosity);
     });
   });
 });

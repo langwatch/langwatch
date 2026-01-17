@@ -1,5 +1,9 @@
 /**
  * Unit tests for parameter configuration
+ *
+ * Updated for unified reasoning parameter refactor:
+ * - Single 'reasoning' field replaces provider-specific fields
+ * - Provider-specific mapping happens at runtime boundary
  */
 
 import { describe, expect, it } from "vitest";
@@ -7,7 +11,7 @@ import type { ReasoningConfig } from "../../../server/modelProviders/llmModels.t
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
-  getEffectiveParameterConfig,
+  getParameterConfigWithModelOverrides,
   getParameterConfig,
   getParameterDefault,
   isReasoningParameter,
@@ -37,8 +41,8 @@ describe("Parameter Config", () => {
       }
     });
 
-    it("has reasoning_effort config as select", () => {
-      const config = PARAMETER_CONFIG.reasoning_effort;
+    it("has unified reasoning config as select", () => {
+      const config = PARAMETER_CONFIG.reasoning;
       expect(config).toBeDefined();
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
@@ -101,10 +105,10 @@ describe("Parameter Config", () => {
       const params = getDisplayParameters([
         "max_tokens",
         "temperature",
-        "reasoning_effort",
+        "reasoning",
       ]);
-      // reasoning_effort should come before temperature in display order
-      expect(params.indexOf("reasoning_effort")).toBeLessThan(
+      // reasoning should come before temperature in display order
+      expect(params.indexOf("reasoning")).toBeLessThan(
         params.indexOf("temperature"),
       );
       expect(params.indexOf("temperature")).toBeLessThan(
@@ -126,14 +130,14 @@ describe("Parameter Config", () => {
       expect(params).toContain("presence_penalty");
     });
 
-    it("handles GPT-5 style parameters", () => {
+    it("handles reasoning model style parameters", () => {
       const params = getDisplayParameters([
-        "reasoning_effort",
+        "reasoning",
         "max_tokens",
         "seed",
         "tool_choice",
       ]);
-      expect(params).toContain("reasoning_effort");
+      expect(params).toContain("reasoning");
       expect(params).toContain("max_tokens");
       expect(params).toContain("seed");
       expect(params).not.toContain("tool_choice"); // Not in our config
@@ -149,8 +153,8 @@ describe("Parameter Config", () => {
       expect(getParameterDefault("max_tokens")).toBe(4096);
     });
 
-    it("returns default for reasoning_effort", () => {
-      expect(getParameterDefault("reasoning_effort")).toBe("medium");
+    it("returns default for unified reasoning", () => {
+      expect(getParameterDefault("reasoning")).toBe("medium");
     });
 
     it("returns undefined for unknown parameter", () => {
@@ -159,16 +163,8 @@ describe("Parameter Config", () => {
   });
 
   describe("isReasoningParameter", () => {
-    it("returns true for reasoning_effort", () => {
-      expect(isReasoningParameter("reasoning_effort")).toBe(true);
-    });
-
-    it("returns true for thinkingLevel", () => {
-      expect(isReasoningParameter("thinkingLevel")).toBe(true);
-    });
-
-    it("returns true for effort", () => {
-      expect(isReasoningParameter("effort")).toBe(true);
+    it("returns true for unified reasoning", () => {
+      expect(isReasoningParameter("reasoning")).toBe(true);
     });
 
     it("returns true for verbosity", () => {
@@ -178,6 +174,10 @@ describe("Parameter Config", () => {
     it("returns false for temperature", () => {
       expect(isReasoningParameter("temperature")).toBe(false);
     });
+
+    it("returns false for max_tokens", () => {
+      expect(isReasoningParameter("max_tokens")).toBe(false);
+    });
   });
 
   describe("supportsTemperature", () => {
@@ -186,24 +186,16 @@ describe("Parameter Config", () => {
     });
 
     it("returns false when temperature is not in supported params", () => {
-      expect(supportsTemperature(["reasoning_effort", "max_tokens"])).toBe(false);
+      expect(supportsTemperature(["reasoning", "max_tokens"])).toBe(false);
     });
   });
 
   describe("supportsReasoning", () => {
-    it("returns true when reasoning_effort is supported", () => {
-      expect(supportsReasoning(["reasoning_effort", "max_tokens"])).toBe(true);
+    it("returns true when unified reasoning is supported", () => {
+      expect(supportsReasoning(["reasoning", "max_tokens"])).toBe(true);
     });
 
-    it("returns true when thinkingLevel is supported", () => {
-      expect(supportsReasoning(["thinkingLevel", "max_tokens"])).toBe(true);
-    });
-
-    it("returns true when effort is supported", () => {
-      expect(supportsReasoning(["effort", "max_tokens"])).toBe(true);
-    });
-
-    it("returns false when no reasoning params supported", () => {
+    it("returns false when no reasoning param supported", () => {
       expect(supportsReasoning(["temperature", "max_tokens"])).toBe(false);
     });
   });
@@ -220,7 +212,7 @@ describe("Parameter Config", () => {
 
   describe("PARAMETER_DISPLAY_ORDER", () => {
     it("has reasoning params first", () => {
-      expect(PARAMETER_DISPLAY_ORDER.indexOf("reasoning_effort")).toBeLessThan(
+      expect(PARAMETER_DISPLAY_ORDER.indexOf("reasoning")).toBeLessThan(
         PARAMETER_DISPLAY_ORDER.indexOf("temperature"),
       );
     });
@@ -232,9 +224,9 @@ describe("Parameter Config", () => {
     });
   });
 
-  describe("getEffectiveParameterConfig", () => {
+  describe("getParameterConfigWithModelOverrides", () => {
     it("returns base config when no reasoningConfig provided", () => {
-      const config = getEffectiveParameterConfig("temperature");
+      const config = getParameterConfigWithModelOverrides("temperature");
       expect(config?.type).toBe("slider");
     });
 
@@ -246,14 +238,14 @@ describe("Parameter Config", () => {
         defaultValue: "medium",
         canDisable: false,
       };
-      const config = getEffectiveParameterConfig(
+      const config = getParameterConfigWithModelOverrides(
         "temperature",
         reasoningConfig,
       );
       expect(config?.type).toBe("slider");
     });
 
-    it("uses model reasoningConfig for reasoning_effort options", () => {
+    it("uses model reasoningConfig for unified reasoning options", () => {
       const reasoningConfig: ReasoningConfig = {
         supported: true,
         parameterName: "reasoning_effort",
@@ -261,8 +253,8 @@ describe("Parameter Config", () => {
         defaultValue: "high",
         canDisable: false,
       };
-      const config = getEffectiveParameterConfig(
-        "reasoning_effort",
+      const config = getParameterConfigWithModelOverrides(
+        "reasoning",
         reasoningConfig,
       );
 
@@ -273,7 +265,59 @@ describe("Parameter Config", () => {
       }
     });
 
-    it("uses model reasoningConfig for reasoning_effort options", () => {
+    it("returns dynamic label for OpenAI reasoning_effort", () => {
+      const reasoningConfig: ReasoningConfig = {
+        supported: true,
+        parameterName: "reasoning_effort",
+        allowedValues: ["low", "medium", "high"],
+        defaultValue: "medium",
+        canDisable: false,
+      };
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+
+      expect(config?.label).toBe("Reasoning Effort");
+    });
+
+    it("returns dynamic label for Gemini thinkingLevel", () => {
+      const reasoningConfig: ReasoningConfig = {
+        supported: true,
+        parameterName: "thinkingLevel",
+        allowedValues: ["low", "high"],
+        defaultValue: "low",
+        canDisable: false,
+      };
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+
+      expect(config?.label).toBe("Thinking Level");
+    });
+
+    it("returns dynamic label for Anthropic effort", () => {
+      const reasoningConfig: ReasoningConfig = {
+        supported: true,
+        parameterName: "effort",
+        allowedValues: ["low", "medium", "high"],
+        defaultValue: "medium",
+        canDisable: false,
+      };
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+
+      expect(config?.label).toBe("Effort");
+    });
+
+    it("returns default Reasoning label for unknown parameterName", () => {
+      const reasoningConfig: ReasoningConfig = {
+        supported: true,
+        parameterName: "custom_reasoning",
+        allowedValues: ["low", "high"],
+        defaultValue: "low",
+        canDisable: false,
+      };
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
+
+      expect(config?.label).toBe("Reasoning");
+    });
+
+    it("uses model reasoningConfig for extended options", () => {
       const reasoningConfig: ReasoningConfig = {
         supported: true,
         parameterName: "reasoning_effort",
@@ -281,7 +325,7 @@ describe("Parameter Config", () => {
         defaultValue: "none",
         canDisable: true,
       };
-      const config = getEffectiveParameterConfig("reasoning_effort", reasoningConfig);
+      const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
@@ -297,7 +341,7 @@ describe("Parameter Config", () => {
     });
 
     it("returns fallback options when no reasoningConfig", () => {
-      const config = getEffectiveParameterConfig("reasoning_effort");
+      const config = getParameterConfigWithModelOverrides("reasoning");
 
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
@@ -318,8 +362,10 @@ describe("Parameter Config", () => {
       expect(PARAM_NAME_MAPPING.frequency_penalty).toBe("frequencyPenalty");
     });
 
-    it("maps reasoning_effort to reasoningEffort", () => {
-      expect(PARAM_NAME_MAPPING.reasoning_effort).toBe("reasoningEffort");
+    it("does not include reasoning (same in both formats)", () => {
+      // reasoning is the same in both snake_case and camelCase
+      // so it should not be in the mapping
+      expect(PARAM_NAME_MAPPING.reasoning).toBeUndefined();
     });
   });
 
@@ -327,12 +373,11 @@ describe("Parameter Config", () => {
     it("converts snake_case to camelCase", () => {
       expect(toFormKey("top_p")).toBe("topP");
       expect(toFormKey("frequency_penalty")).toBe("frequencyPenalty");
-      expect(toFormKey("reasoning_effort")).toBe("reasoningEffort");
     });
 
     it("returns same key for non-mapped params", () => {
       expect(toFormKey("temperature")).toBe("temperature");
-      expect(toFormKey("thinkingLevel")).toBe("thinkingLevel");
+      expect(toFormKey("reasoning")).toBe("reasoning");
       expect(toFormKey("seed")).toBe("seed");
     });
   });
@@ -341,38 +386,29 @@ describe("Parameter Config", () => {
     it("converts camelCase to snake_case", () => {
       expect(toInternalKey("topP")).toBe("top_p");
       expect(toInternalKey("frequencyPenalty")).toBe("frequency_penalty");
-      expect(toInternalKey("reasoningEffort")).toBe("reasoning_effort");
     });
 
     it("returns same key for non-mapped params", () => {
       expect(toInternalKey("temperature")).toBe("temperature");
-      expect(toInternalKey("thinkingLevel")).toBe("thinkingLevel");
+      expect(toInternalKey("reasoning")).toBe("reasoning");
       expect(toInternalKey("seed")).toBe("seed");
     });
   });
 
-  describe("reasoning options fallback", () => {
-    it("does not include none in reasoning_effort fallback options", () => {
-      const config = PARAMETER_CONFIG.reasoning_effort;
+  describe("unified reasoning options", () => {
+    it("does not include none in reasoning fallback options", () => {
+      const config = PARAMETER_CONFIG.reasoning;
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
         expect(config.options).not.toContain("none");
       }
     });
 
-    it("does not include none in thinkingLevel fallback options", () => {
-      const config = PARAMETER_CONFIG.thinkingLevel;
+    it("has dynamic options enabled for reasoning", () => {
+      const config = PARAMETER_CONFIG.reasoning;
       expect(config?.type).toBe("select");
       if (config?.type === "select") {
-        expect(config.options).not.toContain("none");
-      }
-    });
-
-    it("does not include none in effort fallback options", () => {
-      const config = PARAMETER_CONFIG.effort;
-      expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.options).not.toContain("none");
+        expect(config.dynamicOptions).toBe(true);
       }
     });
   });

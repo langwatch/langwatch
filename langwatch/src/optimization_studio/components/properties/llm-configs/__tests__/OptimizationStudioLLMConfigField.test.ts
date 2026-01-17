@@ -49,11 +49,11 @@ describe("normalizeToSnakeCase", () => {
       expect(result.litellm_params).toEqual({ key: "value" });
     });
 
-    // Reasoning parameters
-    it("preserves reasoning_effort parameter", () => {
-      const input = { model: DEFAULT_MODEL, reasoning_effort: "medium" };
+    // Reasoning parameter (unified)
+    it("preserves reasoning parameter", () => {
+      const input = { model: DEFAULT_MODEL, reasoning: "medium" };
       const result = normalizeToSnakeCase(input);
-      expect(result.reasoning_effort).toBe("medium");
+      expect(result.reasoning).toBe("medium");
     });
 
     it("preserves verbosity parameter", () => {
@@ -149,11 +149,12 @@ describe("normalizeToSnakeCase", () => {
       expect((result as Record<string, unknown>).repetitionPenalty).toBeUndefined();
     });
 
-    it("converts reasoningEffort to reasoning_effort", () => {
-      const input = { model: DEFAULT_MODEL, reasoningEffort: "medium" };
+    // Note: reasoning passes through unchanged (no camelCase variant exists)
+    // Provider-specific mapping (reasoning → reasoning_effort) happens at runtime boundary
+    it("reasoning passes through unchanged", () => {
+      const input = { model: DEFAULT_MODEL, reasoning: "medium" };
       const result = normalizeToSnakeCase(input);
-      expect(result.reasoning_effort).toBe("medium");
-      expect((result as Record<string, unknown>).reasoningEffort).toBeUndefined();
+      expect(result.reasoning).toBe("medium");
     });
   });
 });

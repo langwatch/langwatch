@@ -31,7 +31,8 @@ describe("transformToDbFormat", () => {
       expect(mapping.topK).toBe("top_k");
       expect(mapping.minP).toBe("min_p");
       expect(mapping.repetitionPenalty).toBe("repetition_penalty");
-      expect(mapping.reasoningEffort).toBe("reasoning_effort");
+      // Note: 'reasoning' is NOT in the mapping - it passes through unchanged
+      // Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
     });
 
     it("includes prompt-specific mappings", () => {
@@ -82,7 +83,7 @@ describe("transformToDbFormat", () => {
         topK: 40,
         minP: 0.1,
         repetitionPenalty: 1.1,
-        reasoningEffort: "high",
+        reasoning: "high", // Unified reasoning field passes through unchanged
       };
 
       const result = transformCamelToSnake(input);
@@ -93,7 +94,7 @@ describe("transformToDbFormat", () => {
         top_k: 40,
         min_p: 0.1,
         repetition_penalty: 1.1,
-        reasoning_effort: "high",
+        reasoning: "high", // Passes through unchanged
       });
     });
 
@@ -120,6 +121,38 @@ describe("transformToDbFormat", () => {
       transformCamelToSnake(input);
 
       expect(input).toEqual(originalInput);
+    });
+
+    // Unified reasoning field tests
+    describe("unified reasoning field", () => {
+      it("passes through reasoning field unchanged (no conversion needed)", () => {
+        const input = { ...BASE_CONFIG, reasoning: "high" };
+        const result = transformCamelToSnake(input);
+
+        expect(result.reasoning).toBe("high");
+        expect(result).toHaveProperty("reasoning", "high");
+      });
+
+      it("preserves reasoning alongside other converted parameters", () => {
+        const input = {
+          ...BASE_CONFIG,
+          reasoning: "medium",
+          maxTokens: 1000,
+          temperature: 0.7,
+        };
+        const result = transformCamelToSnake(input);
+
+        expect(result.reasoning).toBe("medium");
+        expect(result.max_tokens).toBe(1000);
+        expect(result.temperature).toBe(0.7);
+      });
+
+      it("handles undefined reasoning value", () => {
+        const input = { ...BASE_CONFIG, reasoning: undefined };
+        const result = transformCamelToSnake(input);
+
+        expect(result).toHaveProperty("reasoning", undefined);
+      });
     });
   });
 });

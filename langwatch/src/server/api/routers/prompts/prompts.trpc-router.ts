@@ -199,10 +199,7 @@ export const promptsRouter = createTRPCRouter({
           topK: z.number().optional(),
           minP: z.number().optional(),
           repetitionPenalty: z.number().optional(),
-          // Reasoning model parameters
-          reasoningEffort: z.string().optional(),
-          thinkingLevel: z.string().optional(),
-          effort: z.string().optional(),
+          // Reasoning parameter (canonical/unified field)
           reasoning: z.string().optional(),
           verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
@@ -253,10 +250,7 @@ export const promptsRouter = createTRPCRouter({
           topK: z.number().optional(),
           minP: z.number().optional(),
           repetitionPenalty: z.number().optional(),
-          // Reasoning model parameters
-          reasoningEffort: z.string().optional(),
-          thinkingLevel: z.string().optional(),
-          effort: z.string().optional(),
+          // Reasoning parameter (canonical/unified field)
           reasoning: z.string().optional(),
           verbosity: z.string().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
@@ -499,8 +493,7 @@ export const promptsRouter = createTRPCRouter({
         topK: sourcePrompt.topK ?? undefined,
         minP: sourcePrompt.minP ?? undefined,
         repetitionPenalty: sourcePrompt.repetitionPenalty ?? undefined,
-        // Reasoning model parameters
-        reasoningEffort: sourcePrompt.reasoningEffort ?? undefined,
+        // Reasoning parameter (canonical/unified field)
         reasoning: sourcePrompt.reasoning ?? undefined,
         verbosity: sourcePrompt.verbosity ?? undefined,
         promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
@@ -649,16 +642,7 @@ export const promptsRouter = createTRPCRouter({
           ...(sourcePrompt.repetitionPenalty != null && {
             repetitionPenalty: sourcePrompt.repetitionPenalty,
           }),
-          // Reasoning model parameters
-          ...(sourcePrompt.reasoningEffort != null && {
-            reasoningEffort: sourcePrompt.reasoningEffort,
-          }),
-          ...(sourcePrompt.thinkingLevel != null && {
-            thinkingLevel: sourcePrompt.thinkingLevel,
-          }),
-          ...(sourcePrompt.effort != null && {
-            effort: sourcePrompt.effort,
-          }),
+          // Reasoning parameter (canonical/unified field)
           ...(sourcePrompt.reasoning != null && {
             reasoning: sourcePrompt.reasoning,
           }),
@@ -801,16 +785,7 @@ export const promptsRouter = createTRPCRouter({
             ...(sourcePrompt.repetitionPenalty != null && {
               repetitionPenalty: sourcePrompt.repetitionPenalty,
             }),
-            // Reasoning model parameters
-            ...(sourcePrompt.reasoningEffort != null && {
-              reasoningEffort: sourcePrompt.reasoningEffort,
-            }),
-            ...(sourcePrompt.thinkingLevel != null && {
-              thinkingLevel: sourcePrompt.thinkingLevel,
-            }),
-            ...(sourcePrompt.effort != null && {
-              effort: sourcePrompt.effort,
-            }),
+            // Reasoning parameter (canonical/unified field)
             ...(sourcePrompt.reasoning != null && {
               reasoning: sourcePrompt.reasoning,
             }),

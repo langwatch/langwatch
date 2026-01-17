@@ -18,6 +18,7 @@ import type {
 } from "~/optimization_studio/types/events";
 import type { runtimeInputsSchema } from "~/prompts/schemas";
 import type { PromptConfigFormValues } from "~/prompts/types";
+import { mapReasoningToProvider } from "~/server/prompt-config/reasoningBoundary";
 import type { ChatMessage } from "~/server/tracer/types";
 import { parseLLMError } from "~/utils/formatLLMError";
 import { createLogger } from "~/utils/logger";
@@ -336,6 +337,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           identifier: "llm",
           type: "llm",
           // Convert camelCase form values to snake_case for Python backend
+          // Reasoning is mapped to provider-specific parameter at this boundary
           value: {
             model: formValues.version.configData.llm.model,
             temperature: formValues.version.configData.llm.temperature,
@@ -347,9 +349,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
             top_k: formValues.version.configData.llm.topK,
             min_p: formValues.version.configData.llm.minP,
             repetition_penalty: formValues.version.configData.llm.repetitionPenalty,
-            reasoning_effort: formValues.version.configData.llm.reasoningEffort,
-            thinkingLevel: formValues.version.configData.llm.thinkingLevel,
-            effort: formValues.version.configData.llm.effort,
+            // Map unified 'reasoning' to provider-specific parameter at runtime boundary
+            ...mapReasoningToProvider(
+              formValues.version.configData.llm.model,
+              formValues.version.configData.llm.reasoning,
+            ),
             verbosity: formValues.version.configData.llm.verbosity,
             litellm_params: formValues.version.configData.llm.litellmParams,
           },

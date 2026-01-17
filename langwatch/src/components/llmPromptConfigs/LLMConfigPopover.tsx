@@ -15,12 +15,11 @@ import { ParameterRow } from "./ParameterRow";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
   getDisplayParameters,
-  getEffectiveParameterConfig,
+  getParameterConfigWithModelOverrides,
   toFormKey,
 } from "./parameterConfig";
 import type { LLMConfigValues } from "./types";
 import { getParamValue } from "./utils/paramValueUtils";
-import { resolveDisplayParameters } from "./utils/resolveDisplayParameters";
 import {
   buildModelChangeValues,
   getMaxTokenLimit,
@@ -66,7 +65,7 @@ type LLMConfigPopoverProps = {
  * - Model selector with provider icons
  * - Dynamic parameter display based on model's supportedParameters
  * - Max tokens slider with model-specific limits
- * - Reasoning parameters (effort, verbosity) for reasoning models
+ * - Reasoning parameters (reasoning, verbosity) for reasoning models
  * - Traditional parameters (temperature, top_p, penalties) for other models
  * - Structured outputs toggle and configuration
  */
@@ -95,12 +94,12 @@ export function LLMConfigPopover({
   const reasoningConfig = currentModelMetadata?.reasoningConfig;
 
   // Determine which parameters to display
+  // Uses unified 'reasoning' parameter - no provider-specific substitution needed
   const displayParameters = useMemo(() => {
     const supportedParams =
       currentModelMetadata?.supportedParameters ?? DEFAULT_SUPPORTED_PARAMETERS;
-    const resolvedParams = resolveDisplayParameters(supportedParams, reasoningConfig);
-    return getDisplayParameters(resolvedParams);
-  }, [currentModelMetadata?.supportedParameters, reasoningConfig]);
+    return getDisplayParameters(supportedParams);
+  }, [currentModelMetadata?.supportedParameters]);
 
   // Get max token limit for the model
   const maxTokenLimit = useMemo(() => {
@@ -183,7 +182,7 @@ export function LLMConfigPopover({
         <VStack width="full" gap={1} align="stretch">
           {displayParameters.map((paramName) => {
             // Get effective config (with dynamic options for reasoning)
-            const config = getEffectiveParameterConfig(
+            const config = getParameterConfigWithModelOverrides(
               paramName,
               reasoningConfig ?? undefined,
             );

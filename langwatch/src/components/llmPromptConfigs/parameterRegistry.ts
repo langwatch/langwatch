@@ -157,14 +157,13 @@ export class ParameterRegistry {
 
     const baseConfig = reg.config;
 
-    // Apply dynamic options for reasoning parameters
-    // All reasoning params (reasoning, reasoning_effort, thinkingLevel, effort) use dynamic options
-    const isReasoningParam = ["reasoning_effort", "thinkingLevel", "effort"].includes(name);
+    // Apply dynamic options for the unified reasoning parameter
+    // Options come from model's reasoningConfig.allowedValues
     if (
       baseConfig.type === "select" &&
       baseConfig.dynamicOptions &&
       reasoningConfig &&
-      isReasoningParam
+      name === "reasoning"
     ) {
       return {
         ...baseConfig,
@@ -254,15 +253,15 @@ export const parameterRegistry = new ParameterRegistry();
 // Parameter Registrations (Single Source of Truth)
 // ============================================================================
 
-// Reasoning parameters (display order 0-2)
+// Unified reasoning parameter (display order 0)
+// Provider-specific mapping happens at runtime boundary (reasoningBoundary.ts)
 parameterRegistry.register({
-  name: "reasoning_effort",
-  formKey: "reasoningEffort",
+  name: "reasoning",
   config: {
     type: "select",
     options: ["low", "medium", "high"] as const,
     default: "medium",
-    label: "Reasoning Effort",
+    label: "Reasoning",
     helper:
       "How much the model thinks before answering. Higher = more thorough but slower.",
     dynamicOptions: true,
@@ -270,40 +269,6 @@ parameterRegistry.register({
   icon: Brain,
   iconColor: "cyan.500",
   displayOrder: 0,
-  isCore: true,
-  isReasoning: true,
-});
-
-parameterRegistry.register({
-  name: "thinkingLevel",
-  config: {
-    type: "select",
-    options: ["low", "medium", "high"] as const,
-    default: "medium",
-    label: "Thinking Level",
-    helper: "How deeply the model thinks through problems. (Gemini)",
-    dynamicOptions: true,
-  },
-  icon: Brain,
-  iconColor: "cyan.500",
-  displayOrder: 2,
-  isCore: true,
-  isReasoning: true,
-});
-
-parameterRegistry.register({
-  name: "effort",
-  config: {
-    type: "select",
-    options: ["low", "medium", "high"] as const,
-    default: "medium",
-    label: "Effort",
-    helper: "How much effort the model puts into reasoning. (Anthropic)",
-    dynamicOptions: true,
-  },
-  icon: Brain,
-  iconColor: "cyan.500",
-  displayOrder: 3,
   isCore: true,
   isReasoning: true,
 });

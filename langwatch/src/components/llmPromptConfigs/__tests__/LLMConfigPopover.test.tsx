@@ -61,7 +61,7 @@ const mockModelMetadata = {
     id: "openai/gpt-5",
     name: "GPT-5",
     provider: "openai",
-    supportedParameters: ["reasoning", "max_tokens"], // Generic! Maps to reasoning_effort via reasoningConfig
+    supportedParameters: ["reasoning", "max_tokens"], // Uses unified 'reasoning' field
     contextLength: 256000,
     maxCompletionTokens: 131072,
     defaultParameters: null,
@@ -247,44 +247,42 @@ describe("LLMConfigPopover", () => {
     });
 
     describe("for reasoning models (GPT-5)", () => {
-      it("displays 'Reasoning Effort' label when model uses reasoning_effort parameter", () => {
-        // Mock has supportedParameters: ["reasoning", ...] (generic)
-        // but reasoningConfig.parameterName: "reasoning_effort" (specific API key)
-        // UI should show "Reasoning Effort", NOT "Reasoning"
+      it("displays dynamic label based on reasoningConfig.parameterName", () => {
+        // Uses unified 'reasoning' field but displays provider-specific label
+        // reasoningConfig.parameterName: "reasoning_effort" → label: "Reasoning Effort"
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+          values: { model: "openai/gpt-5", reasoning: "medium" },
         });
 
-        // Should find "Reasoning Effort" (may appear multiple times in UI)
+        // Should find "Reasoning Effort" (label from reasoningConfig.parameterName mapping)
         expect(screen.getAllByText("Reasoning Effort").length).toBeGreaterThan(0);
-        // Should NOT find standalone "Reasoning" (only as part of "Reasoning Effort")
-        expect(screen.queryByText(/^Reasoning$/)).not.toBeInTheDocument();
       });
 
-      it("shows Reasoning Effort parameter", () => {
+      it("shows reasoning parameter row", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+          values: { model: "openai/gpt-5", reasoning: "medium" },
         });
-        expect(screen.getByTestId("parameter-row-reasoning_effort")).toBeInTheDocument();
+        // Parameter row uses unified 'reasoning' key
+        expect(screen.getByTestId("parameter-row-reasoning")).toBeInTheDocument();
       });
 
       it("shows Max Tokens parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+          values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         expect(screen.getByTestId("parameter-row-max_tokens")).toBeInTheDocument();
       });
 
       it("does not show Temperature parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+          values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         expect(screen.queryByText("Temperature")).not.toBeInTheDocument();
       });
 
       it("does not show Top P parameter", () => {
         renderComponent({
-          values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+          values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         expect(screen.queryByText("Top P")).not.toBeInTheDocument();
       });
@@ -292,16 +290,16 @@ describe("LLMConfigPopover", () => {
   });
 
   describe("parameter value changes", () => {
-    it("calls onChange when reasoning_effort is changed", async () => {
+    it("calls onChange when reasoning is changed", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
       renderComponent({
-        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+        values: { model: "openai/gpt-5", reasoning: "medium" },
         onChange,
       });
 
-      // Find the select for reasoning_effort
+      // Find the select for reasoning
       const selects = screen.getAllByRole("combobox");
       // The reasoning select (first select after model selector)
       const reasoningSelect = selects.find(
@@ -314,12 +312,12 @@ describe("LLMConfigPopover", () => {
       }
     });
 
-    it("outputs model-specific API key (reasoning_effort)", async () => {
+    it("outputs unified reasoning field", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
       renderComponent({
-        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+        values: { model: "openai/gpt-5", reasoning: "medium" },
         onChange,
       });
 
@@ -330,9 +328,9 @@ describe("LLMConfigPopover", () => {
 
       if (reasoningSelect) {
         await user.selectOptions(reasoningSelect, "high");
-        // Should use model-specific API key "reasoning_effort"
+        // Should output unified 'reasoning' field
         expect(onChange).toHaveBeenCalledWith(
-          expect.objectContaining({ reasoning_effort: "high" }),
+          expect.objectContaining({ reasoning: "high" }),
         );
       }
     });
@@ -431,14 +429,14 @@ describe("LLMConfigPopover", () => {
     });
   });
 
-  describe("duplicate key prevention", () => {
-    it("removes snake_case key when updating with camelCase output", async () => {
+  describe("unified reasoning field", () => {
+    it("outputs unified reasoning field consistently", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn();
 
-      // Input has snake_case key (from DSL/Optimization Studio)
+      // Input uses unified reasoning field
       renderComponent({
-        values: { model: "openai/gpt-5", reasoning_effort: "medium" },
+        values: { model: "openai/gpt-5", reasoning: "medium" },
         onChange,
       });
 
@@ -450,14 +448,10 @@ describe("LLMConfigPopover", () => {
       if (reasoningSelect) {
         await user.selectOptions(reasoningSelect, "high");
 
-        // Should NOT have both snake_case and camelCase keys
         const calledWith = onChange.mock.calls[0]?.[0] as Record<string, unknown>;
-        
-        // The output should have the camelCase key (form format)
-        expect(calledWith.reasoningEffort).toBe("high");
-        
-        // The snake_case key should be removed to prevent duplicates
-        expect(calledWith.reasoning_effort).toBeUndefined();
+
+        // Should have unified reasoning field
+        expect(calledWith.reasoning).toBe("high");
       }
     });
   });

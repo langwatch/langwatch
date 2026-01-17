@@ -33,7 +33,6 @@ export const PARAM_NAME_MAPPING: Record<string, string> = {
   top_k: "topK",
   min_p: "minP",
   repetition_penalty: "repetitionPenalty",
-  reasoning_effort: "reasoningEffort",
   // These are the same in both: temperature, reasoning, verbosity, seed, model
 };
 
@@ -162,27 +161,44 @@ export function getParameterConfig(
 }
 
 /**
- * Get the effective config for a parameter, using model's reasoningConfig if applicable
- * This resolves dynamic options for reasoning parameters
+ * Maps provider-specific parameter names to display labels.
+ * Used for showing provider-appropriate labels in the UI.
  */
-export function getEffectiveParameterConfig(
+const REASONING_PARAMETER_LABELS: Record<string, string> = {
+  reasoning_effort: "Reasoning Effort",
+  thinkingLevel: "Thinking Level",
+  effort: "Effort",
+};
+
+/**
+ * Get the effective config for a parameter, using model's reasoningConfig if applicable.
+ * This resolves dynamic options AND dynamic labels for the unified reasoning parameter.
+ *
+ * @param paramName - The parameter name (e.g., "reasoning", "temperature")
+ * @param reasoningConfig - Model's reasoning configuration (optional)
+ * @returns ParameterConfig with resolved options and label, or undefined if not configured
+ */
+export function getParameterConfigWithModelOverrides(
   paramName: string,
   reasoningConfig?: ReasoningConfig,
 ): ParameterConfig | undefined {
   const baseConfig = PARAMETER_CONFIG[paramName];
   if (!baseConfig) return undefined;
 
-  // For reasoning parameters with dynamicOptions, use model's reasoningConfig
-  // All reasoning params (reasoning, reasoning_effort, thinkingLevel, effort) use dynamic options
-  const isReasoningParam = ["reasoning_effort", "thinkingLevel", "effort"].includes(paramName);
+  // For the unified reasoning parameter with dynamicOptions, use model's reasoningConfig
   if (
     baseConfig.type === "select" &&
     baseConfig.dynamicOptions &&
     reasoningConfig &&
-    isReasoningParam
+    paramName === "reasoning"
   ) {
+    // Determine the display label based on provider's parameter name
+    const dynamicLabel =
+      REASONING_PARAMETER_LABELS[reasoningConfig.parameterName] ?? "Reasoning";
+
     return {
       ...baseConfig,
+      label: dynamicLabel,
       options: reasoningConfig.allowedValues,
       default: reasoningConfig.defaultValue,
     };
@@ -228,7 +244,7 @@ export function getParameterDefault(paramName: string): unknown {
  * Check if a parameter is a reasoning-type parameter
  */
 export function isReasoningParameter(paramName: string): boolean {
-  return ["reasoning_effort", "thinkingLevel", "effort", "verbosity"].includes(paramName);
+  return ["reasoning", "verbosity"].includes(paramName);
 }
 
 /**
@@ -242,9 +258,5 @@ export function supportsTemperature(supportedParameters: string[]): boolean {
  * Check if a model supports reasoning parameters
  */
 export function supportsReasoning(supportedParameters: string[]): boolean {
-  return (
-    supportedParameters.includes("reasoning_effort") ||
-    supportedParameters.includes("thinkingLevel") ||
-    supportedParameters.includes("effort")
-  );
+  return supportedParameters.includes("reasoning");
 }

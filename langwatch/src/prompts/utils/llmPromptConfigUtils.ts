@@ -347,8 +347,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
           top_k: prompt.topK,
           min_p: prompt.minP,
           repetition_penalty: prompt.repetitionPenalty,
-          // Reasoning model parameters
-          reasoning_effort: prompt.reasoningEffort,
+          // Reasoning parameter (canonical/unified field)
           reasoning: prompt.reasoning,
           verbosity: prompt.verbosity,
         },
@@ -413,10 +412,7 @@ export function formValuesToTriggerSaveVersionParams(
     topK: llm.topK,
     minP: llm.minP,
     repetitionPenalty: llm.repetitionPenalty,
-    // Reasoning model parameters
-    reasoningEffort: llm.reasoningEffort,
-    thinkingLevel: llm.thinkingLevel,
-    effort: llm.effort,
+    // Reasoning parameter (canonical/unified field)
     reasoning: llm.reasoning,
     verbosity: llm.verbosity,
     promptingTechnique: formValues.version.configData.promptingTechnique,
@@ -518,8 +514,7 @@ export function versionedPromptToPromptConfigFormValues(
           topK: prompt.topK,
           minP: prompt.minP,
           repetitionPenalty: prompt.repetitionPenalty,
-          // Reasoning model parameters
-          reasoningEffort: prompt.reasoningEffort,
+          // Reasoning parameter (canonical/unified field)
           reasoning: prompt.reasoning,
           verbosity: prompt.verbosity,
         },
@@ -589,8 +584,7 @@ export function versionedPromptToOptimizationStudioNodeData(
           top_k: prompt.topK,
           min_p: prompt.minP,
           repetition_penalty: prompt.repetitionPenalty,
-          // Reasoning model parameters
-          reasoning_effort: prompt.reasoningEffort,
+          // Reasoning parameter (canonical/unified field)
           reasoning: prompt.reasoning,
           verbosity: prompt.verbosity,
         },

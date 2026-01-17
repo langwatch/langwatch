@@ -96,7 +96,7 @@ describe("normalizeToSnakeCase", () => {
       topK: 40,
       minP: 0.1,
       repetitionPenalty: 1.1,
-      reasoningEffort: "high",
+      reasoning: "high", // Unified reasoning field passes through unchanged
     } as LLMConfig & Record<string, unknown>;
 
     const result = normalizeToSnakeCase(input);
@@ -107,7 +107,7 @@ describe("normalizeToSnakeCase", () => {
       top_k: 40,
       min_p: 0.1,
       repetition_penalty: 1.1,
-      reasoning_effort: "high",
+      reasoning: "high", // Passes through unchanged (no camelCase mapping needed)
     });
   });
 

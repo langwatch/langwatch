@@ -1,4 +1,5 @@
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import { normalizeReasoningFromProviderFields } from "~/server/prompt-config/reasoningBoundary";
 
 /**
  * Form representation of LLM config (camelCase)
@@ -17,10 +18,8 @@ export type FormLLMConfig = {
   topK?: number;
   minP?: number;
   repetitionPenalty?: number;
-  // Reasoning model parameters (provider-specific)
-  reasoningEffort?: string; // OpenAI
-  thinkingLevel?: string; // Gemini
-  effort?: string; // Anthropic
+  // Reasoning parameter (canonical/unified field)
+  reasoning?: string;
   verbosity?: string;
   litellmParams?: Record<string, string>;
 };
@@ -46,10 +45,8 @@ export const LLMConfigFormatUtils = {
       top_k: formLlm.topK,
       min_p: formLlm.minP,
       repetition_penalty: formLlm.repetitionPenalty,
-      // Reasoning model parameters (provider-specific)
-      reasoning_effort: formLlm.reasoningEffort,
-      thinkingLevel: formLlm.thinkingLevel,
-      effort: formLlm.effort,
+      // Reasoning parameter (canonical/unified field)
+      reasoning: formLlm.reasoning,
       verbosity: formLlm.verbosity,
       litellm_params: formLlm.litellmParams,
     };
@@ -57,8 +54,12 @@ export const LLMConfigFormatUtils = {
 
   /**
    * Convert DSL LLM config format (snake_case) to form format (camelCase)
+   * Normalizes legacy provider-specific reasoning fields to canonical 'reasoning'
    */
   dslToFormFormat(dslLlm: LLMConfig): FormLLMConfig {
+    // Normalize reasoning from any provider-specific fields (backward compat)
+    const reasoning = normalizeReasoningFromProviderFields(dslLlm);
+
     return {
       model: dslLlm.model,
       temperature: dslLlm.temperature,
@@ -72,10 +73,8 @@ export const LLMConfigFormatUtils = {
       topK: dslLlm.top_k,
       minP: dslLlm.min_p,
       repetitionPenalty: dslLlm.repetition_penalty,
-      // Reasoning model parameters (provider-specific)
-      reasoningEffort: dslLlm.reasoning_effort,
-      thinkingLevel: dslLlm.thinkingLevel,
-      effort: dslLlm.effort,
+      // Reasoning parameter (normalized from any provider-specific field)
+      reasoning,
       verbosity: dslLlm.verbosity,
       litellmParams: dslLlm.litellm_params,
     };

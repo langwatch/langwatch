@@ -77,11 +77,11 @@ describe("formToDslFormat", () => {
       expect(result.repetition_penalty).toBe(1.1);
     });
 
-    // Reasoning model parameters
-    it("converts reasoningEffort to reasoning_effort", () => {
-      const formConfig = { model: "test", reasoningEffort: "medium" };
+    // Reasoning parameter (canonical/unified field)
+    it("passes reasoning through unchanged", () => {
+      const formConfig = { model: "test", reasoning: "medium" };
       const result = LLMConfigFormatUtils.formToDslFormat(formConfig);
-      expect(result.reasoning_effort).toBe("medium");
+      expect(result.reasoning).toBe("medium");
     });
 
     it("preserves verbosity field", () => {
@@ -165,11 +165,11 @@ describe("dslToFormFormat", () => {
       expect(result.repetitionPenalty).toBe(1.1);
     });
 
-    // Reasoning model parameters
-    it("converts reasoning_effort to reasoningEffort", () => {
+    // Unified reasoning parameter (normalizes from any provider-specific field)
+    it("normalizes reasoning_effort to reasoning", () => {
       const dslConfig: LLMConfig = { model: "test", reasoning_effort: "medium" };
       const result = LLMConfigFormatUtils.dslToFormFormat(dslConfig);
-      expect(result.reasoningEffort).toBe("medium");
+      expect(result.reasoning).toBe("medium");
     });
 
     it("preserves verbosity field", () => {
@@ -193,7 +193,7 @@ describe("round-trip conversion", () => {
       topK: 40,
       minP: 0.05,
       repetitionPenalty: 1.1,
-      reasoningEffort: "medium",
+      reasoning: "medium", // Unified reasoning field
       verbosity: "verbose",
       litellmParams: { key: "value" },
     };
@@ -204,7 +204,8 @@ describe("round-trip conversion", () => {
     expect(roundTripped).toEqual(originalForm);
   });
 
-  it("DSL -> form -> DSL preserves all values", () => {
+  it("DSL -> form -> DSL preserves all values with unified reasoning", () => {
+    // DSL with unified reasoning field
     const originalDsl: LLMConfig = {
       model: "openai/gpt-4",
       temperature: 0.7,
@@ -216,7 +217,7 @@ describe("round-trip conversion", () => {
       top_k: 40,
       min_p: 0.05,
       repetition_penalty: 1.1,
-      reasoning_effort: "medium",
+      reasoning: "medium", // Unified reasoning field
       verbosity: "verbose",
       litellm_params: { key: "value" },
     };
@@ -225,5 +226,26 @@ describe("round-trip conversion", () => {
     const roundTripped = LLMConfigFormatUtils.formToDslFormat(form);
 
     expect(roundTripped).toEqual(originalDsl);
+  });
+
+  it("DSL with legacy reasoning_effort normalizes to unified reasoning", () => {
+    // Legacy DSL with reasoning_effort (backward compatibility)
+    const legacyDsl: LLMConfig = {
+      model: "openai/gpt-4",
+      temperature: 0.7,
+      max_tokens: 4096,
+      reasoning_effort: "high", // Legacy field
+      verbosity: "verbose",
+    };
+
+    const form = LLMConfigFormatUtils.dslToFormFormat(legacyDsl);
+
+    // Form should have unified reasoning
+    expect(form.reasoning).toBe("high");
+
+    // Round-trip writes unified reasoning
+    const roundTripped = LLMConfigFormatUtils.formToDslFormat(form);
+    expect(roundTripped.reasoning).toBe("high");
+    expect(roundTripped.reasoning_effort).toBeUndefined();
   });
 });
