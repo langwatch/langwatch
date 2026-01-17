@@ -119,11 +119,11 @@ export function EvaluatorResultChip({
         </HStack>
         {details && (
           <Box marginTop={1}>
-            <Text fontSize="11px" color="gray.400" marginBottom={0.5}>
+            <Text fontSize="12px" color="gray.400" marginBottom={0.5}>
               Details:
             </Text>
             <Text
-              fontSize="11px"
+              fontSize="12px"
               color="gray.300"
               whiteSpace="pre-wrap"
               maxHeight="100px"
@@ -171,6 +171,7 @@ export function EvaluatorResultChip({
       content={tooltipContent}
       positioning={{ placement: "top" }}
       openDelay={200}
+      closeDelay={200}
       interactive
     >
       {chipContent}
