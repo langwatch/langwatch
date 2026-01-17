@@ -22,6 +22,10 @@ import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModa
 import type { Field } from "~/optimization_studio/types/dsl";
 import { outputsSchema } from "~/prompts/schemas";
 import { VariableTypeIcon, TYPE_LABELS } from "~/prompts/components/ui/VariableTypeIcon";
+import {
+  normalizeIdentifier,
+  generateUniqueIdentifier,
+} from "~/utils/identifierUtils";
 
 // ============================================================================
 // Types
@@ -79,29 +83,6 @@ const DEFAULT_JSON_SCHEMA = {
     },
   },
   required: ["result"],
-};
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-const generateUniqueIdentifier = (
-  baseName: string,
-  existingIdentifiers: string[],
-): string => {
-  if (!existingIdentifiers.includes(baseName)) {
-    return baseName;
-  }
-
-  let counter = 1;
-  while (existingIdentifiers.includes(`${baseName}_${counter}`)) {
-    counter++;
-  }
-  return `${baseName}_${counter}`;
-};
-
-const normalizeIdentifier = (value: string): string => {
-  return value.replace(/ /g, "_").toLowerCase();
 };
 
 // ============================================================================
