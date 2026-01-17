@@ -26,12 +26,11 @@ vi.mock("../../modelProviders/registry", () => ({
   }),
 }));
 
-// Mock the provider helper
+// Mock the provider helper - matches real behavior in modelProviderHelpers.ts
 vi.mock("../../../utils/modelProviderHelpers", () => ({
   getProviderFromModel: vi.fn((model: string) => {
-    const provider = model.split("/")[0];
-    // Map 'gemini' to 'google' for provider lookup
-    return provider === "gemini" ? "google" : provider;
+    // Real behavior: just extract provider from model string
+    return model.split("/")[0] ?? "";
   }),
 }));
 

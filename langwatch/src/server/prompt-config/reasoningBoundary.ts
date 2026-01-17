@@ -22,6 +22,7 @@ import { getProviderFromModel } from "../../utils/modelProviderHelpers";
 const PROVIDER_REASONING_FALLBACKS: Record<string, string> = {
   openai: "reasoning_effort",
   google: "thinkingLevel",
+  gemini: "thinkingLevel", // Alias - registry models use provider "gemini"
   anthropic: "effort",
 };
 
