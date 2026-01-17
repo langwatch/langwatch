@@ -72,6 +72,7 @@ import {
   TargetCellFromMeta,
   TargetHeaderFromMeta,
 } from "./TableMetaWrappers";
+import { AddTargetColumn } from "./AddTargetColumn";
 import { TargetSuperHeader } from "./TargetSuperHeader";
 
 // Types are imported from ../types (TableRowData, TableMeta)
@@ -448,6 +449,120 @@ export function EvaluationsV3Table({
     },
     [addTarget],
   );
+
+  // Handler for adding a new target (opens target type selector flow)
+  const handleAddTarget = useCallback(() => {
+    // Clear any pending mappings from previous flows
+    pendingMappingsRef.current = {};
+
+    // Build available sources for variable mapping (for new prompts)
+    const availableSources = buildAvailableSources();
+
+    // Handler to open promptEditor for new prompts with proper props
+    const openNewPromptEditor = () => {
+      openDrawer(
+        "promptEditor",
+        {
+          // Pass available sources via complexProps
+          availableSources,
+          inputMappings: {},
+          onInputMappingsChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
+            if (mapping) {
+              pendingMappingsRef.current[identifier] = mapping;
+            } else {
+              delete pendingMappingsRef.current[identifier];
+            }
+          },
+        },
+        // Reset stack to prevent back button when creating new prompts
+        { resetStack: true },
+      );
+    };
+
+    // Set flow callbacks for the entire add-target flow
+    setFlowCallbacks("promptList", {
+      onSelect: handleSelectPrompt,
+      // Custom onCreateNew to open promptEditor with availableSources
+      onCreateNew: openNewPromptEditor,
+    });
+    setFlowCallbacks("promptEditor", {
+      // For new prompts: track mappings in pendingMappingsRef, then apply when saved
+      onInputMappingsChange: (
+        identifier: string,
+        mapping: UIFieldMapping | undefined,
+      ) => {
+        if (mapping) {
+          pendingMappingsRef.current[identifier] = mapping;
+        } else {
+          delete pendingMappingsRef.current[identifier];
+        }
+      },
+      onSave: (savedPrompt) => {
+        // Apply pending mappings when creating the target
+        const storeMappings: Record<string, FieldMapping> = {};
+        for (const [key, uiMapping] of Object.entries(
+          pendingMappingsRef.current,
+        )) {
+          storeMappings[key] = convertFromUIMapping(uiMapping, isDatasetSource);
+        }
+
+        // Get current state for active dataset
+        const currentActiveDatasetId =
+          useEvaluationsV3Store.getState().activeDatasetId;
+
+        // Create target with pending mappings
+        const targetId = `target_${Date.now()}`;
+        const targetConfig: TargetConfig = {
+          id: targetId,
+          type: "prompt",
+          name: savedPrompt.name,
+          promptId: savedPrompt.id,
+          promptVersionId: savedPrompt.versionId,
+          promptVersionNumber: savedPrompt.version,
+          inputs: (
+            savedPrompt.inputs ?? [{ identifier: "input", type: "str" }]
+          ).map((i) => ({
+            identifier: i.identifier,
+            type: i.type as Field["type"],
+          })),
+          outputs: (
+            savedPrompt.outputs ?? [{ identifier: "output", type: "str" }]
+          ).map((o) => ({
+            identifier: o.identifier,
+            type: o.type as Field["type"],
+          })),
+          mappings:
+            Object.keys(storeMappings).length > 0
+              ? { [currentActiveDatasetId]: storeMappings }
+              : {},
+        };
+        addTarget(targetConfig);
+
+        // Clear pending mappings
+        pendingMappingsRef.current = {};
+      },
+    });
+    setFlowCallbacks("agentList", {
+      onSelect: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("agentCodeEditor", {
+      onSave: handleSelectSavedAgent,
+    });
+    setFlowCallbacks("workflowSelector", {
+      onSave: handleSelectSavedAgent,
+    });
+    openDrawer("targetTypeSelector");
+  }, [
+    buildAvailableSources,
+    openDrawer,
+    handleSelectPrompt,
+    handleSelectSavedAgent,
+    isDatasetSource,
+    addTarget,
+  ]);
 
   // Dataset handlers for drawer integration
   const datasetHandlers = useMemo(
@@ -1027,120 +1142,6 @@ export function EvaluationsV3Table({
             />
             <TargetSuperHeader
               colSpan={targetsColSpan}
-              onAddClick={() => {
-                // Clear any pending mappings from previous flows
-                pendingMappingsRef.current = {};
-
-                // Build available sources for variable mapping (for new prompts)
-                const availableSources = buildAvailableSources();
-
-                // Handler to open promptEditor for new prompts with proper props
-                const openNewPromptEditor = () => {
-                  openDrawer(
-                    "promptEditor",
-                    {
-                      // Pass available sources via complexProps
-                      availableSources,
-                      inputMappings: {},
-                      onInputMappingsChange: (
-                        identifier: string,
-                        mapping: UIFieldMapping | undefined,
-                      ) => {
-                        if (mapping) {
-                          pendingMappingsRef.current[identifier] = mapping;
-                        } else {
-                          delete pendingMappingsRef.current[identifier];
-                        }
-                      },
-                    },
-                    // Reset stack to prevent back button when creating new prompts
-                    { resetStack: true },
-                  );
-                };
-
-                // Set flow callbacks for the entire add-target flow
-                setFlowCallbacks("promptList", {
-                  onSelect: handleSelectPrompt,
-                  // Custom onCreateNew to open promptEditor with availableSources
-                  onCreateNew: openNewPromptEditor,
-                });
-                setFlowCallbacks("promptEditor", {
-                  // For new prompts: track mappings in pendingMappingsRef, then apply when saved
-                  onInputMappingsChange: (
-                    identifier: string,
-                    mapping: UIFieldMapping | undefined,
-                  ) => {
-                    if (mapping) {
-                      pendingMappingsRef.current[identifier] = mapping;
-                    } else {
-                      delete pendingMappingsRef.current[identifier];
-                    }
-                  },
-                  onSave: (savedPrompt) => {
-                    // Apply pending mappings when creating the target
-                    const storeMappings: Record<string, FieldMapping> = {};
-                    for (const [key, uiMapping] of Object.entries(
-                      pendingMappingsRef.current,
-                    )) {
-                      storeMappings[key] = convertFromUIMapping(
-                        uiMapping,
-                        isDatasetSource,
-                      );
-                    }
-
-                    // Get current state for active dataset
-                    const currentActiveDatasetId =
-                      useEvaluationsV3Store.getState().activeDatasetId;
-
-                    // Create target with pending mappings
-                    const targetId = `target_${Date.now()}`;
-                    const targetConfig: TargetConfig = {
-                      id: targetId,
-                      type: "prompt",
-                      name: savedPrompt.name,
-                      promptId: savedPrompt.id,
-                      promptVersionId: savedPrompt.versionId,
-                      promptVersionNumber: savedPrompt.version,
-                      inputs: (
-                        savedPrompt.inputs ?? [
-                          { identifier: "input", type: "str" },
-                        ]
-                      ).map((i) => ({
-                        identifier: i.identifier,
-                        type: i.type as Field["type"],
-                      })),
-                      outputs: (
-                        savedPrompt.outputs ?? [
-                          { identifier: "output", type: "str" },
-                        ]
-                      ).map((o) => ({
-                        identifier: o.identifier,
-                        type: o.type as Field["type"],
-                      })),
-                      mappings:
-                        Object.keys(storeMappings).length > 0
-                          ? { [currentActiveDatasetId]: storeMappings }
-                          : {},
-                    };
-                    addTarget(targetConfig);
-
-                    // Clear pending mappings
-                    pendingMappingsRef.current = {};
-                  },
-                });
-                setFlowCallbacks("agentList", {
-                  onSelect: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("agentCodeEditor", {
-                  onSave: handleSelectSavedAgent,
-                });
-                setFlowCallbacks("workflowSelector", {
-                  onSave: handleSelectSavedAgent,
-                });
-                openDrawer("targetTypeSelector");
-              }}
-              showWarning={targets.length === 0}
-              hasComparison={targets.length > 0}
               isLoading={isLoadingExperiment}
             />
           </tr>
@@ -1179,24 +1180,19 @@ export function EvaluationsV3Table({
                   </th>
                 );
               })}
-              {targets.length === 0 ? (
-                // Spacer column to match drawer width + default target column width
-                <th
-                  style={{
-                    width: DRAWER_WIDTH + 280,
-                    minWidth: DRAWER_WIDTH + 280,
-                  }}
-                >
-                  <Text fontSize="xs" color="gray.400" fontStyle="italic">
-                    Click "+ Add" above to get started
-                  </Text>
-                </th>
-              ) : (
-                // Spacer column to match drawer width
-                <th
-                  style={{ width: DRAWER_WIDTH, minWidth: DRAWER_WIDTH }}
-                ></th>
-              )}
+              {/* Spacer column with Add button */}
+              <th
+                style={{
+                  width: targets.length === 0 ? DRAWER_WIDTH + 280 : DRAWER_WIDTH,
+                  minWidth: targets.length === 0 ? DRAWER_WIDTH + 280 : DRAWER_WIDTH,
+                }}
+              >
+                <AddTargetColumn
+                  onAddClick={handleAddTarget}
+                  hasTargets={targets.length > 0}
+                  isLoading={isLoadingExperiment}
+                />
+              </th>
             </tr>
           ))}
         </thead>
