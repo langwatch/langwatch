@@ -56,6 +56,8 @@ type TargetCellContentProps = {
   onRunCell?: () => void;
   /** Handler for stopping execution */
   onStopCell?: () => void;
+  /** Handler for re-running a specific evaluator on this cell */
+  onRerunEvaluator?: (evaluatorId: string) => void;
 };
 
 export function TargetCellContent({
@@ -70,6 +72,7 @@ export function TargetCellContent({
   onAddEvaluator,
   onRunCell,
   onStopCell,
+  onRerunEvaluator,
 }: TargetCellContentProps) {
   const { openDrawer } = useDrawer();
   const {
@@ -323,6 +326,11 @@ export function TargetCellContent({
                   background:
                     "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
                 },
+                // Selected row takes priority over hover
+                "tr[data-selected='true'] &": {
+                  background:
+                    "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-50))",
+                },
               }}
             />
           )}
@@ -358,6 +366,9 @@ export function TargetCellContent({
             });
           }}
           onRemove={() => removeEvaluator(evaluator.id)}
+          onRerun={
+            onRerunEvaluator ? () => onRerunEvaluator(evaluator.id) : undefined
+          }
         />
       ))}
       <Button

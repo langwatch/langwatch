@@ -399,6 +399,11 @@ export function EditableCell({
                 background:
                   "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",
               },
+              // Selected row takes priority over hover
+              "tr[data-selected='true'] &": {
+                background:
+                  "linear-gradient(to bottom, transparent, var(--chakra-colors-blue-50))",
+              },
             }}
           />
         )}
