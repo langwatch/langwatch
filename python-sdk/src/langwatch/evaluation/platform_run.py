@@ -127,17 +127,21 @@ class EvaluationRunResult:
     run_url: str
     summary: EvaluationRunSummary
 
-    def print_summary(self, exit_on_failure: bool = True) -> None:
+    def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
         """
         Print a CI-friendly summary and optionally exit with code 1 on failure.
 
         Args:
-            exit_on_failure: If True (default), calls sys.exit(1) when there are failures.
-                           Set to False in notebooks or when you want to handle failures yourself.
+            exit_on_failure: If True, calls sys.exit(1) when there are failures.
+                           If False, never exits.
+                           If None (default), auto-detects: exits in scripts/CI, doesn't exit in notebooks.
         """
         _print_summary(self)
 
-        if exit_on_failure and self.failed > 0:
+        # Auto-detect: don't exit in notebooks, exit in scripts/CI
+        should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
+
+        if should_exit and self.failed > 0:
             sys.exit(1)
 
 
