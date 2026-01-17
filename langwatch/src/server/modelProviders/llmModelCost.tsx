@@ -18,7 +18,7 @@ const getImportedModelCosts = () => {
   > = {};
 
   for (const [modelId, model] of Object.entries(models)) {
-    if (model.pricing?.inputCostPerToken || model.pricing?.outputCostPerToken) {
+    if (model.pricing?.inputCostPerToken != null || model.pricing?.outputCostPerToken != null) {
       tokenModels[modelId] = {
         regex:
           "^" +
@@ -58,7 +58,7 @@ const getImportedModelCosts = () => {
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
-    (model) => !!model.inputCostPerToken || !!model.outputCostPerToken
+    (model) => model.inputCostPerToken != null || model.outputCostPerToken != null
   );
 
   // Exclude some vendors (openrouter is already excluded as we're using their API)

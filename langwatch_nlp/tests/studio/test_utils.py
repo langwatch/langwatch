@@ -211,21 +211,16 @@ class TestReasoningModelConfig:
         call_kwargs = mock_dspy_lm.call_args.kwargs
         # Should be mapped to reasoning_effort
         assert call_kwargs.get("reasoning_effort") == "medium"
-        # Should NOT have 'reasoning' key
         assert "reasoning" not in call_kwargs
 
-    def test_reasoning_effort_takes_precedence_over_legacy_reasoning(self, mock_dspy_lm):
-        """Given both reasoning_effort and legacy reasoning, reasoning_effort takes precedence."""
+    def test_reasoning_takes_precedence_over_reasoning_effort(self, mock_dspy_lm):
+        """The unified 'reasoning' field is canonical and takes priority."""
         config = LLMConfig(
             model="openai/gpt-5",
+            reasoning="low",
             reasoning_effort="high",
-            reasoning="low",  # Legacy field - should be ignored
             max_tokens=16000,
         )
-
         node_llm_config_to_dspy_lm(config)
-
-        mock_dspy_lm.assert_called_once()
         call_kwargs = mock_dspy_lm.call_args.kwargs
-        # reasoning_effort should take precedence
-        assert call_kwargs.get("reasoning_effort") == "high"
+        assert call_kwargs.get("reasoning_effort") == "low"
