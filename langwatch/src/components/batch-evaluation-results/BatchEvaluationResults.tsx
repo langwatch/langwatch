@@ -275,6 +275,15 @@ export function BatchEvaluationResults({
   // Comparison mode
   const runIds = useMemo(() => sidebarRuns.map((r) => r.runId), [sidebarRuns]);
 
+  // Map runId to human-readable name (commit message or runId)
+  const runNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const run of sidebarRuns) {
+      map[run.runId] = run.workflowVersion?.commitMessage ?? run.runId;
+    }
+    return map;
+  }, [sidebarRuns]);
+
   // Get compare run IDs from URL query params
   const queryCompareRunIds = useMemo(() => {
     const compareParam = router.query.compare;
@@ -354,11 +363,12 @@ export function BatchEvaluationResults({
     if (!compareMode) return null;
     return multiRunData.runs.map((run) => ({
       runId: run.runId,
+      runName: runNameMap[run.runId] ?? run.runId,
       color: run.color,
       data: run.data ? transformBatchEvaluationData(run.data) : null,
       isLoading: run.isLoading,
     }));
-  }, [compareMode, multiRunData.runs]);
+  }, [compareMode, multiRunData.runs, runNameMap]);
 
   // Determine if charts are available:
   // 1. In compare mode with 2+ runs selected
@@ -386,12 +396,13 @@ export function BatchEvaluationResults({
     return [
       {
         runId: transformedData.runId,
+        runName: runNameMap[transformedData.runId] ?? transformedData.runId,
         color: stableRunColorMap[transformedData.runId] ?? RUN_COLORS[0],
         data: transformedData,
         isLoading: false,
       },
     ];
-  }, [compareMode, transformedData, targetCount, stableRunColorMap]);
+  }, [compareMode, transformedData, targetCount, stableRunColorMap, runNameMap]);
 
   // Chart data to display - either comparison data or single run data
   const chartDisplayData = compareMode ? comparisonData : singleRunChartData;

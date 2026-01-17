@@ -81,6 +81,7 @@ const createMockRunData = (
 
   return {
     runId,
+    runName: runId === "run-1" ? "Run 1" : "Run 2",
     color: runId === "run-1" ? "#3182ce" : "#dd6b20",
     isLoading: false,
     data: {
@@ -154,6 +155,7 @@ describe("ComparisonCharts", () => {
     it("does not render when single run with single target", () => {
       const singleTargetRun: ComparisonRunData = {
         runId: "run-1",
+        runName: "Run 1",
         color: "#3182ce",
         isLoading: false,
         data: {
@@ -932,6 +934,7 @@ describe("ComparisonCharts", () => {
       const createMultiTargetRunWithDifferentScores =
         (): ComparisonRunData => ({
           runId: "multi-target-run",
+          runName: "Multi Target Run",
           color: "#3182ce",
           isLoading: false,
           data: {

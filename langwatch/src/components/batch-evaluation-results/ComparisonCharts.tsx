@@ -72,8 +72,19 @@ const calculateYAxisWidth = (
   return Math.max(minWidth, Math.min(maxWidth, calculatedWidth));
 };
 
-/** Threshold for rotating X-axis labels */
+/** Threshold for rotating X-axis labels (item count) */
 const ROTATE_LABELS_THRESHOLD = 3;
+
+/** Max label length before truncating (normal) */
+const MAX_LABEL_LENGTH = 14;
+/** Max label length when rotated */
+const MAX_LABEL_LENGTH_ROTATED = 10;
+
+/** Truncate a label and add ellipsis if too long */
+const truncateLabel = (label: string, maxLength = MAX_LABEL_LENGTH): string => {
+  if (label.length <= maxLength) return label;
+  return label.slice(0, maxLength - 1) + "…";
+};
 
 /** Chart height when labels are rotated (needs more space) */
 const CHART_HEIGHT_ROTATED = 190;
@@ -365,6 +376,7 @@ export const ComparisonCharts = ({
       .filter((run) => run.data !== null)
       .map((run) => ({
         runId: run.runId,
+        runName: run.runName,
         color: run.color,
         createdAt: run.data!.createdAt,
         metrics: computeRunMetrics(run.data!),
@@ -418,7 +430,7 @@ export const ComparisonCharts = ({
   const chartData = useMemo(() => {
     if (xAxisOption === "runs") {
       return runMetrics.map((run) => ({
-        name: run.runId.slice(0, 15),
+        name: run.runName,
         color: run.color,
         cost: run.metrics.totalCost,
         latency: run.metrics.avgLatency,
@@ -976,7 +988,10 @@ export const ComparisonCharts = ({
                   Total Cost
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ left: 10, right: 10 }}
+                  >
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
@@ -991,6 +1006,14 @@ export const ComparisonCharts = ({
                       angle={shouldRotateLabels ? -45 : 0}
                       textAnchor={shouldRotateLabels ? "end" : "middle"}
                       height={shouldRotateLabels ? 60 : 25}
+                      tickFormatter={(value) =>
+                        truncateLabel(
+                          String(value),
+                          shouldRotateLabels
+                            ? MAX_LABEL_LENGTH_ROTATED
+                            : MAX_LABEL_LENGTH,
+                        )
+                      }
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1040,7 +1063,10 @@ export const ComparisonCharts = ({
                   Avg Latency
                 </Text>
                 <ResponsiveContainer width="100%" height={chartHeight}>
-                  <BarChart data={chartData}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ left: 10, right: 10 }}
+                  >
                     <CartesianGrid
                       horizontal={true}
                       vertical={false}
@@ -1055,6 +1081,14 @@ export const ComparisonCharts = ({
                       angle={shouldRotateLabels ? -45 : 0}
                       textAnchor={shouldRotateLabels ? "end" : "middle"}
                       height={shouldRotateLabels ? 60 : 25}
+                      tickFormatter={(value) =>
+                        truncateLabel(
+                          String(value),
+                          shouldRotateLabels
+                            ? MAX_LABEL_LENGTH_ROTATED
+                            : MAX_LABEL_LENGTH,
+                        )
+                      }
                     />
                     <YAxis
                       style={{ fontSize: "11px" }}
@@ -1107,7 +1141,10 @@ export const ComparisonCharts = ({
                       {ev.name} (Score)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData}>
+                      <BarChart
+                        data={chartData}
+                        margin={{ left: 10, right: 10 }}
+                      >
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1122,6 +1159,14 @@ export const ComparisonCharts = ({
                           angle={shouldRotateLabels ? -45 : 0}
                           textAnchor={shouldRotateLabels ? "end" : "middle"}
                           height={shouldRotateLabels ? 60 : 25}
+                          tickFormatter={(value) =>
+                            truncateLabel(
+                              String(value),
+                              shouldRotateLabels
+                                ? MAX_LABEL_LENGTH_ROTATED
+                                : MAX_LABEL_LENGTH,
+                            )
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
@@ -1175,7 +1220,10 @@ export const ComparisonCharts = ({
                       {ev.name} (Pass Rate)
                     </Text>
                     <ResponsiveContainer width="100%" height={chartHeight}>
-                      <BarChart data={chartData}>
+                      <BarChart
+                        data={chartData}
+                        margin={{ left: 10, right: 10 }}
+                      >
                         <CartesianGrid
                           horizontal={true}
                           vertical={false}
@@ -1190,6 +1238,14 @@ export const ComparisonCharts = ({
                           angle={shouldRotateLabels ? -45 : 0}
                           textAnchor={shouldRotateLabels ? "end" : "middle"}
                           height={shouldRotateLabels ? 60 : 25}
+                          tickFormatter={(value) =>
+                            truncateLabel(
+                              String(value),
+                              shouldRotateLabels
+                                ? MAX_LABEL_LENGTH_ROTATED
+                                : MAX_LABEL_LENGTH,
+                            )
+                          }
                         />
                         <YAxis
                           style={{ fontSize: "11px" }}
