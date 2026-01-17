@@ -9,20 +9,22 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import React from "react";
-import { Archive, MoreVertical, Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "lucide-react";
+import { ProjectAvatar } from "../../components/ProjectAvatar";
 import SettingsLayout from "../../components/SettingsLayout";
-import { ProjectTechStackIcon } from "../../components/TechStack";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
   TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { canAddProjects } from "../../utils/limits";
 import { trackEvent } from "../../utils/tracking";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
@@ -39,8 +41,8 @@ function ProjectsList({
 }: {
   organization: FullyLoadedOrganization;
 }) {
-  const { project } = useOrganizationTeamProject();
-  const { hasPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
 
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
@@ -61,55 +63,53 @@ function ProjectsList({
         align="start"
         maxWidth="1280px"
       >
+        <HStack width="full" justifyContent="space-between">
+          <Heading size="lg">Projects</Heading>
+          {hasPermission("project:create") &&
+            (canAddProjects(usage.data) ? (
+              <PageLayout.HeaderButton
+                onClick={() => openDrawer("createProject")}
+              >
+                <Plus size={20} />
+                <Text>Add new project</Text>
+              </PageLayout.HeaderButton>
+            ) : (
+              <Tooltip
+                content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
+                positioning={{ placement: "top" }}
+              >
+                <Link
+                  href={`/settings/subscription`}
+                  _hover={{
+                    textDecoration: "none",
+                  }}
+                  onClick={() => {
+                    trackEvent("subscription_hook_click", {
+                      project_id: project?.id,
+                      hook: "new_project_limit_reached_2",
+                    });
+                  }}
+                >
+                  <Button
+                    background="gray.50"
+                    _hover={{ background: "gray.50" }}
+                    color="gray.400"
+                  >
+                    <HStack gap={2}>
+                      <Plus size={20} />
+                      <Text>Add new project</Text>
+                    </HStack>
+                  </Button>
+                </Link>
+              </Tooltip>
+            ))}
+        </HStack>
         <Table.Root variant="line" width="full" size="md">
           {organization.teams.map((team) => (
             <React.Fragment key={team.id}>
               <Table.Header key={team.id}>
                 <Table.Row>
-                  <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">
-                    {hasPermission("project:create") &&
-                      (!usage.data ||
-                      usage.data.projectsCount <
-                        usage.data.activePlan.maxProjects ||
-                      usage.data.activePlan.overrideAddingLimitations ? (
-                        <Link href={`/onboarding/${team.slug}/project`} asChild>
-                          <PageLayout.HeaderButton>
-                            <Plus size={20} />
-                            <Text>Add new project</Text>
-                          </PageLayout.HeaderButton>
-                        </Link>
-                      ) : (
-                        <Tooltip
-                          content="You reached the limit of max new projects, click to upgrade your plan to add more projects"
-                          positioning={{ placement: "top" }}
-                        >
-                          <Link
-                            href={`/settings/subscription`}
-                            _hover={{
-                              textDecoration: "none",
-                            }}
-                            onClick={() => {
-                              trackEvent("subscription_hook_click", {
-                                project_id: project?.id,
-                                hook: "new_project_limit_reached_2",
-                              });
-                            }}
-                          >
-                            <Button
-                              background="gray.50"
-                              _hover={{ background: "gray.50" }}
-                              color="gray.400"
-                            >
-                              <HStack gap={2}>
-                                <Plus size={20} />
-                                <Text>Add new project</Text>
-                              </HStack>
-                            </Button>
-                          </Link>
-                        </Tooltip>
-                      ))}
-                  </Table.ColumnHeader>
+                  <Table.ColumnHeader colSpan={2}>{team.name}</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <TeamProjectsList team={team} />
@@ -163,8 +163,8 @@ export function TeamProjectsList({
           <Table.Cell>
             <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={teamProject.id}>
-                <ProjectTechStackIcon project={teamProject} />
-                <Link href={`/${teamProject.slug}/messages`}>
+                <ProjectAvatar name={teamProject.name} />
+                <Link href={`/${teamProject.slug}`}>
                   {teamProject.name}
                 </Link>
               </HStack>

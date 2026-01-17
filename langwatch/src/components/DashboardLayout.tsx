@@ -20,12 +20,14 @@ import { signIn, signOut } from "next-auth/react";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, Lock, Plus, Search } from "lucide-react";
+import { useDrawer } from "../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
 import { dependencies } from "../injection/dependencies.client";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
+import { canAddProjects } from "../utils/limits";
 import { findCurrentRoute, projectRoutes, type Route } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 import { CurrentDrawer } from "./CurrentDrawer";
@@ -38,6 +40,7 @@ import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
 import { FullLogo } from "./icons/FullLogo";
 import { LogoIcon } from "./icons/LogoIcon";
+import { ProjectAvatar } from "./ProjectAvatar";
 import { RandomColorAvatar } from "./RandomColorAvatar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
@@ -74,22 +77,6 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   );
 };
 
-const ProjectAvatar = ({
-  name,
-  size = "2xs",
-}: {
-  name: string;
-  size?: "2xs" | "xs" | "sm";
-}) => {
-  return (
-    <RandomColorAvatar
-      size={size}
-      name={name.slice(0, 1)}
-      width={size === "2xs" ? "20px" : undefined}
-      height={size === "2xs" ? "20px" : undefined}
-    />
-  );
-};
 
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
@@ -241,6 +228,7 @@ export const AddProjectButton = ({
   organization: Organization;
 }) => {
   const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization.id },
     {
@@ -250,19 +238,18 @@ export const AddProjectButton = ({
     },
   );
 
-  return !usage.data ||
-    usage.data.projectsCount < usage.data.activePlan.maxProjects ? (
-    <Link
-      href={`/onboarding/${team.slug}/project`}
-      _hover={{
-        textDecoration: "none",
-      }}
+  return canAddProjects(usage.data) ? (
+    <Menu.Item
+      value={`new-project-${team.slug}`}
+      fontSize="14px"
+      onClick={() => openDrawer("createProject", {
+        navigateOnCreate: true,
+        defaultTeamId: team.id,
+      })}
     >
-      <Menu.Item value={`new-project-${team.slug}`} fontSize="14px">
-        <Plus />
-        New Project
-      </Menu.Item>
-    </Link>
+      <Plus />
+      New Project
+    </Menu.Item>
   ) : (
     <Tooltip content="You reached the limit of max new projects, click to upgrade your plan to add more projects">
       <Link
