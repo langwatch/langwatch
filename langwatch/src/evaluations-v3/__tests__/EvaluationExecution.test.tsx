@@ -280,6 +280,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };
@@ -998,6 +999,7 @@ describe("Evaluation Execution", () => {
           expandedCells: new Set(),
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
+          concurrency: 10,
         },
       });
 
@@ -1061,6 +1063,7 @@ describe("Evaluation Execution", () => {
           expandedCells: new Set(),
           hiddenColumns: new Set(),
           autosaveStatus: { evaluation: "idle", dataset: "idle" },
+          concurrency: 10,
         },
       });
 

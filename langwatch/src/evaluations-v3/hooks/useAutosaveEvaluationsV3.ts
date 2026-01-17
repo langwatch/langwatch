@@ -83,6 +83,7 @@ export const useAutosaveEvaluationsV3 = () => {
       expandedCells: new Set(),
       hiddenColumns,
       autosaveStatus: { evaluation: "idle", dataset: "idle" },
+      concurrency: 10,
     },
   });
 

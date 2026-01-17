@@ -1068,6 +1068,15 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
     }));
   },
 
+  setConcurrency: (concurrency) => {
+    set((state) => ({
+      ui: {
+        ...state.ui,
+        concurrency,
+      },
+    }));
+  },
+
   toggleCellExpanded: (row, columnId) => {
     set((state) => {
       const key = `${row}-${columnId}`;

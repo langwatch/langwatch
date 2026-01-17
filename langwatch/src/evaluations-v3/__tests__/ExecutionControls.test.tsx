@@ -209,6 +209,7 @@ const setupStoreWithConfiguredEvaluation = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };

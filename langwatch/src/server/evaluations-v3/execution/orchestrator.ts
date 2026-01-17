@@ -47,9 +47,9 @@ import { buildCellWorkflow } from "./workflowBuilder";
 
 const logger = createLogger("evaluations-v3:orchestrator");
 
-// Default concurrency limit (can be overridden via environment variable)
+// Default concurrency limit (can be overridden via environment variable or request)
 const DEFAULT_CONCURRENCY = parseInt(
-  process.env.EVAL_V3_CONCURRENCY ?? "5",
+  process.env.EVAL_V3_CONCURRENCY ?? "10",
   10,
 );
 
@@ -70,6 +70,8 @@ export type OrchestratorInput = {
   saveToEs?: boolean;
   /** Optional run ID - if not provided, a human-readable ID will be generated */
   runId?: string;
+  /** Concurrency limit for parallel execution (default 10) */
+  concurrency?: number;
 };
 
 /**
@@ -472,7 +474,11 @@ export async function* runOrchestrator(
     loadedAgents,
     saveToEs = false,
     runId: providedRunId,
+    concurrency: requestedConcurrency,
   } = input;
+
+  // Use requested concurrency, environment variable, or default
+  const concurrency = requestedConcurrency ?? DEFAULT_CONCURRENCY;
 
   // Use provided run ID or generate a human-readable one like "swift-fox-42"
   const runId = providedRunId ?? generateHumanReadableId();
@@ -636,7 +642,7 @@ export async function* runOrchestrator(
   let aborted = false;
 
   logger.info(
-    { runId, totalCells, concurrency: DEFAULT_CONCURRENCY, experimentId },
+    { runId, totalCells, concurrency, experimentId },
     "Starting evaluation execution",
   );
 
@@ -683,7 +689,7 @@ export async function* runOrchestrator(
   };
 
   // Create semaphore for rate limiting
-  const semaphore = createSemaphore(DEFAULT_CONCURRENCY);
+  const semaphore = createSemaphore(concurrency);
 
   // Track active cell executions
   const activeCells = new Set<Promise<void>>();

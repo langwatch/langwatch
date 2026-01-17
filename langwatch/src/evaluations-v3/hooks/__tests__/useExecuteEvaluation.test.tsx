@@ -110,6 +110,7 @@ const setupStore = () => {
         evaluation: "idle",
         dataset: "idle",
       },
+      concurrency: 10,
     },
   });
 };
@@ -409,6 +410,34 @@ describe("useExecuteEvaluation", () => {
 
       // Abort API should NOT have been called (no runId)
       expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("passes concurrency setting from store to execution request", async () => {
+      setupStore();
+
+      // Set a custom concurrency value
+      useEvaluationsV3Store.setState((state) => ({
+        ...state,
+        ui: { ...state.ui, concurrency: 25 },
+      }));
+
+      let capturedPayload: Record<string, unknown> | undefined;
+      mockFetchSSE.mockImplementation(async ({ payload }) => {
+        capturedPayload = payload;
+        // Don't resolve - we just want to capture the request
+        await new Promise(() => {});
+      });
+
+      const { result } = renderHook(() => useExecuteEvaluation());
+
+      // Start execution
+      act(() => {
+        void result.current.execute({ type: "full" });
+      });
+
+      // Verify the request included the concurrency setting
+      expect(capturedPayload).toBeDefined();
+      expect(capturedPayload?.concurrency).toBe(25);
     });
   });
 

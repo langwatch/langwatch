@@ -10,6 +10,7 @@ import {
   Button,
   HStack,
   IconButton,
+  Input,
   Link,
   Text,
   useDisclosure,
@@ -31,9 +32,12 @@ import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Popover } from "~/components/ui/popover";
+import { SimpleSlider } from "~/components/ui/slider";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { RowHeightMode } from "../types";
+import { DEFAULT_CONCURRENCY } from "../types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { LuGauge } from "react-icons/lu";
 
 type ToggleOption = {
   value: RowHeightMode;
@@ -54,6 +58,108 @@ const rowHeightOptions: ToggleOption[] = [
   },
 ];
 
+// =============================================================================
+// Concurrency Popover Component
+// =============================================================================
+
+type ConcurrencyPopoverProps = {
+  value: number;
+  onChange: (value: number) => void;
+};
+
+const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
+  value,
+  onChange,
+}: ConcurrencyPopoverProps) {
+  const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value.toString());
+
+  // Sync input when value changes externally
+  React.useEffect(() => {
+    setInputValue(value.toString());
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    const parsed = parseInt(inputValue, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= 24) {
+      onChange(parsed);
+    } else {
+      setInputValue(value.toString());
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleInputBlur();
+    }
+  };
+
+  return (
+    <Popover.Root open={open} onOpenChange={(e) => setOpen(e.open)} positioning={{ placement: "bottom-end" }}>
+      <Popover.Trigger asChild>
+        <Button
+          variant="outline"
+          size="xs"
+          justifyContent="space-between"
+          paddingX={3}
+          paddingY={2}
+          height="auto"
+          fontSize="13px"
+          fontWeight="normal"
+          width="100%"
+          _hover={{ bg: "gray.100" }}
+        >
+          <HStack gap={2} color="gray.500" fontWeight="600">
+            <LuGauge />
+            <Text>Concurrency</Text>
+          </HStack>
+          <Text>{value}</Text>
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content width="220px" padding={3}>
+        <VStack align="stretch" gap={3}>
+          <HStack gap={3}>
+            <Input
+              value={inputValue}
+              onChange={handleInputChange}
+              onBlur={handleInputBlur}
+              onKeyDown={handleInputKeyDown}
+              size="sm"
+              width="50px"
+              textAlign="center"
+              paddingX={1}
+            />
+            <SimpleSlider
+              value={[value]}
+              onValueChange={({ value: newValue }) => {
+                const v = newValue[0] ?? DEFAULT_CONCURRENCY;
+                onChange(v);
+                setInputValue(v.toString());
+              }}
+              min={1}
+              max={24}
+              step={1}
+              size="sm"
+              flex={1}
+            />
+          </HStack>
+          <Text fontSize="11px" color="gray.500">
+            Higher values run more cells in parallel but may cause rate limiting
+          </Text>
+        </VStack>
+      </Popover.Content>
+    </Popover.Root>
+  );
+});
+
+// =============================================================================
+// Main Component
+// =============================================================================
+
 type TableSettingsMenuProps = {
   disabled?: boolean;
 };
@@ -62,10 +168,12 @@ type TableSettingsMenuProps = {
  * Popover menu containing table settings and actions.
  */
 export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) {
-  const { rowHeightMode, setRowHeightMode, experimentSlug } =
+  const { rowHeightMode, setRowHeightMode, concurrency, setConcurrency, experimentSlug } =
     useEvaluationsV3Store((state) => ({
       rowHeightMode: state.ui.rowHeightMode,
       setRowHeightMode: state.setRowHeightMode,
+      concurrency: state.ui.concurrency,
+      setConcurrency: state.setConcurrency,
       experimentSlug: state.experimentSlug,
     }));
 
@@ -129,6 +237,18 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
               </HStack>
             </VStack>
 
+            {/* Concurrency Section */}
+            <Box borderTopWidth="1px" borderColor="gray.200" />
+            <Text fontSize="xs" fontWeight="medium" color="gray.500">
+              Concurrency
+            </Text>
+            <VStack align="stretch" gap={1}>
+              <ConcurrencyPopover
+                value={concurrency}
+                onChange={setConcurrency}
+              />
+            </VStack>
+
             {/* CI/CD Section */}
             {showCICDOption && (
               <>
@@ -138,7 +258,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
                     Automation
                   </Text>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     justifyContent="flex-start"
                     paddingX={3}
                     paddingY={2}

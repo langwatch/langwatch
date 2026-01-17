@@ -80,6 +80,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
     activeDatasetId,
     targets,
     evaluators,
+    concurrency,
     setResults,
     clearResults,
   } = useEvaluationsV3Store(
@@ -91,6 +92,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       activeDatasetId: state.activeDatasetId,
       targets: state.targets,
       evaluators: state.evaluators,
+      concurrency: state.ui.concurrency,
       setResults: state.setResults,
       clearResults: state.clearResults,
     })),
@@ -512,6 +514,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           mappings: e.mappings,
         })),
         scope,
+        concurrency,
       };
 
       // Helper to remove this execution's cells from executingCells when done

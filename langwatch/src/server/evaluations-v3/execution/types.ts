@@ -42,6 +42,8 @@ export type ExecutionRequest = {
   targets: TargetConfig[];
   evaluators: EvaluatorConfig[];
   scope: ExecutionScope;
+  /** Concurrency limit for parallel execution (default 10) */
+  concurrency?: number;
 };
 
 export const executionRequestSchema = z.object({
@@ -118,6 +120,7 @@ export const executionRequestSchema = z.object({
       targetOutput: z.unknown().optional(),
     }),
   ]),
+  concurrency: z.number().min(1).max(24).optional(),
 });
 
 // ============================================================================
