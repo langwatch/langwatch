@@ -171,7 +171,10 @@ export type ESBatchEvaluation = {
  * Target in REST API params - type is optional as it can be
  * extracted from metadata or defaulted to "custom"
  */
-export type ESBatchEvaluationTargetREST = Omit<ESBatchEvaluationTarget, "type"> & {
+export type ESBatchEvaluationTargetREST = Omit<
+  ESBatchEvaluationTarget,
+  "type"
+> & {
   type?: ESBatchEvaluationTargetType;
 };
 

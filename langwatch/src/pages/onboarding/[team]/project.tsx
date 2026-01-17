@@ -150,32 +150,32 @@ export default function ProjectOnboarding() {
             Create New Project
           </Heading>
           {isAtMaxProjects(usage.data) && (
-              <Alert.Root>
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Text>
-                    You have reached the maximum number of projects allowed by
-                    your plan. Please{" "}
-                    <Link
-                      href={`/settings/subscription`}
-                      textDecoration="underline"
-                      _hover={{
-                        textDecoration: "none",
-                      }}
-                      onClick={() => {
-                        trackEvent("subscription_hook_click", {
-                          project_id: project?.id,
-                          hook: "new_project_limit_reached",
-                        });
-                      }}
-                    >
-                      upgrade your plan
-                    </Link>{" "}
-                    to create more projects.
-                  </Text>
-                </Alert.Content>
-              </Alert.Root>
-            )}
+            <Alert.Root>
+              <Alert.Indicator />
+              <Alert.Content>
+                <Text>
+                  You have reached the maximum number of projects allowed by
+                  your plan. Please{" "}
+                  <Link
+                    href={`/settings/subscription`}
+                    textDecoration="underline"
+                    _hover={{
+                      textDecoration: "none",
+                    }}
+                    onClick={() => {
+                      trackEvent("subscription_hook_click", {
+                        project_id: project?.id,
+                        hook: "new_project_limit_reached",
+                      });
+                    }}
+                  >
+                    upgrade your plan
+                  </Link>{" "}
+                  to create more projects.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+          )}
           <Text paddingBottom={4} fontSize="14px">
             You can set up separate projects for each service or LLM feature of
             your application (for example, one for your ChatBot, another for
@@ -228,7 +228,9 @@ export default function ProjectOnboarding() {
               <Button
                 colorPalette="orange"
                 type="submit"
-                disabled={createProject.isLoading || isAtMaxProjects(usage.data)}
+                disabled={
+                  createProject.isLoading || isAtMaxProjects(usage.data)
+                }
               >
                 {createProject.isLoading || createProject.isSuccess
                   ? "Loading..."

@@ -14,15 +14,17 @@
 import { Button, Spinner } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-
-import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../hooks/useExecuteEvaluation";
 import { useOpenTargetEditor } from "../hooks/useOpenTargetEditor";
+import {
+  convertFromUIMapping,
+  convertToUIMapping,
+} from "../utils/fieldMappingConverters";
 import { validateWorkbench } from "../utils/mappingValidation";
-import { convertToUIMapping, convertFromUIMapping } from "../utils/fieldMappingConverters";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 
 type RunEvaluationButtonProps = {
   /** Whether the button is disabled (e.g., while loading) */
@@ -34,7 +36,8 @@ export const RunEvaluationButton = ({
 }: RunEvaluationButtonProps) => {
   const { openDrawer } = useDrawer();
   const { openTargetEditor } = useOpenTargetEditor();
-  const { status, progress, execute, abort, isAborting } = useExecuteEvaluation();
+  const { status, progress, execute, abort, isAborting } =
+    useExecuteEvaluation();
 
   const {
     targets,
@@ -53,12 +56,12 @@ export const RunEvaluationButton = ({
       results: state.results,
       setEvaluatorMapping: state.setEvaluatorMapping,
       removeEvaluatorMapping: state.removeEvaluatorMapping,
-    }))
+    })),
   );
 
   const hasTargets = targets.length > 0;
   const isRunning = status === "running" || results.status === "running";
-  const hasProgress = progress.total > 0;
+  const _hasProgress = progress.total > 0;
 
   const handleClick = async () => {
     // If running, stop execution
@@ -115,7 +118,8 @@ export const RunEvaluationButton = ({
           });
         }
 
-        const storeMappings = evaluator.mappings[activeDatasetId]?.[targetId] ?? {};
+        const storeMappings =
+          evaluator.mappings[activeDatasetId]?.[targetId] ?? {};
         const initialMappings: Record<string, UIFieldMapping> = {};
         for (const [key, mapping] of Object.entries(storeMappings)) {
           initialMappings[key] = convertToUIMapping(mapping);
@@ -124,12 +128,29 @@ export const RunEvaluationButton = ({
         const mappingsConfig = {
           availableSources,
           initialMappings,
-          onMappingChange: (identifier: string, mapping: UIFieldMapping | undefined) => {
+          onMappingChange: (
+            identifier: string,
+            mapping: UIFieldMapping | undefined,
+          ) => {
             if (mapping) {
-              const storeMapping = convertFromUIMapping(mapping, isDatasetSource);
-              setEvaluatorMapping(evaluator.id, activeDatasetId, targetId, identifier, storeMapping);
+              const storeMapping = convertFromUIMapping(
+                mapping,
+                isDatasetSource,
+              );
+              setEvaluatorMapping(
+                evaluator.id,
+                activeDatasetId,
+                targetId,
+                identifier,
+                storeMapping,
+              );
             } else {
-              removeEvaluatorMapping(evaluator.id, activeDatasetId, targetId, identifier);
+              removeEvaluatorMapping(
+                evaluator.id,
+                activeDatasetId,
+                targetId,
+                identifier,
+              );
             }
           },
         };

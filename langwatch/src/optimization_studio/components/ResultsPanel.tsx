@@ -19,14 +19,14 @@ import type { Node } from "@xyflow/react";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import { LuSquareCheckBig } from "react-icons/lu";
-import { useBatchEvaluationState } from "../../components/experiments/BatchEvaluationV2";
 import {
   BatchEvaluationResultsTable,
+  type BatchRunSummary,
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
-  type BatchRunSummary,
 } from "../../components/batch-evaluation-results";
+import { useBatchEvaluationState } from "../../components/experiments/BatchEvaluationV2";
 import {
   DSPyExperimentRunList,
   DSPyExperimentSummary,
@@ -209,7 +209,7 @@ export function EvaluationResults({
     {
       enabled: !!project && !!experiment.data && !!selectedRunId_,
       refetchInterval: !isFinished ? 1000 : false,
-    }
+    },
   );
 
   // Transform run data for new table
@@ -218,7 +218,9 @@ export function EvaluationResults({
     : null;
 
   // Transform runs for new sidebar
-  const sidebarRuns: BatchRunSummary[] = (batchEvaluationRuns.data?.runs ?? []).map((run) => ({
+  const sidebarRuns: BatchRunSummary[] = (
+    batchEvaluationRuns.data?.runs ?? []
+  ).map((run) => ({
     runId: run.run_id,
     workflowVersion: run.workflow_version,
     timestamps: run.timestamps,
@@ -235,12 +237,14 @@ export function EvaluationResults({
             averageScore: ev.average_score,
             averagePassed: ev.average_passed,
           },
-        ])
+        ]),
       ),
     },
   }));
 
-  const sidebarSelectedRun = sidebarRuns.find((r) => r.runId === selectedRunId_);
+  const sidebarSelectedRun = sidebarRuns.find(
+    (r) => r.runId === selectedRunId_,
+  );
 
   if (
     (experiment.isError && experiment.error.data?.httpStatus === 404) ||

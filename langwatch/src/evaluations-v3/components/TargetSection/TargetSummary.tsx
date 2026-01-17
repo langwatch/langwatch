@@ -1,17 +1,21 @@
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import { memo } from "react";
-import { LuChevronRight, LuClock, LuTriangleRight, LuZap } from "react-icons/lu";
-
-import { Tooltip } from "~/components/ui/tooltip";
-import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import {
-  LatencyStatsTooltip,
+  LuChevronRight,
+  LuClock,
+  LuTriangleRight,
+  LuZap,
+} from "react-icons/lu";
+import {
   CostStatsTooltip,
+  LatencyStatsTooltip,
 } from "~/components/shared/MetricStatsTooltip";
 import {
-  PassRateCircle,
   getPassRateGradientColor,
+  PassRateCircle,
 } from "~/components/shared/PassRateIndicator";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import type { TargetAggregate } from "../../utils/computeAggregates";
 import {
   formatCost,
@@ -38,7 +42,8 @@ export const TargetSummary = memo(function TargetSummary({
   aggregates,
   isRunning = false,
 }: TargetSummaryProps) {
-  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } =
+    useInteractiveTooltip(150);
 
   // Show summary if we have any completed rows, OR any errors, OR any metrics
   const hasResults =

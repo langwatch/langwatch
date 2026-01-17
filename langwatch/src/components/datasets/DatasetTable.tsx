@@ -30,6 +30,7 @@ import {
   Plus,
   Upload,
 } from "react-feather";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { datasetDatabaseRecordsToInMemoryDataset } from "../../optimization_studio/utils/datasetUtils";
 import type {
@@ -39,12 +40,11 @@ import type {
 } from "../../server/datasets/types";
 import { api } from "../../utils/api";
 import {
-  AddOrEditDatasetDrawer,
   type AddDatasetDrawerProps,
+  AddOrEditDatasetDrawer,
 } from "../AddOrEditDatasetDrawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import { PageLayout } from "../ui/layouts/PageLayout";
 import { Menu } from "../ui/menu";
-
 import { toaster } from "../ui/toaster";
 import { AddRowsFromCSVModal } from "./AddRowsFromCSVModal";
 import {
@@ -53,7 +53,6 @@ import {
   datasetValueToGridValue,
   HeaderCheckboxComponent,
 } from "./DatasetGrid";
-import { PageLayout } from "../ui/layouts/PageLayout";
 
 export type InMemoryDataset = {
   datasetId?: string;
@@ -513,8 +512,8 @@ export function DatasetTable({
                     dataset?.name
                       ? dataset.name
                       : datasetId
-                      ? ""
-                      : DEFAULT_DATASET_NAME
+                        ? ""
+                        : DEFAULT_DATASET_NAME
                   }`}
                 </>
               )}
@@ -537,8 +536,8 @@ export function DatasetTable({
             {savingStatus === "saving"
               ? "Saving..."
               : savingStatus === "saved"
-              ? "Saved"
-              : ""}
+                ? "Saved"
+                : ""}
           </Text>
         </HStack>
         <Spacer />

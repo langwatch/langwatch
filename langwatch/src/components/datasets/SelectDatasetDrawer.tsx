@@ -7,15 +7,15 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState, useMemo } from "react";
-import { Database, Search } from "react-feather";
 import { formatDistanceToNow } from "date-fns";
+import { useMemo, useState } from "react";
+import { Database, Search } from "react-feather";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { DatasetColumns } from "~/server/datasets/types";
+import { api } from "~/utils/api";
 
 export type SelectDatasetDrawerProps = {
   open?: boolean;
@@ -41,7 +41,9 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as SelectDatasetDrawerProps["onSelect"]);
+  const onSelect =
+    props.onSelect ??
+    (complexProps.onSelect as SelectDatasetDrawerProps["onSelect"]);
   // Note: props.open can be a string (drawer name) from CurrentDrawer, convert to boolean
   const isOpen = props.open !== false && props.open !== undefined;
 
@@ -49,7 +51,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
 
   const datasetsQuery = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project?.id && isOpen }
+    { enabled: !!project?.id && isOpen },
   );
 
   const filteredDatasets = useMemo(() => {
@@ -59,7 +61,7 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
     if (!query) return datasetsQuery.data;
 
     return datasetsQuery.data.filter((dataset) =>
-      dataset.name.toLowerCase().includes(query)
+      dataset.name.toLowerCase().includes(query),
     );
   }, [datasetsQuery.data, searchQuery]);
 
@@ -88,7 +90,12 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
             </Text>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
               Select an existing dataset to use for this evaluation.
@@ -170,7 +177,13 @@ type DatasetCardProps = {
   onClick: () => void;
 };
 
-function DatasetCard({ name, columnCount, entryCount, updatedAt, onClick }: DatasetCardProps) {
+function DatasetCard({
+  name,
+  columnCount,
+  entryCount,
+  updatedAt,
+  onClick,
+}: DatasetCardProps) {
   return (
     <Box
       as="button"
@@ -200,7 +213,8 @@ function DatasetCard({ name, columnCount, entryCount, updatedAt, onClick }: Data
             <Text>{columnCount} columns</Text>
             <Text>•</Text>
             <Text>
-              Updated {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
+              Updated{" "}
+              {formatDistanceToNow(new Date(updatedAt), { addSuffix: true })}
             </Text>
           </HStack>
         </VStack>

@@ -1,6 +1,11 @@
+import { generate } from "@langwatch/ksuid";
+import { SpanStatusCode } from "@opentelemetry/api";
+import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
 import type { NextApiRequest, NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { generateOtelSpanId } from "~/utils/trace";
 import { prisma } from "../../../src/server/db"; // Adjust the import based on your setup
@@ -8,11 +13,6 @@ import type { TrackEventRESTParamsValidator } from "../../../src/server/tracer/t
 import { trackEventRESTParamsValidatorSchema } from "../../../src/server/tracer/types.generated";
 import { trackEventsQueue } from "../../server/background/queues/trackEventsQueue";
 import { createLogger } from "../../utils/logger";
-import { traceProcessingPipeline } from "~/server/event-sourcing/runtime/eventSourcing";
-import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
-import { SpanStatusCode } from "@opentelemetry/api";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 const thumbsUpDownSchema = z.object({
   trace_id: z.string(),
@@ -56,14 +56,14 @@ export const predefinedEventsSchemas = z.union([
 ]);
 
 const predefinedEventTypes = predefinedEventsSchemas.options.map(
-  (schema) => schema.shape.event_type.value
+  (schema) => schema.shape.event_type.value,
 );
 
 const logger = createLogger("langwatch:track_event");
 
 export default async function handler(
   req: NextApiRequest,
-  res: NextApiResponse
+  res: NextApiResponse,
 ) {
   if (req.method !== "POST") {
     return res.status(405).end(); // Only accept POST requests
@@ -89,7 +89,7 @@ export default async function handler(
   } catch (error) {
     logger.error(
       { error, body: req.body, projectId: project.id },
-      "invalid event received"
+      "invalid event received",
     );
     captureException(error);
     const validationError = fromZodError(error as ZodError);
@@ -102,7 +102,7 @@ export default async function handler(
     } catch (error) {
       logger.error(
         { error, body: req.body, projectId: project.id },
-        "invalid event received"
+        "invalid event received",
       );
       captureException(error);
       const validationError = fromZodError(error as ZodError);
@@ -139,12 +139,21 @@ export default async function handler(
       // Add event_details as attributes
       if (body.event_details) {
         for (const [key, value] of Object.entries(body.event_details)) {
-          if (typeof value === 'string') {
-            attributes.push({ key: `event.details.${key}`, value: { stringValue: value } });
-          } else if (typeof value === 'number') {
-            attributes.push({ key: `event.details.${key}`, value: { doubleValue: value } });
+          if (typeof value === "string") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: value },
+            });
+          } else if (typeof value === "number") {
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { doubleValue: value },
+            });
           } else if (value != null) {
-            attributes.push({ key: `event.details.${key}`, value: { stringValue: String(value) } });
+            attributes.push({
+              key: `event.details.${key}`,
+              value: { stringValue: String(value) },
+            });
           }
         }
       }
@@ -188,7 +197,7 @@ export default async function handler(
         {
           error,
         },
-        "unable to dispatch tracked event span"
+        "unable to dispatch tracked event span",
       );
     }
   }
@@ -208,7 +217,7 @@ export default async function handler(
       jobId: `track_event_${eventId}`,
       // Add a delay to track events to possibly wait for trace data to be available for the grouping keys
       delay: process.env.VITEST_MODE ? 0 : 5000,
-    }
+    },
   );
 
   return res.status(200).json({ message: "Event tracked" });

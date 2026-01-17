@@ -5,7 +5,10 @@
  * and V3 evaluations (multiple targets, inline evaluators per target).
  */
 
-import type { ESBatchEvaluation, ESBatchEvaluationTarget } from "~/server/experiments/types";
+import type {
+  ESBatchEvaluation,
+  ESBatchEvaluationTarget,
+} from "~/server/experiments/types";
 
 /**
  * Run data with color assignment for comparison mode
@@ -125,7 +128,7 @@ export type BatchEvaluationData = {
  * needed for TanStack Table display.
  */
 export const transformBatchEvaluationData = (
-  data: ESBatchEvaluation
+  data: ESBatchEvaluation,
 ): BatchEvaluationData => {
   const {
     project_id,
@@ -152,7 +155,7 @@ export const transformBatchEvaluationData = (
     (name) => ({
       name,
       hasImages: detectHasImages(dataset, name),
-    })
+    }),
   );
 
   // Build target columns
@@ -179,21 +182,25 @@ export const transformBatchEvaluationData = (
     // Retrocompatibility: handle old format where predicted is flat vs nested
     const predictedColumns = detectPredictedColumns(dataset);
     if (Object.keys(predictedColumns).length > 0) {
-      targetColumns = Object.entries(predictedColumns).map(([node, fields]) => ({
-        id: node || "output",
-        name: node === "end" || node === "" ? "Output" : node,
-        type: "legacy" as const,
-        outputFields: Array.from(fields),
-      }));
+      targetColumns = Object.entries(predictedColumns).map(
+        ([node, fields]) => ({
+          id: node || "output",
+          name: node === "end" || node === "" ? "Output" : node,
+          type: "legacy" as const,
+          outputFields: Array.from(fields),
+        }),
+      );
     } else if (evaluations.length > 0) {
       // API evaluations: no targets, no predicted - derive a virtual target
       // The evaluator's input/output will be displayed in the target column
-      targetColumns = [{
-        id: "_derived",
-        name: "Output",
-        type: "legacy" as const,
-        outputFields: detectEvaluatorOutputFields(evaluations),
-      }];
+      targetColumns = [
+        {
+          id: "_derived",
+          name: "Output",
+          type: "legacy" as const,
+          outputFields: detectEvaluatorOutputFields(evaluations),
+        },
+      ];
     }
   }
 
@@ -219,7 +226,10 @@ export const transformBatchEvaluationData = (
   }
 
   // Group evaluations by index and target
-  const evaluationsByIndexAndTarget = new Map<string, (typeof evaluations)[number][]>();
+  const evaluationsByIndexAndTarget = new Map<
+    string,
+    (typeof evaluations)[number][]
+  >();
   for (const evaluation of evaluations) {
     const key = `${evaluation.index}:${evaluation.target_id ?? ""}`;
     const existing = evaluationsByIndexAndTarget.get(key) ?? [];
@@ -236,9 +246,8 @@ export const transformBatchEvaluationData = (
 
   // Determine the total number of rows
   // When dataset is empty, rowCount should be 0
-  const rowCount = dataset.length > 0
-    ? Math.max(...dataset.map((d) => d.index)) + 1
-    : 0;
+  const rowCount =
+    dataset.length > 0 ? Math.max(...dataset.map((d) => d.index)) + 1 : 0;
 
   // Build rows
   const rows: BatchResultRow[] = [];
@@ -255,7 +264,7 @@ export const transformBatchEvaluationData = (
       // Get dataset entry for this target (V3) or base entry (V2)
       const targetEntry =
         targets && targets.length > 0
-          ? datasetByIndexAndTarget.get(`${i}:${targetId}`) ?? baseEntry
+          ? (datasetByIndexAndTarget.get(`${i}:${targetId}`) ?? baseEntry)
           : baseEntry;
 
       // Extract output for this target
@@ -275,14 +284,14 @@ export const transformBatchEvaluationData = (
           if (targetId === "output" || targetId === "end" || targetId === "") {
             // Check if it's flat (V2 old style) or nested
             const isNested = Object.values(predicted).some(
-              (v) => typeof v === "object" && v !== null && !Array.isArray(v)
+              (v) => typeof v === "object" && v !== null && !Array.isArray(v),
             );
             if (isNested && targetId in predicted) {
               output = predicted[targetId] as Record<string, unknown>;
             } else if (!isNested) {
               output = predicted;
             } else {
-              output = predicted["end"] as Record<string, unknown> ?? predicted;
+              output = (predicted.end as Record<string, unknown>) ?? predicted;
             }
           } else if (targetId in predicted) {
             output = predicted[targetId] as Record<string, unknown>;
@@ -291,21 +300,26 @@ export const transformBatchEvaluationData = (
       }
 
       // Get evaluator results for this target
-      const targetEvaluations = evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
-                                 (targets && targets.length > 0 ? [] : evaluationsByIndexAndTarget.get(`${i}:`) ?? []);
+      const targetEvaluations =
+        evaluationsByIndexAndTarget.get(`${i}:${targetId}`) ??
+        (targets && targets.length > 0
+          ? []
+          : (evaluationsByIndexAndTarget.get(`${i}:`) ?? []));
 
-      const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map((ev) => ({
-        evaluatorId: ev.evaluator,
-        evaluatorName: ev.name ?? ev.evaluator,
-        status: ev.status,
-        score: ev.score,
-        passed: ev.passed,
-        label: ev.label,
-        details: ev.details,
-        cost: ev.cost,
-        duration: ev.duration,
-        inputs: ev.inputs,
-      }));
+      const evaluatorResults: BatchEvaluatorResult[] = targetEvaluations.map(
+        (ev) => ({
+          evaluatorId: ev.evaluator,
+          evaluatorName: ev.name ?? ev.evaluator,
+          status: ev.status,
+          score: ev.score,
+          passed: ev.passed,
+          label: ev.label,
+          details: ev.details,
+          cost: ev.cost,
+          duration: ev.duration,
+          inputs: ev.inputs,
+        }),
+      );
 
       rowTargets[targetId] = {
         targetId,
@@ -347,7 +361,7 @@ export const transformBatchEvaluationData = (
  */
 const detectOutputFields = (
   dataset: ESBatchEvaluation["dataset"],
-  targetId: string
+  targetId: string,
 ): string[] => {
   const fields = new Set<string>();
   for (const entry of dataset) {
@@ -365,7 +379,7 @@ const detectOutputFields = (
  * When there's no target, we use the evaluator's input/output fields
  */
 const detectEvaluatorOutputFields = (
-  evaluations: ESBatchEvaluation["evaluations"]
+  evaluations: ESBatchEvaluation["evaluations"],
 ): string[] => {
   const fields = new Set<string>();
   for (const evaluation of evaluations) {
@@ -390,7 +404,7 @@ const detectEvaluatorOutputFields = (
  * Looks for common output fields in evaluator inputs and returns them
  */
 const extractOutputFromEvaluatorInputs = (
-  evaluations: ESBatchEvaluation["evaluations"]
+  evaluations: ESBatchEvaluation["evaluations"],
 ): Record<string, unknown> | null => {
   // Try to find output from any evaluator's inputs
   for (const evaluation of evaluations) {
@@ -424,7 +438,7 @@ const extractOutputFromEvaluatorInputs = (
  * Returns a map of node name to field names
  */
 const detectPredictedColumns = (
-  dataset: ESBatchEvaluation["dataset"]
+  dataset: ESBatchEvaluation["dataset"],
 ): Record<string, Set<string>> => {
   const columns: Record<string, Set<string>> = {};
 
@@ -433,7 +447,7 @@ const detectPredictedColumns = (
   if (!firstPredicted) return columns;
 
   const isNested = Object.values(firstPredicted).every(
-    (v) => typeof v === "object" && v !== null && !Array.isArray(v)
+    (v) => typeof v === "object" && v !== null && !Array.isArray(v),
   );
 
   if (isNested) {
@@ -441,7 +455,11 @@ const detectPredictedColumns = (
     for (const entry of dataset) {
       if (!entry.predicted) continue;
       for (const [node, value] of Object.entries(entry.predicted)) {
-        if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
           if (!columns[node]) columns[node] = new Set();
           for (const key of Object.keys(value)) {
             columns[node]!.add(key);
@@ -451,11 +469,11 @@ const detectPredictedColumns = (
     }
   } else {
     // Flat format: { field: value }
-    columns["end"] = new Set();
+    columns.end = new Set();
     for (const entry of dataset) {
       if (!entry.predicted) continue;
       for (const key of Object.keys(entry.predicted)) {
-        columns["end"]!.add(key);
+        columns.end!.add(key);
       }
     }
   }
@@ -468,7 +486,7 @@ const detectPredictedColumns = (
  */
 const detectHasImages = (
   dataset: ESBatchEvaluation["dataset"],
-  columnName: string
+  columnName: string,
 ): boolean => {
   // Check up to first 10 entries for image URLs
   const samplesToCheck = dataset.slice(0, 10);

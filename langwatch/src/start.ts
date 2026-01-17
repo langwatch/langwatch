@@ -1,3 +1,4 @@
+import { setEnvironment } from "@langwatch/ksuid";
 import promBundle from "express-prom-bundle";
 import { createServer, type IncomingMessage } from "http";
 import next from "next";
@@ -7,7 +8,6 @@ import type { Duplex } from "stream";
 import { parse } from "url";
 import { initializeBackgroundWorkers } from "./server/background/init";
 import { createLogger } from "./utils/logger";
-import { setEnvironment } from "@langwatch/ksuid";
 
 const logger = createLogger("langwatch:start");
 

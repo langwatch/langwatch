@@ -12,18 +12,18 @@ import { Info, Plus, X } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  VariableTypeIcon,
   TYPE_LABELS,
+  VariableTypeIcon,
 } from "~/prompts/components/ui/VariableTypeIcon";
 import {
-  normalizeIdentifier,
   generateUniqueIdentifier,
+  normalizeIdentifier,
 } from "~/utils/identifierUtils";
 import {
-  VariableMappingInput,
   type AvailableSource,
   type FieldMapping,
   type FieldType,
+  VariableMappingInput,
 } from "./VariableMappingInput";
 
 // ============================================================================
@@ -208,7 +208,8 @@ export const VariablesSection = ({
           {variables.map((variable) => {
             const isLocked = lockedVariables.has(variable.identifier);
             const infoTooltip = variableInfo[variable.identifier];
-            const isMappingDisabled_internal = isMappingDisabled || disabledMappings.has(variable.identifier);
+            const isMappingDisabled_internal =
+              isMappingDisabled || disabledMappings.has(variable.identifier);
 
             return (
               <VariableRow
@@ -257,12 +258,12 @@ export const VariablesSection = ({
 
 // Type options for the dropdown - uses shared TYPE_LABELS for consistency
 const INPUT_TYPE_OPTIONS = [
-  { value: "str", label: TYPE_LABELS["str"] ?? "Text" },
-  { value: "float", label: TYPE_LABELS["float"] ?? "Number" },
-  { value: "bool", label: TYPE_LABELS["bool"] ?? "Boolean" },
-  { value: "image", label: TYPE_LABELS["image"] ?? "Image" },
-  { value: "list", label: TYPE_LABELS["list"] ?? "List" },
-  { value: "dict", label: TYPE_LABELS["dict"] ?? "Object" },
+  { value: "str", label: TYPE_LABELS.str ?? "Text" },
+  { value: "float", label: TYPE_LABELS.float ?? "Number" },
+  { value: "bool", label: TYPE_LABELS.bool ?? "Boolean" },
+  { value: "image", label: TYPE_LABELS.image ?? "Image" },
+  { value: "list", label: TYPE_LABELS.list ?? "List" },
+  { value: "dict", label: TYPE_LABELS.dict ?? "Object" },
 ];
 
 type VariableRowProps = {

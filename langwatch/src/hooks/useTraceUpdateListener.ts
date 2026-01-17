@@ -1,8 +1,7 @@
-import { useEffect, useRef, useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { api } from "~/utils/api";
 import { usePageVisibility } from "./usePageVisibility";
 import { useSSESubscription } from "./useSSESubscription";
-
 
 interface UseTraceUpdateListenerOptions {
   projectId: string;
@@ -73,7 +72,10 @@ export function useTraceUpdateListener({
     };
   }, []);
 
-  useSSESubscription<{ event: string; timestamp: number }, { projectId: string }>(
+  useSSESubscription<
+    { event: string; timestamp: number },
+    { projectId: string }
+  >(
     // @ts-expect-error - tRPC subscription type is not compatible with the useSSESubscription hook
     // it's 6:30am and i do not care anymore
     api.traces.onTraceUpdate,
@@ -81,13 +83,13 @@ export function useTraceUpdateListener({
     {
       enabled: Boolean(enabled && projectId), // Ensure we have a projectId
       onData: (data) => {
-        console.log('📨 Trace update received via SSE:', data, {
+        console.log("📨 Trace update received via SSE:", data, {
           projectId,
           shouldProcessUpdate,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         if (data.event === "trace_updated") {
-          console.log('🔄 Triggering debounced update for trace_updated event');
+          console.log("🔄 Triggering debounced update for trace_updated event");
           debouncedUpdate();
         }
       },
@@ -97,7 +99,7 @@ export function useTraceUpdateListener({
       onConnected: () => {
         console.log("✅ Trace SSE subscription connected", {
           projectId,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
       },
       onDisconnected: () => {
@@ -109,6 +111,6 @@ export function useTraceUpdateListener({
       onStopped: () => {
         console.log("⏹️ Trace SSE subscription stopped", { projectId });
       },
-    }
+    },
   );
 }

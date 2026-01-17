@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  */
-import { describe, expect, it, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetReference } from "../types";
@@ -44,15 +44,15 @@ describe("Saved datasets in workbench", () => {
         name: "Production Samples",
         type: "saved",
         datasetId: "abc123",
-        columns: [
-          { id: "input", name: "input", type: "string" },
-        ],
+        columns: [{ id: "input", name: "input", type: "string" }],
       };
 
       store.addDataset(savedDataset);
       store.setActiveDataset("saved_abc123");
 
-      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe("saved_abc123");
+      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+        "saved_abc123",
+      );
     });
   });
 
@@ -82,7 +82,11 @@ describe("Saved datasets in workbench", () => {
       const addedDataset = state.datasets.find((d) => d.id === "saved_abc123");
 
       expect(addedDataset?.savedRecords).toHaveLength(2);
-      expect(addedDataset?.savedRecords?.[0]).toEqual({ id: "rec1", input: "hello", output: "world" });
+      expect(addedDataset?.savedRecords?.[0]).toEqual({
+        id: "rec1",
+        input: "hello",
+        output: "world",
+      });
     });
 
     it("getRowCount works with saved dataset records", () => {
@@ -93,9 +97,7 @@ describe("Saved datasets in workbench", () => {
         name: "Production Samples",
         type: "saved",
         datasetId: "abc123",
-        columns: [
-          { id: "input", name: "input", type: "string" },
-        ],
+        columns: [{ id: "input", name: "input", type: "string" }],
         savedRecords: [
           { id: "rec1", input: "hello" },
           { id: "rec2", input: "foo" },
@@ -105,7 +107,9 @@ describe("Saved datasets in workbench", () => {
 
       store.addDataset(savedDataset);
 
-      const rowCount = useEvaluationsV3Store.getState().getRowCount("saved_abc123");
+      const rowCount = useEvaluationsV3Store
+        .getState()
+        .getRowCount("saved_abc123");
       expect(rowCount).toBe(3);
     });
 
@@ -130,11 +134,15 @@ describe("Saved datasets in workbench", () => {
       store.addDataset(savedDataset);
 
       // Get value at row 0, column "input"
-      const value = useEvaluationsV3Store.getState().getCellValue("saved_abc123", 0, "input");
+      const value = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_abc123", 0, "input");
       expect(value).toBe("hello");
 
       // Get value at row 1, column "output"
-      const value2 = useEvaluationsV3Store.getState().getCellValue("saved_abc123", 1, "output");
+      const value2 = useEvaluationsV3Store
+        .getState()
+        .getCellValue("saved_abc123", 1, "output");
       expect(value2).toBe("bar");
     });
   });
@@ -148,9 +156,7 @@ describe("Saved datasets in workbench", () => {
         name: "Production Samples",
         type: "saved",
         datasetId: "abc123",
-        columns: [
-          { id: "input", name: "input", type: "string" },
-        ],
+        columns: [{ id: "input", name: "input", type: "string" }],
         savedRecords: [
           { id: "rec1", input: "hello" },
           { id: "rec2", input: "foo" },
@@ -176,21 +182,18 @@ describe("Saved datasets in workbench", () => {
         name: "Production Samples",
         type: "saved",
         datasetId: "abc123",
-        columns: [
-          { id: "input", name: "input", type: "string" },
-        ],
-        savedRecords: [
-          { id: "rec1", input: "hello" },
-        ],
+        columns: [{ id: "input", name: "input", type: "string" }],
+        savedRecords: [{ id: "rec1", input: "hello" }],
       };
 
       store.addDataset(savedDataset);
       store.updateSavedRecordValue("saved_abc123", 0, "input", "changed");
 
       // Should track that rec1 has pending changes
-      const pendingChanges = useEvaluationsV3Store.getState().pendingSavedChanges;
-      expect(pendingChanges["abc123"]).toBeDefined();
-      expect(pendingChanges["abc123"]?.["rec1"]).toEqual({ input: "changed" });
+      const pendingChanges =
+        useEvaluationsV3Store.getState().pendingSavedChanges;
+      expect(pendingChanges.abc123).toBeDefined();
+      expect(pendingChanges.abc123?.rec1).toEqual({ input: "changed" });
     });
   });
 });

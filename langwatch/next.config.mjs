@@ -1,8 +1,8 @@
-import path from "path";
-import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import bundleAnalyser from "@next/bundle-analyzer";
+import fs from "fs";
+import path from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -126,13 +126,13 @@ const config = {
     );
 
     // Ensures that only a single version of those are ever loaded
-    // eslint-disable-next-line @typescript-eslint/dot-notation
+    // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys below
     config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
     config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
-    // eslint-disable-next-line @typescript-eslint/dot-notation
+    // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
     config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
-    // eslint-disable-next-line @typescript-eslint/dot-notation
+    // biome-ignore lint/complexity/useLiteralKeys: using string keys for consistency with hyphenated keys
     config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
     // Add fallback for pino logger requirements

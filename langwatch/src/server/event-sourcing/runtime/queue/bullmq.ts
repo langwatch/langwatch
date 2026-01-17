@@ -359,17 +359,19 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     const opts: JobsOptions = {
       jobId,
       ...(this.delay !== void 0 ? { delay: this.delay } : {}),
-      ...(this.deduplication !== void 0 ? {
-        deduplication: {
-          // Sanitize deduplication ID for BullMQ (replace colons with dots)
-          id: this.deduplication.makeId(payload).replaceAll(":", "."),
-          ttl: this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS,
-          // Enable Debounce Mode by default: new jobs replace existing ones and reset TTL
-          // This ensures the latest event is always processed, and batch processor catches up on missed events
-          extend: this.deduplication.extend ?? true,
-          replace: this.deduplication.replace ?? true,
-        },
-      } : {}),
+      ...(this.deduplication !== void 0
+        ? {
+            deduplication: {
+              // Sanitize deduplication ID for BullMQ (replace colons with dots)
+              id: this.deduplication.makeId(payload).replaceAll(":", "."),
+              ttl: this.deduplication.ttlMs ?? DEFAULT_DEDUPLICATION_TTL_MS,
+              // Enable Debounce Mode by default: new jobs replace existing ones and reset TTL
+              // This ensures the latest event is always processed, and batch processor catches up on missed events
+              extend: this.deduplication.extend ?? true,
+              replace: this.deduplication.replace ?? true,
+            },
+          }
+        : {}),
     };
 
     const customAttributes = this.spanAttributes

@@ -1,4 +1,4 @@
-import { connection as redisConnection, isBuildOrNoRedis } from "../redis";
+import { isBuildOrNoRedis, connection as redisConnection } from "../redis";
 import { TtlCache } from "../utils/ttlCache";
 
 interface CacheEntry {
@@ -36,7 +36,7 @@ export class StaleWhileRevalidateCache {
           const entry: CacheEntry = JSON.parse(result);
           return entry;
         }
-      } catch (error) {
+      } catch (_error) {
         // Redis failed, fall through to memory cache
       }
     }
@@ -58,9 +58,9 @@ export class StaleWhileRevalidateCache {
         await redisConnection.setex(
           `${this.prefix}${key}`,
           24 * 60 * 60, // 24 hours
-          JSON.stringify(entry)
+          JSON.stringify(entry),
         );
-      } catch (error) {
+      } catch (_error) {
         // Redis failed, fall through to memory cache
       }
     }
@@ -74,7 +74,7 @@ export class StaleWhileRevalidateCache {
     if (redisConnection && !isBuildOrNoRedis) {
       try {
         await redisConnection.del(`${this.prefix}${key}`);
-      } catch (error) {
+      } catch (_error) {
         // Redis failed, continue to memory cache
       }
     }
@@ -91,7 +91,7 @@ export class StaleWhileRevalidateCache {
         if (keys.length > 0) {
           await redisConnection.del(...keys);
         }
-      } catch (error) {
+      } catch (_error) {
         // Redis failed, continue to memory cache
       }
     }

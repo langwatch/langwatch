@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { createExecutionCellSet, isCellInExecution } from "../utils/executionScope";
+import {
+  createExecutionCellSet,
+  isCellInExecution,
+} from "../utils/executionScope";
 
 describe("Execution Skeleton State", () => {
   beforeEach(() => {
@@ -138,7 +141,9 @@ describe("Execution Skeleton State", () => {
       const results = useEvaluationsV3Store.getState().results;
 
       // Cell should be marked as executing even though it has content
-      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(true);
+      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(
+        true,
+      );
       // The existing output is still in the store (will be replaced when new result arrives)
       expect(results.targetOutputs["target-1"]?.[0]).toBe("existing output");
     });
@@ -176,12 +181,20 @@ describe("Execution Skeleton State", () => {
       const results = useEvaluationsV3Store.getState().results;
 
       // target-1 cells should be executing
-      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(true);
-      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(true);
+      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(
+        true,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(
+        true,
+      );
 
       // target-2 cells should NOT be executing
-      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(false);
-      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(false);
+      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(
+        false,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(
+        false,
+      );
 
       // target-2 outputs should be untouched
       expect(results.targetOutputs["target-2"]?.[0]).toBe("output 2 row 0");
@@ -238,10 +251,18 @@ describe("Execution Skeleton State", () => {
       const results = useEvaluationsV3Store.getState().results;
 
       // Both targets should have executing cells
-      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(true);
-      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(true);
-      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(true);
-      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(true);
+      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(
+        true,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(
+        true,
+      );
+      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(
+        true,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(
+        true,
+      );
 
       // Total should be 4 cells
       expect(results.executingCells?.size).toBe(4);
@@ -278,14 +299,15 @@ describe("Execution Skeleton State", () => {
 
         const remainingCells = new Set(
           [...state.results.executingCells].filter(
-            (cellKey) => !target1CellsToRemove.has(cellKey)
-          )
+            (cellKey) => !target1CellsToRemove.has(cellKey),
+          ),
         );
 
         return {
           results: {
             ...state.results,
-            executingCells: remainingCells.size > 0 ? remainingCells : undefined,
+            executingCells:
+              remainingCells.size > 0 ? remainingCells : undefined,
           },
         };
       });
@@ -293,12 +315,20 @@ describe("Execution Skeleton State", () => {
       const results = useEvaluationsV3Store.getState().results;
 
       // target-1 cells should be gone
-      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(false);
-      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(false);
+      expect(isCellInExecution(results.executingCells!, 0, "target-1")).toBe(
+        false,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-1")).toBe(
+        false,
+      );
 
       // target-2 cells should still be executing
-      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(true);
-      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(true);
+      expect(isCellInExecution(results.executingCells!, 0, "target-2")).toBe(
+        true,
+      );
+      expect(isCellInExecution(results.executingCells!, 1, "target-2")).toBe(
+        true,
+      );
 
       // Only 2 cells should remain
       expect(results.executingCells?.size).toBe(2);

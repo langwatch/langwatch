@@ -1,27 +1,29 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  getProviderFromModel,
-  getEffectiveDefaults,
-  isProviderEffectiveDefault,
-  isProviderDefaultModel,
-  isProviderUsedForDefaultModels,
-  getSchemaShape,
-  getDisplayKeysForProvider,
-  buildCustomKeyState,
-  hasUserEnteredNewApiKey,
-} from "../modelProviderHelpers";
-import {
+  DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
-  DEFAULT_EMBEDDINGS_MODEL,
   MASKED_KEY_PLACEHOLDER,
 } from "../constants";
+import {
+  buildCustomKeyState,
+  getDisplayKeysForProvider,
+  getEffectiveDefaults,
+  getProviderFromModel,
+  getSchemaShape,
+  hasUserEnteredNewApiKey,
+  isProviderDefaultModel,
+  isProviderEffectiveDefault,
+  isProviderUsedForDefaultModels,
+} from "../modelProviderHelpers";
 
 describe("modelProviderHelpers", () => {
   describe("getProviderFromModel", () => {
     it("extracts provider key from model string", () => {
       expect(getProviderFromModel("openai/gpt-4")).toBe("openai");
-      expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe("anthropic");
+      expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe(
+        "anthropic",
+      );
       expect(getProviderFromModel("azure/gpt-4-turbo")).toBe("azure");
     });
 
@@ -172,19 +174,29 @@ describe("modelProviderHelpers", () => {
   describe("isProviderUsedForDefaultModels", () => {
     it("returns true when provider matches default model", () => {
       expect(
-        isProviderUsedForDefaultModels("openai", "openai/gpt-4o", null, null)
+        isProviderUsedForDefaultModels("openai", "openai/gpt-4o", null, null),
       ).toBe(true);
     });
 
     it("returns true when provider matches topic clustering model", () => {
       expect(
-        isProviderUsedForDefaultModels("openai", null, "openai/gpt-4o-mini", null)
+        isProviderUsedForDefaultModels(
+          "openai",
+          null,
+          "openai/gpt-4o-mini",
+          null,
+        ),
       ).toBe(true);
     });
 
     it("returns true when provider matches embeddings model", () => {
       expect(
-        isProviderUsedForDefaultModels("openai", null, null, "openai/text-embedding-3-small")
+        isProviderUsedForDefaultModels(
+          "openai",
+          null,
+          null,
+          "openai/text-embedding-3-small",
+        ),
       ).toBe(true);
     });
 
@@ -194,14 +206,14 @@ describe("modelProviderHelpers", () => {
           "azure",
           "openai/gpt-4o",
           "anthropic/claude-sonnet-4",
-          "openai/text-embedding-3-small"
-        )
+          "openai/text-embedding-3-small",
+        ),
       ).toBe(false);
     });
 
     it("returns false when all models are null", () => {
       expect(isProviderUsedForDefaultModels("openai", null, null, null)).toBe(
-        false
+        false,
       );
     });
   });
@@ -299,7 +311,11 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-old" };
       const previousKeys = { OPENAI_API_KEY: "sk-user-typing" };
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
+      const result = buildCustomKeyState(
+        displayKeyMap,
+        storedKeys,
+        previousKeys,
+      );
 
       expect(result.OPENAI_API_KEY).toBe("sk-user-typing");
     });
@@ -309,7 +325,11 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const previousKeys = { MANAGED: "true" };
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys, previousKeys);
+      const result = buildCustomKeyState(
+        displayKeyMap,
+        storedKeys,
+        previousKeys,
+      );
 
       expect(result).toEqual({ MANAGED: "true" });
     });
@@ -319,7 +339,12 @@ describe("modelProviderHelpers", () => {
       const storedKeys = {};
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
+      const result = buildCustomKeyState(
+        displayKeyMap,
+        storedKeys,
+        undefined,
+        options,
+      );
 
       expect(result.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       expect(result.OPENAI_BASE_URL).toBe(""); // URL fields are not masked
@@ -339,7 +364,12 @@ describe("modelProviderHelpers", () => {
       const storedKeys = { OPENAI_API_KEY: "sk-actual-key" };
       const options = { providerEnabledWithEnvVars: true };
 
-      const result = buildCustomKeyState(displayKeyMap, storedKeys, undefined, options);
+      const result = buildCustomKeyState(
+        displayKeyMap,
+        storedKeys,
+        undefined,
+        options,
+      );
 
       expect(result.OPENAI_API_KEY).toBe("sk-actual-key");
     });
@@ -355,7 +385,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           OPENAI_API_KEY: "sk-new-key",
-        })
+        }),
       ).toBe(true);
     });
 
@@ -363,7 +393,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
-        })
+        }),
       ).toBe(false);
     });
 
@@ -371,7 +401,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           OPENAI_API_KEY: "",
-        })
+        }),
       ).toBe(false);
     });
 
@@ -379,7 +409,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           OPENAI_API_KEY: "   ",
-        })
+        }),
       ).toBe(false);
     });
 
@@ -387,7 +417,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           OPENAI_BASE_URL: "https://api.example.com",
-        })
+        }),
       ).toBe(false);
     });
 
@@ -396,7 +426,7 @@ describe("modelProviderHelpers", () => {
         hasUserEnteredNewApiKey({
           OPENAI_API_KEY: MASKED_KEY_PLACEHOLDER,
           ANTHROPIC_API_KEY: "sk-ant-new-key",
-        })
+        }),
       ).toBe(true);
     });
 
@@ -404,7 +434,7 @@ describe("modelProviderHelpers", () => {
       expect(
         hasUserEnteredNewApiKey({
           AWS_ACCESS_KEY_ID: "AKIAIOSFODNN7EXAMPLE",
-        })
+        }),
       ).toBe(true);
     });
 

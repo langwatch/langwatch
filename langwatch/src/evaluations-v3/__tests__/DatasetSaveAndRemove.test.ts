@@ -6,10 +6,10 @@
  * 2. Save as dataset with name conflict should auto-suggest next available name
  * 3. Removing a saved dataset should handle edge case when it's the last one
  */
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import type { DatasetReference, DatasetColumn } from "../types";
+import type { DatasetColumn, DatasetReference } from "../types";
 import { DEFAULT_TEST_DATA_ID } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 
@@ -48,7 +48,9 @@ describe("Dataset save and remove edge cases", () => {
 
       // At this point we have only one dataset (the saved one)
       expect(useEvaluationsV3Store.getState().datasets.length).toBe(1);
-      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe("saved_abc123");
+      expect(useEvaluationsV3Store.getState().activeDatasetId).toBe(
+        "saved_abc123",
+      );
 
       // BUG: Trying to remove the last dataset should NOT crash
       // The removeDataset function has a guard for this, but let's verify
@@ -127,7 +129,9 @@ describe("Dataset save and remove edge cases", () => {
 
       // Now we should have exactly 1 dataset
       expect(useEvaluationsV3Store.getState().datasets.length).toBe(1);
-      expect(useEvaluationsV3Store.getState().datasets[0]!.id).toBe("workbench_saved_ref");
+      expect(useEvaluationsV3Store.getState().datasets[0]!.id).toBe(
+        "workbench_saved_ref",
+      );
 
       // Step 4: BUG - User tries to remove this dataset
       // This should NOT crash with "can't access property 'id', newDatasets[0] is undefined"

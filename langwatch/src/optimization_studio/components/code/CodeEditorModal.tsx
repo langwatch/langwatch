@@ -1,6 +1,8 @@
 import { Button } from "@chakra-ui/react";
+import { Prism } from "prism-react-renderer";
 import { Dialog } from "../../../components/ui/dialog";
 
+(typeof global !== "undefined" ? global : window).Prism = Prism;
 require("prismjs/components/prism-python");
 
 import dynamic from "next/dynamic";

@@ -1,8 +1,8 @@
 /**
  * Unit tests for project limits utility functions.
  */
-import { describe, it, expect } from "vitest";
-import { isAtMaxProjects, canAddProjects, type UsageData } from "../limits";
+import { describe, expect, it } from "vitest";
+import { canAddProjects, isAtMaxProjects, type UsageData } from "../limits";
 
 describe("isAtMaxProjects", () => {
   describe("when usage data is undefined", () => {

@@ -1,8 +1,7 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { BATCH_EVALUATION_INDEX } from "../../src/server/elasticsearch";
 import { recreateIndexAndMigrate } from "../helpers";
-
-import { Client as ElasticClient } from "@elastic/elasticsearch";
 import { batchEvaluationMapping } from "../schema";
 
 export const migrate = async (migrationKey: string, client: ElasticClient) => {

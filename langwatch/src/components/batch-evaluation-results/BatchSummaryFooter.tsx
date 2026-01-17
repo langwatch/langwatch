@@ -3,7 +3,7 @@
  *
  * Adapted from BatchEvaluationV2EvaluationSummary with cleaner styling.
  */
-import { useEffect, useMemo, useState } from "react";
+
 import {
   Box,
   Button,
@@ -15,9 +15,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-
-import { Tooltip } from "~/components/ui/tooltip";
+import { useEffect, useMemo, useState } from "react";
 import { formatCost, formatLatency } from "~/components/shared/formatters";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { BatchRunSummary } from "./BatchRunsSidebar";
 
 type BatchSummaryFooterProps = {
@@ -34,7 +34,7 @@ type BatchSummaryFooterProps = {
  */
 const getFinishedAt = (
   timestamps: BatchRunSummary["timestamps"],
-  currentTimestamp: number
+  currentTimestamp: number,
 ): number | undefined => {
   if (timestamps.finished_at) {
     return timestamps.finished_at;
@@ -54,7 +54,10 @@ const formatEvalSummary = (evaluation: {
   averageScore?: number | null;
   averagePassed?: number | null;
 }): string => {
-  if (evaluation.averagePassed !== undefined && evaluation.averagePassed !== null) {
+  if (
+    evaluation.averagePassed !== undefined &&
+    evaluation.averagePassed !== null
+  ) {
     const pct = numeral(evaluation.averagePassed).format("0.[0]%");
     const scoreNote =
       evaluation.averageScore !== undefined &&
@@ -64,7 +67,10 @@ const formatEvalSummary = (evaluation: {
         : "";
     return `${pct} pass${scoreNote}`;
   }
-  if (evaluation.averageScore !== undefined && evaluation.averageScore !== null) {
+  if (
+    evaluation.averageScore !== undefined &&
+    evaluation.averageScore !== null
+  ) {
     return numeral(evaluation.averageScore).format("0.[00]");
   }
   return "-";
@@ -79,14 +85,14 @@ export function BatchSummaryFooter({
 
   const finishedAt = useMemo(
     () => getFinishedAt(run.timestamps, currentTimestamp),
-    [run.timestamps, currentTimestamp]
+    [run.timestamps, currentTimestamp],
   );
 
   const runtime = Math.max(
     run.timestamps.created_at
       ? (finishedAt ?? currentTimestamp) - run.timestamps.created_at
       : 0,
-    0
+    0,
   );
 
   // Update timestamp every second while running
@@ -100,7 +106,8 @@ export function BatchSummaryFooter({
     return () => clearInterval(interval);
   }, [finishedAt]);
 
-  const totalCost = (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
+  const totalCost =
+    (run.summary.datasetCost ?? 0) + (run.summary.evaluationsCost ?? 0);
   const progress = run.progress ?? 0;
   const total = run.total ?? 0;
   const progressPct = total > 0 ? (progress / total) * 100 : 0;
@@ -145,7 +152,8 @@ export function BatchSummaryFooter({
                   Target cost: {formatCost(run.summary.datasetCost ?? null)}
                 </Text>
                 <Text fontSize="12px">
-                  Evaluation cost: {formatCost(run.summary.evaluationsCost ?? null)}
+                  Evaluation cost:{" "}
+                  {formatCost(run.summary.evaluationsCost ?? null)}
                 </Text>
               </VStack>
             }
@@ -161,7 +169,9 @@ export function BatchSummaryFooter({
           <Text fontWeight="500" fontSize="14px">
             Runtime
           </Text>
-          <Text fontSize="14px">{numeral(runtime / 1000).format("00:00:00")}</Text>
+          <Text fontSize="14px">
+            {numeral(runtime / 1000).format("00:00:00")}
+          </Text>
         </VStack>
 
         {/* Stopped indicator */}

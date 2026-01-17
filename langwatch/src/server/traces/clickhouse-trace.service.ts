@@ -1,22 +1,22 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
+import { getLangWatchTracer } from "langwatch";
+import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { getClickHouseClient } from "~/server/clickhouse/client";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
-import type { NormalizedSpan } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type {
+  NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import type { Evaluation, Span, Trace } from "~/server/tracer/types";
-import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import { createLogger } from "~/utils/logger";
 import {
+  applyTraceProtections,
   mapNormalizedSpansToSpans,
   mapTraceSummaryToTrace,
-  applyTraceProtections,
 } from "./mappers";
-import { getLangWatchTracer } from "langwatch";
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -57,7 +57,7 @@ export class ClickHouseTraceService {
   private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer(
-    "langwatch.traces.clickhouse-service"
+    "langwatch.traces.clickhouse-service",
   );
 
   constructor(private readonly prisma: PrismaClient) {
@@ -92,11 +92,11 @@ export class ClickHouseTraceService {
 
         span.setAttribute(
           "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceTraces === true
+          project?.featureClickHouseDataSourceTraces === true,
         );
 
         return project?.featureClickHouseDataSourceTraces === true;
-      }
+      },
     );
   }
 
@@ -115,7 +115,7 @@ export class ClickHouseTraceService {
   async getTracesWithSpans(
     projectId: string,
     traceIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpans",
@@ -135,14 +135,14 @@ export class ClickHouseTraceService {
 
         this.logger.debug(
           { projectId, traceIdCount: traceIds.length },
-          "Fetching traces with spans from ClickHouse"
+          "Fetching traces with spans from ClickHouse",
         );
 
         try {
           // Fetch trace summaries with spans using JOIN
           const tracesWithSpans = await this.fetchTracesWithSpansJoined(
             projectId,
-            traceIds
+            traceIds,
           );
 
           // Map to legacy Trace format and apply protections
@@ -152,7 +152,7 @@ export class ClickHouseTraceService {
             const trace = mapTraceSummaryToTrace(
               summary,
               mappedSpans,
-              projectId
+              projectId,
             );
             // Apply redaction protections
             traces.push(applyTraceProtections(trace, protections));
@@ -160,7 +160,7 @@ export class ClickHouseTraceService {
 
           this.logger.debug(
             { projectId, traceCount: traces.length },
-            "Successfully fetched traces from ClickHouse"
+            "Successfully fetched traces from ClickHouse",
           );
 
           return traces;
@@ -170,11 +170,11 @@ export class ClickHouseTraceService {
               projectId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch traces from ClickHouse"
+            "Failed to fetch traces from ClickHouse",
           );
           throw new Error("Failed to fetch traces with spans");
         }
-      }
+      },
     );
   }
 
@@ -196,7 +196,7 @@ export class ClickHouseTraceService {
   async getTracesByThreadId(
     projectId: string,
     threadId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesByThreadId",
@@ -212,7 +212,7 @@ export class ClickHouseTraceService {
 
         this.logger.debug(
           { projectId, threadId },
-          "Fetching traces by thread ID from ClickHouse"
+          "Fetching traces by thread ID from ClickHouse",
         );
 
         try {
@@ -250,11 +250,11 @@ export class ClickHouseTraceService {
               threadId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch traces by thread ID from ClickHouse"
+            "Failed to fetch traces by thread ID from ClickHouse",
           );
           throw new Error("Failed to fetch traces by thread ID");
         }
-      }
+      },
     );
   }
 
@@ -276,12 +276,15 @@ export class ClickHouseTraceService {
   async getTracesWithSpansByThreadIds(
     projectId: string,
     threadIds: string[],
-    protections: Protections
+    protections: Protections,
   ): Promise<Trace[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTracesWithSpansByThreadIds",
       {
-        attributes: { "tenant.id": projectId, "thread.count": threadIds.length },
+        attributes: {
+          "tenant.id": projectId,
+          "thread.count": threadIds.length,
+        },
       },
       async () => {
         // Check if ClickHouse is enabled
@@ -296,7 +299,7 @@ export class ClickHouseTraceService {
 
         this.logger.debug(
           { projectId, threadIdCount: threadIds.length },
-          "Fetching traces by thread IDs from ClickHouse"
+          "Fetching traces by thread IDs from ClickHouse",
         );
 
         try {
@@ -334,11 +337,11 @@ export class ClickHouseTraceService {
               threadIds,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch traces by thread IDs from ClickHouse"
+            "Failed to fetch traces by thread IDs from ClickHouse",
           );
           throw new Error("Failed to fetch traces by thread IDs");
         }
-      }
+      },
     );
   }
 
@@ -358,7 +361,7 @@ export class ClickHouseTraceService {
    */
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
-    protections: Protections
+    protections: Protections,
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
@@ -371,7 +374,7 @@ export class ClickHouseTraceService {
 
         this.logger.debug(
           { projectId: input.projectId, scrollId: input.scrollId },
-          "Fetching all traces for project from ClickHouse"
+          "Fetching all traces for project from ClickHouse",
         );
 
         try {
@@ -387,11 +390,11 @@ export class ClickHouseTraceService {
                 scrollId: input.scrollId,
                 hasScrollId: !!input.scrollId,
               },
-              "Parsing scrollId from request"
+              "Parsing scrollId from request",
             );
             try {
               cursor = JSON.parse(
-                Buffer.from(input.scrollId, "base64").toString("utf-8")
+                Buffer.from(input.scrollId, "base64").toString("utf-8"),
               );
 
               // Validate that cursor parameters match current request
@@ -401,7 +404,7 @@ export class ClickHouseTraceService {
                     cursorSortDirection: cursor.sortDirection,
                     requestSortDirection: sortDirection,
                   },
-                  "Sort direction mismatch in cursor, ignoring cursor"
+                  "Sort direction mismatch in cursor, ignoring cursor",
                 );
                 cursor = null;
               } else if (cursor && cursor.pageSize !== pageSize) {
@@ -410,7 +413,7 @@ export class ClickHouseTraceService {
                     cursorPageSize: cursor.pageSize,
                     requestPageSize: pageSize,
                   },
-                  "Page size mismatch in cursor, ignoring cursor"
+                  "Page size mismatch in cursor, ignoring cursor",
                 );
                 cursor = null;
               }
@@ -423,7 +426,7 @@ export class ClickHouseTraceService {
                   cursorSortDirection: cursor?.sortDirection,
                   cursorPageSize: cursor?.pageSize,
                 },
-                "Cursor parsing and validation result"
+                "Cursor parsing and validation result",
               );
             } catch (e) {
               this.logger.warn(
@@ -431,7 +434,7 @@ export class ClickHouseTraceService {
                   scrollId: input.scrollId,
                   error: e instanceof Error ? e.message : e,
                 },
-                "Invalid scrollId, starting from beginning"
+                "Invalid scrollId, starting from beginning",
               );
             }
           } else {
@@ -447,7 +450,7 @@ export class ClickHouseTraceService {
               cursor,
               protections,
               input.startDate,
-              input.endDate
+              input.endDate,
             );
 
           // Generate new scrollId from last trace
@@ -460,7 +463,7 @@ export class ClickHouseTraceService {
               sortDirection,
             };
             newScrollId = Buffer.from(JSON.stringify(newCursor)).toString(
-              "base64"
+              "base64",
             );
 
             this.logger.debug(
@@ -471,7 +474,7 @@ export class ClickHouseTraceService {
                 pageSize,
                 newScrollId,
               },
-              "Generated new scrollId"
+              "Generated new scrollId",
             );
           }
 
@@ -486,7 +489,7 @@ export class ClickHouseTraceService {
 
           // Transform traces to include guardrail information
           const groups = rawGroups.map((group) =>
-            transformTracesWithGuardrails(group)
+            transformTracesWithGuardrails(group),
           );
 
           this.logger.debug(
@@ -497,9 +500,10 @@ export class ClickHouseTraceService {
               firstTraceId: traces[0]?.trace_id,
               firstTraceTimestamp: traces[0]?.timestamps.started_at,
               lastTraceId: traces[traces.length - 1]?.trace_id,
-              lastTraceTimestamp: traces[traces.length - 1]?.timestamps.started_at,
+              lastTraceTimestamp:
+                traces[traces.length - 1]?.timestamps.started_at,
             },
-            "Returning traces result"
+            "Returning traces result",
           );
 
           return {
@@ -514,11 +518,11 @@ export class ClickHouseTraceService {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch all traces from ClickHouse"
+            "Failed to fetch all traces from ClickHouse",
           );
           throw new Error("Failed to fetch all traces for project");
         }
-      }
+      },
     );
   }
 
@@ -531,7 +535,7 @@ export class ClickHouseTraceService {
    * @returns TopicCountsResult or null if ClickHouse is not enabled
    */
   async getTopicCounts(
-    input: AggregationFiltersInput
+    input: AggregationFiltersInput,
   ): Promise<TopicCountsResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getTopicCounts",
@@ -547,12 +551,12 @@ export class ClickHouseTraceService {
           const conditions: string[] = ["TenantId = {tenantId:String}"];
           if (input.startDate) {
             conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
             );
           }
           if (input.endDate) {
             conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
             );
           }
 
@@ -590,20 +594,26 @@ export class ClickHouseTraceService {
           for (const row of rows) {
             if (row.TopicId) {
               const current = topicCountsMap.get(row.TopicId) ?? 0;
-              topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
+              topicCountsMap.set(
+                row.TopicId,
+                current + parseInt(row.count, 10),
+              );
             }
             if (row.SubTopicId) {
               const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
-              subtopicCountsMap.set(row.SubTopicId, current + parseInt(row.count, 10));
+              subtopicCountsMap.set(
+                row.SubTopicId,
+                current + parseInt(row.count, 10),
+              );
             }
           }
 
           return {
             topicCounts: Array.from(topicCountsMap.entries()).map(
-              ([key, count]) => ({ key, count })
+              ([key, count]) => ({ key, count }),
             ),
             subtopicCounts: Array.from(subtopicCountsMap.entries()).map(
-              ([key, count]) => ({ key, count })
+              ([key, count]) => ({ key, count }),
             ),
           };
         } catch (error) {
@@ -612,11 +622,11 @@ export class ClickHouseTraceService {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch topic counts from ClickHouse"
+            "Failed to fetch topic counts from ClickHouse",
           );
           throw new Error("Failed to fetch topic counts");
         }
-      }
+      },
     );
   }
 
@@ -629,7 +639,7 @@ export class ClickHouseTraceService {
    * @returns CustomersAndLabelsResult or null if ClickHouse is not enabled
    */
   async getCustomersAndLabels(
-    input: AggregationFiltersInput
+    input: AggregationFiltersInput,
   ): Promise<CustomersAndLabelsResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getCustomersAndLabels",
@@ -645,12 +655,12 @@ export class ClickHouseTraceService {
           const conditions: string[] = ["TenantId = {tenantId:String}"];
           if (input.startDate) {
             conditions.push(
-              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+              "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
             );
           }
           if (input.endDate) {
             conditions.push(
-              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+              "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
             );
           }
 
@@ -727,11 +737,11 @@ export class ClickHouseTraceService {
               projectId: input.projectId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch customers and labels from ClickHouse"
+            "Failed to fetch customers and labels from ClickHouse",
           );
           throw new Error("Failed to fetch customers and labels");
         }
-      }
+      },
     );
   }
 
@@ -751,7 +761,7 @@ export class ClickHouseTraceService {
   async getSpanForPromptStudio(
     projectId: string,
     spanId: string,
-    protections: Protections
+    protections: Protections,
   ): Promise<PromptStudioSpanResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getSpanForPromptStudio",
@@ -806,7 +816,9 @@ export class ClickHouseTraceService {
           }
 
           // Check if this is an LLM span by looking at attributes
-          const spanType = row.SpanAttributes["langwatch.span.type"] as string | undefined;
+          const spanType = row.SpanAttributes["langwatch.span.type"] as
+            | string
+            | undefined;
           if (spanType !== "llm") {
             return null;
           }
@@ -820,11 +832,11 @@ export class ClickHouseTraceService {
               spanId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to fetch span for prompt studio from ClickHouse"
+            "Failed to fetch span for prompt studio from ClickHouse",
           );
           throw new Error("Failed to fetch span for prompt studio");
         }
-      }
+      },
     );
   }
 
@@ -844,7 +856,7 @@ export class ClickHouseTraceService {
       StatusCode: number | null;
       StatusMessage: string | null;
     },
-    _protections: Protections
+    _protections: Protections,
   ): PromptStudioSpanResult {
     const attrs = row.SpanAttributes;
     const messages: PromptStudioSpanResult["messages"] = [];
@@ -888,20 +900,25 @@ export class ClickHouseTraceService {
     }
 
     // Extract LLM config
-    const model = (attrs["gen_ai.response.model"] as string) ??
+    const model =
+      (attrs["gen_ai.response.model"] as string) ??
       (attrs["gen_ai.request.model"] as string) ??
       (attrs["llm.model"] as string) ??
       null;
-    const temperature = attrs["gen_ai.request.temperature"] as number ?? null;
-    const maxTokens = attrs["gen_ai.request.max_tokens"] as number ?? null;
-    const topP = attrs["gen_ai.request.top_p"] as number ?? null;
+    const temperature = (attrs["gen_ai.request.temperature"] as number) ?? null;
+    const maxTokens = (attrs["gen_ai.request.max_tokens"] as number) ?? null;
+    const topP = (attrs["gen_ai.request.top_p"] as number) ?? null;
     const vendor = (attrs["gen_ai.system"] as string) ?? null;
 
     const systemPrompt = messages.find((m) => m.role === "system")?.content;
 
     // Extract metrics
-    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as number | undefined;
-    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as number | undefined;
+    const promptTokens = attrs["gen_ai.usage.prompt_tokens"] as
+      | number
+      | undefined;
+    const completionTokens = attrs["gen_ai.usage.completion_tokens"] as
+      | number
+      | undefined;
 
     // Build error if present
     let error: Span["error"] | null = null;
@@ -932,12 +949,13 @@ export class ClickHouseTraceService {
         started_at: row.StartTime,
         finished_at: row.EndTime,
       },
-      metrics: promptTokens !== undefined || completionTokens !== undefined
-        ? {
-            prompt_tokens: promptTokens,
-            completion_tokens: completionTokens,
-          }
-        : null,
+      metrics:
+        promptTokens !== undefined || completionTokens !== undefined
+          ? {
+              prompt_tokens: promptTokens,
+              completion_tokens: completionTokens,
+            }
+          : null,
     };
   }
 
@@ -952,7 +970,7 @@ export class ClickHouseTraceService {
     cursor: ClickHouseScrollCursor | null,
     protections: Protections,
     startDate?: number,
-    endDate?: number
+    endDate?: number,
   ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -970,12 +988,12 @@ export class ClickHouseTraceService {
         // Date range filters
         if (startDate) {
           conditions.push(
-            "ts.CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})"
+            "ts.CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
           );
         }
         if (endDate) {
           conditions.push(
-            "ts.CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})"
+            "ts.CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
           );
         }
 
@@ -990,18 +1008,18 @@ export class ClickHouseTraceService {
               currentSortDirection: sortDirection,
               currentPageSize: pageSize,
             },
-            "Using cursor for pagination"
+            "Using cursor for pagination",
           );
 
           if (sortDirection === "desc") {
             // For descending order: get records BEFORE the cursor
             conditions.push(
-              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})`
+              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) < ({lastTimestamp:UInt64}, {lastTraceId:String})`,
             );
           } else {
             // For ascending order: get records AFTER the cursor
             conditions.push(
-              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})`
+              `(toUnixTimestamp64Milli(ts.CreatedAt), ts.TraceId) > ({lastTimestamp:UInt64}, {lastTraceId:String})`,
             );
           }
         }
@@ -1084,7 +1102,7 @@ export class ClickHouseTraceService {
         // Fetch spans for these traces
         const tracesWithSpans = await this.fetchTracesWithSpansJoined(
           projectId,
-          traceIds
+          traceIds,
         );
 
         // Map to Trace objects and apply protections
@@ -1096,7 +1114,7 @@ export class ClickHouseTraceService {
             const trace = mapTraceSummaryToTrace(
               traceData.summary,
               mappedSpans,
-              projectId
+              projectId,
             );
             // Apply redaction protections
             traces.push(applyTraceProtections(trace, protections));
@@ -1110,10 +1128,10 @@ export class ClickHouseTraceService {
         }
 
         const lastTrace =
-          traces.length > 0 ? traces[traces.length - 1] ?? null : null;
+          traces.length > 0 ? (traces[traces.length - 1] ?? null) : null;
 
         return { traces, totalHits, lastTrace };
-      }
+      },
     );
   }
 
@@ -1193,7 +1211,7 @@ export class ClickHouseTraceService {
    */
   private async fetchTracesWithSpansJoined(
     projectId: string,
-    traceIds: string[]
+    traceIds: string[],
   ): Promise<
     Map<string, { summary: TraceSummaryRecord; spans: NormalizedSpan[] }>
   > {
@@ -1309,7 +1327,7 @@ export class ClickHouseTraceService {
         }
 
         return tracesMap;
-      }
+      },
     );
   }
 
@@ -1318,7 +1336,7 @@ export class ClickHouseTraceService {
    * @internal
    */
   private extractTraceSummaryFromRow(
-    row: JoinedTraceSpanRow
+    row: JoinedTraceSpanRow,
   ): TraceSummaryRecord {
     return {
       TraceId: row.ts_TraceId,
@@ -1353,7 +1371,7 @@ export class ClickHouseTraceService {
    */
   private extractSpanFromRow(
     row: JoinedTraceSpanRow,
-    tenantId: string
+    tenantId: string,
   ): NormalizedSpan {
     // Reconstruct events array with proper typing
     const events = (row.ss_Events_Timestamp ?? []).map((timestamp, index) => ({

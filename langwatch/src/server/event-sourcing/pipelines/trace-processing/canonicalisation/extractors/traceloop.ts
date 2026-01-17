@@ -15,13 +15,13 @@
  * - gen_ai.output.messages (from traceloop.entity.output)
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import { ATTR_KEYS } from "./_constants";
 import {
   ALLOWED_SPAN_TYPES,
   extractInputMessages,
   extractOutputMessages,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class TraceloopExtractor implements CanonicalAttributesExtractor {
   readonly id = "traceloop";

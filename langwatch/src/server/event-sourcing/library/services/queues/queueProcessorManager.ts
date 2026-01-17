@@ -1,4 +1,5 @@
 import { createLogger } from "~/utils/logger";
+import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
 import type { Command, CommandHandler } from "../../commands/command";
 import type { CommandHandlerClass } from "../../commands/commandHandlerClass";
@@ -6,18 +7,19 @@ import type { AggregateType } from "../../domain/aggregateType";
 import type { Event } from "../../domain/types";
 import { EventSchema } from "../../domain/types";
 import type { EventHandlerDefinitions } from "../../eventHandler.types";
-import type { CommandSchemaType, CommandType, DeduplicationConfig } from "../../index";
+import type {
+  CommandSchemaType,
+  CommandType,
+  DeduplicationConfig,
+} from "../../index";
 import { createCommand, createTenantId, EventUtils } from "../../index";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { EventSourcedQueueProcessor } from "../../queues";
 import type { EventStoreReadContext } from "../../stores/eventStore.types";
-import { ConfigurationError, ValidationError } from "../errorHandling";
-import type { FeatureFlagServiceInterface } from "../../../../featureFlag/types";
 import type { DistributedLock } from "../../utils/distributedLock";
+import { ConfigurationError, ValidationError } from "../errorHandling";
 
-const logger = createLogger(
-  "langwatch:event-sourcing:queue-processor-manager",
-);
+const logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
 
 /**
  * Kill switch options for event sourcing components.
@@ -127,7 +129,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
   aggregateType: AggregateType,
   commandName: string,
   _distributedLock?: DistributedLock,
-  _commandLockTtlMs: number = 30000,
+  _commandLockTtlMs = 30000,
   featureFlagService?: FeatureFlagServiceInterface,
   killSwitchOptions?: KillSwitchOptions,
 ): EventSourcedQueueProcessor<Payload> {
@@ -136,7 +138,9 @@ function createCommandDispatcher<Payload, EventType extends Event>(
     delay: options.delay,
     deduplication: options.deduplication,
     spanAttributes: options.spanAttributes,
-    options: options.concurrency ? { concurrency: options.concurrency } : void 0,
+    options: options.concurrency
+      ? { concurrency: options.concurrency }
+      : void 0,
     async process(payload: Payload) {
       // Validate payload (also validated in send, but keep here for safety)
       const validation = commandSchema.validate(payload);

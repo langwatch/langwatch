@@ -224,11 +224,10 @@ export const AnnotationsTable = ({
         annotation.annotations.some((annotation) => annotation.expectedOutput),
       );
     }
-    return allQueueItems.some(
-      (item: UnifiedQueueItem) =>
-        item.annotations?.some(
-          (annotation: AnnotationWithUser) => annotation.expectedOutput,
-        ),
+    return allQueueItems.some((item: UnifiedQueueItem) =>
+      item.annotations?.some(
+        (annotation: AnnotationWithUser) => annotation.expectedOutput,
+      ),
     );
   };
 
@@ -240,11 +239,10 @@ export const AnnotationsTable = ({
     ) {
       return true;
     }
-    return allQueueItems.some(
-      (item: UnifiedQueueItem) =>
-        item.annotations?.some(
-          (annotation: AnnotationWithUser) => annotation.comment,
-        ),
+    return allQueueItems.some((item: UnifiedQueueItem) =>
+      item.annotations?.some(
+        (annotation: AnnotationWithUser) => annotation.comment,
+      ),
     );
   };
 

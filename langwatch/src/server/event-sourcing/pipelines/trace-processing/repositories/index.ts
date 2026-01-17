@@ -15,7 +15,6 @@ import type { TraceSummaryRepository } from "./traceSummaryRepository";
 import { TraceSummaryRepositoryClickHouse } from "./traceSummaryRepositoryClickHouse";
 import { TraceSummaryRepositoryMemory } from "./traceSummaryRepositoryMemory";
 
-
 const clickHouseClient = getClickHouseClient();
 
 export const spanRepository: SpanRepository = clickHouseClient

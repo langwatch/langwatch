@@ -5,6 +5,7 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 import { EventSourcingService } from "../eventSourcingService";
 import {
   cleanupTestEnvironment,
+  createMockDistributedLock,
   createMockEventHandler,
   createMockEventStore,
   createMockProcessorCheckpointStore,
@@ -18,7 +19,6 @@ import {
   createTestTenantId,
   setupTestEnvironment,
   TEST_CONSTANTS,
-  createMockDistributedLock,
 } from "./testHelpers";
 
 describe("EventSourcingService - Projection Flows", () => {

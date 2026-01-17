@@ -1,12 +1,12 @@
 import { z } from "zod";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import type { Workflow } from "~/optimization_studio/types/dsl";
 import type {
-  TargetConfig,
-  EvaluatorConfig,
   DatasetReference,
+  EvaluatorConfig,
   FieldMapping,
+  TargetConfig,
 } from "~/evaluations-v3/types";
+import type { Workflow } from "~/optimization_studio/types/dsl";
+import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
 
 // ============================================================================
 // Execution Request Types
@@ -45,40 +45,63 @@ export const executionRequestSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: z.enum(["inline", "saved"]),
-    inline: z.object({
-      columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
-      records: z.record(z.string(), z.array(z.string())),
-    }).optional(),
+    inline: z
+      .object({
+        columns: z.array(
+          z.object({ id: z.string(), name: z.string(), type: z.string() }),
+        ),
+        records: z.record(z.string(), z.array(z.string())),
+      })
+      .optional(),
     datasetId: z.string().optional(),
-    columns: z.array(z.object({ id: z.string(), name: z.string(), type: z.string() })),
-    savedRecords: z.array(z.object({ id: z.string() }).passthrough()).optional(),
+    columns: z.array(
+      z.object({ id: z.string(), name: z.string(), type: z.string() }),
+    ),
+    savedRecords: z
+      .array(z.object({ id: z.string() }).passthrough())
+      .optional(),
   }),
-  targets: z.array(z.object({
-    id: z.string(),
-    type: z.enum(["prompt", "agent"]),
-    name: z.string(),
-    promptId: z.string().optional(),
-    promptVersionId: z.string().optional(),
-    promptVersionNumber: z.number().optional(),
-    dbAgentId: z.string().optional(),
-    inputs: z.array(z.object({ identifier: z.string(), type: z.string() })).optional(),
-    outputs: z.array(z.object({ identifier: z.string(), type: z.string() })).optional(),
-    mappings: z.record(z.string(), z.record(z.string(), z.any())),
-    localPromptConfig: z.any().optional(),
-  })),
-  evaluators: z.array(z.object({
-    id: z.string(),
-    evaluatorType: z.string(),
-    name: z.string(),
-    settings: z.record(z.string(), z.any()),
-    inputs: z.array(z.object({ identifier: z.string(), type: z.string() })),
-    mappings: z.record(z.string(), z.record(z.string(), z.record(z.string(), z.any()))),
-  })),
+  targets: z.array(
+    z.object({
+      id: z.string(),
+      type: z.enum(["prompt", "agent"]),
+      name: z.string(),
+      promptId: z.string().optional(),
+      promptVersionId: z.string().optional(),
+      promptVersionNumber: z.number().optional(),
+      dbAgentId: z.string().optional(),
+      inputs: z
+        .array(z.object({ identifier: z.string(), type: z.string() }))
+        .optional(),
+      outputs: z
+        .array(z.object({ identifier: z.string(), type: z.string() }))
+        .optional(),
+      mappings: z.record(z.string(), z.record(z.string(), z.any())),
+      localPromptConfig: z.any().optional(),
+    }),
+  ),
+  evaluators: z.array(
+    z.object({
+      id: z.string(),
+      evaluatorType: z.string(),
+      name: z.string(),
+      settings: z.record(z.string(), z.any()),
+      inputs: z.array(z.object({ identifier: z.string(), type: z.string() })),
+      mappings: z.record(
+        z.string(),
+        z.record(z.string(), z.record(z.string(), z.any())),
+      ),
+    }),
+  ),
   scope: z.discriminatedUnion("type", [
     z.object({ type: z.literal("full") }),
     z.object({ type: z.literal("rows"), rowIndices: z.array(z.number()) }),
     z.object({ type: z.literal("target"), targetId: z.string() }),
-    z.object({ type: z.literal("cell"), targetId: z.string(), rowIndex: z.number() }),
+    z.object({
+      type: z.literal("cell"),
+      targetId: z.string(),
+      rowIndex: z.number(),
+    }),
   ]),
 });
 
@@ -224,7 +247,9 @@ export const getCellKey = (rowIndex: number, targetId: string): string =>
 /**
  * Parse a cell key back to its components.
  */
-export const parseCellKey = (key: string): { rowIndex: number; targetId: string } => {
+export const parseCellKey = (
+  key: string,
+): { rowIndex: number; targetId: string } => {
   const dashIndex = key.indexOf("-");
   return {
     rowIndex: parseInt(key.substring(0, dashIndex), 10),
@@ -237,7 +262,7 @@ export const parseCellKey = (key: string): { rowIndex: number; targetId: string 
  */
 export const createInitialCellState = (
   rowIndex: number,
-  targetId: string
+  targetId: string,
 ): CellExecutionState => ({
   rowIndex,
   targetId,

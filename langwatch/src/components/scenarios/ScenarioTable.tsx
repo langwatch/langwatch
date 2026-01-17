@@ -1,15 +1,15 @@
 import { HStack, Table, Text } from "@chakra-ui/react";
 import type { Scenario } from "@prisma/client";
 import {
+  type ColumnFiltersState,
   createColumnHelper,
+  type FilterFn,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  useReactTable,
-  type ColumnFiltersState,
-  type FilterFn,
   type SortingState,
+  useReactTable,
 } from "@tanstack/react-table";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -82,7 +82,7 @@ export function ScenarioTable({
         ),
       }),
     ],
-    []
+    [],
   );
 
   const table = useReactTable({
@@ -116,7 +116,7 @@ export function ScenarioTable({
                 <HStack gap={1}>
                   {flexRender(
                     header.column.columnDef.header,
-                    header.getContext()
+                    header.getContext(),
                   )}
                   {header.column.getIsSorted() === "asc" && (
                     <ChevronUp size={14} />

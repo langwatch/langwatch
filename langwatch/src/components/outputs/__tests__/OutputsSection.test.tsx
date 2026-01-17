@@ -2,7 +2,14 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,14 +19,16 @@ vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
 }));
 
 import {
-  OutputsSection,
-  LLM_OUTPUT_TYPES,
   CODE_OUTPUT_TYPES,
+  LLM_OUTPUT_TYPES,
   type Output,
+  OutputsSection,
   type OutputType,
 } from "../OutputsSection";
 
-const renderComponent = (props: Partial<Parameters<typeof OutputsSection>[0]> = {}) => {
+const renderComponent = (
+  props: Partial<Parameters<typeof OutputsSection>[0]> = {},
+) => {
   const defaultProps = {
     outputs: [],
     onChange: vi.fn(),
@@ -28,7 +37,7 @@ const renderComponent = (props: Partial<Parameters<typeof OutputsSection>[0]> = 
   return render(
     <ChakraProvider value={defaultSystem}>
       <OutputsSection {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -148,7 +157,10 @@ describe("OutputsSection", () => {
 
     it("shows CODE_OUTPUT_TYPES when set for code blocks", async () => {
       const user = userEvent.setup();
-      renderComponent({ canAddRemove: true, availableTypes: CODE_OUTPUT_TYPES });
+      renderComponent({
+        canAddRemove: true,
+        availableTypes: CODE_OUTPUT_TYPES,
+      });
 
       const addButton = screen.getByTestId("add-output-button");
       await user.click(addButton);
@@ -168,7 +180,7 @@ describe("OutputsSection", () => {
     });
 
     it("filters type dropdown options based on availableTypes", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       const outputs: Output[] = [{ identifier: "output", type: "str" }];
       const { container } = renderComponent({
         outputs,
@@ -181,7 +193,7 @@ describe("OutputsSection", () => {
 
       if (select) {
         const options = Array.from(select.querySelectorAll("option")).map(
-          (opt) => opt.textContent
+          (opt) => opt.textContent,
         );
         // Should have code types
         expect(options).toContain("Text");
@@ -211,7 +223,9 @@ describe("OutputsSection", () => {
       const removeButton = screen.getByTestId("remove-output-output2");
       await user.click(removeButton);
 
-      expect(onChange).toHaveBeenCalledWith([{ identifier: "output1", type: "str" }]);
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "output1", type: "str" },
+      ]);
     });
 
     it("disables remove button for last output", () => {
@@ -314,7 +328,9 @@ describe("OutputsSection", () => {
       ];
       renderComponent({ outputs, readOnly: true });
 
-      expect(screen.queryByTestId("remove-output-output1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("remove-output-output1"),
+      ).not.toBeInTheDocument();
     });
   });
 

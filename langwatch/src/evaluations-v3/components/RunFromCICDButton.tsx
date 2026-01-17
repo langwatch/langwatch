@@ -7,22 +7,26 @@
 import {
   Button,
   HStack,
+  Link,
   Text,
   useDisclosure,
   VStack,
-  Link,
 } from "@chakra-ui/react";
 import type { PrismLanguage } from "@react-email/components";
-import { CheckIcon, ChevronDownIcon, Terminal, ExternalLink } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ExternalLink,
+  Terminal,
+} from "lucide-react";
 import NextLink from "next/link";
-
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import React, { useMemo, useState } from "react";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 type Language = "python" | "typescript" | "curl";
 
@@ -30,7 +34,9 @@ type RunFromCICDButtonProps = {
   disabled?: boolean;
 };
 
-export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) {
+export function RunFromCICDButton({
+  disabled = false,
+}: RunFromCICDButtonProps) {
   const { open, onOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const [selectedLanguage, setSelectedLanguage] = useState<Language>("python");
@@ -42,7 +48,10 @@ export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) 
   const snippets = useMemo(() => {
     if (!experimentSlug) return null;
 
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://app.langwatch.ai";
+    const baseUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://app.langwatch.ai";
 
     return {
       python: generatePythonSnippet(experimentSlug),
@@ -54,7 +63,10 @@ export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) 
   // Don't show if no project or experimentSlug
   if (!project || !experimentSlug) return null;
 
-  const languageConfig: Record<Language, { label: string; prism: PrismLanguage }> = {
+  const languageConfig: Record<
+    Language,
+    { label: string; prism: PrismLanguage }
+  > = {
     python: { label: "Python", prism: "python" },
     typescript: { label: "TypeScript", prism: "typescript" },
     curl: { label: "curl", prism: "bash" },
@@ -90,8 +102,8 @@ export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) 
             <VStack alignItems="flex-start" gap={2} width="100%">
               <Dialog.Title>Run from CI/CD</Dialog.Title>
               <Dialog.Description>
-                Execute this evaluation from your CI/CD pipeline using one of the
-                following code snippets.
+                Execute this evaluation from your CI/CD pipeline using one of
+                the following code snippets.
               </Dialog.Description>
             </VStack>
           </Dialog.Header>
@@ -120,10 +132,15 @@ export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) 
               )}
               <VStack align="flex-start" gap={2}>
                 <Text fontSize="sm" color="gray.500">
-                  Set the <code>LANGWATCH_API_KEY</code> environment variable with your API key.{" "}
+                  Set the <code>LANGWATCH_API_KEY</code> environment variable
+                  with your API key.{" "}
                   <Link asChild color="blue.500">
                     <NextLink href={`/${project.slug}/setup`}>
-                      Find your API key <ExternalLink size={12} style={{ display: "inline", marginLeft: "2px" }} />
+                      Find your API key{" "}
+                      <ExternalLink
+                        size={12}
+                        style={{ display: "inline", marginLeft: "2px" }}
+                      />
                     </NextLink>
                   </Link>
                 </Text>
@@ -135,7 +152,11 @@ export function RunFromCICDButton({ disabled = false }: RunFromCICDButtonProps) 
                     rel="noopener noreferrer"
                     color="blue.500"
                   >
-                    documentation <ExternalLink size={12} style={{ display: "inline", marginLeft: "2px" }} />
+                    documentation{" "}
+                    <ExternalLink
+                      size={12}
+                      style={{ display: "inline", marginLeft: "2px" }}
+                    />
                   </Link>
                 </Text>
               </VStack>

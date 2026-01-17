@@ -54,7 +54,11 @@
 
 import dns from "dns/promises";
 import { isIP } from "net";
-import { Agent, fetch as undiciFetch, type Response as FetchResponse } from "undici";
+import {
+  Agent,
+  type Response as FetchResponse,
+  fetch as undiciFetch,
+} from "undici";
 import { createLogger } from "./logger";
 import { BLOCKED_CLOUD_DOMAINS, BLOCKED_METADATA_HOSTS } from "./ssrfConstants";
 
@@ -121,19 +125,30 @@ interface ValidationContext {
 // Error Message Formatters (Map-based, OCP-compliant)
 // ============================================================================
 
-type ErrorFormatter = (hostname: string, port: number, message: string) => string;
+type ErrorFormatter = (
+  hostname: string,
+  port: number,
+  message: string,
+) => string;
 
 const CONNECTION_ERROR_FORMATTERS: Record<string, ErrorFormatter> = {
-  ECONNREFUSED: (h, p) => `Connection refused - is the server running at ${h}:${p}?`,
+  ECONNREFUSED: (h, p) =>
+    `Connection refused - is the server running at ${h}:${p}?`,
   ENOTFOUND: (h) => `Could not resolve hostname: ${h}`,
   ETIMEDOUT: (h, p) => `Connection timed out while connecting to ${h}:${p}`,
   ECONNRESET: (h, p) => `Connection was reset by ${h}:${p}`,
   CERT_HAS_EXPIRED: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
-  DEPTH_ZERO_SELF_SIGNED_CERT: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
-  UNABLE_TO_VERIFY_LEAF_SIGNATURE: (h, _p, m) => `TLS certificate error for ${h}: ${m}`,
+  DEPTH_ZERO_SELF_SIGNED_CERT: (h, _p, m) =>
+    `TLS certificate error for ${h}: ${m}`,
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: (h, _p, m) =>
+    `TLS certificate error for ${h}: ${m}`,
 };
 
-function formatConnectionError(err: Error, hostname: string, port: number): Error {
+function formatConnectionError(
+  err: Error,
+  hostname: string,
+  port: number,
+): Error {
   const code = (err as NodeJS.ErrnoException).code ?? "UNKNOWN";
   const formatter = CONNECTION_ERROR_FORMATTERS[code];
   const message = formatter
@@ -163,7 +178,8 @@ export function isBlockedCloudDomain(hostname: string): boolean {
   }
 
   return BLOCKED_CLOUD_DOMAINS.some(
-    (domain) => lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain)
+    (domain) =>
+      lowerHostname === domain.slice(1) || lowerHostname.endsWith(domain),
   );
 }
 
@@ -178,7 +194,7 @@ function isPrivateIPv4(ip: string): boolean {
   if (ip.startsWith("192.168.")) return true;
 
   const match172 = ip.match(/^172\.(\d+)\./);
-  if (match172 && match172[1]) {
+  if (match172?.[1]) {
     const second = parseInt(match172[1], 10);
     if (second >= 16 && second <= 31) return true;
   }
@@ -197,7 +213,7 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
   if (normalized.startsWith("fe80:")) return true;
 
   const ipv4MappedMatch = normalized.match(/^::ffff:(.+)$/);
-  if (ipv4MappedMatch && ipv4MappedMatch[1]) {
+  if (ipv4MappedMatch?.[1]) {
     const mapped = ipv4MappedMatch[1];
 
     if (mapped.includes(".")) {
@@ -205,7 +221,7 @@ export function isPrivateOrLocalhostIP(ip: string): boolean {
     }
 
     const hexMatch = mapped.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
-    if (hexMatch && hexMatch[1] && hexMatch[2]) {
+    if (hexMatch?.[1] && hexMatch[2]) {
       const high = parseInt(hexMatch[1], 16);
       const low = parseInt(hexMatch[2], 16);
       const reconstructed = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
@@ -224,10 +240,10 @@ function validateNotMetadataEndpoint(ctx: ValidationContext): void {
   if (BLOCKED_METADATA_HOSTS.includes(ctx.hostname)) {
     logger.error(
       { url: ctx.url, hostname: ctx.hostname, reason: "metadata_endpoint" },
-      "SSRF attempt blocked: cloud metadata endpoint"
+      "SSRF attempt blocked: cloud metadata endpoint",
     );
     throw new Error(
-      "Access to cloud metadata endpoints is not allowed for security reasons"
+      "Access to cloud metadata endpoints is not allowed for security reasons",
     );
   }
 }
@@ -236,23 +252,35 @@ function validateNotBlockedCloudDomain(ctx: ValidationContext): void {
   if (isBlockedCloudDomain(ctx.hostname)) {
     logger.error(
       { url: ctx.url, hostname: ctx.hostname, reason: "cloud_internal_domain" },
-      "SSRF attempt blocked: cloud provider internal domain"
+      "SSRF attempt blocked: cloud provider internal domain",
     );
     throw new Error(
-      "Access to cloud provider internal domains is not allowed for security reasons"
+      "Access to cloud provider internal domains is not allowed for security reasons",
     );
   }
 }
 
-function validateNotPrivateIpLiteral(ctx: ValidationContext, skipPrivateChecks: boolean): void {
+function validateNotPrivateIpLiteral(
+  ctx: ValidationContext,
+  skipPrivateChecks: boolean,
+): void {
   const ipVersion = isIP(ctx.hostname);
-  if (ipVersion !== 0 && !skipPrivateChecks && isPrivateOrLocalhostIP(ctx.hostname)) {
+  if (
+    ipVersion !== 0 &&
+    !skipPrivateChecks &&
+    isPrivateOrLocalhostIP(ctx.hostname)
+  ) {
     logger.warn(
-      { url: ctx.url, hostname: ctx.hostname, ipVersion, reason: "private_ip_literal" },
-      "SSRF attempt blocked: private or localhost IP address"
+      {
+        url: ctx.url,
+        hostname: ctx.hostname,
+        ipVersion,
+        reason: "private_ip_literal",
+      },
+      "SSRF attempt blocked: private or localhost IP address",
     );
     throw new Error(
-      "Access to private or localhost IP addresses is not allowed for security reasons"
+      "Access to private or localhost IP addresses is not allowed for security reasons",
     );
   }
 }
@@ -260,7 +288,7 @@ function validateNotPrivateIpLiteral(ctx: ValidationContext, skipPrivateChecks: 
 function validateResolvedAddresses(
   ctx: ValidationContext,
   addresses: string[],
-  skipPrivateChecks: boolean
+  skipPrivateChecks: boolean,
 ): void {
   if (skipPrivateChecks) return;
 
@@ -274,10 +302,10 @@ function validateResolvedAddresses(
         privateAddresses,
         reason: "resolves_to_private_ip",
       },
-      "SSRF attempt blocked: hostname resolves to private IP"
+      "SSRF attempt blocked: hostname resolves to private IP",
     );
     throw new Error(
-      "This hostname resolves to a private or localhost IP address, which is not allowed for security reasons"
+      "This hostname resolves to a private or localhost IP address, which is not allowed for security reasons",
     );
   }
 }
@@ -310,17 +338,23 @@ function buildResultBase(ctx: ValidationContext): SSRFResultBase {
   };
 }
 
-function buildResolvedResult(ctx: ValidationContext, resolvedIp: string): SSRFResolvedResult {
+function buildResolvedResult(
+  ctx: ValidationContext,
+  resolvedIp: string,
+): SSRFResolvedResult {
   return { ...buildResultBase(ctx), type: "resolved", resolvedIp };
 }
 
-function buildAllowlistedResult(ctx: ValidationContext, resolvedIp?: string): SSRFAllowlistedResult {
+function buildAllowlistedResult(
+  ctx: ValidationContext,
+  resolvedIp?: string,
+): SSRFAllowlistedResult {
   return { ...buildResultBase(ctx), type: "allowlisted", resolvedIp };
 }
 
 function buildDevelopmentBypassResult(
   ctx: ValidationContext,
-  reason: "dns-failed" | "no-records"
+  reason: "dns-failed" | "no-records",
 ): SSRFDevelopmentBypassResult {
   return { ...buildResultBase(ctx), type: "development-bypass", reason };
 }
@@ -334,7 +368,9 @@ function buildDevelopmentBypassResult(
  * Use this for testability or custom configurations.
  */
 export function createSSRFValidator(config: SSRFConfig) {
-  return async function validateUrlForSSRF(url: string): Promise<SSRFValidationResult> {
+  return async function validateUrlForSSRF(
+    url: string,
+  ): Promise<SSRFValidationResult> {
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(url);
@@ -345,10 +381,19 @@ export function createSSRFValidator(config: SSRFConfig) {
     const hostname = parsedUrl.hostname.toLowerCase();
     const port = parsedUrl.port
       ? parseInt(parsedUrl.port, 10)
-      : (parsedUrl.protocol === "https:" ? 443 : 80);
+      : parsedUrl.protocol === "https:"
+        ? 443
+        : 80;
     const path = parsedUrl.pathname + parsedUrl.search;
 
-    const ctx: ValidationContext = { url, parsedUrl, hostname, port, path, config };
+    const ctx: ValidationContext = {
+      url,
+      parsedUrl,
+      hostname,
+      port,
+      path,
+      config,
+    };
 
     // Always validate metadata and cloud domains (critical security)
     validateNotMetadataEndpoint(ctx);
@@ -356,18 +401,24 @@ export function createSSRFValidator(config: SSRFConfig) {
 
     // Check development allowlist
     if (config.isDevelopment && config.allowedDevHosts.length > 0) {
-      const normalizedAllowed = config.allowedDevHosts.map((h) => h.trim().toLowerCase());
+      const normalizedAllowed = config.allowedDevHosts.map((h) =>
+        h.trim().toLowerCase(),
+      );
       if (normalizedAllowed.includes(hostname)) {
         logger.info(
           { url, hostname, allowedHosts: normalizedAllowed },
-          "Development mode: allowing request to allowlisted host"
+          "Development mode: allowing request to allowlisted host",
         );
         const ipVersion = isIP(hostname);
-        return buildAllowlistedResult(ctx, ipVersion !== 0 ? hostname : undefined);
+        return buildAllowlistedResult(
+          ctx,
+          ipVersion !== 0 ? hostname : undefined,
+        );
       }
     }
 
-    const skipPrivateChecks = config.isDevelopment && config.allowedDevHosts.length === 0;
+    const skipPrivateChecks =
+      config.isDevelopment && config.allowedDevHosts.length === 0;
 
     // Handle IP literals
     const ipVersion = isIP(hostname);
@@ -383,33 +434,54 @@ export function createSSRFValidator(config: SSRFConfig) {
     } catch (dnsError) {
       if (config.isDevelopment) {
         logger.debug(
-          { url, hostname, error: dnsError instanceof Error ? dnsError.message : String(dnsError) },
-          "DNS resolution failed during SSRF check in development"
+          {
+            url,
+            hostname,
+            error:
+              dnsError instanceof Error ? dnsError.message : String(dnsError),
+          },
+          "DNS resolution failed during SSRF check in development",
         );
         return buildDevelopmentBypassResult(ctx, "dns-failed");
       }
       logger.error(
-        { url, hostname, error: dnsError instanceof Error ? dnsError.message : String(dnsError) },
-        "DNS resolution failed during SSRF check - blocking request"
+        {
+          url,
+          hostname,
+          error:
+            dnsError instanceof Error ? dnsError.message : String(dnsError),
+        },
+        "DNS resolution failed during SSRF check - blocking request",
       );
       throw new Error(
-        "Unable to resolve hostname. Please verify the URL is correct and the server is reachable."
+        "Unable to resolve hostname. Please verify the URL is correct and the server is reachable.",
       );
     }
 
     if (allAddresses.length === 0) {
       if (config.isDevelopment) {
-        logger.debug({ url, hostname }, "No DNS records found in development, allowing request");
+        logger.debug(
+          { url, hostname },
+          "No DNS records found in development, allowing request",
+        );
         return buildDevelopmentBypassResult(ctx, "no-records");
       }
-      logger.error({ url, hostname }, "No DNS records found - blocking request");
-      throw new Error("Unable to resolve hostname. Please verify the URL is correct.");
+      logger.error(
+        { url, hostname },
+        "No DNS records found - blocking request",
+      );
+      throw new Error(
+        "Unable to resolve hostname. Please verify the URL is correct.",
+      );
     }
 
     validateResolvedAddresses(ctx, allAddresses, skipPrivateChecks);
 
     const resolvedIp = allAddresses[0]!;
-    logger.debug({ url, hostname, resolvedIp }, "URL validated and resolved for SSRF-safe fetch");
+    logger.debug(
+      { url, hostname, resolvedIp },
+      "URL validated and resolved for SSRF-safe fetch",
+    );
 
     return buildResolvedResult(ctx, resolvedIp);
   };
@@ -438,7 +510,9 @@ function createIpPinningAgent(resolvedIp: string): Agent {
   return new Agent({
     connect: {
       lookup: (_hostname, _options, callback) => {
-        callback(null, [{ address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 }]);
+        callback(null, [
+          { address: resolvedIp, family: isIP(resolvedIp) === 6 ? 6 : 4 },
+        ]);
       },
     },
   });
@@ -462,7 +536,7 @@ function getResolvedIpForPinning(result: SSRFValidationResult): string | null {
  */
 export async function fetchWithResolvedIp(
   validated: SSRFValidationResult,
-  init?: SSRFSafeFetchOptions
+  init?: SSRFSafeFetchOptions,
 ): Promise<FetchResponse> {
   const headers = new Headers(init?.headers);
   const redirectCount = init?._redirectCount ?? 0;
@@ -475,9 +549,10 @@ export async function fetchWithResolvedIp(
   const resolvedIp = getResolvedIpForPinning(validated);
 
   // Use IP pinning dispatcher when we have a resolved IP, otherwise let undici resolve DNS
-  const dispatcher = resolvedIp && isIP(resolvedIp) !== 0
-    ? createIpPinningAgent(resolvedIp)
-    : undefined;
+  const dispatcher =
+    resolvedIp && isIP(resolvedIp) !== 0
+      ? createIpPinningAgent(resolvedIp)
+      : undefined;
 
   try {
     const response = await undiciFetch(requestUrl, {
@@ -498,8 +573,12 @@ export async function fetchWithResolvedIp(
         const redirectUrl = new URL(location, validated.originalUrl).toString();
 
         logger.debug(
-          { originalUrl: validated.originalUrl, redirectUrl, redirectCount: redirectCount + 1 },
-          "Following redirect with SSRF validation"
+          {
+            originalUrl: validated.originalUrl,
+            redirectUrl,
+            redirectCount: redirectCount + 1,
+          },
+          "Following redirect with SSRF validation",
         );
 
         const redirectValidated = await validateUrlForSSRF(redirectUrl);
@@ -509,7 +588,12 @@ export async function fetchWithResolvedIp(
           _redirectCount: redirectCount + 1,
         };
 
-        if (response.status === 303 || (response.status !== 307 && response.status !== 308 && init?.method === "POST")) {
+        if (
+          response.status === 303 ||
+          (response.status !== 307 &&
+            response.status !== 308 &&
+            init?.method === "POST")
+        ) {
           redirectInit.method = "GET";
           redirectInit.body = undefined;
         }
@@ -537,7 +621,7 @@ export async function fetchWithResolvedIp(
  */
 export async function ssrfSafeFetch(
   url: string,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<FetchResponse> {
   const validated = await validateUrlForSSRF(url);
   return fetchWithResolvedIp(validated, init);

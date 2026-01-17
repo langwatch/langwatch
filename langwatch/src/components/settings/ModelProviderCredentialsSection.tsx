@@ -1,13 +1,8 @@
-import {
-  VStack,
-  Input,
-  Box,
-  Field,
-} from "@chakra-ui/react";
+import { Box, Field, Input, VStack } from "@chakra-ui/react";
 import React, { useEffect } from "react";
 import type {
-  UseModelProviderFormState,
   UseModelProviderFormActions,
+  UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import { dependencies } from "../../injection/dependencies.client";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
@@ -53,7 +48,9 @@ export const CredentialsSection = ({
     provider,
   });
   // Type assertion needed: managedModelProviderComponent is dynamically injected and may vary by deployment
-  const ManagedModelProviderAny = ManagedModelProvider as React.ComponentType<{ provider: MaybeStoredModelProvider }> | undefined;
+  const ManagedModelProviderAny = ManagedModelProvider as
+    | React.ComponentType<{ provider: MaybeStoredModelProvider }>
+    | undefined;
 
   useEffect(() => {
     if (ManagedModelProviderAny) {
@@ -77,7 +74,12 @@ export const CredentialsSection = ({
           const isInvalid = Boolean(fieldErrors[key]);
 
           return (
-            <Field.Root key={key} required={!isOptional} invalid={isInvalid} width="full">
+            <Field.Root
+              key={key}
+              required={!isOptional}
+              invalid={isInvalid}
+              width="full"
+            >
               <SmallLabel>
                 {key}
                 {!isOptional && <Field.RequiredIndicator />}
@@ -88,7 +90,7 @@ export const CredentialsSection = ({
                   onChange={(e) => {
                     actions.setCustomKey(key, e.target.value);
                     if (fieldErrors[key]) {
-                      setFieldErrors(prev => {
+                      setFieldErrors((prev) => {
                         const updated = { ...prev };
                         delete updated[key];
                         return updated;

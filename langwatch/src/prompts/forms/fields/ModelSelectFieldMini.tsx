@@ -1,15 +1,20 @@
 import { Button } from "@chakra-ui/react";
 import React, { useCallback } from "react";
 import { ChevronDown } from "react-feather";
-import { Controller, useFieldArray, useFormContext, useWatch } from "react-hook-form";
+import {
+  Controller,
+  useFieldArray,
+  useFormContext,
+  useWatch,
+} from "react-hook-form";
 import {
   LLMConfigPopover,
   type Output,
   type OutputType,
 } from "~/components/llmPromptConfigs/LLMConfigPopover";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
-import type { PromptConfigFormValues } from "~/prompts";
 import { Popover } from "~/components/ui/popover";
+import type { PromptConfigFormValues } from "~/prompts";
 import type { LlmConfigOutputType } from "~/types";
 
 type ModelSelectFieldMiniProps = {
@@ -65,7 +70,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             identifier: o.identifier,
             type: o.type as LlmConfigOutputType,
             json_schema: o.json_schema as { type: string } | undefined,
-          }))
+          })),
         );
         return;
       }
@@ -85,7 +90,9 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
         // Removed a single output - find which one
         for (let i = 0; i < currentFields.length; i++) {
           const currentField = currentFields[i];
-          if (!newOutputs.some((o) => o.identifier === currentField?.identifier)) {
+          if (
+            !newOutputs.some((o) => o.identifier === currentField?.identifier)
+          ) {
             outputsFieldArray.remove(i);
             break;
           }
@@ -100,18 +107,21 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
             currentField &&
             (newOutput.identifier !== currentField.identifier ||
               newOutput.type !== currentField.type ||
-              JSON.stringify(newOutput.json_schema) !== JSON.stringify(currentField.json_schema))
+              JSON.stringify(newOutput.json_schema) !==
+                JSON.stringify(currentField.json_schema))
           ) {
             outputsFieldArray.update(i, {
               identifier: newOutput.identifier,
               type: newOutput.type as LlmConfigOutputType,
-              json_schema: newOutput.json_schema as { type: string } | undefined,
+              json_schema: newOutput.json_schema as
+                | { type: string }
+                | undefined,
             });
           }
         }
       }
     },
-    [getValues, outputsFieldArray]
+    [getValues, outputsFieldArray],
   );
 
   return (

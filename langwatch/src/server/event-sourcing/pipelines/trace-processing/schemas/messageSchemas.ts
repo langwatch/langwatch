@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { match, P } from "ts-pattern";
+import { z } from "zod";
 
 /**
  * OpenTelemetry GenAI semantic conventions message format (target format)

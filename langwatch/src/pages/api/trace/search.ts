@@ -1,9 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
-import {
-  getAllForProjectInput,
-} from "../../../server/api/routers/traces";
+import { getAllForProjectInput } from "../../../server/api/routers/traces";
 import { getProtectionsForProject } from "../../../server/api/utils";
 import { prisma } from "../../../server/db";
 import type { LLMModeTrace, Span, Trace } from "../../../server/tracer/types";
@@ -93,7 +91,7 @@ export default async function handler(
     {
       downloadMode: !params.llmMode,
       scrollId: params.scrollId ?? undefined,
-    }
+    },
   );
   let traces: (Trace | LLMModeTrace)[] = results.groups.flat();
 

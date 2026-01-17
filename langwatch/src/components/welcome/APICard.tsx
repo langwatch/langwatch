@@ -16,8 +16,8 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { trackEvent } from "../../utils/tracking";
 import { CopyInput } from "../CopyInput";
 import { useIntegrationChecks } from "../IntegrationChecks";
-import ObservabilityCard from "./ObservabilityCard";
 import { Link } from "../ui/link";
+import ObservabilityCard from "./ObservabilityCard";
 
 const getLangWatchEndpoint = () => {
   if (typeof window === "undefined") return "";

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { EvaluationsV3State, EvaluationResults } from "../types";
+import type { EvaluationResults, EvaluationsV3State } from "../types";
 import {
   datasetReferenceSchema,
   evaluatorConfigSchema,
@@ -69,7 +69,9 @@ export type PersistedEvaluationsV3State = Omit<
 /**
  * Validated persisted state type - derived from schema.
  */
-export type ValidatedPersistedState = z.infer<typeof persistedEvaluationsV3StateSchema>;
+export type ValidatedPersistedState = z.infer<
+  typeof persistedEvaluationsV3StateSchema
+>;
 
 // ============================================================================
 // Helper Functions
@@ -79,7 +81,9 @@ export type ValidatedPersistedState = z.infer<typeof persistedEvaluationsV3State
  * Extracts the persistable results from the full results state.
  * Excludes transient fields like status, progress, and executingCells.
  */
-const extractPersistedResults = (results: EvaluationResults): PersistedResults | undefined => {
+const extractPersistedResults = (
+  results: EvaluationResults,
+): PersistedResults | undefined => {
   // Only persist if there are actual results
   const hasResults =
     Object.keys(results.targetOutputs).length > 0 ||
@@ -107,7 +111,7 @@ const extractPersistedResults = (results: EvaluationResults): PersistedResults |
  * not stored in the experiment's wizardState.
  */
 export const extractPersistedState = (
-  state: EvaluationsV3State
+  state: EvaluationsV3State,
 ): PersistedEvaluationsV3State => {
   const { ui, results, datasets, ...restState } = state;
   const persistedResults = extractPersistedResults(results);

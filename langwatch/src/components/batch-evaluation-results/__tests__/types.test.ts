@@ -1,9 +1,9 @@
 /**
  * Tests for batch evaluation data transformer
  */
-import { describe, it, expect } from "vitest";
-import { transformBatchEvaluationData } from "../types";
+import { describe, expect, it } from "vitest";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
+import { transformBatchEvaluationData } from "../types";
 
 // Helper to create base timestamps
 const createTimestamps = () => ({
@@ -199,7 +199,9 @@ describe("transformBatchEvaluationData", () => {
         project_id: "proj-1",
         experiment_id: "exp-1",
         run_id: "run-1",
-        dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
+        dataset: [
+          { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
+        ],
         evaluations: [
           {
             evaluator: "llm_judge",
@@ -214,7 +216,8 @@ describe("transformBatchEvaluationData", () => {
       const result = transformBatchEvaluationData(data);
 
       const targetId = result.targetColumns[0]!.id;
-      const evalResult = result.rows[0]!.targets[targetId]!.evaluatorResults[0]!;
+      const evalResult =
+        result.rows[0]!.targets[targetId]!.evaluatorResults[0]!;
       expect(evalResult.status).toBe("error");
       expect(evalResult.details).toBe("API rate limit exceeded");
     });
@@ -290,12 +293,16 @@ describe("transformBatchEvaluationData", () => {
       const row = result.rows[0]!;
 
       // Target 1 data
-      expect(row.targets["target-1"]?.output).toEqual({ response: "Hi from GPT!" });
+      expect(row.targets["target-1"]?.output).toEqual({
+        response: "Hi from GPT!",
+      });
       expect(row.targets["target-1"]?.cost).toBe(0.001);
       expect(row.targets["target-1"]?.traceId).toBe("trace-gpt");
 
       // Target 2 data
-      expect(row.targets["target-2"]?.output).toEqual({ response: "Hi from Claude!" });
+      expect(row.targets["target-2"]?.output).toEqual({
+        response: "Hi from Claude!",
+      });
       expect(row.targets["target-2"]?.cost).toBe(0.002);
       expect(row.targets["target-2"]?.traceId).toBe("trace-claude");
     });
@@ -305,9 +312,7 @@ describe("transformBatchEvaluationData", () => {
         project_id: "proj-1",
         experiment_id: "exp-1",
         run_id: "run-1",
-        targets: [
-          { id: "target-1", name: "GPT-4o", type: "prompt" },
-        ],
+        targets: [{ id: "target-1", name: "GPT-4o", type: "prompt" }],
         dataset: [
           {
             index: 0,
@@ -346,13 +351,13 @@ describe("transformBatchEvaluationData", () => {
       expect(target.evaluatorResults).toHaveLength(2);
 
       const exactMatch = target.evaluatorResults.find(
-        (e) => e.evaluatorId === "exact_match"
+        (e) => e.evaluatorId === "exact_match",
       );
       expect(exactMatch?.passed).toBe(true);
       expect(exactMatch?.score).toBe(1.0);
 
       const llmJudge = target.evaluatorResults.find(
-        (e) => e.evaluatorId === "llm_judge"
+        (e) => e.evaluatorId === "llm_judge",
       );
       expect(llmJudge?.score).toBe(0.9);
       expect(llmJudge?.details).toBe("Answer is correct and concise");
@@ -364,7 +369,12 @@ describe("transformBatchEvaluationData", () => {
         experiment_id: "exp-1",
         run_id: "run-1",
         targets: [
-          { id: "agent-1", name: "Support Agent", type: "agent", agent_id: "ag-123" },
+          {
+            id: "agent-1",
+            name: "Support Agent",
+            type: "agent",
+            agent_id: "ag-123",
+          },
         ],
         dataset: [
           {
@@ -426,8 +436,14 @@ describe("transformBatchEvaluationData", () => {
         experiment_id: "exp-1",
         run_id: "run-1",
         dataset: [
-          { index: 0, entry: { question: "Q1", context: "C1", expected: "E1" } },
-          { index: 1, entry: { question: "Q2", context: "C2", expected: "E2" } },
+          {
+            index: 0,
+            entry: { question: "Q1", context: "C1", expected: "E1" },
+          },
+          {
+            index: 1,
+            entry: { question: "Q2", context: "C2", expected: "E2" },
+          },
         ],
         evaluations: [],
         timestamps: createTimestamps(),
@@ -526,9 +542,16 @@ describe("transformBatchEvaluationData", () => {
         project_id: "proj-1",
         experiment_id: "exp-1",
         run_id: "run-1",
-        dataset: [{ index: 0, entry: { input: "test" }, predicted: { out: "x" } }],
+        dataset: [
+          { index: 0, entry: { input: "test" }, predicted: { out: "x" } },
+        ],
         evaluations: [
-          { evaluator: "eval-1", name: "Custom Evaluator", status: "processed", index: 0 },
+          {
+            evaluator: "eval-1",
+            name: "Custom Evaluator",
+            status: "processed",
+            index: 0,
+          },
           { evaluator: "eval-2", status: "processed", index: 0 }, // No name
         ],
         timestamps: createTimestamps(),
@@ -582,12 +605,20 @@ describe("transformBatchEvaluationData", () => {
 
       // Should have rows with derived output from evaluator inputs
       expect(result.rows).toHaveLength(2);
-      expect(result.rows[0]?.targets["_derived"]?.output).toEqual({ output: "The answer is 4" });
-      expect(result.rows[1]?.targets["_derived"]?.output).toEqual({ output: "The answer is 6" });
+      expect(result.rows[0]?.targets._derived?.output).toEqual({
+        output: "The answer is 4",
+      });
+      expect(result.rows[1]?.targets._derived?.output).toEqual({
+        output: "The answer is 6",
+      });
 
       // Evaluator results should be attached
-      expect(result.rows[0]?.targets["_derived"]?.evaluatorResults).toHaveLength(1);
-      expect(result.rows[0]?.targets["_derived"]?.evaluatorResults[0]?.score).toBe(0.95);
+      expect(result.rows[0]?.targets._derived?.evaluatorResults).toHaveLength(
+        1,
+      );
+      expect(result.rows[0]?.targets._derived?.evaluatorResults[0]?.score).toBe(
+        0.95,
+      );
     });
 
     it("extracts output from various evaluator input field names", () => {
@@ -619,7 +650,9 @@ describe("transformBatchEvaluationData", () => {
         const result = transformBatchEvaluationData(data);
 
         expect(result.targetColumns[0]?.id).toBe("_derived");
-        expect(result.rows[0]?.targets["_derived"]?.output).toEqual({ output: value });
+        expect(result.rows[0]?.targets._derived?.output).toEqual({
+          output: value,
+        });
       }
     });
 
@@ -629,7 +662,11 @@ describe("transformBatchEvaluationData", () => {
         experiment_id: "exp-1",
         run_id: "run-1",
         dataset: [
-          { index: 0, entry: { input: "test" }, predicted: { result: "predicted value" } },
+          {
+            index: 0,
+            entry: { input: "test" },
+            predicted: { result: "predicted value" },
+          },
         ],
         evaluations: [
           {
@@ -660,9 +697,24 @@ describe("transformBatchEvaluationData", () => {
         experiment_id: "exp-1",
         run_id: "run-1",
         targets: [
-          { id: "gpt-4", name: "GPT-4", type: "custom", metadata: { model: "openai/gpt-4" } },
-          { id: "gpt-3.5", name: "GPT-3.5", type: "custom", metadata: { model: "openai/gpt-3.5-turbo" } },
-          { id: "claude-3", name: "Claude-3", type: "custom", metadata: { model: "anthropic/claude-3" } },
+          {
+            id: "gpt-4",
+            name: "GPT-4",
+            type: "custom",
+            metadata: { model: "openai/gpt-4" },
+          },
+          {
+            id: "gpt-3.5",
+            name: "GPT-3.5",
+            type: "custom",
+            metadata: { model: "openai/gpt-3.5-turbo" },
+          },
+          {
+            id: "claude-3",
+            name: "Claude-3",
+            type: "custom",
+            metadata: { model: "anthropic/claude-3" },
+          },
         ],
         dataset: [
           // Dataset entries are shared - no target_id
@@ -671,12 +723,54 @@ describe("transformBatchEvaluationData", () => {
         ],
         evaluations: [
           // Each evaluation has a target_id
-          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.95 },
-          { evaluator: "quality", name: "Quality", target_id: "gpt-3.5", status: "processed", index: 0, score: 0.70 },
-          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 0, score: 0.50 },
-          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 1, score: 0.90 },
-          { evaluator: "quality", name: "Quality", target_id: "gpt-3.5", status: "processed", index: 1, score: 0.60 },
-          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 1, score: 0.40 },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-4",
+            status: "processed",
+            index: 0,
+            score: 0.95,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-3.5",
+            status: "processed",
+            index: 0,
+            score: 0.7,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "claude-3",
+            status: "processed",
+            index: 0,
+            score: 0.5,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-4",
+            status: "processed",
+            index: 1,
+            score: 0.9,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-3.5",
+            status: "processed",
+            index: 1,
+            score: 0.6,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "claude-3",
+            status: "processed",
+            index: 1,
+            score: 0.4,
+          },
         ],
         timestamps: createTimestamps(),
       };
@@ -685,7 +779,11 @@ describe("transformBatchEvaluationData", () => {
 
       // Should have 3 target columns
       expect(result.targetColumns).toHaveLength(3);
-      expect(result.targetColumns.map(t => t.id)).toEqual(["gpt-4", "gpt-3.5", "claude-3"]);
+      expect(result.targetColumns.map((t) => t.id)).toEqual([
+        "gpt-4",
+        "gpt-3.5",
+        "claude-3",
+      ]);
 
       // Should have 2 rows
       expect(result.rows).toHaveLength(2);
@@ -699,18 +797,18 @@ describe("transformBatchEvaluationData", () => {
 
       // GPT-3.5 should have score 0.70
       expect(row0.targets["gpt-3.5"]?.evaluatorResults).toHaveLength(1);
-      expect(row0.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.70);
+      expect(row0.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.7);
 
       // Claude-3 should have score 0.50
       expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(1);
-      expect(row0.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.50);
+      expect(row0.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.5);
 
       // Row 1: Same structure, different scores
       const row1 = result.rows[1]!;
 
-      expect(row1.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.90);
-      expect(row1.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.60);
-      expect(row1.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.40);
+      expect(row1.targets["gpt-4"]?.evaluatorResults[0]?.score).toBe(0.9);
+      expect(row1.targets["gpt-3.5"]?.evaluatorResults[0]?.score).toBe(0.6);
+      expect(row1.targets["claude-3"]?.evaluatorResults[0]?.score).toBe(0.4);
     });
 
     it("handles multiple evaluators per target", () => {
@@ -722,16 +820,42 @@ describe("transformBatchEvaluationData", () => {
           { id: "gpt-4", name: "GPT-4", type: "custom" },
           { id: "claude-3", name: "Claude-3", type: "custom" },
         ],
-        dataset: [
-          { index: 0, entry: { question: "Test" } },
-        ],
+        dataset: [{ index: 0, entry: { question: "Test" } }],
         evaluations: [
           // GPT-4 has two evaluators
-          { evaluator: "latency", name: "Latency", target_id: "gpt-4", status: "processed", index: 0, score: 100 },
-          { evaluator: "quality", name: "Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.9 },
+          {
+            evaluator: "latency",
+            name: "Latency",
+            target_id: "gpt-4",
+            status: "processed",
+            index: 0,
+            score: 100,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "gpt-4",
+            status: "processed",
+            index: 0,
+            score: 0.9,
+          },
           // Claude-3 has two evaluators
-          { evaluator: "latency", name: "Latency", target_id: "claude-3", status: "processed", index: 0, score: 200 },
-          { evaluator: "quality", name: "Quality", target_id: "claude-3", status: "processed", index: 0, score: 0.8 },
+          {
+            evaluator: "latency",
+            name: "Latency",
+            target_id: "claude-3",
+            status: "processed",
+            index: 0,
+            score: 200,
+          },
+          {
+            evaluator: "quality",
+            name: "Quality",
+            target_id: "claude-3",
+            status: "processed",
+            index: 0,
+            score: 0.8,
+          },
         ],
         timestamps: createTimestamps(),
       };
@@ -742,13 +866,29 @@ describe("transformBatchEvaluationData", () => {
 
       // GPT-4 should have 2 evaluator results
       expect(row0.targets["gpt-4"]?.evaluatorResults).toHaveLength(2);
-      expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(100);
-      expect(row0.targets["gpt-4"]?.evaluatorResults.find(e => e.evaluatorId === "quality")?.score).toBe(0.9);
+      expect(
+        row0.targets["gpt-4"]?.evaluatorResults.find(
+          (e) => e.evaluatorId === "latency",
+        )?.score,
+      ).toBe(100);
+      expect(
+        row0.targets["gpt-4"]?.evaluatorResults.find(
+          (e) => e.evaluatorId === "quality",
+        )?.score,
+      ).toBe(0.9);
 
       // Claude-3 should have 2 evaluator results
       expect(row0.targets["claude-3"]?.evaluatorResults).toHaveLength(2);
-      expect(row0.targets["claude-3"]?.evaluatorResults.find(e => e.evaluatorId === "latency")?.score).toBe(200);
-      expect(row0.targets["claude-3"]?.evaluatorResults.find(e => e.evaluatorId === "quality")?.score).toBe(0.8);
+      expect(
+        row0.targets["claude-3"]?.evaluatorResults.find(
+          (e) => e.evaluatorId === "latency",
+        )?.score,
+      ).toBe(200);
+      expect(
+        row0.targets["claude-3"]?.evaluatorResults.find(
+          (e) => e.evaluatorId === "quality",
+        )?.score,
+      ).toBe(0.8);
     });
 
     it("correctly builds evaluatorNames map for targets with target_id", () => {
@@ -756,14 +896,17 @@ describe("transformBatchEvaluationData", () => {
         project_id: "proj-1",
         experiment_id: "exp-1",
         run_id: "run-1",
-        targets: [
-          { id: "gpt-4", name: "GPT-4", type: "custom" },
-        ],
-        dataset: [
-          { index: 0, entry: { question: "Test" } },
-        ],
+        targets: [{ id: "gpt-4", name: "GPT-4", type: "custom" }],
+        dataset: [{ index: 0, entry: { question: "Test" } }],
         evaluations: [
-          { evaluator: "quality", name: "Response Quality", target_id: "gpt-4", status: "processed", index: 0, score: 0.9 },
+          {
+            evaluator: "quality",
+            name: "Response Quality",
+            target_id: "gpt-4",
+            status: "processed",
+            index: 0,
+            score: 0.9,
+          },
         ],
         timestamps: createTimestamps(),
       };

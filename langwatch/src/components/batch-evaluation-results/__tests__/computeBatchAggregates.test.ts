@@ -1,9 +1,9 @@
 /**
  * Tests for computeBatchAggregates - aggregate statistics computation
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { computeBatchTargetAggregates } from "../computeBatchAggregates";
-import type { BatchTargetColumn, BatchResultRow } from "../types";
+import type { BatchResultRow, BatchTargetColumn } from "../types";
 
 describe("computeBatchTargetAggregates", () => {
   const createTargetColumn = (id: string): BatchTargetColumn => ({
@@ -232,7 +232,13 @@ describe("computeBatchTargetAggregates", () => {
               error: null,
               traceId: null,
               evaluatorResults: [
-                { evaluatorId: "quality", evaluatorName: "Quality", status: "processed", score: 0.95, passed: null },
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.95,
+                  passed: null,
+                },
               ],
             },
             "claude-3": {
@@ -243,7 +249,13 @@ describe("computeBatchTargetAggregates", () => {
               error: null,
               traceId: null,
               evaluatorResults: [
-                { evaluatorId: "quality", evaluatorName: "Quality", status: "processed", score: 0.50, passed: null },
+                {
+                  evaluatorId: "quality",
+                  evaluatorName: "Quality",
+                  status: "processed",
+                  score: 0.5,
+                  passed: null,
+                },
               ],
             },
           },
@@ -256,9 +268,11 @@ describe("computeBatchTargetAggregates", () => {
       // GPT-4 should have high score
       expect(gpt4Result.overallAverageScore).toBeCloseTo(0.95, 3);
       // Claude should have low score
-      expect(claudeResult.overallAverageScore).toBeCloseTo(0.50, 3);
+      expect(claudeResult.overallAverageScore).toBeCloseTo(0.5, 3);
       // They should be DIFFERENT
-      expect(gpt4Result.overallAverageScore).not.toEqual(claudeResult.overallAverageScore);
+      expect(gpt4Result.overallAverageScore).not.toEqual(
+        claudeResult.overallAverageScore,
+      );
     });
   });
 });

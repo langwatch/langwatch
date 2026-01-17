@@ -1,8 +1,16 @@
-import { Box, Code, HStack, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
+import {
+  Box,
+  Code,
+  HStack,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
 import { useCallback } from "react";
 import {
-  MessageRoleLabel,
   AddMessageButton,
+  MessageRoleLabel,
   RemoveMessageButton,
 } from "../../ui/messages";
 
@@ -76,28 +84,28 @@ export function TestMessagesBuilder({
       newMessages[index] = message;
       onChange(newMessages);
     },
-    [messages, onChange]
+    [messages, onChange],
   );
 
   const handleRemove = useCallback(
     (index: number) => {
       onChange(messages.filter((_, i) => i !== index));
     },
-    [messages, onChange]
+    [messages, onChange],
   );
 
   const handleAdd = useCallback(
     (role: "user" | "assistant") => {
       onChange([...messages, { role, content: "" }]);
     },
-    [messages, onChange]
+    [messages, onChange],
   );
 
   return (
     <VStack align="stretch" gap={3} width="full">
       {/* Header with Add button */}
       <HStack width="full">
-      <Text fontSize="xs" color="gray.600" marginBottom={2}>
+        <Text fontSize="xs" color="gray.600" marginBottom={2}>
           <Code fontSize="xs">{`{{messages}}`}</Code>
         </Text>
 
@@ -134,6 +142,6 @@ export function TestMessagesBuilder({
  */
 export function messagesToJson(messages: TestMessage[]): string {
   return JSON.stringify(
-    messages.map((m) => ({ role: m.role, content: m.content }))
+    messages.map((m) => ({ role: m.role, content: m.content })),
   );
 }

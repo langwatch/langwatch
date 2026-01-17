@@ -7,7 +7,7 @@ import {
 } from "~/components/analytics/CustomGraph";
 import type { FilterField } from "~/server/filters/types";
 import { GraphCardHeader } from "./GraphCardHeader";
-import { type SizeOption } from "./GraphCardMenu";
+import type { SizeOption } from "./GraphCardMenu";
 
 interface GraphData {
   id: string;
@@ -109,4 +109,4 @@ export function DraggableGraphCard({
 
 export type { SizeOption, GraphData };
 // Re-export from GraphCardMenu for backwards compatibility
-export { sizeOptions, getCurrentSize } from "./GraphCardMenu";
+export { getCurrentSize, sizeOptions } from "./GraphCardMenu";

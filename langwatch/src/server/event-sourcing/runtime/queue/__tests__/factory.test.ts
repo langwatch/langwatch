@@ -8,7 +8,7 @@ const mockLogger = {
 };
 
 const mockTracer = {
-  withActiveSpan: vi.fn((_name,_optionss, fn) => fn()),
+  withActiveSpan: vi.fn((_name, _optionss, fn) => fn()),
 };
 
 vi.mock("../../../../utils/logger", () => ({

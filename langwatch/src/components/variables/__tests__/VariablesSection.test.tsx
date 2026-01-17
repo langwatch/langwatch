@@ -2,7 +2,13 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -16,10 +22,10 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
 }));
 
 import {
-  VariablesSection,
-  type Variable,
   type AvailableSource,
   type FieldMapping,
+  type Variable,
+  VariablesSection,
 } from "../VariablesSection";
 
 const mockSources: AvailableSource[] = [
@@ -34,7 +40,9 @@ const mockSources: AvailableSource[] = [
   },
 ];
 
-const renderComponent = (props: Partial<Parameters<typeof VariablesSection>[0]> = {}) => {
+const renderComponent = (
+  props: Partial<Parameters<typeof VariablesSection>[0]> = {},
+) => {
   const defaultProps = {
     variables: [],
     onChange: vi.fn(),
@@ -43,7 +51,7 @@ const renderComponent = (props: Partial<Parameters<typeof VariablesSection>[0]> 
   return render(
     <ChakraProvider value={defaultSystem}>
       <VariablesSection {...defaultProps} {...props} />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -157,7 +165,7 @@ describe("VariablesSection", () => {
       // Get the edit input (not the value input)
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "new_name");
@@ -177,7 +185,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "my variable");
@@ -197,7 +205,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "MyVariable");
@@ -217,7 +225,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "my-custom-score");
@@ -238,7 +246,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "my@score!test#123");
@@ -259,7 +267,7 @@ describe("VariablesSection", () => {
       await user.click(screen.getByText("question"));
       const inputs = screen.getAllByRole("textbox");
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "question"
+        (input) => (input as HTMLInputElement).value === "question",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "my_custom_score");
@@ -285,7 +293,7 @@ describe("VariablesSection", () => {
       const inputs = screen.getAllByRole("textbox");
       // Find the edit input (value "answer")
       const editInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "answer"
+        (input) => (input as HTMLInputElement).value === "answer",
       )!;
       await user.clear(editInput);
       await user.type(editInput, "question"); // Try to rename to existing name
@@ -297,7 +305,8 @@ describe("VariablesSection", () => {
       if (lastCall) {
         const updatedVariables = lastCall[0];
         const hasQuestionTwice =
-          updatedVariables.filter((v: Variable) => v.identifier === "question").length > 1;
+          updatedVariables.filter((v: Variable) => v.identifier === "question")
+            .length > 1;
         expect(hasQuestionTwice).toBe(false);
       }
     });
@@ -305,7 +314,12 @@ describe("VariablesSection", () => {
     it("does not enter edit mode when readOnly", async () => {
       const user = userEvent.setup();
       const variables: Variable[] = [{ identifier: "question", type: "str" }];
-      renderComponent({ variables, onChange: vi.fn(), readOnly: true, showMappings: false });
+      renderComponent({
+        variables,
+        onChange: vi.fn(),
+        readOnly: true,
+        showMappings: false,
+      });
 
       // Count textboxes before clicking (value input exists)
       const initialTextboxes = screen.getAllByRole("textbox").length;
@@ -443,7 +457,7 @@ describe("VariablesSection", () => {
 
       const inputs = screen.getAllByRole("textbox");
       const valueInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "test value"
+        (input) => (input as HTMLInputElement).value === "test value",
       );
       expect(valueInput).toBeInTheDocument();
     });
@@ -465,14 +479,17 @@ describe("VariablesSection", () => {
       const inputs = screen.getAllByRole("textbox");
       // The value input should be the one without a value (empty)
       const valueInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === ""
+        (input) => (input as HTMLInputElement).value === "",
       );
 
       if (valueInput) {
         await user.type(valueInput, "hello");
         expect(onValueChange).toHaveBeenCalled();
         // Should be called with identifier and new value
-        expect(onValueChange).toHaveBeenCalledWith("question", expect.any(String));
+        expect(onValueChange).toHaveBeenCalledWith(
+          "question",
+          expect.any(String),
+        );
       }
     });
 
@@ -490,10 +507,10 @@ describe("VariablesSection", () => {
 
       const inputs = screen.getAllByRole("textbox");
       const helloInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "hello"
+        (input) => (input as HTMLInputElement).value === "hello",
       );
       const countInput = inputs.find(
-        (input) => (input as HTMLInputElement).value === "42"
+        (input) => (input as HTMLInputElement).value === "42",
       );
 
       expect(helloInput).toBeInTheDocument();
@@ -529,7 +546,7 @@ describe("VariablesSection", () => {
 
       // Input should not have a delete button
       expect(
-        screen.queryByTestId("remove-variable-input")
+        screen.queryByTestId("remove-variable-input"),
       ).not.toBeInTheDocument();
 
       // Context should still have a delete button
@@ -570,7 +587,9 @@ describe("VariablesSection", () => {
       });
 
       // Should not show info icon
-      expect(screen.queryByTestId("variable-info-input")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("variable-info-input"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -621,7 +640,7 @@ describe("VariablesSection", () => {
       // Both variable names should be shown
       expect(screen.getByTestId("variable-name-input")).toBeInTheDocument();
       expect(screen.getByTestId("variable-name-context")).toBeInTheDocument();
-      
+
       // Only one = sign should be shown (for context, not input)
       const equalSigns = screen.getAllByText("=");
       expect(equalSigns).toHaveLength(1);

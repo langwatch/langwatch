@@ -9,9 +9,10 @@
  * the store state might be stale (from previous evaluation or initial state),
  * and autosave could overwrite the actual saved evaluation with blank data.
  */
-import { cleanup, render, waitFor, act } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
@@ -37,7 +38,7 @@ const mockSaveMutateAsync = vi.hoisted(() =>
     id: "existing-experiment-id",
     slug: "existing-evaluation",
     name: "My Important Evaluation",
-  })
+  }),
 );
 
 // Mock load query with controllable data
@@ -93,9 +94,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
 const TestAutosaveComponent = () => {
   const { isLoading } = useAutosaveEvaluationsV3();
   return (
-    <div data-testid="autosave-test">
-      {isLoading ? "Loading..." : "Ready"}
-    </div>
+    <div data-testid="autosave-test">{isLoading ? "Loading..." : "Ready"}</div>
   );
 };
 
@@ -124,7 +123,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait a bit longer than debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
         );
       });
 
@@ -217,7 +216,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait longer than debounce - autosave should NOT trigger
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
         );
       });
 
@@ -249,7 +248,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait longer than debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
         );
       });
 
@@ -351,13 +350,22 @@ describe("Navigation and autosave interaction", () => {
         experimentId: "the-real-id", // This ID is still in store
         experimentSlug: "the-real-slug",
         name: "Important Evaluation",
-        targets: [{ id: "t1", type: "prompt", name: "My Target", mappings: {}, inputs: [], outputs: [] }],
+        targets: [
+          {
+            id: "t1",
+            type: "prompt",
+            name: "My Target",
+            mappings: {},
+            inputs: [],
+            outputs: [],
+          },
+        ],
       });
 
       // Now simulate what happens after navigation:
       // Store gets reset but maybe experimentId/slug persists in some edge case
       // OR the store is fresh but experimentSlug is empty while experimentId isn't set
-      const resetState = useEvaluationsV3Store.getState();
+      const _resetState = useEvaluationsV3Store.getState();
       useEvaluationsV3Store.getState().reset();
 
       // URL points to an existing evaluation
@@ -370,7 +378,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait longer than autosave debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 1000),
         );
       });
 
@@ -427,7 +435,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait for autosave debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
         );
       });
 
@@ -455,9 +463,7 @@ describe("Navigation and autosave interaction", () => {
           datasets: [],
           activeDatasetId: null,
           evaluators: [],
-          targets: [
-            { id: "t1", type: "prompt", name: "Target 1" },
-          ],
+          targets: [{ id: "t1", type: "prompt", name: "Target 1" }],
         },
       };
 
@@ -485,7 +491,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait for potential autosave debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
         );
       });
 
@@ -528,7 +534,7 @@ describe("Navigation and autosave interaction", () => {
       // Wait for autosave debounce
       await act(async () => {
         await new Promise((resolve) =>
-          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500)
+          setTimeout(resolve, AUTOSAVE_DEBOUNCE_MS + 500),
         );
       });
 
@@ -548,7 +554,9 @@ describe("Navigation and autosave interaction", () => {
       mockExistingExperimentLoading = false;
       mockExistingExperimentData = null;
 
-      const { rerender } = render(<TestAutosaveComponent />, { wrapper: Wrapper });
+      const { rerender } = render(<TestAutosaveComponent />, {
+        wrapper: Wrapper,
+      });
 
       // Now URL changes to evaluation B (simulating back button)
       mockRouterQuery = { slug: "eval-b" };
@@ -569,13 +577,16 @@ describe("Navigation and autosave interaction", () => {
       rerender(<TestAutosaveComponent />);
 
       // Should detect slug mismatch and load evaluation B
-      await waitFor(() => {
-        const state = useEvaluationsV3Store.getState();
-        expect(state.experimentId).toBe("eval-b-id");
-        expect(state.experimentSlug).toBe("eval-b");
-        expect(state.targets.length).toBe(1);
-        expect(state.targets[0]?.name).toBe("B Target");
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          const state = useEvaluationsV3Store.getState();
+          expect(state.experimentId).toBe("eval-b-id");
+          expect(state.experimentSlug).toBe("eval-b");
+          expect(state.targets.length).toBe(1);
+          expect(state.targets[0]?.name).toBe("B Target");
+        },
+        { timeout: 3000 },
+      );
     });
   });
 });

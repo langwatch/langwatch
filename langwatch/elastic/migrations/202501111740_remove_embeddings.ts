@@ -1,9 +1,9 @@
-import {
-  type QueryDslBoolQuery,
-  type QueryDslQueryContainer,
-  type SearchResponse,
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+  SearchResponse,
 } from "@elastic/elasticsearch/lib/api/types";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 

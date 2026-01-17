@@ -7,7 +7,11 @@ import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { DatasetConflictError, DatasetNotFoundError } from "./errors";
 import { ExperimentRepository } from "./experiment.repository";
-import type { DatasetColumns, DatasetRecordEntry, DatasetRecordInput } from "./types";
+import type {
+  DatasetColumns,
+  DatasetRecordEntry,
+  DatasetRecordInput,
+} from "./types";
 
 /**
  * Service input types for business operations

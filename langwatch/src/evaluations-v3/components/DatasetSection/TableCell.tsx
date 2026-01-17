@@ -1,9 +1,8 @@
 import { Skeleton } from "@chakra-ui/react";
-import { flexRender, type Cell } from "@tanstack/react-table";
-
+import { type Cell, flexRender } from "@tanstack/react-table";
+import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { EditableCell } from "./EditableCell";
-import type { DatasetColumnType } from "~/server/datasets/types";
 
 // ============================================================================
 // Types
@@ -20,7 +19,10 @@ type ColumnMeta = {
 type RowData = {
   rowIndex: number;
   dataset: Record<string, string>;
-  targets: Record<string, { output: unknown; evaluators: Record<string, unknown> }>;
+  targets: Record<
+    string,
+    { output: unknown; evaluators: Record<string, unknown> }
+  >;
 };
 
 type TableCellProps = {
@@ -38,18 +40,19 @@ type TableCellProps = {
  * Renders a single table cell with selection and interaction support.
  * Handles click/double-click for selection/editing, and applies visual styles.
  */
-export const TableCell = ({ cell, rowIndex, activeDatasetId, isLoading }: TableCellProps) => {
-  const {
-    selectedCell,
-    setSelectedCell,
-    setEditingCell,
-    toggleRowSelection,
-  } = useEvaluationsV3Store((state) => ({
-    selectedCell: state.ui.selectedCell,
-    setSelectedCell: state.setSelectedCell,
-    setEditingCell: state.setEditingCell,
-    toggleRowSelection: state.toggleRowSelection,
-  }));
+export const TableCell = ({
+  cell,
+  rowIndex,
+  activeDatasetId,
+  isLoading,
+}: TableCellProps) => {
+  const { selectedCell, setSelectedCell, setEditingCell, toggleRowSelection } =
+    useEvaluationsV3Store((state) => ({
+      selectedCell: state.ui.selectedCell,
+      setSelectedCell: state.setSelectedCell,
+      setEditingCell: state.setEditingCell,
+      toggleRowSelection: state.toggleRowSelection,
+    }));
 
   const meta = cell.column.columnDef.meta as ColumnMeta | undefined;
 
@@ -63,8 +66,7 @@ export const TableCell = ({ cell, rowIndex, activeDatasetId, isLoading }: TableC
   }
 
   const isSelected =
-    selectedCell?.row === rowIndex &&
-    selectedCell?.columnId === meta.columnId;
+    selectedCell?.row === rowIndex && selectedCell?.columnId === meta.columnId;
 
   const handleSelect = () => {
     setSelectedCell({ row: rowIndex, columnId: meta.columnId });

@@ -26,7 +26,11 @@ import { safeTruncate } from "../../../../utils/truncate";
 import { findOrCreateExperiment } from "../../experiment/init";
 
 /** Valid target types for validation */
-const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = ["prompt", "agent", "custom"];
+const VALID_TARGET_TYPES: ESBatchEvaluationTargetType[] = [
+  "prompt",
+  "agent",
+  "custom",
+];
 
 const logger = createLogger("langwatch:evaluations:batch:log_results");
 
@@ -156,7 +160,7 @@ export default async function handler(
  * and remove it from metadata.
  */
 const processTargets = (
-  targets: ESBatchEvaluationRESTParams["targets"]
+  targets: ESBatchEvaluationRESTParams["targets"],
 ): ESBatchEvaluationTarget[] | null => {
   if (!targets || targets.length === 0) {
     return null;
@@ -170,7 +174,8 @@ const processTargets = (
     if (metadata && "type" in metadata) {
       const typeFromMetadata = metadata.type;
       if (typeof typeFromMetadata === "string") {
-        const parseResult = eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
+        const parseResult =
+          eSBatchEvaluationTargetTypeSchema.safeParse(typeFromMetadata);
         if (parseResult.success) {
           targetType = parseResult.data;
           // Remove "type" from metadata since it's now the target type
@@ -178,7 +183,7 @@ const processTargets = (
           metadata = Object.keys(restMetadata).length > 0 ? restMetadata : null;
         } else {
           throw new Error(
-            `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`
+            `Invalid target type '${typeFromMetadata}'. Must be one of: ${VALID_TARGET_TYPES.join(", ")}`,
           );
         }
       }

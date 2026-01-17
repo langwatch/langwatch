@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeAll } from "vitest";
 import type { Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { buildCellWorkflow } from "../workflowBuilder";
-import type { ExecutionCell } from "../types";
-import type { TargetConfig, EvaluatorConfig, LocalPromptConfig } from "~/evaluations-v3/types";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
+import { beforeAll, describe, expect, it } from "vitest";
+import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import type {
+  EvaluatorConfig,
+  LocalPromptConfig,
+  TargetConfig,
+} from "~/evaluations-v3/types";
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
-import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
+import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { getTestProject } from "~/utils/testUtils";
+import type { ExecutionCell } from "../types";
+import { buildCellWorkflow } from "../workflowBuilder";
 
 /**
  * Integration tests for workflow execution against langwatch_nlp.
@@ -45,14 +49,20 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
       maxTokens: 50,
     },
     messages: [
-      { role: "system", content: "You are a helpful assistant. Respond with only the exact word requested." },
+      {
+        role: "system",
+        content:
+          "You are a helpful assistant. Respond with only the exact word requested.",
+      },
       { role: "user", content: "{{input}}" },
     ],
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
   });
 
-  const createTargetConfig = (overrides?: Partial<TargetConfig>): TargetConfig => ({
+  const createTargetConfig = (
+    overrides?: Partial<TargetConfig>,
+  ): TargetConfig => ({
     id: "target-1",
     type: "prompt",
     name: "Test Prompt",
@@ -60,7 +70,12 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
     outputs: [{ identifier: "output", type: "str" }],
     mappings: {
       "dataset-1": {
-        input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "question" },
+        input: {
+          type: "source",
+          source: "dataset",
+          sourceId: "dataset-1",
+          sourceField: "question",
+        },
       },
     },
     localPromptConfig: createSimplePromptConfig(),
@@ -79,8 +94,18 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
     mappings: {
       "dataset-1": {
         "target-1": {
-          output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-          expected_output: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "expected" },
+          output: {
+            type: "source",
+            source: "target",
+            sourceId: "target-1",
+            sourceField: "output",
+          },
+          expected_output: {
+            type: "source",
+            source: "dataset",
+            sourceId: "dataset-1",
+            sourceField: "expected",
+          },
         },
       },
     },
@@ -88,7 +113,7 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
 
   const createCell = (
     datasetEntry: Record<string, unknown>,
-    overrides?: Partial<ExecutionCell>
+    overrides?: Partial<ExecutionCell>,
   ): ExecutionCell => ({
     rowIndex: 0,
     targetId: "target-1",
@@ -107,7 +132,7 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
    */
   const executeWorkflow = async (
     cell: ExecutionCell,
-    datasetColumns: Array<{ id: string; name: string; type: string }>
+    datasetColumns: Array<{ id: string; name: string; type: string }>,
   ): Promise<StudioServerEvent[]> => {
     const events: StudioServerEvent[] = [];
 
@@ -118,7 +143,7 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
         cell,
         datasetColumns,
       },
-      {}
+      {},
     );
 
     // Create the event
@@ -139,7 +164,7 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
     // Then load/process datasets
     const enrichedEvent = await loadDatasets(
       await addEnvs(rawEvent, project.id),
-      project.id
+      project.id,
     );
 
     // Execute through the NLP backend
@@ -171,17 +196,25 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
 
       // Find the component_state_change event for the target
       const targetCompletedEvent = events.find(
-        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+        (
+          e,
+        ): e is Extract<
+          StudioServerEvent,
+          { type: "component_state_change" }
+        > =>
           e.type === "component_state_change" &&
           e.payload.component_id === "target-1" &&
-          e.payload.execution_state?.status === "success"
+          e.payload.execution_state?.status === "success",
       );
 
       expect(targetCompletedEvent).toBeDefined();
-      expect(targetCompletedEvent?.payload.execution_state?.outputs?.output).toBeDefined();
+      expect(
+        targetCompletedEvent?.payload.execution_state?.outputs?.output,
+      ).toBeDefined();
 
       // The output should be a string (the LLM response)
-      const output = targetCompletedEvent?.payload.execution_state?.outputs?.output;
+      const output =
+        targetCompletedEvent?.payload.execution_state?.outputs?.output;
       expect(typeof output).toBe("string");
     }, 60000);
 
@@ -193,9 +226,7 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
           temperature: 0,
           maxTokens: 50,
         },
-        messages: [
-          { role: "user", content: "{{input}}" },
-        ],
+        messages: [{ role: "user", content: "{{input}}" }],
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
       };
@@ -203,8 +234,10 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
       const cell = createCell(
         { question: "Hello", expected: "hello" },
         {
-          targetConfig: createTargetConfig({ localPromptConfig: badPromptConfig }),
-        }
+          targetConfig: createTargetConfig({
+            localPromptConfig: badPromptConfig,
+          }),
+        },
       );
 
       const events = await executeWorkflow(cell, [
@@ -216,9 +249,9 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
       const errorEvent = events.find(
         (e) =>
           (e.type === "component_state_change" &&
-           "payload" in e &&
-           e.payload.execution_state?.status === "error") ||
-          e.type === "error"
+            "payload" in e &&
+            e.payload.execution_state?.status === "error") ||
+          e.type === "error",
       );
 
       expect(errorEvent).toBeDefined();
@@ -257,10 +290,15 @@ describe.skipIf(process.env.CI)("WorkflowExecution Integration", () => {
       ]);
 
       const targetEvent = events.find(
-        (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
+        (
+          e,
+        ): e is Extract<
+          StudioServerEvent,
+          { type: "component_state_change" }
+        > =>
           e.type === "component_state_change" &&
           e.payload.component_id === "target-1" &&
-          e.payload.execution_state?.status === "success"
+          e.payload.execution_state?.status === "success",
       );
 
       expect(targetEvent).toBeDefined();

@@ -4,9 +4,10 @@
  * Used for dataset columns in the batch results table.
  * Simpler version of BatchTargetCell without evaluator chips and trace buttons.
  */
-import { useCallback, useState, useRef } from "react";
+
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import { LuCopy, LuCheck } from "react-icons/lu";
+import { useCallback, useRef, useState } from "react";
+import { LuCheck, LuCopy } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";
 
@@ -55,7 +56,8 @@ export function ExpandableDatasetCell({
   // Use a simple heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
   const hasNewlines = rawContent.includes("\n");
-  const isLikelyOverflowing = rawContent.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
+  const isLikelyOverflowing =
+    rawContent.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
 
   // Handler to expand
   const handleExpand = useCallback(() => {
@@ -161,8 +163,7 @@ export function ExpandableDatasetCell({
             onClick={handleExpand}
             className="cell-fade-overlay"
             css={{
-              background:
-                "linear-gradient(to bottom, transparent, white)",
+              background: "linear-gradient(to bottom, transparent, white)",
               "tr:hover &": {
                 background:
                   "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",

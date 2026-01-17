@@ -1,12 +1,12 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Tag } from "lucide-react";
+import { Checkbox } from "~/components/ui/checkbox";
 import {
   PopoverBody,
   PopoverContent,
   PopoverRoot,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import { Checkbox } from "~/components/ui/checkbox";
 
 type LabelFilterDropdownProps = {
   allLabels: string[];
@@ -66,8 +66,3 @@ export function LabelFilterDropdown({
     </PopoverRoot>
   );
 }
-
-
-
-
-

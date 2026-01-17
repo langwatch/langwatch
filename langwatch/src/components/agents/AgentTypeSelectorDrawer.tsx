@@ -1,16 +1,9 @@
-import {
-  Box,
-  Button,
-  Heading,
-  HStack,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Code, Globe, Workflow } from "lucide-react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
-import { useDrawer, getComplexProps } from "~/hooks/useDrawer";
+import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
 
 /**
  * Agent types - code, workflow, or http.
@@ -35,7 +28,8 @@ const agentTypes: Array<{
     type: "code",
     icon: Code,
     title: "Code Agent",
-    description: "Write custom Python code to process inputs and generate outputs",
+    description:
+      "Write custom Python code to process inputs and generate outputs",
   },
   {
     type: "workflow",
@@ -61,7 +55,9 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
   const complexProps = getComplexProps();
 
   const onClose = props.onClose ?? closeDrawer;
-  const onSelect = props.onSelect ?? (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
+  const onSelect =
+    props.onSelect ??
+    (complexProps.onSelect as AgentTypeSelectorDrawerProps["onSelect"]);
   const isOpen = props.open !== false && props.open !== undefined;
 
   const handleSelectType = (type: AgentType) => {
@@ -109,19 +105,19 @@ export function AgentTypeSelectorDrawer(props: AgentTypeSelectorDrawerProps) {
             <Heading>Choose Agent Type</Heading>
           </HStack>
         </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
+        <Drawer.Body
+          display="flex"
+          flexDirection="column"
+          overflow="hidden"
+          padding={0}
+        >
           <VStack gap={4} align="stretch" flex={1} overflow="hidden">
             <Text color="gray.600" fontSize="sm" paddingX={6} paddingTop={4}>
               Select the type of agent you want to create.
             </Text>
 
             {/* Agent type cards */}
-            <VStack
-              gap={3}
-              align="stretch"
-              paddingX={6}
-              paddingBottom={4}
-            >
+            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
               {agentTypes.map((agentType) => (
                 <AgentTypeCard
                   key={agentType.type}
@@ -154,7 +150,13 @@ type AgentTypeCardProps = {
   onClick: () => void;
 };
 
-function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentTypeCardProps) {
+function AgentTypeCard({
+  type,
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: AgentTypeCardProps) {
   return (
     <Box
       as="button"
@@ -172,12 +174,7 @@ function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentT
       cursor="pointer"
     >
       <HStack gap={4} align="start">
-        <Box
-          padding={3}
-          borderRadius="md"
-          bg="blue.50"
-          color="blue.600"
-        >
+        <Box padding={3} borderRadius="md" bg="blue.50" color="blue.600">
           <Icon size={24} />
         </Box>
         <VStack align="start" gap={1} flex={1}>

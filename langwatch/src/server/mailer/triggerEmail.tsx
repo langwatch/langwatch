@@ -5,9 +5,8 @@ import { Heading } from "@react-email/heading";
 import { Html } from "@react-email/html";
 import { Img } from "@react-email/img";
 import { render } from "@react-email/render";
-
-import { env } from "../../env.mjs";
 import type { TriggerData } from "~/pages/api/cron/triggers/types";
+import { env } from "../../env.mjs";
 import { sendEmail } from "./emailSender";
 
 export const sendTriggerEmail = async ({

@@ -10,9 +10,24 @@
  * - Abort handling
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within, act } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 import { createExecutionCellSet } from "../utils/executionScope";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
@@ -33,10 +48,10 @@ vi.mock("~/prompts/hooks/useLatestPromptVersion", () => ({
   }),
 }));
 
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
-import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
 import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
+import { EvaluationsV3Table } from "../components/EvaluationsV3Table";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
 vi.mock("next/router", () => ({
@@ -207,7 +222,12 @@ const setupStoreWithConfiguredEvaluation = () => {
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "test-dataset": {
-            input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "test-dataset",
+              sourceField: "input",
+            },
           },
         },
       },
@@ -225,8 +245,18 @@ const setupStoreWithConfiguredEvaluation = () => {
         mappings: {
           "test-dataset": {
             "target-1": {
-              output: { type: "source", source: "target", sourceId: "target-1", sourceField: "output" },
-              expected_output: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "expected_output" },
+              output: {
+                type: "source",
+                source: "target",
+                sourceId: "target-1",
+                sourceField: "output",
+              },
+              expected_output: {
+                type: "source",
+                source: "dataset",
+                sourceId: "test-dataset",
+                sourceField: "expected_output",
+              },
             },
           },
         },
@@ -270,7 +300,7 @@ const renderTable = () => {
   return render(
     <ChakraProvider value={defaultSystem}>
       <EvaluationsV3Table disableVirtualization />
-    </ChakraProvider>
+    </ChakraProvider>,
   );
 };
 
@@ -385,7 +415,11 @@ describe("Evaluation Execution", () => {
         },
         evaluatorResults: {
           "target-1": {
-            "eval-1": [{ status: "processed", passed: true, score: 1.0 }, undefined, undefined],
+            "eval-1": [
+              { status: "processed", passed: true, score: 1.0 },
+              undefined,
+              undefined,
+            ],
           },
         },
       });
@@ -467,7 +501,11 @@ describe("Evaluation Execution", () => {
         evaluatorResults: {
           "target-1": {
             "eval-1": [
-              { status: "error", error_type: "EvaluatorError", details: "Missing expected_output" },
+              {
+                status: "error",
+                error_type: "EvaluatorError",
+                details: "Missing expected_output",
+              },
               undefined,
               undefined,
             ],
@@ -546,7 +584,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -609,7 +652,7 @@ describe("Evaluation Execution", () => {
       expect(results.targetOutputs["target-1"]).toHaveLength(3);
       expect(results.evaluatorResults["target-1"]?.["eval-1"]).toHaveLength(3);
       expect(results.evaluatorResults["target-1"]?.["eval-1"]?.[1]).toEqual(
-        expect.objectContaining({ passed: false, score: 0.5 })
+        expect.objectContaining({ passed: false, score: 0.5 }),
       );
     });
   });
@@ -696,7 +739,9 @@ describe("Evaluation Execution", () => {
 
       // TargetSummary shows errors as "X errors"
       await waitFor(() => {
-        expect(screen.getAllByText("2 errors").length).toBeGreaterThanOrEqual(1);
+        expect(screen.getAllByText("2 errors").length).toBeGreaterThanOrEqual(
+          1,
+        );
       });
     });
 
@@ -807,7 +852,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -856,7 +906,12 @@ describe("Evaluation Execution", () => {
             outputs: [{ identifier: "output", type: "str" }],
             mappings: {
               "test-dataset": {
-                input: { type: "source", source: "dataset", sourceId: "test-dataset", sourceField: "input" },
+                input: {
+                  type: "source",
+                  source: "dataset",
+                  sourceId: "test-dataset",
+                  sourceField: "input",
+                },
               },
             },
           },
@@ -905,8 +960,8 @@ describe("Evaluation Execution", () => {
                 { id: "expected", name: "expected", type: "string" },
               ],
               records: {
-                input: ["Hello", "", "World"],    // Row 1 is empty
-                expected: ["Hi", "", "There"],    // Row 1 is empty
+                input: ["Hello", "", "World"], // Row 1 is empty
+                expected: ["Hi", "", "There"], // Row 1 is empty
               },
             },
           },
@@ -972,7 +1027,7 @@ describe("Evaluation Execution", () => {
             inline: {
               columns: [{ id: "input", name: "input", type: "string" }],
               records: {
-                input: ["A", "", "B", "", ""],  // 2 non-empty rows out of 5
+                input: ["A", "", "B", "", ""], // 2 non-empty rows out of 5
               },
             },
           },
@@ -1038,7 +1093,9 @@ describe("Evaluation Execution", () => {
       expect(state.results.targetMetadata["target-1"]?.[0]?.cost).toBe(0.001);
       expect(state.results.targetMetadata["target-1"]?.[0]?.duration).toBe(500);
       expect(state.results.targetMetadata["target-1"]?.[1]?.cost).toBe(0.002);
-      expect(state.results.targetMetadata["target-1"]?.[2]?.duration).toBe(1500);
+      expect(state.results.targetMetadata["target-1"]?.[2]?.duration).toBe(
+        1500,
+      );
     });
 
     it("merges targetMetadata correctly with existing results", () => {
@@ -1049,7 +1106,11 @@ describe("Evaluation Execution", () => {
         status: "running",
         targetOutputs: { "target-1": ["Output 1", undefined, undefined] },
         targetMetadata: {
-          "target-1": [{ cost: 0.001, duration: 500 }, undefined, undefined] as any,
+          "target-1": [
+            { cost: 0.001, duration: 500 },
+            undefined,
+            undefined,
+          ] as any,
         },
       });
 

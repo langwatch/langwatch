@@ -1,6 +1,6 @@
-import { chromium } from "playwright";
 import * as fs from "fs";
 import * as path from "path";
+import { chromium } from "playwright";
 
 /**
  * This script launches a Chromium browser, navigates to your app,
@@ -27,7 +27,7 @@ void (async () => {
   // Instruct the user
   console.log("Please log in manually in the opened browser window.");
   console.log(
-    "Once you are fully logged in, return here and press Enter to save the storage state."
+    "Once you are fully logged in, return here and press Enter to save the storage state.",
   );
 
   // Wait for user input

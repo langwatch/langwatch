@@ -7,14 +7,13 @@
  * 2. Results are loaded and displayed correctly when the table renders
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, act } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import { useAutosaveEvaluationsV3 } from "../hooks/useAutosaveEvaluationsV3";
+import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
+import { createInitialResults, createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
-import { createInitialState, createInitialResults } from "../types";
 
 // Mock router
 vi.mock("next/router", () => ({
@@ -65,14 +64,14 @@ vi.mock("~/components/ui/toaster", () => ({
   },
 }));
 
-const AUTOSAVE_DEBOUNCE_MS = 1500;
+const _AUTOSAVE_DEBOUNCE_MS = 1500;
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
+const _Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
 // Component that uses the autosave hook
-const TestAutosaveComponent = () => {
+const _TestAutosaveComponent = () => {
   useAutosaveEvaluationsV3();
   return <div data-testid="autosave-test">Autosave Active</div>;
 };
@@ -148,7 +147,7 @@ describe("Results Persistence Integration", () => {
     it("useAutosaveEvaluationsV3 subscribes to results changes", () => {
       // This test verifies the hook includes results in its state subscription
       // by checking the extractPersistedState output with real results
-      
+
       useEvaluationsV3Store.setState({
         ...createInitialState(),
         name: "Test Evaluation",
@@ -159,9 +158,7 @@ describe("Results Persistence Integration", () => {
             "target-1": ["Result for row 0", "Result for row 1"],
           },
           targetMetadata: {
-            "target-1": [
-              { cost: 0.001, duration: 500, traceId: "trace-abc" },
-            ],
+            "target-1": [{ cost: 0.001, duration: 500, traceId: "trace-abc" }],
           },
           evaluatorResults: {
             "target-1": {
@@ -183,9 +180,9 @@ describe("Results Persistence Integration", () => {
       expect(persistedState.results?.targetMetadata["target-1"]).toEqual([
         { cost: 0.001, duration: 500, traceId: "trace-abc" },
       ]);
-      expect(persistedState.results?.evaluatorResults["target-1"]?.["eval-1"]).toEqual([
-        { passed: true },
-      ]);
+      expect(
+        persistedState.results?.evaluatorResults["target-1"]?.["eval-1"],
+      ).toEqual([{ passed: true }]);
     });
 
     it("extractPersistedState excludes transient execution state", () => {
@@ -213,7 +210,9 @@ describe("Results Persistence Integration", () => {
       expect(persistedState.results).not.toHaveProperty("total");
       expect(persistedState.results).not.toHaveProperty("executingCells");
       // But actual results should be present
-      expect(persistedState.results?.targetOutputs["target-1"]).toEqual(["Completed output"]);
+      expect(persistedState.results?.targetOutputs["target-1"]).toEqual([
+        "Completed output",
+      ]);
     });
   });
 
@@ -284,7 +283,9 @@ describe("Results Persistence Integration", () => {
       const state = useEvaluationsV3Store.getState();
 
       // Existing results should be preserved
-      expect(state.results.targetOutputs["target-1"]).toEqual(["Existing output"]);
+      expect(state.results.targetOutputs["target-1"]).toEqual([
+        "Existing output",
+      ]);
     });
   });
 
@@ -326,7 +327,9 @@ describe("Results Persistence Integration", () => {
       useEvaluationsV3Store.setState(createInitialState());
 
       // Verify reset
-      expect(useEvaluationsV3Store.getState().results.targetOutputs).toEqual({});
+      expect(useEvaluationsV3Store.getState().results.targetOutputs).toEqual(
+        {},
+      );
 
       // 4. Load the persisted state (what would happen on page load)
       useEvaluationsV3Store.getState().loadState(persistedState);
@@ -338,15 +341,16 @@ describe("Results Persistence Integration", () => {
         "Output A",
         "Output B",
       ]);
-      expect(restoredState.results.targetOutputs["target-2"]).toEqual(["Output X"]);
+      expect(restoredState.results.targetOutputs["target-2"]).toEqual([
+        "Output X",
+      ]);
       expect(restoredState.results.targetMetadata["target-1"]).toEqual([
         { cost: 0.01, duration: 100 },
         { cost: 0.02, duration: 200 },
       ]);
-      expect(restoredState.results.evaluatorResults["target-1"]?.["exact-match"]).toEqual([
-        { passed: true },
-        { passed: false },
-      ]);
+      expect(
+        restoredState.results.evaluatorResults["target-1"]?.["exact-match"],
+      ).toEqual([{ passed: true }, { passed: false }]);
       expect(restoredState.results.errors["target-2"]).toEqual([
         undefined,
         "Error on row 1",

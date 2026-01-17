@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
-import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { providerDefaultBaseUrls } from "../../../features/onboarding/regions/model-providers/registry";
+import { MASKED_KEY_PLACEHOLDER } from "../../../utils/constants";
 import { modelProviders } from "../../modelProviders/registry";
 
 /** Validation result returned by all validation functions */
@@ -39,9 +39,7 @@ function buildModelsEndpointUrl(
   const endpoint = baseUrl || defaultBaseUrl;
   const normalized = endpoint.replace(/\/$/, "");
 
-  return normalized.endsWith("/models")
-    ? normalized
-    : `${normalized}/models`;
+  return normalized.endsWith("/models") ? normalized : `${normalized}/models`;
 }
 
 /**
@@ -216,7 +214,10 @@ export async function validateKeyWithCustomUrl(
     select: { customKeys: true },
   });
 
-  const storedKeys = storedProvider?.customKeys as Record<string, string> | null;
+  const storedKeys = storedProvider?.customKeys as Record<
+    string,
+    string
+  > | null;
   let apiKey = storedKeys?.[apiKeyField]?.trim() ?? "";
 
   // Fallback to env var if no stored key

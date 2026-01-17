@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { checkProjectPermission } from "../rbac";
 import { RecentItemsService } from "~/server/home/recent-items.service";
+import { checkProjectPermission } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /**
  * Home router

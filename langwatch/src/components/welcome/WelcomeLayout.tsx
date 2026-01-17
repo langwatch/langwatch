@@ -1,8 +1,4 @@
-import {
-  Box,
-  Container,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Container, VStack } from "@chakra-ui/react";
 import APICard from "./APICard";
 
 /**

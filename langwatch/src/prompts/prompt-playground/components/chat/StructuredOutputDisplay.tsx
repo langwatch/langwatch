@@ -29,7 +29,11 @@ export function tryParseJson(content: string | undefined): object | undefined {
   try {
     const parsed = JSON.parse(trimmed);
     // Only accept objects, not arrays or primitives
-    if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed)
+    ) {
       return parsed;
     }
     return undefined;

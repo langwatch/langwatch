@@ -1,34 +1,33 @@
-import { useCallback, useMemo, useState, useRef, useEffect } from "react";
 import {
   Box,
   Button,
   HStack,
+  Portal,
+  Skeleton,
   Text,
   VStack,
-  Skeleton,
-  Portal,
 } from "@chakra-ui/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  LuPlus,
+  LuCheck,
   LuCircleAlert,
+  LuCopy,
   LuListTree,
   LuPlay,
+  LuPlus,
   LuSquare,
-  LuCopy,
-  LuCheck,
 } from "react-icons/lu";
-
-import { useDrawer } from "~/hooks/useDrawer";
 import { Tooltip } from "~/components/ui/tooltip";
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import type { EvaluatorConfig, TargetConfig } from "../../types";
+import { formatLatency } from "../../utils/computeAggregates";
 import {
   convertFromUIMapping,
   convertToUIMapping,
 } from "../../utils/fieldMappingConverters";
 import { evaluatorHasMissingMappings } from "../../utils/mappingValidation";
-import { formatLatency } from "../../utils/computeAggregates";
-import type { TargetConfig, EvaluatorConfig } from "../../types";
-import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import { EvaluatorChip } from "../TargetSection/EvaluatorChip";
 
 // Max characters to display for performance reasons
@@ -228,8 +227,8 @@ export function TargetCellContent({
     output === null || output === undefined
       ? ""
       : typeof output === "object"
-      ? JSON.stringify(output, null, 2)
-      : String(output);
+        ? JSON.stringify(output, null, 2)
+        : String(output);
 
   // Truncate for performance (but keep full text for expanded view)
   const isTruncated = rawOutput.length > MAX_DISPLAY_CHARS;
@@ -319,8 +318,7 @@ export function TargetCellContent({
               onClick={handleExpandOutput}
               className="cell-fade-overlay"
               css={{
-                background:
-                  "linear-gradient(to bottom, transparent, white)",
+                background: "linear-gradient(to bottom, transparent, white)",
                 "tr:hover &": {
                   background:
                     "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",

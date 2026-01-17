@@ -4,10 +4,10 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, cleanup } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BatchEvaluationResultsTable } from "../BatchEvaluationResultsTable";
 import type { BatchEvaluationData } from "../types";
@@ -26,7 +26,7 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 // Helper to create test data
 const createTestData = (
-  overrides: Partial<BatchEvaluationData> = {}
+  overrides: Partial<BatchEvaluationData> = {},
 ): BatchEvaluationData => ({
   runId: "run-1",
   experimentId: "exp-1",
@@ -85,9 +85,16 @@ describe("BatchEvaluationResultsTable", () => {
 
   describe("Loading State", () => {
     it("shows skeleton when loading", () => {
-      render(<BatchEvaluationResultsTable data={null} isLoading disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          isLoading
+          disableVirtualization
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       // Check for skeleton elements
       const skeletons = document.querySelectorAll('[class*="chakra-skeleton"]');
@@ -97,9 +104,16 @@ describe("BatchEvaluationResultsTable", () => {
 
   describe("Empty State", () => {
     it("shows empty message when no data", () => {
-      render(<BatchEvaluationResultsTable data={null} isLoading={false} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable
+          data={null}
+          isLoading={false}
+          disableVirtualization
+        />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("No results to display")).toBeInTheDocument();
     });
@@ -107,9 +121,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("shows empty message when rows is empty", () => {
       const data = createTestData({ rows: [] });
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("No results to display")).toBeInTheDocument();
     });
@@ -119,9 +136,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number column (empty header, shows row numbers in cells)", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       // Row number column has empty header but shows numbers in cells
       expect(screen.getByText("1")).toBeInTheDocument();
@@ -130,9 +150,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset column headers", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       // Column names appear in both the table header and the column visibility popover
       // Check that at least one instance exists
@@ -143,9 +166,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target column headers", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
     });
@@ -155,9 +181,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders row number", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("1")).toBeInTheDocument();
     });
@@ -165,9 +194,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders dataset values", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("What is 2+2?")).toBeInTheDocument();
       // Note: "4" appears multiple times (expected, output)
@@ -177,9 +209,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders target output", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       // The output is JSON stringified
       expect(screen.getByText(/response/)).toBeInTheDocument();
@@ -188,9 +223,12 @@ describe("BatchEvaluationResultsTable", () => {
     it("renders evaluator chips", () => {
       const data = createTestData();
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
     });
@@ -233,9 +271,12 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("Row 1 input")).toBeInTheDocument();
       expect(screen.getByText("Row 2 input")).toBeInTheDocument();
@@ -279,9 +320,12 @@ describe("BatchEvaluationResultsTable", () => {
         ],
       });
 
-      render(<BatchEvaluationResultsTable data={data} disableVirtualization />, {
-        wrapper: Wrapper,
-      });
+      render(
+        <BatchEvaluationResultsTable data={data} disableVirtualization />,
+        {
+          wrapper: Wrapper,
+        },
+      );
 
       expect(screen.getByText("GPT-4o")).toBeInTheDocument();
       expect(screen.getByText("Claude")).toBeInTheDocument();
@@ -320,8 +364,12 @@ describe("BatchEvaluationResultsTable", () => {
       const hiddenColumns = new Set(["id"]);
 
       render(
-        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} disableVirtualization />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResultsTable
+          data={data}
+          hiddenColumns={hiddenColumns}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
       );
 
       // input column should be visible
@@ -359,8 +407,12 @@ describe("BatchEvaluationResultsTable", () => {
       const hiddenColumns = new Set<string>();
 
       render(
-        <BatchEvaluationResultsTable data={data} hiddenColumns={hiddenColumns} disableVirtualization />,
-        { wrapper: Wrapper }
+        <BatchEvaluationResultsTable
+          data={data}
+          hiddenColumns={hiddenColumns}
+          disableVirtualization
+        />,
+        { wrapper: Wrapper },
       );
 
       // Both columns and their values should be visible

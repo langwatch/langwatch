@@ -1,8 +1,8 @@
+import type { Client as ElasticClient } from "@elastic/elasticsearch";
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
+import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
 import { createIndex } from "../helpers";
 import { eventMapping } from "../mappings/scenario-events";
-import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await createIndex({

@@ -3,13 +3,13 @@ import { Play, Square, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
 import {
-  DialogRoot,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogBody,
-  DialogFooter,
   DialogCloseTrigger,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogRoot,
+  DialogTitle,
 } from "~/components/ui/dialog";
 
 export type SelectionToolbarProps = {
@@ -118,12 +118,15 @@ export function SelectionToolbar({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete {selectedCount} row{selectedCount > 1 ? "s" : ""}?</DialogTitle>
+            <DialogTitle>
+              Delete {selectedCount} row{selectedCount > 1 ? "s" : ""}?
+            </DialogTitle>
           </DialogHeader>
           <DialogCloseTrigger />
           <DialogBody>
             <Text>
-              Are you sure you want to delete {selectedCount} selected row{selectedCount > 1 ? "s" : ""}?
+              Are you sure you want to delete {selectedCount} selected row
+              {selectedCount > 1 ? "s" : ""}?
             </Text>
           </DialogBody>
           <DialogFooter>

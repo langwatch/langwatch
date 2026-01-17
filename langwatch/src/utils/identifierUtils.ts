@@ -24,7 +24,7 @@ export const normalizeIdentifier = (value: string): string => {
  */
 export const generateUniqueIdentifier = (
   baseName: string,
-  existingIdentifiers: string[]
+  existingIdentifiers: string[],
 ): string => {
   if (!existingIdentifiers.includes(baseName)) {
     return baseName;

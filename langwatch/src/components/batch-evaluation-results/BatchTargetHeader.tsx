@@ -12,19 +12,22 @@ import {
   LuFileText,
   LuTriangleRight,
 } from "react-icons/lu";
-
+import {
+  formatCost,
+  formatLatency,
+  formatScore,
+} from "~/components/shared/formatters";
+import {
+  CostStatsTooltip,
+  LatencyStatsTooltip,
+} from "~/components/shared/MetricStatsTooltip";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "~/components/shared/PassRateIndicator";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useInteractiveTooltip } from "~/hooks/useInteractiveTooltip";
 import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBlockIcons";
-import {
-  LatencyStatsTooltip,
-  CostStatsTooltip,
-} from "~/components/shared/MetricStatsTooltip";
-import {
-  PassRateCircle,
-  getPassRateGradientColor,
-} from "~/components/shared/PassRateIndicator";
-import { formatCost, formatLatency, formatScore } from "~/components/shared/formatters";
 import type { BatchTargetAggregate } from "./computeBatchAggregates";
 import type { BatchTargetColumn } from "./types";
 
@@ -51,7 +54,13 @@ const SummaryTooltipContent = ({
 }: {
   aggregates: BatchTargetAggregate;
 }) => (
-  <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="white">
+  <VStack
+    align="stretch"
+    gap={0}
+    fontSize="12px"
+    minWidth="230px"
+    color="white"
+  >
     <VStack align="stretch" gap={2} padding={2}>
       {/* Progress */}
       <HStack justify="space-between">
@@ -60,7 +69,8 @@ const SummaryTooltipContent = ({
           {aggregates.completedRows}/{aggregates.totalRows}
           {aggregates.errorRows > 0 && (
             <Text as="span" color="red.300" marginLeft={1}>
-              ({aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"})
+              ({aggregates.errorRows}{" "}
+              {aggregates.errorRows === 1 ? "error" : "errors"})
             </Text>
           )}
         </Text>
@@ -140,7 +150,9 @@ const SummaryTooltipContent = ({
           >
             <Text color="white/75">Total Cost</Text>
             <HStack gap={1}>
-              <Text fontWeight="medium">{formatCost(aggregates.totalCost)}</Text>
+              <Text fontWeight="medium">
+                {formatCost(aggregates.totalCost)}
+              </Text>
               <Icon as={LuChevronRight} boxSize={3} color="white/50" />
             </HStack>
           </HStack>
@@ -151,7 +163,9 @@ const SummaryTooltipContent = ({
       {aggregates.totalDuration !== null && (
         <HStack justify="space-between">
           <Text color="white/75">Execution Time</Text>
-          <Text fontWeight="medium">{formatLatency(aggregates.totalDuration)}</Text>
+          <Text fontWeight="medium">
+            {formatLatency(aggregates.totalDuration)}
+          </Text>
         </HStack>
       )}
     </VStack>
@@ -188,7 +202,8 @@ const SummaryTooltipContent = ({
                 )}
                 {evaluator.errors > 0 && (
                   <Text fontSize="11px" color="red.300">
-                    {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
+                    {evaluator.errors}{" "}
+                    {evaluator.errors === 1 ? "error" : "errors"}
                   </Text>
                 )}
               </HStack>
@@ -218,7 +233,8 @@ const SummaryBadge = memo(function SummaryBadge({
     aggregates.errorRows > 0 ||
     aggregates.totalCost !== null;
 
-  const { isOpen, handleMouseEnter, handleMouseLeave } = useInteractiveTooltip(150);
+  const { isOpen, handleMouseEnter, handleMouseLeave } =
+    useInteractiveTooltip(150);
 
   if (!hasResults) return null;
 
@@ -271,7 +287,9 @@ const SummaryBadge = memo(function SummaryBadge({
         {aggregates.overallAverageScore !== null && (
           <HStack gap={1}>
             <LuTriangleRight />
-            <Text color="gray.600">{formatScore(aggregates.overallAverageScore)}</Text>
+            <Text color="gray.600">
+              {formatScore(aggregates.overallAverageScore)}
+            </Text>
           </HStack>
         )}
 
@@ -279,7 +297,9 @@ const SummaryBadge = memo(function SummaryBadge({
         {aggregates.averageLatency !== null && (
           <HStack gap={1}>
             <LuClock size={12} />
-            <Text fontWeight="medium">{formatLatency(aggregates.averageLatency)}</Text>
+            <Text fontWeight="medium">
+              {formatLatency(aggregates.averageLatency)}
+            </Text>
           </HStack>
         )}
 
@@ -295,7 +315,8 @@ const SummaryBadge = memo(function SummaryBadge({
         {/* Errors indicator */}
         {aggregates.errorRows > 0 && (
           <Text color="red.500" fontWeight="medium">
-            {aggregates.errorRows} {aggregates.errorRows === 1 ? "error" : "errors"}
+            {aggregates.errorRows}{" "}
+            {aggregates.errorRows === 1 ? "error" : "errors"}
           </Text>
         )}
       </HStack>

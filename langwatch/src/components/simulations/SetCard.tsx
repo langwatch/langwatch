@@ -12,7 +12,7 @@ export function SetCard({
   lastRunAt,
   onClick,
 }: SetCardProps) {
-  const formatDate = (timestamp: number) => {
+  const _formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
 
     return new Intl.DateTimeFormat("en-US", {
@@ -41,7 +41,9 @@ export function SetCard({
       position="relative"
     >
       <VStack align="stretch" gap="2">
-        <Text fontSize="2xl" paddingBottom="2">{"🎭"}</Text>
+        <Text fontSize="2xl" paddingBottom="2">
+          {"🎭"}
+        </Text>
         <Text fontWeight="500" color="gray.900">
           {scenarioSetId}
         </Text>

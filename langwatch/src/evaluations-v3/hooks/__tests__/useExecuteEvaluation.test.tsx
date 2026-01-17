@@ -4,8 +4,16 @@
  * Tests for useExecuteEvaluation hook.
  * Specifically tests the abort functionality and state synchronization.
  */
-import { renderHook, act, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
 
 // Mock optimization_studio hooks to prevent circular dependency issues
 vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
@@ -14,10 +22,10 @@ vi.mock("~/optimization_studio/hooks/useWorkflowStore", () => ({
   useWorkflowStore: vi.fn(() => ({})),
 }));
 
+import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
+import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { useEvaluationsV3Store } from "../useEvaluationsV3Store";
 import { useExecuteEvaluation } from "../useExecuteEvaluation";
-import { fetchSSE } from "~/utils/sse/fetchSSE";
-import type { EvaluationV3Event } from "~/server/evaluations-v3/execution/types";
 
 // Mock useOrganizationTeamProject
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -74,7 +82,12 @@ const setupStore = () => {
         outputs: [{ identifier: "output", type: "str" }],
         mappings: {
           "dataset-1": {
-            input: { type: "source", source: "dataset", sourceId: "dataset-1", sourceField: "input" },
+            input: {
+              type: "source",
+              source: "dataset",
+              sourceId: "dataset-1",
+              sourceField: "input",
+            },
           },
         },
       },
@@ -122,15 +135,25 @@ describe("useExecuteEvaluation", () => {
         resolveSSE = resolve;
       });
 
-      mockFetchSSE.mockImplementation(async ({ onEvent }: { onEvent: (event: EvaluationV3Event) => void }) => {
-        // Emit execution_started with the runId
-        onEvent({ type: "execution_started", runId: "run-abc-123", total: 2 });
-        
-        // Wait for the promise to resolve (we'll resolve it after calling abort)
-        await ssePromise;
-        
-        onEvent({ type: "stopped", reason: "user" });
-      });
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          // Emit execution_started with the runId
+          onEvent({
+            type: "execution_started",
+            runId: "run-abc-123",
+            total: 2,
+          });
+
+          // Wait for the promise to resolve (we'll resolve it after calling abort)
+          await ssePromise;
+
+          onEvent({ type: "stopped", reason: "user" });
+        },
+      );
 
       const { result } = renderHook(() => useExecuteEvaluation());
 
@@ -153,7 +176,10 @@ describe("useExecuteEvaluation", () => {
       expect(mockFetch).toHaveBeenCalledWith("/api/evaluations/v3/abort", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: "test-project", runId: "run-abc-123" }),
+        body: JSON.stringify({
+          projectId: "test-project",
+          runId: "run-abc-123",
+        }),
       });
 
       // Cleanup: resolve the SSE promise
@@ -169,10 +195,16 @@ describe("useExecuteEvaluation", () => {
         resolveSSE = resolve;
       });
 
-      mockFetchSSE.mockImplementation(async ({ onEvent }: { onEvent: (event: EvaluationV3Event) => void }) => {
-        sseOnEvent = onEvent;
-        await ssePromise;
-      });
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          sseOnEvent = onEvent;
+          await ssePromise;
+        },
+      );
 
       const { result } = renderHook(() => useExecuteEvaluation());
 
@@ -183,7 +215,11 @@ describe("useExecuteEvaluation", () => {
 
       // Simulate SSE sending execution_started
       act(() => {
-        sseOnEvent({ type: "execution_started", runId: "run-xyz-789", total: 2 });
+        sseOnEvent({
+          type: "execution_started",
+          runId: "run-xyz-789",
+          total: 2,
+        });
       });
 
       // Call abort
@@ -193,7 +229,7 @@ describe("useExecuteEvaluation", () => {
 
       // Verify abort API was called with the correct runId
       const abortCall = mockFetch.mock.calls.find(
-        (call) => call[0] === "/api/evaluations/v3/abort"
+        (call) => call[0] === "/api/evaluations/v3/abort",
       );
       expect(abortCall).toBeDefined();
       const body = JSON.parse(abortCall![1].body);
@@ -208,11 +244,18 @@ describe("useExecuteEvaluation", () => {
 
       let sseOnEvent: (event: EvaluationV3Event) => void;
 
-      mockFetchSSE.mockImplementation(async ({ onEvent }: { onEvent: (event: EvaluationV3Event) => void }) => {
-        sseOnEvent = onEvent;
-        // Don't resolve - let us control when events arrive
-        await new Promise(() => {}); // Never resolves
-      });
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          sseOnEvent = onEvent;
+          // Don't resolve - let us control when events arrive
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
+          await new Promise(() => {});
+        },
+      );
 
       const { result } = renderHook(() => useExecuteEvaluation());
 
@@ -236,12 +279,14 @@ describe("useExecuteEvaluation", () => {
 
       // Verify hook status is stopped
       expect(result.current.status).toBe("stopped");
-      
+
       // Verify store status is also stopped (this was the bug!)
       expect(useEvaluationsV3Store.getState().results.status).toBe("stopped");
-      
+
       // Verify executingCells is cleared
-      expect(useEvaluationsV3Store.getState().results.executingCells).toBeUndefined();
+      expect(
+        useEvaluationsV3Store.getState().results.executingCells,
+      ).toBeUndefined();
     });
 
     it("isAborting stays true until stopped event is received", async () => {
@@ -249,10 +294,17 @@ describe("useExecuteEvaluation", () => {
 
       let sseOnEvent: (event: EvaluationV3Event) => void;
 
-      mockFetchSSE.mockImplementation(async ({ onEvent }: { onEvent: (event: EvaluationV3Event) => void }) => {
-        sseOnEvent = onEvent;
-        await new Promise(() => {}); // Never resolves
-      });
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          sseOnEvent = onEvent;
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
+          await new Promise(() => {});
+        },
+      );
 
       const { result } = renderHook(() => useExecuteEvaluation());
 
@@ -291,10 +343,17 @@ describe("useExecuteEvaluation", () => {
 
       let sseOnEvent: (event: EvaluationV3Event) => void;
 
-      mockFetchSSE.mockImplementation(async ({ onEvent }: { onEvent: (event: EvaluationV3Event) => void }) => {
-        sseOnEvent = onEvent;
-        await new Promise(() => {}); // Never resolves
-      });
+      mockFetchSSE.mockImplementation(
+        async ({
+          onEvent,
+        }: {
+          onEvent: (event: EvaluationV3Event) => void;
+        }) => {
+          sseOnEvent = onEvent;
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional - promise that never resolves for test control
+          await new Promise(() => {});
+        },
+      );
 
       const { result } = renderHook(() => useExecuteEvaluation());
 
@@ -310,17 +369,32 @@ describe("useExecuteEvaluation", () => {
 
       // Simulate done event
       act(() => {
-        sseOnEvent({ type: "done", summary: { runId: "run-123", totalCells: 2, completedCells: 2, failedCells: 0, duration: 1000, timestamps: { startedAt: Date.now() - 1000, finishedAt: Date.now() } } });
+        sseOnEvent({
+          type: "done",
+          summary: {
+            runId: "run-123",
+            totalCells: 2,
+            completedCells: 2,
+            failedCells: 0,
+            duration: 1000,
+            timestamps: {
+              startedAt: Date.now() - 1000,
+              finishedAt: Date.now(),
+            },
+          },
+        });
       });
 
       // Verify hook status is completed
       expect(result.current.status).toBe("completed");
-      
+
       // Verify store status is success
       expect(useEvaluationsV3Store.getState().results.status).toBe("success");
-      
+
       // Verify executingCells is cleared
-      expect(useEvaluationsV3Store.getState().results.executingCells).toBeUndefined();
+      expect(
+        useEvaluationsV3Store.getState().results.executingCells,
+      ).toBeUndefined();
     });
 
     it("abort does nothing when no execution is running", async () => {

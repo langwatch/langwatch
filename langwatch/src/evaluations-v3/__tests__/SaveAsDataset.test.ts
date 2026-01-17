@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { DatasetColumn } from "../types";
-import { filterEmptyRows, convertInlineToRowRecords } from "../utils/datasetConversion";
+import {
+  convertInlineToRowRecords,
+  filterEmptyRows,
+} from "../utils/datasetConversion";
 
 describe("Save as dataset utilities", () => {
   describe("filterEmptyRows", () => {
@@ -106,7 +109,10 @@ describe("Save as dataset utilities", () => {
       const result = convertInlineToRowRecords(columns, records);
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ input: "my input", expected_output: "my output" });
+      expect(result[0]).toEqual({
+        input: "my input",
+        expected_output: "my output",
+      });
     });
 
     it("keeps partially filled rows", () => {

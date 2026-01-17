@@ -5,7 +5,12 @@
  */
 import { Hash, List, MessageSquare, Type } from "lucide-react";
 
-export type ColumnType = "string" | "number" | "json" | "chat_messages" | string;
+export type ColumnType =
+  | "string"
+  | "number"
+  | "json"
+  | "chat_messages"
+  | string;
 
 type ColumnTypeIconProps = {
   /** The type of the column */

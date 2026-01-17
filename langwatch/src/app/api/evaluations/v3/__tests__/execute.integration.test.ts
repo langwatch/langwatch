@@ -4,10 +4,11 @@
  *
  * These tests call the actual Hono endpoint with mocked session.
  */
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
 import type { Project } from "@prisma/client";
-import { getTestProject, getTestUser } from "~/utils/testUtils";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "~/server/db";
+import { getTestProject, getTestUser } from "~/utils/testUtils";
 
 // Mock next-auth to provide a valid session
 vi.mock("next-auth", async () => {

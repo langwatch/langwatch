@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  formatOutputForStreaming,
   extractStreamableOutput,
+  formatOutputForStreaming,
   type OutputConfig,
 } from "../output-formatter";
 
@@ -70,17 +70,14 @@ describe("formatOutputForStreaming", () => {
 
   describe("when type is json_schema", () => {
     it("converts object to pretty-printed JSON", () => {
-      const result = formatOutputForStreaming(
-        { key: "value" },
-        "json_schema"
-      );
+      const result = formatOutputForStreaming({ key: "value" }, "json_schema");
       expect(result).toBe('{\n  "key": "value"\n}');
     });
 
     it("handles nested objects", () => {
       const result = formatOutputForStreaming(
         { outer: { inner: "value" } },
-        "json_schema"
+        "json_schema",
       );
       expect(result).toBe('{\n  "outer": {\n    "inner": "value"\n  }\n}');
     });
@@ -92,7 +89,7 @@ describe("formatOutputForStreaming", () => {
 
     it("returns undefined for string value (type mismatch)", () => {
       expect(
-        formatOutputForStreaming('{"key": "value"}', "json_schema")
+        formatOutputForStreaming('{"key": "value"}', "json_schema"),
       ).toBeUndefined();
     });
 
@@ -101,7 +98,9 @@ describe("formatOutputForStreaming", () => {
     });
 
     it("returns undefined for undefined value", () => {
-      expect(formatOutputForStreaming(undefined, "json_schema")).toBeUndefined();
+      expect(
+        formatOutputForStreaming(undefined, "json_schema"),
+      ).toBeUndefined();
     });
   });
 });
@@ -131,7 +130,9 @@ describe("extractStreamableOutput", () => {
     });
 
     it("displays json_schema as formatted JSON", () => {
-      const configs: OutputConfig[] = [{ identifier: "output", type: "json_schema" }];
+      const configs: OutputConfig[] = [
+        { identifier: "output", type: "json_schema" },
+      ];
       const outputs = { output: { sentiment: "positive" } };
 
       const result = extractStreamableOutput(outputs, configs);
@@ -182,11 +183,15 @@ describe("extractStreamableOutput", () => {
     });
 
     it("wraps json_schema value in JSON object with nested structure", () => {
-      const configs: OutputConfig[] = [{ identifier: "analysis", type: "json_schema" }];
+      const configs: OutputConfig[] = [
+        { identifier: "analysis", type: "json_schema" },
+      ];
       const outputs = { analysis: { sentiment: "positive", confidence: 0.9 } };
 
       const result = extractStreamableOutput(outputs, configs);
-      expect(result).toBe('{\n  "analysis": {\n    "sentiment": "positive",\n    "confidence": 0.9\n  }\n}');
+      expect(result).toBe(
+        '{\n  "analysis": {\n    "sentiment": "positive",\n    "confidence": 0.9\n  }\n}',
+      );
     });
   });
 
@@ -200,7 +205,9 @@ describe("extractStreamableOutput", () => {
       const outputs = { complete_name: "Sergio Cardenas", score: 10 };
 
       const result = extractStreamableOutput(outputs, configs);
-      expect(result).toBe('{\n  "complete_name": "Sergio Cardenas",\n  "score": 10\n}');
+      expect(result).toBe(
+        '{\n  "complete_name": "Sergio Cardenas",\n  "score": 10\n}',
+      );
     });
 
     it("combines string and boolean outputs", () => {
@@ -211,7 +218,9 @@ describe("extractStreamableOutput", () => {
       const outputs = { summary: "Good result", passed: true };
 
       const result = extractStreamableOutput(outputs, configs);
-      expect(result).toBe('{\n  "summary": "Good result",\n  "passed": true\n}');
+      expect(result).toBe(
+        '{\n  "summary": "Good result",\n  "passed": true\n}',
+      );
     });
 
     it("combines three outputs", () => {
@@ -318,7 +327,9 @@ describe("extractStreamableOutput", () => {
 
     describe("when identifier has special characters", () => {
       it("wraps value with special char identifier in JSON object", () => {
-        const configs: OutputConfig[] = [{ identifier: "my-score", type: "float" }];
+        const configs: OutputConfig[] = [
+          { identifier: "my-score", type: "float" },
+        ];
         const outputs = { "my-score": 42 };
 
         const result = extractStreamableOutput(outputs, configs);
@@ -326,7 +337,9 @@ describe("extractStreamableOutput", () => {
       });
 
       it("wraps value with underscore identifier in JSON object", () => {
-        const configs: OutputConfig[] = [{ identifier: "my_result", type: "str" }];
+        const configs: OutputConfig[] = [
+          { identifier: "my_result", type: "str" },
+        ];
         const outputs = { my_result: "test" };
 
         const result = extractStreamableOutput(outputs, configs);
@@ -336,7 +349,9 @@ describe("extractStreamableOutput", () => {
 
     describe("when single config but multiple outputs exist in data", () => {
       it("only extracts the configured custom identifier output", () => {
-        const configs: OutputConfig[] = [{ identifier: "summary", type: "str" }];
+        const configs: OutputConfig[] = [
+          { identifier: "summary", type: "str" },
+        ];
         const outputs = { summary: "Good result", score: 0.85 };
 
         const result = extractStreamableOutput(outputs, configs);

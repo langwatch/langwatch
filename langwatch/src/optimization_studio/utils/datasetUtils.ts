@@ -79,7 +79,7 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
  * Converts a DatasetColumnType to a DSL FieldType.
  */
 export const datasetColumnTypeToFieldType = (
-  columnType: DatasetColumnType
+  columnType: DatasetColumnType,
 ): Field["type"] => columnTypeToFieldTypeMap[columnType];
 
 export function fieldsToDatasetColumns(fields: Field[]): DatasetColumns {

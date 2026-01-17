@@ -149,9 +149,7 @@ describe("EvaluatorTypeSelectorDrawer", () => {
       renderDrawer();
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/expected answer/i),
-        ).toBeInTheDocument();
+        expect(screen.getByText(/expected answer/i)).toBeInTheDocument();
       });
     });
 

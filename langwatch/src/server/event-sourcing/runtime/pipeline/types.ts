@@ -1,3 +1,4 @@
+import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import type { Event, ParentLink, Projection } from "../../library/domain/types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
@@ -14,7 +15,6 @@ import type { EventSourcingService } from "../../library/services/eventSourcingS
 import type { ProcessorCheckpointStore } from "../../library/stores/eventHandlerCheckpointStore.types";
 import type { EventStore } from "../../library/stores/eventStore.types";
 import type { DistributedLock } from "../../library/utils/distributedLock";
-import type { FeatureFlagServiceInterface } from "../../../featureFlag/types";
 
 /**
  * Static metadata about a pipeline for tooling and introspection.

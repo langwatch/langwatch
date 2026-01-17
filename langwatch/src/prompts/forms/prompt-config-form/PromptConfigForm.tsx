@@ -74,7 +74,9 @@ function InnerPromptConfigForm() {
     const data = formValuesToTriggerSaveVersionParams(values);
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       setIsSaving(false);
     };
 
@@ -108,7 +110,9 @@ function InnerPromptConfigForm() {
 
   const handleRestore = useCallback(
     async (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
     },
     [methods],
   );

@@ -4,15 +4,15 @@
  * This is a read-only version for displaying historical evaluation results.
  * For the interactive workbench version, see evaluations-v3/components/TargetSection/TargetCell.tsx
  */
-import { useCallback, useState, useRef } from "react";
-import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
-import { LuListTree, LuCircleAlert, LuCopy, LuCheck } from "react-icons/lu";
 
-import { useDrawer } from "~/hooks/useDrawer";
-import { Tooltip } from "~/components/ui/tooltip";
+import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { useCallback, useRef, useState } from "react";
+import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 import { EvaluatorResultChip } from "~/components/shared/EvaluatorResultChip";
 import { formatLatency } from "~/components/shared/formatters";
-import type { BatchTargetOutput, BatchEvaluatorResult } from "./types";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useDrawer } from "~/hooks/useDrawer";
+import type { BatchEvaluatorResult, BatchTargetOutput } from "./types";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
@@ -28,7 +28,7 @@ const OVERFLOW_CHAR_THRESHOLD = 200;
  * e.g., {"output": "lorem ipsum"} -> "lorem ipsum"
  */
 const unwrapSingleOutputField = (
-  output: Record<string, unknown> | null
+  output: Record<string, unknown> | null,
 ): unknown => {
   if (output === null || output === undefined) return output;
   if (typeof output !== "object") return output;
@@ -46,7 +46,9 @@ type BatchTargetCellProps = {
   /** Target output data for this row */
   targetOutput: BatchTargetOutput;
   /** Callback to get result object for an evaluator */
-  getEvaluatorResult?: (evaluatorId: string) => BatchEvaluatorResult | undefined;
+  getEvaluatorResult?: (
+    evaluatorId: string,
+  ) => BatchEvaluatorResult | undefined;
 };
 
 export function BatchTargetCell({
@@ -134,7 +136,8 @@ export function BatchTargetCell({
   // Use a simple heuristic to determine if content likely overflows
   // This avoids useEffect + scrollHeight measurement which causes flicker during virtualization
   const hasNewlines = rawOutput.includes("\n");
-  const isLikelyOverflowing = rawOutput.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
+  const isLikelyOverflowing =
+    rawOutput.length > OVERFLOW_CHAR_THRESHOLD || hasNewlines;
 
   // Render output content
   const renderOutput = (expanded: boolean) => {
@@ -205,8 +208,7 @@ export function BatchTargetCell({
               onClick={handleExpandOutput}
               className="cell-fade-overlay"
               css={{
-                background:
-                  "linear-gradient(to bottom, transparent, white)",
+                background: "linear-gradient(to bottom, transparent, white)",
                 "tr:hover &": {
                   background:
                     "linear-gradient(to bottom, transparent, var(--chakra-colors-gray-50))",

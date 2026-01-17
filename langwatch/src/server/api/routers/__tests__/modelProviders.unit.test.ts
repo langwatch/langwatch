@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 
 /**
@@ -8,20 +8,20 @@ import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../../../utils/constants";
 
 // Extract the masking logic for testing
 function maskKeys(
-  customKeys: Record<string, unknown>
+  customKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(customKeys).map(([key, value]) => [
       key,
       KEY_CHECK.some((k) => key.includes(k)) ? MASKED_KEY_PLACEHOLDER : value,
-    ])
+    ]),
   );
 }
 
 // Extract the key merging logic for testing
 function mergeKeysWithExisting(
   validatedKeys: Record<string, unknown>,
-  existingKeys: Record<string, unknown>
+  existingKeys: Record<string, unknown>,
 ): Record<string, unknown> {
   return {
     // Start with new keys
@@ -30,7 +30,7 @@ function mergeKeysWithExisting(
     ...Object.fromEntries(
       Object.entries(existingKeys)
         .filter(([key]) => validatedKeys[key] === MASKED_KEY_PLACEHOLDER)
-        .map(([key, value]) => [key, value])
+        .map(([key, value]) => [key, value]),
     ),
   };
 }
@@ -74,7 +74,7 @@ describe("modelProviders key masking logic", () => {
 
       expect(result.OPENAI_BASE_URL).toBe("https://custom.openai.com/v1");
       expect(result.AZURE_OPENAI_ENDPOINT).toBe(
-        "https://myresource.openai.azure.com"
+        "https://myresource.openai.azure.com",
       );
     });
 

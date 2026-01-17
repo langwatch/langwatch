@@ -1,7 +1,7 @@
 import { z } from "zod";
-import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-import type { DatasetColumnType } from "~/server/datasets/types";
 import type { Field } from "~/optimization_studio/types/dsl";
+import type { DatasetColumnType } from "~/server/datasets/types";
+import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 // ============================================================================
@@ -109,7 +109,7 @@ export const localPromptConfigSchema = z.object({
     z.object({
       role: z.enum(["user", "assistant", "system"]),
       content: z.string(),
-    })
+    }),
   ),
   inputs: z.array(
     z.object({
@@ -126,14 +126,14 @@ export const localPromptConfigSchema = z.object({
         "dict",
         "list",
       ]),
-    })
+    }),
   ),
   outputs: z.array(
     z.object({
       identifier: z.string(),
       type: z.enum(["str", "float", "bool", "json_schema"]),
       json_schema: z.unknown().optional(),
-    })
+    }),
   ),
 });
 export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
@@ -157,7 +157,7 @@ export const evaluatorConfigSchema = z.object({
   // Per-dataset, per-target mappings: datasetId -> targetId -> inputFieldName -> FieldMapping
   mappings: z.record(
     z.string(),
-    z.record(z.string(), z.record(z.string(), fieldMappingSchema))
+    z.record(z.string(), z.record(z.string(), fieldMappingSchema)),
   ),
   dbEvaluatorId: z.string().optional(),
 });
@@ -216,7 +216,12 @@ export type TargetConfig = Omit<
 // Execution Results Types
 // ============================================================================
 
-export type EvaluationResultStatus = "idle" | "running" | "success" | "error" | "stopped";
+export type EvaluationResultStatus =
+  | "idle"
+  | "running"
+  | "success"
+  | "error"
+  | "stopped";
 
 /**
  * Schema for per-row metadata for a target execution.
@@ -354,7 +359,10 @@ export type EvaluationsV3Actions = {
   addDataset: (dataset: DatasetReference) => void;
   removeDataset: (datasetId: string) => void;
   setActiveDataset: (datasetId: string) => void;
-  updateDataset: (datasetId: string, updates: Partial<DatasetReference>) => void;
+  updateDataset: (
+    datasetId: string,
+    updates: Partial<DatasetReference>,
+  ) => void;
   exportInlineToSaved: (datasetId: string, savedDatasetId: string) => void;
 
   // Dataset cell/column actions (works for both inline and saved)
@@ -362,7 +370,7 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     row: number,
     columnId: string,
-    value: string
+    value: string,
   ) => void;
   getCellValue: (datasetId: string, row: number, columnId: string) => string;
   getRowCount: (datasetId: string) => number;
@@ -372,10 +380,13 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     rowIndex: number,
     columnId: string,
-    value: string
+    value: string,
   ) => void;
   clearPendingChange: (dbDatasetId: string, recordId: string) => void;
-  getSavedRecordInfo: (datasetId: string, rowIndex: number) => {
+  getSavedRecordInfo: (
+    datasetId: string,
+    rowIndex: number,
+  ) => {
     dbDatasetId: string;
     recordId: string;
   } | null;
@@ -387,7 +398,7 @@ export type EvaluationsV3Actions = {
   updateColumnType: (
     datasetId: string,
     columnId: string,
-    type: DatasetColumnType
+    type: DatasetColumnType,
   ) => void;
 
   // Target actions
@@ -399,20 +410,20 @@ export type EvaluationsV3Actions = {
     targetId: string,
     datasetId: string,
     inputField: string,
-    mapping: FieldMapping
+    mapping: FieldMapping,
   ) => void;
   /** Remove a mapping for a target input field for a specific dataset */
   removeTargetMapping: (
     targetId: string,
     datasetId: string,
-    inputField: string
+    inputField: string,
   ) => void;
 
   // Global evaluator actions (evaluators apply to ALL targets automatically)
   addEvaluator: (evaluator: EvaluatorConfig) => void;
   updateEvaluator: (
     evaluatorId: string,
-    updates: Partial<EvaluatorConfig>
+    updates: Partial<EvaluatorConfig>,
   ) => void;
   removeEvaluator: (evaluatorId: string) => void;
 
@@ -422,14 +433,14 @@ export type EvaluationsV3Actions = {
     datasetId: string,
     targetId: string,
     inputField: string,
-    mapping: FieldMapping
+    mapping: FieldMapping,
   ) => void;
   /** Remove a mapping for an evaluator input field for a specific dataset and target */
   removeEvaluatorMapping: (
     evaluatorId: string,
     datasetId: string,
     targetId: string,
-    inputField: string
+    inputField: string,
   ) => void;
 
   // Results actions
@@ -440,7 +451,7 @@ export type EvaluationsV3Actions = {
   openOverlay: (
     type: OverlayType,
     targetId?: string,
-    evaluatorId?: string
+    evaluatorId?: string,
   ) => void;
   closeOverlay: () => void;
   setSelectedCell: (cell: CellPosition | undefined) => void;
@@ -450,7 +461,9 @@ export type EvaluationsV3Actions = {
   clearRowSelection: () => void;
   deleteSelectedRows: (datasetId: string) => void;
   setExpandedEvaluator: (
-    expanded: { targetId: string; evaluatorId: string; row: number } | undefined
+    expanded:
+      | { targetId: string; evaluatorId: string; row: number }
+      | undefined,
   ) => void;
   setColumnWidth: (columnId: string, width: number) => void;
   setColumnWidths: (widths: Record<string, number>) => void;
@@ -461,7 +474,7 @@ export type EvaluationsV3Actions = {
   setAutosaveStatus: (
     type: "evaluation" | "dataset",
     state: AutosaveState,
-    error?: string
+    error?: string,
   ) => void;
 
   // Reset

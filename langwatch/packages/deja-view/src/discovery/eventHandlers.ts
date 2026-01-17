@@ -7,16 +7,20 @@ import { pipelineRoot } from "../paths";
 import type { DiscoveredEventHandler } from "./eventHandlers.types";
 import { discoverPipelines } from "./pipelines";
 
-function isEventHandler(exported: unknown): exported is new () => EventHandler<Event> {
+function isEventHandler(
+  exported: unknown,
+): exported is new () => EventHandler<Event> {
   if (typeof exported !== "function") return false;
   const hasHandle =
     typeof (exported as { prototype?: unknown }).prototype === "object" &&
-    typeof (exported as { prototype: { handle?: unknown } }).prototype.handle ===
-      "function";
+    typeof (exported as { prototype: { handle?: unknown } }).prototype
+      .handle === "function";
   return Boolean(hasHandle);
 }
 
-async function importModule(modulePath: string): Promise<Record<string, unknown>> {
+async function importModule(
+  modulePath: string,
+): Promise<Record<string, unknown>> {
   const url = pathToFileURL(modulePath).href;
   try {
     return await import(url);
@@ -40,11 +44,13 @@ async function importModule(modulePath: string): Promise<Record<string, unknown>
  * @example
  * const handlers = await discoverEventHandlers();
  */
-export async function discoverEventHandlers(): Promise<DiscoveredEventHandler[]> {
+export async function discoverEventHandlers(): Promise<
+  DiscoveredEventHandler[]
+> {
   // Discover all pipelines to get pipeline context
   const pipelines = await discoverPipelines();
   // Build a map of directory name -> pipeline for matching
-  const pipelineByDir = new Map<string, typeof pipelines[0]>();
+  const pipelineByDir = new Map<string, (typeof pipelines)[0]>();
   for (const pipeline of pipelines) {
     // Extract directory name from pipeline file path
     const dirName = path.basename(path.dirname(pipeline.pipelineFilePath));
@@ -96,7 +102,7 @@ export async function discoverEventHandlers(): Promise<DiscoveredEventHandler[]>
           });
         }
       }
-    } catch (error) {
+    } catch {
       // Skip files that can't be imported
       continue;
     }
@@ -104,4 +110,3 @@ export async function discoverEventHandlers(): Promise<DiscoveredEventHandler[]>
 
   return Array.from(resultsMap.values());
 }
-

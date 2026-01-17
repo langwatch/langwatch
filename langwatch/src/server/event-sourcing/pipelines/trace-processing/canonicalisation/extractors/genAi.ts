@@ -33,19 +33,19 @@
  * - gen_ai.usage.completion_tokens → gen_ai.usage.output_tokens
  */
 
-import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
+import { ATTR_KEYS } from "./_constants";
 import {
-  safeJsonParse,
-  isRecord,
   asNumber,
   coerceToStringArray,
-  spanTypeToGenAiOperationName,
   extractInputMessages,
-  extractOutputMessages,
   extractModelToBoth,
+  extractOutputMessages,
   extractUsageTokens,
+  isRecord,
+  safeJsonParse,
+  spanTypeToGenAiOperationName,
 } from "./_helpers";
-import { ATTR_KEYS } from "./_constants";
+import type { CanonicalAttributesExtractor, ExtractorContext } from "./_types";
 
 export class GenAIExtractor implements CanonicalAttributesExtractor {
   readonly id = "genai";

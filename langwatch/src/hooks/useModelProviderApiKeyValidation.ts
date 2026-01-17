@@ -58,39 +58,44 @@ export function useModelProviderApiKeyValidation(
    * Validates stored or env var API key against a custom URL or default URL.
    * When customBaseUrl is not provided, validates against the provider's default URL.
    */
-  const validateWithCustomUrl = useCallback(async (customBaseUrl?: string): Promise<boolean> => {
-    if (!projectId) {
-      setValidationError("Project ID is required for validation");
-      return false;
-    }
-
-    setIsValidating(true);
-    setValidationError(undefined);
-
-    try {
-      const result = await utils.modelProvider.validateKeyWithCustomUrl.fetch({
-        projectId,
-        provider,
-        customBaseUrl,
-      });
-
-      if (!result.valid) {
-        setValidationError(result.error);
+  const validateWithCustomUrl = useCallback(
+    async (customBaseUrl?: string): Promise<boolean> => {
+      if (!projectId) {
+        setValidationError("Project ID is required for validation");
         return false;
       }
 
-      return true;
-    } catch (error) {
-      setValidationError(
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred during validation",
-      );
-      return false;
-    } finally {
-      setIsValidating(false);
-    }
-  }, [projectId, provider, utils.modelProvider.validateKeyWithCustomUrl]);
+      setIsValidating(true);
+      setValidationError(undefined);
+
+      try {
+        const result = await utils.modelProvider.validateKeyWithCustomUrl.fetch(
+          {
+            projectId,
+            provider,
+            customBaseUrl,
+          },
+        );
+
+        if (!result.valid) {
+          setValidationError(result.error);
+          return false;
+        }
+
+        return true;
+      } catch (error) {
+        setValidationError(
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred during validation",
+        );
+        return false;
+      } finally {
+        setIsValidating(false);
+      }
+    },
+    [projectId, provider, utils.modelProvider.validateKeyWithCustomUrl],
+  );
 
   const clearError = useCallback(() => {
     setValidationError(undefined);

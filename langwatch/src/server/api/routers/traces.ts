@@ -3,14 +3,14 @@ import { PublicShareResourceTypes } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
 import { z } from "zod";
-import { sseService } from "~/server/services/sse.service";
-import { createLogger } from "~/utils/logger";
-
 import {
   createTRPCRouter,
   protectedProcedure,
   publicProcedure,
 } from "~/server/api/trpc";
+import { sseService } from "~/server/services/sse.service";
+import { TraceService } from "~/server/traces/trace.service";
+import { createLogger } from "~/utils/logger";
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { evaluatePreconditions } from "../../evaluations/preconditions";
@@ -18,7 +18,7 @@ import { checkPreconditionSchema } from "../../evaluations/types.generated";
 import { checkPermissionOrPubliclyShared } from "../permission";
 import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
-import { TraceService } from "~/server/traces/trace.service";
+
 const tracesFilterInput = sharedFiltersInputSchema.extend({
   pageOffset: z.number().optional(),
   pageSize: z.number().optional(),
@@ -53,7 +53,7 @@ export const tracesRouter = createTRPCRouter({
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -64,7 +64,7 @@ export const tracesRouter = createTRPCRouter({
       const trace = await traceService.getById(
         input.projectId,
         input.traceId,
-        protections
+        protections,
       );
 
       if (!trace) {
@@ -80,7 +80,7 @@ export const tracesRouter = createTRPCRouter({
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      })
+      }),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -91,7 +91,7 @@ export const tracesRouter = createTRPCRouter({
       const evaluations = await traceService.getEvaluationsMultiple(
         input.projectId,
         [input.traceId],
-        protections
+        protections,
       );
 
       return evaluations[input.traceId];
@@ -102,7 +102,7 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceIds: z.array(z.string()),
-      })
+      }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
@@ -114,7 +114,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getEvaluationsMultiple(
         input.projectId,
         input.traceIds,
-        protections
+        protections,
       );
     }),
 
@@ -133,12 +133,12 @@ export const tracesRouter = createTRPCRouter({
             },
             select: { id: true, name: true, parentId: true },
           })
-        ).map((topic) => [topic.id, topic])
+        ).map((topic) => [topic.id, topic]),
       );
 
       const mapBuckets = (
         buckets: Array<{ key: string; count: number }>,
-        includeParent = false
+        includeParent = false,
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
@@ -160,7 +160,7 @@ export const tracesRouter = createTRPCRouter({
             name: string;
             count: number;
             parentId?: string | null;
-          }[]
+          }[],
         );
       };
 
@@ -184,13 +184,13 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-      })
+      }),
     )
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      })
+      }),
     )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
@@ -203,7 +203,7 @@ export const tracesRouter = createTRPCRouter({
       const tracesGrouped = await traceService.getTracesByThreadId(
         projectId,
         threadId,
-        protections
+        protections,
       );
 
       if (!ctx.publiclyShared) {
@@ -222,8 +222,8 @@ export const tracesRouter = createTRPCRouter({
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id
-        )
+          (publicShare) => publicShare.resourceId === trace.trace_id,
+        ),
       );
 
       return filteredTraces;
@@ -255,7 +255,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getTracesWithSpansByThreadIds(
         projectId,
         threadIds,
-        protections
+        protections,
       );
     }),
 
@@ -265,7 +265,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         query: z.string().optional(),
         sortBy: z.string().optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
@@ -280,11 +280,11 @@ export const tracesRouter = createTRPCRouter({
           groupBy: "none",
           pageSize: 10,
         },
-        protections
+        protections,
       );
 
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -294,7 +294,7 @@ export const tracesRouter = createTRPCRouter({
       return traceService.getTracesWithSpans(
         input.projectId,
         traceIds,
-        protections
+        protections,
       );
     }),
 
@@ -308,7 +308,7 @@ export const tracesRouter = createTRPCRouter({
           .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
-      })
+      }),
     )
     .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
@@ -323,11 +323,11 @@ export const tracesRouter = createTRPCRouter({
           groupBy: "none",
           pageSize: 100,
         },
-        protections
+        protections,
       );
 
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -340,7 +340,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await traceService.getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       const passedPreconditions = traceWithSpans.filter(
@@ -350,11 +350,11 @@ export const tracesRouter = createTRPCRouter({
             evaluatorType,
             trace,
             trace.spans ?? [],
-            preconditions
-          )
+            preconditions,
+          ),
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
-        (trace) => trace.trace_id
+        (trace) => trace.trace_id,
       );
 
       let samples = shuffle(passedPreconditions)
@@ -364,11 +364,11 @@ export const tracesRouter = createTRPCRouter({
         samples = samples.concat(
           shuffle(
             traceWithSpans.filter(
-              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
-            )
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
+            ),
           )
             .slice(0, expectedResults - samples.length)
-            .map((sample) => ({ ...sample, passesPreconditions: false }))
+            .map((sample) => ({ ...sample, passesPreconditions: false })),
         );
       }
 
@@ -379,7 +379,7 @@ export const tracesRouter = createTRPCRouter({
     .input(
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
-      })
+      }),
     )
     .use(checkProjectPermission("traces:view"))
     .mutation(async ({ ctx, input }) => {
@@ -399,7 +399,7 @@ export const tracesRouter = createTRPCRouter({
           downloadMode: true,
           includeSpans: input.includeSpans,
           scrollId: input.scrollId,
-        }
+        },
       );
     }),
 
@@ -419,7 +419,7 @@ export const tracesRouter = createTRPCRouter({
         })) {
           logger.debug(
             { projectId, event: eventArgs[0] },
-            "SSE event received"
+            "SSE event received",
           );
           yield eventArgs[0];
         }

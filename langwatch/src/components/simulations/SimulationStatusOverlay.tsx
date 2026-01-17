@@ -58,12 +58,7 @@ export function SimulationStatusOverlay({
       borderRadius="xl"
     >
       <VStack gap={2}>
-        <Box
-          bg="whiteAlpha.200"
-          borderRadius="full"
-          boxShadow="xl"
-          p={3}
-        >
+        <Box bg="whiteAlpha.200" borderRadius="full" boxShadow="xl" p={3}>
           <Icon size={32} color="white" strokeWidth={2.5} />
         </Box>
         <Text

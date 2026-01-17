@@ -62,6 +62,7 @@ import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Dialog } from "~/components/ui/dialog";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { Popover } from "~/components/ui/popover";
 import { Select } from "~/components/ui/select";
@@ -75,8 +76,8 @@ import {
   summaryGraphTypes,
 } from "../../../../components/analytics/CustomGraph";
 import { DashboardLayout } from "../../../../components/DashboardLayout";
-import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import { FilterIconWithBadge } from "../../../../components/filters/FilterIconWithBadge";
+import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
   FilterToggle,
   FilterToggleButton,
@@ -116,7 +117,6 @@ import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -631,7 +631,6 @@ function CustomGraphForm({
   filterParams: SharedFiltersInput;
 }) {
   const [expandedSeries, setExpandedSeries] = useState<string[]>(["0"]);
-  const { openDrawer } = useDrawer();
   const groupByField = form.control.register("groupBy");
   const graphType = form.watch("graphType");
   const groupBy = form.watch("groupBy");
@@ -1193,14 +1192,14 @@ function SeriesField({
 
   useEffect(() => {
     const aggregation_ = aggregation
-      ? metricAggregations[aggregation] ?? aggregation
+      ? (metricAggregations[aggregation] ?? aggregation)
       : undefined;
     const pipeline_ = pipelineField
-      ? analyticsPipelines[pipelineField]?.label ?? pipelineField
+      ? (analyticsPipelines[pipelineField]?.label ?? pipelineField)
       : undefined;
     const pipelineAggregation_ =
       pipelineField && pipelineAggregation
-        ? pipelineAggregations[pipelineAggregation] ?? pipelineAggregation
+        ? (pipelineAggregations[pipelineAggregation] ?? pipelineAggregation)
         : undefined;
 
     const name_ = uppercaseFirstLetterLowerCaseRest(

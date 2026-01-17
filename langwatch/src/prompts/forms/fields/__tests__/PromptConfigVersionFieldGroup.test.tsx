@@ -2,10 +2,16 @@
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { FormProvider, useForm } from "react-hook-form";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PromptConfigFormValues } from "~/prompts";
 
 // Mock the optimization studio hooks that have complex dependencies
@@ -25,10 +31,14 @@ vi.mock("~/optimization_studio/hooks/useWorkflowExecution", () => ({
   useWorkflowExecution: () => ({}),
 }));
 
-import { InputsFieldGroup, OutputsFieldGroup } from "../PromptConfigVersionFieldGroup";
+import {
+  InputsFieldGroup,
+  OutputsFieldGroup,
+} from "../PromptConfigVersionFieldGroup";
 
 // Store form methods for testing
-let testFormMethods: ReturnType<typeof useForm<PromptConfigFormValues>> | null = null;
+let testFormMethods: ReturnType<typeof useForm<PromptConfigFormValues>> | null =
+  null;
 
 // Default LLM config for tests
 const defaultLlmConfig = {
@@ -71,22 +81,22 @@ const TestWrapper = ({
 
 // Helper to render with form context
 const renderInputsFieldGroup = (
-  defaultValues?: Partial<PromptConfigFormValues>
+  defaultValues?: Partial<PromptConfigFormValues>,
 ) => {
   return render(
     <TestWrapper defaultValues={defaultValues}>
       <InputsFieldGroup />
-    </TestWrapper>
+    </TestWrapper>,
   );
 };
 
 const renderOutputsFieldGroup = (
-  defaultValues?: Partial<PromptConfigFormValues>
+  defaultValues?: Partial<PromptConfigFormValues>,
 ) => {
   return render(
     <TestWrapper defaultValues={defaultValues}>
       <OutputsFieldGroup />
-    </TestWrapper>
+    </TestWrapper>,
   );
 };
 
@@ -158,7 +168,9 @@ describe("PromptConfigVersionFieldGroup", () => {
 
       // Check that form value was updated
       await waitFor(() => {
-        const formValue = testFormMethods?.getValues("version.configData.inputs.0.identifier");
+        const formValue = testFormMethods?.getValues(
+          "version.configData.inputs.0.identifier",
+        );
         expect(formValue).toBe("user_input");
       });
     });
@@ -182,7 +194,9 @@ describe("PromptConfigVersionFieldGroup", () => {
 
       // Check form value - it should be normalized
       await waitFor(() => {
-        const formValue = testFormMethods?.getValues("version.configData.inputs.0.identifier");
+        const formValue = testFormMethods?.getValues(
+          "version.configData.inputs.0.identifier",
+        );
         expect(formValue).toBe("user_input");
       });
     });
@@ -206,7 +220,9 @@ describe("PromptConfigVersionFieldGroup", () => {
 
       // Check form value - it should be lowercase
       await waitFor(() => {
-        const formValue = testFormMethods?.getValues("version.configData.inputs.0.identifier");
+        const formValue = testFormMethods?.getValues(
+          "version.configData.inputs.0.identifier",
+        );
         expect(formValue).toBe("userinput");
       });
     });
@@ -255,7 +271,9 @@ describe("PromptConfigVersionFieldGroup", () => {
       });
 
       // Initially should have 2 inputs
-      expect(testFormMethods?.getValues("version.configData.inputs")).toHaveLength(2);
+      expect(
+        testFormMethods?.getValues("version.configData.inputs"),
+      ).toHaveLength(2);
 
       // Find delete buttons - they contain the Trash2 icon (svg with class containing feather-trash)
       // Each input row has a delete button
@@ -263,8 +281,10 @@ describe("PromptConfigVersionFieldGroup", () => {
 
       // Find the button that is a delete button (not the add button with Plus icon)
       // The delete buttons have colorPalette="gray" in the component
-      const deleteButtons = allButtons.filter(btn =>
-        btn.className.includes("gray") || btn.querySelector('svg.feather-trash-2')
+      const deleteButtons = allButtons.filter(
+        (btn) =>
+          btn.className.includes("gray") ||
+          btn.querySelector("svg.feather-trash-2"),
       );
 
       // Click the first delete button
@@ -302,14 +322,14 @@ describe("PromptConfigVersionFieldGroup", () => {
       });
 
       // The delete button for the only output should be disabled
-      const deleteButtons = screen.getAllByRole("button").filter(
-        (btn) => btn.querySelector("svg")
-      );
+      const deleteButtons = screen
+        .getAllByRole("button")
+        .filter((btn) => btn.querySelector("svg"));
 
       // Find the trash button (not the + button)
-      const trashButton = deleteButtons.find((btn) =>
-        btn.getAttribute("disabled") !== null ||
-        btn.hasAttribute("disabled")
+      const trashButton = deleteButtons.find(
+        (btn) =>
+          btn.getAttribute("disabled") !== null || btn.hasAttribute("disabled"),
       );
 
       // The button should be disabled
@@ -317,7 +337,7 @@ describe("PromptConfigVersionFieldGroup", () => {
     });
 
     it("allows deleting output when multiple exist", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderOutputsFieldGroup({
         version: {
           configData: {
@@ -333,9 +353,11 @@ describe("PromptConfigVersionFieldGroup", () => {
       });
 
       // Both delete buttons should be enabled
-      const deleteButtons = screen.getAllByRole("button").filter(
-        (btn) => btn.querySelector("svg") && !btn.hasAttribute("disabled")
-      );
+      const deleteButtons = screen
+        .getAllByRole("button")
+        .filter(
+          (btn) => btn.querySelector("svg") && !btn.hasAttribute("disabled"),
+        );
 
       // Should have the + button plus 2 enabled delete buttons
       expect(deleteButtons.length).toBeGreaterThanOrEqual(2);

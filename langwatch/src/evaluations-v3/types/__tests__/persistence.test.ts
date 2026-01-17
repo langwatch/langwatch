@@ -1,7 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { extractPersistedState, persistedEvaluationsV3StateSchema } from "../persistence";
-import { createInitialState, createInitialResults } from "../../types";
+import { beforeEach, describe, expect, it } from "vitest";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import { createInitialResults, createInitialState } from "../../types";
+import {
+  extractPersistedState,
+  persistedEvaluationsV3StateSchema,
+} from "../persistence";
 
 describe("Persistence", () => {
   beforeEach(() => {
@@ -176,7 +179,11 @@ describe("Persistence", () => {
     it("includes errors in persisted results", () => {
       const state = createInitialState();
       state.results.errors = {
-        "target-1": ["Error on row 0", undefined as unknown as string, "Error on row 2"],
+        "target-1": [
+          "Error on row 0",
+          undefined as unknown as string,
+          "Error on row 2",
+        ],
       };
 
       const persisted = extractPersistedState(state);
@@ -404,7 +411,9 @@ describe("Persistence", () => {
 
       const state = useEvaluationsV3Store.getState();
       // Existing results should be preserved
-      expect(state.results.targetOutputs["target-1"]).toEqual(["existing output"]);
+      expect(state.results.targetOutputs["target-1"]).toEqual([
+        "existing output",
+      ]);
     });
 
     it("loads results with status set to idle (not running)", () => {
@@ -443,8 +452,8 @@ describe("Persistence", () => {
         targets: [],
         results: {
           runId: "run-1",
-          targetOutputs: { "t1": ["out"] },
-          targetMetadata: { "t1": [{ cost: 0.01 }] },
+          targetOutputs: { t1: ["out"] },
+          targetMetadata: { t1: [{ cost: 0.01 }] },
           evaluatorResults: {},
           errors: {},
         },
@@ -475,10 +484,10 @@ describe("Persistence", () => {
         evaluators: [],
         targets: [],
         results: {
-          targetOutputs: { "t1": [null, "output", null] },
-          targetMetadata: { "t1": [null, { cost: 0.01 }, null] },
-          evaluatorResults: { "t1": { "e1": [null, { passed: true }] } },
-          errors: { "t1": [null, null, "error"] },
+          targetOutputs: { t1: [null, "output", null] },
+          targetMetadata: { t1: [null, { cost: 0.01 }, null] },
+          evaluatorResults: { t1: { e1: [null, { passed: true }] } },
+          errors: { t1: [null, null, "error"] },
         },
       };
 

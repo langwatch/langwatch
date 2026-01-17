@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { nanoid } from "nanoid";
-import { createElasticsearchBatchEvaluationRepository } from "../elasticsearchBatchEvaluation.repository";
-import type { BatchEvaluationRepository } from "../batchEvaluation.repository";
-import { getTestProject, getTestUser } from "~/utils/testUtils";
 import type { Project, User } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
-import { esClient, BATCH_EVALUATION_INDEX } from "~/server/elasticsearch";
+import { BATCH_EVALUATION_INDEX, esClient } from "~/server/elasticsearch";
+import { getTestProject, getTestUser } from "~/utils/testUtils";
+import type { BatchEvaluationRepository } from "../batchEvaluation.repository";
+import { createElasticsearchBatchEvaluationRepository } from "../elasticsearchBatchEvaluation.repository";
 
 /**
  * Integration tests for BatchEvaluationRepository with real Elasticsearch.
@@ -16,14 +16,14 @@ import { esClient, BATCH_EVALUATION_INDEX } from "~/server/elasticsearch";
 describe("BatchEvaluationRepository Integration", () => {
   let repository: BatchEvaluationRepository;
   let project: Project;
-  let user: User;
+  let _user: User;
   let experimentId: string;
   const createdRunIds: string[] = [];
 
   beforeAll(async () => {
     // Get test project and user
     project = await getTestProject("batch-eval-repo-test");
-    user = await getTestUser();
+    _user = await getTestUser();
 
     // Create a test experiment
     const experiment = await prisma.experiment.create({
@@ -64,7 +64,9 @@ describe("BatchEvaluationRepository Integration", () => {
     }
 
     // Clean up experiment
-    await prisma.experiment.delete({ where: { id: experimentId, projectId: project.id } });
+    await prisma.experiment.delete({
+      where: { id: experimentId, projectId: project.id },
+    });
   });
 
   describe("create", () => {
@@ -292,8 +294,12 @@ describe("BatchEvaluationRepository Integration", () => {
 
       expect(result?.dataset).toHaveLength(2);
       expect(result?.progress).toBe(2);
-      expect(result?.dataset?.find((d) => d.index === 0)?.predicted?.output).toBe("Hi there!");
-      expect(result?.dataset?.find((d) => d.index === 1)?.predicted?.output).toBe("Hello World!");
+      expect(
+        result?.dataset?.find((d) => d.index === 0)?.predicted?.output,
+      ).toBe("Hi there!");
+      expect(
+        result?.dataset?.find((d) => d.index === 1)?.predicted?.output,
+      ).toBe("Hello World!");
     });
 
     it("adds evaluation results with target_id", async () => {
@@ -349,8 +355,12 @@ describe("BatchEvaluationRepository Integration", () => {
 
       expect(result?.evaluations).toHaveLength(2);
 
-      const target1Eval = result?.evaluations?.find((e) => e.target_id === "target-1");
-      const target2Eval = result?.evaluations?.find((e) => e.target_id === "target-2");
+      const target1Eval = result?.evaluations?.find(
+        (e) => e.target_id === "target-1",
+      );
+      const target2Eval = result?.evaluations?.find(
+        (e) => e.target_id === "target-2",
+      );
 
       expect(target1Eval?.passed).toBe(true);
       expect(target2Eval?.passed).toBe(false);

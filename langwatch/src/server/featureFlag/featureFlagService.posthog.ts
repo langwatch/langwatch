@@ -1,8 +1,8 @@
-import { getPostHogInstance } from "../posthog";
-import { createLogger } from "~/utils/logger";
 import { getLangWatchTracer } from "langwatch";
-import type { FeatureFlagServiceInterface } from "./types";
+import { createLogger } from "~/utils/logger";
+import { getPostHogInstance } from "../posthog";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
+import type { FeatureFlagServiceInterface } from "./types";
 
 /**
  * PostHog-based feature flag service with hybrid Redis/in-memory caching.
@@ -10,16 +10,16 @@ import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
 export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   private readonly posthog: ReturnType<typeof getPostHogInstance>;
   private readonly logger = createLogger(
-    "langwatch:posthog-feature-flag-service"
+    "langwatch:posthog-feature-flag-service",
   );
   private readonly tracer = getLangWatchTracer(
-    "langwatch.posthog-feature-flag-service"
+    "langwatch.posthog-feature-flag-service",
   );
 
   // Stale-while-revalidate cache: 5 min stale threshold, 30 sec refresh threshold
   private readonly cache = new StaleWhileRevalidateCache(
     1 * 60 * 1000,
-    1 * 30 * 1000
+    1 * 30 * 1000,
   );
 
   constructor() {
@@ -39,7 +39,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
   async isEnabled(
     flagKey: string,
     distinctId: string,
-    defaultValue: boolean = true
+    defaultValue = true,
   ): Promise<boolean> {
     return await this.tracer.withActiveSpan(
       "FeatureFlagServicePostHog.isEnabled",
@@ -65,7 +65,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
           const cacheType = this.cache.isRedisAvailable() ? "redis" : "memory";
           span.setAttribute(
             "feature.flag.source",
-            `posthog-cached-${cacheType}`
+            `posthog-cached-${cacheType}`,
           );
           span.setAttribute("feature.flag.enabled", cachedResult.value);
           return cachedResult.value;
@@ -78,7 +78,7 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
             distinctId,
             {
               disableGeoip: true,
-            }
+            },
           );
 
           const result = isEnabled ?? defaultValue;
@@ -95,13 +95,13 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
               distinctId,
               error: error instanceof Error ? error.message : error,
             },
-            "Failed to check PostHog feature flag, using default value"
+            "Failed to check PostHog feature flag, using default value",
           );
           span.setAttribute("feature.flag.source", "posthog-error");
 
           return defaultValue;
         }
-      }
+      },
     );
   }
 

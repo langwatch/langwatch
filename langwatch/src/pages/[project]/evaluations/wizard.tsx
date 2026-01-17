@@ -53,7 +53,8 @@ export default function EvaluationWizard() {
             <Alert.Indicator />
             <Alert.Title>Evaluation not found</Alert.Title>
             <Alert.Description>
-              The evaluation you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+              The evaluation you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have access to it.
             </Alert.Description>
           </Alert.Root>
         </Box>

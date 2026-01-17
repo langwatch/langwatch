@@ -1,16 +1,16 @@
+import { TraceState } from "@opentelemetry/core";
+import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
 import {
   ESpanKind,
   type EStatusCode,
 } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types";
-import type { Fixed64 } from "@opentelemetry/otlp-transformer-next/build/esm/common/internal-types";
-import { TraceState } from "@opentelemetry/core";
-import {
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-  type NormalizedAttributes,
-} from "../schemas/spans";
 import { match } from "ts-pattern";
 import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "../schemas/otlp";
+import {
+  type NormalizedAttributes,
+  NormalizedSpanKind,
+  NormalizedStatusCode,
+} from "../schemas/spans";
 
 const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8

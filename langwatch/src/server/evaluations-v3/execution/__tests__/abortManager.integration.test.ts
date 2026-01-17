@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { nanoid } from "nanoid";
-import { abortManager } from "../abortManager";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { connection } from "~/server/redis";
+import { abortManager } from "../abortManager";
 
 describe("AbortManager Integration", () => {
   const testRunIds: string[] = [];
@@ -16,7 +16,7 @@ describe("AbortManager Integration", () => {
   // Clean up all test keys after each test
   afterEach(async () => {
     if (!connection) return;
-    
+
     for (const runId of testRunIds) {
       await connection.del(`eval_v3_abort:${runId}`);
       await connection.del(`eval_v3_running:${runId}`);

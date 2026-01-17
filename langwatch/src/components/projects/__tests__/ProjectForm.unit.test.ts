@@ -2,11 +2,11 @@
  * Unit tests for ProjectForm validation logic.
  * Tests the extracted validation functions.
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  validateProjectName,
-  validateNewTeamName,
   NEW_TEAM_VALUE,
+  validateNewTeamName,
+  validateProjectName,
 } from "../projectFormValidation";
 
 describe("ProjectForm validation logic", () => {
@@ -35,19 +35,19 @@ describe("ProjectForm validation logic", () => {
 
     it("requires new team name when creating new team", () => {
       expect(validateNewTeamName(NEW_TEAM_VALUE, undefined)).toBe(
-        "Team name is required"
+        "Team name is required",
       );
     });
 
     it("rejects empty new team name", () => {
       expect(validateNewTeamName(NEW_TEAM_VALUE, "")).toBe(
-        "Team name is required"
+        "Team name is required",
       );
     });
 
     it("rejects whitespace-only new team name", () => {
       expect(validateNewTeamName(NEW_TEAM_VALUE, "   ")).toBe(
-        "Team name is required"
+        "Team name is required",
       );
     });
 

@@ -1,27 +1,30 @@
 import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   Controller,
   type UseFieldArrayReturn,
   useFieldArray,
   useFormContext,
 } from "react-hook-form";
+import {
+  AddMessageButton,
+  MessageRoleLabel,
+  RemoveMessageButton,
+} from "~/components/ui/messages";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import {
-  PromptTextAreaWithVariables,
-  type PromptTextAreaOnAddMention,
-  type Variable,
   type AvailableSource,
+  type PromptTextAreaOnAddMention,
+  PromptTextAreaWithVariables,
+  type Variable,
 } from "~/components/variables";
 import type { PromptConfigFormValues } from "~/prompts";
-import { AddMessageButton } from "~/components/ui/messages";
+import { useLayoutMode } from "~/prompts/prompt-playground/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 import {
   EditingModeTitle,
   getDefaultEditingMode,
   type PromptEditingMode,
 } from "./EditingModeTitle";
-import { MessageRoleLabel, RemoveMessageButton } from "~/components/ui/messages";
 
 // Re-export for backwards compatibility
 export type { PromptEditingMode } from "./EditingModeTitle";
@@ -334,8 +337,8 @@ export function PromptMessagesField({
           .map((message) => message.content?.message)
           .join(", ")
       : typeof errors.version?.configData?.messages === "string"
-      ? errors.version?.configData?.messages
-      : undefined;
+        ? errors.version?.configData?.messages
+        : undefined;
   }, [errors]);
 
   const systemIndex = useMemo(

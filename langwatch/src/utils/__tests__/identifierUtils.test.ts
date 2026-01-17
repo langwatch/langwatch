@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  normalizeIdentifier,
   generateUniqueIdentifier,
+  normalizeIdentifier,
 } from "../identifierUtils";
 
 describe("normalizeIdentifier", () => {
@@ -41,25 +41,25 @@ describe("normalizeIdentifier", () => {
 describe("generateUniqueIdentifier", () => {
   it("returns baseName if not in existing identifiers", () => {
     expect(generateUniqueIdentifier("output", ["input", "other"])).toBe(
-      "output"
+      "output",
     );
   });
 
   it("returns baseName_1 if baseName exists", () => {
     expect(generateUniqueIdentifier("output", ["output", "other"])).toBe(
-      "output_1"
+      "output_1",
     );
   });
 
   it("returns baseName_2 if baseName and baseName_1 exist", () => {
     expect(
-      generateUniqueIdentifier("output", ["output", "output_1", "other"])
+      generateUniqueIdentifier("output", ["output", "output_1", "other"]),
     ).toBe("output_2");
   });
 
   it("finds next available number in sequence", () => {
     expect(
-      generateUniqueIdentifier("var", ["var", "var_1", "var_2", "var_3"])
+      generateUniqueIdentifier("var", ["var", "var_1", "var_2", "var_3"]),
     ).toBe("var_4");
   });
 
